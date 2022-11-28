@@ -3,7 +3,7 @@ Constrained Control-as-inference
 
 Requirements:
 The following requirements can be installed via pip
-- numpy
+- NumPy
 - PyTorch 
 - nullspace_optimizer (use command `pip install nullspace_optimizer[osqp,colored,matplotlib]`)
 Other dependencies:
