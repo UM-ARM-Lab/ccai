@@ -1,7 +1,7 @@
 # ccai
 Constrained Control-as-inference 
 
-##Requirements:
+## Requirements:
 The following requirements can be installed via pip
 - NumPy
 - PyTorch 
@@ -10,7 +10,7 @@ Other dependencies:
 - Isaac Gym (https://developer.nvidia.com/isaac-gym)
 - isaacgym-arm-envs https://github.com/UM-ARM-Lab/isaacgym-arm-envs
 
-##Scripts:
+## Scripts:
 
 `victor_example_task_space.py` will run the planner on a task where the robot must move the end-effector to a goal location while maintaining contact with the table. On launch the user should adjust the camera and move via ctrl-c. Once planning is completed the script will prompt the user for a key-press to execute. 
 
