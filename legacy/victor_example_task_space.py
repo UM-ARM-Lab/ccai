@@ -168,7 +168,7 @@ class VictorPuckProblem(EuclideanOptimizable):
 if __name__ == "__main__":
 
     M = 1
-    T = 20
+    T = 10
     env = VictorEnv(M)
     sim, gym, viewer = env.get_sim()
     state = env.get_state()
@@ -205,10 +205,11 @@ if __name__ == "__main__":
         dt = 0.05
         params = {'alphaC': 1, 'debug': 0, 'alphaJ': 0.25, 'dt': dt, 'maxtrials': 1, 'qp_solver': 'osqp',
                   'maxit': 200}
-
+        s= time.time()
         retval = nlspace_solve(problem, params)
         trajectory = retval['x'][-1].reshape(M, T, -1)
-
+        print(time.time() - s)
+        exit(0)
         # just choose first trajectory for now
         trajectory = trajectory
         #input('Optimization finished')
