@@ -5,6 +5,7 @@ from functools import partial
 from functorch import vmap, jacrev, hessian, jacfwd
 import pytorch_kinematics as pk
 from ccai.kernels import rbf_kernel
+from isaac_victor_envs.utils import get_assets_dir
 
 
 class VictorWrenchProblem:
@@ -36,7 +37,7 @@ class VictorWrenchProblem:
         self.device = device
         self.chain = chain
         if chain is None:
-            asset = '/home/tpower/dev/isaac_test/IsaacVictorEnvs/isaac_victor_envs/assets/victor/victor.urdf'
+            asset = f'{get_assets_dir()}/victor/victor_grippers.urdf'
             ee_name = 'l_palm'
             self.chain = pk.build_serial_chain_from_urdf(open(asset).read(), ee_name)
 

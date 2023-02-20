@@ -8,6 +8,7 @@ from ccai.constrained_svgd_trajopt import ConstrainedSteinTrajOpt
 import torch
 import pytorch_kinematics as pk
 from victor_wrench import VictorWrenchProblem
+from isaac_victor_envs.utils import get_assets_dir
 
 
 def stop_condition(feedback):
@@ -23,7 +24,7 @@ def main():
     dt = 0.1
     online_iters = 5
     device = 'cuda:0'
-    asset = '/home/tpower/dev/isaac_test/IsaacVictorEnvs/isaac_victor_envs/assets/victor/victor.urdf'
+    asset = f'{get_assets_dir()}/victor/victor_gripper.urdf'
     ee_name = 'l_palm'
     victor_dt = 2
     alpha_J = 0.5

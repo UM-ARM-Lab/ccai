@@ -1,5 +1,6 @@
 import numpy as np
 from isaac_victor_envs.tasks.victor_wrench import VictorWrenchEnv
+from isaac_victor_envs.utils import get_assets_dir
 from ccai.constrained_svgd_trajopt import ConstrainedSteinTrajOpt
 import torch
 import time
@@ -10,7 +11,7 @@ from victor_wrench import VictorWrenchProblem
 if __name__ == "__main__":
 
     DEVICE = 'cuda:0'
-    asset = '/home/tpower/dev/isaac_test/IsaacVictorEnvs/isaac_victor_envs/assets/victor/victor.urdf'
+    asset = f'{get_assets_dir()}/victor/victor_grippers.urdf'
     ee_name = 'l_palm'
 
     chain = pk.build_serial_chain_from_urdf(open(asset).read(), ee_name)
