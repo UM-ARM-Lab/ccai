@@ -1,5 +1,6 @@
 import torch
 
+
 def median(tensor):
     """
     torch.median() acts differently from np.median(). We want to simulate numpy implementation.
@@ -23,3 +24,74 @@ def rbf_kernel(X, Xbar, M=None):
     h = torch.sqrt(h / 2) + 1e-3
     # h = 0.1
     return torch.exp(-0.5 * scaled_diff / h)
+
+
+def get_chunk(X, num_chunks, expected_chunk_size):
+    x = torch.chunk(X, chunks=num_chunks, dim=1)
+    if x[-1].shape[1] < expected_chunk_size:
+        x = x[:-1]
+    return x
+
+
+def structured_rbf_kernel(X, Xbar):
+    # X is N x T x d
+    n, T, d = X.shape
+    mod = T % 3
+    num_chunks = T // 3
+
+    x1 = get_chunk(X, num_chunks, 3)
+    x2 = get_chunk(X[:, 1:], num_chunks, 3)
+    x3 = get_chunk(X[:, 2:], num_chunks, 3)
+    x1bar = get_chunk(Xbar, num_chunks, 3)
+    x2bar = get_chunk(Xbar[:, 1:], num_chunks, 3)
+    x3bar = get_chunk(Xbar[:, 2:], num_chunks, 3)
+
+    x = torch.stack((*x1, *x2, *x3), dim=0)
+    xbar = torch.stack((*x1bar, *x2bar, *x3bar), dim=0)
+
+    M = x.shape[0]
+    x = x.reshape(M, n, -1)
+    xbar = xbar.reshape(M, n, -1)
+    d = x.shape[2]
+    diff = x.unsqueeze(1) - xbar.unsqueeze(2)
+
+    sq_diff = (diff.reshape(-1, 1, d) @ diff.reshape(-1, d, 1)).reshape(M, n, n)
+    h = median(sq_diff)
+    h = torch.sqrt(h / 2) + 1e-3
+    # h = 0.1
+    return torch.exp(-0.5 * sq_diff / h).mean(dim=0)
+
+
+class RBFKernel:
+
+    def __init__(self,
+                 use_median_trick=True,
+                 lengthscale=None,
+                 outputscale=None):
+
+        if not use_median_trick:
+            if lengthscale is None or outputscale is None:
+                raise ValueError('Must supply lengthscale and output scale if not using median heuristic')
+
+        self.use_median_trick = use_median_trick
+        self.l = lengthscale
+        self.sigma_sq = outputscale
+
+    def __call__(self, X, Xbar):
+        n, d = X.shape
+        m = Xbar.shape[0]
+        diff = X.unsqueeze(1) - Xbar.unsqueeze(0)  # diff should be n x m x d
+
+        sq_diff = (diff.reshape(-1, 1, d) @ diff.reshape(-1, d, 1)).reshape(n, m)
+        if self.use_median_trick:
+            h = torch.sqrt(median(sq_diff) / 2) + 1e-3
+            sigma_sq = 1
+        else:
+            h = self.l ** 2
+            sigma_sq = self.sigma_sq
+
+        K = sigma_sq * torch.exp(-0.5 * sq_diff / h)
+        grad_K = - sigma_sq * diff * K.reshape(n, m, 1) / h
+        hess_K = sigma_sq * (diff.reshape(n, m, d, 1) @ diff.reshape(n, m, 1, d) - h) * K.reshape(n, m, 1, 1) / h
+
+        return K, grad_K, hess_K

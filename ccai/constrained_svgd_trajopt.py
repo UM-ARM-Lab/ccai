@@ -172,21 +172,38 @@ class ConstrainedSteinTrajOpt:
         T = self.iters
         C = 1
         p = 1
+        import time
         def driving_force(t):
             return ((t % (T / C)) / (T / C)) ** p
 
         for iter in range(T):
-            self.gamma = driving_force(iter+1)
-            #self.gamma = 1
+            s = time.time()
+            if T > 100:
+                self.gamma = driving_force(iter+1)
+            else:
+                self.gamma = 1
             grad = self.compute_update(xuz)
-            xuz = xuz + self.dt * grad
+            new_xuz = xuz + self.dt * grad
 
             # clamp within bounds for simple bounds
             if self.problem.x_max is not None:
-                xuz = self._clamp_in_bounds(xuz)
+                new_xuz = self._clamp_in_bounds(new_xuz)
 
+            old_C = self.problem.constraints(xuz)
+            new_C = self.problem.constraints(new_xuz)
+            improvement = -torch.max(new_C.abs(), dim=1).values + torch.max(old_C.abs(), dim=1).values
+
+            # if any trajectory failed to improve then we replace it with a trajectory that has the lowest constraint
+            # violation with some noise
+            best_idx = torch.argmin(torch.max(new_C.abs(), dim=1).values)
+            best_traj = new_xuz[best_idx].unsqueeze(0)
+            new_xuz = torch.where(improvement.unsqueeze(-1) > -0.025,
+                                  new_xuz,
+                                  best_traj + 0.05 * torch.randn_like(best_traj)
+                                  )
             if torch.all(torch.linalg.norm(grad, dim=-1) < 1e-3):
                 print(f'converged after {iter} iterations')
                 break
-
+            #print(time.time() - s)
+            xuz = new_xuz
         return xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du]
