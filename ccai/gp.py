@@ -8,7 +8,7 @@ class GPSurfaceModel:
     def __init__(self, train_x, train_y):
         self.train_x = train_x
         self.train_y = train_y.flatten()
-        self.kernel = RBFKernel(lengthscale=1.5, outputscale=0.25)
+        self.kernel = RBFKernel(lengthscale=1.5, outputscale=0.1)
         self.sigma_sq_noise = 0.01
         self.training = True
 

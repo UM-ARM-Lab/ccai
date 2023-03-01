@@ -10,7 +10,7 @@ class QuadrotorEnv:
     def __init__(self, surface_data_fname):
         self.env_dims = [-10, 10]
         self.state_dim = 12
-        self.dt = 0.1
+        self.dt = 0.05
         self.state = None
         data = np.load(surface_data_fname)
         self.surface_model = GPSurfaceModel(torch.from_numpy(data['xy']).to(dtype=torch.float32),
@@ -51,9 +51,13 @@ class QuadrotorEnv:
         start[3:5] = 0.05*(-np.pi + 2 * np.pi * np.random.rand(2))
 
         # Initial velocity zero for now - may change in future
-        # start[6:] = np.random.randn(6)
+        start[6:] = 0.0*np.random.randn(6)
+        print(start)
         # start[9:] *= 5
         self.state = start
+
+    def get_constraint_violation(self):
+        return self.state[2] - self._get_surface_h(self.state)
 
     def step(self, control):
         # Unroll state
@@ -104,6 +108,6 @@ class QuadrotorEnv:
                         self.surface_plotting_vars[2] - 1, alpha=0.5)
         ax.axes.set_zlim3d(bottom=-5, top=5)
         ax.scatter(self.state[0], self.state[1], self.state[2], s=100, c='g')
-        ax.scatter(0, 0, 0, s=100, c='k')
+        ax.scatter(4, 4, 0, s=100, c='k')
 
         return ax

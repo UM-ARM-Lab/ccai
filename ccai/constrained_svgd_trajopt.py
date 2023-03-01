@@ -5,7 +5,7 @@ from torch.profiler import profile, record_function, ProfilerActivity
 
 class ConstrainedSteinTrajOpt:
 
-    def __init__(self, problem, dt, alpha_C, alpha_J):
+    def __init__(self, problem, dt, alpha_C, alpha_J, momentum):
         self.dt = dt
 
         self.problem = problem
@@ -24,7 +24,7 @@ class ConstrainedSteinTrajOpt:
         self.alpha_C = alpha_C
         self.alpha_J = alpha_J
         self.iters = 500
-
+        self.momentum = momentum
         self.normxiJ = None
 
     def compute_update(self, xuz):
@@ -32,18 +32,17 @@ class ConstrainedSteinTrajOpt:
         d = self.dx + self.du
         xuz = xuz.detach()
         xuz.requires_grad = True
-        grad_J, K, grad_K, C, dC, hess_C = self.problem.eval(xuz)
+        grad_J, hess_J, K, grad_K, C, dC, hess_C = self.problem.eval(xuz)
 
         with torch.no_grad():
             # we try and invert the dC dCT, if it is singular then we use the psuedo-inverse
-
             eye = torch.eye(self.dg + self.dh).repeat(N, 1, 1).to(device=C.device)
             try:
                 dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1), eye)
                 if torch.any(torch.isnan(dCdCT_inv)):
                     raise ValueError('nan in inverse')
             except Exception as e:
-                print(e)
+                #print(e)
                 # dCdCT_inv = torch.linalg.lstsq(dC @ dC.permute(0, 2, 1), eye).solution
                 dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1))
 
@@ -51,10 +50,10 @@ class ConstrainedSteinTrajOpt:
             projection = dCdCT_inv @ dC
             eye = torch.eye(d * self.T + self.dh, device=xuz.device, dtype=xuz.dtype).unsqueeze(0)
             projection = eye - dC.permute(0, 2, 1) @ projection
-
             # compute term for repelling towards constraint
             xi_C = dCdCT_inv @ C.unsqueeze(-1)
             xi_C = (dC.permute(0, 2, 1) @ xi_C).squeeze(-1)
+            #xi_C = (dC.permute(0, 2, 1) @ C.unsqueeze(-1)).squeeze(-1)
 
             # compute gradient for projection
             # now the second index (1) is the
@@ -95,10 +94,9 @@ class ConstrainedSteinTrajOpt:
                 matrix_K = projection.unsqueeze(0) @ K_extended @ projection.unsqueeze(1)
 
             else:
-                if self.use_fisher or self.use_hessian:
-                    Q_inv = 0.1 * torch.eye(d * self.T + self.dh, device=xuz.device)
-                    # Q_inv[:self.T*d, :self.T*d] = torch.linalg.pinv(Q)
-
+                if hess_J is not None:
+                    # Q_inv = 0.1 * torch.eye(d * self.T + self.dh, device=xuz.device)
+                    Q_inv = torch.linalg.pinv(hess_J)
                     PQ = projection @ Q_inv.unsqueeze(0)
                     PQP = PQ.unsqueeze(0) @ projection.unsqueeze(1)
                     first_term = torch.einsum('nmj, nmij->nmi', grad_K, PQP)
@@ -119,43 +117,31 @@ class ConstrainedSteinTrajOpt:
 
             # compute kernelized score
             kernelized_score = torch.sum(matrix_K @ -grad_J.reshape(N, 1, -1, 1), dim=0)
-            phi = self.gamma * kernelized_score.squeeze(-1) / N + grad_matrix_K / N
+            phi = self.gamma * kernelized_score.squeeze(-1) / N + grad_matrix_K / N  # maximize phi
+
             xi_J = -phi
 
-            # Normalize gradient
-            normxiC = torch.clamp(torch.linalg.norm(xi_C, dim=1, keepdim=True, ord=np.inf), min=1e-6)
-            normxiC = torch.min(0.9 * torch.ones_like(normxiC) / self.dt, normxiC)
-            xi_C = self.alpha_C * xi_C / normxiC
+            if False:
+                # Normalize gradient
+                normxiC = torch.clamp(torch.linalg.norm(xi_C, dim=1, keepdim=True, ord=np.inf), min=1e-6)
+                normxiC = torch.min(0.9 * torch.ones_like(normxiC) / self.dt, normxiC)
+                xi_C = self.alpha_C * xi_C / normxiC
 
-            if self.normxiJ is None:
-                self.normxiJ = torch.clamp(torch.linalg.norm(xi_J, dim=1, keepdim=True, ord=np.inf), min=1e-6)
-                xi_J = self.alpha_J * xi_J / self.normxiJ
-            else:
-                normxiJ = torch.clamp(torch.linalg.norm(xi_J, dim=1, keepdim=True, ord=np.inf), min=1e-6)
-                normxiJ = torch.max(normxiJ, self.normxiJ)
-                xi_J = self.alpha_J * xi_J / normxiJ
+                if self.normxiJ is None:
+                    self.normxiJ = torch.clamp(torch.linalg.norm(xi_J, dim=1, keepdim=True, ord=np.inf), min=1e-6)
+                    xi_J = self.alpha_J * xi_J / self.normxiJ
+                else:
+                    normxiJ = torch.clamp(torch.linalg.norm(xi_J, dim=1, keepdim=True, ord=np.inf), min=1e-6)
+                    normxiJ = torch.max(normxiJ, self.normxiJ)
+                    xi_J = self.alpha_J * xi_J / normxiJ
 
-        if torch.any(torch.isnan(xi_J)) or torch.any(torch.isnan(xi_C)):
-            # for debugging purposes
-            print(torch.any(torch.isnan(dCdCT_inv)))
-            print(torch.any(torch.isnan(dC)))
-            print(dC.shape)
-            print(torch.any(torch.isinf(dC)))
-            for d in dC:
-                print(d)
-                print(d.shape)
-                print(torch.linalg.matrix_rank(d))
-                print(torch.linalg.svdvals(d))
-            exit(0)
-        return (self.alpha_J * -xi_J - self.alpha_C * xi_C).detach()
+        return (self.alpha_J * xi_J + self.alpha_C * xi_C).detach()
 
     def _clamp_in_bounds(self, xuz):
         N = xuz.shape[0]
-        xuz = xuz.reshape(N, self.T, -1)
-        xuz[:, :, :self.dx + self.du] = torch.clamp(xuz[:, :, :self.dx + self.du],
-                                                    min=self.problem.x_min.reshape(1, 1, -1).to(device=xuz.device),
-                                                    max=self.problem.x_max.reshape(1, 1, -1).to(device=xuz.device))
-        return xuz.reshape(N, -1)
+        min_x = self.problem.x_min.reshape(1, 1, -1).repeat(1, self.problem.T, 1).reshape(1, -1)
+        max_x = self.problem.x_max.reshape(1, 1, -1).repeat(1, self.problem.T, 1).reshape(1, -1)
+        torch.clamp_(xuz, min=min_x.to(device=xuz.device), max=max_x.to(device=xuz.device))
 
     def solve(self, x0):
         self.normxiJ = None
@@ -168,6 +154,11 @@ class ConstrainedSteinTrajOpt:
         else:
             xuz = x0.clone().reshape(N, -1)
 
+        optim = torch.optim.SGD(params=[xuz], lr=self.dt, momentum=self.momentum,
+                                nesterov=True if self.momentum > 0 else False)
+
+        #optim = torch.optim.RMSprop(params=[xuz], lr=self.dt)
+
         # driving force useful for helping exploration -- currently unused
         T = self.iters
         C = 1
@@ -179,31 +170,37 @@ class ConstrainedSteinTrajOpt:
         for iter in range(T):
             s = time.time()
             if T > 100:
-                self.gamma = driving_force(iter+1)
+                self.gamma = driving_force(iter + 1)
             else:
                 self.gamma = 1
-            grad = self.compute_update(xuz)
-            new_xuz = xuz + self.dt * grad
 
+            optim.zero_grad()
+            old_xuz = xuz.clone()
+            grad = self.compute_update(xuz)
+            xuz.grad = grad
+            # print(torch.linalg.norm(grad))
+            torch.nn.utils.clip_grad_norm_(xuz, 10)
+            # new_xuz = xuz + self.dt * grad
+            optim.step()
             # clamp within bounds for simple bounds
             if self.problem.x_max is not None:
-                new_xuz = self._clamp_in_bounds(new_xuz)
-
-            old_C = self.problem.constraints(xuz)
-            new_C = self.problem.constraints(new_xuz)
+                self._clamp_in_bounds(xuz)
+            old_C = self.problem.constraints(old_xuz)
+            new_C = self.problem.constraints(xuz)
             improvement = -torch.max(new_C.abs(), dim=1).values + torch.max(old_C.abs(), dim=1).values
 
             # if any trajectory failed to improve then we replace it with a trajectory that has the lowest constraint
             # violation with some noise
             best_idx = torch.argmin(torch.max(new_C.abs(), dim=1).values)
-            best_traj = new_xuz[best_idx].unsqueeze(0)
-            new_xuz = torch.where(improvement.unsqueeze(-1) > -0.025,
-                                  new_xuz,
-                                  best_traj + 0.05 * torch.randn_like(best_traj)
+            best_traj = xuz[best_idx].unsqueeze(0)
+            xuz.data = torch.where(improvement.unsqueeze(-1) > -0.05,
+                                  xuz.data,
+                                  best_traj + 0.1 * torch.randn_like(best_traj)
                                   )
+
             if torch.all(torch.linalg.norm(grad, dim=-1) < 1e-3):
                 print(f'converged after {iter} iterations')
                 break
-            #print(time.time() - s)
-            xuz = new_xuz
+            # torch.cuda.synchronize()
+            # print(time.time() - s)
         return xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du]

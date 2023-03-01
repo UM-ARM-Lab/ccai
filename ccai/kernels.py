@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 
 def median(tensor):
@@ -10,18 +11,22 @@ def median(tensor):
     return (torch.cat((tensor, tensor_max)).median() + tensor.median()) / 2.
 
 
-def rbf_kernel(X, Xbar, M=None):
+def rbf_kernel(X, Xbar, Q=None):
     # X is N x d
+    n = X.shape[0]
+    X = X.reshape(n, -1)
+    Xbar = Xbar.reshape(n, -1)
     n, d = X.shape
     diff = X.unsqueeze(0) - Xbar.unsqueeze(1)
-    if M is not None:
-        scaled_diff = diff @ M.unsqueeze(0)
+    if Q is not None:
+        scaled_diff = diff @ Q.unsqueeze(0)
     else:
         scaled_diff = diff
 
     scaled_diff = (scaled_diff.reshape(-1, 1, d) @ diff.reshape(-1, d, 1)).reshape(n, n)
-    h = median(scaled_diff)
-    h = torch.sqrt(h / 2) + 1e-3
+    h = median(torch.sqrt(scaled_diff)) ** 2
+    h = h / (2 * np.log(n + 1)) + 1e-3
+
     # h = 0.1
     return torch.exp(-0.5 * scaled_diff / h)
 
@@ -33,11 +38,13 @@ def get_chunk(X, num_chunks, expected_chunk_size):
     return x
 
 
-def structured_rbf_kernel(X, Xbar):
+def structured_rbf_kernel(X, Xbar, Q=None):
     # X is N x T x d
     n, T, d = X.shape
     mod = T % 3
     num_chunks = T // 3
+    if Q is not None:
+        Xbar = (Q.reshape(1, T * d, T * d) @ Xbar.reshape(n, T * d, 1)).reshape(n, T, d)
 
     x1 = get_chunk(X, num_chunks, 3)
     x2 = get_chunk(X[:, 1:], num_chunks, 3)
@@ -56,8 +63,8 @@ def structured_rbf_kernel(X, Xbar):
     diff = x.unsqueeze(1) - xbar.unsqueeze(2)
 
     sq_diff = (diff.reshape(-1, 1, d) @ diff.reshape(-1, d, 1)).reshape(M, n, n)
-    h = median(sq_diff)
-    h = torch.sqrt(h / 2) + 1e-3
+    h = median(torch.sqrt(sq_diff)) ** 2
+    h = h / (2 * np.log(n + 1)) + 1e-3
     # h = 0.1
     return torch.exp(-0.5 * sq_diff / h).mean(dim=0)
 
@@ -92,6 +99,7 @@ class RBFKernel:
 
         K = sigma_sq * torch.exp(-0.5 * sq_diff / h)
         grad_K = - sigma_sq * diff * K.reshape(n, m, 1) / h
-        hess_K = sigma_sq * (diff.reshape(n, m, d, 1) @ diff.reshape(n, m, 1, d) - h) * K.reshape(n, m, 1, 1) / h
-
+        hess_K = diff.reshape(n, m, d, 1) @ diff.reshape(n, m, 1, d) * K.reshape(n, m, 1, 1) / h ** 2
+        hess_K = hess_K - torch.diag_embed(K.reshape(n, m, 1).repeat(1, 1, d)) / h
+        hess_K = hess_K * sigma_sq
         return K, grad_K, hess_K

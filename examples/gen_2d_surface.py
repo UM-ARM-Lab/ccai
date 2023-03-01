@@ -49,3 +49,19 @@ if __name__ == '__main__':
     ax.plot_surface(x.numpy(), y.numpy(), z.numpy())
     ax.axes.set_zlim3d(bottom=-5, top=5)
     plt.show()
+
+    # check correctness of constraints and grad
+    from functorch import vmap, jacrev
+
+    fn = vmap(surface_gp.posterior_mean)
+    grad_fn = vmap(jacrev(surface_gp.posterior_mean))
+
+    N = 10
+    test_x = torch.randn(N, 1, 2)
+    z, grad_z, hess_z = fn(test_x)
+    grad_z_2, hess_z_2, _ = grad_fn(test_x)
+    i = 1
+    assert torch.allclose(grad_z.reshape(N, 2), grad_z_2.reshape(N, 2), atol=1e-6)
+    assert torch.allclose(hess_z.reshape(N, 2, 2), hess_z_2.reshape(N, 2, 2), atol=1e-6)
+
+
