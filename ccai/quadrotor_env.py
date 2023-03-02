@@ -10,7 +10,7 @@ class QuadrotorEnv:
     def __init__(self, surface_data_fname):
         self.env_dims = [-10, 10]
         self.state_dim = 12
-        self.dt = 0.05
+        self.dt = 0.1
         self.state = None
         data = np.load(surface_data_fname)
         self.surface_model = GPSurfaceModel(torch.from_numpy(data['xy']).to(dtype=torch.float32),
@@ -34,7 +34,7 @@ class QuadrotorEnv:
         xy = torch.from_numpy(state[:2]).reshape(1, 2).to(dtype=torch.float32)
         with torch.no_grad():
             z, _, _ = self.surface_model.posterior_mean(xy)
-        return z.numpy().reshape(1).astype(np.float64)
+        return z.numpy().reshape(1).astype(np.float32)
 
     def reset(self):
         start = np.zeros(self.state_dim)
@@ -45,26 +45,26 @@ class QuadrotorEnv:
 
         # Angles in rad
         # Heading angle can be between 0 and pi/2
-        start[5] = np.pi / 2 * np.random.rand()
+        start[5] = np.pi / 2.0 * np.random.rand()
 
         # Other two must be restriced by a lot
-        start[3:5] = 0.05*(-np.pi + 2 * np.pi * np.random.rand(2))
+        start[3:5] = 0.0*(-np.pi + 2 * np.pi * np.random.rand(2))
 
         # Initial velocity zero for now - may change in future
         start[6:] = 0.0*np.random.randn(6)
-        print(start)
         # start[9:] *= 5
         self.state = start
 
     def get_constraint_violation(self):
-        return self.state[2] - self._get_surface_h(self.state)
+        surface_h = self._get_surface_h(self.state)
+        return self.state[2] - surface_h
 
     def step(self, control):
         # Unroll state
         g = -9.81
         m = 1
         Ix, Iy, Iz = 0.5, 0.1, 0.3
-        K = 5
+        K = 1
         x, y, z, phi, theta, psi, x_dot, y_dot, z_dot, p, q, r = self.state
 
         u1, u2, u3, u4 = control
@@ -88,15 +88,34 @@ class QuadrotorEnv:
         q_dot = ((Iz - Ix) * p * r + K * u3) / Iy
         r_dot = ((Ix - Iy) * p * q + K * u4) / Iz
 
+        # symplectic euler -- update velocities first
+        new_xdot = x_dot + x_ddot * self.dt
+        new_ydot = y_dot + y_ddot * self.dt
+        new_zdot = z_dot + z_ddot * self.dt
+        new_p = p + p_dot * self.dt
+        new_q = q + q_dot * self.dt
+        new_r = r + r_dot * self.dt
+
+
         ''' velocities'''
-        psi_dot = q * sphi / ctheta + r * cphi / ctheta
-        theta_dot = q * cphi - r * sphi
-        phi_dot = p + q * sphi * ttheta + r * cphi * ttheta
+        psi_dot = new_q * sphi / ctheta + new_r * cphi / ctheta
+        theta_dot = new_q * cphi - new_r * sphi
+        phi_dot = new_p + new_q * sphi * ttheta + new_r * cphi * ttheta
 
-        dstate = np.stack((x_dot, y_dot, z_dot, phi_dot, theta_dot, psi_dot,
-                           x_ddot, y_ddot, z_ddot, p_dot, q_dot, r_dot), axis=-1)
+        new_phi = phi + phi_dot * self.dt
+        new_theta = theta + theta_dot * self.dt
+        new_psi = psi + psi_dot * self.dt
+        new_x = x + new_xdot * self.dt
+        new_y = y + new_ydot + self.dt
+        new_z = z + new_zdot + self.dt
 
-        self.state = self.state + dstate * self.dt
+        #dstate = np.stack((x_dot, y_dot, z_dot, phi_dot, theta_dot, psi_dot,
+        #                   x_ddot, y_ddot, z_ddot, p_dot, q_dot, r_dot), axis=-1)
+
+        #self.state = self.state + dstate * self.dt
+        self.state = np.stack(
+            (new_x, new_y, new_z, new_phi, new_theta, new_psi, new_xdot, new_ydot, new_zdot, new_p, new_q, new_r)
+        )
         # self.state[3:6] = normalize_angles(self.state[3:6])
 
         return self.state
@@ -105,9 +124,9 @@ class QuadrotorEnv:
         ax = plt.axes(projection='3d')
         ax.plot_surface(self.surface_plotting_vars[0],
                         self.surface_plotting_vars[1],
-                        self.surface_plotting_vars[2] - 1, alpha=0.5)
+                        self.surface_plotting_vars[2], alpha=0.5)
         ax.axes.set_zlim3d(bottom=-5, top=5)
         ax.scatter(self.state[0], self.state[1], self.state[2], s=100, c='g')
-        ax.scatter(4, 4, 0, s=100, c='k')
+        ax.scatter(4, 4, self._get_surface_h(np.array([4, 4])), s=100, c='k')
 
         return ax

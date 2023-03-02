@@ -2,11 +2,16 @@ import torch
 import numpy as np
 from torch.profiler import profile, record_function, ProfilerActivity
 
+from torch_cg import cg_batch
+
 
 class ConstrainedSteinTrajOpt:
 
-    def __init__(self, problem, dt, alpha_C, alpha_J, momentum):
-        self.dt = dt
+    def __init__(self, problem, params):
+        self.dt = params.get('step_size', 1e-2)
+        self.alpha_J = params.get('alpha_J', 1)
+        self.alpha_C = params.get('alpha_C', 1)
+        self.momentum = params.get('momentum', 0)
 
         self.problem = problem
         self.dx = problem.dx
@@ -20,11 +25,6 @@ class ConstrainedSteinTrajOpt:
         self.use_fisher = False
         self.use_hessian = False  # True
         self.use_constraint_hessian = True
-
-        self.alpha_C = alpha_C
-        self.alpha_J = alpha_J
-        self.iters = 500
-        self.momentum = momentum
         self.normxiJ = None
 
     def compute_update(self, xuz):
@@ -37,14 +37,18 @@ class ConstrainedSteinTrajOpt:
         with torch.no_grad():
             # we try and invert the dC dCT, if it is singular then we use the psuedo-inverse
             eye = torch.eye(self.dg + self.dh).repeat(N, 1, 1).to(device=C.device)
-            try:
-                dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1), eye)
-                if torch.any(torch.isnan(dCdCT_inv)):
-                    raise ValueError('nan in inverse')
-            except Exception as e:
-                #print(e)
-                # dCdCT_inv = torch.linalg.lstsq(dC @ dC.permute(0, 2, 1), eye).solution
-                dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1))
+            dCdCT = dC @ dC.permute(0, 2, 1)
+            A_bmm = lambda x: dCdCT @ x
+            #dCdCT_inv, _ = cg_batch(A_bmm, eye, verbose=False)
+
+            # try:
+            #    dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1), eye)
+            #    if torch.any(torch.isnan(dCdCT_inv)):
+            #        raise ValueError('nan in inverse')
+            # except Exception as e:
+            #    #print(e)
+            #    # dCdCT_inv = torch.linalg.lstsq(dC @ dC.permute(0, 2, 1), eye).solution
+            dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1))
 
             # get projection operator
             projection = dCdCT_inv @ dC
@@ -53,7 +57,7 @@ class ConstrainedSteinTrajOpt:
             # compute term for repelling towards constraint
             xi_C = dCdCT_inv @ C.unsqueeze(-1)
             xi_C = (dC.permute(0, 2, 1) @ xi_C).squeeze(-1)
-            #xi_C = (dC.permute(0, 2, 1) @ C.unsqueeze(-1)).squeeze(-1)
+            # xi_C = (dC.permute(0, 2, 1) @ C.unsqueeze(-1)).squeeze(-1)
 
             # compute gradient for projection
             # now the second index (1) is the
@@ -96,8 +100,8 @@ class ConstrainedSteinTrajOpt:
             else:
                 if hess_J is not None:
                     # Q_inv = 0.1 * torch.eye(d * self.T + self.dh, device=xuz.device)
-                    Q_inv = torch.linalg.pinv(hess_J)
-                    PQ = projection @ Q_inv.unsqueeze(0)
+                    Q_inv = torch.linalg.inv(hess_J.unsqueeze(0))
+                    PQ = projection @ Q_inv
                     PQP = PQ.unsqueeze(0) @ projection.unsqueeze(1)
                     first_term = torch.einsum('nmj, nmij->nmi', grad_K, PQP)
                     matrix_K = K.reshape(N, N, 1, 1) * PQ.unsqueeze(0) @ projection.unsqueeze(1)
@@ -157,12 +161,14 @@ class ConstrainedSteinTrajOpt:
         optim = torch.optim.SGD(params=[xuz], lr=self.dt, momentum=self.momentum,
                                 nesterov=True if self.momentum > 0 else False)
 
-        #optim = torch.optim.RMSprop(params=[xuz], lr=self.dt)
+        #optim = torch.optim.Adagrad(params=[xuz], lr=1e-1)
+
 
         # driving force useful for helping exploration -- currently unused
         T = self.iters
         C = 1
         p = 1
+        self.max_gamma = 1
         import time
         def driving_force(t):
             return ((t % (T / C)) / (T / C)) ** p
@@ -170,9 +176,9 @@ class ConstrainedSteinTrajOpt:
         for iter in range(T):
             s = time.time()
             if T > 100:
-                self.gamma = driving_force(iter + 1)
+                self.gamma = self.max_gamma * driving_force(iter + 1)
             else:
-                self.gamma = 1
+                self.gamma = self.max_gamma
 
             optim.zero_grad()
             old_xuz = xuz.clone()
@@ -185,8 +191,8 @@ class ConstrainedSteinTrajOpt:
             # clamp within bounds for simple bounds
             if self.problem.x_max is not None:
                 self._clamp_in_bounds(xuz)
-            old_C = self.problem.constraints(old_xuz)
-            new_C = self.problem.constraints(xuz)
+            old_C = self.problem.combined_constraints(old_xuz)[0]
+            new_C = self.problem.combined_constraints(xuz)[0]
             improvement = -torch.max(new_C.abs(), dim=1).values + torch.max(old_C.abs(), dim=1).values
 
             # if any trajectory failed to improve then we replace it with a trajectory that has the lowest constraint
@@ -194,9 +200,9 @@ class ConstrainedSteinTrajOpt:
             best_idx = torch.argmin(torch.max(new_C.abs(), dim=1).values)
             best_traj = xuz[best_idx].unsqueeze(0)
             xuz.data = torch.where(improvement.unsqueeze(-1) > -0.05,
-                                  xuz.data,
-                                  best_traj + 0.1 * torch.randn_like(best_traj)
-                                  )
+                                   xuz.data,
+                                   best_traj + 0.1 * torch.randn_like(best_traj)
+                                   )
 
             if torch.all(torch.linalg.norm(grad, dim=-1) < 1e-3):
                 print(f'converged after {iter} iterations')

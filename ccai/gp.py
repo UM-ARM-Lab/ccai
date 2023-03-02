@@ -8,7 +8,7 @@ class GPSurfaceModel:
     def __init__(self, train_x, train_y):
         self.train_x = train_x
         self.train_y = train_y.flatten()
-        self.kernel = RBFKernel(lengthscale=1.5, outputscale=0.1)
+        self.kernel = RBFKernel(use_median_trick=False, lengthscale=1.5, outputscale=0.5)
         self.sigma_sq_noise = 0.01
         self.training = True
 
@@ -32,7 +32,6 @@ class GPSurfaceModel:
 
         # compute [K + sigma_sq I]^-1 y
         tmp = torch.linalg.solve(train_K + self.sigma_sq_noise * eye, self.train_y.reshape(-1, 1))
-
         y = K @ tmp
         grad_y = grad_K.permute(0, 2, 1) @ tmp
         hess_y = hess_K.permute(0, 2, 3, 1) @ tmp

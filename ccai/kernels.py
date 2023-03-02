@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-
+EPS = 1e-9
 
 def median(tensor):
     """
@@ -25,7 +25,7 @@ def rbf_kernel(X, Xbar, Q=None):
 
     scaled_diff = (scaled_diff.reshape(-1, 1, d) @ diff.reshape(-1, d, 1)).reshape(n, n)
     h = median(torch.sqrt(scaled_diff)) ** 2
-    h = h / (2 * np.log(n + 1)) + 1e-3
+    h = h / (2 * np.log(n + 1)) + EPS
 
     # h = 0.1
     return torch.exp(-0.5 * scaled_diff / h)
@@ -64,7 +64,9 @@ def structured_rbf_kernel(X, Xbar, Q=None):
 
     sq_diff = (diff.reshape(-1, 1, d) @ diff.reshape(-1, d, 1)).reshape(M, n, n)
     h = median(torch.sqrt(sq_diff)) ** 2
-    h = h / (2 * np.log(n + 1)) + 1e-3
+    h = h / (2 * np.log(n + 1)) + EPS
+    #if Q is not None:
+    #    h = d
     # h = 0.1
     return torch.exp(-0.5 * sq_diff / h).mean(dim=0)
 
@@ -88,8 +90,7 @@ class RBFKernel:
         n, d = X.shape
         m = Xbar.shape[0]
         diff = X.unsqueeze(1) - Xbar.unsqueeze(0)  # diff should be n x m x d
-
-        sq_diff = (diff.reshape(-1, 1, d) @ diff.reshape(-1, d, 1)).reshape(n, m)
+        sq_diff = (diff.reshape(n, m, 1, d) @ diff.reshape(n, m, d, 1)).reshape(n, m)
         if self.use_median_trick:
             h = torch.sqrt(median(sq_diff) / 2) + 1e-3
             sigma_sq = 1

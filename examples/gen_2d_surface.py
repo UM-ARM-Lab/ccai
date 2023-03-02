@@ -5,9 +5,6 @@ from mpl_toolkits.mplot3d import axes3d, Axes3D  # <-- Note the capitalization!
 from ccai.gp import GPSurfaceModel
 
 if __name__ == '__main__':
-    lengthscale = 1.5
-    outputscale = 1
-
     N = 10
     xs = torch.linspace(-5, 5, steps=N)
     ys = torch.linspace(-5, 5, steps=N)
