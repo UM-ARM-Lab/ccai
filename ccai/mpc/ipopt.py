@@ -40,7 +40,7 @@ class IpoptMPC:
             )
         if self.ineq is True:
             cons.append(
-                {'type': 'eq', 'fun': self.problem.con_ineq,
+                {'type': 'ineq', 'fun': self.problem.con_ineq,
                  'jac': self.problem.con_ineq_grad,
                  'hess': self.problem.con_ineq_hvp}
             )
@@ -58,7 +58,7 @@ class IpoptMPC:
         res = cyipopt.minimize_ipopt(self.problem.objective, jac=self.problem.objective_grad,
                                      hess=self.problem.objective_hess, x0=x,
                                      bounds=bnds,
-                                     constraints=cons, options={'disp': 5,
+                                     constraints=cons, options={'disp': 0,
                                                                 'max_iter': iters})
 
         self.x = torch.from_numpy(res.x).reshape(self.problem.T, -1)

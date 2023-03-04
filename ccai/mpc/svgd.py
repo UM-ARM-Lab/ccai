@@ -77,10 +77,19 @@ class SVMPC:
 
         return torch.stack(x[1:], dim=1)
 
-    def step(self, state):
+    def step(self, state, **kwargs):
         self.U = self.U.detach()
         self.U.requires_grad = True
         self.optim = torch.optim.Adam(params=[self.U], lr=self.lr)
+
+        if self.fixed_H:
+            new_T = None
+        else:
+            new_T = self.problem.T - 1
+            self.H = new_T
+
+        self.problem.update(state, T=new_T, **kwargs)
+
         if self.warmed_up:
             iterations = self.online_iters
         else:

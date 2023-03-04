@@ -11,7 +11,7 @@ class MPPI:
         self.N = params.get('N', 100)
         self.device = params.get('device', 'cuda:0')
         self.sigma = params.get('sigma', torch.ones(self.du))
-        self.lambda_ = params.get('lambda', 1)
+        self.lambda_ = params.get('lambda', 0.1)
         self.warmup_iters = params.get('warmup_iters', 100)
         self.online_iters = params.get('online_iters', 100)
 
@@ -35,7 +35,14 @@ class MPPI:
 
         return torch.stack(x[1:], dim=1)
 
-    def step(self, x):
+    def step(self, x, **kwargs):
+        if self.fixed_H:
+            new_T = None
+        else:
+            new_T = self.problem.T - 1
+            self.H = new_T
+
+        self.problem.update(x, T=new_T, **kwargs)
 
         if self.warmed_up:
             iterations = self.online_iters
@@ -67,7 +74,7 @@ class MPPI:
         out_trajectory = torch.cat((out_X, out_U), dim=-1)
         sampled_trajectories = torch.cat((pred_x, peturbed_actions), dim=-1)
 
-        return out_trajectory, sampled_trajectories
+        return out_trajectory, []#sampled_trajectories
 
     def shift(self):
         self.U = torch.roll(self.U, shifts=-1, dims=0)
