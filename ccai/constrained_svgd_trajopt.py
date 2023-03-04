@@ -41,14 +41,14 @@ class ConstrainedSteinTrajOpt:
             A_bmm = lambda x: dCdCT @ x
             #dCdCT_inv, _ = cg_batch(A_bmm, eye, verbose=False)
 
-            # try:
-            #    dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1), eye)
-            #    if torch.any(torch.isnan(dCdCT_inv)):
-            #        raise ValueError('nan in inverse')
-            # except Exception as e:
-            #    #print(e)
-            #    # dCdCT_inv = torch.linalg.lstsq(dC @ dC.permute(0, 2, 1), eye).solution
-            dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1))
+            try:
+                dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1), eye)
+                if torch.any(torch.isnan(dCdCT_inv)):
+                    raise ValueError('nan in inverse')
+            except Exception as e:
+                print(e)
+                #dCdCT_inv = torch.linalg.lstsq(dC @ dC.permute(0, 2, 1), eye).solution
+                dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1))
 
             # get projection operator
             projection = dCdCT_inv @ dC
@@ -99,8 +99,9 @@ class ConstrainedSteinTrajOpt:
 
             else:
                 if hess_J is not None:
-                    # Q_inv = 0.1 * torch.eye(d * self.T + self.dh, device=xuz.device)
-                    Q_inv = torch.linalg.inv(hess_J.unsqueeze(0))
+                    Q_inv = torch.eye(d * self.T + self.dh, device=xuz.device)
+                    #Q_inv = torch.linalg.pinv(hess_J.unsqueeze(0))
+
                     PQ = projection @ Q_inv
                     PQP = PQ.unsqueeze(0) @ projection.unsqueeze(1)
                     first_term = torch.einsum('nmj, nmij->nmi', grad_K, PQP)
@@ -143,9 +144,14 @@ class ConstrainedSteinTrajOpt:
 
     def _clamp_in_bounds(self, xuz):
         N = xuz.shape[0]
-        min_x = self.problem.x_min.reshape(1, 1, -1).repeat(1, self.problem.T, 1).reshape(1, -1)
-        max_x = self.problem.x_max.reshape(1, 1, -1).repeat(1, self.problem.T, 1).reshape(1, -1)
-        torch.clamp_(xuz, min=min_x.to(device=xuz.device), max=max_x.to(device=xuz.device))
+        min_x = self.problem.x_min.reshape(1, 1, -1).repeat(1, self.problem.T, 1)
+        max_x = self.problem.x_max.reshape(1, 1, -1).repeat(1, self.problem.T, 1)
+        if self.problem.dz > 0:
+            min_x = torch.cat((min_x, -1e3 * torch.ones(1, self.problem.T, self.problem.dz)), dim=-1)
+            max_x = torch.cat((max_x, 1e3 * torch.ones(1, self.problem.T, self.problem.dz)), dim=-1)
+
+        torch.clamp_(xuz, min=min_x.to(device=xuz.device).reshape(1, -1),
+                     max=max_x.to(device=xuz.device).reshape(1, -1))
 
     def solve(self, x0):
         self.normxiJ = None

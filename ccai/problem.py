@@ -98,15 +98,17 @@ class ConstrainedSVGDProblem(Problem):
         # eye is (N, T, dz, dz, dz)
         eye = torch.diag_embed(torch.eye(self.dz, device=self.device)).repeat(N, self.T, 1, 1, 1)
         # make eye (N, T, dz, T, dz, T, dz)
-        eye = torch.diag_embed(torch.diag_embed(eye.permute(0, 2, 3, 4, 1))).permute(0, 4, 1, 5, 2, 6)
-        zeros = torch.zeros(N, self.T, self.dz, self.T, self.dx + self.du, self.T, self.dz, device=self.device)
+        eye = torch.diag_embed(torch.diag_embed(eye.permute(0, 2, 3, 4, 1)))
+        eye = eye.permute(0, 4, 1, 5, 2, 6, 3)
 
-        hess_h_aug = torch.cat((
-            torch.cat((hess_h.reshape(N, self.T, self.dz, self.dx + self.du, self.dx + self.du),
-                       zeros.permute(0, 1, 2, 3, 4, 6, 5)), dim=-2),
-            torch.cat((zeros, eye), dim=-2)
-        ), dim=-1).reshape(N, self.dh, self.T * (self.dx + self.du + self.dz), self.T * (self.dx + self.du + self.dz))
+        hess_h = hess_h.reshape(N, self.T, self.dz, self.T, self.dx + self.du, self.T, self.dx + self.du)
+        hess_h_aug = torch.zeros(N, self.T, self.dz, self.T, self.dx + self.du + self.dz,
+                                 self.T, self.dx + self.du + self.dz, device=self.device)
+        hess_h_aug[:, :, :, :, :self.dx + self.du, :, :self.dx + self.du] = hess_h
+        hess_h_aug[:, :, :, :, -self.dz:, :, -self.dz:] = eye
 
+        hess_h_aug = hess_h_aug.reshape(N, self.dh, self.T * (self.dx + self.du + self.dz),
+                                        self.T * (self.dx + self.du + self.dz))
         if g is None:
             return h_aug, grad_h_aug, hess_h_aug
 
@@ -119,17 +121,17 @@ class ConstrainedSVGDProblem(Problem):
         hess_g_aug = torch.zeros(N, self.dg,
                                  self.T, (self.dx + self.du + self.dz),
                                  self.T, (self.dx + self.du + self.dz), device=self.device)
-        hess_g_aug[:, :, :, :self.dx + self.du, :self.dx + self.du] = hess_g.reshape(N,
-                                                                                     self.dg,
-                                                                                     self.T,
-                                                                                     self.dx + self.du,
-                                                                                     self.T,
-                                                                                     self.dx + self.du)
+        hess_g_aug[:, :, :, :self.dx + self.du, :, :self.dx + self.du] = hess_g.reshape(N,
+                                                                                       self.dg,
+                                                                                       self.T,
+                                                                                       self.dx + self.du,
+                                                                                       self.T,
+                                                                                       self.dx + self.du)
         hess_g_aug = hess_g_aug.reshape(N, self.dg,
                                         self.T * (self.dx + self.du + self.dz),
                                         self.T * (self.dx + self.du + self.dz))
 
-        c = torch.stack((g, h_aug), dim=1)  # (N, dg + dh)
+        c = torch.cat((g, h_aug), dim=1)  # (N, dg + dh)
         grad_c = torch.cat((grad_g_aug, grad_h_aug), dim=1)
         hess_c = torch.cat((hess_g_aug, hess_h_aug), dim=1)
         return c, grad_c, hess_c
@@ -198,21 +200,21 @@ class IpoptProblem(Problem):
         h, _, _ = self._con_ineq(tensor_x)
         if h is None:
             return None
-        return h.reshape(-1).detach().numpy()
+        return -h.reshape(-1).detach().numpy()
 
     def con_ineq_grad(self, x):
         tensor_x = torch.from_numpy(x).reshape(1, self.T, -1).to(torch.float32)
         _, grad_h, _ = self._con_ineq(tensor_x)
         if grad_h is None:
             return None
-        return grad_h.reshape(self.dh, -1).detach().numpy()
+        return -grad_h.reshape(self.dh, -1).detach().numpy()
 
     def con_ineq_hess(self, x):
         tensor_x = torch.from_numpy(x).reshape(1, self.T, -1).to(torch.float32)
         _, _, hess_h = self._con_ineq(tensor_x)
         if hess_h is None:
             return None
-        return hess_h.reshape(self.dh, self.T * (self.dx + self.du), -1).numpy()
+        return -hess_h.reshape(self.dh, self.T * (self.dx + self.du), -1).numpy()
 
     def con_ineq_hvp(self, x, v):
         hess = self.con_ineq_hess(x)

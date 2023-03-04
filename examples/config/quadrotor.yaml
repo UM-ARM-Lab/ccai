@@ -1,0 +1,39 @@
+---
+T: 12
+receding_horizon: True
+obstacle_mode: 'dynamic'
+num_steps: 60
+num_trials: 20
+controllers:
+  csvgd:
+    N: 8
+    alpha_J: 1.2
+    alpha_C: 1
+    step_size: 1
+    momentum: 0.1
+    device: 'cuda:0'
+    online_iters: 10
+    warmup_iters: 100
+  ipopt:
+    device: 'cpu'
+    online_iters: 10
+    warmup_iters: 100
+  mppi:
+    N: 1000
+    lambda: 0.001
+    sigma: 0.25
+    device: 'cuda:0'
+    penalty: 1000
+    online_iters: 50
+    warmup_iters: 500
+  svgd:
+    M: 8
+    N: 128
+    step_size: 0.1
+    sigma: 0.1
+    lambda: 0.001
+    use_grad: False
+    penalty: 1000
+    online_iters: 50
+    warmup_iters: 500
+    device: 'cuda:0'
