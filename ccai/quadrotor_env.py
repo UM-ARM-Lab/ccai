@@ -37,7 +37,6 @@ class QuadrotorEnv:
         self.ax = None
         self._surf = None
         self._render_pos = None
-        self.render_init()
 
     def _get_surface_h(self, state):
         xy = torch.from_numpy(state[:2]).reshape(1, 2).to(dtype=torch.float32)
@@ -49,7 +48,7 @@ class QuadrotorEnv:
         start = np.zeros(self.state_dim)
 
         # positions
-        start[:2] = np.array([-4.5, -4.5]) + 0.25 * np.random.randn(2)
+        start[:2] = np.array([-4.5, -4.5]) + 0.5 * np.random.randn(2)
         start[2] = self._get_surface_h(start)
 
         # Angles in rad
@@ -60,11 +59,13 @@ class QuadrotorEnv:
         start[3:5] = 0.0 * (-np.pi + 2 * np.pi * np.random.rand(2))
 
         # Initial velocity zero for now - may change in future
-        start[6:] = 0.1 * np.random.randn(6)
+        start[6:] = 0.05 * np.random.randn(6)
         # start[9:] *= 5
         self.state = start
-        self.obstacle_pos = np.array([-2.0, 3.0])
-
+        if self.obstacle_mode == 'dynamic':
+            self.obstacle_pos = np.array([-2.0, 3.0])
+        else:
+            self.obstacle_pos = np.array([0.0, 0.0])
     def get_constraint_violation(self):
         surface_h = self._get_surface_h(self.state)
         surface_violation = self.state[2] - surface_h
@@ -140,7 +141,7 @@ class QuadrotorEnv:
 
     def _get_surface_colours(self):
         if self.obstacle_mode is None:
-            return np.array([1.0, 0.0, 0.0, self.alpha])
+            return np.array([1.0, 0.0, 0.0, self.alpha])[None, None, :]
 
         x, y, z = self.surface_plotting_vars
         in_obs = np.where((x - self.obstacle_pos[0]) ** 2 + (y - self.obstacle_pos[1]) ** 2 < self.obstacle_r ** 2,

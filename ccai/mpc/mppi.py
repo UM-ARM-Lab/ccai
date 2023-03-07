@@ -33,7 +33,7 @@ class MPPI:
         for t in range(self.H):
             x.append(self.problem.dynamics(x[-1], u[:, t]))
 
-        return torch.stack(x[1:], dim=1)
+        return torch.stack(x[:-1], dim=1)
 
     def step(self, x, **kwargs):
         if self.fixed_H:
@@ -54,7 +54,7 @@ class MPPI:
             # Sample peturbations
             noise = torch.randn(self.N, self.H, self.du, device=self.device)
             peturbed_actions = self.U.unsqueeze(dim=0) + self.sigma * noise
-            action_cost = torch.sum(self.lambda_ * noise * self.U / self.sigma, dim=[1, 2])
+            action_cost = torch.sum(self.lambda_ * noise * self.U / self.sigma**2, dim=[1, 2])
 
             pred_x = self._rollout_dynamics(x, peturbed_actions)
             # Get total cost
@@ -78,7 +78,7 @@ class MPPI:
 
     def shift(self):
         self.U = torch.roll(self.U, shifts=-1, dims=0)
-        self.U[-1] = torch.randn(self.du, device=self.device)
+        self.U[-1] = self.sigma * torch.randn(self.du, device=self.device)
         if not self.fixed_H:
             self.U = self.U[:-1]
 

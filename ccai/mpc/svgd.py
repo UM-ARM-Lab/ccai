@@ -75,7 +75,7 @@ class SVMPC:
         for t in range(self.H):
             x.append(self.problem.dynamics(x[-1], u[:, t]))
 
-        return torch.stack(x[1:], dim=1)
+        return torch.stack(x[:-1], dim=1)
 
     def step(self, state, **kwargs):
         self.U = self.U.detach()

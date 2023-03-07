@@ -69,7 +69,7 @@ class IpoptMPC:
 
     def shift(self):
         self.x = torch.roll(self.x, shifts=-1, dims=0)
-        self.x[-1] = self.x[-2]  # just copy over previous last
+        self.x[-1] = self.x[-2]
         if not self.fix_T:
             self.x = self.x[:-1]
 

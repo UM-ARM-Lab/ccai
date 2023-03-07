@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
     # sample from GP prior to get our data
     samples = initial_gp_model.prior().sample()
-    # now we will save the data so that we can use it for our quadrotor experiment
+    # now we will save the data so that we can use it for our quadrotor_dynamic experiment
     data = {
         'xy': train_x.numpy(),
         'z': samples.numpy()

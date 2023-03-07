@@ -20,6 +20,7 @@ import yaml
 from ccai.problem import ConstrainedSVGDProblem, IpoptProblem, UnconstrainedPenaltyProblem
 
 import pathlib
+
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
 
@@ -28,8 +29,9 @@ def cost(trajectory, goal):
     u = trajectory[:, 12:]
     T = x.shape[0]
     Q = torch.eye(12, device=trajectory.device)
-    Q[2:, 2:] *= 0.5
+    Q[3:, 3:] *= 0.5
     Q[5, 5] = 1e-2
+    Q[2, 2] = 1e-2
     P = Q * 100
     R = torch.eye(4, device=trajectory.device)
 
@@ -70,7 +72,7 @@ def cost(trajectory, goal):
 
 class QuadrotorProblem(ConstrainedSVGDProblem):
 
-    def __init__(self, start, goal, T, device='cuda:0', alpha=0.0025, include_obstacle=False):
+    def __init__(self, start, goal, T, device='cuda:0', alpha=0.005, include_obstacle=False):
         super().__init__(start, goal, T, device)
         self.T = T
         self.dx = 12
@@ -120,7 +122,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         self.x_min = -self.x_max
 
         self.obstacle_centre = torch.tensor([0.0, 0.0], device=self.device)
-        self.obstacle_rad = 1
+        self.obstacle_rad = 1.01
 
     def _objective(self, x):
         return cost(x, self.goal)
@@ -165,6 +167,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         # start constraint
         start_constraint = (trajectory[:, 0, :12] - self.start.reshape(1, 12)).reshape(N, 12)
         g = torch.cat((dynamics_constr, start_constraint, surf_constr[:, 1:]), dim=1)
+        #g = torch.cat((dynamics_constr, start_constraint), dim=1)
 
         if not compute_grads:
             return g, None, None
@@ -186,6 +189,8 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
 
         Dg = torch.cat((grad_dynamics_constr, grad_start_constraint, grad_surf_constr[:, 1:]), dim=1)
         DDg = torch.cat((hess_dynamics_constr, hess_start_constraint, hess_surf_constr[:, 1:]), dim=1)
+        #Dg = torch.cat((grad_dynamics_constr, grad_start_constraint), dim=1)
+        #DDg = torch.cat((hess_dynamics_constr, hess_start_constraint), dim=1)
         # g = torch.cat((dynamics_constr, start_constraint, surf_constr[:, 1:]), dim=1)
         # Dg = torch.cat((grad_dynamics_constr,  grad_start_constraint, grad_surf_constr[:, 1:]), dim=1)
         # DDg = torch.cat((hess_dynamics_constr, hess_start_constraint, hess_surf_constr[:, 1:]), dim=1)
@@ -295,7 +300,7 @@ class QuadrotorIpoptProblem(QuadrotorProblem, IpoptProblem):
 
 class QuadrotorUnconstrainedProblem(QuadrotorProblem, UnconstrainedPenaltyProblem):
     def __init__(self, start, goal, T, device, penalty, include_obstacle=False):
-        super().__init__(start, goal, T, device, include_obstacle)
+        super().__init__(start, goal, T, device=device, include_obstacle=include_obstacle)
         self.penalty = penalty
 
 
@@ -324,39 +329,39 @@ def update_plot_with_trajectories(ax, traj_lines, best, trajectory):
         traj_lines[-1].set_3d_properties(traj_np[1:, 2])
 
 
-def do_trial(params, fpath):
-    env = QuadrotorEnv('surface_data.npz', obstacle_mode=params['obstacle_mode'])
-    env.reset()
-    env.render_init()
+def do_trial(env, params, fpath):
+    #env.render_init()
 
     start = torch.from_numpy(env.state).to(dtype=torch.float32, device=params['device'])
     goal = torch.zeros(12, device=params['device'])
     goal[:2] = 4
 
     include_obstacle = True if params['obstacle_mode'] is not None else False
+
     if params['controller'] == 'csvgd':
         problem = QuadrotorProblem(start, goal, params['T'], device=params['device'], include_obstacle=include_obstacle)
         controller = Constrained_SVGD_MPC(problem, params)
     elif params['controller'] == 'ipopt':
         problem = QuadrotorIpoptProblem(start, goal, params['T'], include_obstacle=include_obstacle)
         controller = IpoptMPC(problem, params)
-    elif params['controller'] == 'mppi':
+    elif 'mppi' in params['controller']:
         problem = QuadrotorUnconstrainedProblem(start, goal, params['T'],
-                                                device=params['device'], penalty=params['penalty'])
+                                                device=params['device'], penalty=params['penalty'],
+                                                include_obstacle=include_obstacle)
         controller = MPPI(problem, params)
-    elif params['controller'] == 'svgd':
+    elif 'svgd' in params['controller']:
         problem = QuadrotorUnconstrainedProblem(start, goal, params['T'],
-                                                device=params['device'], penalty=params['penalty'])
+                                                device=params['device'], penalty=params['penalty'],
+                                                include_obstacle=include_obstacle)
         controller = SVMPC(problem, params)
     else:
         raise ValueError('Invalid controller')
-    plt.axis('off')
+    #plt.axis('off')
     ax = env.ax
     traj_lines = None
     collision = False
     actual_traj = []
     all_violation = []
-    goal_reached = False
     for step in range(params['num_steps']):
         if not collision:
             start = torch.from_numpy(env.state).to(dtype=torch.float32, device=params['device'])
@@ -367,45 +372,50 @@ def do_trial(params, fpath):
             if include_obstacle:
                 if violation[1] > 0:
                     collision = True
-
+                    print('collided')
         actual_traj.append(env.state)
         all_violation.append(violation)
+        #print(np.linalg.norm(env.state[:2] - np.array([4, 4])))
+        #
 
-        if np.linalg.norm(env.state[:2] - np.array([4, 4])) < 0.5:
-            print(f'Goal reached after {step} num steps')
-            goal_reached = True
-            break
+        # if np.linalg.norm(env.state[:2] - np.array([4, 4])) < 0.5:
+        #    goal_reached = True
 
-        env.render_update()
+        #env.render_update()
 
         # ax = env.render()
-        update_plot_with_trajectories(ax, traj_lines, best_traj, trajectories)
-        plt.draw()
-        #plt.pause(0.01)
+        #update_plot_with_trajectories(ax, traj_lines, best_traj, trajectories)
+        #plt.draw()
+        # plt.pause(0.01)
 
-        plt.savefig(f'{fpath.resolve()}/im_{step:02d}.svg')
-        plt.gcf().canvas.flush_events()
+        #plt.savefig(f'{fpath.resolve()}/im_{step:02d}.svg')
+        #plt.gcf().canvas.flush_events()
 
     actual_traj = np.stack(actual_traj)
     all_violation = np.stack(all_violation)
     np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_traj, constr=all_violation)
 
-    plt.close()
-    #plt.show(block=True)
-    return goal_reached
-
-
-
-
+    #plt.close()
+    # plt.show(block=True)
+    return np.linalg.norm(env.state[:2] - np.array([4, 4]))
 
 
 if __name__ == "__main__":
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/quadrotor.yaml').read_text())
     from tqdm import tqdm
+    if config['obstacle_mode'] == 'none':
+        config['obstacle_mode'] = None
+
     results = {}
     for i in tqdm(range(config['num_trials'])):
+        env = QuadrotorEnv('surface_data.npz', obstacle_mode=config['obstacle_mode'])
+        env.reset()
+        start_state = env.state.copy()
+
         for controller in config['controllers'].keys():
-            fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/quadrotor/{controller}/trial_{i+1}')
+            env.reset()
+            env.state = start_state
+            fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/quadrotor/{controller}/trial_{i + 1}')
             pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
 
             # set up params
@@ -414,12 +424,11 @@ if __name__ == "__main__":
             params.update(config['controllers'][controller])
             params['controller'] = controller
 
-            success = do_trial(params, fpath)
+            final_distance_to_goal = do_trial(env, params, fpath)
 
             if controller not in results.keys():
-                results[controller] = 1 if success else 0
+                results[controller] = [final_distance_to_goal]
             else:
-                if success:
-                    results[controller] += 1
+                results[controller].append(final_distance_to_goal)
 
         print(results)

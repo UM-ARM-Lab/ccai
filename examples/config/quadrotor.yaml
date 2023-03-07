@@ -1,16 +1,16 @@
 ---
 T: 12
 receding_horizon: True
-obstacle_mode: 'dynamic'
-num_steps: 60
+obstacle_mode: 'none'
+num_steps: 100
 num_trials: 20
 controllers:
   csvgd:
     N: 8
-    alpha_J: 1.2
+    alpha_J: 1
     alpha_C: 1
     step_size: 1
-    momentum: 0.1
+    momentum: 0.
     device: 'cuda:0'
     online_iters: 10
     warmup_iters: 100
@@ -18,22 +18,63 @@ controllers:
     device: 'cpu'
     online_iters: 10
     warmup_iters: 100
-  mppi:
+  mppi_1000:
     N: 1000
-    lambda: 0.001
+    lambda: 1.0e-4
     sigma: 0.25
     device: 'cuda:0'
     penalty: 1000
     online_iters: 50
     warmup_iters: 500
-  svgd:
+  svgd_1000:
     M: 8
     N: 128
     step_size: 0.1
     sigma: 0.1
-    lambda: 0.001
+    lambda: 1.0e-4
     use_grad: False
     penalty: 1000
+    online_iters: 50
+    warmup_iters: 500
+    device: 'cuda:0'
+  mppi_100:
+    N: 1000
+    lambda: 1.0e-4
+    sigma: 0.25
+    device: 'cuda:0'
+    penalty: 100
+    online_iters: 50
+    warmup_iters: 500
+  svgd_100:
+    M: 8
+    N: 128
+    step_size: 0.1
+    sigma: 0.1
+    lambda: 1.0e-4
+    use_grad: False
+    penalty: 100
+    online_iters: 50
+    warmup_iters: 500
+    device: 'cuda:0'
+  svgd_grad_1000:
+    M: 8
+    N: 128
+    step_size: 0.1
+    sigma: 0.1
+    lambda: 250
+    use_grad: True
+    penalty: 1000
+    online_iters: 25
+    warmup_iters: 250
+    device: 'cuda:0'
+  svgd_grad_100:
+    M: 8
+    N: 128
+    step_size: 0.1
+    sigma: 0.1
+    lambda: 250
+    use_grad: True
+    penalty: 100
     online_iters: 50
     warmup_iters: 500
     device: 'cuda:0'
