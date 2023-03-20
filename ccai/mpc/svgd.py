@@ -40,8 +40,9 @@ class SVMPC:
         self.warmup_iters = params.get('warmup_iters', 100)
         self.online_iters = params.get('online_iters', 100)
         self.use_true_grad = params.get('use_grad', False)
+        self.includes_x0 = params.get('include_x0', False)
 
-        self.kernel = structured_rbf_kernel
+        self.kernel = rbf_kernel#structured_rbf_kernel
         self.kernel_grad = jacrev(self.kernel, argnums=0)
 
         self.grad_cost = jacrev(self._combined_rollout_cost, argnums=1)
@@ -75,14 +76,16 @@ class SVMPC:
         for t in range(self.H):
             x.append(self.problem.dynamics(x[-1], u[:, t]))
 
-        return torch.stack(x[:-1], dim=1)
+        if self.includes_x0:
+            return torch.stack(x[:-1], dim=1)
+        return torch.stack(x[1:], dim=1)
 
     def step(self, state, **kwargs):
         self.U = self.U.detach()
         self.U.requires_grad = True
         self.optim = torch.optim.Adam(params=[self.U], lr=self.lr)
 
-        if self.fixed_H:
+        if self.fixed_H or (not self.warmed_up):
             new_T = None
         else:
             new_T = self.problem.T - 1
@@ -114,9 +117,7 @@ class SVMPC:
         pred_X = self._rollout_dynamics(state, self.U)
         pred_traj = torch.cat((pred_X, self.U), dim=-1)
 
-        # shift actions & psterior
-        self.U = torch.roll(self.U, -1, dims=1)
-        self.U[:, -1] = self.sigma * torch.randn(self.M, self.du, device=self.device)
+        self.shift()
 
         return pred_traj[0].detach(), pred_traj.detach()
 
@@ -151,6 +152,13 @@ class SVMPC:
         self.U.grad = -phi
         self.optim.step()
         self.optim.zero_grad()
+
+    def shift(self):
+        if self.fixed_H:
+            self.U = torch.roll(self.U, -1, dims=1)
+            self.U[:, -1] = self.sigma * torch.randn(self.M, self.du, device=self.device)
+        else:
+            self.U = self.U[:, 1:]
 
     def reset(self):
         # sample initial actions

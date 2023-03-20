@@ -23,7 +23,7 @@ class IpoptMPC:
         self.warmed_up = False
 
     def step(self, state, **kwargs):
-        if self.fix_T:
+        if self.fix_T or (not self.warmed_up):
             new_T = None
         else:
             new_T = self.problem.T - 1
@@ -61,17 +61,18 @@ class IpoptMPC:
                                      constraints=cons, options={'disp': 0,
                                                                 'max_iter': iters})
 
-        self.x = torch.from_numpy(res.x).reshape(self.problem.T, -1)
+        self.x = torch.from_numpy(res.x).reshape(self.problem.T, -1).to(dtype=torch.float32)
         ret_x = self.x.clone()
         self.shift()
 
         return ret_x, ret_x.unsqueeze(0)
 
     def shift(self):
-        self.x = torch.roll(self.x, shifts=-1, dims=0)
-        self.x[-1] = self.x[-2]
-        if not self.fix_T:
-            self.x = self.x[:-1]
+        if self.fix_T:
+            self.x = torch.roll(self.x, shifts=-1, dims=0)
+            self.x[-1] = self.x[-2]
+        else:
+            self.x = self.x[1:]
 
     def reset(self, start, **kwargs):
         self.problem.update(start, **kwargs)

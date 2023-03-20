@@ -109,6 +109,10 @@ class ConstrainedSVGDProblem(Problem):
 
         hess_h_aug = hess_h_aug.reshape(N, self.dh, self.T * (self.dx + self.du + self.dz),
                                         self.T * (self.dx + self.du + self.dz))
+
+        #grad_h_aug = torch.where(h.unsqueeze(-1) > -0.1, grad_h_aug, torch.zeros_like(grad_h_aug))
+        #hess_h_aug = torch.where(h.unsqueeze(-1).unsqueeze(-1) > -0.1, hess_h_aug, torch.zeros_like(hess_h_aug))
+
         if g is None:
             return h_aug, grad_h_aug, hess_h_aug
 
@@ -122,11 +126,11 @@ class ConstrainedSVGDProblem(Problem):
                                  self.T, (self.dx + self.du + self.dz),
                                  self.T, (self.dx + self.du + self.dz), device=self.device)
         hess_g_aug[:, :, :, :self.dx + self.du, :, :self.dx + self.du] = hess_g.reshape(N,
-                                                                                       self.dg,
-                                                                                       self.T,
-                                                                                       self.dx + self.du,
-                                                                                       self.T,
-                                                                                       self.dx + self.du)
+                                                                                        self.dg,
+                                                                                        self.T,
+                                                                                        self.dx + self.du,
+                                                                                        self.T,
+                                                                                        self.dx + self.du)
         hess_g_aug = hess_g_aug.reshape(N, self.dg,
                                         self.T * (self.dx + self.du + self.dz),
                                         self.T * (self.dx + self.du + self.dz))
@@ -135,6 +139,12 @@ class ConstrainedSVGDProblem(Problem):
         grad_c = torch.cat((grad_g_aug, grad_h_aug), dim=1)
         hess_c = torch.cat((hess_g_aug, hess_h_aug), dim=1)
         return c, grad_c, hess_c
+
+    def get_initial_z(self, x):
+        h, _, _ = self._con_ineq(x, compute_grads=False)
+        if h is not None:
+            z = torch.where(h < 0, torch.sqrt(-2 * h), 0)
+            return z.reshape(-1, self.T, self.dz)
 
 
 class IpoptProblem(Problem):
@@ -229,6 +239,10 @@ class UnconstrainedPenaltyProblem(Problem):
     def penalty(self):
         pass
 
+    @abstractmethod
+    def dynamics(self, x, u):
+        pass
+
     def objective(self, x):
         J, _, _ = self._objective(x)
         g, _, _ = self._con_eq(x, compute_grads=False)
@@ -238,4 +252,10 @@ class UnconstrainedPenaltyProblem(Problem):
             J = J + self.penalty * torch.sum(torch.clamp(h, min=0), dim=1)
         if g is not None:
             J = J + self.penalty * torch.sum(g.abs(), dim=1)
+        N, T, _ = x.shape
+        J = J + torch.where(x > self.x_max.repeat(N, T, 1).to(device=self.device), self.penalty * torch.ones_like(x),
+                            torch.zeros_like(x)).sum(dim=1).sum(dim=1)
+        J = J + torch.where(x < self.x_min.repeat(N, T, 1).to(device=self.device), self.penalty * torch.ones_like(x),
+                            torch.zeros_like(x)).sum(dim=1).sum(dim=1)
+
         return J

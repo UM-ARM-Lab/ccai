@@ -6,9 +6,17 @@ def median(tensor):
     """
     torch.median() acts differently from np.median(). We want to simulate numpy implementation.
     """
-    tensor = tensor.detach().flatten()
-    tensor_max = tensor.max()[None]
-    return (torch.cat((tensor, tensor_max)).median() + tensor.median()) / 2.
+    if len(tensor.shape) > 2:
+        n = tensor.shape[1]
+    else:
+        n = tensor.shape[0]
+        tensor = tensor.unsqueeze(0)
+    m = tensor.shape[0]
+    idx = torch.triu_indices(n, n, 1)
+    tensor = tensor[:, idx[0], idx[1]]
+    tensor = tensor.detach().reshape(m, -1)
+    tensor_max = tensor.max(dim=1).values.reshape(-1, 1)
+    return (torch.cat((tensor, tensor_max), dim=1).median(dim=1).values + tensor.median(dim=1).values) / 2.
 
 
 def rbf_kernel(X, Xbar, Q=None):
@@ -18,15 +26,19 @@ def rbf_kernel(X, Xbar, Q=None):
     Xbar = Xbar.reshape(n, -1)
     n, d = X.shape
     diff = X.unsqueeze(0) - Xbar.unsqueeze(1)
+    # Q must be PD - add diagonal to make it so
+    Q = Q #+# torch.eye(d, device=X.device)
     if Q is not None:
         scaled_diff = diff @ Q.unsqueeze(0)
     else:
         scaled_diff = diff
 
     scaled_diff = (scaled_diff.reshape(-1, 1, d) @ diff.reshape(-1, d, 1)).reshape(n, n)
-    h = median(torch.sqrt(scaled_diff)) ** 2
+    h = median(torch.sqrt(scaled_diff))**2
     h = h / (2 * np.log(n + 1)) + EPS
-
+    if torch.isnan(h):
+        # re run with no Q
+        return rbf_kernel(X, Xbar, None)
     # h = 0.1
     return torch.exp(-0.5 * scaled_diff / h)
 
@@ -65,10 +77,11 @@ def structured_rbf_kernel(X, Xbar, Q=None):
     sq_diff = (diff.reshape(-1, 1, d) @ diff.reshape(-1, d, 1)).reshape(M, n, n)
     h = median(torch.sqrt(sq_diff)) ** 2
     h = h / (2 * np.log(n + 1)) + EPS
+
     #if Q is not None:
     #    h = d
     # h = 0.1
-    return torch.exp(-0.5 * sq_diff / h).mean(dim=0)
+    return torch.exp(-0.5 * sq_diff / h.reshape(M, 1, 1)).mean(dim=0)
 
 
 class RBFKernel:

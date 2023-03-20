@@ -14,6 +14,7 @@ class MPPI:
         self.lambda_ = params.get('lambda', 0.1)
         self.warmup_iters = params.get('warmup_iters', 100)
         self.online_iters = params.get('online_iters', 100)
+        self.includes_x0 = params.get('include_x0', False)
 
         # randomly generate actions
         self.U = self.sigma * torch.randn(self.H, self.du, device=self.device)
@@ -33,10 +34,12 @@ class MPPI:
         for t in range(self.H):
             x.append(self.problem.dynamics(x[-1], u[:, t]))
 
-        return torch.stack(x[:-1], dim=1)
+        if self.includes_x0:
+            return torch.stack(x[:-1], dim=1)
+        return torch.stack(x[1:], dim=1)
 
     def step(self, x, **kwargs):
-        if self.fixed_H:
+        if self.fixed_H or (not self.warmed_up):
             new_T = None
         else:
             new_T = self.problem.T - 1
@@ -54,7 +57,7 @@ class MPPI:
             # Sample peturbations
             noise = torch.randn(self.N, self.H, self.du, device=self.device)
             peturbed_actions = self.U.unsqueeze(dim=0) + self.sigma * noise
-            action_cost = torch.sum(self.lambda_ * noise * self.U / self.sigma**2, dim=[1, 2])
+            action_cost = torch.sum(self.lambda_ * noise * self.U / self.sigma ** 2, dim=[1, 2])
 
             pred_x = self._rollout_dynamics(x, peturbed_actions)
             # Get total cost
@@ -74,13 +77,15 @@ class MPPI:
         out_trajectory = torch.cat((out_X, out_U), dim=-1)
         sampled_trajectories = torch.cat((pred_x, peturbed_actions), dim=-1)
 
-        return out_trajectory, []#sampled_trajectories
+        self.shift()
+        return out_trajectory, sampled_trajectories
 
     def shift(self):
-        self.U = torch.roll(self.U, shifts=-1, dims=0)
-        self.U[-1] = self.sigma * torch.randn(self.du, device=self.device)
-        if not self.fixed_H:
-            self.U = self.U[:-1]
+        if self.fixed_H:
+            self.U = torch.roll(self.U, shifts=-1, dims=0)
+            self.U[-1] = self.sigma * torch.randn(self.du, device=self.device)
+        else:
+            self.U = self.U[1:]
 
     def reset(self):
         self.U = self.sigma * torch.randn(self.H, self.du, device=self.device)

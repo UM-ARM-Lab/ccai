@@ -93,7 +93,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
                                          torch.from_numpy(data['z']).to(dtype=torch.float32, device=device))
 
         # gradient and hessian of dynamics
-        self.dynamics = Quadrotor12DDynamics(dt=0.1)
+        self._dynamics = Quadrotor12DDynamics(dt=0.1)
         self.dynamics_constraint = vmap(self._dynamics_constraint)
         self.grad_dynamics = vmap(jacrev(self._dynamics_constraint))
         self.hess_dynamics = vmap(hessian(self._dynamics_constraint))
@@ -126,6 +126,9 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
 
     def _objective(self, x):
         return cost(x, self.goal)
+
+    def dynamics(self, x, u):
+        return self._dynamics(x, u)
 
     def _dynamics_constraint(self, trajectory):
         x = trajectory[:, :12]
@@ -167,7 +170,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         # start constraint
         start_constraint = (trajectory[:, 0, :12] - self.start.reshape(1, 12)).reshape(N, 12)
         g = torch.cat((dynamics_constr, start_constraint, surf_constr[:, 1:]), dim=1)
-        #g = torch.cat((dynamics_constr, start_constraint), dim=1)
+        # g = torch.cat((dynamics_constr, start_constraint), dim=1)
 
         if not compute_grads:
             return g, None, None
@@ -189,8 +192,8 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
 
         Dg = torch.cat((grad_dynamics_constr, grad_start_constraint, grad_surf_constr[:, 1:]), dim=1)
         DDg = torch.cat((hess_dynamics_constr, hess_start_constraint, hess_surf_constr[:, 1:]), dim=1)
-        #Dg = torch.cat((grad_dynamics_constr, grad_start_constraint), dim=1)
-        #DDg = torch.cat((hess_dynamics_constr, hess_start_constraint), dim=1)
+        # Dg = torch.cat((grad_dynamics_constr, grad_start_constraint), dim=1)
+        # DDg = torch.cat((hess_dynamics_constr, hess_start_constraint), dim=1)
         # g = torch.cat((dynamics_constr, start_constraint, surf_constr[:, 1:]), dim=1)
         # Dg = torch.cat((grad_dynamics_constr,  grad_start_constraint, grad_surf_constr[:, 1:]), dim=1)
         # DDg = torch.cat((hess_dynamics_constr, hess_start_constraint, hess_surf_constr[:, 1:]), dim=1)
@@ -235,7 +238,8 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         cost, grad_cost, hess_cost = self._objective(trajectory)
         grad_cost = grad_cost * self.alpha
         cost = cost * self.alpha
-        hess_cost = hess_cost.mean(dim=0).detach()
+        #hess_cost = hess_cost * self.alpha
+        # hess_cost = hess_cost.mean(dim=0).detach()
         # hess_cost = None
         grad_cost = torch.cat((grad_cost.reshape(N, self.T, -1),
                                torch.zeros(N, self.T, self.dz, device=trajectory.device)
@@ -243,8 +247,8 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
 
         # compute kernel and grad kernel
         # Xk = trajectory.reshape(N, -1)
-        K = self.K(trajectory, trajectory, hess_cost)
-        grad_K = -self.dK(trajectory, trajectory, hess_cost).reshape(N, N, N, -1)
+        K = self.K(trajectory, trajectory, hess_cost.mean(dim=0))
+        grad_K = -self.dK(trajectory, trajectory, hess_cost.mean(dim=0)).reshape(N, N, N, -1)
         grad_K = torch.einsum('nmmi->nmi', grad_K)
         grad_K = torch.cat((grad_K.reshape(N, N, self.T, self.dx + self.du),
                             torch.zeros(N, N, self.T, self.dz, device=trajectory.device)), dim=-1)
@@ -253,15 +257,20 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         # Now we need to compute constraints and their first and second partial derivatives
         g, Dg, DDg = self.combined_constraints(augmented_trajectory)
 
-        hess_cost_ext = torch.zeros(self.T, self.dx + self.du + self.dz, self.T, self.dx + self.du + self.dz,
+        hess_cost_ext = torch.zeros(N, self.T, self.dx + self.du + self.dz, self.T, self.dx + self.du + self.dz,
                                     device=trajectory.device)
-        hess_cost_ext[:, :self.dx + self.du, :, :self.dx + self.du] = hess_cost.reshape(self.T, self.dx + self.du,
-                                                                                        self.T, self.dx + self.du)
-        hess_cost = hess_cost_ext.reshape(self.T * (self.dx + self.du + self.dz),
+        hess_cost_ext[:, :, :self.dx + self.du, :, :self.dx + self.du] = hess_cost.reshape(N, self.T, self.dx + self.du,
+                                                                                          self.T, self.dx + self.du)
+        hess_cost = hess_cost_ext.reshape(N, self.T * (self.dx + self.du + self.dz),
                                           self.T * (self.dx + self.du + self.dz))
         #print(g.abs().max())
         #print(cost.reshape(-1))
-        # print(g[0])
+        #print(g[0])
+        grad_cost_augmented = grad_cost + 2 * (g.reshape(N, 1, -1) @ Dg).reshape(N, -1)
+        hess_J_augmented = hess_cost + 2 * (torch.sum(g.reshape(N, -1, 1, 1) * DDg, dim=1) + Dg.permute(0, 2, 1) @ Dg)
+        grad_cost = grad_cost_augmented
+        hess_cost = hess_J_augmented.mean(dim=0)
+
         return grad_cost.detach(), hess_cost, K.detach(), grad_K.detach(), g.detach(), Dg.detach(), DDg.detach()
 
     def update(self, start, goal=None, T=None, obstacle_pos=None):
@@ -284,12 +293,6 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
             x.append(self.dynamics(x[-1], u[:, t]))
 
         return torch.cat((torch.stack(x, dim=1), u), dim=2)
-
-    def get_initial_z(self, x):
-        h, _, _ = self._con_ineq(x, compute_grads=False)
-        z = torch.where(h < 0, torch.sqrt(-2 * h), 0)
-
-        return z.reshape(-1, self.T, self.dz)
 
 
 class QuadrotorIpoptProblem(QuadrotorProblem, IpoptProblem):
@@ -330,7 +333,7 @@ def update_plot_with_trajectories(ax, traj_lines, best, trajectory):
 
 
 def do_trial(env, params, fpath):
-    #env.render_init()
+    # env.render_init()
 
     start = torch.from_numpy(env.state).to(dtype=torch.float32, device=params['device'])
     goal = torch.zeros(12, device=params['device'])
@@ -356,7 +359,7 @@ def do_trial(env, params, fpath):
         controller = SVMPC(problem, params)
     else:
         raise ValueError('Invalid controller')
-    #plt.axis('off')
+    # plt.axis('off')
     ax = env.ax
     traj_lines = None
     collision = False
@@ -372,30 +375,28 @@ def do_trial(env, params, fpath):
             if include_obstacle:
                 if violation[1] > 0:
                     collision = True
-                    print('collided')
         actual_traj.append(env.state)
         all_violation.append(violation)
-        #print(np.linalg.norm(env.state[:2] - np.array([4, 4])))
         #
 
         # if np.linalg.norm(env.state[:2] - np.array([4, 4])) < 0.5:
         #    goal_reached = True
 
-        #env.render_update()
+        # env.render_update()
 
         # ax = env.render()
-        #update_plot_with_trajectories(ax, traj_lines, best_traj, trajectories)
-        #plt.draw()
+        # update_plot_with_trajectories(ax, traj_lines, best_traj, trajectories)
+        # plt.draw()
         # plt.pause(0.01)
 
-        #plt.savefig(f'{fpath.resolve()}/im_{step:02d}.svg')
-        #plt.gcf().canvas.flush_events()
+        # plt.savefig(f'{fpath.resolve()}/im_{step:02d}.svg')
+        # plt.gcf().canvas.flush_events()
 
     actual_traj = np.stack(actual_traj)
     all_violation = np.stack(all_violation)
     np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_traj, constr=all_violation)
 
-    #plt.close()
+    # plt.close()
     # plt.show(block=True)
     return np.linalg.norm(env.state[:2] - np.array([4, 4]))
 
@@ -403,6 +404,7 @@ def do_trial(env, params, fpath):
 if __name__ == "__main__":
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/quadrotor.yaml').read_text())
     from tqdm import tqdm
+
     if config['obstacle_mode'] == 'none':
         config['obstacle_mode'] = None
 

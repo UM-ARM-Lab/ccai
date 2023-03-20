@@ -21,7 +21,10 @@ class Constrained_SVGD_MPC:
         if self.fix_T:
             new_T = None
         else:
-            new_T = self.problem.T - 1
+            if self.warmed_up:
+                new_T = self.problem.T - 1
+            else:
+                new_T = None
 
         self.problem.update(state, T=new_T, **kwargs)
         # warm starting
@@ -41,10 +44,11 @@ class Constrained_SVGD_MPC:
         return best_trajectory, all_trajectories
 
     def shift(self):
-        self.x = torch.roll(self.x, shifts=-1, dims=1)
-        self.x[:, -1] = self.x[:, -2]  # just copy over previous last
-        if not self.fix_T:
-            self.x = self.x[:, :-1]
+        if self.fix_T:
+            self.x = torch.roll(self.x, shifts=-1, dims=1)
+            self.x[:, -1] = self.x[:, -2]  # just copy over previous last
+        else:
+            self.x = self.x[:, 1:]
 
     def reset(self, start, **kwargs):
         self.problem.update(start, **kwargs)
