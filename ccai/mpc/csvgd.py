@@ -24,7 +24,7 @@ class Constrained_SVGD_MPC:
             if self.warmed_up:
                 new_T = self.problem.T - 1
             else:
-                new_T = None
+                new_T = self.problem.T
 
         self.problem.update(state, T=new_T, **kwargs)
         # warm starting
