@@ -125,8 +125,9 @@ class SVMPC:
 
         # get kernel and kernel gradient
         self.U.requires_grad = True
-        Kxx = self.kernel(self.U, self.U)
-        grad_K = self.kernel_grad(self.U, self.U)
+        Kxx = self.kernel(self.U.reshape(self.M, -1), self.U.reshape(self.M, -1))
+        grad_K = self.kernel_grad(self.U.reshape(self.M, -1), self.U.reshape(self.M, -1))
+        grad_K = grad_K.reshape(self.M, self.M, self.M, self.H, self.du)
         grad_K = torch.mean(torch.einsum('nmmti->nmti', grad_K), dim=0)
 
         if self.use_true_grad:

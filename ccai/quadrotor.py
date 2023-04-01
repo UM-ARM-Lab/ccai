@@ -58,6 +58,7 @@ class Quadrotor12DDynamics(torch.nn.Module):
         #                   x_ddot, y_ddot, z_ddot, p_dot, q_dot, r_dot), axis=-1)
 
         # self.state = self.state + dstate * self.dt
+
         return torch.cat(
             (new_x, new_y, new_z, new_phi, new_theta, new_psi, new_xdot, new_ydot, new_zdot, new_p, new_q, new_r),
             dim=-1

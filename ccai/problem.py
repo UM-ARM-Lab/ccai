@@ -91,7 +91,8 @@ class ConstrainedSVGDProblem(Problem):
                                       ).permute(0, 3, 1, 4, 2)  # (N, T, dz, T dz)
         grad_h_aug = torch.cat((
             grad_h.reshape(N, self.T, self.dz, self.T, -1),
-            z_extended), dim=-1).reshape(N, self.dh, self.T * (self.dx + self.du + self.dz))
+            z_extended), dim=-1)
+        grad_h_aug = grad_h_aug.reshape(N, self.dh, self.T * (self.dx + self.du + self.dz))
 
         # Hessians - second derivative wrt z should be identity
         # partial derivatives dx dz should be zero
@@ -134,7 +135,6 @@ class ConstrainedSVGDProblem(Problem):
         hess_g_aug = hess_g_aug.reshape(N, self.dg,
                                         self.T * (self.dx + self.du + self.dz),
                                         self.T * (self.dx + self.du + self.dz))
-
         c = torch.cat((g, h_aug), dim=1)  # (N, dg + dh)
         grad_c = torch.cat((grad_g_aug, grad_h_aug), dim=1)
         hess_c = torch.cat((hess_g_aug, hess_h_aug), dim=1)

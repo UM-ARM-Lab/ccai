@@ -48,24 +48,23 @@ class QuadrotorEnv:
         start = np.zeros(self.state_dim)
 
         # positions
-        start[:2] = np.array([-4.5, -4.5]) + 0.5 * np.random.randn(2)
+        start[:2] = np.array([-2.5, -2.5]) - 3. * np.random.rand(2)
         start[2] = self._get_surface_h(start)
 
+
         # Angles in rad
-        # Heading angle can be between 0 and pi/2
-        start[5] = np.pi / 2.0 * np.random.rand()
+        start[3:6] = 0.05 * (-np.pi + 2 * np.pi * np.random.rand(3))
 
-        # Other two must be restriced by a lot
-        start[3:5] = 0.0 * (-np.pi + 2 * np.pi * np.random.rand(2))
-
-        # Initial velocity zero for now - may change in future
+        # Initial velocity
         start[6:] = 0.05 * np.random.randn(6)
+
         # start[9:] *= 5
         self.state = start
         if self.obstacle_mode == 'dynamic':
-            self.obstacle_pos = np.array([-2.0, 3.0])
+            self.obstacle_pos = np.array([-1.0, 2.5])
         else:
             self.obstacle_pos = np.array([0.0, 0.0])
+
     def get_constraint_violation(self):
         surface_h = self._get_surface_h(self.state)
         surface_violation = self.state[2] - surface_h
@@ -135,7 +134,7 @@ class QuadrotorEnv:
         # self.state[3:6] = normalize_angles(self.state[3:6])
 
         if self.obstacle_mode == 'dynamic':
-            self.obstacle_pos += np.array([0.25, -0.25])
+            self.obstacle_pos += np.array([0.25, -0.1])
 
         return self.state, self.get_constraint_violation()
 
@@ -160,7 +159,6 @@ class QuadrotorEnv:
                                           self.surface_plotting_vars[2] - 0.1, alpha=self.alpha,
                                           shade=True,
                                           antialiased=True, linewidth=0,
-                                          edgecolors='k',
                                           facecolors=self._get_surface_colours(),
                                           rstride=1,
                                           cstride=1)

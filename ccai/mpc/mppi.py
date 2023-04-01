@@ -76,8 +76,12 @@ class MPPI:
 
         out_trajectory = torch.cat((out_X, out_U), dim=-1)
         sampled_trajectories = torch.cat((pred_x, peturbed_actions), dim=-1)
+        # only return best 10% trajectories for visualization
+        sampled_trajectories = sampled_trajectories[torch.argsort(total_cost, descending=False)][:self.N//20]
 
         self.shift()
+
+
         return out_trajectory, sampled_trajectories
 
     def shift(self):

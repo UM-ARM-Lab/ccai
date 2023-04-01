@@ -27,7 +27,6 @@ def rbf_kernel(X, Xbar, Q=None):
     n, d = X.shape
     diff = X.unsqueeze(0) - Xbar.unsqueeze(1)
     # Q must be PD - add diagonal to make it so
-    Q = Q #+# torch.eye(d, device=X.device)
     if Q is not None:
         scaled_diff = diff @ Q.unsqueeze(0)
     else:
@@ -35,8 +34,13 @@ def rbf_kernel(X, Xbar, Q=None):
 
     scaled_diff = (scaled_diff.reshape(-1, 1, d) @ diff.reshape(-1, d, 1)).reshape(n, n)
     h = median(torch.sqrt(scaled_diff))**2
-    h = h / (2 * np.log(n + 1)) + EPS
+    h = h / np.log(n)+ EPS
+
     if torch.isnan(h):
+        print(h)
+        print(torch.sqrt(scaled_diff))
+        print(X)
+        exit(0)
         # re run with no Q
         return rbf_kernel(X, Xbar, None)
     # h = 0.1
@@ -76,7 +80,7 @@ def structured_rbf_kernel(X, Xbar, Q=None):
 
     sq_diff = (diff.reshape(-1, 1, d) @ diff.reshape(-1, d, 1)).reshape(M, n, n)
     h = median(torch.sqrt(sq_diff)) ** 2
-    h = h / (2 * np.log(n + 1)) + EPS
+    h = h / np.log(n) + EPS
 
     #if Q is not None:
     #    h = d

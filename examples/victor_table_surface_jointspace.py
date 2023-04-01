@@ -41,10 +41,10 @@ class VictorTableProblem(ConstrainedSVGDProblem):
         self.start = start
         self.goal = goal
         self.K = rbf_kernel
-        self.K = structured_rbf_kernel
+        #self.K = structured_rbf_kernel
 
         self.grad_kernel = jacrev(rbf_kernel, argnums=0)
-        self.alpha = 2.
+        self.alpha = 10
 
         self._equality_constraints = EndEffectorConstraint(
             chain, ee_equality_constraint
@@ -94,7 +94,7 @@ class VictorTableProblem(ConstrainedSVGDProblem):
         if term_grad_g is not None:
             term_grad_g_extended = term_grad_g.reshape(N, self.T, self.dx)
             term_hess_g_extended = term_hess_g.reshape(N, self.T, self.dx, self.dx).permute(0, 2, 3, 1)
-            term_grad_g_extended[:, -1] *= 20
+            term_grad_g_extended[:, -1] *= 10
             term_hess_g_extended = torch.diag_embed(term_hess_g_extended).permute(0, 3, 1, 4, 2)
             term_hess_g_extended[:, -1, :, -1] *= 10
 
@@ -270,19 +270,19 @@ class VictorTableUnconstrainedProblem(VictorTableProblem, UnconstrainedPenaltyPr
 def cost(x, start):
     x = torch.cat((start.reshape(1, 7), x[:, :7]), dim=0)
     weight = torch.tensor([
-        8, 7,  7, 5, 3, 3, 1], device=x.device)
-
+        0.2, 0.25, 0.4, 0.4, 0.6, 0.75, 1.0], device=x.device, dtype=torch.float32)
+    weight = 1.0 / weight
     diff = x[1:] - x[:-1]
-    weighted_diff = diff * weight.unsqueeze(0)
-    return 2 * torch.sum(weighted_diff**2)
+    weighted_diff = diff.reshape(-1, 1, 7) @ torch.diag(weight).unsqueeze(0) @ diff.reshape(-1, 7, 1)
+    return 10 * torch.sum(weighted_diff)
 
 def obstacle_constraint(x):
     xy = x[:2]
-    centre1 = torch.tensor([0.6, 0.35], device=x.device)
-    centre2 = torch.tensor([0.825, 0.45], device=x.device)
-    constr1 = 0.12 ** 2 - torch.sum((xy - centre1) ** 2)
+    centre1 = torch.tensor([0.7, 0.3], device=x.device)
+    centre2 = torch.tensor([0.825, 0.5], device=x.device)
+    constr1 = 0.1 ** 2 - torch.sum((xy - centre1) ** 2)
     #return constr1.reshape(-1)
-    constr2 = 0.12 ** 2 - torch.sum((xy - centre2) ** 2)
+    constr2 = 0.1 ** 2 - torch.sum((xy - centre2) ** 2)
 
     # if we were to do an SDF style thing, we would look at which was closest
     #return torch.max(constr1, constr2).reshape(-1)
@@ -441,6 +441,13 @@ def ee_inequality_constraint(p, mat):
 
 def do_trial(env, params, fpath):
     state = env.get_state()
+    if params['visualize']:
+        env.frame_fpath = fpath
+        env.frame_id = 0
+    else:
+        env.frame_fpath = None
+        env.frame_id = None
+
     # ee_pos, ee_ori = state['ee_pos'], state['ee_ori']
     # start = torch.cat((ee_pos, ee_ori), dim=-1).reshape(7).to(device=params['device'])
     start = state['q'].reshape(7).to(device=params['device'])
@@ -472,13 +479,12 @@ def do_trial(env, params, fpath):
         best_traj, trajectories = controller.step(start)
 
         x = best_traj[0, :7]
-
         # add goal lines to sim
         line_vertices = np.array([
-            [goal[0].item() - 0.025, goal[1].item() - 0.025, 0.803],
-            [goal[0].item() + 0.025, goal[1].item() + 0.025, 0.803],
-            [goal[0].item() - 0.025, goal[1].item() + 0.025, 0.803],
-            [goal[0].item() + 0.025, goal[1].item() - 0.025, 0.803],
+            [goal[0].item() - 0.025, goal[1].item() - 0.025, 0.808],
+            [goal[0].item() + 0.025, goal[1].item() + 0.025, 0.808],
+            [goal[0].item() - 0.025, goal[1].item() + 0.025, 0.808],
+            [goal[0].item() + 0.025, goal[1].item() - 0.025, 0.808],
         ], dtype=np.float32)
 
         line_colors = np.array([
@@ -509,7 +515,7 @@ def do_trial(env, params, fpath):
                 for t in range(T - 1):
                     p = torch.stack((trajectories[:, t, :3], trajectories[:, t + 1, :3]), dim=1).reshape(2 * M, 3)
                     p = p.cpu().numpy()
-                    p[:, 2] += 0.005
+                    p[:, 2] += 0.01
                     gym.add_lines(viewer, e, M, p, traj_line_colors)
                 gym.step_graphics(sim)
                 gym.draw_viewer(viewer, sim, False)
@@ -564,11 +570,11 @@ if __name__ == "__main__":
     results = {}
 
     for i in tqdm(range(config['num_trials'])):
-        goal = torch.tensor([0.6, 0.6])
-        goal = goal + torch.tensor([0.25, 0.1]) * torch.rand(2)
+        goal = torch.tensor([0.8, 0.15])
+        goal = goal + 0.025 * torch.randn(2)#torch.tensor([0.25, 0.1]) * torch.rand(2)
         for controller in config['controllers'].keys():
             env.reset()
-            fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/victor_table_jointspace/{controller}/trial_{i + 1}')
+            fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_{i + 1}')
             pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
             # set up params
             params = config.copy()

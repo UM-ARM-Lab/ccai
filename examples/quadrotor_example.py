@@ -33,7 +33,7 @@ def cost(trajectory, goal):
     Q[5, 5] = 1e-2
     Q[2, 2] = 1e-2
     P = Q * 100
-    R = torch.eye(4, device=trajectory.device)
+    R = 2*torch.eye(4, device=trajectory.device)
 
     d2goal = x - goal.reshape(-1, 12)
 
@@ -108,8 +108,8 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         # self.grad_g = vmap(jacrev(self._combined_contraints))
         # self.hess_g = vmap(hessian(self._combined_contraints))
 
-        # kernel = structured_rbf_kernel
-        kernel = rbf_kernel
+        kernel = structured_rbf_kernel
+        #kernel = rbf_kernel
         self.K = kernel
         self.dK = jacrev(kernel, argnums=0)
         self.x_max = torch.ones(self.dx + self.du)
@@ -172,6 +172,11 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         g = torch.cat((dynamics_constr, start_constraint, surf_constr[:, 1:]), dim=1)
         # g = torch.cat((dynamics_constr, start_constraint), dim=1)
 
+        if torch.any(torch.isinf(surf_constr)):
+            print('inf in surface')
+        if torch.any(torch.isinf(dynamics_constr)):
+            print('inf in dynamics')
+
         if not compute_grads:
             return g, None, None
 
@@ -200,6 +205,20 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
 
         # print(surf_constr[0])
         # return dynamics_constr, grad_dynamics_constr, hess_dynamics_constr
+
+        if torch.isinf(g).any():
+            print('inf in g')
+            print(torch.where(torch.isinf(g)))
+        if torch.isinf(Dg).any():
+            print('inf in Dg')
+            print(torch.where(torch.isinf(Dg)))
+        if torch.isnan(g).any():
+            print('nan in g')
+            print(torch.where(torch.isnan(g)))
+        if torch.isnan(Dg).any():
+            print('nan in Dg')
+            print(torch.where(torch.isnan(Dg)))
+
         return g, Dg, DDg
 
     def _con_ineq(self, trajectory, compute_grads=True):
@@ -228,7 +247,6 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         hess_h[:, :, :, :2, :, :2] = hess_h_xy
         hess_h = hess_h.reshape(N, self.T, self.T * (self.dx + self.du),
                                 self.T * (self.dx + self.du))
-
         return h, grad_h, hess_h
 
     def eval(self, augmented_trajectory):
@@ -238,17 +256,18 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         cost, grad_cost, hess_cost = self._objective(trajectory)
         grad_cost = grad_cost * self.alpha
         cost = cost * self.alpha
+
         #hess_cost = hess_cost * self.alpha
         # hess_cost = hess_cost.mean(dim=0).detach()
-        # hess_cost = None
+        hess_cost = None
         grad_cost = torch.cat((grad_cost.reshape(N, self.T, -1),
                                torch.zeros(N, self.T, self.dz, device=trajectory.device)
                                ), dim=2).reshape(N, -1)
 
         # compute kernel and grad kernel
-        # Xk = trajectory.reshape(N, -1)
-        K = self.K(trajectory, trajectory, hess_cost.mean(dim=0))
-        grad_K = -self.dK(trajectory, trajectory, hess_cost.mean(dim=0)).reshape(N, N, N, -1)
+        Xk = trajectory#.reshape(N, -1)
+        K = self.K(Xk, Xk, None)
+        grad_K = -self.dK(Xk, Xk, None).reshape(N, N, N, -1)
         grad_K = torch.einsum('nmmi->nmi', grad_K)
         grad_K = torch.cat((grad_K.reshape(N, N, self.T, self.dx + self.du),
                             torch.zeros(N, N, self.T, self.dz, device=trajectory.device)), dim=-1)
@@ -257,19 +276,18 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         # Now we need to compute constraints and their first and second partial derivatives
         g, Dg, DDg = self.combined_constraints(augmented_trajectory)
 
-        hess_cost_ext = torch.zeros(N, self.T, self.dx + self.du + self.dz, self.T, self.dx + self.du + self.dz,
-                                    device=trajectory.device)
-        hess_cost_ext[:, :, :self.dx + self.du, :, :self.dx + self.du] = hess_cost.reshape(N, self.T, self.dx + self.du,
-                                                                                          self.T, self.dx + self.du)
-        hess_cost = hess_cost_ext.reshape(N, self.T * (self.dx + self.du + self.dz),
-                                          self.T * (self.dx + self.du + self.dz))
+        #hess_cost_ext = torch.zeros(N, self.T, self.dx + self.du + self.dz, self.T, self.dx + self.du + self.dz,
+        #hess_cost_ext[:, :, :self.dx + self.du, :, :self.dx + self.du] = hess_cost.reshape(N, self.T, self.dx + self.du,
+         #                                                                                 self.T, self.dx + self.du)
+        #hess_cost = hess_cost_ext.reshape(N, self.T * (self.dx + self.du + self.dz),
+        #                                  self.T * (self.dx + self.du + self.dz))
         #print(g.abs().max())
         #print(cost.reshape(-1))
         #print(g[0])
-        grad_cost_augmented = grad_cost + 2 * (g.reshape(N, 1, -1) @ Dg).reshape(N, -1)
-        hess_J_augmented = hess_cost + 2 * (torch.sum(g.reshape(N, -1, 1, 1) * DDg, dim=1) + Dg.permute(0, 2, 1) @ Dg)
-        grad_cost = grad_cost_augmented
-        hess_cost = hess_J_augmented.mean(dim=0)
+        #grad_cost_augmented = grad_cost + 2 * (g.reshape(N, 1, -1) @ Dg).reshape(N, -1)
+        #hess_J_augmented = hess_cost + 2 * (torch.sum(g.reshape(N, -1, 1, 1) * DDg, dim=1) + Dg.permute(0, 2, 1) @ Dg)
+        #grad_cost = grad_cost_augmented
+        #hess_cost = hess_J_augmented.mean(dim=0)
 
         return grad_cost.detach(), hess_cost, K.detach(), grad_K.detach(), g.detach(), Dg.detach(), DDg.detach()
 
@@ -287,7 +305,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
 
     def get_initial_xu(self, N):
         x = [self.start.repeat(N, 1)]
-        u = 0.1 * torch.randn(N, self.T, self.du, device=self.device)
+        u = np.sqrt(2) * torch.randn(N, self.T, self.du, device=self.device) / 2
 
         for t in range(self.T - 1):
             x.append(self.dynamics(x[-1], u[:, t]))
@@ -308,7 +326,8 @@ class QuadrotorUnconstrainedProblem(QuadrotorProblem, UnconstrainedPenaltyProble
 
 
 def update_plot_with_trajectories(ax, traj_lines, best, trajectory):
-    ax.lines = []
+    for line in ax.get_lines():
+        line.remove()
     if traj_lines is None:
         traj_lines = []
         for traj in trajectory:
@@ -333,7 +352,8 @@ def update_plot_with_trajectories(ax, traj_lines, best, trajectory):
 
 
 def do_trial(env, params, fpath):
-    # env.render_init()
+    if params['visualize']:
+        env.render_init()
 
     start = torch.from_numpy(env.state).to(dtype=torch.float32, device=params['device'])
     goal = torch.zeros(12, device=params['device'])
@@ -377,27 +397,20 @@ def do_trial(env, params, fpath):
                     collision = True
         actual_traj.append(env.state)
         all_violation.append(violation)
-        #
 
-        # if np.linalg.norm(env.state[:2] - np.array([4, 4])) < 0.5:
-        #    goal_reached = True
-
-        # env.render_update()
-
-        # ax = env.render()
-        # update_plot_with_trajectories(ax, traj_lines, best_traj, trajectories)
-        # plt.draw()
-        # plt.pause(0.01)
-
-        # plt.savefig(f'{fpath.resolve()}/im_{step:02d}.svg')
-        # plt.gcf().canvas.flush_events()
+        if params['visualize']:
+            env.render_update()
+            update_plot_with_trajectories(ax, traj_lines, best_traj, trajectories)
+            plt.savefig(f'{fpath.resolve()}/im_{step:02d}.png')
+            plt.gcf().canvas.flush_events()
 
     actual_traj = np.stack(actual_traj)
     all_violation = np.stack(all_violation)
     np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_traj, constr=all_violation)
 
-    # plt.close()
-    # plt.show(block=True)
+    if params['visualize']:
+        plt.close()
+
     return np.linalg.norm(env.state[:2] - np.array([4, 4]))
 
 
@@ -417,7 +430,8 @@ if __name__ == "__main__":
         for controller in config['controllers'].keys():
             env.reset()
             env.state = start_state
-            fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/quadrotor/{controller}/trial_{i + 1}')
+            print(env.state[:3])
+            fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_{i + 1}')
             pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
 
             # set up params

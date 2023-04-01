@@ -12,6 +12,10 @@ class ConstrainedSteinTrajOpt:
         self.alpha_J = params.get('alpha_J', 1)
         self.alpha_C = params.get('alpha_C', 1)
         self.momentum = params.get('momentum', 0)
+        self.iters = params.get('iters', 100)
+        self.penalty = params.get('penalty', 1e2)
+        self.resample_sigma = params.get('resample_sigma', 1e-2)
+        self.resample_temperature = params.get('resample_temperature', 0.1)
 
         self.problem = problem
         self.dx = problem.dx
@@ -157,14 +161,14 @@ class ConstrainedSteinTrajOpt:
         J = self.problem.get_cost(xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du])
         C, dC, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1))
 
-        penalty = J.reshape(N) + 100.0 * torch.sum(C.reshape(N, -1).abs(), dim=1)
-
+        penalty = J.reshape(N) + self.penalty * torch.sum(C.reshape(N, -1).abs(), dim=1)
+        # normalize penalty
+        penalty = (penalty - penalty.min()) / (penalty.max() - penalty.min())
         # now we sort particles
         idx = torch.argsort(penalty, descending=False)
         xuz = xuz[idx]
         penalty = penalty[idx]
-        temperature = 1e-1
-        weights = torch.softmax(-temperature * penalty, dim=0, )
+        weights = torch.softmax(-penalty / self.resample_temperature, dim=0, )
         weights = torch.cumsum(weights, dim=0)
         # now we resample
         p = torch.rand(N, device=xuz.device)
@@ -187,7 +191,7 @@ class ConstrainedSteinTrajOpt:
         eye = torch.eye((self.dx + self.du) * self.T + self.dh, device=xuz.device, dtype=xuz.dtype).unsqueeze(0)
         projection = eye - dC.permute(0, 2, 1) @ projection
 
-        noise = self.sigma * torch.randn_like(xuz)
+        noise = self.resample_sigma * torch.randn_like(xuz)
         eps = projection[idx] @ noise.unsqueeze(-1)
         # print(penalty, weights)
         # we need to add a very small amount of noise just so that the particles are distinct - otherwise
@@ -198,7 +202,7 @@ class ConstrainedSteinTrajOpt:
 
         # weights = weights / torch.sum(weights)
 
-    def solve(self, x0):
+    def solve(self, x0, resample=False):
         self.normxiJ = None
 
         # update from problem incase T has changed
@@ -228,19 +232,20 @@ class ConstrainedSteinTrajOpt:
         def driving_force(t):
             return ((t % (T / C)) / (T / C)) ** p
 
-        resample_period = 25
+        if resample:
+            xuz.data = self.resample(xuz.data)
 
+        resample_period = 25
+        path = [xuz.data.clone()]
         for iter in range(T):
             s = time.time()
             if T > 50:
-                self.gamma = self.max_gamma * driving_force(iter + 1)
-                self.sigma = 0.1 * (1.0 - iter / T) + 1e-2
-            else:
-                self.gamma = self.max_gamma
-                self.sigma = 1.0e-2
+                self.gamma = 1#self.max_gamma * driving_force(iter + 1)
+            #    self.sigma = 0.1 * (1.0 - iter / T) + 1e-2
 
-            if iter % resample_period == 0:
-                xuz.data = self.resample(xuz.data)
+            #if (iter + 1) % resample_period == 0 and (iter < T - 1):
+            #    print('resampling', iter)
+            #    xuz.data = self.resample(xuz.data)
 
             optim.zero_grad()
             grad = self.compute_update(xuz)
@@ -252,28 +257,13 @@ class ConstrainedSteinTrajOpt:
             # clamp within bounds for simple bounds
             if self.problem.x_max is not None:
                 self._clamp_in_bounds(xuz)
-            # old_C = self.problem.combined_constraints(old_xuz)[0]
-            # new_C = self.problem.combined_constraints(xuz)[0]
-            # improvement = -torch.max(new_C.abs(), dim=1).values + torch.max(old_C.abs(), dim=1).values
+            path.append(xuz.data.clone())
 
-            # if any trajectory failed to improve then we replace it with a trajectory that has the lowest constraint
-            # violation with some noise
-            # best_idx = torch.argmin(torch.max(new_C.abs(), dim=1).values)
-            # best_traj = xuz[best_idx].unsqueeze(0)
-            # xuz.data = torch.where(improvement.unsqueeze(-1) > -0.05,
-            #                       xuz.data,
-            #                       best_traj + 0.01 * torch.randn_like(best_traj)
-            #                       )
-
-            # if torch.all(torch.linalg.norm(grad, dim=-1) < 1e-6):
-            #    print(f'converged after {iter} iterations')
-            #    break
-            # torch.cuda.synchronize()
-            # print(time.time() - s)
-
-            # readjust values for z
-            # z_init = self.problem.get_initial_z(xuz.data.reshape(N, self.T, -1)[:, :, :self.dx + self.du])
-            # xuz.data = torch.cat((xuz.data.reshape(N, self.T, -1)[:, :, :self.dx + self.du],
-            #                      z_init), dim=2).reshape(N, -1)
-
-        return xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du]
+        # sort particles by penalty
+        J = self.problem.get_cost(xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du])
+        C, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1))
+        penalty = J.reshape(N) + self.penalty * torch.sum(C.reshape(N, -1).abs(), dim=1)
+        idx = torch.argsort(penalty, descending=False)
+        path = torch.stack(path, dim=0).reshape(len(path), N, self.T, -1)[:, :, :, :self.dx + self.du]
+        path = path[:, idx]
+        return path
