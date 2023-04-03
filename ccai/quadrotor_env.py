@@ -48,9 +48,8 @@ class QuadrotorEnv:
         start = np.zeros(self.state_dim)
 
         # positions
-        start[:2] = np.array([-2.5, -2.5]) - 3. * np.random.rand(2)
+        start[:2] = np.array([-4, -4]) - 1. * np.random.rand(2)
         start[2] = self._get_surface_h(start)
-
 
         # Angles in rad
         start[3:6] = 0.05 * (-np.pi + 2 * np.pi * np.random.rand(3))
@@ -61,7 +60,7 @@ class QuadrotorEnv:
         # start[9:] *= 5
         self.state = start
         if self.obstacle_mode == 'dynamic':
-            self.obstacle_pos = np.array([-1.0, 2.5])
+            self.obstacle_pos = np.array([-0.5, 1.])
         else:
             self.obstacle_pos = np.array([0.0, 0.0])
 
@@ -134,7 +133,8 @@ class QuadrotorEnv:
         # self.state[3:6] = normalize_angles(self.state[3:6])
 
         if self.obstacle_mode == 'dynamic':
-            self.obstacle_pos += np.array([0.25, -0.1])
+            #if self.obstacle_pos[0] < 3:
+            self.obstacle_pos += np.array([0.3, -0.15])
 
         return self.state, self.get_constraint_violation()
 

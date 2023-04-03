@@ -33,7 +33,7 @@ def cost(trajectory, goal):
     Q[5, 5] = 1e-2
     Q[2, 2] = 1e-2
     P = Q * 100
-    R = 2*torch.eye(4, device=trajectory.device)
+    R = torch.eye(4, device=trajectory.device)
 
     d2goal = x - goal.reshape(-1, 12)
 
@@ -125,7 +125,8 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         self.obstacle_rad = 1.01
 
     def _objective(self, x):
-        return cost(x, self.goal)
+        J, dJ, HJ = cost(x, self.goal)
+        return J * self.alpha, dJ * self.alpha, HJ * self.alpha
 
     def dynamics(self, x, u):
         return self._dynamics(x, u)
@@ -254,20 +255,17 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         trajectory = augmented_trajectory.reshape(N, self.T, -1)[:, :, :self.dx + self.du]
 
         cost, grad_cost, hess_cost = self._objective(trajectory)
-        grad_cost = grad_cost * self.alpha
-        cost = cost * self.alpha
 
-        #hess_cost = hess_cost * self.alpha
-        # hess_cost = hess_cost.mean(dim=0).detach()
-        hess_cost = None
+        #M = hess_cost.mean(dim=0).detach()
+        M = None
         grad_cost = torch.cat((grad_cost.reshape(N, self.T, -1),
                                torch.zeros(N, self.T, self.dz, device=trajectory.device)
                                ), dim=2).reshape(N, -1)
 
         # compute kernel and grad kernel
-        Xk = trajectory#.reshape(N, -1)
-        K = self.K(Xk, Xk, None)
-        grad_K = -self.dK(Xk, Xk, None).reshape(N, N, N, -1)
+        Xk = trajectory  # .reshape(N, -1)
+        K = self.K(Xk, Xk, M)
+        grad_K = -self.dK(Xk, Xk, M).reshape(N, N, N, -1)
         grad_K = torch.einsum('nmmi->nmi', grad_K)
         grad_K = torch.cat((grad_K.reshape(N, N, self.T, self.dx + self.du),
                             torch.zeros(N, N, self.T, self.dz, device=trajectory.device)), dim=-1)
@@ -276,18 +274,22 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         # Now we need to compute constraints and their first and second partial derivatives
         g, Dg, DDg = self.combined_constraints(augmented_trajectory)
 
-        #hess_cost_ext = torch.zeros(N, self.T, self.dx + self.du + self.dz, self.T, self.dx + self.du + self.dz,
-        #hess_cost_ext[:, :, :self.dx + self.du, :, :self.dx + self.du] = hess_cost.reshape(N, self.T, self.dx + self.du,
-         #                                                                                 self.T, self.dx + self.du)
-        #hess_cost = hess_cost_ext.reshape(N, self.T * (self.dx + self.du + self.dz),
-        #                                  self.T * (self.dx + self.du + self.dz))
-        #print(g.abs().max())
-        #print(cost.reshape(-1))
-        #print(g[0])
-        #grad_cost_augmented = grad_cost + 2 * (g.reshape(N, 1, -1) @ Dg).reshape(N, -1)
-        #hess_J_augmented = hess_cost + 2 * (torch.sum(g.reshape(N, -1, 1, 1) * DDg, dim=1) + Dg.permute(0, 2, 1) @ Dg)
-        #grad_cost = grad_cost_augmented
-        #hess_cost = hess_J_augmented.mean(dim=0)
+        if M is not None:
+            hess_cost_ext = torch.zeros(N, self.T, self.dx + self.du + self.dz, self.T, self.dx + self.du + self.dz,
+                                        device=self.device)
+            hess_cost_ext[:, :, :self.dx + self.du, :, :self.dx + self.du] = hess_cost.reshape(N, self.T, self.dx + self.du,
+                                                                                               self.T, self.dx + self.du)
+            hess_cost = hess_cost_ext.reshape(N, self.T * (self.dx + self.du + self.dz),
+                                              self.T * (self.dx + self.du + self.dz))
+            # print(g.abs().max())
+            # print(cost.reshape(-1))
+            # print(g[0])
+            grad_cost_augmented = grad_cost + 2 * (g.reshape(N, 1, -1) @ Dg).reshape(N, -1)
+            hess_J_augmented = hess_cost + 2 * (torch.sum(g.reshape(N, -1, 1, 1) * DDg, dim=1) + Dg.permute(0, 2, 1) @ Dg)
+            grad_cost = grad_cost_augmented
+            hess_cost = hess_J_augmented.mean(dim=0)
+        else:
+            hess_cost = None
 
         return grad_cost.detach(), hess_cost, K.detach(), grad_K.detach(), g.detach(), Dg.detach(), DDg.detach()
 
@@ -305,7 +307,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
 
     def get_initial_xu(self, N):
         x = [self.start.repeat(N, 1)]
-        u = np.sqrt(2) * torch.randn(N, self.T, self.du, device=self.device) / 2
+        u = torch.randn(N, self.T, self.du, device=self.device) / 2
 
         for t in range(self.T - 1):
             x.append(self.dynamics(x[-1], u[:, t]))
@@ -411,7 +413,7 @@ def do_trial(env, params, fpath):
     if params['visualize']:
         plt.close()
 
-    return np.linalg.norm(env.state[:2] - np.array([4, 4]))
+    return np.min(np.linalg.norm(actual_traj[:, :2] - np.array([[4, 4]]), axis=1))
 
 
 if __name__ == "__main__":

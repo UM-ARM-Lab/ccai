@@ -104,7 +104,7 @@ class ConstrainedSteinTrajOpt:
             else:
                 if hess_J is not None:
                     Q_inv = torch.eye(d * self.T + self.dh, device=xuz.device)
-                    # Q_inv = torch.linalg.inv(hess_J.unsqueeze(0))
+                    Q_inv = torch.linalg.inv(hess_J.unsqueeze(0))
 
                     PQ = projection @ Q_inv
                     PQP = PQ.unsqueeze(0) @ projection.unsqueeze(1)
@@ -240,7 +240,7 @@ class ConstrainedSteinTrajOpt:
         for iter in range(T):
             s = time.time()
             if T > 50:
-                self.gamma = 1#self.max_gamma * driving_force(iter + 1)
+                self.gamma = self.max_gamma * driving_force(iter + 1)
             #    self.sigma = 0.1 * (1.0 - iter / T) + 1e-2
 
             #if (iter + 1) % resample_period == 0 and (iter < T - 1):

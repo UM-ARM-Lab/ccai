@@ -42,7 +42,7 @@ class SVMPC:
         self.use_true_grad = params.get('use_grad', False)
         self.includes_x0 = params.get('include_x0', False)
 
-        self.kernel = rbf_kernel#structured_rbf_kernel
+        self.kernel = structured_rbf_kernel
         self.kernel_grad = jacrev(self.kernel, argnums=0)
 
         self.grad_cost = jacrev(self._combined_rollout_cost, argnums=1)
@@ -125,8 +125,8 @@ class SVMPC:
 
         # get kernel and kernel gradient
         self.U.requires_grad = True
-        Kxx = self.kernel(self.U.reshape(self.M, -1), self.U.reshape(self.M, -1))
-        grad_K = self.kernel_grad(self.U.reshape(self.M, -1), self.U.reshape(self.M, -1))
+        Kxx = self.kernel(self.U, self.U)
+        grad_K = self.kernel_grad(self.U, self.U)
         grad_K = grad_K.reshape(self.M, self.M, self.M, self.H, self.du)
         grad_K = torch.mean(torch.einsum('nmmti->nmti', grad_K), dim=0)
 
