@@ -61,12 +61,19 @@ def do_trial(env, params, fpath):
         raise ValueError('Invalid controller')
 
     actual_trajectory = []
+    duration = 0
     for k in range(params['num_steps']):
         #print(k)
         state = env.get_state()
         state = torch.cat((state['q'], state['offset'], state['theta']), dim=1).to(device=params['device']).reshape(9)
         actual_trajectory.append(state)
+        if k > 0:
+            torch.cuda.synchronize()
+            start_time = time.time()
         best_traj, trajectories = controller.step(state)
+        if k > 0:
+            torch.cuda.synchronize()
+            duration += time.time() - start_time
 
         M = len(trajectories)
         K = len(trajectories[0])
@@ -88,6 +95,8 @@ def do_trial(env, params, fpath):
         x = best_traj[0, :7]
         env.step(x.reshape(1, 7).to(device=env.device))
         gym.clear_lines(viewer)
+
+    print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"]- 1)}')
 
     state = env.get_state()
     state = torch.cat((state['q'], state['offset'], state['theta']), dim=1).to(device=params['device']).reshape(9)

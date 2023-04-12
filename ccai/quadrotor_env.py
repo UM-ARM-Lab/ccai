@@ -60,7 +60,7 @@ class QuadrotorEnv:
         # start[9:] *= 5
         self.state = start
         if self.obstacle_mode == 'dynamic':
-            self.obstacle_pos = np.array([-0.5, 1.])
+            self.obstacle_pos = np.array([-1.0, 1.5])
         else:
             self.obstacle_pos = np.array([0.0, 0.0])
 
@@ -139,10 +139,12 @@ class QuadrotorEnv:
         return self.state, self.get_constraint_violation()
 
     def _get_surface_colours(self):
-        if self.obstacle_mode is None:
-            return np.array([1.0, 0.0, 0.0, self.alpha])[None, None, :]
-
         x, y, z = self.surface_plotting_vars
+        N = x.shape[0]
+        if self.obstacle_mode is None:
+            c = np.array([0.0, 0.0, .7, self.alpha])[None, None, :]
+            return c.repeat(N, axis=0).repeat(N, axis=1)
+
         in_obs = np.where((x - self.obstacle_pos[0]) ** 2 + (y - self.obstacle_pos[1]) ** 2 < self.obstacle_r ** 2,
                           1, 0)
         c = np.where(in_obs[:, :, None],

@@ -2,9 +2,9 @@
 T: 10
 receding_horizon: False
 num_steps: 10
-num_trials: 20
-visualize: True
-experiment_name: 'victor_wrench'
+num_trials: 1
+visualize: False
+experiment_name: 'victor_wrench_timing'
 controllers:
   csvgd:
     N: 4

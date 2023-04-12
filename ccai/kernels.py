@@ -80,12 +80,12 @@ def structured_rbf_kernel(X, Xbar, Q=None):
 
     sq_diff = (diff.reshape(-1, 1, d) @ diff.reshape(-1, d, 1)).reshape(M, n, n)
     h = median(torch.sqrt(sq_diff)) ** 2
-    h = h / np.log(n) + EPS
+    h = h / np.log(2 * n + 1) + EPS
 
     #if Q is not None:
     #    h = d
     # h = 0.1
-    return torch.exp(-0.5 * sq_diff / h.reshape(M, 1, 1)).mean(dim=0)
+    return torch.exp(-sq_diff / h.reshape(M, 1, 1)).mean(dim=0)
 
 
 class RBFKernel:

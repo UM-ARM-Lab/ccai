@@ -3,7 +3,7 @@ T: 12
 receding_horizon: True
 num_steps: 25
 num_trials: 20
-visualize: True
+visualize: False
 experiment_name: 'victor_table_jointspace'
 controllers:
   csvgd:
@@ -50,17 +50,17 @@ controllers:
     penalty: 100
     online_iters: 25
     warmup_iters: 250
-#  svgd_100:
-#    M: 8
-#    N: 128
-#    step_size: 0.1
-#    sigma: 0.25
-#    lambda: 1.0e-4
-#    use_grad: False
-#    penalty: 100
-#    online_iters: 25
-#    warmup_iters: 250
-#    device: 'cuda:0'
+  svgd_100:
+    M: 8
+    N: 128
+    step_size: 0.1
+    sigma: 0.25
+    lambda: 1.0e-4
+    use_grad: False
+    penalty: 100
+    online_iters: 25
+    warmup_iters: 250
+    device: 'cuda:0'
   svgd_grad_100:
     M: 8
     N: 128

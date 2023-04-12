@@ -17,7 +17,7 @@ from ccai.mpc.csvgd import Constrained_SVGD_MPC
 from ccai.mpc.mppi import MPPI
 from ccai.mpc.svgd import SVMPC
 from ccai.mpc.ipopt import IpoptMPC
-
+import time
 import pytorch_kinematics as pk
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
@@ -184,7 +184,7 @@ class VictorTableProblem(ConstrainedSVGDProblem):
 
         J, grad_J, hess_J = self._objective(x)
         hess_J = hess_J + 0.1 * torch.eye(self.T * (self.dx + self.du), device=self.device).unsqueeze(0)
-        # hess_J = None
+        hess_J = None
         grad_J = torch.cat((grad_J.reshape(N, self.T, -1),
                             torch.zeros(N, self.T, self.dz, device=x.device)), dim=2).reshape(N, -1)
 
@@ -214,7 +214,7 @@ class VictorTableProblem(ConstrainedSVGDProblem):
         #hess_J = hess_J_augmented.mean(dim=0)
 
         #print(G.abs().max(), G.abs().mean(), J)
-        return grad_J.detach(), hess_J.detach(), K.detach(), grad_K.detach(), G.detach(), dG.detach(), hessG.detach()
+        return grad_J.detach(), hess_J, K.detach(), grad_K.detach(), G.detach(), dG.detach(), hessG.detach()
 
     def update(self, start, goal=None, T=None):
         self.start = start
@@ -471,12 +471,19 @@ def do_trial(env, params, fpath):
         raise ValueError('Invalid controller')
 
     actual_trajectory = []
+    duration = 0
     for k in range(params['num_steps']):
         state = env.get_state()
         start = state['q'].reshape(7).to(device=params['device'])
 
         actual_trajectory.append(start.clone())
+        if k > 0:
+            torch.cuda.synchronize()
+            start_time = time.time()
         best_traj, trajectories = controller.step(start)
+        if k > 0:
+            torch.cuda.synchronize()
+            duration += time.time() - start_time
 
         x = best_traj[0, :7]
         # add goal lines to sim
@@ -539,6 +546,7 @@ def do_trial(env, params, fpath):
     )
 
     print(f'Controller: {params["controller"]} Final distance to goal: {torch.min(final_distance_to_goal)}')
+    print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"]- 1)}')
 
     np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
              constr=constraint_val.cpu().numpy(),
