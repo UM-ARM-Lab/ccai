@@ -34,17 +34,9 @@ def rbf_kernel(X, Xbar, Q=None):
 
     scaled_diff = (scaled_diff.reshape(-1, 1, d) @ diff.reshape(-1, d, 1)).reshape(n, n)
     h = median(torch.sqrt(scaled_diff))**2
-    h = h / np.log(n)+ EPS
-
-    if torch.isnan(h):
-        print(h)
-        print(torch.sqrt(scaled_diff))
-        print(X)
-        exit(0)
-        # re run with no Q
-        return rbf_kernel(X, Xbar, None)
+    h = h / np.log(n) + EPS
     # h = 0.1
-    return torch.exp(-0.5 * scaled_diff / h)
+    return torch.exp(-scaled_diff / h)
 
 
 def get_chunk(X, num_chunks, expected_chunk_size):

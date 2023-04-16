@@ -37,16 +37,16 @@ class Problem(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def _objective(self, x):
+    def _objective(self, x, *args, **kwargs):
         pass
 
     @abstractmethod
-    def _con_eq(self, x, compute_grads=True):
+    def _con_eq(self, x, *args, **kwargs):
         g, grad_g, hess_g = None, None, None
         return g, grad_g, hess_g
 
     @abstractmethod
-    def _con_ineq(self, x, compute_grads=True):
+    def _con_ineq(self, x, *args, **kwargs):
         h, grad_h, hess_h = None, None, None
         return h, grad_h, hess_h
 
@@ -69,22 +69,23 @@ class ConstrainedSVGDProblem(Problem):
         pass
 
     @abstractmethod
-    def eval(self, x):
+    def eval(self, x, *args, **kwargs):
         pass
 
-    def combined_constraints(self, augmented_x):
-        N = augmented_x.shape[0]
-        augmented_x = augmented_x.reshape(N, self.T, self.dx + self.du + self.dz)
-        xu = augmented_x[:, :, :(self.dx + self.du)]
-        z = augmented_x[:, :, -self.dz:]
+    def combined_constraints(self, augmented_x, *args, **kwargs):
+        B, N = augmented_x.shape[:2]
 
-        g, grad_g, hess_g = self._con_eq(xu)
-        h, grad_h, hess_h = self._con_ineq(xu)
+        augmented_x = augmented_x.reshape(B, N, self.T, self.dx + self.du + self.dz)
+        xu = augmented_x[:, :, :, :(self.dx + self.du)]  # B x N x T x (dx + du)
+        z = augmented_x[:, :, :, -self.dz:]  # B x N x T x dz
+
+        g, grad_g, hess_g = self._con_eq(xu, *args, **kwargs)  # returns B x N x T x dg
+        h, grad_h, hess_h = self._con_ineq(xu, *args, **kwargs)  # returns B x N x T x dh
 
         if h is None or grad_h is None or hess_h is None:
             return g, grad_g, hess_g
 
-        h_aug = h + 0.5 * z.reshape(-1, self.dz * self.T) ** 2
+        h_aug = h + 0.5 * z.reshape(B, -1, self.dz * self.T) ** 2
 
         # Gradients - gradient wrt z should be z
         z_extended = torch.diag_embed(torch.diag_embed(z).permute(0, 2, 3, 1)
@@ -111,8 +112,8 @@ class ConstrainedSVGDProblem(Problem):
         hess_h_aug = hess_h_aug.reshape(N, self.dh, self.T * (self.dx + self.du + self.dz),
                                         self.T * (self.dx + self.du + self.dz))
 
-        #grad_h_aug = torch.where(h.unsqueeze(-1) > -0.1, grad_h_aug, torch.zeros_like(grad_h_aug))
-        #hess_h_aug = torch.where(h.unsqueeze(-1).unsqueeze(-1) > -0.1, hess_h_aug, torch.zeros_like(hess_h_aug))
+        # grad_h_aug = torch.where(h.unsqueeze(-1) > -0.1, grad_h_aug, torch.zeros_like(grad_h_aug))
+        # hess_h_aug = torch.where(h.unsqueeze(-1).unsqueeze(-1) > -0.1, hess_h_aug, torch.zeros_like(hess_h_aug))
 
         if g is None:
             return h_aug, grad_h_aug, hess_h_aug
