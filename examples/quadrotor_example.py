@@ -72,7 +72,7 @@ def cost(trajectory, goal):
 
 class QuadrotorProblem(ConstrainedSVGDProblem):
 
-    def __init__(self, start, goal, T, device='cuda:0', alpha=1, include_obstacle=False):
+    def __init__(self, start, goal, T, device='cuda:0', alpha=0.01, include_obstacle=False):
         super().__init__(start, goal, T, device)
         self.T = T
         self.dx = 12
@@ -100,7 +100,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
 
         self.height_constraint = vmap(self._height_constraint)
 
-        self._objective = vmap(partial(cost, goal=goal))
+        self._obj = vmap(partial(cost, goal=goal))
 
         self.start = start
         self.goal = goal
@@ -125,7 +125,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         self.obstacle_rad = 1.01
 
     def _objective(self, x):
-        J, dJ, HJ = cost(x, self.goal)
+        J, dJ, HJ = self._obj(x)
         return J * self.alpha, dJ * self.alpha, HJ * self.alpha
 
     def dynamics(self, x, u):
@@ -359,7 +359,7 @@ def do_trial(env, params, fpath):
 
     start = torch.from_numpy(env.state).to(dtype=torch.float32, device=params['device'])
     goal = torch.zeros(12, device=params['device'])
-    goal[:2] = 4
+    goal[:3] = torch.from_numpy(env.goal).to(device=params['device'])
 
     include_obstacle = True if params['obstacle_mode'] is not None else False
 
@@ -389,6 +389,7 @@ def do_trial(env, params, fpath):
     all_violation = []
 
     duration = 0.0
+    planned_trajectories = []
     for step in range(params['num_steps']):
         if not collision:
             start = torch.from_numpy(env.state).to(dtype=torch.float32, device=params['device'])
@@ -409,7 +410,8 @@ def do_trial(env, params, fpath):
                     collision = True
         actual_traj.append(env.state)
         all_violation.append(violation)
-
+        
+        planned_trajectories.append(trajectories)
         if params['visualize']:
             env.render_update()
             update_plot_with_trajectories(ax, traj_lines, best_traj, trajectories)
@@ -419,6 +421,12 @@ def do_trial(env, params, fpath):
     print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"]- 1)}')
     actual_traj = np.stack(actual_traj)
     all_violation = np.stack(all_violation)
+    planned_trajectories = torch.stack(planned_trajectories, dim=0)
+    np.savez(f'{fpath.resolve()}/planned_trajector_data.npz', 
+            traj=planned_trajectories.detach().cpu().numpy(), 
+            goal=env.goal,
+            surface=env.surface_model.train_y.cpu().numpy())
+        
     np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_traj, constr=all_violation)
 
     if params['visualize']:
@@ -436,14 +444,14 @@ if __name__ == "__main__":
 
     results = {}
     for i in tqdm(range(config['num_trials'])):
-        env = QuadrotorEnv('surface_data.npz', obstacle_mode=config['obstacle_mode'])
+        env = QuadrotorEnv(randomize_GP=config['random_surface'], surface_data_fname='surface_data.npz', obstacle_mode=config['obstacle_mode'])
         env.reset()
         start_state = env.state.copy()
-
+        goal = env.goal.copy()
         for controller in config['controllers'].keys():
             env.reset()
             env.state = start_state
-            print(env.state[:3])
+            env.goal = goal
             fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_{i + 1}')
             pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
 

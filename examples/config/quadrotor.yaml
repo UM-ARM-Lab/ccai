@@ -2,18 +2,19 @@
 T: 12
 receding_horizon: True
 obstacle_mode: 'none'
-num_steps: 100
-num_trials: 20
+num_steps: 10
+num_trials: 1000
 visualize: False
-experiment_name: 'quadrotor_noobs_new_penalty_100'
+experiment_name: 'quadrotor_data_collection_multi_constraint'
+random_surface: True
 controllers:
   csvgd:
-    N: 8
-    alpha_J: 0.5
+    N: 16
+    alpha_J: 1
     alpha_C: 1
     step_size: 0.5
     momentum: 0.
-    device: 'cuda:0'
+    device: 'cuda:1'
     online_iters: 10
     warmup_iters: 100
     resample_steps: 5

@@ -1,21 +1,25 @@
 import torch
 import numpy as np
-from ccai.gp import GPSurfaceModel
+from ccai.gp import GPSurfaceModel, get_random_surface
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D  # <-- Note the capitalization!
 
 
 class QuadrotorEnv:
 
-    def __init__(self, surface_data_fname, obstacle_mode=None):
+    def __init__(self, randomize_GP=False, surface_data_fname=None, obstacle_mode=None):
         assert obstacle_mode in [None, 'static', 'dynamic']
         self.env_dims = [-10, 10]
         self.state_dim = 12
         self.dt = 0.1
         self.state = None
-        data = np.load(surface_data_fname)
-        self.surface_model = GPSurfaceModel(torch.from_numpy(data['xy']).to(dtype=torch.float32),
+        
+        if not randomize_GP:
+            data = np.load(surface_data_fname)
+            self.surface_model = GPSurfaceModel(torch.from_numpy(data['xy']).to(dtype=torch.float32),
                                             torch.from_numpy(data['z']).to(dtype=torch.float32))
+        else:
+            self.surface_model = get_random_surface()
         # For rendering height
         N = 100
         xs = torch.linspace(-6, 6, steps=N)
@@ -37,6 +41,7 @@ class QuadrotorEnv:
         self.ax = None
         self._surf = None
         self._render_pos = None
+        self.goal = np.array([4., 4., 0])
 
     def _get_surface_h(self, state):
         xy = torch.from_numpy(state[:2]).reshape(1, 2).to(dtype=torch.float32)
@@ -48,11 +53,16 @@ class QuadrotorEnv:
         start = np.zeros(self.state_dim)
 
         # positions
-        start[:2] = np.array([-4, -4]) - 1. * np.random.rand(2)
+        start[:2] = 10 * np.random.rand(2) - 5#np.array([-4, -4]) - 1. * np.random.rand(2)
         start[2] = self._get_surface_h(start)
+        
+        goal = 10 * np.random.rand(3) - 5
+        goal[2] = self._get_surface_h(goal)
+        self.goal = goal
 
         # Angles in rad
         start[3:6] = 0.05 * (-np.pi + 2 * np.pi * np.random.rand(3))
+        start[5] /= 0.05
 
         # Initial velocity
         start[6:] = 0.05 * np.random.randn(6)
@@ -165,7 +175,7 @@ class QuadrotorEnv:
                                           rstride=1,
                                           cstride=1)
         self._render_pos = self.ax.scatter(self.state[0], self.state[1], self.state[2], s=100, c='g')
-        self.ax.scatter(4, 4, self._get_surface_h(np.array([4, 4])), s=100, c='k')
+        self.ax.scatter(self.goal[0], self.goal[1], self.goal[2], s=100, c='k')
         self.ax.view_init(60, -50)
         self.ax.axes.set_xlim3d(left=-6, right=6)
         self.ax.axes.set_ylim3d(bottom=-6, top=6)

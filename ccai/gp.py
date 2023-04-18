@@ -37,3 +37,18 @@ class GPSurfaceModel:
         hess_y = hess_K.permute(0, 2, 3, 1) @ tmp
 
         return y.squeeze(-1), grad_y.squeeze(-1), hess_y.squeeze(-1)
+
+
+def get_random_surface():
+    N = 10
+    xs = torch.linspace(-5, 5, steps=N)
+    ys = torch.linspace(-5, 5, steps=N)
+    x, y = torch.meshgrid(xs, ys, indexing='xy')
+    train_x = torch.stack((x.flatten(), y.flatten()), dim=1)
+    train_y = torch.randn(len(train_x), 1)
+    initial_gp_model = GPSurfaceModel(train_x, train_y)
+
+    # sample from GP prior to get our data
+    samples = initial_gp_model.prior().sample()
+    return GPSurfaceModel(train_x, samples)
+
