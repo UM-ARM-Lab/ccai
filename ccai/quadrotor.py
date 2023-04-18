@@ -60,12 +60,12 @@ class Quadrotor12DDynamics(torch.nn.Module):
         #new_psi = torch.clamp(new_psi, -torch.pi, torch.pi)
 
         # clamp velocities
-        new_xdot = torch.clamp(new_xdot, -100, 100)
-        new_ydot = torch.clamp(new_ydot, -100, 100)
-        new_zdot = torch.clamp(new_zdot, -100, 100)
-        new_p = torch.clamp(new_p, -100, 100)
-        new_q = torch.clamp(new_q, -100, 100)
-        new_r = torch.clamp(new_r, -100, 100)
+        new_xdot = torch.clamp(new_xdot, -1000, 1000)
+        new_ydot = torch.clamp(new_ydot, -1000, 1000)
+        new_zdot = torch.clamp(new_zdot, -1000, 1000)
+        new_p = torch.clamp(new_p, -1000, 1000)
+        new_q = torch.clamp(new_q, -1000, 1000)
+        new_r = torch.clamp(new_r, -1000, 1000)
 
         # dstate = np.stack((x_dot, y_dot, z_dot, phi_dot, theta_dot, psi_dot,
         #                   x_ddot, y_ddot, z_ddot, p_dot, q_dot, r_dot), axis=-1)

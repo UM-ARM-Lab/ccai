@@ -13,7 +13,7 @@ def compute_constrained_gradient(xuz, starts, goals, problem, alpha_J=1, alpha_C
     d = problem.dx + problem.du
     xuz = xuz.detach()
     xuz.requires_grad = True
-    grad_J, hess_J, K, grad_K, C, dC, hess_C = problem.eval(xuz, starts, goals)
+    J, grad_J, hess_J, K, grad_K, C, dC, hess_C = problem.eval(xuz, starts, goals)
 
     with torch.no_grad():
         # we try and invert the dC dCT, if it is singular then we use the psuedo-inverse
@@ -80,4 +80,4 @@ def compute_constrained_gradient(xuz, starts, goals, problem, alpha_J=1, alpha_C
         phi = kernelized_score.squeeze(-1) / N + grad_matrix_K / N  # maximize phi
         xi_J = -phi
 
-    return (alpha_J * xi_J + alpha_C * xi_C).detach()
+    return (alpha_J * xi_J + alpha_C * xi_C).detach(), J, C
