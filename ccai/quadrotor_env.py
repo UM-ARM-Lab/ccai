@@ -1,21 +1,24 @@
 import torch
 import numpy as np
-from ccai.gp import GPSurfaceModel
+from ccai.gp import GPSurfaceModel, get_random_surface
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D  # <-- Note the capitalization!
 
 
 class QuadrotorEnv:
 
-    def __init__(self, surface_data_fname, obstacle_mode=None):
+    def __init__(self, randomize_GP=False, surface_data_fname=None, obstacle_mode=None):
         assert obstacle_mode in [None, 'static', 'dynamic']
         self.env_dims = [-10, 10]
         self.state_dim = 12
         self.dt = 0.1
         self.state = None
-        data = np.load(surface_data_fname)
-        self.surface_model = GPSurfaceModel(torch.from_numpy(data['xy']).to(dtype=torch.float32),
-                                            torch.from_numpy(data['z']).to(dtype=torch.float32))
+        if not randomize_GP:
+            data = np.load(surface_data_fname)
+            self.surface_model = GPSurfaceModel(torch.from_numpy(data['xy']).to(dtype=torch.float32),
+                                                torch.from_numpy(data['z']).to(dtype=torch.float32))
+        else:
+            self.surface_model = get_random_surface()
         # For rendering height
         N = 100
         xs = torch.linspace(-6, 6, steps=N)

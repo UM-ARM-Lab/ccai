@@ -226,7 +226,7 @@ class ConstrainedSteinTrajOpt:
         # driving force useful for helping exploration -- currently unused
         T = self.iters
         C = 1
-        p = 1
+        p = 0.5
         self.max_gamma = 1
         import time
         def driving_force(t):
@@ -241,6 +241,8 @@ class ConstrainedSteinTrajOpt:
             s = time.time()
             if T > 50:
                 self.gamma = self.max_gamma * driving_force(iter + 1)
+            else:
+                self.gamma = self.max_gamma
             #    self.sigma = 0.1 * (1.0 - iter / T) + 1e-2
 
             #if (iter + 1) % resample_period == 0 and (iter < T - 1):

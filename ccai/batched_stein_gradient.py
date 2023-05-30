@@ -2,7 +2,7 @@ import torch
 from torch_cg import cg_batch
 
 
-def compute_constrained_gradient(xuz, starts, goals, problem, alpha_J=1, alpha_C=1):
+def compute_constrained_gradient(xuz, starts, goals, constraints, problem, alpha_J=1, alpha_C=1):
     """
 
     :param xuz: B x N x T(dx + du + dz)
@@ -13,7 +13,7 @@ def compute_constrained_gradient(xuz, starts, goals, problem, alpha_J=1, alpha_C
     d = problem.dx + problem.du
     xuz = xuz.detach()
     xuz.requires_grad = True
-    J, grad_J, hess_J, K, grad_K, C, dC, hess_C = problem.eval(xuz, starts, goals)
+    J, grad_J, hess_J, K, grad_K, C, dC, hess_C = problem.eval(xuz, starts, goals, constraints)
 
     with torch.no_grad():
         # we try and invert the dC dCT, if it is singular then we use the psuedo-inverse
