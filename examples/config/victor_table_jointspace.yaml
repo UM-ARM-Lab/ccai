@@ -1,14 +1,15 @@
 ---
 T: 12
 receding_horizon: True
-num_steps: 25
-num_trials: 20
+num_steps: 10
+num_trials: 2000
 visualize: False
-experiment_name: 'victor_table_jointspace'
+simulate: False
+experiment_name: 'victor_table_jointspace_train_data1'
 controllers:
   csvgd:
-    N: 8
-    alpha_J: 5.0e-3
+    N: 16
+    alpha_J: 1.0e-2
     alpha_C: 1
     step_size: 0.25
     momentum: 0.
@@ -19,67 +20,67 @@ controllers:
     resample_sigma: 0.01
     resample_temperature: 0.1
     penalty: 100
-  ipopt:
-    device: 'cpu'
-    online_iters: 10
-    warmup_iters: 100
-  mppi_1000:
-    N: 1000
-    lambda: 1.0e-4
-    sigma: 0.2
-    device: 'cuda:0'
-    penalty: 1000
-    online_iters: 25
-    warmup_iters: 250
-#  svgd_1000:
-#    M: 8
-#    N: 128
-#    step_size: 0.05
-#    sigma: 0.25
+#  ipopt:
+#    device: 'cpu'
+#    online_iters: 10
+#    warmup_iters: 100
+#  mppi_1000:
+#    N: 1000
 #    lambda: 1.0e-4
-#    use_grad: False
+#    sigma: 0.2
+#    device: 'cuda:0'
 #    penalty: 1000
 #    online_iters: 25
 #    warmup_iters: 250
+##  svgd_1000:
+##    M: 8
+##    N: 128
+##    step_size: 0.05
+##    sigma: 0.25
+##    lambda: 1.0e-4
+##    use_grad: False
+##    penalty: 1000
+##    online_iters: 25
+##    warmup_iters: 250
+##    device: 'cuda:0'
+#  mppi_100:
+#    N: 1000
+#    lambda: 1.0e-4
+#    sigma: 0.2
 #    device: 'cuda:0'
-  mppi_100:
-    N: 1000
-    lambda: 1.0e-4
-    sigma: 0.2
-    device: 'cuda:0'
-    penalty: 100
-    online_iters: 25
-    warmup_iters: 250
-  svgd_100:
-    M: 8
-    N: 128
-    step_size: 0.1
-    sigma: 0.25
-    lambda: 1.0e-4
-    use_grad: False
-    penalty: 100
-    online_iters: 25
-    warmup_iters: 250
-    device: 'cuda:0'
-  svgd_grad_100:
-    M: 8
-    N: 128
-    step_size: 0.025
-    sigma: 0.25
-    lambda: 100
-    use_grad: True
-    penalty: 100
-    online_iters: 10
-    warmup_iters: 100
-    device: 'cuda:0'
-  svgd_grad_1000:
-    M: 8
-    N: 128
-    step_size: 0.025
-    sigma: 0.25
-    lambda: 100
-    use_grad: True
-    penalty: 1000
-    online_iters: 10
-    warmup_iters: 100
-    device: 'cuda:0'
+#    penalty: 100
+#    online_iters: 25
+#    warmup_iters: 250
+#  svgd_100:
+#    M: 8
+#    N: 128
+#    step_size: 0.1
+#    sigma: 0.25
+#    lambda: 1.0e-4
+#    use_grad: False
+#    penalty: 100
+#    online_iters: 25
+#    warmup_iters: 250
+#    device: 'cuda:0'
+#  svgd_grad_100:
+#    M: 8
+#    N: 128
+#    step_size: 0.025
+#    sigma: 0.25
+#    lambda: 100
+#    use_grad: True
+#    penalty: 100
+#    online_iters: 10
+#    warmup_iters: 100
+#    device: 'cuda:0'
+#  svgd_grad_1000:
+#    M: 8
+#    N: 128
+#    step_size: 0.025
+#    sigma: 0.25
+#    lambda: 100
+#    use_grad: True
+#    penalty: 1000
+#    online_iters: 10
+#    warmup_iters: 100
+#    device: 'cuda:0'

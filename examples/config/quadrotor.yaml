@@ -4,12 +4,13 @@ receding_horizon: True
 obstacle_mode: 'none'
 num_steps: 100
 num_trials: 20
-visualize: False
-experiment_name: 'quadrotor_noobs_new_penalty_100'
+visualize: True
+experiment_name: 'quadrotor_flow_test_multi_constraints'
+random_surface: True
 controllers:
   csvgd:
     N: 8
-    alpha_J: 0.5
+    alpha_J: 1
     alpha_C: 1
     step_size: 0.5
     momentum: 0.
@@ -20,6 +21,35 @@ controllers:
     resample_sigma: 0.1
     resample_temperature: 0.25
     penalty: 100.00
+    flow_model: 'none'
+  csvgd_demonstration_flow:
+    N: 8
+    alpha_J: 1
+    alpha_C: 1
+    step_size: 0.5
+    momentum: 0.
+    device: 'cuda:0'
+    online_iters: 10
+    warmup_iters: 100
+    resample_steps: 5
+    resample_sigma: 0.1
+    resample_temperature: 0.25
+    penalty: 100.00
+    flow_model: 'spline_learned_sampler_quadrotor_multi_constraint_from_demonstration_controls_only2.pt'
+  csvgd_finetuned_flow:
+    N: 8
+    alpha_J: 1
+    alpha_C: 1
+    step_size: 0.5
+    momentum: 0.
+    device: 'cuda:0'
+    online_iters: 10
+    warmup_iters: 100
+    resample_steps: 5
+    resample_sigma: 0.1
+    resample_temperature: 0.25
+    penalty: 100.00
+    flow_model: 'spline_learned_sampler_quadrotor_multi_constraint_finetuned_controls_only2.pt'
 #  ipopt:
 #    device: 'cpu'
 #    online_iters: 10
