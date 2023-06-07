@@ -1,7 +1,7 @@
 /ccai/models/cnf/plots/
 /null-space-optimizer/
 /legacy/
-
+/data/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
