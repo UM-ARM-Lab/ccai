@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D  # <-- Note the capitalization!
 import time
 from functools import partial
-from functorch import vmap, jacrev, hessian
+from torch.func import vmap, jacrev, hessian
 
 from ccai.kernels import rbf_kernel, structured_rbf_kernel
 from ccai.quadrotor_env import QuadrotorEnv
@@ -18,11 +18,11 @@ from ccai.mpc.svgd import SVMPC
 import argparse
 import yaml
 from ccai.problem import ConstrainedSVGDProblem, IpoptProblem, UnconstrainedPenaltyProblem
-
 import pathlib
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
+from ccai.models.trajectory_samplers import TrajectorySampler
 
 def cost(trajectory, goal):
     x = trajectory[:, :12]
@@ -72,7 +72,7 @@ def cost(trajectory, goal):
 
 class QuadrotorProblem(ConstrainedSVGDProblem):
 
-    def __init__(self, start, goal, T, device='cuda:0', alpha=1, include_obstacle=False):
+    def __init__(self, start, goal, T, device='cuda:0', alpha=0.01, include_obstacle=False, gp_surface_model=None):
         super().__init__(start, goal, T, device)
         self.T = T
         self.dx = 12
@@ -89,8 +89,15 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         # self.dg = 2 * T - 1
         data = np.load('surface_data.npz')
         # GP which models surface
-        self.surface_gp = GPSurfaceModel(torch.from_numpy(data['xy']).to(dtype=torch.float32, device=device),
-                                         torch.from_numpy(data['z']).to(dtype=torch.float32, device=device))
+        #self.surface_gp = GPSurfaceModel(torch.from_numpy(data['xy']).to(dtype=torch.float32, device=device),
+        #                                 torch.from_numpy(data['z']).to(dtype=torch.float32, device=device))
+        if gp_surface_model is None:
+            self.surface_gp = GPSurfaceModel(torch.from_numpy(data['xy']).to(dtype=torch.float32, device=device),
+                                             torch.from_numpy(data['z']).to(dtype=torch.float32, device=device))
+        else:
+            self.surface_gp = GPSurfaceModel(gp_surface_model.train_x.to(device=device),
+                                             gp_surface_model.train_y.to(device=device))
+
 
         # gradient and hessian of dynamics
         self._dynamics = Quadrotor12DDynamics(dt=0.1)
@@ -100,7 +107,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
 
         self.height_constraint = vmap(self._height_constraint)
 
-        self._objective = vmap(partial(cost, goal=goal))
+        self._obj = vmap(partial(cost, goal=goal))
 
         self.start = start
         self.goal = goal
@@ -125,7 +132,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         self.obstacle_rad = 1.01
 
     def _objective(self, x):
-        J, dJ, HJ = cost(x, self.goal)
+        J, dJ, HJ = self._obj(x)
         return J * self.alpha, dJ * self.alpha, HJ * self.alpha
 
     def dynamics(self, x, u):
@@ -273,7 +280,6 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
 
         # Now we need to compute constraints and their first and second partial derivatives
         g, Dg, DDg = self.combined_constraints(augmented_trajectory)
-        #print(g.abs().max())
         # print(cost.reshape(-1))
         # print(g[0])
         if M is not None:
@@ -363,8 +369,22 @@ def do_trial(env, params, fpath):
 
     include_obstacle = True if params['obstacle_mode'] is not None else False
 
-    if params['controller'] == 'csvgd':
-        problem = QuadrotorProblem(start, goal, params['T'], device=params['device'], include_obstacle=include_obstacle)
+    if 'csvgd' in params['controller']:
+        if params['flow_model'] != 'none':
+            if 'diffusion' in params['flow_model']:
+                flow_type = 'diffusion'
+            elif 'cnf' in params['flow_model']:
+                flow_type = 'cnf'
+            else:
+                raise ValueError('Invalid flow model type')
+            flow_model = TrajectorySampler(T=params['T'], dx=12, du=4, context_dim=12 + 3 + 100, type=flow_type)
+            flow_model.load_state_dict(torch.load(f'{CCAI_PATH}/params["flow_model"]'))
+            flow_model.to(device=params['device'])
+        else:
+            flow_model = None
+        params['flow_model'] = flow_model
+        problem = QuadrotorProblem(start, goal, params['T'], device=params['device'], include_obstacle=include_obstacle,
+                                   gp_surface_model=env.surface_model)
         controller = Constrained_SVGD_MPC(problem, params)
     elif params['controller'] == 'ipopt':
         problem = QuadrotorIpoptProblem(start, goal, params['T'], include_obstacle=include_obstacle)
@@ -389,6 +409,7 @@ def do_trial(env, params, fpath):
     all_violation = []
 
     duration = 0.0
+    constraint_params = env.surface_model.train_y.reshape(-1).to(device=params['device'], dtype=torch.float32)
     for step in range(params['num_steps']):
         if not collision:
             start = torch.from_numpy(env.state).to(dtype=torch.float32, device=params['device'])
@@ -396,14 +417,16 @@ def do_trial(env, params, fpath):
             if step > 0:
                 torch.cuda.synchronize()
                 start_time = time.time()
-            best_traj, trajectories = controller.step(start, obstacle_pos=env.obstacle_pos)
+            best_traj, trajectories = controller.step(start,
+                                                      obstacle_pos=env.obstacle_pos,
+                                                      constr_param=constraint_params)
             if step > 0:
                 torch.cuda.synchronize()
                 duration += time.time() - start_time
 
             u = best_traj[0, -4:].detach().cpu().numpy()
             _, violation = env.step(u)
-
+            #print(violation)
             if include_obstacle:
                 if violation[1] > 0:
                     collision = True
@@ -428,7 +451,7 @@ def do_trial(env, params, fpath):
 
 
 if __name__ == "__main__":
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/quadrotor.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/config/planning_configs/quadrotor.yaml').read_text())
     from tqdm import tqdm
 
     if config['obstacle_mode'] == 'none':
@@ -436,7 +459,8 @@ if __name__ == "__main__":
 
     results = {}
     for i in tqdm(range(config['num_trials'])):
-        env = QuadrotorEnv('surface_data.npz', obstacle_mode=config['obstacle_mode'])
+        env = QuadrotorEnv(randomize_GP=config['random_surface'], surface_data_fname='surface_data.npz',
+                           obstacle_mode=config['obstacle_mode'])
         env.reset()
         start_state = env.state.copy()
 

@@ -43,6 +43,7 @@ class SVMPC:
         self.includes_x0 = params.get('include_x0', False)
 
         self.kernel = structured_rbf_kernel
+        self.kernel = rbf_kernel
         self.kernel_grad = jacrev(self.kernel, argnums=0)
 
         self.grad_cost = jacrev(self._combined_rollout_cost, argnums=1)

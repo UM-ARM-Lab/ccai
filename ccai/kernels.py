@@ -1,6 +1,8 @@
 import torch
 import numpy as np
+
 EPS = 1e-9
+
 
 def median(tensor):
     """
@@ -33,18 +35,10 @@ def rbf_kernel(X, Xbar, Q=None):
         scaled_diff = diff
 
     scaled_diff = (scaled_diff.reshape(-1, 1, d) @ diff.reshape(-1, d, 1)).reshape(n, n)
-    h = median(torch.sqrt(scaled_diff))**2
-    h = h / np.log(n)+ EPS
-
-    if torch.isnan(h):
-        print(h)
-        print(torch.sqrt(scaled_diff))
-        print(X)
-        exit(0)
-        # re run with no Q
-        return rbf_kernel(X, Xbar, None)
+    h = median(torch.sqrt(scaled_diff)) ** 2
+    h = h / np.log(n) + EPS
     # h = 0.1
-    return torch.exp(-0.5 * scaled_diff / h)
+    return torch.exp(-scaled_diff / h)
 
 
 def get_chunk(X, num_chunks, expected_chunk_size):
@@ -82,7 +76,7 @@ def structured_rbf_kernel(X, Xbar, Q=None):
     h = median(torch.sqrt(sq_diff)) ** 2
     h = h / np.log(2 * n + 1) + EPS
 
-    #if Q is not None:
+    # if Q is not None:
     #    h = d
     # h = 0.1
     return torch.exp(-sq_diff / h.reshape(M, 1, 1)).mean(dim=0)
@@ -91,15 +85,14 @@ def structured_rbf_kernel(X, Xbar, Q=None):
 class RBFKernel:
 
     def __init__(self,
-                 use_median_trick=True,
+                 #        use_median_trick=True,
                  lengthscale=None,
                  outputscale=None):
+        # if not use_median_trick:
+        #    if lengthscale is None or outputscale is None:
+        #        raise ValueError('Must supply lengthscale and output scale if not using median heuristic')
 
-        if not use_median_trick:
-            if lengthscale is None or outputscale is None:
-                raise ValueError('Must supply lengthscale and output scale if not using median heuristic')
-
-        self.use_median_trick = use_median_trick
+        # self.use_median_trick = use_median_trick
         self.l = lengthscale
         self.sigma_sq = outputscale
 
@@ -108,12 +101,12 @@ class RBFKernel:
         m = Xbar.shape[0]
         diff = X.unsqueeze(1) - Xbar.unsqueeze(0)  # diff should be n x m x d
         sq_diff = (diff.reshape(n, m, 1, d) @ diff.reshape(n, m, d, 1)).reshape(n, m)
-        if self.use_median_trick:
-            h = torch.sqrt(median(sq_diff) / 2) + 1e-3
-            sigma_sq = 1
-        else:
-            h = self.l ** 2
-            sigma_sq = self.sigma_sq
+        # if self.use_median_trick:
+        #    h = torch.sqrt(median(sq_diff) / 2) + 1e-3
+        #    sigma_sq = 1
+        # else:
+        h = self.l ** 2
+        sigma_sq = self.sigma_sq
 
         K = sigma_sq * torch.exp(-0.5 * sq_diff / h)
         grad_K = - sigma_sq * diff * K.reshape(n, m, 1) / h

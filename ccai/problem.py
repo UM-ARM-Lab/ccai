@@ -37,16 +37,16 @@ class Problem(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def _objective(self, x):
+    def _objective(self, x, *args, **kwargs):
         pass
 
     @abstractmethod
-    def _con_eq(self, x, compute_grads=True):
+    def _con_eq(self, x, *args, **kwargs):
         g, grad_g, hess_g = None, None, None
         return g, grad_g, hess_g
 
     @abstractmethod
-    def _con_ineq(self, x, compute_grads=True):
+    def _con_ineq(self, x, *args, **kwargs):
         h, grad_h, hess_h = None, None, None
         return h, grad_h, hess_h
 
@@ -69,8 +69,77 @@ class ConstrainedSVGDProblem(Problem):
         pass
 
     @abstractmethod
-    def eval(self, x):
+    def eval(self, x, *args, **kwargs):
         pass
+
+    def batched_combined_constraints(self, augmented_x, *args, **kwargs):
+        B, N = augmented_x.shape[:2]
+
+        augmented_x = augmented_x.reshape(B, N, self.T, self.dx + self.du + self.dz)
+        xu = augmented_x[:, :, :, :(self.dx + self.du)]  # B x N x T x (dx + du)
+        z = augmented_x[:, :, :, -self.dz:]  # B x N x T x dz
+
+        g, grad_g, hess_g = self._con_eq(xu, *args, **kwargs)  # returns B x N x T x dg
+        h, grad_h, hess_h = self._con_ineq(xu, *args, **kwargs)  # returns B x N x T x dh
+
+        if h is None or grad_h is None or hess_h is None:
+            return g, grad_g, hess_g
+
+        h_aug = h + 0.5 * z.reshape(B, -1, self.dz * self.T) ** 2
+
+        # Gradients - gradient wrt z should be z
+        z_extended = torch.diag_embed(torch.diag_embed(z).permute(0, 2, 3, 1)
+                                      ).permute(0, 3, 1, 4, 2)  # (N, T, dz, T dz)
+        grad_h_aug = torch.cat((
+            grad_h.reshape(N, self.T, self.dz, self.T, -1),
+            z_extended), dim=-1)
+        grad_h_aug = grad_h_aug.reshape(N, self.dh, self.T * (self.dx + self.du + self.dz))
+
+        # Hessians - second derivative wrt z should be identity
+        # partial derivatives dx dz should be zero
+        # eye is (N, T, dz, dz, dz)
+        eye = torch.diag_embed(torch.eye(self.dz, device=self.device)).repeat(N, self.T, 1, 1, 1)
+        # make eye (N, T, dz, T, dz, T, dz)
+        eye = torch.diag_embed(torch.diag_embed(eye.permute(0, 2, 3, 4, 1)))
+        eye = eye.permute(0, 4, 1, 5, 2, 6, 3)
+
+        hess_h = hess_h.reshape(N, self.T, self.dz, self.T, self.dx + self.du, self.T, self.dx + self.du)
+        hess_h_aug = torch.zeros(N, self.T, self.dz, self.T, self.dx + self.du + self.dz,
+                                 self.T, self.dx + self.du + self.dz, device=self.device)
+        hess_h_aug[:, :, :, :, :self.dx + self.du, :, :self.dx + self.du] = hess_h
+        hess_h_aug[:, :, :, :, -self.dz:, :, -self.dz:] = eye
+
+        hess_h_aug = hess_h_aug.reshape(N, self.dh, self.T * (self.dx + self.du + self.dz),
+                                        self.T * (self.dx + self.du + self.dz))
+
+        # grad_h_aug = torch.where(h.unsqueeze(-1) > -0.1, grad_h_aug, torch.zeros_like(grad_h_aug))
+        # hess_h_aug = torch.where(h.unsqueeze(-1).unsqueeze(-1) > -0.1, hess_h_aug, torch.zeros_like(hess_h_aug))
+
+        if g is None:
+            return h_aug, grad_h_aug, hess_h_aug
+
+        grad_g_aug = torch.cat((
+            grad_g.reshape(N, self.dg, self.T, -1),
+            torch.zeros(N, self.dg, self.T, self.dz, device=self.device)),
+            dim=-1
+        ).reshape(N, self.dg, self.T * (self.dx + self.du + self.dz))
+
+        hess_g_aug = torch.zeros(N, self.dg,
+                                 self.T, (self.dx + self.du + self.dz),
+                                 self.T, (self.dx + self.du + self.dz), device=self.device)
+        hess_g_aug[:, :, :, :self.dx + self.du, :, :self.dx + self.du] = hess_g.reshape(N,
+                                                                                        self.dg,
+                                                                                        self.T,
+                                                                                        self.dx + self.du,
+                                                                                        self.T,
+                                                                                        self.dx + self.du)
+        hess_g_aug = hess_g_aug.reshape(N, self.dg,
+                                        self.T * (self.dx + self.du + self.dz),
+                                        self.T * (self.dx + self.du + self.dz))
+        c = torch.cat((g, h_aug), dim=1)  # (N, dg + dh)
+        grad_c = torch.cat((grad_g_aug, grad_h_aug), dim=1)
+        hess_c = torch.cat((hess_g_aug, hess_h_aug), dim=1)
+        return c, grad_c, hess_c
 
     def combined_constraints(self, augmented_x):
         N = augmented_x.shape[0]
