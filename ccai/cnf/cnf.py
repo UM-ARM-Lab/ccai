@@ -11,6 +11,9 @@ from einops.layers.torch import Rearrange
 
 from ccai.diffusion.helpers import SinusoidalPosEmb
 
+import ot
+import numpy as np
+
 
 class MLP(nn.Module):
     def __init__(self, x_dim, context_dim, hidden_dim, num_layers=4):
@@ -106,8 +109,8 @@ def set_cnf_options(solver, model):
 
             # Set the test settings
             module.test_solver = solver
-            module.test_atol = 1e-4
-            module.test_rtol = 1e-4
+            module.test_atol = 1e-5
+            module.test_rtol = 1e-5
 
         if isinstance(module, ODEfunc):
             module.rademacher = False
@@ -130,17 +133,20 @@ class TrajectoryCNF(nn.Module):
         self.horizon = horizon
         self.xu_dim = xu_dim
         self.context_dim = context_dim
+        self.loss_type = 'ot'
 
-        self.model = TemporalUnet(self.horizon, self.xu_dim, cond_dim=context_dim, dim=32, dim_mults=(1, 2, 4), attention=False)
-
-        #self.model = MLP(horizon * xu_dim, context_dim, 256, num_layers=4)
-        #self.model = TrajectoryConvNet(xu_dim, context_dim)
+        self.model = TemporalUnet(self.horizon, self.xu_dim,
+                                  cond_dim=context_dim,
+                                  dim=32, dim_mults=(1, 2, 4, 8),
+                                  attention=False)
+        # self.model = MLP(horizon * xu_dim, context_dim, 256, num_layers=4)
+        # self.model = TrajectoryConvNet(xu_dim, context_dim)
 
         self.register_buffer('prior_mu', torch.zeros(horizon, xu_dim))
         self.register_buffer('prior_sigma', torch.ones(horizon, xu_dim))
 
         self.inflation_noise = inflation_noise
-        self.sigma_min = 0.01
+        self.sigma_min = 1e-4
         noise_dist = torch.distributions.Normal(self.prior_mu, self.prior_sigma)
 
         odefunc = ODEfunc(
@@ -160,6 +166,16 @@ class TrajectoryCNF(nn.Module):
         set_cnf_options(solver, self.flow)
 
     def flow_matching_loss(self, xu, context):
+        if self.loss_type == 'diffusion':
+            return self.flow_matching_loss_diffusion(xu, context)
+        elif self.loss_type == 'ot':
+            return self.flow_matching_loss_ot(xu, context)
+        elif self.loss_type == 'conditional_ot':
+            return self.conditional_flow_matching_loss_ot(xu, context)
+        elif self.loss_type == 'conditional_sb':
+            return self.conditional_flow_matching_loss_sb(xu, context)
+
+    def flow_matching_loss_ot(self, xu, context):
         # Using OT flow matching from https://arxiv.org/pdf/2210.02747.pdf
         B, T, _ = xu.shape
 
@@ -167,7 +183,7 @@ class TrajectoryCNF(nn.Module):
         xu = xu + self.inflation_noise * torch.randn_like(xu)
 
         # sample t from [0, 1]
-        t = torch.rand(B, 1, 1, device=xu.device)
+        t = torch.rand(B, 1, 1, device=xu.device) * (1 - 1.0e-5)
 
         mu_t = t * xu
         sigma_t = 1 - (1 - self.sigma_min) * t * torch.ones_like(xu)
@@ -182,10 +198,81 @@ class TrajectoryCNF(nn.Module):
         ut = (xu - (1 - self.sigma_min) * x0)
         # ut = (xu - (1 - self.sigma_min) * xut) / (1 - t * (1 - self.sigma_min))
 
-        vt = self.model(t.reshape(-1), xut, context)
+        # faster for training
+        vt = self.model.compiled_fwd(t.reshape(-1), xut, context)
 
         # compute loss
         return mse_loss(ut, vt)
+
+    def conditional_flow_matching_loss_ot(self, xu, context):
+        # Using OT flow matching from https://arxiv.org/pdf/2210.02747.pdf
+        B, T, _ = xu.shape
+
+        # Inflate xu with noise
+        xu = xu + self.inflation_noise * torch.randn_like(xu)
+        # sample initial noise
+        x0 = torch.randn_like(xu)
+
+        # solve OT problem between x0 and xu
+        x0_flatten = x0.reshape(B, -1)
+        xu_flatten = xu.reshape(B, -1)
+        M = torch.cdist(x0_flatten,
+                        xu_flatten) ** 2  # in principle we can use a different distance specific to trajectories
+        M = M / M.max()
+        a, b = ot.unif(x0.size()[0]), ot.unif(xu.size()[0])
+        pi = ot.emd(a, b, M.detach().cpu().numpy())
+        # Sample random interpolations on pi
+        p = pi.flatten()
+        p = p / p.sum()
+        choices = np.random.choice(pi.shape[0] * pi.shape[1], p=p, size=B)
+        i, j = np.divmod(choices, pi.shape[1])
+        x0 = x0[i]
+        xu = xu[j]
+
+        # sample t from [0, 1]
+        t = torch.rand(B, 1, 1, device=xu.device)# * (1 - 1.0e-5)
+        sigma = 0.1
+        mu_t = t * xu + (1 - t) * x0
+        # sample
+        xut = mu_t + sigma * torch.randn_like(xu)
+        # get GT velocity
+        ut = (xu - x0)
+
+        # faster for training
+        vt = self.model.compiled_fwd(t.reshape(-1), xut, context)
+
+        # compute loss
+        return mse_loss(ut, vt)
+    def conditional_flow_matching_loss_sb(self, xu, context):
+        sigma = 1
+        B = xu.shape[0]
+        # Inflate xu with noise
+        xu = xu + self.inflation_noise * torch.randn_like(xu)
+        # sample initial noise
+        x0 = torch.randn_like(xu)
+        t = torch.rand(B, 1, 1, device=xu.device)# * (1 - 1.0e-5)
+
+        a, b = ot.unif(x0.size()[0]), ot.unif(xu.size()[0])
+        M = torch.cdist(x0.reshape(B, -1), xu.reshape(B, -1)) ** 2
+        pi = ot.sinkhorn(a, b, M.detach().cpu().numpy(), reg=2 * (sigma ** 2))
+        # Sample random interpolations on pi
+        p = pi.flatten()
+        p = p / p.sum()
+        choices = np.random.choice(pi.shape[0] * pi.shape[1], p=p, size=B)
+        i, j = np.divmod(choices, pi.shape[1])
+        x0 = x0[i]
+        xu = xu[j]
+        # calculate regression loss
+        mu_t = t * xu + (1 - t) * x0
+        sigma_t = sigma * torch.sqrt(t - t ** 2)
+        xut = mu_t + sigma_t * torch.randn_like(x0)
+        sigma_t_prime_over_sigma_t = (1 - 2 * t) / (2 * t * (1 - t))
+        ut = sigma_t_prime_over_sigma_t * (xut - mu_t) + xu - x0
+        # faster for training
+        vt = self.model.compiled_fwd(t.reshape(-1), xut, context)
+        # compute loss
+        return mse_loss(ut, vt)
+
 
     def _sample(self, context=None):
         N = context.shape[0]
@@ -207,6 +294,53 @@ class TrajectoryCNF(nn.Module):
         logprob = prior.log_prob(z).to(xu).sum(dim=[1, 2]) - delta_log_prob  # logp(z_S) = logp(z_0) - \int_0^S trJ
         return logprob, z
 
+    def _get_Ts(self, t):
+        beta_min = 0.1
+        beta_max = 20
+        Ts = t * beta_min + t ** 2 * (beta_max - beta_min) / 2
+        grad_Ts = beta_min + t * (beta_max - beta_min)
+        return Ts, grad_Ts
+
+    def flow_matching_loss_diffusion(self, xu, context):
+        B, T, _ = xu.shape
+
+        # Inflate xu with noise
+        xu = xu + self.inflation_noise * torch.randn_like(xu)
+
+        # sample t from [0, 1]
+        t = torch.rand(B, 1, 1, device=xu.device) * (1 - 1.0e-5)
+
+        Ts, grad_Ts = self._get_Ts(1 - t)
+
+        alpha_1_minus_t = torch.exp(-Ts / 2)
+
+        mu_t = alpha_1_minus_t * xu
+        sigma_t = torch.sqrt(1 - alpha_1_minus_t ** 2) * torch.ones_like(xu)
+
+        # sample initial noise
+        x0 = torch.randn_like(xu)
+
+        # Re-parameterize to xt
+        xut = mu_t + sigma_t * x0
+
+        # get GT velocity
+        tmp = torch.exp(-Ts)
+        ut = -grad_Ts * (tmp * xut - alpha_1_minus_t * xu) / (2 * (1 - tmp))
+        # faster for training
+        vt = self.model.compiled_fwd(t.reshape(-1), xut, context)
+
+        # compute loss
+        return mse_loss(ut, vt)
+
+    def diffusion_grad_wrapper(self, t, xu, context):
+        s = self.model(t, xu, context)
+
+        Ts, grad_Ts = self._get_Ts(1 - t)
+
+        alpha_1_minus_t = torch.exp(-Ts / 2)
+        sigma_t = torch.sqrt(1 - alpha_1_minus_t ** 2) * torch.ones_like(xu)
+        return s / sigma_t
+
 
 import matplotlib.pyplot as plt
 
@@ -217,11 +351,11 @@ if __name__ == "__main__":
     device = 'cuda:0'
 
     # generate some data - let's do a 1D uniform [-1, 1] distribution embedded in 2D
-    #z = 4 * torch.rand(N, 1, device=device) - 2
+    # z = 4 * torch.rand(N, 1, device=device) - 2
     z = torch.randn(N, 1, device=device)
-    #z1 = 1.2 + 0.25 * torch.randn(N // 2, 1, device=device)
-    #z2 = -0.9 + 0.2 * torch.randn(N // 2, 1, device=device)
-    #z = torch.cat([z1, z2], dim=0)
+    # z1 = 1.2 + 0.25 * torch.randn(N // 2, 1, device=device)
+    # z2 = -0.9 + 0.2 * torch.randn(N // 2, 1, device=device)
+    # z = torch.cat([z1, z2], dim=0)
     A = torch.tensor([[0.8825],
                       [-0.2678]], device=device)
 
