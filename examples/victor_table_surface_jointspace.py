@@ -465,7 +465,7 @@ def do_trial(env, params, fpath):
             else:
                 raise ValueError('Invalid flow model type')
             flow_model = TrajectorySampler(T=params['T'], dx=7, du=0, context_dim=7 + 2 + 5, type=flow_type)
-            flow_model.load_state_dict(torch.load(f'{CCAI_PATH}/params["flow_model"]'))
+            flow_model.load_state_dict(torch.load(f'{CCAI_PATH}/{params["flow_model"]}'))
             flow_model.to(device=params['device'])
         else:
             flow_model = None
