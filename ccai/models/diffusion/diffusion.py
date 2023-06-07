@@ -1,13 +1,10 @@
 import torch
 from torch import nn
 import numpy as np
-from torch_cg import cg_batch
 
-from ccai.diffusion.temporal import TemporalUnet
-from ccai.diffusion.training import EMA
+from ccai.models.temporal import TemporalUnet
 
 from einops import reduce
-from random import random
 
 
 def cosine_beta_schedule(timesteps, s=0.008, dtype=torch.float32):
@@ -75,7 +72,7 @@ class oldGaussianDiffusion(nn.Module):
         self.horizon = horizon
         self.xu_dim = xu_dim
         self.context_dim = context_dim
-        self.net = TemporalUnet(self.horizon, self.xu_dim, cond_dim=context_dim, dim=64)
+        self.net = TemporalUnet(self.horizon, self.xu_dim, cond_dim=context_dim, dim=32)
 
         self.n_timesteps = num_timesteps
 
@@ -204,7 +201,6 @@ def extract(a, t, x_shape):
 
 
 from torch.nn import functional as F
-from functools import partial
 
 
 def identity(t, *args, **kwargs):
@@ -212,7 +208,6 @@ def identity(t, *args, **kwargs):
 
 
 from collections import namedtuple
-from tqdm.auto import tqdm
 
 ModelPrediction = namedtuple('ModelPrediction', ['pred_noise', 'pred_x_start'])
 
@@ -247,7 +242,7 @@ class GaussianDiffusion(nn.Module):
 
         self.horizon = horizon
         self.xu_dim = xu_dim
-        self.model = TemporalUnet(self.horizon, self.xu_dim, cond_dim=context_dim, dim=128)
+        self.model = TemporalUnet(self.horizon, self.xu_dim, cond_dim=context_dim, dim=32)
         self.objective = objective
 
         beta_schedule_fn = cosine_beta_schedule
@@ -308,13 +303,14 @@ class GaussianDiffusion(nn.Module):
         maybe_clipped_snr = snr.clone()
         if min_snr_loss_weight:
             maybe_clipped_snr.clamp_(max=min_snr_gamma)
-
         if objective == 'pred_noise':
             register_buffer('loss_weight', maybe_clipped_snr / snr)
         elif objective == 'pred_x0':
             register_buffer('loss_weight', maybe_clipped_snr)
         elif objective == 'pred_v':
             register_buffer('loss_weight', maybe_clipped_snr / (snr + 1))
+
+        print(self.loss_weight)
 
     def predict_start_from_noise(self, x_t, t, noise):
         return (
@@ -350,7 +346,7 @@ class GaussianDiffusion(nn.Module):
         return posterior_mean, posterior_variance, posterior_log_variance_clipped
 
     def model_predictions(self, x, t, context):
-        model_output = self.model(x, t, context)
+        model_output = self.model(t, x, context)
         pred_noise = model_output
         x_start = self.predict_start_from_noise(x, t, pred_noise)
         return ModelPrediction(pred_noise, x_start)
@@ -458,7 +454,7 @@ class GaussianDiffusion(nn.Module):
         noise = default(noise, lambda: torch.randn_like(x_start))
         x = self.q_sample(x_start=x_start, t=t, noise=noise)
         # predict and take gradient step
-        model_out = self.model(x, t, context)
+        model_out = self.model.compiled_fwd(t, x, context)
 
         loss = self.loss_fn(model_out, noise, reduction='none')
         loss = reduce(loss, 'b ... -> b (...)', 'mean')

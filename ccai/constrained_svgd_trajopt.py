@@ -37,7 +37,6 @@ class ConstrainedSteinTrajOpt:
         xuz = xuz.detach()
         xuz.requires_grad = True
         grad_J, hess_J, K, grad_K, C, dC, hess_C = self.problem.eval(xuz)
-
         with torch.no_grad():
             # we try and invert the dC dCT, if it is singular then we use the psuedo-inverse
             eye = torch.eye(self.dg + self.dh).repeat(N, 1, 1).to(device=C.device)
@@ -142,7 +141,6 @@ class ConstrainedSteinTrajOpt:
                     normxiJ = torch.clamp(torch.linalg.norm(xi_J, dim=1, keepdim=True, ord=np.inf), min=1e-6)
                     normxiJ = torch.max(normxiJ, self.normxiJ)
                     xi_J = self.alpha_J * xi_J / normxiJ
-
         return (self.alpha_J * xi_J + self.alpha_C * xi_C).detach()
 
     def _clamp_in_bounds(self, xuz):
@@ -226,7 +224,7 @@ class ConstrainedSteinTrajOpt:
         # driving force useful for helping exploration -- currently unused
         T = self.iters
         C = 1
-        p = 0.5
+        p = 1
         self.max_gamma = 1
         import time
         def driving_force(t):

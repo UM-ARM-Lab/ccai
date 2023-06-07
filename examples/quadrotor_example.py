@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D  # <-- Note the capitalization!
 import time
 from functools import partial
-from functorch import vmap, jacrev, hessian
+from torch.func import vmap, jacrev, hessian
 
 from ccai.kernels import rbf_kernel, structured_rbf_kernel
 from ccai.quadrotor_env import QuadrotorEnv
@@ -18,11 +18,11 @@ from ccai.mpc.svgd import SVMPC
 import argparse
 import yaml
 from ccai.problem import ConstrainedSVGDProblem, IpoptProblem, UnconstrainedPenaltyProblem
-from quadrotor_learn_to_sample import TrajectoryFlowModel
 import pathlib
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
+from ccai.models.trajectory_samplers import TrajectorySampler
 
 def cost(trajectory, goal):
     x = trajectory[:, :12]
@@ -371,8 +371,14 @@ def do_trial(env, params, fpath):
 
     if 'csvgd' in params['controller']:
         if params['flow_model'] != 'none':
-            flow_model = TrajectoryFlowModel(T=params['T'], dx=12, du=4, context_dim=12 + 3 + 100)
-            flow_model.load_state_dict(torch.load(params['flow_model']))
+            if 'diffusion' in params['flow_model']:
+                flow_type = 'diffusion'
+            elif 'cnf' in params['flow_model']:
+                flow_type = 'cnf'
+            else:
+                raise ValueError('Invalid flow model type')
+            flow_model = TrajectorySampler(T=params['T'], dx=12, du=4, context_dim=12 + 3 + 100, type=flow_type)
+            flow_model.load_state_dict(torch.load(f'{CCAI_PATH}/params["flow_model"]'))
             flow_model.to(device=params['device'])
         else:
             flow_model = None
@@ -403,6 +409,7 @@ def do_trial(env, params, fpath):
     all_violation = []
 
     duration = 0.0
+    constraint_params = env.surface_model.train_y.reshape(-1).to(device=params['device'], dtype=torch.float32)
     for step in range(params['num_steps']):
         if not collision:
             start = torch.from_numpy(env.state).to(dtype=torch.float32, device=params['device'])
@@ -410,7 +417,9 @@ def do_trial(env, params, fpath):
             if step > 0:
                 torch.cuda.synchronize()
                 start_time = time.time()
-            best_traj, trajectories = controller.step(start, obstacle_pos=env.obstacle_pos)
+            best_traj, trajectories = controller.step(start,
+                                                      obstacle_pos=env.obstacle_pos,
+                                                      constr_param=constraint_params)
             if step > 0:
                 torch.cuda.synchronize()
                 duration += time.time() - start_time
@@ -442,7 +451,7 @@ def do_trial(env, params, fpath):
 
 
 if __name__ == "__main__":
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/quadrotor.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/config/planning_configs/quadrotor.yaml').read_text())
     from tqdm import tqdm
 
     if config['obstacle_mode'] == 'none':

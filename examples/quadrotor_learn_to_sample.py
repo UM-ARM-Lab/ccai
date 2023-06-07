@@ -1,45 +1,27 @@
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import axes3d, Axes3D  # <-- Note the capitalization!
-import time
 from functools import partial
-from functorch import vmap, jacrev, hessian
+from torch.func import vmap, jacrev, hessian
+import yaml
 
-from ccai.kernels import rbf_kernel, structured_rbf_kernel
+from ccai.kernels import rbf_kernel
 from ccai.quadrotor_env import QuadrotorEnv
 from ccai.quadrotor import Quadrotor12DDynamics
-from ccai.gp import GPSurfaceModel, BatchGPSurfaceModel
+from ccai.gp import BatchGPSurfaceModel
 
-from ccai.mpc.csvgd import Constrained_SVGD_MPC
-from ccai.mpc.ipopt import IpoptMPC
-from ccai.mpc.mppi import MPPI
-from ccai.mpc.svgd import SVMPC
-import argparse
-import yaml
-from ccai.problem import ConstrainedSVGDProblem, IpoptProblem, UnconstrainedPenaltyProblem
+from ccai.problem import ConstrainedSVGDProblem
 from ccai.batched_stein_gradient import compute_constrained_gradient
 from ccai.dataset import QuadrotorSingleConstraintTrajectoryDataset, QuadrotorMultiConstraintTrajectoryDataset
-import quadrotor_example
 import pathlib
 from torch import nn
 import tqdm
+import copy
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
+from ccai.models.training import EMA
 
-from nflows.flows.base import Flow
-from nflows.distributions.normal import ConditionalDiagonalNormal, DiagonalNormal, StandardNormal
-from nflows.transforms.base import CompositeTransform
-from nflows.transforms.autoregressive import MaskedAffineAutoregressiveTransform, \
-    MaskedPiecewiseRationalQuadraticAutoregressiveTransform
-from nflows.transforms.coupling import PiecewiseRationalQuadraticCouplingTransform, AffineCouplingTransform
-from nflows.transforms.permutations import ReversePermutation, RandomPermutation
-from nflows.transforms.lu import LULinear
-from nflows.nn.nets import ResidualNet
-from nflows.utils import torchutils
-
-from ccai.diffusion.diffusion import GaussianDiffusion
-from ccai.diffusion.training import EMA
+from ccai.models.trajectory_samplers import TrajectorySampler
 
 
 def cost(trajectory, goal):
@@ -304,298 +286,34 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         pass
 
 
-class MLP(nn.Module):
-
-    def __init__(self, input_size, output_size, hidden_size=256):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(input_size, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, output_size)
-        )
-
-    def forward(self, x):
-        return self.net(x)
-
-
-class TrajectoryFlowModel(nn.Module):
-
-    def __init__(self, T, dx, du, context_dim):
-        super().__init__()
-        self.T = T
-        self.dx = dx
-        self.du = du
-        split_prior = False
-        controls_only = True
-        if controls_only:
-            flow_dim = T * du
-        else:
-            flow_dim = T * (dx + du)
-        self.controls_only = controls_only
-        self.dynamics = Quadrotor12DDynamics(dt=0.1)
-        # self.flow = build_ffjord(T*(dx+du), context_dim, 1)
-        # self.flow = OTFlow(T*(dx+du), 64, 2, context_dim)
-
-        if split_prior or controls_only:
-            prior_dim = T * du
-        else:
-            prior_dim = T * (dx + du)
-
-        def create_transform_net(in_features, out_features):
-            net = ResidualNet(in_features, out_features, hidden_features=64, context_features=context_dim)
-            return net
-
-        # base_dist = StandardNormal(shape=[flow_dim])
-        base_dist = ConditionalDiagonalNormal(shape=[flow_dim], context_encoder=MLP(context_dim,
-                                                                                    2 * flow_dim,
-                                                                                    hidden_size=64)
-                                              )
-
-        transforms = []
-        for _ in range(16):
-            # transforms.append(ReversePermutation(features=flow_dim))
-            # transforms.append(RandomPermutation(features=flow_dim))
-            transforms.append(LULinear(features=flow_dim))
-            # transforms.append(MaskedPiecewiseRationalQuadraticAutoregressiveTransform(features=flow_dim,
-            #                                                                          context_features=context_dim,
-            #                                                                          hidden_features=64,
-            #                                                                          tails='linear',
-            #                                                                          tail_bound=4))
-            mask = torchutils.create_mid_split_binary_mask(flow_dim)
-            transforms.append(PiecewiseRationalQuadraticCouplingTransform(mask=mask,
-                                                                          transform_net_create_fn=create_transform_net,
-                                                                          tails='linear', tail_bound=4))
-            # transforms.append(AffineCouplingTransform(mask=mask, transform_net_create_fn=create_transform_net))
-
-        transforms = CompositeTransform(transforms)
-        self.flow = Flow(transforms, base_dist)
-
-    def sample(self, start, goal, constraints=None, T=1):
-        B = start.shape[0]
-        context = torch.cat((start, goal), dim=1)
-        if constraints is not None:
-            context = torch.cat((context, constraints), dim=1)
-
-        samples = self.flow.sample(num_samples=1, context=context)
-        trajectories = samples.reshape(B, self.T, -1)
-
-        if self.controls_only:
-            x = [start.clone()]
-            for t in range(self.T - 1):
-                x.append(self.dynamics(x[-1], trajectories[:, t]))
-            x = torch.stack(x, dim=1)
-            trajectories = torch.cat((x, trajectories), dim=-1)
-
-        return trajectories.reshape(B, self.T, self.dx + self.du)
-
-    def log_prob(self, trajectories, start, goal, constraints=None):
-        B = start.shape[0]
-        context = torch.cat((start, goal), dim=1)
-
-        if constraints is not None:
-            context = torch.cat((context, constraints), dim=1)
-
-        if self.controls_only:
-            trajectories = trajectories[:, :, -self.du:]
-
-        log_prob = self.flow.log_prob(trajectories.reshape(B, -1), context=context)
-        return log_prob.reshape(B)
-
-    def loss(self, trajectories, start, goal, constraints=None):
-        return -self.log_prob(trajectories, start, goal, constraints).mean()
-
-
-class TrajectoryDiffusionModel(nn.Module):
-
-    def __init__(self, T, dx, du, context_dim):
-        super().__init__()
-        self.T = T
-        self.dx = dx
-        self.du = du
-        self.context_dim = context_dim
-        self.diffusion_model = GaussianDiffusion(T, (dx + du), context_dim, timesteps=20, sampling_timesteps=20)
-
-    def sample(self, start, goal, constraints):
-        context = torch.cat((start, goal, constraints), dim=1)
-        condition = {0: start}
-        samples = self.diffusion_model.sample(N=1, context=context, condition=condition).reshape(-1, self.T,
-                                                                                                 self.dx + self.du)
-        return samples
-
-    def loss(self, trajectories, start, goal, constraints):
-        B = trajectories.shape[0]
-        context = torch.cat((start, goal, constraints), dim=1)
-        return self.diffusion_model.loss(trajectories.reshape(B, -1), context=context).mean()
-
-
-from ccai.cnf.cnf import TrajectoryCNF
-
-
-class TrajectoryCNFModel(TrajectoryCNF):
-
-    def __init__(self, horizon, dx, du, context_dim):
-        super().__init__(horizon, dx + du, context_dim)
-
-    def sample(self, start, goal, constraints):
-        context = torch.cat((start, goal, constraints), dim=1)
-        return self._sample(context)
-
-    def loss(self, x, start, goal, constraints):
-        context = torch.cat((start, goal, constraints), dim=1)
-        return self.flow_matching_loss(x, context)
-
-
-class TrajectorySampler(nn.Module):
-
-    def __init__(self, T, dx, du, context_dim, type='nf'):
-        super().__init__()
-        self.T = T
-        self.dx = dx
-        self.du = du
-        self.context_dim = context_dim
-        assert type in ['nf', 'diffusion', 'cnf']
-        if type == 'nf':
-            self.model = TrajectoryFlowModel(T, dx, du, context_dim)
-        elif type == 'cnf':
-            self.model = TrajectoryCNFModel(T, dx, du, context_dim)
-        else:
-            self.model = TrajectoryDiffusionModel(T, dx, du, context_dim)
-
-        self.register_buffer('x_mean', torch.zeros(dx + du))
-        self.register_buffer('x_std', torch.ones(dx + du))
-
-    def set_norm_constants(self, x_mean, x_std):
-        self.x_mean.data = torch.from_numpy(x_mean).to(device=self.x_mean.device, dtype=self.x_mean.dtype)
-        self.x_std.data = torch.from_numpy(x_std).to(device=self.x_std.device, dtype=self.x_std.dtype)
-
-    def sample(self, start, goal, constraints=None):
-        samples = self.model.sample(start, goal, constraints)
-        return samples * self.x_std + self.x_mean
-
-    def loss(self, trajectories, start, goal, constraints=None):
-        return self.model.loss(trajectories, start, goal, constraints)
-
-
-def train_model_from_demonstrations():
-    model = TrajectoryFlowModel(T=12, dx=12, du=4, context_dim=12 + 3)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-
-    from torch.utils.data import random_split, DataLoader, RandomSampler
-
-    datasets = [
-        QuadrotorSingleConstraintTrajectoryDataset(f'../data/quadrotor_data_collection_single_constraint_part{i + 1}'
-                                                   ) for i in range(5)]
-    from torch.utils.data import ConcatDataset
-    dataset = ConcatDataset(datasets)
-
-    train_dataset, val_dataset = random_split(dataset, [int(0.9 * len(dataset)),
-                                                        len(dataset) - int(0.9 * len(dataset))])
-
-    train_sampler = RandomSampler(train_dataset)
-    val_sampler = RandomSampler(val_dataset)
-
-    train_loader = DataLoader(train_dataset, batch_size=128, sampler=train_sampler)
-    val_loader = DataLoader(val_dataset, batch_size=512, sampler=val_sampler)
-
-    epochs = 100
-    pbar = tqdm.tqdm(range(epochs))
-
-    model.cuda()
-    for epoch in pbar:
-        train_loss = 0.0
-        val_loss = 0.0
-        model.train()
-        for trajectories, starts, goals in train_loader:
-            trajectories = trajectories.to(device='cuda:0')
-            B, N, T, dxu = trajectories.shape
-            starts = starts.to(device='cuda:0')
-            goals = goals.to(device='cuda:0')
-            optimizer.zero_grad()
-            log_prob = model.log_prob(trajectories.reshape(B * N, T, dxu),
-                                      starts.reshape(B * N, -1),
-                                      goals.reshape(B * N, -1))
-            loss = -log_prob.mean()
-            loss.backward()
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
-            optimizer.step()
-            train_loss += loss.item()
-
-        with torch.no_grad():
-            model.eval()
-            for trajectories, starts, goals in val_loader:
-                trajectories = trajectories.to(device='cuda:0')
-                B, N, T, dxu = trajectories.shape
-                starts = starts.to(device='cuda:0')
-                goals = goals.to(device='cuda:0')
-                log_prob = model.log_prob(trajectories.reshape(B * N, T, dxu),
-                                          starts.reshape(B * N, -1),
-                                          goals.reshape(B * N, -1))
-                loss = -log_prob.mean()
-                val_loss += loss.item()
-
-        val_loss /= len(val_loader)
-        train_loss /= len(train_loader)
-        pbar.set_description(
-            f'Train loss {train_loss:.3f} Val loss {val_loss:.3f}')
-        # generate samples and plot them
-        if (epoch + 1) % 10 == 0:
-            for _, starts, goals in val_loader:
-                starts = starts.to(device='cuda:0')
-                goals = goals.to(device='cuda:0')
-                N = starts.shape[1]
-                starts = starts[:16].reshape(-1, 12)
-                goals = goals[:16].reshape(-1, 3)
-                with torch.no_grad():
-                    trajectories = model.sample(starts, goals)
-                trajectories = trajectories.reshape(16, N, 12, 16)
-                starts = starts.reshape(16, N, 12)
-                goals = goals.reshape(16, N, 3)
-                for i, trajs in enumerate(trajectories):
-                    env = QuadrotorEnv('surface_data.npz')
-                    env.state = starts[i, 0].cpu().numpy()
-                    env.goal = goals[i, 0].cpu().numpy()
-                    ax = env.render_init()
-                    update_plot_with_trajectories(ax, trajs.reshape(N, 12, 16))
-                    plt.savefig(
-                        f'learning_plots/demonstrations/learned_sampler_quadrotor_single_constraint_{epoch}_{i}.png')
-                    plt.close()
-
-                break
-
-    torch.save(model.state_dict(),
-               'spline_learned_sampler_quadrotor_single_constraint_from_demonstration_controls_only.pt')
-
-
 def test_model_multi(model, loader, problem):
     model.eval()
     val_ll = 0.0
     val_sample_loss = 0.0
     val_av_constraint_volation = 0.0
 
-    for i, (trajectories, starts, goals, constraints) in enumerate(loader):
+    for i, (trajectories, starts, goals, constraints, _) in enumerate(loader):
         trajectories = trajectories.to(device='cuda:0')
-        B, N, T, dxu = trajectories.shape
+        B, T, dxu = trajectories.shape
         starts = starts.to(device='cuda:0')
         goals = goals.to(device='cuda:0')
         constraints = constraints.to(device='cuda:0')
         with torch.no_grad():
-            log_prob = model.log_prob(trajectories.reshape(B * N, T, dxu),
-                                      starts.reshape(B * N, -1),
-                                      goals.reshape(B * N, -1),
-                                      constraints.reshape(B * N, -1))
+            log_prob = model.loss(trajectories.reshape(B, T, dxu),
+                                  starts.reshape(B, -1),
+                                  goals.reshape(B, -1),
+                                  constraints.reshape(B, -1))
 
         loss = -log_prob.mean()
         val_ll += loss.item()
 
-        sampled_trajectories = model.sample(starts.reshape(B * N, -1),
-                                            goals.reshape(B * N, -1),
-                                            constraints.reshape(B * N, -1)).reshape(B, N, T, dxu)
-        goals = torch.cat((goals, torch.zeros(B, N, 9).to(device='cuda:0')), dim=-1)
+        sampled_trajectories = model.sample(starts.reshape(B, -1),
+                                            goals.reshape(B, -1),
+                                            constraints.reshape(B, -1)).reshape(B, T, dxu)
+        goals = torch.cat((goals, torch.zeros(B, 9).to(device='cuda:0')), dim=-1)
         # J, _, _, _, _, C, _, _ = problem.eval(sampled_trajectories, starts[:, 0], goals[:, 0], constraints[:, 0])
-        J, _, _ = problem._objective(sampled_trajectories, goals)
-        C, _, _ = problem.batched_combined_constraints(sampled_trajectories, starts[:, 0], constraints[:, 0],
+        J, _, _ = problem._objective(sampled_trajectories.unsqueeze(1), goals.unsqueeze(1))
+        C, _, _ = problem.batched_combined_constraints(sampled_trajectories.unsqueeze(1), starts, constraints,
                                                        compute_grads=False)
 
         val_sample_loss += J.mean().item()
@@ -607,304 +325,40 @@ def test_model_multi(model, loader, problem):
     return val_ll, val_sample_loss, val_av_constraint_volation
 
 
-def test_model_inr(model, constraint_model, loader, problem, constraint_embedding=None):
-    # model.eval()
-    # constraint_model.eval()
-    val_ll = 0.0
-    val_constraint_model_loss = 0.0
-    val_sample_loss = 0.0
-    val_av_constraint_volation = 0.0
-
-    for i, (trajectories, starts, goals, constraints, constraint_idx) in enumerate(loader):
-        trajectories = trajectories.to(device='cuda:0')
-        B, T, dxu = trajectories.shape
-        starts = starts.to(device='cuda:0')
-        goals = goals.to(device='cuda:0')
-        constraints = constraints.to(device='cuda:0')
-        constraint_idx = constraint_idx.to(device='cuda:0').reshape(-1)
-
-        shuffled_trajectories = trajectories.reshape(B * T, -1)[torch.randperm(B * T)].reshape(B, 1, T, -1)
-        unnormalized_shuffled_trajectories = shuffled_trajectories * model.x_std + \
-                                             model.x_mean
-        surf_constr, grad_surf_constr, _ = problem.height_constraint(unnormalized_shuffled_trajectories,
-                                                                     constraints.reshape(B, 1, -1, 1)
-                                                                     )
-
-        surf_constr = surf_constr.reshape(B, T, -1)
-        grad_surf_constr = grad_surf_constr.reshape(B, T, -1)
-        grad_surf_constr = grad_surf_constr / model.x_std
-
-        if constraint_embedding is not None:
-            context_mu, context_log_std = torch.chunk(constraint_embedding(constraint_idx), chunks=2, dim=1)
-            context_std = torch.exp(context_log_std)
-        else:
-            context_mu, context_std = constraint_model.infer_posterior_context(trajectories,
-                                                                               surf_constr,
-                                                                               grad_surf_constr
-                                                                               )
-        # get loss from constraint model
-        constraint_model_loss, context_sample = constraint_model.loss(shuffled_trajectories.reshape(B, T, -1),
-                                                                      surf_constr,
-                                                                      grad_surf_constr,
-                                                                      context_mu, context_std)
-
-        with torch.no_grad():
-            loss = model.loss(trajectories,
-                              starts,
-                              goals,
-                              context_sample)
-
-        val_ll += loss.item()
-        val_constraint_model_loss += constraint_model_loss.item()
-
-        # sample trajectories
-        sampled_trajectories = model.sample(starts, goals, context_sample).reshape(B, T, dxu)
-
-        g = torch.cat((goals, torch.zeros(B, 9).to(device='cuda:0')), dim=-1)
-        # J, _, _, _, _, C, _, _ = problem.eval(sampled_trajectories, starts[:, 0], goals[:, 0], constraints[:, 0])
-        J, _, _ = problem._objective(sampled_trajectories.unsqueeze(1),
-                                     g.reshape(B, 1, -1))
-        C, _, _ = problem.batched_combined_constraints(sampled_trajectories.unsqueeze(1),
-                                                       starts.unsqueeze(1),
-                                                       constraints.unsqueeze(1),
-                                                       compute_grads=False)
-
-        val_sample_loss += J.mean().item()
-        val_av_constraint_volation += C[:, :, -11:].abs().mean().item()
-
-    val_ll /= len(loader)
-    val_sample_loss /= len(loader)
-    val_av_constraint_volation /= len(loader)
-    val_constraint_model_loss /= len(loader)
-    return val_ll, val_constraint_model_loss, val_sample_loss, val_av_constraint_volation
-
-
-def train_multi_constraint_model_from_demonstrations(model, train_loader, val_loader, problem):
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-    epochs = 1000
-    pbar = tqdm.tqdm(range(epochs))
-
-    model.cuda()
-    for epoch in pbar:
-        train_loss = 0.0
-        val_loss = 0.0
-        model.train()
-        for trajectories, starts, goals, constraints in train_loader:
-            trajectories = trajectories.to(device='cuda:0')
-            B, N, T, dxu = trajectories.shape
-            starts = starts.to(device='cuda:0')
-            goals = goals.to(device='cuda:0')
-            constraints = constraints.to(device='cuda:0')
-
-            optimizer.zero_grad()
-            loss = model.loss(trajectories.reshape(B * N, T, dxu),
-                              starts.reshape(B * N, -1),
-                              goals.reshape(B * N, -1),
-                              constraints.reshape(B * N, -1))
-
-            loss.backward()
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
-            optimizer.step()
-            train_loss += loss.item()
-
-        train_loss /= len(train_loader)
-        pbar.set_description(
-            f'Train loss {train_loss:.3f}')
-
-        # generate samples and plot them
-        if (epoch + 1) % 100 == 0:
-            demo_ll, sample_cost, constraint_violation = test_model_multi(model, val_loader, problem)
-            print(
-                f'Epoch: {epoch + 1}  Demonstration log-likelihood: {demo_ll}   Sample Cost: {sample_cost}   Constraint Violation: {constraint_violation}')
-            for _, starts, goals, constraints in val_loader:
-                starts = starts.to(device='cuda:0')
-                goals = goals.to(device='cuda:0')
-                N = starts.shape[1]
-                starts = starts[:16].reshape(-1, 12)
-                goals = goals[:16].reshape(-1, 3)
-                constraints = constraints[:16].reshape(-1, 100).to(device='cuda:0')
-                with torch.no_grad():
-                    trajectories = model.sample(starts, goals, constraints)
-                trajectories = trajectories.reshape(16, N, 12, 16)
-                starts = starts.reshape(16, N, 12)
-                goals = goals.reshape(16, N, 3)
-                constraints = constraints.reshape(16, N, 100)
-                for i, trajs in enumerate(trajectories):
-                    env = QuadrotorEnv('surface_data.npz')
-                    xy_data = env.surface_model.train_x.cpu().numpy()
-                    z_data = constraints[i, 0].cpu().numpy()
-                    np.savez('tmp_surface_data.npz', xy=xy_data, z=z_data)
-                    env = QuadrotorEnv('tmp_surface_data.npz')
-                    env.state = starts[i, 0].cpu().numpy()
-                    env.goal = goals[i, 0].cpu().numpy()
-                    ax = env.render_init()
-                    update_plot_with_trajectories(ax, trajs.reshape(N, 12, 16))
-                    plt.savefig(
-                        f'learning_plots/demonstrations/learned_sampler_quadrotor_multi_constraint_{epoch}_{i}.png')
-                    plt.close()
-
-                break
-
-    torch.save(model.state_dict(),
-               'spline_learned_sampler_quadrotor_multi_constraint_from_demonstration_controls_only2.pt')
-
-
-def fine_tune_model_with_stein(model):
-    B, N, T = 6, 16, 12
-    batched_problem = QuadrotorProblem(T=12, device='cuda', include_obstacle=False, alpha=0.01)
-    datasets = [
-        QuadrotorSingleConstraintTrajectoryDataset(f'../data/quadrotor_data_collection_single_constraint_part{i + 1}'
-                                                   ) for i in range(5)]
-    from torch.utils.data import ConcatDataset, RandomSampler, DataLoader, random_split
-
-    dataset = ConcatDataset(datasets)
-    train_dataset, val_dataset = random_split(dataset, [int(0.9 * len(dataset)),
-                                                        len(dataset) - int(0.9 * len(dataset))])
-    train_sampler = RandomSampler(train_dataset)
-    val_sampler = RandomSampler(val_dataset)
-
-    train_loader = DataLoader(train_dataset, batch_size=B, sampler=train_sampler)
-    val_loader = DataLoader(val_dataset, batch_size=512, sampler=val_sampler)
-
-    # optimizer = torch.optim.SGD(model.parameters(), lr=1e-2, momentum=0.9, nesterov=True)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-    epochs = 100
+def fine_tune_model_with_stein(model, train_loader, val_loader, problem, config):
+    fpath = pathlib.Path(f'{CCAI_PATH}/data/training/quadrotor/{config["model_name"]}_{config["model_type"]}')
+    optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'])
+    epochs = config['epochs']
     model.train()
-    min_vel_scale = 0.01
-    max_vel_scale = 1
     pbar = tqdm.tqdm(range(epochs))
     for epoch in pbar:
-        for batch_no, (trajectories, starts, goals) in enumerate(train_loader):
-            trajectories = trajectories.to(device='cuda:0')
-            B, N, T, dxu = trajectories.shape
-            starts = starts.to(device='cuda:0')
-            goals = goals.to(device='cuda:0')
+        N = config['num_samples']
+        for batch_no, (trajectories, starts, goals, constraints, _) in enumerate(train_loader):
+            trajectories = trajectories.to(device=config['device'])
+            B, T, dxu = trajectories.shape
+            starts = starts.to(device=config['device'])
+            goals = goals.to(device=config['device'])
+            constraints = constraints.to(device=config['device'])
 
             # sample trajectories
-            s = starts.reshape(B * N, 12)
-            goals = torch.cat((goals, torch.zeros(B, N, 9).to(device='cuda:0')), dim=-1)
+            s = starts.reshape(B, 1, 12).repeat(1, N, 1).reshape(B * N, 12)
+            goals = torch.cat((goals.reshape(N, 1, 3).repeat(1, N, 1), torch.zeros(B, N, 9).to(device='cuda:0')),
+                              dim=-1)
             g = goals.reshape(B * N, 12)
-
-            trajectories = model.sample(s, g[:, :3]).reshape(B, N, T, 16)
-            phi, J, C = compute_constrained_gradient(trajectories,
-                                                     starts[:, 0],
-                                                     goals[:, 0],
-                                                     batched_problem,
-                                                     alpha_J=1,
-                                                     alpha_C=1)
-            """
-            phi = []
-            J = []
-            C = []
-            for i in range(B):
-                # now compute the gradient
-                _phi, _J, _C = compute_constrained_gradient(trajectories[i].unsqueeze(0),
-                                                            starts[i, 0].unsqueeze(0),
-                                                            goals[i, 0].unsqueeze(0),
-                                                            batched_problem,
-                                                            alpha_J=1,
-                                                            alpha_C=1)
-                phi.append(_phi)
-                J.append(_J)
-                C.append(_C)
-
-            J = torch.stack(J, dim=0)
-            C = torch.stack(C, dim=0)
-            phi = torch.stack(phi, dim=0)
-            """
-            phi = phi.reshape(B, N, batched_problem.T, -1)
-
-            trajectories.backward(phi)
-
-            if (batch_no + 1) % 16 == 0:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
-
-                pbar.set_description(
-                    f'Average Cost {J.mean().item():.3f} Average Constraint Violation {C.abs().mean().item():.3f}')
-                optimizer.step()
-                optimizer.zero_grad()
-
-        if (epoch + 10) % 1 == 0:
-            for _, starts, goals, in val_loader:
-                starts = starts.to(device='cuda:0')
-                goals = goals.to(device='cuda:0')
-                N = starts.shape[1]
-                starts = starts[:16].reshape(-1, 12)
-                goals = goals[:16].reshape(-1, 3)
-                with torch.no_grad():
-                    trajectories = model.sample(starts, goals)
-                trajectories = trajectories.reshape(16, N, 12, 16)
-                starts = starts.reshape(16, N, 12)
-                goals = goals.reshape(16, N, 3)
-                for i, trajs in enumerate(trajectories):
-                    env = QuadrotorEnv('surface_data.npz')
-                    env.state = starts[i, 0].cpu().numpy()
-                    env.goal = goals[i, 0].cpu().numpy()
-                    ax = env.render_init()
-                    update_plot_with_trajectories(ax, trajs.reshape(N, 12, 16))
-                    plt.savefig(
-                        f'learning_plots/finetuning/learned_sampler_quadrotor_single_constraint_{epoch}_{i}.png')
-                    plt.close()
-
-                break
-
-    torch.save(model.state_dict(), 'spline_learned_sampler_quadrotor_single_constraint_finetuned_controls_only.pt')
-
-
-def fine_tune_model_with_stein_multi(model, train_loader, val_loader, problem):
-    # optimizer = torch.optim.SGD(model.parameters(), lr=1e-2, momentum=0.9, nesterov=True)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-    epochs = 10
-    model.train()
-    min_vel_scale = 0.01
-    max_vel_scale = 1
-    pbar = tqdm.tqdm(range(epochs))
-    for epoch in pbar:
-        for batch_no, (trajectories, starts, goals, constraints) in enumerate(train_loader):
-            trajectories = trajectories.to(device='cuda:0')
-            B, N, T, dxu = trajectories.shape
-            starts = starts.to(device='cuda:0')
-            goals = goals.to(device='cuda:0')
-            constraints = constraints.to(device='cuda:0')
-
-            # sample trajectories
-            s = starts.reshape(B * N, 12)
-            goals = torch.cat((goals, torch.zeros(B, N, 9).to(device='cuda:0')), dim=-1)
-            g = goals.reshape(B * N, 12)
-            c = constraints.reshape(B * N, -1)
+            c = constraints.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
             trajectories = model.sample(s, g[:, :3], c).reshape(B, N, T, 16)
             phi, J, C = compute_constrained_gradient(trajectories,
-                                                     starts[:, 0],
-                                                     goals[:, 0],
-                                                     constraints[:, 0],
+                                                     starts,
+                                                     goals,
+                                                     constraints,
                                                      batched_problem,
                                                      alpha_J=1,
                                                      alpha_C=1)
-            """
-            phi = []
-            J = []
-            C = []
-            for i in range(B):
-                # now compute the gradient
-                _phi, _J, _C = compute_constrained_gradient(trajectories[i].unsqueeze(0),
-                                                            starts[i, 0].unsqueeze(0),
-                                                            goals[i, 0].unsqueeze(0),
-                                                            batched_problem,
-                                                            alpha_J=1,
-                                                            alpha_C=1)
-                phi.append(_phi)
-                J.append(_J)
-                C.append(_C)
-
-            J = torch.stack(J, dim=0)
-            C = torch.stack(C, dim=0)
-            phi = torch.stack(phi, dim=0)
-            """
+            # Update plot
             phi = phi.reshape(B, N, batched_problem.T, -1)
-
             trajectories.backward(phi)
 
-            if (batch_no + 1) % 16 == 0:
+            if (batch_no + 1) % config['optim_update_every'] == 0:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
 
                 pbar.set_description(
@@ -942,12 +396,12 @@ def fine_tune_model_with_stein_multi(model, train_loader, val_loader, problem):
                     ax = env.render_init()
                     update_plot_with_trajectories(ax, trajs.reshape(N, 12, 16))
                     plt.savefig(
-                        f'learning_plots/finetuning/learned_sampler_quadrotor_multi_constraint_{epoch}_{i}.png')
+                        f'{fpath}_finetuned_{epoch}_{i}.png')
                     plt.close()
 
                 break
 
-    torch.save(model.state_dict(), 'spline_learned_sampler_quadrotor_multi_constraint_finetuned_controls_only2.pt')
+    torch.save(model.state_dict(), f'{fpath}_finetuned.pt')
 
 
 def update_plot_with_trajectories(ax, trajectory, color='g'):
@@ -959,190 +413,26 @@ def update_plot_with_trajectories(ax, trajectory, color='g'):
                                   traj_np[1:, 2], color=color, alpha=0.5, linestyle='--'))
 
 
-def train_with_implicit_neural_constraint_fn(trajectory_sampler, constraint_model, train_loader, val_loader, problem):
-    # each constraint in the dataset should have a corresponding latent embedding (mu, sigma)
-    num_embeddings = train_loader.dataset.num_trials
-    embedding_dim = 128
-    constraint_embedding = torch.nn.Embedding(num_embeddings, 2 * embedding_dim, dtype=torch.float32, device='cuda:0')
+def train_model_from_demonstrations(trajectory_sampler, train_loader, val_loader, problem, config):
+    pbar = tqdm.tqdm(range(config['epochs']))
+    fpath = f'{CCAI_PATH}/data/config/training/quadrotor/{config["model_name"]}_{config["model_type"]}'
 
-    # initialize embeddings to represent N(0, I), i.e. mu = 0, log_std = 0
-    constraint_embedding.weight.data = torch.zeros(num_embeddings, 2 * embedding_dim, dtype=torch.float32,
-                                                   device='cuda:0')
-    # make mean random to break symmetry
-    constraint_embedding.weight.data[:, :embedding_dim] = torch.randn(num_embeddings, embedding_dim,
-                                                                      dtype=torch.float32, device='cuda:0')
-
-    # Turn on gradients for the embeddings
-    constraint_embedding.weight.requires_grad = True
-
-    import copy
-    ema = EMA(beta=0.995)
-    ema_model = copy.deepcopy(trajectory_sampler)
-
-    optimizer = torch.optim.Adam(list(trajectory_sampler.parameters()) +
-                                 list(constraint_model.parameters()) +
-                                 list(constraint_embedding.parameters()), lr=1e-4)
-
-    step = 0
-    warmup_steps = 1000
+    if config['use_ema']:
+        ema = EMA(beta=config['ema_decay'])
+        ema_model = copy.deepcopy(trajectory_sampler)
 
     def reset_parameters():
         ema_model.load_state_dict(trajectory_sampler.state_dict())
 
     def update_ema(model):
-        if step < warmup_steps:
+        if step < config['ema_warmup_steps']:
             reset_parameters()
         else:
             ema.update_model_average(ema_model, model)
 
-    epochs = 100
-    pbar = tqdm.tqdm(range(epochs))
-
-    for epoch in pbar:
-        train_loss = 0.0
-        val_loss = 0.0
-        total_sampler_loss = 0.0
-        total_constraint_loss = 0.0
-        trajectory_sampler.train()
-        for trajectories, starts, goals, constraints, constraint_idx in train_loader:
-            trajectories = trajectories.to(device='cuda:0')
-            B, T, dxu = trajectories.shape
-            starts = starts.to(device='cuda:0')
-            goals = goals.to(device='cuda:0')
-            constraints = constraints.to(device='cuda:0')
-            constraint_idx = constraint_idx.to(device='cuda:0').reshape(B)
-
-            # shuffle trajectories when calculating constraints, otherwise all trajectories have zero constraint violation
-            shuffled_trajectories = trajectories.reshape(B * T, -1)[torch.randperm(B * T)].reshape(B, 1, T, -1)
-            unnormalized_shuffled_trajectories = shuffled_trajectories * trajectory_sampler.x_std + \
-                                                 trajectory_sampler.x_mean
-
-            surf_constr, grad_surf_constr, _ = problem.height_constraint(unnormalized_shuffled_trajectories,
-                                                                         constraints.reshape(B, 1, -1, 1)
-                                                                         )
-
-            surf_constr = surf_constr.reshape(B, T, -1).detach()
-            grad_surf_constr = grad_surf_constr.reshape(B, T, -1).detach() / trajectory_sampler.x_std
-
-            context_mu, context_log_std = torch.chunk(constraint_embedding(constraint_idx), chunks=2, dim=1)
-            context_std = torch.exp(context_log_std)
-            constraint_model_loss, context_sample = constraint_model.loss(shuffled_trajectories.reshape(B, T, -1),
-                                                                          surf_constr,
-                                                                          grad_surf_constr,
-                                                                          context_mu, context_std)
-
-            sampler_loss = trajectory_sampler.loss(trajectories,
-                                                   starts,
-                                                   goals,
-                                                   context_sample)
-            loss = sampler_loss + constraint_model_loss
-            loss.backward()
-
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
-            optimizer.step()
-            optimizer.zero_grad()
-
-            train_loss += loss.item()
-            total_sampler_loss += sampler_loss.item()
-            total_constraint_loss += constraint_model_loss.item()
-            step += 1
-            break
-            if step % 10 == 0:
-                update_ema(trajectory_sampler)
-
-        train_loss /= len(train_loader)
-        total_sampler_loss /= len(train_loader)
-        total_constraint_loss /= len(train_loader)
-        pbar.set_description(
-            f'Train loss {train_loss:.3f} Sampler loss {total_sampler_loss:.3f} Constraint loss {total_constraint_loss:.3f}')
-
-        # generate samples and plot them
-        if (epoch + 1) % 10 == 0:
-            demo_ll, constraint_model_loss, sample_cost, constraint_violation = test_model_inr(ema_model,
-                                                                                               constraint_model,
-                                                                                               train_loader, problem,
-                                                                                               constraint_embedding)
-            # print('TRAINING')
-            # print(
-            #    f'Epoch: {epoch + 1}  Demonstration loss: {demo_ll}   Constraint loss: {constraint_model_loss} Sample Cost: {sample_cost} Constraint Violation: {constraint_violation}')
-            # demo_ll, constraint_model_loss, sample_cost, constraint_violation = test_model_inr(ema_model,
-            #                                                                                   constraint_model,
-            #                                                                                   val_loader, problem)
-            print('VALIDATION')
-            print(
-                f'Epoch: {epoch + 1}  Demonstration loss: {demo_ll}   Constraint loss: {constraint_model_loss} Sample Cost: {sample_cost} Constraint Violation: {constraint_violation}')
-
-            for trajectories, starts, goals, constraints, constraint_idx in val_loader:
-                starts = starts.to(device='cuda:0')
-                goals = goals.to(device='cuda:0')
-                N = 16  # trajectories.shape[1]
-                B = 9
-                starts = starts[:B].reshape(-1, 12)
-                goals = goals[:B].reshape(-1, 3)
-                true_trajectories = trajectories[:B].to(device='cuda:0')
-                constraints = constraints[:B].reshape(-1, 100).to(device='cuda:0')
-                constraint_idx = constraint_idx[:B].reshape(-1).to(device='cuda:0')
-                surf_constr, grad_surf_constr, _ = problem.height_constraint(trajectories.reshape(B, N, -1, 16),
-                                                                             constraints.reshape(B, 1, -1, 1).repeat(1,
-                                                                                                                     N,
-                                                                                                                     1,
-                                                                                                                     1)
-                                                                             )
-                surf_constr = surf_constr.unsqueeze(-1)
-                grad_surf_constr = grad_surf_constr
-                context_mu, context_std = constraint_model.infer_posterior_context(trajectories,
-                                                                                   surf_constr,
-                                                                                   grad_surf_constr
-                                                                                   )
-                context_sample = context_mu + context_std * torch.randn_like(context_std)
-                context_mu, context_log_std = torch.chunk(constraint_embedding(constraint_idx), chunks=2, dim=1)
-                context_std = torch.exp(context_log_std)
-                context_sample = context_mu + context_std * torch.randn_like(context_std)
-
-                s = starts.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
-                g = goals.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
-                c = context_sample.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
-                with torch.no_grad():
-                    trajectories = ema_model.sample(s, g, c)
-
-                trajectories = trajectories.reshape(B, N, 12, 16)
-                starts = s.reshape(B, N, 12)
-
-                # unnormalize starts
-                starts = starts * ema_model.x_std[:12] + ema_model.x_mean[:12]
-                true_trajectories = true_trajectories * ema_model.x_std + ema_model.x_mean
-
-                goals = g.reshape(B, N, 3)
-                constraints = constraints.reshape(B, 100)
-                for i, trajs in enumerate(trajectories):
-                    env = QuadrotorEnv('surface_data.npz')
-                    xy_data = env.surface_model.train_x.cpu().numpy()
-                    z_data = constraints[i].cpu().numpy()
-                    np.savez('tmp_surface_data.npz', xy=xy_data, z=z_data)
-                    env = QuadrotorEnv(randomize_GP=False, surface_data_fname='tmp_surface_data.npz')
-                    env.state = starts[i, 0].cpu().numpy()
-                    env.goal = goals[i, 0].cpu().numpy()
-                    ax = env.render_init()
-                    update_plot_with_trajectories(ax, trajs.reshape(N, 12, 16))
-                    update_plot_with_trajectories(ax, true_trajectories[i].reshape(1, 12, 16), color='red')
-                    plt.savefig(
-                        f'learning_plots/implicit_constraint_fn/learned_sampler_quadrotor_multi_constraint_{epoch}_{i}.png')
-                plt.close()
-
-                break
-
-        torch.save(ema_model.state_dict(), 'implicit_constraint_fn_diffusion.pt')
-        torch.save(constraint_model.state_dict(), 'implicit_constraint_fn_constraint_model.pt')
-
-
-def train_cnf(trajectory_sampler, train_loader, val_loader, problem):
-    optimizer = torch.optim.Adam(trajectory_sampler.parameters(), lr=1e-4)
+    optimizer = torch.optim.Adam(trajectory_sampler.parameters(), lr=config['lr'])
 
     step = 0
-    warmup_steps = 1000
-
-    epochs = 100
-    pbar = tqdm.tqdm(range(epochs))
 
     for epoch in pbar:
         train_loss = 0.0
@@ -1168,12 +458,35 @@ def train_cnf(trajectory_sampler, train_loader, val_loader, problem):
 
             train_loss += loss.item()
 
+            step += 1
+            if config['use_ema']:
+                if step % config['ema_update_every'] == 0:
+                    update_ema(trajectory_sampler)
+
         train_loss /= len(train_loader)
         pbar.set_description(
             f'Train loss {train_loss:.3f}')
 
         # generate samples and plot them
-        if (epoch + 1) % 10 == 0:
+        if (epoch + 1) % config['test_every'] == 0:
+            if config['use_ema']:
+                test_model = ema_model
+            else:
+                test_model = trajectory_sampler
+
+            demo_ll, sample_cost, constraint_violation = test_model_multi(test_model,
+                                                                          train_loader,
+                                                                          problem)
+            print('TRAINING')
+            print(
+                f'Epoch: {epoch + 1}  Demonstration loss: {demo_ll}  Sample Cost: {sample_cost} Constraint Violation: {constraint_violation}')
+            demo_ll, sample_cost, constraint_violation = test_model_multi(test_model,
+                                                                          val_loader,
+                                                                          problem)
+            print('VALIDATION')
+            print(
+                f'Epoch: {epoch + 1}  Demonstration loss: {demo_ll}  Sample Cost: {sample_cost} Constraint Violation: {constraint_violation}')
+
             for trajectories, starts, goals, constraints, constraint_idx in val_loader:
                 starts = starts.to(device='cuda:0')
                 goals = goals.to(device='cuda:0')
@@ -1212,51 +525,55 @@ def train_cnf(trajectory_sampler, train_loader, val_loader, problem):
                     update_plot_with_trajectories(ax, trajs.reshape(N, 12, 16))
                     update_plot_with_trajectories(ax, true_trajectories[i].reshape(1, 12, 16), color='red')
                     plt.savefig(
-                        f'learning_plots/cnf/learned_sampler_quadrotor_multi_constraint_{epoch}_{i}.png')
+                        f'{fpath}/from_demonstrations_{epoch}_{i}.png')
                 plt.close()
 
                 break
-
-        torch.save(trajectory_sampler.state_dict(), 'cnf.pt')
+    if config['use_ema']:
+        torch.save(ema_model.state_dict(), f'{fpath}/from_demonstrations_ema.pt')
+    else:
+        torch.save(model.state_dict(),
+                   f'{fpath}/from_demonstrations_.pt')
 
 
 if __name__ == "__main__":
-    # train_model_from_demonstrations()
-    # train_multi_constraint_model_from_demonstrations()
-    batched_problem = QuadrotorProblem(T=12, device='cuda', include_obstacle=False, alpha=0.01)
+    # load config
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/config/training_configs/quadrotor_diffusion.yaml').read_text())
+    torch.set_float32_matmul_precision('high')
 
-    model = TrajectorySampler(T=12, dx=12, du=4, context_dim=12 + 3 + 100, type='cnf')
-    from torch.utils.data import random_split, DataLoader, RandomSampler
+    # make path for saving model and plots
+    fpath = pathlib.Path(f'{CCAI_PATH}/data/training/quadrotor/{config["model_name"]}_{config["model_type"]}')
+    pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
 
-    train_dataset = QuadrotorMultiConstraintTrajectoryDataset(
-        [f'../data/quadrotor_data_collection_multi_constraint_part{i + 1}' for i in range(6)])
-    val_dataset = QuadrotorMultiConstraintTrajectoryDataset(
-        ['../data/quadrotor_data_collection_multi_constraint_val'])
+    batched_problem = QuadrotorProblem(T=12, device=config['device'], include_obstacle=False, alpha=0.01)
+    model = TrajectorySampler(T=12, dx=12, du=4,
+                              context_dim=12 + 3 + 100,
+                              type=config['model_type'],
+                              dynamics=Quadrotor12DDynamics(dt=0.1))
 
-    train_dataset.compute_norm_constants()
-    val_dataset.set_norm_constants(*train_dataset.get_norm_constants())
+    # Load data
+    from torch.utils.data import DataLoader, RandomSampler
 
-    from torch.utils.data import ConcatDataset
+    data_path = pathlib.Path(f'{CCAI_PATH}/data/training_data/{config["data_directory"]}')
+    train_dataset = QuadrotorMultiConstraintTrajectoryDataset([p for p in data_path.glob('*train_data*')])
+    val_dataset = QuadrotorMultiConstraintTrajectoryDataset([p for p in data_path.glob('*test_data*')])
+
+    # Get Normalization Constants
+    if config['normalize_data']:
+        train_dataset.compute_norm_constants()
+        val_dataset.set_norm_constants(*train_dataset.get_norm_constants())
+        model.set_norm_constants(*train_dataset.get_norm_constants())
 
     train_sampler = RandomSampler(train_dataset)
-    train_loader = DataLoader(train_dataset, batch_size=256, sampler=train_sampler, num_workers=4, pin_memory=True)
+    train_loader = DataLoader(train_dataset, batch_size=config['batch_size'],
+                              sampler=train_sampler, num_workers=4, pin_memory=True)
     val_loader = DataLoader(val_dataset, batch_size=4096, shuffle=True, num_workers=4)
-    '''
-    # train_multi_constraint_model_from_demonstrations(model, train_loader, val_loader, batched_problem)
-    model.load_state_dict(
-        torch.load('spline_learned_sampler_quadrotor_multi_constraint_from_demonstration_controls_only2.pt'))
-    model.cuda()
-    fine_tune_model_with_stein_multi(model, train_loader, val_loader, batched_problem)
-    '''
 
-    model.set_norm_constants(*train_dataset.get_norm_constants())
+    if config['load_model'] != 'none':
+        model.load_state_dict(torch.load(config['load_model']))
+    model.to(device=config['device'])
 
-    # train_diffusion_from_demonstrations(train_loader, val_loader, batched_problem)
-    from ccai.cgm.cgm import ConstraintGenerativeModel
-
-    constraint_model = ConstraintGenerativeModel(horizon=12, xu_dim=16, context_dim=128, constraint_dim=1)
-    constraint_model = constraint_model.to(device='cuda:0')
-    model = model.to(device='cuda:0')
-
-    #train_with_implicit_neural_constraint_fn(model, constraint_model, train_loader, val_loader, batched_problem)
-    train_cnf(model, train_loader, val_loader, batched_problem)
+    if config['use_csvto_gradient']:
+        fine_tune_model_with_stein(model, train_loader, val_loader, batched_problem, config)
+    else:
+        train_model_from_demonstrations(model, train_loader, val_loader, batched_problem, config)

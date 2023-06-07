@@ -2,10 +2,9 @@ import torch
 import torch.nn as nn
 import einops
 from einops.layers.torch import Rearrange
-import pdb
 import numpy as np
 
-from .helpers import (
+from ccai.models.helpers import (
     SinusoidalPosEmb,
     Downsample1d,
     Upsample1d,
@@ -134,7 +133,7 @@ class TemporalUnet(nn.Module):
 
     def vmapped_fwd(self, t, x, context=None):
         return self(t.reshape(1), x.unsqueeze(0), context.unsqueeze(0)).squeeze(0)
-
+    #@torch.compile(mode='reduce-overhead')
     def forward(self, t, x, context=None):
         '''
             x : [ batch x horizon x transition ]
@@ -154,21 +153,25 @@ class TemporalUnet(nn.Module):
         h = []
         for resnet, resnet2, attn, downsample in self.downs:
             x = resnet(x, t)
-            #x = resnet2(x, t)
+            x = resnet2(x, t)
             #x = attn(x)
             h.append(x)
             x = downsample(x)
         x = self.mid_block1(x, t)
         #x = self.mid_attn(x)
-        #x = self.mid_block2(x, t)
+        x = self.mid_block2(x, t)
 
         for resnet, resnet2, attn, upsample in self.ups:
             x = torch.cat((x, h.pop()), dim=1)
             x = resnet(x, t)
-            #x = resnet2(x, t)
+            x = resnet2(x, t)
             #x = attn(x)
             x = upsample(x)
         x = self.final_conv(x)
 
         x = einops.rearrange(x, 'b t h -> b h t')
         return x
+
+    @torch.compile(mode='reduce-overhead')
+    def compiled_fwd(self, t, x, context=None):
+        return self(t, x, context)

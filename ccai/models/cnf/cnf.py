@@ -4,15 +4,13 @@ import torch
 import torch.nn as nn
 from torch.nn.functional import mse_loss
 
-from ccai.diffusion.temporal import TemporalUnet
+from ccai.models.temporal import TemporalUnet
 
-from ccai.cnf.ffjord.layers import RegularizedODEfunc, CNF, ODEfunc, SequentialFlow
-from einops.layers.torch import Rearrange
+from ccai.models.cnf.ffjord.layers import CNF, ODEfunc
 
-from ccai.diffusion.helpers import SinusoidalPosEmb
+from ccai.models.helpers import SinusoidalPosEmb
 
-import ot
-import numpy as np
+#import ot
 
 
 class MLP(nn.Module):
@@ -51,7 +49,7 @@ class MLP(nn.Module):
         return x.reshape(B, T, d)
 
 
-from ccai.diffusion.temporal import ResidualTemporalBlock
+from ccai.models.temporal import ResidualTemporalBlock
 
 import einops
 

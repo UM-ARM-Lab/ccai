@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 from flow_mpc.flows.ffjord.layers import diffeq_layers
 from flow_mpc.flows.ffjord.layers.squeeze import squeeze, unsqueeze
-import functorch
+from torch.func import jacrev, vmap
 
 __all__ = ["ODEnet", "ODEfunc", 'RegularizedODEfunc']
 
@@ -194,7 +194,10 @@ class ODEnet(nn.Module):
             dx = unsqueeze(dx, 2)
         return dx
 
-batch_trace = functorch.vmap(torch.trace)
+
+batch_trace = vmap(torch.trace)
+
+
 class ODEfunc(nn.Module):
 
     def __init__(self, diffeq, divergence_fn="approximate", residual=False, rademacher=False):
@@ -213,7 +216,7 @@ class ODEfunc(nn.Module):
             self.divergence_fn = divergence_bf
         elif divergence_fn == "approximate":
             self.divergence_fn = divergence_approx
-        self.divergence_fn = functorch.vmap(functorch.jacrev(diffeq_fn, argnums=1))
+        self.divergence_fn = vmap(jacrev(diffeq_fn, argnums=1))
         self.register_buffer("_num_evals", torch.tensor(0.))
         self.div_samples = 1
 
@@ -250,11 +253,11 @@ class ODEfunc(nn.Module):
                 s_.requires_grad_(True)
             dy = self.diffeq(t, y, *states[2:])
             # Hack for 2D data to use brute force divergence computation.
-            #if not self.training and dy.view(dy.shape[0], -1).shape[1] == 2:
+            # if not self.training and dy.view(dy.shape[0], -1).shape[1] == 2:
             divergence = self.divergence_fn(t.reshape(1, 1).repeat(y.shape[0], 1), y, states[2])
             yshape = torch.prod(torch.tensor(y.shape[1:]))
             divergence = batch_trace(divergence.reshape(batchsize, yshape, yshape))
-            #else:
+            # else:
             #    divergence, sqjacnorm = self.divergence_fn(dy, y, e=self._e)
             #    divergence = divergence.view(batchsize, 1)
             #    self.sqjacnorm = sqjacnorm

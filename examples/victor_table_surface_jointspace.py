@@ -465,7 +465,7 @@ def do_trial(env, params, fpath):
             else:
                 raise ValueError('Invalid flow model type')
             flow_model = TrajectorySampler(T=params['T'], dx=7, du=0, context_dim=7 + 2 + 5, type=flow_type)
-            flow_model.load_state_dict(torch.load(params['flow_model']))
+            flow_model.load_state_dict(torch.load(f'{CCAI_PATH}/params["flow_model"]'))
             flow_model.to(device=params['device'])
         else:
             flow_model = None
@@ -605,7 +605,7 @@ def do_trial(env, params, fpath):
 if __name__ == "__main__":
     torch.set_float32_matmul_precision('high')
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/victor_table_jointspace.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/config/planning_configs/victor_table_jointspace.yaml').read_text())
     from tqdm import tqdm
 
     # instantiate environment
