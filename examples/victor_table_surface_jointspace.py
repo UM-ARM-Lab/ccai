@@ -7,7 +7,7 @@ import time
 import yaml
 import pathlib
 from functools import partial
-from functorch import vmap, jacrev, hessian, jacfwd
+from torch.func import vmap, jacrev, hessian, jacfwd
 
 from ccai.constrained_svgd_trajopt import ConstrainedSteinTrajOpt
 from ccai.kernels import rbf_kernel, structured_rbf_kernel
@@ -19,6 +19,8 @@ from ccai.mpc.svgd import SVMPC
 from ccai.mpc.ipopt import IpoptMPC
 import time
 import pytorch_kinematics as pk
+
+from quadrotor_learn_to_sample import TrajectorySampler
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 asset = '/home/tpower/dev/isaac_test/IsaacVictorEnvs/isaac_victor_envs/assets/victor/victor.urdf'
@@ -452,9 +454,22 @@ def do_trial(env, params, fpath):
 
     obs1_pos = state['obs1_pos'][0, :2]
     obs2_pos = state['obs2_pos'][0, :2]
-    rads = [0.1, 0.1]
+    rads = [0.12, 0.12]
     centres = [obs1_pos, obs2_pos]
-    if params['controller'] == 'csvgd':
+    if 'csvgd' in params['controller']:
+        if params['flow_model'] != 'none':
+            if 'diffusion' in params['flow_model']:
+                flow_type = 'diffusion'
+            elif 'cnf' in params['flow_model']:
+                flow_type = 'cnf'
+            else:
+                raise ValueError('Invalid flow model type')
+            flow_model = TrajectorySampler(T=params['T'], dx=7, du=0, context_dim=7 + 2 + 5, type=flow_type)
+            flow_model.load_state_dict(torch.load(params['flow_model']))
+            flow_model.to(device=params['device'])
+        else:
+            flow_model = None
+        params['flow_model'] = flow_model
         problem = VictorTableProblem(start, params['goal'], params['T'], device=params['device'],
                                      obstacle_rads=rads,
                                      obstacle_centres=centres,
@@ -462,17 +477,17 @@ def do_trial(env, params, fpath):
         controller = Constrained_SVGD_MPC(problem, params)
     elif params['controller'] == 'ipopt':
         problem = VictorTableIpoptProblem(start, params['goal'], params['T'], obstacle_centres=centres,
-                                          obstacle_rads=rads, table_height=env.height)
+                                          obstacle_rads=rads, table_height=env.table_height)
         controller = IpoptMPC(problem, params)
     elif 'svgd' in params['controller']:
         problem = VictorTableUnconstrainedProblem(start, params['goal'], params['T'], device=params['device'],
                                                   penalty=params['penalty'], obstacle_centres=centres,
-                                                  obstacle_rads=rads, table_height=env.height)
+                                                  obstacle_rads=rads, table_height=env.table_height)
         controller = SVMPC(problem, params)
     elif 'mppi' in params['controller']:
         problem = VictorTableUnconstrainedProblem(start, params['goal'], params['T'], device=params['device'],
                                                   penalty=params['penalty'], obstace_centres=centres,
-                                                  obstcale_rads=rads, table_height=env.height)
+                                                  obstcale_rads=rads, table_height=env.table_height)
         controller = MPPI(problem, params)
     else:
         raise ValueError('Invalid controller')
@@ -480,6 +495,10 @@ def do_trial(env, params, fpath):
     actual_trajectory = []
     planned_trajectories = []
     duration = 0
+
+    constr_params = torch.tensor([env.table_height]).to(device=params['device'])
+    constr_params = torch.cat((constr_params, torch.stack(centres, dim=0).reshape(-1)))
+
     for k in range(params['num_steps']):
         if params['simulate'] or k == 0:
             state = env.get_state()
@@ -492,7 +511,7 @@ def do_trial(env, params, fpath):
         if k > 0:
             torch.cuda.synchronize()
             start_time = time.time()
-        best_traj, trajectories = controller.step(start)
+        best_traj, trajectories = controller.step(start, constr_params)
         planned_trajectories.append(trajectories)
         if k > 0:
             torch.cuda.synchronize()
@@ -569,8 +588,8 @@ def do_trial(env, params, fpath):
         dim=1
     )
 
-    #print(f'Controller: {params["controller"]} Final distance to goal: {torch.min(final_distance_to_goal)}')
-    #print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
+    # print(f'Controller: {params["controller"]} Final distance to goal: {torch.min(final_distance_to_goal)}')
+    print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
 
     np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
              constr=constraint_val.cpu().numpy(),
@@ -584,12 +603,16 @@ def do_trial(env, params, fpath):
 
 
 if __name__ == "__main__":
+    torch.set_float32_matmul_precision('high')
     # get config
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/victor_table_jointspace.yaml').read_text())
     from tqdm import tqdm
 
     # instantiate environment
-    env = VictorPuckObstacleEnv(1, control_mode='joint_impedance', randomize_obstacles=True, randomize_start=True)
+    env = VictorPuckObstacleEnv(1, control_mode='joint_impedance',
+                                randomize_obstacles=config['random_env'],
+                                randomize_start=config['random_env'],
+                                viewer=config['visualize'])
     sim, gym, viewer = env.get_sim()
 
     """
@@ -608,18 +631,20 @@ if __name__ == "__main__":
 
     for i in tqdm(range(config['num_trials'])):
         env.reset()
-        # goal = toddrch.tensor([0.8, 0.15])
-        # goal = goal + 0.025 * torch.randn(2)#torch.tensor([0.25, 0.1]) * torch.rand(2)
 
-        goal = torch.tensor([0.45, 0.5]) * torch.rand(2) + torch.tensor([0.4, 0.2])
-        state = env.get_state()
-        obs1, obs2 = state['obs1_pos'][0, :2].cpu(), state['obs2_pos'][0, :2].cpu()
-
-        while torch.linalg.norm(goal - obs1) < 0.1 or torch.linalg.norm(goal - obs2) < 0.1:
-            goal = torch.tensor([0.4, 0.5]) * torch.rand(2) + torch.tensor([0.5, 0.2])
+        if config['random_env']:
+            goal = torch.tensor([0.45, 0.5]) * torch.rand(2) + torch.tensor([0.4, 0.2])
+            state = env.get_state()
+            obs1, obs2 = state['obs1_pos'][0, :2].cpu(), state['obs2_pos'][0, :2].cpu()
+            while torch.linalg.norm(goal - obs1) < 0.1 or torch.linalg.norm(goal - obs2) < 0.1:
+                goal = torch.tensor([0.4, 0.5]) * torch.rand(2) + torch.tensor([0.5, 0.2])
+        else:
+            goal = torch.tensor([0.8, 0.15])
+            goal = goal + 0.025 * torch.randn(2)  # torch.tensor([0.25, 0.1]) * torch.rand(2)
 
         for controller in config['controllers'].keys():
             # env.reset()
+            env.reset_arm_only()
             fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_{i + 1}')
             pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
             # set up params
