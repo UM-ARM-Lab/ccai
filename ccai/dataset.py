@@ -42,6 +42,7 @@ class QuadrotorMultiConstraintTrajectoryDataset(Dataset):
         goals = []
         trajectories = []
         constraints = []
+        constraint_type = []
         for fpath in fpaths:
             if not isinstance(fpath, pathlib.PosixPath):
                 path = pathlib.Path(fpath)
@@ -51,14 +52,25 @@ class QuadrotorMultiConstraintTrajectoryDataset(Dataset):
                 data = np.load(p)
                 goals.append(data['goal'])
                 trajectories.append(data['traj'])
-                constraints.append(data['surface'])
+
+                if 'obstacle' in data.keys():
+                    if data['obstacle'] is not None:
+                        constraints.append(data['obstacle'])
+                        constraint_type.append(np.array([1]))
+                    else:
+                        constraints.append(data['surface'])
+                        constraint_type.append(np.array([0]))
+                else:
+                    constraints.append(data['surface'])
+                    constraint_type.append(np.array([0]))
 
         self.goals = np.stack(goals, axis=0)
         self.trajectories = np.stack(trajectories, axis=0)
         self.constraints = np.stack(constraints, axis=0)
+        self.constraint_type = np.stack(constraint_type, axis=0)
 
         self.num_trials, self.num_steps, self.num_particles, horizon, xu_dim = self.trajectories.shape
-
+        print(self.num_trials)
         self.xu_mean = None
         self.xu_std = None
 
@@ -89,7 +101,7 @@ class QuadrotorMultiConstraintTrajectoryDataset(Dataset):
                 torch.from_numpy(self.trajectories[trial_idx, step_idx, particle_idx, 0, :12]).to(dtype=torch.float32),
                 torch.from_numpy(self.goals[trial_idx]).to(dtype=torch.float32),
                 torch.from_numpy(self.constraints[trial_idx]).to(dtype=torch.float32),
-                torch.tensor([trial_idx])
+                torch.from_numpy(self.constraint_type[trial_idx]).to(dtype=torch.long)
                 )
 
 
@@ -119,6 +131,7 @@ class VictorTableMultiConstraintTrajectoryDataset(Dataset):
 
         self.xu_mean = None
         self.xu_std = None
+
     def compute_norm_constants(self):
         self.xu_mean = np.mean(self.trajectories, axis=(0, 1, 2, 3))
         self.xu_std = np.std(self.trajectories, axis=(0, 1, 2, 3))

@@ -4,6 +4,7 @@ import einops
 from einops.layers.torch import Rearrange
 import numpy as np
 
+from torch.distributions import Bernoulli
 from ccai.models.helpers import (
     SinusoidalPosEmb,
     Downsample1d,
@@ -60,6 +61,7 @@ class TemporalUnet(nn.Module):
             dim=32,
             dim_mults=(1, 2, 4, 8),
             attention=False,
+            context_dropout_p=0.25
     ):
         super().__init__()
 
@@ -69,25 +71,31 @@ class TemporalUnet(nn.Module):
 
         self.time_embedding = SinusoidalPosEmb(32)
 
-        self.mlp = nn.Sequential(
-            nn.Linear(cond_dim + 32, 256),
+        self.constraint_type_embed = nn.Sequential(
+            nn.Linear(2, 32),
             nn.Mish()
-            #nn.Linear(256, 256)
         )
 
-        # self.time_mlp = nn.Sequential(
-        #    SinusoidalPosEmb(dim),
-        #    nn.Linear(dim, dim),
-        #    nn.ReLU(),
-        #    nn.Linear(dim, dim),
-        # )
+        self.time_mlp = nn.Sequential(
+            nn.Linear(cond_dim + + 32 + 32 - 2, 256),
+            nn.Mish()
+            # nn.Linear(256, 256)
+        )
+        self.mask_dist = Bernoulli(probs=1 - context_dropout_p)
 
-        # self.context_mlp = nn.Sequential(
-        #    nn.Linear(cond_dim, dim),
-        #    nn.ReLU(),
-        #    nn.Linear(dim, dim),
-        # )
-        time_dim = dim
+        '''
+        self.time_mlp = nn.Sequential(
+            SinusoidalPosEmb(dim),
+            nn.Linear(dim, 128),
+            nn.Mish(),
+        )
+
+        self.context_mlp = nn.Sequential(
+            nn.Linear(cond_dim, 128),
+            nn.Mish(),
+        )
+        '''
+        time_dim = 256
 
         self.downs = nn.ModuleList([])
         self.ups = nn.ModuleList([])
@@ -131,10 +139,14 @@ class TemporalUnet(nn.Module):
             nn.Conv1d(dim, transition_dim, 1),
         )
 
+        self.context_dropout_p = context_dropout_p
+        self.cond_dim = cond_dim
+
     def vmapped_fwd(self, t, x, context=None):
         return self(t.reshape(1), x.unsqueeze(0), context.unsqueeze(0)).squeeze(0)
-    #@torch.compile(mode='reduce-overhead')
-    def forward(self, t, x, context=None):
+
+    # @torch.compile(mode='reduce-overhead')
+    def forward(self, t, x, context=None, dropout=False):
         '''
             x : [ batch x horizon x transition ]
         '''
@@ -143,35 +155,55 @@ class TemporalUnet(nn.Module):
         t = t.reshape(-1)
         if t.shape[0] == 1:
             t = t.repeat(B)
-
-        x = einops.rearrange(x, 'b h t -> b t h')
         t = self.time_embedding(t)
+        x = einops.rearrange(x, 'b h t -> b t h')
         if context is not None:
-            t = torch.cat((t, context), dim=1)
+            constraint_type = context[:, -2:]
+            context = context[:, :-2]
+            ctype_embed = self.constraint_type_embed(constraint_type)
+            #c = context
+            c = torch.cat((context, ctype_embed), dim=-1)
+            # need to do dropout on context embedding to train unconditional model alongside conditional
+            if dropout:
+                mask = self.mask_dist.sample((B, 1)).to(device=context.device)
+                c = mask * c
+                t = torch.cat((t, c), dim=-1)
+            else:
+                t = torch.cat((t, c), dim=-1)
+        else:
+            t = torch.cat((t, torch.zeros(B, self.cond_dim + 32 - 2, device=t.device)), dim=-1)
+        t = self.time_mlp(t)
         #
-        t = self.mlp(t)
         h = []
         for resnet, resnet2, attn, downsample in self.downs:
             x = resnet(x, t)
             x = resnet2(x, t)
-            #x = attn(x)
+            # x = attn(x)
             h.append(x)
             x = downsample(x)
         x = self.mid_block1(x, t)
-        #x = self.mid_attn(x)
+        # x = self.mid_attn(x)
         x = self.mid_block2(x, t)
 
         for resnet, resnet2, attn, upsample in self.ups:
             x = torch.cat((x, h.pop()), dim=1)
             x = resnet(x, t)
             x = resnet2(x, t)
-            #x = attn(x)
+            # x = attn(x)
             x = upsample(x)
         x = self.final_conv(x)
 
         x = einops.rearrange(x, 'b t h -> b h t')
         return x
 
-    @torch.compile(mode='reduce-overhead')
-    def compiled_fwd(self, t, x, context=None):
-        return self(t, x, context)
+    #@torch.compile(mode='reduce-overhead')
+    def compiled_conditional_test(self, t, x, context):
+        return self(t, x, context, dropout=False)
+
+    #@torch.compile(mode='reduce-overhead')
+    def compiled_unconditional_test(self, t, x):
+        return self(t, x, context=None, dropout=False)
+
+    #@torch.compile(mode='reduce-overhead')
+    def compiled_conditional_train(self, t, x, context):
+        return self(t, x, context, dropout=False)

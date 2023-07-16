@@ -21,8 +21,9 @@ from ccai.problem import ConstrainedSVGDProblem, IpoptProblem, UnconstrainedPena
 import pathlib
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
-
+import tqdm
 from ccai.models.trajectory_samplers import TrajectorySampler
+
 
 def cost(trajectory, goal):
     x = trajectory[:, :12]
@@ -30,7 +31,7 @@ def cost(trajectory, goal):
     T = x.shape[0]
     Q = torch.eye(12, device=trajectory.device)
     Q[5, 5] = 1e-2
-    Q[2, 2] = 1e-3
+    Q[2, 2] = 100
     Q[3:, 3:] *= 0.5
     P = Q * 100
     R = 1 * torch.eye(4, device=trajectory.device)
@@ -72,7 +73,8 @@ def cost(trajectory, goal):
 
 class QuadrotorProblem(ConstrainedSVGDProblem):
 
-    def __init__(self, start, goal, T, device='cuda:0', alpha=0.01, include_obstacle=False, gp_surface_model=None):
+    def __init__(self, start, goal, T, device='cuda:0', alpha=0.01, include_obstacle=False, gp_surface_model=None,
+                 gp_sdf_model=None):
         super().__init__(start, goal, T, device)
         self.T = T
         self.dx = 12
@@ -83,21 +85,31 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
             self.dz = 0
 
         self.dh = self.dz * T
-        self.dg = 12 * T + T - 1
+        self.dg = 12 * T
+        if gp_surface_model is not None:
+            self.dg += T - 1
+
         self.alpha = alpha
         self.include_obstacle = include_obstacle
         # self.dg = 2 * T - 1
         data = np.load('surface_data.npz')
         # GP which models surface
-        #self.surface_gp = GPSurfaceModel(torch.from_numpy(data['xy']).to(dtype=torch.float32, device=device),
+        # self.surface_gp = GPSurfaceModel(torch.from_numpy(data['xy']).to(dtype=torch.float32, device=device),
         #                                 torch.from_numpy(data['z']).to(dtype=torch.float32, device=device))
         if gp_surface_model is None:
-            self.surface_gp = GPSurfaceModel(torch.from_numpy(data['xy']).to(dtype=torch.float32, device=device),
-                                             torch.from_numpy(data['z']).to(dtype=torch.float32, device=device))
+            #self.surface_gp = GPSurfaceModel(torch.from_numpy(data['xy']).to(dtype=torch.float32, device=device),
+            #                                 torch.from_numpy(data['z']).to(dtype=torch.float32, device=device))
+            self.surface_gp = None
         else:
             self.surface_gp = GPSurfaceModel(gp_surface_model.train_x.to(device=device),
                                              gp_surface_model.train_y.to(device=device))
 
+        # GP which models sdf
+        if gp_sdf_model is not None:
+            self.obs_gp = GPSurfaceModel(gp_sdf_model.train_x.to(device=device),
+                                         gp_sdf_model.train_y.to(device=device))
+        else:
+            self.obs_gp = None
 
         # gradient and hessian of dynamics
         self._dynamics = Quadrotor12DDynamics(dt=0.1)
@@ -106,6 +118,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         self.hess_dynamics = vmap(hessian(self._dynamics_constraint))
 
         self.height_constraint = vmap(self._height_constraint)
+        self.sdf_constraint = vmap(self._sdf_constraint)
 
         self._obj = vmap(partial(cost, goal=goal))
 
@@ -116,7 +129,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         # self.hess_g = vmap(hessian(self._combined_contraints))
 
         kernel = structured_rbf_kernel
-        #kernel = rbf_kernel
+        # kernel = rbf_kernel
         self.K = kernel
         self.dK = jacrev(kernel, argnums=0)
         self.x_max = torch.ones(self.dx + self.du)
@@ -164,6 +177,22 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
 
         return constr, grad_constr, hess_constr
 
+    def _sdf_constraint(self, trajectory):
+        T = trajectory.shape[0]
+        xy, z = trajectory[:, :2], trajectory[:, 2]
+
+        # compute z of surface and gradient and hessian
+        sdf, grad_sdf, hess_sdf = self.obs_gp.posterior_mean(xy)
+
+        constr = sdf
+        grad_constr = torch.cat((grad_sdf,
+                                 torch.zeros(T, 14, device=trajectory.device)), dim=1)
+        hess_constr = torch.cat((
+            torch.cat((hess_sdf, torch.zeros(T, 2, 14, device=trajectory.device)), dim=2),
+            torch.zeros(T, 14, 16, device=trajectory.device)), dim=1)
+
+        return constr, grad_constr, hess_constr
+
     def _con_eq(self, trajectory, compute_grads=True):
         trajectory = trajectory.reshape(-1, self.T, self.dx + self.du)
         N = trajectory.shape[0]
@@ -173,17 +202,15 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
 
         # dynamics constraint
         dynamics_constr = self.dynamics_constraint(trajectory).reshape(N, -1)
-        # surface constraint
-        surf_constr, grad_surf_constr, hess_surf_constr = self.height_constraint(trajectory)
         # start constraint
         start_constraint = (trajectory[:, 0, :12] - self.start.reshape(1, 12)).reshape(N, 12)
-        g = torch.cat((dynamics_constr, start_constraint, surf_constr[:, 1:]), dim=1)
-        # g = torch.cat((dynamics_constr, start_constraint), dim=1)
 
-        if torch.any(torch.isinf(surf_constr)):
-            print('inf in surface')
-        if torch.any(torch.isinf(dynamics_constr)):
-            print('inf in dynamics')
+        # surface constraint
+        if self.surface_gp is not None:
+            surf_constr, grad_surf_constr, hess_surf_constr = self.height_constraint(trajectory)
+            g = torch.cat((dynamics_constr, start_constraint, surf_constr[:, 1:]), dim=1)
+        else:
+            g = torch.cat((dynamics_constr, start_constraint), dim=1)
 
         if not compute_grads:
             return g, None, None
@@ -191,22 +218,26 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         grad_dynamics_constr = self.grad_dynamics(trajectory).reshape(N, -1, prob_dim)
         hess_dynamics_constr = self.hess_dynamics(trajectory).reshape(N, -1, prob_dim, prob_dim)
 
-        # currently only take derivative of height at time t wrt state at time t - need to include other times
-        # (all derivatives and hessians will be zero)
-        grad_surf_constr = torch.diag_embed(grad_surf_constr.permute(0, 2, 1))
-        grad_surf_constr = grad_surf_constr.permute(0, 2, 3, 1).reshape(N, self.T, prob_dim)
-        hess_surf_constr = torch.diag_embed(torch.diag_embed(hess_surf_constr.permute(0, 2, 3, 1)))
-        hess_surf_constr = hess_surf_constr.permute(0, 3, 4, 1, 5, 2).reshape(N, self.T, prob_dim, prob_dim)
+
 
         grad_start_constraint = torch.zeros(N, 12, self.T, 16, device=trajectory.device)
         grad_start_constraint[:, :12, 0, :12] = torch.eye(12, device=trajectory.device)
         grad_start_constraint = grad_start_constraint.reshape(N, 12, -1)
         hess_start_constraint = torch.zeros(N, 12, self.T * 16, self.T * 16, device=trajectory.device)
 
-        Dg = torch.cat((grad_dynamics_constr, grad_start_constraint, grad_surf_constr[:, 1:]), dim=1)
-        DDg = torch.cat((hess_dynamics_constr, hess_start_constraint, hess_surf_constr[:, 1:]), dim=1)
-        # Dg = torch.cat((grad_dynamics_constr, grad_start_constraint), dim=1)
-        # DDg = torch.cat((hess_dynamics_constr, hess_start_constraint), dim=1)
+        if self.surface_gp is not None:
+            # currently only take derivative of height at time t wrt state at time t - need to include other times
+            # (all derivatives and hessians will be zero)
+            grad_surf_constr = torch.diag_embed(grad_surf_constr.permute(0, 2, 1))
+            grad_surf_constr = grad_surf_constr.permute(0, 2, 3, 1).reshape(N, self.T, prob_dim)
+            hess_surf_constr = torch.diag_embed(torch.diag_embed(hess_surf_constr.permute(0, 2, 3, 1)))
+            hess_surf_constr = hess_surf_constr.permute(0, 3, 4, 1, 5, 2).reshape(N, self.T, prob_dim, prob_dim)
+            Dg = torch.cat((grad_dynamics_constr, grad_start_constraint, grad_surf_constr[:, 1:]), dim=1)
+            DDg = torch.cat((hess_dynamics_constr, hess_start_constraint, hess_surf_constr[:, 1:]), dim=1)
+
+        else:
+            Dg = torch.cat((grad_dynamics_constr, grad_start_constraint), dim=1)
+            DDg = torch.cat((hess_dynamics_constr, hess_start_constraint), dim=1)
         # g = torch.cat((dynamics_constr, start_constraint, surf_constr[:, 1:]), dim=1)
         # Dg = torch.cat((grad_dynamics_constr,  grad_start_constraint, grad_surf_constr[:, 1:]), dim=1)
         # DDg = torch.cat((hess_dynamics_constr, hess_start_constraint, hess_surf_constr[:, 1:]), dim=1)
@@ -214,29 +245,14 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         # print(surf_constr[0])
         # return dynamics_constr, grad_dynamics_constr, hess_dynamics_constr
 
-        if torch.isinf(g).any():
-            print('inf in g')
-            print(torch.where(torch.isinf(g)))
-        if torch.isinf(Dg).any():
-            print('inf in Dg')
-            print(torch.where(torch.isinf(Dg)))
-        if torch.isnan(g).any():
-            print('nan in g')
-            print(torch.where(torch.isnan(g)))
-        if torch.isnan(Dg).any():
-            print('nan in Dg')
-            print(torch.where(torch.isnan(Dg)))
-
         return g, Dg, DDg
 
-    def _con_ineq(self, trajectory, compute_grads=True):
-        if not self.include_obstacle:
-            return None, None, None
-
+    def _obs_disc(self, trajectory, compute_grads=True):
         N = trajectory.shape[0]
         xy = trajectory.reshape(N, self.T, -1)[:, :, :2] - self.obstacle_centre.reshape(1, 1, 2)
 
         h = self.obstacle_rad ** 2 - torch.sum(xy ** 2, dim=-1)  # N x T
+
         if not compute_grads:
             return h, None, None
 
@@ -255,7 +271,34 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         hess_h[:, :, :, :2, :, :2] = hess_h_xy
         hess_h = hess_h.reshape(N, self.T, self.T * (self.dx + self.du),
                                 self.T * (self.dx + self.du))
+
         return h, grad_h, hess_h
+
+    def _obs_sdf(self, trajectory, compute_grads=True):
+        N = trajectory.shape[0]
+        prob_dim = self.T * (self.dx + self.du)
+
+        # surface constraint
+        sdf_constr, grad_sdf_constr, hess_sdf_constr = self.sdf_constraint(trajectory)
+        # currently only take derivative of height at time t wrt state at time t - need to include other times
+        # (all derivatives and hessians will be zero)
+        grad_sdf_constr = torch.diag_embed(grad_sdf_constr.permute(0, 2, 1))
+        grad_sdf_constr = grad_sdf_constr.permute(0, 2, 3, 1).reshape(N, self.T, prob_dim)
+        hess_sdf_constr = torch.diag_embed(torch.diag_embed(hess_sdf_constr.permute(0, 2, 3, 1)))
+        hess_sdf_constr = hess_sdf_constr.permute(0, 3, 4, 1, 5, 2).reshape(N, self.T, prob_dim, prob_dim)
+
+        return sdf_constr, grad_sdf_constr, hess_sdf_constr
+
+    def _con_ineq(self, trajectory, compute_grads=True):
+        if not self.include_obstacle:
+            return None, None, None
+
+        # If no gp we assume disc obstacle
+        if self.obs_gp is None:
+            return self._obs_disc(trajectory, compute_grads=compute_grads)
+
+        # Otherwise we use the GP sdf function
+        return self._obs_sdf(trajectory, compute_grads=compute_grads)
 
     def eval(self, augmented_trajectory):
         N = augmented_trajectory.shape[0]
@@ -281,17 +324,20 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         # Now we need to compute constraints and their first and second partial derivatives
         g, Dg, DDg = self.combined_constraints(augmented_trajectory)
         # print(cost.reshape(-1))
-        # print(g[0])
+        #print(g.abs().mean())
         if M is not None:
             hess_cost_ext = torch.zeros(N, self.T, self.dx + self.du + self.dz, self.T, self.dx + self.du + self.dz,
                                         device=self.device)
-            hess_cost_ext[:, :, :self.dx + self.du, :, :self.dx + self.du] = hess_cost.reshape(N, self.T, self.dx + self.du,
-                                                                                               self.T, self.dx + self.du)
+            hess_cost_ext[:, :, :self.dx + self.du, :, :self.dx + self.du] = hess_cost.reshape(N, self.T,
+                                                                                               self.dx + self.du,
+                                                                                               self.T,
+                                                                                               self.dx + self.du)
             hess_cost = hess_cost_ext.reshape(N, self.T * (self.dx + self.du + self.dz),
                                               self.T * (self.dx + self.du + self.dz))
 
             grad_cost_augmented = grad_cost + 2 * (g.reshape(N, 1, -1) @ Dg).reshape(N, -1)
-            hess_J_augmented = hess_cost + 2 * (torch.sum(g.reshape(N, -1, 1, 1) * DDg, dim=1) + Dg.permute(0, 2, 1) @ Dg)
+            hess_J_augmented = hess_cost + 2 * (
+                    torch.sum(g.reshape(N, -1, 1, 1) * DDg, dim=1) + Dg.permute(0, 2, 1) @ Dg)
             grad_cost = grad_cost_augmented
             hess_cost = hess_J_augmented.mean(dim=0)
         else:
@@ -365,10 +411,11 @@ def do_trial(env, params, fpath):
 
     start = torch.from_numpy(env.state).to(dtype=torch.float32, device=params['device'])
     goal = torch.zeros(12, device=params['device'])
-    goal[:2] = 4
+    goal[:3] = torch.from_numpy(env.goal).to(dtype=torch.float32, device=params['device'])
 
     include_obstacle = True if params['obstacle_mode'] is not None else False
-
+    sdf_model = env.obstacle_model if params['obstacle_mode'] == 'gp' else None
+    surface_model = env.surface_model if params['surface_constr'] else None
     if 'csvgd' in params['controller']:
         if params['flow_model'] != 'none':
             if 'diffusion' in params['flow_model']:
@@ -384,7 +431,8 @@ def do_trial(env, params, fpath):
             flow_model = None
         params['flow_model'] = flow_model
         problem = QuadrotorProblem(start, goal, params['T'], device=params['device'], include_obstacle=include_obstacle,
-                                   gp_surface_model=env.surface_model)
+                                   gp_surface_model=surface_model, gp_sdf_model=sdf_model)
+
         controller = Constrained_SVGD_MPC(problem, params)
     elif params['controller'] == 'ipopt':
         problem = QuadrotorIpoptProblem(start, goal, params['T'], include_obstacle=include_obstacle)
@@ -410,6 +458,8 @@ def do_trial(env, params, fpath):
 
     duration = 0.0
     constraint_params = env.surface_model.train_y.reshape(-1).to(device=params['device'], dtype=torch.float32)
+    planned_trajectories = []
+
     for step in range(params['num_steps']):
         if not collision:
             start = torch.from_numpy(env.state).to(dtype=torch.float32, device=params['device'])
@@ -420,18 +470,20 @@ def do_trial(env, params, fpath):
             best_traj, trajectories = controller.step(start,
                                                       obstacle_pos=env.obstacle_pos,
                                                       constr_param=constraint_params)
+
             if step > 0:
                 torch.cuda.synchronize()
                 duration += time.time() - start_time
 
             u = best_traj[0, -4:].detach().cpu().numpy()
             _, violation = env.step(u)
-            #print(violation)
+            # print(violation)
             if include_obstacle:
                 if violation[1] > 0:
                     collision = True
         actual_traj.append(env.state)
         all_violation.append(violation)
+        planned_trajectories.append(trajectories)
 
         if params['visualize']:
             env.render_update()
@@ -439,10 +491,17 @@ def do_trial(env, params, fpath):
             plt.savefig(f'{fpath.resolve()}/im_{step:02d}.png')
             plt.gcf().canvas.flush_events()
 
-    print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"]- 1)}')
+    print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
     actual_traj = np.stack(actual_traj)
     all_violation = np.stack(all_violation)
-    np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_traj, constr=all_violation)
+    planned_trajectories = torch.stack(planned_trajectories, dim=0)
+
+    np.savez(f'{fpath.resolve()}/planned_trajector_data.npz',
+             traj=planned_trajectories.detach().cpu().numpy(),
+             goal=env.goal,
+             surface=env.surface_model.train_y.cpu().numpy(),
+             obstacle=env.obstacle_model.train_y.cpu().numpy() if env.obstacle_model is not None else None,
+             )
 
     if params['visualize']:
         plt.close()
@@ -461,13 +520,13 @@ if __name__ == "__main__":
     for i in tqdm(range(config['num_trials'])):
         env = QuadrotorEnv(randomize_GP=config['random_surface'], surface_data_fname='surface_data.npz',
                            obstacle_mode=config['obstacle_mode'])
-        env.reset()
         start_state = env.state.copy()
-
+        goal = env.goal.copy()
         for controller in config['controllers'].keys():
             env.reset()
             env.state = start_state
-            print(env.state[:3])
+            env.goal = goal
+
             fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_{i + 1}')
             pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
 
@@ -484,4 +543,3 @@ if __name__ == "__main__":
             else:
                 results[controller].append(final_distance_to_goal)
 
-        print(results)

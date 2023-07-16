@@ -1,13 +1,15 @@
 ---
-model_name: 'quadrotor_multi_constraint'
+model_name: 'quadrotor_multi_constraint_gp'
 load_model: 'none'
+load_checkpoint: False
 epochs: 100
-batch_size: 512
+batch_size: 256
 lr: 1.0e-4
 model_type: 'diffusion'
 data_directory: 'quadrotor_multi_constraint'
 device: 'cuda:0'
-test_every: 1
+test_every: 10
+save_every: 10
 normalize_data: True
 # only applied to training with csvto gradient
 use_csvto_gradient: False

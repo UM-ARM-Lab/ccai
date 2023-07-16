@@ -236,13 +236,14 @@ class GaussianDiffusion(nn.Module):
             ddim_sampling_eta=0.,
             auto_normalize=True,
             min_snr_loss_weight=False,  # https://arxiv.org/abs/2303.09556
-            min_snr_gamma=5
+            min_snr_gamma=5,
+            guidance_w=1.2
     ):
         super().__init__()
-
+        self.guidance_w = guidance_w
         self.horizon = horizon
         self.xu_dim = xu_dim
-        self.model = TemporalUnet(self.horizon, self.xu_dim, cond_dim=context_dim, dim=32)
+        self.model = TemporalUnet(self.horizon, self.xu_dim, cond_dim=context_dim, dim=128)
         self.objective = objective
 
         beta_schedule_fn = cosine_beta_schedule
@@ -310,8 +311,6 @@ class GaussianDiffusion(nn.Module):
         elif objective == 'pred_v':
             register_buffer('loss_weight', maybe_clipped_snr / (snr + 1))
 
-        print(self.loss_weight)
-
     def predict_start_from_noise(self, x_t, t, noise):
         return (
                 extract(self.sqrt_recip_alphas_cumprod, t, x_t.shape) * x_t -
@@ -346,7 +345,13 @@ class GaussianDiffusion(nn.Module):
         return posterior_mean, posterior_variance, posterior_log_variance_clipped
 
     def model_predictions(self, x, t, context):
-        model_output = self.model(t, x, context)
+        if context is not None:
+            # classifier free guidance
+            unconditional = self.model.compiled_unconditional_test(t, x)
+            conditional = self.model.compiled_conditional_test(t, x, context)
+            model_output = unconditional + self.guidance_w * (conditional - unconditional)
+        else:
+            model_output = self.model(t, x, context)
         pred_noise = model_output
         x_start = self.predict_start_from_noise(x, t, pred_noise)
         return ModelPrediction(pred_noise, x_start)
@@ -454,7 +459,7 @@ class GaussianDiffusion(nn.Module):
         noise = default(noise, lambda: torch.randn_like(x_start))
         x = self.q_sample(x_start=x_start, t=t, noise=noise)
         # predict and take gradient step
-        model_out = self.model.compiled_fwd(t, x, context)
+        model_out = self.model.compiled_conditional_train(t, x, context)
 
         loss = self.loss_fn(model_out, noise, reduction='none')
         loss = reduce(loss, 'b ... -> b (...)', 'mean')

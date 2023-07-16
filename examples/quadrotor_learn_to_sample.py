@@ -292,24 +292,31 @@ def test_model_multi(model, loader, problem):
     val_sample_loss = 0.0
     val_av_constraint_volation = 0.0
 
-    for i, (trajectories, starts, goals, constraints, _) in enumerate(loader):
+    for i, (trajectories, starts, goals, constraints, constraint_type) in enumerate(loader):
         trajectories = trajectories.to(device='cuda:0')
         B, T, dxu = trajectories.shape
         starts = starts.to(device='cuda:0')
         goals = goals.to(device='cuda:0')
         constraints = constraints.to(device='cuda:0')
+        constraint_type = constraint_type.to(device='cuda:0').reshape(B)
+
+        # make one hot
+        constraint_type = torch.nn.functional.one_hot(constraint_type, num_classes=2).float()
+        # constraint consists of parameters of constraint and constraint type
+        c = torch.cat([constraints, constraint_type], dim=-1)
+
         with torch.no_grad():
             log_prob = model.loss(trajectories.reshape(B, T, dxu),
                                   starts.reshape(B, -1),
                                   goals.reshape(B, -1),
-                                  constraints.reshape(B, -1))
+                                  c.reshape(B, -1))
 
         loss = -log_prob.mean()
         val_ll += loss.item()
 
         sampled_trajectories = model.sample(starts.reshape(B, -1),
                                             goals.reshape(B, -1),
-                                            constraints.reshape(B, -1)).reshape(B, T, dxu)
+                                            c.reshape(B, -1)).reshape(B, T, dxu)
         goals = torch.cat((goals, torch.zeros(B, 9).to(device='cuda:0')), dim=-1)
         # J, _, _, _, _, C, _, _ = problem.eval(sampled_trajectories, starts[:, 0], goals[:, 0], constraints[:, 0])
         J, _, _ = problem._objective(sampled_trajectories.unsqueeze(1), goals.unsqueeze(1))
@@ -414,8 +421,7 @@ def update_plot_with_trajectories(ax, trajectory, color='g'):
 
 
 def train_model_from_demonstrations(trajectory_sampler, train_loader, val_loader, problem, config):
-    pbar = tqdm.tqdm(range(config['epochs']))
-    fpath = f'{CCAI_PATH}/data/config/training/quadrotor/{config["model_name"]}_{config["model_type"]}'
+    fpath = f'{CCAI_PATH}/data/training/quadrotor/{config["model_name"]}_{config["model_type"]}'
 
     if config['use_ema']:
         ema = EMA(beta=config['ema_decay'])
@@ -433,18 +439,34 @@ def train_model_from_demonstrations(trajectory_sampler, train_loader, val_loader
     optimizer = torch.optim.Adam(trajectory_sampler.parameters(), lr=config['lr'])
 
     step = 0
+    start_epoch = 0
+
+    if config['load_checkpoint']:
+        checkpoint = torch.load(f'{fpath}/checkpoint.pth')
+        trajectory_sampler.load_state_dict(checkpoint['model'])
+        if config['use_ema']:
+            ema_model.load_state_dict(checkpoint['ema'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
+        start_epoch = checkpoint['epoch']
+        step = checkpoint['step']
+
+    pbar = tqdm.tqdm(range(config['epochs']), initial=start_epoch)
 
     for epoch in pbar:
         train_loss = 0.0
         trajectory_sampler.train()
-        for trajectories, starts, goals, constraints, constraint_idx in train_loader:
+        for trajectories, starts, goals, constraints, constraint_type in train_loader:
             trajectories = trajectories.to(device='cuda:0')
             B, T, dxu = trajectories.shape
             starts = starts.to(device='cuda:0')
             goals = goals.to(device='cuda:0')
             constraints = constraints.to(device='cuda:0')
-            constraint_idx = constraint_idx.to(device='cuda:0').reshape(B)
+            constraint_type = constraint_type.to(device='cuda:0').reshape(B)
 
+            # make one hot
+            constraint_type = torch.nn.functional.one_hot(constraint_type, num_classes=2).float()
+            # constraint consists of parameters of constraint and constraint type
+            constraints = torch.cat([constraints, constraint_type], dim=-1)
             sampler_loss = trajectory_sampler.loss(trajectories,
                                                    starts,
                                                    goals,
@@ -473,7 +495,7 @@ def train_model_from_demonstrations(trajectory_sampler, train_loader, val_loader
                 test_model = ema_model
             else:
                 test_model = trajectory_sampler
-
+            """
             demo_ll, sample_cost, constraint_violation = test_model_multi(test_model,
                                                                           train_loader,
                                                                           problem)
@@ -486,8 +508,8 @@ def train_model_from_demonstrations(trajectory_sampler, train_loader, val_loader
             print('VALIDATION')
             print(
                 f'Epoch: {epoch + 1}  Demonstration loss: {demo_ll}  Sample Cost: {sample_cost} Constraint Violation: {constraint_violation}')
-
-            for trajectories, starts, goals, constraints, constraint_idx in val_loader:
+            """
+            for trajectories, starts, goals, constraints, constraint_type in val_loader:
                 starts = starts.to(device='cuda:0')
                 goals = goals.to(device='cuda:0')
                 N = 16  # trajectories.shape[1]
@@ -496,11 +518,15 @@ def train_model_from_demonstrations(trajectory_sampler, train_loader, val_loader
                 goals = goals[:B].reshape(-1, 3)
                 true_trajectories = trajectories[:B].to(device='cuda:0')
                 constraints = constraints[:B].reshape(-1, 100).to(device='cuda:0')
-                constraint_idx = constraint_idx[:B].reshape(-1).to(device='cuda:0')
+                constraint_type = constraint_type[:B].to(device='cuda:0').reshape(B)
 
+                # make one hot
+                constraint_type = torch.nn.functional.one_hot(constraint_type, num_classes=2).float()
                 s = starts.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
                 g = goals.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
                 c = constraints.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
+                ctype = constraint_type.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
+                c = torch.cat([c, ctype], dim=1)
                 with torch.no_grad():
                     trajectories = trajectory_sampler.sample(s, g, c)
 
@@ -513,12 +539,19 @@ def train_model_from_demonstrations(trajectory_sampler, train_loader, val_loader
 
                 goals = g.reshape(B, N, 3)
                 constraints = constraints.reshape(B, 100)
+
                 for i, trajs in enumerate(trajectories):
                     env = QuadrotorEnv('surface_data.npz')
                     xy_data = env.surface_model.train_x.cpu().numpy()
                     z_data = constraints[i].cpu().numpy()
                     np.savez('tmp_surface_data.npz', xy=xy_data, z=z_data)
-                    env = QuadrotorEnv(randomize_GP=False, surface_data_fname='tmp_surface_data.npz')
+
+                    if constraint_type[i, 0] == 1:
+                        env = QuadrotorEnv(randomize_GP=False, surface_data_fname='tmp_surface_data.npz')
+                    else:
+                        env = QuadrotorEnv(randomize_GP=False, obstacle_data_fname='tmp_surface_data.npz',
+                                           obstacle_mode='gp')
+
                     env.state = starts[i, 0].cpu().numpy()
                     env.goal = goals[i, 0].cpu().numpy()
                     ax = env.render_init()
@@ -529,6 +562,16 @@ def train_model_from_demonstrations(trajectory_sampler, train_loader, val_loader
                 plt.close()
 
                 break
+        if (epoch + 1) % config['save_every'] == 0:
+            checkpoint = {
+                'epoch': epoch,
+                'model': trajectory_sampler.state_dict(),
+                'optimizer': optimizer.state_dict(),
+                'ema': ema_model.state_dict(),
+                'step': step,
+            }
+            torch.save(checkpoint, f'{fpath}/checkpoint.pth')
+
     if config['use_ema']:
         torch.save(ema_model.state_dict(), f'{fpath}/from_demonstrations_ema.pt')
     else:
@@ -547,7 +590,7 @@ if __name__ == "__main__":
 
     batched_problem = QuadrotorProblem(T=12, device=config['device'], include_obstacle=False, alpha=0.01)
     model = TrajectorySampler(T=12, dx=12, du=4,
-                              context_dim=12 + 3 + 100,
+                              context_dim=12 + 3 + 100 + 2,
                               type=config['model_type'],
                               dynamics=Quadrotor12DDynamics(dt=0.1))
 
@@ -565,9 +608,10 @@ if __name__ == "__main__":
         model.set_norm_constants(*train_dataset.get_norm_constants())
 
     train_sampler = RandomSampler(train_dataset)
+    val_sampler = RandomSampler(val_dataset)
     train_loader = DataLoader(train_dataset, batch_size=config['batch_size'],
-                              sampler=train_sampler, num_workers=4, pin_memory=True)
-    val_loader = DataLoader(val_dataset, batch_size=4096, shuffle=True, num_workers=4)
+                              sampler=train_sampler, num_workers=4)
+    val_loader = DataLoader(val_dataset, sampler=val_sampler, batch_size=256)
 
     if config['load_model'] != 'none':
         model.load_state_dict(torch.load(config['load_model']))

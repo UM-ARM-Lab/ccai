@@ -1,46 +1,60 @@
 import torch
 import numpy as np
-from ccai.gp import GPSurfaceModel, get_random_surface
+from ccai.gp import GPSurfaceModel, get_random_surface, get_random_obs
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D  # <-- Note the capitalization!
 
 
 class QuadrotorEnv:
 
-    def __init__(self, randomize_GP=False, surface_data_fname=None, obstacle_mode=None):
-        assert obstacle_mode in [None, 'static', 'dynamic']
+    def __init__(self, randomize_GP=False, surface_data_fname=None, obstacle_data_fname=None, obstacle_mode=None):
+        assert obstacle_mode in [None, 'static', 'dynamic', 'gp']
         self.env_dims = [-10, 10]
         self.state_dim = 12
         self.dt = 0.1
         self.state = None
-        if not randomize_GP:
+        if not randomize_GP and surface_data_fname is not None:
             data = np.load(surface_data_fname)
             self.surface_model = GPSurfaceModel(torch.from_numpy(data['xy']).to(dtype=torch.float32),
                                                 torch.from_numpy(data['z']).to(dtype=torch.float32))
         else:
             self.surface_model = get_random_surface()
+
+        self.obstacle_pos = np.array([0.0, 0.0])
+        self.obstacle_r = 1
+        self.obstacle_mode = obstacle_mode
+        self.reset()
+
+        if self.obstacle_mode == 'gp':
+            if obstacle_data_fname is None:
+                self.obstacle_model = get_random_obs(self.state, self.goal)
+            else:
+                data = np.load(obstacle_data_fname)
+                self.obstacle_model = GPSurfaceModel(torch.from_numpy(data['xy']).to(dtype=torch.float32),
+                                                     torch.from_numpy(data['z']).to(dtype=torch.float32))
+
+            self.obs_plotting_vars = self._get_plotting_vars(self.obstacle_model)
+
+        self.surface_plotting_vars = self._get_plotting_vars(self.surface_model)
+
+        self.alpha = 0.5
+        self.ax = None
+        self._surf = None
+        self._render_pos = None
+
+    def _get_plotting_vars(self, gp_model):
         # For rendering height
         N = 100
         xs = torch.linspace(-6, 6, steps=N)
         ys = torch.linspace(-6, 6, steps=N)
         x, y = torch.meshgrid(xs, ys, indexing='xy')
         test_x = torch.stack((x.flatten(), y.flatten()), dim=1)
-        z, _, _, = self.surface_model.posterior_mean(test_x)
+        z, _, _, =  gp_model.posterior_mean(test_x)
 
         x = test_x[:, 0].reshape(N, N).numpy()
         y = test_x[:, 1].reshape(N, N).numpy()
         z = z.detach().reshape(N, N).numpy()
-
-        self.surface_plotting_vars = [x, y, z]
-        self.obstacle_pos = np.array([0.0, 0.0])
-        self.obstacle_r = 1
-        self.obstacle_mode = obstacle_mode
-        self.alpha = 0.5
-        self.reset()
-        self.ax = None
-        self._surf = None
-        self._render_pos = None
-        self.goal = np.array([4, 4])
+        return x, y, z
 
     def _get_surface_h(self, state):
         xy = torch.from_numpy(state[:2]).reshape(1, 2).to(dtype=torch.float32)
@@ -48,13 +62,29 @@ class QuadrotorEnv:
             z, _, _ = self.surface_model.posterior_mean(xy)
         return z.numpy().reshape(1).astype(np.float32)
 
+    def _get_gp_obs_sdf(self, state):
+        xy = torch.from_numpy(state[:2]).reshape(1, 2).to(dtype=torch.float32)
+        with torch.no_grad():
+            z, _, _ = self.obstacle_model.posterior_mean(xy)
+        return z.numpy().reshape(1).astype(np.float32)
+
     def reset(self):
         start = np.zeros(self.state_dim)
 
         # positions
-        start[:2] = np.array([-4, -4]) - 1. * np.random.rand(2)
+        start[:2] = 10 * np.random.rand(2) - 5  # np.array([-4, -4]) - 1. * np.random.rand(2)
         start[2] = self._get_surface_h(start)
 
+        goal = 10 * np.random.rand(3) - 5
+        goal[2] = self._get_surface_h(goal)
+
+        """
+        # positions
+        start[:2] = np.array([-4, -4]) - 1. * np.random.rand(2)
+        start[2] = self._get_surface_h(start)
+        self.goal = np.array([4, 4, 0])
+        self.goal = self.goal + 0.5 * np.random.randn(3)
+        """
         # Angles in rad
         start[3:6] = 0.05 * (-np.pi + 2 * np.pi * np.random.rand(3))
 
@@ -63,10 +93,12 @@ class QuadrotorEnv:
 
         # start[9:] *= 5
         self.state = start
+        self.goal = goal
         if self.obstacle_mode == 'dynamic':
             self.obstacle_pos = np.array([-1.0, 1.5])
         else:
             self.obstacle_pos = np.array([0.0, 0.0])
+
 
     def get_constraint_violation(self):
         surface_h = self._get_surface_h(self.state)
@@ -74,8 +106,13 @@ class QuadrotorEnv:
         if self.obstacle_mode is None:
             return surface_violation
 
-        obstacle_violation = self.obstacle_r ** 2 - np.sum((self.state[:2] - self.obstacle_pos) ** 2)
-        obstacle_violation = np.clip(obstacle_violation, a_min=0, a_max=None)
+        if self.obstacle_mode == 'gp':
+            sdf = self._get_gp_obs_sdf(self.state)
+            obstacle_violation = np.clip(sdf, a_min=0, a_max=None)
+        else:
+            obstacle_violation = self.obstacle_r ** 2 - np.sum((self.state[:2] - self.obstacle_pos) ** 2)
+            obstacle_violation = np.clip(obstacle_violation, a_min=0, a_max=None)
+
         return np.array([surface_violation.item(), obstacle_violation.item()])
 
     def step(self, control):
@@ -149,8 +186,13 @@ class QuadrotorEnv:
             c = np.array([0.0, 0.0, .7, self.alpha])[None, None, :]
             return c.repeat(N, axis=0).repeat(N, axis=1)
 
-        in_obs = np.where((x - self.obstacle_pos[0]) ** 2 + (y - self.obstacle_pos[1]) ** 2 < self.obstacle_r ** 2,
-                          1, 0)
+        if self.obstacle_mode == 'gp':
+            _, _, zobs = self.obs_plotting_vars
+            in_obs = np.where(zobs > 0, 1, 0)
+        else:
+            in_obs = np.where((x - self.obstacle_pos[0]) ** 2 + (y - self.obstacle_pos[1]) ** 2 < self.obstacle_r ** 2,
+                              1, 0)
+
         c = np.where(in_obs[:, :, None],
                      np.array([1.0, 0.0, 0.0, self.alpha])[None, None, :],
                      np.array([0, 0.0, .7, self.alpha])[None, None, :]
