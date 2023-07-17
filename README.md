@@ -25,7 +25,7 @@ Example scripts are in the `examples` folder.
 
 The planning configuration files for these examples are found in `config/planning_configs` in `.yaml` format.
 
-### Training generative models for assistance in plannig:
+### Training generative models to improve planning
 `quadrotor_learn_to_sample.py` will train a generative model for the quadrotor example
 `victor_table_learn_to_sample.py` will train a generative model for the victor table example
 
