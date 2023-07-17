@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D  # <-- Note the capitalization!
 import time
 from functools import partial
-from torch.func import vmap, jacrev, hessian
-
+#from torch.func import vmap, jacrev, hessian
+from functorch import vmap, jacrev, hessian
 from ccai.kernels import rbf_kernel, structured_rbf_kernel
 from ccai.quadrotor_env import QuadrotorEnv
 from ccai.quadrotor import Quadrotor12DDynamics
@@ -31,7 +31,7 @@ def cost(trajectory, goal):
     T = x.shape[0]
     Q = torch.eye(12, device=trajectory.device)
     Q[5, 5] = 1e-2
-    Q[2, 2] = 100
+    Q[2, 2] = 1e-2#100
     Q[3:, 3:] *= 0.5
     P = Q * 100
     R = 1 * torch.eye(4, device=trajectory.device)
@@ -73,7 +73,7 @@ def cost(trajectory, goal):
 
 class QuadrotorProblem(ConstrainedSVGDProblem):
 
-    def __init__(self, start, goal, T, device='cuda:0', alpha=0.01, include_obstacle=False, gp_surface_model=None,
+    def __init__(self, start, goal, T, device='cuda:0', alpha=1, include_obstacle=False, gp_surface_model=None,
                  gp_sdf_model=None):
         super().__init__(start, goal, T, device)
         self.T = T
@@ -184,7 +184,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         # compute z of surface and gradient and hessian
         sdf, grad_sdf, hess_sdf = self.obs_gp.posterior_mean(xy)
 
-        constr = sdf
+        constr = sdf + 0.01
         grad_constr = torch.cat((grad_sdf,
                                  torch.zeros(T, 14, device=trajectory.device)), dim=1)
         hess_constr = torch.cat((
@@ -424,8 +424,9 @@ def do_trial(env, params, fpath):
                 flow_type = 'cnf'
             else:
                 raise ValueError('Invalid flow model type')
-            flow_model = TrajectorySampler(T=params['T'], dx=12, du=4, context_dim=12 + 3 + 100, type=flow_type)
-            flow_model.load_state_dict(torch.load(f'{CCAI_PATH}/params["flow_model"]'))
+            flow_model = TrajectorySampler(T=params['T'], dx=12, du=4, context_dim=12 + 3 + 100 + 2, type=flow_type)
+            if 'untrained' not in params['flow_model']:
+                flow_model.load_state_dict(torch.load(f'{CCAI_PATH}/{params["flow_model"]}'))
             flow_model.to(device=params['device'])
         else:
             flow_model = None
@@ -457,7 +458,22 @@ def do_trial(env, params, fpath):
     all_violation = []
 
     duration = 0.0
-    constraint_params = env.surface_model.train_y.reshape(-1).to(device=params['device'], dtype=torch.float32)
+    np_constraint_params = env.get_constraint_params()
+
+    # configure constraint parameters for input to generative model
+    constraint_params = []
+    constraint_codes = []
+    if np_constraint_params['surface'] is not None and 'obs_only' not in params['controller']:
+        constraint_params.append(torch.from_numpy(np_constraint_params['surface']).to(device=params['device']))
+        constraint_codes.append(torch.tensor([1.0, 0.0], device=params['device']))
+
+    if np_constraint_params['obstacle'] is not None and 'surface_only' not in params['controller']:
+        constraint_params.append(torch.from_numpy(np_constraint_params['obstacle']).to(device=params['device']))
+        constraint_codes.append(torch.tensor([0.0, 1.0], device=params['device']))
+
+    constraint_params = torch.stack(constraint_params, dim=0).unsqueeze(0)
+    constraint_codes = torch.stack(constraint_codes, dim=0).unsqueeze(0)
+    constraint_params = torch.cat((constraint_params, constraint_codes), dim=-1)
     planned_trajectories = []
 
     for step in range(params['num_steps']):
@@ -467,9 +483,12 @@ def do_trial(env, params, fpath):
             if step > 0:
                 torch.cuda.synchronize()
                 start_time = time.time()
-            best_traj, trajectories = controller.step(start,
-                                                      obstacle_pos=env.obstacle_pos,
-                                                      constr_param=constraint_params)
+            try:
+                best_traj, trajectories = controller.step(start,
+                                                          obstacle_pos=env.obstacle_pos,
+                                                          constr_param=constraint_params)
+            except Exception as e:
+                print(e)
 
             if step > 0:
                 torch.cuda.synchronize()
@@ -478,12 +497,13 @@ def do_trial(env, params, fpath):
             u = best_traj[0, -4:].detach().cpu().numpy()
             _, violation = env.step(u)
             # print(violation)
-            if include_obstacle:
-                if violation[1] > 0:
+            if 'obstacle' in violation.keys():
+                if violation['obstacle'] > 0:
                     collision = True
+
         actual_traj.append(env.state)
-        all_violation.append(violation)
         planned_trajectories.append(trajectories)
+        all_violation.append(violation)
 
         if params['visualize']:
             env.render_update()
@@ -493,14 +513,23 @@ def do_trial(env, params, fpath):
 
     print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
     actual_traj = np.stack(actual_traj)
-    all_violation = np.stack(all_violation)
     planned_trajectories = torch.stack(planned_trajectories, dim=0)
+
+    # all violation is list of dictionaries
+    violation = {}
+    for key in all_violation[0].keys():
+        for v in all_violation:
+            if key in violation.keys():
+                violation[key].append(v[key])
+            else:
+                violation[key] = [v[key]]
 
     np.savez(f'{fpath.resolve()}/planned_trajector_data.npz',
              traj=planned_trajectories.detach().cpu().numpy(),
              goal=env.goal,
-             surface=env.surface_model.train_y.cpu().numpy(),
-             obstacle=env.obstacle_model.train_y.cpu().numpy() if env.obstacle_model is not None else None,
+             surface=np_constraint_params['surface'],
+             obstacle=np_constraint_params['obstacle'],
+             violation=violation,
              )
 
     if params['visualize']:
@@ -519,7 +548,7 @@ if __name__ == "__main__":
     results = {}
     for i in tqdm(range(config['num_trials'])):
         env = QuadrotorEnv(randomize_GP=config['random_surface'], surface_data_fname='surface_data.npz',
-                           obstacle_mode=config['obstacle_mode'])
+                           obstacle_mode=config['obstacle_mode'], surface_constraint=config['surface_constr'])
         start_state = env.state.copy()
         goal = env.goal.copy()
         for controller in config['controllers'].keys():
@@ -542,4 +571,6 @@ if __name__ == "__main__":
                 results[controller] = [final_distance_to_goal]
             else:
                 results[controller].append(final_distance_to_goal)
+
+        print(results)
 

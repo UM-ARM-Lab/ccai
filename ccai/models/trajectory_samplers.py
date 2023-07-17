@@ -114,7 +114,10 @@ class TrajectoryDiffusionModel(nn.Module):
         self.diffusion_model = GaussianDiffusion(T, (dx + du), context_dim, timesteps=20, sampling_timesteps=20)
 
     def sample(self, start, goal, constraints):
-        context = torch.cat((start, goal, constraints), dim=1)
+        B, N, _ = constraints.shape
+        context = torch.cat((start.unsqueeze(1).repeat(1, N, 1),
+                             goal.unsqueeze(1).repeat(1, N, 1),
+                             constraints), dim=-1)
         condition = {0: start}
         samples = self.diffusion_model.sample(N=1, context=context, condition=condition).reshape(-1, self.T,
                                                                                                  self.dx + self.du)

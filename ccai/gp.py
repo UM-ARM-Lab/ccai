@@ -113,8 +113,12 @@ def get_random_obs(start, goal):
     lengthscale = 1
     outputscale = 1
     # we will say that start and goal are very far from an obstacle, but that is all
-    train_x = torch.tensor(np.stack((start[:2], goal[:2]), axis=0)).to(dtype=torch.float)
-    train_y = torch.tensor([[-1.], [-1.]])
+    # randomly create passage
+    passage_x = 6 * np.random.rand(1) - 3
+    passage_y = - passage_x
+    passage = np.concatenate([passage_x, passage_y])
+    train_x = torch.tensor(np.stack((start[:2], goal[:2], passage), axis=0)).to(dtype=torch.float)
+    train_y = torch.tensor([[-1.], [-1.], [-2.]])
     initial_gp_model = GPSurfaceModel(train_x, train_y, lengthscale=lengthscale, outputscale=outputscale)
 
     # get a sample from the resulting posterior

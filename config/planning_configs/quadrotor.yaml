@@ -2,32 +2,60 @@
 T: 12
 receding_horizon: True
 obstacle_mode: 'gp'
-surface_constr: False
-num_steps: 10
-num_trials: 1000
-visualize: False
-experiment_name: 'quadrotor_flow_test_gp_sdf_1'
+surface_constr: True
+num_steps: 100
+num_trials: 20
+visualize: True
+experiment_name: 'test_quadrotor_composable'
 random_surface: True
 controllers:
   csvgd:
     N: 16
-    alpha_J: 1
+    alpha_J: 0.1
     alpha_C: 1
-    step_size: 1
+    step_size: 0.5
     momentum: 0.
     device: 'cuda:0'
-    online_iters: 20
+    online_iters: 10
     warmup_iters: 100
     resample_steps: 5
     resample_sigma: 0.1
     resample_temperature: 0.25
     penalty: 100.00
     flow_model: 'none'
-#  csvgd_demonstration_flow:
-#    N: 8
+  csvgd_diffusion_flow_surf_only:
+    N: 16
+    alpha_J: 0.1
+    alpha_C: 1
+    step_size: 0.5
+    momentum: 0.
+    device: 'cuda:0'
+    online_iters: 10
+    warmup_iters: 100
+    resample_steps: 5
+    resample_sigma: 0.1
+    resample_temperature: 0.25
+    penalty: 100.00
+    flow_model: 'data/training/quadrotor/quadrotor_multi_constraint_surface_only_diffusion/from_demonstrations_ema.pt'
+  csvgd_diffusion_flow_surf_and_obs:
+    N: 16
+    alpha_J: 0.1
+    alpha_C: 1
+    step_size: 0.5
+    momentum: 0.
+    device: 'cuda:0'
+    online_iters: 100
+    warmup_iters: 10
+    resample_steps: 5
+    resample_sigma: 0.1
+    resample_temperature: 0.25
+    penalty: 100.00
+    flow_model: 'data/training/quadrotor/quadrotor_multi_constraint_obs_and_surf_diffusion/from_demonstrations_ema.pt'
+#  csvgd_diffusion_flow_surf_only_no_opt:
+#    N: 16
 #    alpha_J: 1
 #    alpha_C: 1
-#    step_size: 0.5
+#    step_size: 1
 #    momentum: 0.
 #    device: 'cuda:0'
 #    online_iters: 10
@@ -36,21 +64,21 @@ controllers:
 #    resample_sigma: 0.1
 #    resample_temperature: 0.25
 #    penalty: 100.00
-#    flow_model: 'spline_learned_sampler_quadrotor_multi_constraint_from_demonstration_controls_only2.pt'
-#  csvgd_finetuned_flow:
-#    N: 8
+#    flow_model: 'data/training/quadrotor/quadrotor_multi_constraint_surface_only_diffusion/from_demonstrations_ema.pt'
+#  csvgd_diffusion_flow_surf_and_obs_no_opt:
+#    N: 16
 #    alpha_J: 1
 #    alpha_C: 1
-#    step_size: 0.5
+#    step_size: 1
 #    momentum: 0.
 #    device: 'cuda:0'
-#    online_iters: 10
-#    warmup_iters: 100
+#    online_iters: 0
+#    warmup_iters: 0
 #    resample_steps: 5
 #    resample_sigma: 0.1
 #    resample_temperature: 0.25
 #    penalty: 100.00
-#    flow_model: 'spline_learned_sampler_quadrotor_multi_constraint_finetuned_controls_only2.pt'
+#    flow_model: 'data/training/quadrotor/quadrotor_multi_constraint_obs_and_surf_diffusion/from_demonstrations_ema.pt'
 #  ipopt:
 #    device: 'cpu'
 #    online_iters: 10

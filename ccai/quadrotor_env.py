@@ -7,18 +7,23 @@ from mpl_toolkits.mplot3d import axes3d, Axes3D  # <-- Note the capitalization!
 
 class QuadrotorEnv:
 
-    def __init__(self, randomize_GP=False, surface_data_fname=None, obstacle_data_fname=None, obstacle_mode=None):
+    def __init__(self, randomize_GP=False, surface_data_fname=None, obstacle_data_fname=None, obstacle_mode=None,
+                 surface_constraint=True):
         assert obstacle_mode in [None, 'static', 'dynamic', 'gp']
         self.env_dims = [-10, 10]
         self.state_dim = 12
         self.dt = 0.1
         self.state = None
-        if not randomize_GP and surface_data_fname is not None:
-            data = np.load(surface_data_fname)
-            self.surface_model = GPSurfaceModel(torch.from_numpy(data['xy']).to(dtype=torch.float32),
-                                                torch.from_numpy(data['z']).to(dtype=torch.float32))
-        else:
-            self.surface_model = get_random_surface()
+        self.surface_model = None
+        if surface_constraint:
+            if not randomize_GP and surface_data_fname is not None:
+                data = np.load(surface_data_fname)
+                self.surface_model = GPSurfaceModel(torch.from_numpy(data['xy']).to(dtype=torch.float32),
+                                                    torch.from_numpy(data['z']).to(dtype=torch.float32))
+            else:
+                self.surface_model = get_random_surface()
+
+        self.surface_plotting_vars = self._get_plotting_vars(self.surface_model)
 
         self.obstacle_pos = np.array([0.0, 0.0])
         self.obstacle_r = 1
@@ -35,25 +40,26 @@ class QuadrotorEnv:
 
             self.obs_plotting_vars = self._get_plotting_vars(self.obstacle_model)
 
-        self.surface_plotting_vars = self._get_plotting_vars(self.surface_model)
-
         self.alpha = 0.5
         self.ax = None
         self._surf = None
         self._render_pos = None
 
-    def _get_plotting_vars(self, gp_model):
+    def _get_plotting_vars(self, gp_model=None):
         # For rendering height
         N = 100
         xs = torch.linspace(-6, 6, steps=N)
         ys = torch.linspace(-6, 6, steps=N)
         x, y = torch.meshgrid(xs, ys, indexing='xy')
         test_x = torch.stack((x.flatten(), y.flatten()), dim=1)
-        z, _, _, =  gp_model.posterior_mean(test_x)
-
+        if gp_model is not None:
+            z, _, _, = gp_model.posterior_mean(test_x)
+            z = z.detach()
+        else:
+            z = torch.zeros_like(x)
         x = test_x[:, 0].reshape(N, N).numpy()
         y = test_x[:, 1].reshape(N, N).numpy()
-        z = z.detach().reshape(N, N).numpy()
+        z = z.reshape(N, N).numpy()
         return x, y, z
 
     def _get_surface_h(self, state):
@@ -70,13 +76,23 @@ class QuadrotorEnv:
 
     def reset(self):
         start = np.zeros(self.state_dim)
+        goal = np.zeros(3)
 
         # positions
-        start[:2] = 10 * np.random.rand(2) - 5  # np.array([-4, -4]) - 1. * np.random.rand(2)
-        start[2] = self._get_surface_h(start)
+        got_sg = False
+        while not got_sg:
+            start[:2] = 10 * np.random.rand(2) - 5  # np.array([-4, -4]) - 1. * np.random.rand(2)
+            goal = 10 * np.random.rand(3) - 5
 
-        goal = 10 * np.random.rand(3) - 5
-        goal[2] = self._get_surface_h(goal)
+            if np.linalg.norm(start[:2] - goal[:2]) > 3:
+                got_sg = True
+
+        if self.surface_model is not None:
+            start[2] = self._get_surface_h(start)
+            goal[2] = self._get_surface_h(goal)
+        else:
+            start[2] = np.random.rand(1)
+            goal[2] = np.random.rand(1)
 
         """
         # positions
@@ -99,21 +115,23 @@ class QuadrotorEnv:
         else:
             self.obstacle_pos = np.array([0.0, 0.0])
 
-
     def get_constraint_violation(self):
-        surface_h = self._get_surface_h(self.state)
-        surface_violation = self.state[2] - surface_h
-        if self.obstacle_mode is None:
-            return surface_violation
+        constraints = {}
 
-        if self.obstacle_mode == 'gp':
-            sdf = self._get_gp_obs_sdf(self.state)
-            obstacle_violation = np.clip(sdf, a_min=0, a_max=None)
-        else:
-            obstacle_violation = self.obstacle_r ** 2 - np.sum((self.state[:2] - self.obstacle_pos) ** 2)
-            obstacle_violation = np.clip(obstacle_violation, a_min=0, a_max=None)
+        if self.surface_model is not None:
+            surface_h = self._get_surface_h(self.state)
+            surface_violation = self.state[2] - surface_h
+            constraints['surface'] = surface_violation.item()
 
-        return np.array([surface_violation.item(), obstacle_violation.item()])
+        if self.obstacle_mode is not None:
+            if self.obstacle_mode == 'gp':
+                sdf = self._get_gp_obs_sdf(self.state)
+                obstacle_violation = np.clip(sdf, a_min=0, a_max=None)
+            else:
+                obstacle_violation = self.obstacle_r ** 2 - np.sum((self.state[:2] - self.obstacle_pos) ** 2)
+                obstacle_violation = np.clip(obstacle_violation, a_min=0, a_max=None)
+            constraints['obstacle'] = obstacle_violation.item()
+        return constraints
 
     def step(self, control):
 
@@ -212,8 +230,9 @@ class QuadrotorEnv:
                                           cstride=1)
         self._render_pos = self.ax.scatter(self.state[0], self.state[1], self.state[2], s=100, c='g')
 
-        self.ax.scatter(self.goal[0], self.goal[1], self._get_surface_h(self.goal[:2]), s=100, c='k')
+        self.ax.scatter(self.goal[0], self.goal[1], self.goal[2], s=100, c='k')
         self.ax.view_init(60, -50)
+        # self.ax.view_init(90, -50)
         self.ax.axes.set_xlim3d(left=-6, right=6)
         self.ax.axes.set_ylim3d(bottom=-6, top=6)
         self.ax.axes.set_zlim3d(bottom=-3, top=3)
@@ -229,3 +248,16 @@ class QuadrotorEnv:
         self._render_pos._offsets3d = ([self.state[0]], [self.state[1]], [self.state[2]])
         if self.obstacle_mode == 'dynamic':
             self._surf.set_facecolors(self._get_surface_colours()[:-1, :-1].reshape(-1, 4))
+
+    def get_constraint_params(self):
+        params = {
+            'surface': None,
+            'obstacle': None
+        }
+        if self.surface_model is not None:
+            params['surface'] = self.surface_model.train_y.reshape(-1).cpu().numpy()
+
+        if self.obstacle_model is not None:
+            params['obstacle'] = self.obstacle_model.train_y.reshape(-1).cpu().numpy()
+
+        return params
