@@ -345,11 +345,16 @@ class GaussianDiffusion(nn.Module):
         return posterior_mean, posterior_variance, posterior_log_variance_clipped
 
     def model_predictions(self, x, t, context):
+        guidance_weights = [1.6, 0.6]
         if context is not None:
+            num_constraints = context.shape[1]
             # classifier free guidance
             unconditional = self.model.compiled_unconditional_test(t, x)
-            conditional = self.model.compiled_conditional_test(t, x, context)
-            model_output = unconditional + self.guidance_w * (conditional - unconditional)
+            model_output = unconditional
+            # compose multiple constraints
+            for i in range(context.shape[1]):
+                conditional = self.model.compiled_conditional_test(t, x, context[:, i])
+                model_output += guidance_weights[i] * (conditional - unconditional) / num_constraints
         else:
             model_output = self.model(t, x, context)
         pred_noise = model_output
@@ -432,8 +437,8 @@ class GaussianDiffusion(nn.Module):
 
     @torch.no_grad()
     def sample(self, N, condition, context, return_all_timesteps=False):
-        B = context.shape[0]
-        context = context.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
+        B, num_constraints, dc = context.shape
+        context = context.reshape(B, 1, num_constraints, dc).repeat(1, N, 1, 1).reshape(B * N, num_constraints, -1)
         sample_fn = self.p_sample_loop if not self.is_ddim_sampling else self.ddim_sample
         return sample_fn((B * N, self.horizon, self.xu_dim), condition=condition, context=context,
                          return_all_timesteps=return_all_timesteps)
