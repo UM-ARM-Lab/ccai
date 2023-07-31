@@ -84,7 +84,7 @@ class QuadrotorEnv:
             start[:2] = 10 * np.random.rand(2) - 5  # np.array([-4, -4]) - 1. * np.random.rand(2)
             goal = 10 * np.random.rand(3) - 5
 
-            if np.linalg.norm(start[:2] - goal[:2]) > 3:
+            if np.linalg.norm(start[:2] - goal[:2]) > 4:
                 got_sg = True
 
         if self.surface_model is not None:

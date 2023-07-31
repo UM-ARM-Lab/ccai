@@ -524,8 +524,9 @@ def do_trial(env, params, fpath):
             else:
                 violation[key] = [v[key]]
 
-    np.savez(f'{fpath.resolve()}/planned_trajector_data.npz',
+    np.savez(f'{fpath.resolve()}/planned_trajectory_data.npz',
              traj=planned_trajectories.detach().cpu().numpy(),
+             actual_traj=actual_traj,
              goal=env.goal,
              surface=np_constraint_params['surface'],
              obstacle=np_constraint_params['obstacle'],
@@ -535,7 +536,7 @@ def do_trial(env, params, fpath):
     if params['visualize']:
         plt.close()
 
-    return np.min(np.linalg.norm(actual_traj[:, :2] - np.array([[4, 4]]), axis=1))
+    return np.min(np.linalg.norm(actual_traj[:, :2] - env.goal[:2], axis=1))
 
 
 if __name__ == "__main__":

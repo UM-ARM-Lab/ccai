@@ -6,7 +6,7 @@ surface_constr: True
 num_steps: 100
 num_trials: 20
 visualize: True
-experiment_name: 'test_quadrotor_composable'
+experiment_name: 'test_quadrotor_composable_2'
 random_surface: True
 controllers:
   csvgd:
@@ -37,6 +37,20 @@ controllers:
     resample_temperature: 0.25
     penalty: 100.00
     flow_model: 'data/training/quadrotor/quadrotor_multi_constraint_surface_only_diffusion/from_demonstrations_ema.pt'
+  csvgd_diffusion_flow_obs_only:
+    N: 16
+    alpha_J: 0.1
+    alpha_C: 1
+    step_size: 0.5
+    momentum: 0.
+    device: 'cuda:0'
+    online_iters: 10
+    warmup_iters: 100
+    resample_steps: 5
+    resample_sigma: 0.1
+    resample_temperature: 0.25
+    penalty: 100.00
+    flow_model: 'data/training/quadrotor/quadrotor_multi_constraint_obs_only_diffusion/from_demonstrations_ema.pt'
   csvgd_diffusion_flow_surf_and_obs:
     N: 16
     alpha_J: 0.1

@@ -1,5 +1,5 @@
 ---
-model_name: 'quadrotor_multi_constraint_gp'
+model_name: 'quadrotor_multi_constraint_obs_only'
 load_model: 'none'
 load_checkpoint: False
 epochs: 100

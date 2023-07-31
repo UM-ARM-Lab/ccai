@@ -32,9 +32,16 @@ class VictorTableProblem(ConstrainedSVGDProblem):
 
     def __init__(self, start, goal, T, obstacle_centres, obstacle_rads, table_height, device='cuda:0'):
         super().__init__(start, goal, T, device)
-        self.dz = 2
+        if obstacle_centres is None:
+            self.dz = 0
+        else:
+            self.dz = 2
         self.dh = self.dz * T
-        self.dg = 2 * T  # + 2
+        if table_height is None:
+            self.dg = 0
+        else:
+            self.dg = 2 * T  # + 2
+
         self.dx = 7
         self.du = 0
         self.dt = 0.1
@@ -47,12 +54,19 @@ class VictorTableProblem(ConstrainedSVGDProblem):
         self.grad_kernel = jacrev(rbf_kernel, argnums=0)
         self.alpha = 10
 
-        self._equality_constraints = EndEffectorConstraint(
-            chain, partial(ee_equality_constraint, height=table_height)
-        )
-        self._inequality_constraints = EndEffectorConstraint(
-            chain, partial(ee_inequality_constraint, centres=obstacle_centres, rads=obstacle_rads)
-        )
+        if table_height is not None:
+            self._equality_constraints = EndEffectorConstraint(
+                chain, partial(ee_equality_constraint, height=table_height)
+            )
+        else:
+            self._equality_constraints = None
+
+        if obstacle_centres is not None:
+            self._inequality_constraints = EndEffectorConstraint(
+                chain, partial(ee_inequality_constraint, centres=obstacle_centres, rads=obstacle_rads)
+            )
+        else:
+            self._inequality_constraints = None
 
         self._terminal_constraints = EndEffectorConstraint(
             chain, partial(ee_terminal_constraint, goal=self.goal)
@@ -111,6 +125,9 @@ class VictorTableProblem(ConstrainedSVGDProblem):
     def _con_eq(self, x, compute_grads=True):
         x = x[:, :, :self.dx]
         N = x.shape[0]
+        if self._equality_constraints is None:
+            return None, None, None
+
         g, grad_g, hess_g = self._equality_constraints.eval(x.reshape(-1, self.dx), compute_grads)
         # term_g, term_grad_g, term_hess_g = self._terminal_constraints.eval(x[:, -1])
 
@@ -157,6 +174,9 @@ class VictorTableProblem(ConstrainedSVGDProblem):
         x = x[:, :, :self.dx]
         # return None, None, None
         N = x.shape[0]
+        if self._inequality_constraints is None:
+            return None, None, None
+
         h, grad_h, hess_h = self._inequality_constraints.eval(x.reshape(-1, self.dx), compute_grads)
 
         # Consider time as another batch, need to reshape
@@ -452,10 +472,19 @@ def do_trial(env, params, fpath):
     start = state['q'].reshape(7).to(device=params['device'])
     chain.to(device=params['device'])
 
-    obs1_pos = state['obs1_pos'][0, :2]
-    obs2_pos = state['obs2_pos'][0, :2]
+    if params['include_obstacles']:
+        obs1_pos = state['obs1_pos'][0, :2]
+        obs2_pos = state['obs2_pos'][0, :2]
+        centres = [obs1_pos, obs2_pos]
+    else:
+        centres = None
+
+    if params['include_table']:
+        table_height = env.table_height
+    else:
+        table_height = None
+
     rads = [0.12, 0.12]
-    centres = [obs1_pos, obs2_pos]
     if 'csvgd' in params['controller']:
         if params['flow_model'] != 'none':
             if 'diffusion' in params['flow_model']:
@@ -473,7 +502,7 @@ def do_trial(env, params, fpath):
         problem = VictorTableProblem(start, params['goal'], params['T'], device=params['device'],
                                      obstacle_rads=rads,
                                      obstacle_centres=centres,
-                                     table_height=env.table_height)
+                                     table_height=table_height)
         controller = Constrained_SVGD_MPC(problem, params)
     elif params['controller'] == 'ipopt':
         problem = VictorTableIpoptProblem(start, params['goal'], params['T'], obstacle_centres=centres,
@@ -496,8 +525,11 @@ def do_trial(env, params, fpath):
     planned_trajectories = []
     duration = 0
 
-    constr_params = torch.tensor([env.table_height]).to(device=params['device'])
-    constr_params = torch.cat((constr_params, torch.stack(centres, dim=0).reshape(-1)))
+    constr_params = []
+    if params['include_table']:
+        constr_params.append(torch.tensor([env.table_height, 0.0, 0.0, 0.0]).to(device=params['device']))
+    if params['include_obstacles']:
+        constr_params.append(torch.stack(centres, dim=0).reshape(-1))
 
     for k in range(params['num_steps']):
         if params['simulate'] or k == 0:
@@ -573,15 +605,20 @@ def do_trial(env, params, fpath):
     obs2_pos = state['obs2_pos'][0, :2]
     state = state['q'].reshape(7).to(device=params['device'])
 
-    obs = torch.stack((obs1_pos, obs2_pos), dim=0)
+    obs = torch.stack((obs1_pos, obs2_pos), dim=0).cpu().numpy()
+    if not params['include_obstacles']:
+        obs = None
+
     actual_trajectory.append(state.clone())
 
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 7)
     planned_trajectories = torch.stack(planned_trajectories, dim=0)
 
     problem.T = actual_trajectory.shape[0]
-    constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
-
+    if params['include_table']:
+        constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0).cpu().numpy()
+    else:
+        constraint_val = None
     final_distance_to_goal = torch.linalg.norm(
         chain.forward_kinematics(actual_trajectory[:, :7].reshape(-1, 7)).reshape(-1, 4, 4)[:, :2, 3] - params[
             'goal'].unsqueeze(0),
@@ -592,11 +629,11 @@ def do_trial(env, params, fpath):
     print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
 
     np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
-             constr=constraint_val.cpu().numpy(),
+             constr=constraint_val,
              d2goal=final_distance_to_goal.cpu().numpy(),
              traj=planned_trajectories.cpu().numpy(),
-             obs=obs.cpu().numpy(),
-             height=env.table_height,
+             obs=obs,
+             height=table_height,
              goal=params['goal'].cpu().numpy(),
              )
     return torch.min(final_distance_to_goal).cpu().numpy()
@@ -605,7 +642,8 @@ def do_trial(env, params, fpath):
 if __name__ == "__main__":
     torch.set_float32_matmul_precision('high')
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/config/planning_configs/victor_table_jointspace.yaml').read_text())
+    config = yaml.safe_load(
+        pathlib.Path(f'{CCAI_PATH}/config/planning_configs/victor_table_jointspace.yaml').read_text())
     from tqdm import tqdm
 
     # instantiate environment
@@ -630,7 +668,10 @@ if __name__ == "__main__":
     results = {}
 
     for i in tqdm(range(config['num_trials'])):
-        env.reset()
+        table_height = None if config['include_table'] else 0.1
+        obstacles_1 = None if config['include_obstacles'] else [3, 3]
+        obstacles_2 = None if config['include_obstacles'] else [-3, -3]
+        env.reset(table_height, obstacles_1, obstacles_2, start_on_table=config['include_table'])
 
         if config['random_env']:
             goal = torch.tensor([0.45, 0.5]) * torch.rand(2) + torch.tensor([0.4, 0.2])
