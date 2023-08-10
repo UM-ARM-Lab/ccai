@@ -484,7 +484,7 @@ def do_trial(env, params, fpath):
     else:
         table_height = None
 
-    rads = [0.12, 0.12]
+    rads = [0.115, 0.115]
     if 'csvgd' in params['controller']:
         if params['flow_model'] != 'none':
             if 'diffusion' in params['flow_model']:
@@ -493,7 +493,7 @@ def do_trial(env, params, fpath):
                 flow_type = 'cnf'
             else:
                 raise ValueError('Invalid flow model type')
-            flow_model = TrajectorySampler(T=params['T'], dx=7, du=0, context_dim=7 + 2 + 5, type=flow_type)
+            flow_model = TrajectorySampler(T=params['T'], dx=7, du=0, context_dim=7 + 2 + 4 + 2, type=flow_type)
             flow_model.load_state_dict(torch.load(f'{CCAI_PATH}/{params["flow_model"]}'))
             flow_model.to(device=params['device'])
         else:
@@ -526,10 +526,17 @@ def do_trial(env, params, fpath):
     duration = 0
 
     constr_params = []
-    if params['include_table']:
+    constr_codes = []
+    if params['include_table'] and 'obs_only' not in params['controller']:
         constr_params.append(torch.tensor([env.table_height, 0.0, 0.0, 0.0]).to(device=params['device']))
-    if params['include_obstacles']:
+        constr_codes.append(torch.tensor([1.0, 0.0]).to(device=params['device']))
+    if params['include_obstacles'] and 'table_only' not in params['controller']:
         constr_params.append(torch.stack(centres, dim=0).reshape(-1))
+        constr_codes.append(torch.tensor([0.0, 1.0]).to(device=params['device']))
+
+    constr_params = torch.stack(constr_params, dim=0).unsqueeze(0)
+    constr_codes = torch.stack(constr_codes, dim=0).unsqueeze(0)
+    constr_params = torch.cat((constr_params, constr_codes), dim=-1)
 
     for k in range(params['num_steps']):
         if params['simulate'] or k == 0:
@@ -674,11 +681,17 @@ if __name__ == "__main__":
         env.reset(table_height, obstacles_1, obstacles_2, start_on_table=config['include_table'])
 
         if config['random_env']:
+            ct = 0
             goal = torch.tensor([0.45, 0.5]) * torch.rand(2) + torch.tensor([0.4, 0.2])
             state = env.get_state()
             obs1, obs2 = state['obs1_pos'][0, :2].cpu(), state['obs2_pos'][0, :2].cpu()
-            while torch.linalg.norm(goal - obs1) < 0.1 or torch.linalg.norm(goal - obs2) < 0.1:
+            while (torch.linalg.norm(goal - obs1) < 0.1 or
+                   torch.linalg.norm(goal - obs2) < 0.1 or
+                   torch.linalg.norm(goal - state['ee_pos'][0, :2].cpu()) < 0.3):
                 goal = torch.tensor([0.4, 0.5]) * torch.rand(2) + torch.tensor([0.5, 0.2])
+                ct += 1
+                if ct > 100:
+                    break
         else:
             goal = torch.tensor([0.8, 0.15])
             goal = goal + 0.025 * torch.randn(2)  # torch.tensor([0.25, 0.1]) * torch.rand(2)

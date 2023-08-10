@@ -53,12 +53,15 @@ def train_model(trajectory_sampler, train_loader, val_loader, config):
     for epoch in pbar:
         train_loss = 0.0
         trajectory_sampler.train()
-        for trajectories, starts, goals, constraints, constraint_idx in train_loader:
+        for trajectories, starts, goals, constraints, constraint_type in train_loader:
             trajectories = trajectories.to(device=config['device'])
             B, T, dxu = trajectories.shape
             starts = starts.to(device=config['device'])
             goals = goals.to(device=config['device'])
             constraints = constraints.to(device=config['device'])
+            constraint_type = constraint_type.to(device='cuda:0').reshape(B)
+            constraint_type = torch.nn.functional.one_hot(constraint_type, num_classes=2).float()
+            constraints = torch.cat([constraints, constraint_type], dim=-1)
 
             sampler_loss = trajectory_sampler.loss(trajectories,
                                                    starts,
@@ -83,7 +86,7 @@ def train_model(trajectory_sampler, train_loader, val_loader, config):
         # generate samples and plot them
         if (epoch + 1) % config['test_every'] == 0:
             count = 0
-            for trajectories, starts, goals, constraints, constraint_idx in val_loader:
+            for trajectories, starts, goals, constraints, constraint_type in val_loader:
                 if config['use_ema']:
                     test_model = ema_model
                 else:
@@ -96,12 +99,15 @@ def train_model(trajectory_sampler, train_loader, val_loader, config):
                 starts = starts[:B].reshape(-1, 7)
                 goals = goals[:B].reshape(-1, 2)
                 true_trajectories = trajectories[:B].to(device='cuda:0')
-                constraints = constraints[:B].reshape(-1, 5).to(device='cuda:0')
-                constraint_idx = constraint_idx[:B].reshape(-1).to(device='cuda:0')
+                constraints = constraints[:B].reshape(-1, 4).to(device='cuda:0')
+                constraint_type = constraint_type[:B].to(device='cuda:0').reshape(B)
+                constraint_type = torch.nn.functional.one_hot(constraint_type, num_classes=2).float()
 
                 s = starts.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
                 g = goals.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
                 c = constraints.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
+                ctype = constraint_type.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
+                c = torch.cat([c, ctype], dim=1).unsqueeze(1)
                 with torch.no_grad():
                     trajectories = test_model.sample(s, g, c)
                 # unnormalize starts
@@ -124,32 +130,30 @@ def train_model(trajectory_sampler, train_loader, val_loader, config):
 
                 goals = g.reshape(B, N, 2)
                 constraints = constraints.reshape(B, -1)
-                height = constraints[:, 0]
-                height_error = ee_trajectories[:, :, :, 2] - height[:, None, None]
-                # print(height_error.abs().mean())
-                centres = constraints[:, 1:].reshape(B, 2, 2)
 
                 fig, axes = plt.subplots(3, 3, figsize=(12, 12), subplot_kw=dict(projection='3d'))
                 axes = axes.flatten()
-                for i, (s_ee, t_ee, h, c, g) in enumerate(zip(ee_trajectories,
+                for i, (s_ee, t_ee, g) in enumerate(zip(ee_trajectories,
                                                               true_ee_trajectories,
-                                                              height,
-                                                              centres, goals)):
+                                                              goals)):
                     s_ee = s_ee.cpu().numpy()
                     t_ee = t_ee.cpu().numpy()
-                    h = h.cpu().numpy()
-                    c = c.cpu().numpy()
-                    g = g.cpu().numpy()
-                    # add 3D cylinder objects to plot
-                    cylinder_1 = data_for_cylinder_along_z(c[0, 0], c[0, 1], h, 0.05, 0.1)
-                    cylinder_2 = data_for_cylinder_along_z(c[1, 0], c[1, 1], h, 0.05, 0.1)
-                    axes[i].plot_surface(*cylinder_1, alpha=0.5, color='r')
-                    axes[i].plot_surface(*cylinder_2, alpha=0.5, color='r')
+                    if constraint_type[i, 0] == 1:
+                        h = constraints[i, 0].cpu().numpy()
+                        # plot the table
+                        xx, yy = np.meshgrid(np.linspace(0.4, 1.0, 10), np.linspace(0.1, 0.8, 10))
+                        zz = np.ones_like(xx) * h
+                        axes[i].plot_surface(xx, yy, zz, alpha=0.25, color='k')
+                    else:
+                        c = constraints[i].reshape(2, 2).cpu().numpy()
+                        h = t_ee[0, 2]
+                        # add 3D cylinder objects to plot
+                        cylinder_1 = data_for_cylinder_along_z(c[0, 0], c[0, 1], h, 0.05, 0.2)
+                        cylinder_2 = data_for_cylinder_along_z(c[1, 0], c[1, 1], h, 0.05, 0.2)
+                        axes[i].plot_surface(*cylinder_1, alpha=0.5, color='r')
+                        axes[i].plot_surface(*cylinder_2, alpha=0.5, color='r')
 
-                    # plot the table
-                    xx, yy = np.meshgrid(np.linspace(0.4, 1.0, 10), np.linspace(0.1, 0.8, 10))
-                    zz = np.ones_like(xx) * h
-                    axes[i].plot_surface(xx, yy, zz, alpha=0.25, color='k')
+                    g = g.cpu().numpy()
                     # circle1 = plt.Circle((c[0, 0], c[0, 1]), 0.1, color='r')
                     # circle2 = plt.Circle((c[1, 0], c[1, 1]), 0.1, color='r')
                     # axes[i].add_patch(circle1)
@@ -164,7 +168,8 @@ def train_model(trajectory_sampler, train_loader, val_loader, config):
                     axes[i].view_init(azim=-60, elev=-135)
                     axes[i].set_xlabel('x')
                     axes[i].set_ylabel('y')
-                    axes[i].set_zlim(h - 0.15, h + 0.15)
+                    if constraint_type[i, 0] == 1:
+                        axes[i].set_zlim(h - 0.15, h + 0.15)
                     axes[i].grid(False)
                 plt.tight_layout()
                 plt.savefig(
@@ -182,8 +187,8 @@ def train_model(trajectory_sampler, train_loader, val_loader, config):
 if __name__ == "__main__":
     torch.set_float32_matmul_precision('high')
     config = yaml.safe_load(
-        pathlib.Path(f'{CCAI_PATH}/config/training_configs/victor_table_flow_matching.yaml').read_text())
-    model = TrajectorySampler(T=12, dx=7, du=0, context_dim=7 + 2 + 5, type=config['model_type'])
+        pathlib.Path(f'{CCAI_PATH}/config/training_configs/victor_table_diffusion.yaml').read_text())
+    model = TrajectorySampler(T=12, dx=7, du=0, context_dim=7 + 2 + 4 + 2, type=config['model_type'])
     from torch.utils.data import DataLoader, RandomSampler
 
     data_path = pathlib.Path(f'{CCAI_PATH}/data/training_data/{config["data_directory"]}')
@@ -199,7 +204,7 @@ if __name__ == "__main__":
     train_sampler = RandomSampler(train_dataset)
     train_loader = DataLoader(train_dataset, batch_size=config['batch_size'],
                               sampler=train_sampler, num_workers=4, pin_memory=True)
-    val_loader = DataLoader(val_dataset, batch_size=128, shuffle=False, num_workers=4)
+    val_loader = DataLoader(val_dataset, batch_size=128, shuffle=True, num_workers=4)
 
     model = model.to(device=config['device'])
     train_model(model, train_loader, val_loader, config)

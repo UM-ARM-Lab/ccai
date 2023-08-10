@@ -243,7 +243,7 @@ class GaussianDiffusion(nn.Module):
         self.guidance_w = guidance_w
         self.horizon = horizon
         self.xu_dim = xu_dim
-        self.model = TemporalUnet(self.horizon, self.xu_dim, cond_dim=context_dim, dim=128)
+        self.model = TemporalUnet(self.horizon, self.xu_dim, cond_dim=context_dim, dim=32)
         self.objective = objective
 
         beta_schedule_fn = cosine_beta_schedule
@@ -345,7 +345,7 @@ class GaussianDiffusion(nn.Module):
         return posterior_mean, posterior_variance, posterior_log_variance_clipped
 
     def model_predictions(self, x, t, context):
-        guidance_weights = [1.6, 0.6]
+        guidance_weights = [1.2, 1.2]
         if context is not None:
             num_constraints = context.shape[1]
             # classifier free guidance

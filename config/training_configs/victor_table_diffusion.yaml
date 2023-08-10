@@ -1,13 +1,13 @@
 ---
-model_name: 'victor_table'
+model_name: 'victor_table_compose'
 load_model: 'none'
 epochs: 500
 batch_size: 256
 lr: 1.0e-4
 model_type: 'diffusion'
-data_directory: 'victor_table'
+data_directory: 'victor_table_compose'
 device: 'cuda:0'
-test_every: 1
+test_every: 10
 normalize_data: True
 # only applied to training with csvto gradient
 use_csvto_gradient: False

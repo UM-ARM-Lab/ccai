@@ -110,23 +110,27 @@ class VictorTableMultiConstraintTrajectoryDataset(Dataset):
     def __init__(self, fpaths):
         goals = []
         trajectories = []
-        object_centres = []
-        height = []
+        constraints = []
+        constraint_type = []
 
         for fpath in fpaths:
             path = pathlib.Path(fpath)
             for p in path.rglob('*trajectory.npz'):
-                data = np.load(p)
+                data = np.load(p, allow_pickle=True)
+
+                if data['obs'].reshape(-1)[0] is not None:
+                    constraints.append(data['obs'].reshape(-1))
+                    constraint_type.append(np.array([1]))
+                else:
+                    constraints.append(np.array([data['height'], 0.0, 0.0, 0.0]).reshape(-1))
+                    constraint_type.append(np.array([0]))
+
                 goals.append(data['goal'])
-                object_centres.append(data['obs'].reshape(-1))
-                height.append(data['height'])
                 trajectories.append(data['traj'])
         self.goals = np.stack(goals, axis=0)
         self.trajectories = np.stack(trajectories, axis=0)
-        object_centres = np.stack(object_centres, axis=0)
-        height = np.stack(height, axis=0)
-        # height and object centre define constraints
-        self.constraints = np.concatenate((height.reshape(-1, 1), object_centres), axis=1)
+        self.constraints = np.stack(constraints, axis=0)
+        self.constraint_type = np.stack(constraint_type, axis=0)
         self.num_trials, self.num_steps, self.num_particles, horizon, xu_dim = self.trajectories.shape
 
         self.xu_mean = None
@@ -158,7 +162,7 @@ class VictorTableMultiConstraintTrajectoryDataset(Dataset):
                 torch.from_numpy(self.trajectories[trial_idx, step_idx, particle_idx, 0]).to(dtype=torch.float32),
                 torch.from_numpy(self.goals[trial_idx]).to(dtype=torch.float32),
                 torch.from_numpy(self.constraints[trial_idx]).to(dtype=torch.float32),
-                torch.tensor([trial_idx])
+                torch.from_numpy(self.constraint_type[trial_idx]).to(dtype=torch.long)
                 )
 
 

@@ -77,7 +77,7 @@ class TemporalUnet(nn.Module):
         )
 
         self.time_mlp = nn.Sequential(
-            nn.Linear(cond_dim + + 32 + 32 - 2, 256),
+            nn.Linear(cond_dim + 32 + 32 - 2, 256),
             nn.Mish()
             # nn.Linear(256, 256)
         )
