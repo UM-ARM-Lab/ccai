@@ -110,6 +110,6 @@ class RBFKernel:
         K = sigma_sq * torch.exp(-0.5 * sq_diff / h)
         grad_K = - sigma_sq * diff * K.reshape(n, m, 1) / h
         hess_K = diff.reshape(n, m, d, 1) @ diff.reshape(n, m, 1, d) * K.reshape(n, m, 1, 1) / h ** 2
-        hess_K = hess_K - torch.diag_embed(K.reshape(n, m, 1).repeat(1, 1, d)) / h
+        hess_K = hess_K - torch.diag_embed(K.reshape(n, m, 1).expand(-1, -1, d)) / h
         hess_K = hess_K * sigma_sq
         return K, grad_K, hess_K

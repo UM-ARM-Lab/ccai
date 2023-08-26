@@ -31,11 +31,12 @@ class Constrained_SVGD_MPC:
 
         self.problem.update(state, T=new_T, **kwargs)
         if self.flow_model is not None:
+            self.flow_model.model.diffusion_model.problem = self.problem
             state_norm = (state - self.flow_model.x_mean[:self.problem.dx]) / self.flow_model.x_std[:self.problem.dx]
 
-            sampled_x = self.flow_model.sample(state_norm.repeat(self.N, 1),
-                                               self.problem.goal[:3].repeat(self.N, 1),
-                                               constr_param.repeat(self.N, 1, 1))
+            sampled_x = self.flow_model.sample(state_norm.expand(self.N, -1),
+                                               self.problem.goal[:3].expand(self.N, -1),
+                                               constr_param.expand(self.N, -1, -1))
             sampled_x = sampled_x.detach()
             # want to choose between sampled x and current x
             all_x = torch.cat((sampled_x, self.x), dim=0)

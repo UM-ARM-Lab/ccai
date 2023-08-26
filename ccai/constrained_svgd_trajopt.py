@@ -39,11 +39,10 @@ class ConstrainedSteinTrajOpt:
         grad_J, hess_J, K, grad_K, C, dC, hess_C = self.problem.eval(xuz)
         with torch.no_grad():
             # we try and invert the dC dCT, if it is singular then we use the psuedo-inverse
-            eye = torch.eye(self.dg + self.dh).repeat(N, 1, 1).to(device=C.device)
+            eye = torch.eye(self.dg + self.dh).expand(N, -1, -1).to(device=C.device)
             dCdCT = dC @ dC.permute(0, 2, 1)
             A_bmm = lambda x: dCdCT @ x
             #
-
             try:
                 dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1), eye)
                 if torch.any(torch.isnan(dCdCT_inv)):
@@ -95,7 +94,7 @@ class ConstrainedSteinTrajOpt:
                                    dim=-2)
 
                 first_term = projection.unsqueeze(0) @ grad_K @ projection.unsqueeze(1)
-                K_extended = torch.eye(self.T * d + self.dh, self.T * d + self.dh, device=xuz.device).repeat(N, N, 1, 1)
+                K_extended = torch.eye(self.T * d + self.dh, self.T * d + self.dh, device=xuz.device).expand(N, N, -1, -1)
                 K_extended[:, :, :self.T * d, :self.T * d] = K
                 first_term = torch.sum(first_term, dim=3)
                 matrix_K = projection.unsqueeze(0) @ K_extended @ projection.unsqueeze(1)
@@ -145,8 +144,8 @@ class ConstrainedSteinTrajOpt:
 
     def _clamp_in_bounds(self, xuz):
         N = xuz.shape[0]
-        min_x = self.problem.x_min.reshape(1, 1, -1).repeat(1, self.problem.T, 1)
-        max_x = self.problem.x_max.reshape(1, 1, -1).repeat(1, self.problem.T, 1)
+        min_x = self.problem.x_min.reshape(1, 1, -1).expand(-1, self.problem.T, -1)
+        max_x = self.problem.x_max.reshape(1, 1, -1).expand(-1, self.problem.T, -1)
         if self.problem.dz > 0:
             min_x = torch.cat((min_x, -1e3 * torch.ones(1, self.problem.T, self.problem.dz)), dim=-1)
             max_x = torch.cat((max_x, 1e3 * torch.ones(1, self.problem.T, self.problem.dz)), dim=-1)
@@ -175,7 +174,7 @@ class ConstrainedSteinTrajOpt:
         # compute projection for noise
         dCdCT = dC @ dC.permute(0, 2, 1)
         A_bmm = lambda x: dCdCT @ x
-        eye = torch.eye(self.dg + self.dh).repeat(N, 1, 1).to(device=C.device)
+        eye = torch.eye(self.dg + self.dh).expand(N, -1, -1).to(device=C.device)
         try:
             dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1), eye)
             if torch.any(torch.isnan(dCdCT_inv)):

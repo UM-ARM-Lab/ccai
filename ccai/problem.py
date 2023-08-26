@@ -98,7 +98,7 @@ class ConstrainedSVGDProblem(Problem):
         # Hessians - second derivative wrt z should be identity
         # partial derivatives dx dz should be zero
         # eye is (N, T, dz, dz, dz)
-        eye = torch.diag_embed(torch.eye(self.dz, device=self.device)).repeat(N, self.T, 1, 1, 1)
+        eye = torch.diag_embed(torch.eye(self.dz, device=self.device)).expand(N, self.T, -1, -1, -1)
         # make eye (N, T, dz, T, dz, T, dz)
         eye = torch.diag_embed(torch.diag_embed(eye.permute(0, 2, 3, 4, 1)))
         eye = eye.permute(0, 4, 1, 5, 2, 6, 3)
@@ -166,7 +166,7 @@ class ConstrainedSVGDProblem(Problem):
         # Hessians - second derivative wrt z should be identity
         # partial derivatives dx dz should be zero
         # eye is (N, T, dz, dz, dz)
-        eye = torch.diag_embed(torch.eye(self.dz, device=self.device)).repeat(N, self.T, 1, 1, 1)
+        eye = torch.diag_embed(torch.eye(self.dz, device=self.device)).expand(N, self.T, -1, -1, -1)
         # make eye (N, T, dz, T, dz, T, dz)
         eye = torch.diag_embed(torch.diag_embed(eye.permute(0, 2, 3, 4, 1)))
         eye = eye.permute(0, 4, 1, 5, 2, 6, 3)
@@ -270,7 +270,7 @@ class IpoptProblem(Problem):
 
     def get_bounds(self):
         prob_dim = self.T * (self.dx + self.du)
-        ub = self.x_max.reshape(1, self.dx + self.du).repeat(self.T, 1).reshape(-1)
+        ub = self.x_max.reshape(1, self.dx + self.du).expand(self.T, -1).reshape(-1)
         lb = - ub
         return lb, ub
 
@@ -322,9 +322,9 @@ class UnconstrainedPenaltyProblem(Problem):
         if g is not None:
             J = J + self.penalty * torch.sum(g.abs(), dim=1)
         N, T, _ = x.shape
-        J = J + torch.where(x > self.x_max.repeat(N, T, 1).to(device=self.device), self.penalty * torch.ones_like(x),
+        J = J + torch.where(x > self.x_max.expand(N, T, -1).to(device=self.device), self.penalty * torch.ones_like(x),
                             torch.zeros_like(x)).sum(dim=1).sum(dim=1)
-        J = J + torch.where(x < self.x_min.repeat(N, T, 1).to(device=self.device), self.penalty * torch.ones_like(x),
+        J = J + torch.where(x < self.x_min.expand(N, T, -1).to(device=self.device), self.penalty * torch.ones_like(x),
                             torch.zeros_like(x)).sum(dim=1).sum(dim=1)
 
         return J

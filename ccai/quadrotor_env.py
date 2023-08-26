@@ -39,6 +39,8 @@ class QuadrotorEnv:
                                                      torch.from_numpy(data['z']).to(dtype=torch.float32))
 
             self.obs_plotting_vars = self._get_plotting_vars(self.obstacle_model)
+        else:
+            self.obstacle_model = None
 
         self.alpha = 0.5
         self.ax = None
