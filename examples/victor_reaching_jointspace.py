@@ -249,7 +249,7 @@ class VictorReacherProblem(ConstrainedSVGDProblem):
         # grad_J = grad_J_augmented
         # hess_J = hess_J_augmented.mean(dim=0)
 
-        print(G.abs().max(), G.abs().mean(), J)
+        #print(G.abs().max(), G.abs().mean(), J)
         return grad_J.detach(), hess_J, K.detach(), grad_K.detach(), G.detach(), dG.detach(), hessG.detach()
 
     def update(self, start, goal=None, T=None):
@@ -431,8 +431,8 @@ def do_trial(env, params, fpath):
                     gym.draw_viewer(viewer, sim, False)
                     gym.sync_frame_time(sim)
 
-        full_x = torch.cat((x, problem.right_arm), dim=0).reshape(1, 14)
-        problem.robot_scene.visualize_robot(full_x)
+        #full_x = torch.cat((x, problem.right_arm), dim=0).reshape(1, 14)
+        #problem.robot_scene.visualize_robot(full_x)
 
         if params['simulate']:
             env.step(x.reshape(1, 7).to(device=env.device))
