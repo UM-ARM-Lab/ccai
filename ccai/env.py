@@ -125,7 +125,7 @@ def generate_random_sphere_sdf(max_spheres, min_spheres, max_rad, min_rad, range
     return sdf_val, grad_sdf, hess_sdf
 
 
-def convert_sdf_to_mesh(sdf_grid, range_per_dim, device='cpu'):
+def convert_sdf_to_mesh(sdf_grid, range_per_dim, name, device='cpu'):
     sdf_size = sdf_grid.shape[0]
     occupancy = np.where(sdf_grid > 0, 1, 0)
     # occupancy = np.zeros_like(occupancy)
@@ -143,10 +143,9 @@ def convert_sdf_to_mesh(sdf_grid, range_per_dim, device='cpu'):
     mesh = o3d.geometry.TriangleMesh()
     mesh.vertices = o3d.utility.Vector3dVector(verts)
     mesh.triangles = o3d.utility.Vector3iVector(faces)
-    o3d.io.write_triangle_mesh('tmp.obj', mesh)
-
+    o3d.io.write_triangle_mesh(f'{name}.obj', mesh)
     # scale = 1
-    sdf_from_mesh = pv.MeshSDF(pv.MeshObjectFactory('tmp.obj', scale=scale))
+    sdf_from_mesh = pv.MeshSDF(pv.MeshObjectFactory(f'{name}.obj', scale=scale))
     mesh_range_per_dim = range_per_dim.copy()
     mesh_range_per_dim[:, 0] -= 0.5
     mesh_range_per_dim[:, 1] += 0.5
@@ -159,25 +158,31 @@ def convert_sdf_to_mesh(sdf_grid, range_per_dim, device='cpu'):
 
 
 def generate_random_sphere_world(max_spheres, min_spheres, max_rad, min_rad, range_per_dim, sdf_size, device='cpu',
-                                 plot=False):
+                                 plot=False, name='tmp'):
     sdf_grid, _, _ = generate_random_sphere_sdf(max_spheres, min_spheres, max_rad, min_rad, range_per_dim, sdf_size,
                                                 plot)
 
-    cache_sdf_from_mesh = convert_sdf_to_mesh(sdf_grid, range_per_dim, device=device)
+    cache_sdf_from_mesh = convert_sdf_to_mesh(sdf_grid, range_per_dim, name, device=device)
     return sdf_grid, cache_sdf_from_mesh
 
 
 if __name__ == "__main__":
-    np.random.seed(123)
+    np.random.seed(2464)
+    #np.random.seed(1234)
     sdf_size = 64
     range_per_dim = np.array([[-0.5, 0.5], [-0.5, 0.5], [-0.5, 0.5]])
-    sdf_grid, sdf_grad, sdf_hess = generate_random_sphere_sdf(2,
-                                                              1,
-                                                              0.6,
-                                                              0.4,
-                                                              range_per_dim,
-                                                              sdf_size)
-    sdf_mesh = convert_sdf_to_mesh(sdf_grid, range_per_dim)
+    for i in range(1, 21):
+        if i in [1, 10, 12, 19]:
+            continue
+        sdf_grid, sdf_grad, sdf_hess = generate_random_sphere_sdf(7,
+                                                               3,
+                                                               0.15,
+                                                               0.075,
+                                                               range_per_dim,
+                                                               sdf_size)
+        sdf_mesh = convert_sdf_to_mesh(sdf_grid, range_per_dim, name=f'floating_spheres_{i}')
+
+        np.savez(f'floating_spheres_{i}.npz', sdf_grid=sdf_grid, sdf_grad=sdf_grad, sdf_hess=sdf_hess)
 
     # reconstruct sdf_grid from mesh
     xx, yy, zz = np.meshgrid(np.linspace(range_per_dim[0, 0], range_per_dim[0, 1], sdf_size),

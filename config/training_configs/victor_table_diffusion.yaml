@@ -1,14 +1,16 @@
 ---
-model_name: 'victor_table_compose'
+model_name: 'victor_compose_2'
 load_model: 'none'
-epochs: 500
+epochs: 100
 batch_size: 256
 lr: 1.0e-4
 model_type: 'diffusion'
-data_directory: 'victor_table_compose'
+data_directory: 'victor_compose'
 device: 'cuda:0'
 test_every: 10
+save_every: 10
 normalize_data: True
+constraint_embedding_dim: 64
 # only applied to training with csvto gradient
 use_csvto_gradient: False
 num_samples: 16

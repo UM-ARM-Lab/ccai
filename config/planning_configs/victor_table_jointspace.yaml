@@ -1,14 +1,16 @@
 ---
 T: 12
 receding_horizon: True
-num_steps: 20
-num_trials: 20
+num_steps: 10
+num_trials: 5000
 visualize: False
-simulate: True
-experiment_name: 'victor_table_jointspace_test_composable_diffusion'
-random_env: False
-include_obstacles: True
+simulate: False
+experiment_name: 'victor_table_jointspace_train_new_1'
+random_env: True
+include_obstacles: False
 include_table: True
+obstacle_type: 'none'
+table_height: 'random'
 controllers:
   csvgd:
     N: 16
@@ -19,53 +21,81 @@ controllers:
     device: 'cuda:0'
     online_iters: 10
     warmup_iters: 100
-    resample_steps: 1
+    resample_steps: 5
     resample_sigma: 0.01
     resample_temperature: 0.1
     penalty: 100
     flow_model: 'none'
-  csvgd_diffusion:
-    N: 16
-    alpha_J: 5.0e-3
-    alpha_C: 1
-    step_size: 0.25
-    momentum: 0.
-    device: 'cuda:0'
-    online_iters: 10
-    warmup_iters: 100
-    resample_steps: 5
-    resample_sigma: 0.01
-    resample_temperature: 0.1
-    penalty: 100
-    flow_model: 'data/training/victor_table/victor_table_compose_diffusion/victor_table_diffusion.pt'
-  csvgd_diffusion_obs_only:
-    N: 16
-    alpha_J: 5.0e-3
-    alpha_C: 1
-    step_size: 0.25
-    momentum: 0.
-    device: 'cuda:0'
-    online_iters: 10
-    warmup_iters: 100
-    resample_steps: 5
-    resample_sigma: 0.01
-    resample_temperature: 0.1
-    penalty: 100
-    flow_model: 'data/training/victor_table/victor_table_compose_diffusion/victor_table_diffusion.pt'
-  csvgd_diffusion_table_only:
-    N: 16
-    alpha_J: 5.0e-3
-    alpha_C: 1
-    step_size: 0.25
-    momentum: 0.
-    device: 'cuda:0'
-    online_iters: 10
-    warmup_iters: 100
-    resample_steps: 5
-    resample_sigma: 0.01
-    resample_temperature: 0.1
-    penalty: 100
-    flow_model: 'data/training/victor_table/victor_table_compose_diffusion/victor_table_diffusion.pt'
+#  csvgd_table_and_obstacle_diffusion:
+#    N: 16
+#    alpha_J: 5.0e-3
+#    alpha_C: 1
+#    step_size: 0.25
+#    momentum: 0.
+#    device: 'cuda:0'
+#    online_iters: 10
+#    warmup_iters: 100
+#    resample_steps: 5
+#    resample_sigma: 0.01
+#    resample_temperature: 0.1
+#    penalty: 100
+#    flow_model: 'data/training/victor_table/victor_compose_2_diffusion/checkpoint.pth'
+#  csvgd_table_diffusion:
+#      N: 16
+#      alpha_J: 5.0e-3
+#      alpha_C: 1
+#      step_size: 0.25
+#      momentum: 0.
+#      device: 'cuda:0'
+#      online_iters: 10
+#      warmup_iters: 100
+#      resample_steps: 5
+#      resample_sigma: 0.01
+#      resample_temperature: 0.1
+#      penalty: 100
+#      flow_model: 'data/training/victor_table/victor_compose_2_diffusion/checkpoint.pth'
+#  csvgd_obstacle_diffusion:
+#      N: 16
+#      alpha_J: 5.0e-3
+#      alpha_C: 1
+#      step_size: 0.25
+#      momentum: 0.
+#      device: 'cuda:0'
+#      online_iters: 10
+#      warmup_iters: 100
+#      resample_steps: 5
+#      resample_sigma: 0.01
+#      resample_temperature: 0.1
+#      penalty: 100
+#      flow_model: 'data/training/victor_table/victor_compose_2_diffusion/checkpoint.pth'
+#  csvgd_diffusion_obs_only:
+#    N: 16
+#    alpha_J: 5.0e-3
+#    alpha_C: 1
+#    step_size: 0.25
+#    momentum: 0.
+#    device: 'cuda:0'
+#    online_iters: 10
+#    warmup_iters: 100
+#    resample_steps: 5
+#    resample_sigma: 0.01
+#    resample_temperature: 0.1
+#    penalty: 100
+#    flow_model: 'data/training/victor_table/victor_table_compose_diffusion/victor_table_diffusion.pt'
+#  csvgd_diffusion_table_only:
+#    N: 16
+#    alpha_J: 5.0e-3
+#    alpha_C: 1
+#    step_size: 0.25
+#    momentum: 0.
+#    device: 'cuda:0'
+#    online_iters: 10
+#    warmup_iters: 100
+#    resample_steps: 5
+#    resample_sigma: 0.01
+#    resample_temperature: 0.1
+#    penalty: 100
+#    flow_model: 'data/training/victor_table/victor_table_compose_diffusion/victor_table_diffusion.pt'
 #  ipopt:
 #    device: 'cpu'
 #    online_iters: 10

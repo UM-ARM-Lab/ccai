@@ -166,5 +166,101 @@ class VictorTableMultiConstraintTrajectoryDataset(Dataset):
                 )
 
 
+class VictorConstraintDataset(Dataset):
+
+    def __init__(self):
+        self.xu_mean = None
+        self.xu_std = None
+
+    def compute_norm_constants(self):
+        self.xu_mean = np.mean(self.trajectories, axis=(0, 1, 2, 3))
+        self.xu_std = np.std(self.trajectories, axis=(0, 1, 2, 3))
+        self.trajectories = (self.trajectories - self.xu_mean) / self.xu_std
+
+    def set_norm_constants(self, xu_mean, xu_std):
+        self.xu_mean = xu_mean
+        self.xu_std = xu_std
+        self.trajectories = (self.trajectories - self.xu_mean) / self.xu_std
+
+    def get_norm_constants(self):
+        return self.xu_mean, self.xu_std
+
+    def __len__(self):
+        return self.num_trials * self.num_steps * self.num_particles
+
+    def __getitem__(self, idx):
+        trial_idx = idx // (self.num_steps * self.num_particles)
+        step_particle_idx = idx % (self.num_steps * self.num_particles)
+        step_idx = step_particle_idx // self.num_particles
+        particle_idx = step_particle_idx % self.num_particles
+        # trajectory, goal, start
+        return (self.trajectories[trial_idx, step_idx, particle_idx],
+                self.trajectories[trial_idx, step_idx, particle_idx, 0],
+                self.goals[trial_idx],
+                self.constraints[trial_idx]
+                )
+
+        return (torch.from_numpy(self.trajectories[trial_idx, step_idx, particle_idx]).to(dtype=torch.float32),
+                torch.from_numpy(self.trajectories[trial_idx, step_idx, particle_idx, 0]).to(dtype=torch.float32),
+                torch.from_numpy(self.goals[trial_idx]).to(dtype=torch.float32),
+                torch.from_numpy(self.constraints[trial_idx]).to(dtype=torch.float32),
+                )
+
+
+class VictorTableHeightDataset(VictorConstraintDataset):
+
+    def __init__(self, fpaths):
+        super().__init__()
+        goals = []
+        trajectories = []
+        constraints = []
+        constraint_type = []
+
+        for fpath in fpaths:
+            path = pathlib.Path(fpath)
+            print(path)
+            goal = np.zeros(3)
+            for p in path.rglob('*trajectory.npz'):
+                data = np.load(p, allow_pickle=True)
+                constraints.append(np.array([data['height']]).reshape(-1))
+                goal[:2] = data[('goal')]
+                goal[2] = data['height']
+                goals.append(goal.copy())
+                trajectories.append(data['traj'])
+        self.goals = np.stack(goals, axis=0)
+        self.trajectories = np.stack(trajectories, axis=0)
+        self.constraints = np.stack(constraints, axis=0)
+        self.num_trials, self.num_steps, self.num_particles, horizon, xu_dim = self.trajectories.shape
+
+        self.goals = torch.from_numpy(self.goals).to(dtype=torch.float32)
+        self.trajectories = torch.from_numpy(self.trajectories).to(dtype=torch.float32)
+        self.constraints = torch.from_numpy(self.constraints).to(dtype=torch.float32)
+
+
+class VictorReachingDataset(VictorConstraintDataset):
+
+    def __init__(self, fpaths):
+        super().__init__()
+        goals = []
+        trajectories = []
+        constraints = []
+        constraint_type = []
+        print('running init')
+        for fpath in fpaths:
+            path = pathlib.Path(fpath)
+            for p in path.rglob('*trajectory.npz'):
+                data = np.load(p, allow_pickle=True)
+                constraints.append(np.array([data['sdf_grid']]).reshape((1, 64, 64, 64)))
+                goals.append(data['goal'])
+                trajectories.append(data['traj'])
+        self.goals = np.stack(goals, axis=0)
+        self.trajectories = np.stack(trajectories, axis=0)
+        self.constraints = np.stack(constraints, axis=0)
+        self.num_trials, self.num_steps, self.num_particles, horizon, xu_dim = self.trajectories.shape
+
+        self.goals = torch.from_numpy(self.goals).to(dtype=torch.float32)
+        self.trajectories = torch.from_numpy(self.trajectories).to(dtype=torch.float32)
+        self.constraints = torch.from_numpy(self.constraints).to(dtype=torch.float32)
+
 if __name__ == "__main__":
     dataset = QuadrotorSingleConstraintTrajectoryDataset('data/quadrotor_data_collection_single_constraint')

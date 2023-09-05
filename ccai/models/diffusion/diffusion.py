@@ -64,136 +64,6 @@ class ResNet(nn.Module):
         return x
 
 
-class oldGaussianDiffusion(nn.Module):
-
-    def __init__(self, horizon, xu_dim, context_dim, num_timesteps):
-        super().__init__()
-
-        self.horizon = horizon
-        self.xu_dim = xu_dim
-        self.context_dim = context_dim
-        self.net = TemporalUnet(self.horizon, self.xu_dim, cond_dim=context_dim, dim=32)
-
-        self.n_timesteps = num_timesteps
-
-        betas = cosine_beta_schedule(num_timesteps)
-        betas = betas.reshape(-1, 1, 1)
-
-        alphas = 1. - betas
-        alphas_cumprod = torch.cumprod(alphas, dim=0)
-        alphas_cumprod_prev = torch.cat([torch.ones(1, 1, 1), alphas_cumprod], dim=0)
-
-        alphas_cumprod = alphas_cumprod
-        alphas_cumprod_prev = alphas_cumprod_prev
-        self.register_buffer('betas', betas)
-        self.register_buffer('alphas_cumprod', alphas_cumprod)
-        self.register_buffer('alphas_cumprod_prev', alphas_cumprod_prev)
-
-        # calculations for diffusion q(x_t | x_{t-1}) and others
-        self.register_buffer('sqrt_alphas_cumprod', torch.sqrt(alphas_cumprod))
-        self.register_buffer('sqrt_one_minus_alphas_cumprod', torch.sqrt(1. - alphas_cumprod))
-        self.register_buffer('log_one_minus_alphas_cumprod', torch.log(1. - alphas_cumprod))
-        self.register_buffer('sqrt_recip_alphas_cumprod', torch.sqrt(1. / alphas_cumprod))
-        self.register_buffer('sqrt_recipm1_alphas_cumprod', 1.0 / torch.sqrt(1 - alphas_cumprod))
-
-        self.register_buffer('sqrt_alphas_cumprod_prev', torch.sqrt(alphas_cumprod_prev))
-        self.register_buffer('sqrt_one_minus_alphas_cumprod_prev', torch.sqrt(1. - alphas_cumprod_prev))
-        self.register_buffer('sqrt_recip_alphas_cumprod_prev', torch.sqrt(1. / alphas_cumprod_prev))
-
-        posterior_variance = betas * (1. - alphas_cumprod_prev[:-1]) / (1. - alphas_cumprod)
-        self.register_buffer('posterior_variance', posterior_variance)
-
-        ## log calculation clipped because the posterior variance
-        ## is 0 at the beginning of the diffusion chain
-        self.register_buffer('posterior_log_variance_clipped',
-                             torch.log(torch.clamp(posterior_variance, min=1e-20)))
-        # self.register_buffer('posterior_mean_coef1',
-        #                     betas * np.sqrt(alphas_cumprod_prev) / (1. - alphas_cumprod))
-        # self.register_buffer('posterior_mean_coef2',
-        #                     (1. - alphas_cumprod_prev) * np.sqrt(alphas) / (1. - alphas_cumprod))
-
-        self.register_buffer('posterior_mean_coef',
-                             betas / torch.sqrt(1 - alphas_cumprod))
-
-    def sample_q(self, x_start, t, noise=None):
-        """
-        sample from the forward diffusion q(x_t | x0)
-        """
-        if noise is None:
-            noise = torch.randn_like(x_start)
-
-        return self.sqrt_alphas_cumprod[t] * x_start + self.sqrt_one_minus_alphas_cumprod[t] * noise
-
-    @torch.no_grad()
-    def sample_p(self, N, context, x=None):
-        """
-        sample from the reverse diffusion p(x0 | x_t)
-        """
-        B = context.shape[0]
-        if x is None:
-            x = torch.randn(B * N, self.horizon, self.xu_dim, device=self.betas.device)
-
-        context_repeated = context.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
-        for t in np.arange(self.n_timesteps)[::-1]:
-            if t > 0:
-                z = torch.randn_like(x)
-            else:
-                z = 0
-
-            t_tensor = torch.tensor([t]).long().to(x.device).reshape(1).repeat(B * N)
-            epsilon = self.net(x, t_tensor, context_repeated)
-
-            x = 1 / torch.sqrt(1 - self.betas[t]) * (x - epsilon * self.posterior_mean_coef[t]) + \
-                torch.sqrt(self.betas[t]) * z
-        return x.reshape(B, N, -1)
-
-    @torch.no_grad()
-    def sample_ddim(self, N, context, x=None, subsample=10):
-        """
-        sample from the reverse diffusion using Denoising Diffusion Implicit Models formulation
-        """
-        B = context.shape[0]
-        if x is None:
-            x = torch.randn(B * N, self.horizon, self.xu_dim, device=self.betas.device)
-
-        context_repeated = context.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
-
-        # sigma_t = 0
-        subsampled_t = np.arange(self.n_timesteps)[::subsample][::-1]
-        seq = np.concatenate((np.array([self.n_timesteps]), subsampled_t[:-1]))
-        prev_seq = subsampled_t
-
-        for t, t_prev in zip(seq, prev_seq):
-            t_tensor = torch.tensor([t]).long().to(x.device).reshape(1).repeat(B * N)
-            epsilon = self.net(x, t_tensor, context_repeated)
-
-            pred_x0 = self.sqrt_alphas_cumprod_prev[t_prev] * (x - self.sqrt_one_minus_alphas_cumprod_prev[t] *
-                                                               self.sqrt_recip_alphas_cumprod_prev[t] * epsilon)
-
-            direction_to_xt = torch.sqrt(1 - self.alphas_cumprod_prev[t]) * epsilon
-
-            x = pred_x0 + direction_to_xt
-
-        return x.reshape(B, N, -1)
-
-    def loss(self, x, context, *args, **kwargs):
-        B = x.shape[0]
-        x = x.reshape(B, self.horizon, self.xu_dim)
-        # randomly sample timestep
-        t = torch.randint(0, self.n_timesteps, (B,), device=x.device).long()
-
-        # sample epsilon
-        epsilon = torch.randn_like(x)
-
-        # predict epsilon
-        x_t = self.sample_q(x, t, epsilon)
-        epilson_pred = self.net(x_t, t, context)
-
-        loss = nn.functional.mse_loss(epilson_pred, epsilon, reduction='mean')
-
-        return loss
-
-
 def extract(a, t, x_shape):
     b, *_ = t.shape
     out = a.gather(-1, t)
@@ -237,13 +107,14 @@ class GaussianDiffusion(nn.Module):
             auto_normalize=True,
             min_snr_loss_weight=False,  # https://arxiv.org/abs/2303.09556
             min_snr_gamma=5,
-            guidance_w=1.2
+            guidance_w=1.2,
+            hidden_dim=32
     ):
         super().__init__()
         self.guidance_w = guidance_w
         self.horizon = horizon
         self.xu_dim = xu_dim
-        self.model = TemporalUnet(self.horizon, self.xu_dim, cond_dim=context_dim, dim=32)
+        self.model = TemporalUnet(self.horizon, self.xu_dim, cond_dim=context_dim, dim=hidden_dim)
         self.objective = objective
 
         beta_schedule_fn = cosine_beta_schedule
@@ -345,7 +216,7 @@ class GaussianDiffusion(nn.Module):
         return posterior_mean, posterior_variance, posterior_log_variance_clipped
 
     def model_predictions(self, x, t, context):
-        guidance_weights = [1.2, 1.2]
+        guidance_weights = [1.2, 0.8]
         if context is not None:
             num_constraints = context.shape[1]
             # classifier free guidance
@@ -394,6 +265,7 @@ class GaussianDiffusion(nn.Module):
             img = self._apply_conditioning(img, condition)
             imgs.append(img)
         ret = img if not return_all_timesteps else torch.stack(imgs, dim=1)
+
         return ret
 
     @torch.no_grad()
@@ -435,7 +307,6 @@ class GaussianDiffusion(nn.Module):
         ret = img if not return_all_timesteps else torch.stack(imgs, dim=1)
         return ret
 
-    @torch.no_grad()
     def sample(self, N, condition, context, return_all_timesteps=False):
         B, num_constraints, dc = context.shape
         context = context.reshape(B, 1, num_constraints, dc).repeat(1, N, 1, 1).reshape(B * N, num_constraints, -1)
@@ -478,3 +349,118 @@ class GaussianDiffusion(nn.Module):
         t = torch.randint(0, self.num_timesteps, (b,), device=device).long()
         return self.p_losses(x, t, context)
 
+    def set_norm_constants(self, mu, std):
+        self.mu = mu
+        self.std = std
+
+class ConstrainedDiffusion(GaussianDiffusion):
+
+    def __init__(
+            self,
+            horizon,
+            xu_dim,
+            context_dim,
+            opt_problem,
+            z_dim,
+            timesteps=1000,
+            sampling_timesteps=10,
+            loss_type='l2',
+            objective='pred_noise',
+            schedule_fn_kwargs=dict(),
+            ddim_sampling_eta=0.,
+            auto_normalize=True,
+            min_snr_loss_weight=False,  # https://arxiv.org/abs/2303.09556
+            min_snr_gamma=5,
+            guidance_w=1.2
+    ):
+        super().__init__(
+            horizon,
+            xu_dim,
+            context_dim,
+            timesteps=timesteps,
+            sampling_timesteps=sampling_timesteps,
+            loss_type=loss_type,
+        )
+        self.problem = opt_problem
+        self.z_dim = z_dim  # dimension of auxiliary variable z (number of inequality constraints)
+
+    def p_sample(self, x, t, context):
+        b, *_, device = *x.shape, x.device
+        batched_times = torch.full((b,), t, device=x.device, dtype=torch.long)
+        with torch.no_grad():
+            model_mean, _, model_log_variance, x_start = self.p_mean_variance(x=x[:, :, :self.xu_dim], t=batched_times, context=context)
+        noise = torch.randn_like(x)[:, :, :self.xu_dim] if t > 0 else 0.  # no noise if t == 0
+
+        # we have to unnormalize first
+        x[:, :, :self.xu_dim] = x[:, :, :self.xu_dim] * self.std + self.mu
+
+        _, dJ, _ = self.problem._objective(x[:, :, :self.xu_dim])
+        C, dC, _ = self.problem.combined_constraints(x)
+        # renormalize
+        x[:, :, :self.xu_dim] = (x[:, :, :self.xu_dim] - self.mu.reshape(1, 1, self.xu_dim)) / self.std.reshape(1, 1, self.xu_dim)
+
+        # normalize grads
+        dJ = dJ.reshape(b, self.horizon, self.xu_dim) / self.std
+        dC = dC.reshape(b, -1, self.horizon, self.xu_dim + self.z_dim) #/ self.std
+        dC[:, :, :, :self.xu_dim] /= self.std
+        dC = dC.reshape(b, -1, self.horizon * (self.xu_dim + self.z_dim))
+
+        #print(t, C.abs().mean())
+
+        with torch.no_grad():
+            unconstrained_new_x = model_mean - 0.015 * dJ.reshape(b, self.horizon, self.xu_dim) + (0.5 * model_log_variance).exp() * noise
+
+            unconstrained_delta_x = unconstrained_new_x - x[:, :, :self.xu_dim]
+            unconstrained_delta_x = torch.cat((unconstrained_delta_x,
+                                               torch.zeros(b, self.horizon, self.problem.dz, device=device)), dim=2)
+            eye = torch.eye(C.shape[1]).repeat(b, 1, 1).to(device=C.device)
+
+            try:
+                dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1), eye)
+            except Exception as e:
+                dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1))
+
+            projection = dC.permute(0, 2, 1) @ dCdCT_inv @ dC
+            # we linearly increase the weight of the projection
+            import math
+            projection_factor = math.exp(-t)#(1.0 - (float(t) / self.num_timesteps))**2
+
+            eye = torch.eye(x.shape[1] * x.shape[2], device=x.device, dtype=x.dtype).unsqueeze(0)
+            constrained_tau_update = (eye - projection_factor * projection) @ unconstrained_delta_x.reshape(b, -1, 1)
+
+            xi_C = dCdCT_inv @ C.unsqueeze(-1)
+            xi_C = (dC.permute(0, 2, 1) @ xi_C).squeeze(-1)
+
+            #xi_C = torch.mean(dC, dim=1)
+            eta = 0.1 * (1.0 - (float(t) / self.num_timesteps))
+            # new constrained update rule
+            pred_x = x + constrained_tau_update.reshape(b, self.horizon, -1) - eta * xi_C.reshape(b, self.horizon, -1)
+
+        return pred_x, x_start
+
+    def p_sample_loop(self, shape, condition, context, return_all_timesteps=False):
+        batch, T, xu_dim = shape
+        device = context.device
+
+        trajectory = torch.randn(shape, device=device)
+        z = self.problem.get_initial_z(trajectory)
+
+        # what should we initialize z to? try zero to start
+
+        augmented_trajectory = torch.cat((trajectory, z), dim=-1)
+        augmented_trajectory = self._apply_conditioning(augmented_trajectory, condition)
+        trajectories = [augmented_trajectory]
+
+        for t in reversed(range(0, self.num_timesteps)):
+            augmented_trajectory, x_start = self.p_sample(augmented_trajectory, t, context)
+            augmented_trajectory = self._apply_conditioning(augmented_trajectory, condition)
+            trajectories.append(augmented_trajectory)
+        ret = augmented_trajectory[:, :, :self.xu_dim] if not return_all_timesteps else torch.stack(trajectories, dim=1)
+
+        return ret
+
+    def model_predictions(self, x, t, context):
+        model_output = self.model.compiled_unconditional_test(t, x)
+        pred_noise = model_output
+        x_start = self.predict_start_from_noise(x, t, pred_noise)
+        return ModelPrediction(pred_noise, x_start)

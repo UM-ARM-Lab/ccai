@@ -1,6 +1,7 @@
 import numpy as np
 from isaacgym.torch_utils import quat_apply
-from isaac_victor_envs.tasks.victor import VictorPuckObstacleEnv2, orientation_error, quat_change_convention
+from isaac_victor_envs.tasks.victor import VictorPuckObstacleEnv2, orientation_error, quat_change_convention, \
+    VictorFloatingSpheresTableEnv, VictorPuckObstacleEnv
 from isaac_victor_envs.utils import get_assets_dir
 import torch
 import time
@@ -21,6 +22,8 @@ import time
 import pytorch_kinematics as pk
 
 from quadrotor_learn_to_sample import TrajectorySampler
+from ccai.models.constraint_embedding.vae import Conv3DEncoder
+from ccai.models.helpers import SinusoidalPosEmb
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 asset_dir = get_assets_dir()
@@ -28,11 +31,22 @@ asset = asset_dir + '/victor/victor_mallet.urdf'
 ee_name = 'victor_left_arm_striker_mallet_tip'
 chain = pk.build_serial_chain_from_urdf(open(asset).read(), ee_name)
 chain_cc = pk.build_chain_from_urdf(open(asset).read())
+collision_check_links = [
+    'victor_left_arm_link_2',
+    'victor_left_arm_link_3',
+    'victor_left_arm_link_4',
+    'victor_left_arm_link_5',
+    'victor_left_arm_link_6',
+    'victor_left_arm_link_7',
+    'victor_left_arm_striker_base',
+    'victor_left_arm_striker_mallet'
+]
 
 
 class VictorTableProblem(ConstrainedSVGDProblem):
 
-    def __init__(self, start, goal, T, obstacle_poses, table_height, device='cuda:0'):
+    def __init__(self, start, goal, T, obstacle_poses, table_height, obstacle_type, device='cuda:0',
+                 flow_model=None, constr_params=None):
         super().__init__(start, goal, T, device)
         if obstacle_poses is None:
             self.dz = 0
@@ -51,7 +65,7 @@ class VictorTableProblem(ConstrainedSVGDProblem):
         self.T = T
         self.start = start
         self.goal = goal
-        #self.K = rbf_kernel
+        # self.K = rbf_kernel
         self.K = structured_rbf_kernel
 
         self.grad_kernel = jacrev(rbf_kernel, argnums=0)
@@ -71,28 +85,62 @@ class VictorTableProblem(ConstrainedSVGDProblem):
         # else:
 
         #    self._inequality_constraints = None
-        import pytorch_volumetric as pv
-        sdf = pv.RobotSDF(chain_cc, path_prefix=asset_dir + '/victor')
-        # Load SDFs
-        mug1_sdf = pv.MeshSDF(pv.MeshObjectFactory(f"{asset_dir}/obstacles/mug/mug.obj"))
-        mug2_sdf = pv.MeshSDF(pv.MeshObjectFactory(f"{asset_dir}/obstacles/mug/mug.obj"))
-        pitcher_sdf = pv.MeshSDF(pv.MeshObjectFactory(f"{asset_dir}/obstacles/pitcher/pitcher.obj"))
-        # Get transforms
-        obstacle_transforms = torch.stack([
-            obstacle_poses['mug1'],
-            obstacle_poses['mug2'],
-            obstacle_poses['pitcher']
-        ]).reshape(-1, 4, 4).inverse()
-        # Compose SDFs
-        scene_sdf = pv.ComposedSDF([mug1_sdf, mug2_sdf, pitcher_sdf],
-                                   pk.Transform3d(matrix=obstacle_transforms))
-        scene_sdf_cached = pv.CachedSDF('scene', resolution=0.01, gt_sdf=scene_sdf, range_per_dim=np.array([
-            [0.4, 1.0],
-            [-0.3, 1.0],
-            [0.6, 1.5]
-        ]), device=self.device, cache_sdf_hessian=True, clean_cache=False)
+        if obstacle_type != 'none':
+            import pytorch_volumetric as pv
+            sdf = pv.RobotSDF(chain_cc, path_prefix=asset_dir + '/victor')
 
-        self.robot_scene = pv.RobotScene(sdf, scene_sdf_cached, pk.Transform3d(matrix=torch.eye(4, device=self.device)))
+        if 'obstacle_type' == 'tabletop_ycb':
+            # Load SDFs
+            mug1_sdf = pv.MeshSDF(pv.MeshObjectFactory(f"{asset_dir}/obstacles/mug/mug.obj"))
+            mug2_sdf = pv.MeshSDF(pv.MeshObjectFactory(f"{asset_dir}/obstacles/mug/mug.obj"))
+            pitcher_sdf = pv.MeshSDF(pv.MeshObjectFactory(f"{asset_dir}/obstacles/pitcher/pitcher.obj"))
+            # Get transforms
+            obstacle_transforms = torch.stack([
+                obstacle_poses['mug1'],
+                obstacle_poses['mug2'],
+                obstacle_poses['pitcher']
+            ]).reshape(-1, 4, 4).inverse()
+            # Compose SDFs
+            scene_sdf = pv.ComposedSDF([mug1_sdf, mug2_sdf, pitcher_sdf],
+                                       pk.Transform3d(matrix=obstacle_transforms))
+            scene_sdf_cached = pv.CachedSDF('scene', resolution=0.01, gt_sdf=scene_sdf, range_per_dim=np.array([
+                [0.4, 1.0],
+                [-0.3, 1.0],
+                [0.6, 1.5]
+            ]), device=self.device, cache_sdf_hessian=True, clean_cache=False)
+
+            self.robot_scene = pv.RobotScene(sdf, scene_sdf_cached,
+                                             pk.Transform3d(matrix=torch.eye(4,
+                                                                             device=self.device
+                                                                             )
+                                                            ),
+                                             collision_check_links=collision_check_links
+                                             )
+        elif 'floating_spheres' in obstacle_type:
+            T = pk.Transform3d(matrix=torch.tensor([[[1., 0., 0., 0.75],
+                                                     [0., 1., 0., 0.25],
+                                                     [0., 0., 1., 1.],
+                                                     [0., 0., 0., 1.]]], device=device))
+            # Get transforms
+            # Compose SDFs
+            range_per_dim = np.array([[-0.5, 0.5], [-0.5, 0.5], [-0.5, 0.5]])
+            spacing = (range_per_dim[:, 1] - range_per_dim[:, 0]) / 64
+            mesh_range_per_dim = range_per_dim.copy()
+            mesh_range_per_dim[:, 0] -= 0.5
+            mesh_range_per_dim[:, 1] += 0.5
+            scale = 1.0 / (1.0 - spacing)
+            scene_sdf = pv.MeshSDF(pv.MeshObjectFactory(f"{asset_dir}/obstacles/{obstacle_type}/{obstacle_type}.obj",
+                                                        scale=scale))
+
+            scene_sdf_cached = pv.CachedSDF('sphere_world', resolution=spacing[0],
+                                            range_per_dim=mesh_range_per_dim, gt_sdf=scene_sdf,
+                                            cache_sdf_hessian=True,
+                                            clean_cache=True,
+                                            device=self.device)
+
+            self.robot_scene = pv.RobotScene(sdf, scene_sdf_cached, T, collision_check_links=collision_check_links)
+        else:
+            self._inequality_constraints = None
 
         self._terminal_constraints = EndEffectorConstraint(
             chain, partial(ee_terminal_constraint, goal=self.goal)
@@ -110,15 +158,16 @@ class VictorTableProblem(ConstrainedSVGDProblem):
         self.hess_cost = vmap(hessian(partial(cost, start=self.start)))
         self.right_arm = torch.tensor([1.144, -1.189, 0.590, 0.292, 0.296, 0.265, -0.809], device=self.device)
 
-        self.robot_scene.visualize_robot(torch.zeros(1, 14, device=self.device))
-
+        self.flow_model = flow_model
+        self.constr_params = constr_params
+        # self.robot_scene.visualize_robot(torch.zeros(1, 14, device=self.device))
 
     def _inequality_constraints(self, x, compute_grads=True):
         N = x.shape[0]
 
         q = torch.cat((x, self.right_arm.repeat(N, 1)), dim=1)
 
-        ret_scene = self.robot_scene.scene_collision_check(q, compute_grads, compute_hessian=compute_grads)
+        ret_scene = self.robot_scene.scene_collision_check(q, compute_grads, compute_hessian=False)
 
         h = -ret_scene.get('sdf') + 0.05
         grad_h = ret_scene.get('grad_sdf', None)
@@ -166,6 +215,22 @@ class VictorTableProblem(ConstrainedSVGDProblem):
             J = J.reshape(-1) + term_g.reshape(N, self.T).sum(dim=1)
             grad_J = grad_J.reshape(N, self.T, -1) + term_grad_g_extended
             hess_J = hess_J.reshape(N, self.T, self.dx, self.T, self.dx) + term_hess_g_extended
+
+        # add auxiliary grad from diffusion model
+        if self.flow_model is not None:
+            cparams = self.constr_params.expand(N, -1, -1)
+            start_normalized = (self.start - self.flow_model.x_mean[:self.dx]) / self.flow_model.x_std[:self.dx]
+            x_normalized = (x - self.flow_model.x_mean[:self.dx]) / self.flow_model.x_std[:self.dx]
+            start_normalized = start_normalized.expand(N, -1)
+            t = torch.tensor([0], device=self.device, dtype=torch.int64).expand(N)
+            aux_grad = self.flow_model.grad(x_normalized.reshape(N, self.T, self.dx), t=t,
+                                            start=start_normalized,
+                                            goal=self.goal.expand(N, -1),
+                                            constraints=cparams)
+            aux_grad = aux_grad.reshape(N, self.T, self.dx)
+            # unnormalize
+            aux_grad = aux_grad * self.flow_model.x_std[:self.dx]
+            grad_J = grad_J + aux_grad
 
         N = x.shape[0]
         return (self.alpha * J.reshape(N),
@@ -285,7 +350,7 @@ class VictorTableProblem(ConstrainedSVGDProblem):
         # grad_J = grad_J_augmented
         # hess_J = hess_J_augmented.mean(dim=0)
 
-        print(G.abs().max(), G.abs().mean(), J)
+        # print(G.abs().max(), G.abs().mean(), J)
         return grad_J.detach(), hess_J, K.detach(), grad_K.detach(), G.detach(), dG.detach(), hessG.detach()
 
     def update(self, start, goal=None, T=None):
@@ -466,7 +531,7 @@ def ee_terminal_constraint(p, mat, goal):
     :return:
     """
 
-    return 10 * torch.sum((p[:2] - goal.reshape(2)) ** 2).reshape(-1)
+    return 10 * torch.sum((p[:2] - goal.reshape(-1)[:2]) ** 2).reshape(-1)
 
 
 def ee_equality_constraint(p, mat, height):
@@ -534,8 +599,10 @@ def do_trial(env, params, fpath):
         table_height = env.table_height
     else:
         table_height = None
-
-    rads = [0.115, 0.115]
+    flow_model = None
+    env_encoder = None
+    height_encoder = None
+    constr_params = None
     if 'csvgd' in params['controller']:
         if params['flow_model'] != 'none':
             if 'diffusion' in params['flow_model']:
@@ -544,15 +611,46 @@ def do_trial(env, params, fpath):
                 flow_type = 'cnf'
             else:
                 raise ValueError('Invalid flow model type')
-            flow_model = TrajectorySampler(T=params['T'], dx=7, du=0, context_dim=7 + 2 + 4 + 2, type=flow_type)
-            flow_model.load_state_dict(torch.load(f'{CCAI_PATH}/{params["flow_model"]}'))
+            flow_model = TrajectorySampler(T=params['T'], dx=7, du=0, context_dim=7 + 3 + 64 + 2, type=flow_type)
+            flow_model.load_state_dict(torch.load(f'{CCAI_PATH}/{params["flow_model"]}')['ema'])
             flow_model.to(device=params['device'])
-        else:
-            flow_model = None
+
+            if 'obstacle' in params['controller']:
+                env_encoder = Conv3DEncoder(64)
+                env_encoder.load_state_dict(torch.load(f'{CCAI_PATH}/{params["flow_model"]}')['env_encoder'])
+                env_encoder.to(device=params['device'])
+            if 'table' in params['controller']:
+                height_encoder = SinusoidalPosEmb(64)
+                height_encoder.to(device=params['device'])
+
+            # parameterize constraints
+            constr_params = []
+            constr_codes = []
+            if 'floating_spheres' in config['obstacle_type']:
+                sdf_grid = np.load(f'{CCAI_PATH}/{config["obstacle_type"]}.npz')['sdf_grid']
+                sdf_grid = torch.from_numpy(sdf_grid).to(device=params['device']).reshape(1, 1, 64, 64, 64).to(
+                    dtype=torch.float32)
+                if env_encoder is not None:
+                    env_embedding = env_encoder(sdf_grid)
+                    constr_params.append(env_embedding)
+                    constr_codes.append(torch.tensor([[1.0, 0.0]]).to(device=params['device']))
+            if height_encoder is not None:
+                htensor = torch.tensor([table_height]).to(device=params['device']).reshape(-1)
+                height_embedding = height_encoder(htensor)
+                constr_params.append(height_embedding)
+                constr_codes.append(torch.tensor([[0.0, 1.0]]).to(device=params['device']))
+            if len(constr_params) > 0:
+                constr_params = torch.stack(constr_params, dim=0).reshape(1, -1, 64)
+                constr_codes = torch.stack(constr_codes, dim=0).reshape(1, -1, 2)
+                constr_params = torch.cat((constr_params, constr_codes), dim=-1)
+
         params['flow_model'] = flow_model
         problem = VictorTableProblem(start, params['goal'], params['T'], device=params['device'],
                                      obstacle_poses=obstacle_poses,
-                                     table_height=table_height)
+                                     table_height=table_height,
+                                     obstacle_type=params['obstacle_type'],
+                                     flow_model=flow_model,
+                                     constr_params=constr_params)
         controller = Constrained_SVGD_MPC(problem, params)
     elif params['controller'] == 'ipopt':
         problem = VictorTableIpoptProblem(start, params['goal'], params['T'], obstacle_poses=obstacle_poses,
@@ -574,19 +672,6 @@ def do_trial(env, params, fpath):
     actual_trajectory = []
     planned_trajectories = []
     duration = 0
-
-    constr_params = []
-    constr_codes = []
-    #if params['include_table'] and 'obs_only' not in params['controller']:
-    #    constr_params.append(torch.tensor([env.table_height, 0.0, 0.0, 0.0]).to(device=params['device']))
-    #    constr_codes.append(torch.tensor([1.0, 0.0]).to(device=params['device']))
-    #if params['include_obstacles'] and 'table_only' not in params['controller']:
-        #constr_params.append(torch.stack(centres, dim=0).reshape(-1))
-        #constr_codes.append(torch.tensor([0.0, 1.0]).to(device=params['device']))
-
-    #constr_params = torch.stack(constr_params, dim=0).unsqueeze(0)
-    #constr_codes = torch.stack(constr_codes, dim=0).unsqueeze(0)
-    #constr_params = torch.cat((constr_params, constr_codes), dim=-1)
 
     for k in range(params['num_steps']):
         if params['simulate'] or k == 0:
@@ -631,7 +716,10 @@ def do_trial(env, params, fpath):
 
             M = len(trajectories)
             if M > 0:
-                trajectories = chain.forward_kinematics(trajectories[:, :, :7].reshape(-1, 7)).get_matrix().reshape(M, -1, 4, 4)
+                trajectories = chain.forward_kinematics(trajectories[:, :, :7].reshape(-1, 7)).get_matrix().reshape(M,
+                                                                                                                    -1,
+                                                                                                                    4,
+                                                                                                                    4)
                 trajectories = trajectories[:, :, :3, 3]
 
                 traj_line_colors = np.random.random((1, M)).astype(np.float32)
@@ -658,14 +746,14 @@ def do_trial(env, params, fpath):
             gym.clear_lines(viewer)
 
     state = env.get_state()
-    #obs1_pos = state['obs1_pos'][0, :2]
-    #obs2_pos = state['obs2_pos'][0, :2]
+    # obs1_pos = state['obs1_pos'][0, :2]
+    # obs2_pos = state['obs2_pos'][0, :2]
     state = state['q'].reshape(7).to(device=params['device'])
 
-    #obs = torch.stack((obs1_pos, obs2_pos), dim=0).cpu().numpy()
-    #if not params['include_obstacles']:
+    # obs = torch.stack((obs1_pos, obs2_pos), dim=0).cpu().numpy()
+    # if not params['include_obstacles']:
     #    obs = None
-    obs=None
+    obs = None
     actual_trajectory.append(state.clone())
 
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 7)
@@ -676,14 +764,20 @@ def do_trial(env, params, fpath):
         constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0).cpu().numpy()
     else:
         constraint_val = None
+
+    if params['include_obstacles']:
+        obs_constraint_val = problem._con_ineq(actual_trajectory.unsqueeze(0), False)[0].squeeze(0).cpu().numpy()
+    else:
+        obs_constraint_val = None
+
     final_distance_to_goal = torch.linalg.norm(
-        chain.forward_kinematics(actual_trajectory[:, :7].reshape(-1, 7)).get_matrix().reshape(-1, 4, 4)[:, :2, 3] - params[
+        chain.forward_kinematics(actual_trajectory[:, :7].reshape(-1, 7)).get_matrix().reshape(-1, 4, 4)[:, :3, 3] -
+        params[
             'goal'].unsqueeze(0),
         dim=1
     )
-
     # print(f'Controller: {params["controller"]} Final distance to goal: {torch.min(final_distance_to_goal)}')
-    print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
+    #print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
 
     np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
              constr=constraint_val,
@@ -692,6 +786,7 @@ def do_trial(env, params, fpath):
              obs=obs,
              height=table_height,
              goal=params['goal'].cpu().numpy(),
+             obs_constr=obs_constraint_val,
              )
     return torch.min(final_distance_to_goal).cpu().numpy()
 
@@ -704,8 +799,18 @@ if __name__ == "__main__":
     from tqdm import tqdm
 
     # instantiate environment
-    env = VictorPuckObstacleEnv2(1, control_mode='joint_impedance',
-                                 viewer=config['visualize'])
+    if config['include_obstacles']:
+        if config['obstacle_type'] == 'tabletop_ycb':
+            env = VictorPuckObstacleEnv2(1, control_mode='joint_impedance',
+                                         viewer=config['visualize'])
+        elif 'floating_spheres' in config['obstacle_type']:
+            env = VictorFloatingSpheresTableEnv(1, control_mode='joint_impedance',
+                                                viewer=config['visualize'], obs_name=config['obstacle_type'])
+    else:
+        env = VictorPuckObstacleEnv(1, control_mode='joint_impedance',
+                                     viewer=config['visualize'], randomize_start=True,
+                                    randomize_obstacles=config['random_env'])
+
     sim, gym, viewer = env.get_sim()
 
     """
@@ -727,24 +832,36 @@ if __name__ == "__main__":
         # obstacles_1 = None if config['include_obstacles'] else [3, 3]
         # obstacles_2 = None if config['include_obstacles'] else [-3, -3]
         # env.reset(table_height, obstacles_1, obstacles_2, start_on_table=config['include_table'])
-        env.reset()
+        if not config['include_obstacles']:
+            env.reset(table_height=config['table_height'], start_on_table=config['include_table'],
+                      obstacles_1=[3, 3], obstacles_2=[-3, -3])
+        else:
+            env.reset(table_height=config['table_height'])
 
+        # set goal
         if config['random_env']:
             ct = 0
-            goal = torch.tensor([0.45, 0.5]) * torch.rand(2) + torch.tensor([0.4, 0.2])
+            goal = torch.tensor([0.45, -0.1]) + torch.rand(2) * torch.tensor([0.5, 0.7])
             state = env.get_state()
             obs1, obs2 = state['obs1_pos'][0, :2].cpu(), state['obs2_pos'][0, :2].cpu()
             while (torch.linalg.norm(goal - obs1) < 0.1 or
-                   torch.linalg.norm(goal - obs2) < 0.1 or
-                   torch.linalg.norm(goal - state['ee_pos'][0, :2].cpu()) < 0.3):
-                goal = torch.tensor([0.4, 0.5]) * torch.rand(2) + torch.tensor([0.5, 0.2])
+                   torch.linalg.norm(goal - obs2) < 0.1):
+                goal = torch.tensor([0.45, -0.1]) + torch.rand(2) * torch.tensor([0.5, 0.7])
                 ct += 1
                 if ct > 100:
                     break
         else:
-            goal = torch.tensor([0.85, 0.1])
-            goal = goal + 0.025 * torch.randn(2)  # torch.tensor([0.25, 0.1]) * torch.rand(2)
-
+            if config['obstacle_type'] == 'tabletop_ycb':
+                goal = torch.tensor([0.85, 0.1]) + 0.025 * torch.randn(2)
+            elif config['obstacle_type'] == 'floating_spheres_1':
+                goal = torch.tensor([0.65, 0.05])
+                goal = goal + 0.05 * torch.randn(2)  # torch.tensor([0.25, 0.1]) * torch.rand(2)
+            elif config['obstacle_type'] == 'floating_spheres_5':
+                goal = torch.tensor([0.85, 0.0]) + 0.025 * torch.randn(2)
+        g = torch.zeros(3)
+        g[:2] = goal
+        g[2] = env.table_height
+        goal = g
         for controller in config['controllers'].keys():
             # env.reset()
             env.reset_arm_only()
@@ -762,7 +879,7 @@ if __name__ == "__main__":
                 results[controller] = [final_distance_to_goal]
             else:
                 results[controller].append(final_distance_to_goal)
-        print(results)
+        #print(results)
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)

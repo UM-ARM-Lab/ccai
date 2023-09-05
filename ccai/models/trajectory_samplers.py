@@ -11,7 +11,7 @@ from nflows.nn.nets import ResidualNet
 from nflows.utils import torchutils
 
 # Diffusion
-from ccai.models.diffusion.diffusion import GaussianDiffusion
+from ccai.models.diffusion.diffusion import GaussianDiffusion, ConstrainedDiffusion
 from ccai.models.cnf.cnf import TrajectoryCNF
 
 from ccai.models.helpers import MLP
@@ -60,7 +60,7 @@ class TrajectoryFlowModel(nn.Module):
             #                                                                          tails='linear',
             #                                                                          tail_bound=4))
             mask = torchutils.create_mid_split_binary_mask(flow_dim)
-            #transforms.append(PiecewiseRationalQuadraticCouplingTransform(mask=mask,
+            # transforms.append(PiecewiseRationalQuadraticCouplingTransform(mask=mask,
             #                                                              transform_net_create_fn=create_transform_net,
             #                                                              tails='linear', tail_bound=4))
             transforms.append(AffineCouplingTransform(mask=mask, transform_net_create_fn=create_transform_net))
@@ -105,13 +105,20 @@ class TrajectoryFlowModel(nn.Module):
 
 class TrajectoryDiffusionModel(nn.Module):
 
-    def __init__(self, T, dx, du, context_dim):
+    def __init__(self, T, dx, du, context_dim, problem=None, timesteps=20):
         super().__init__()
         self.T = T
         self.dx = dx
         self.du = du
         self.context_dim = context_dim
-        self.diffusion_model = GaussianDiffusion(T, (dx + du), context_dim, timesteps=20, sampling_timesteps=20)
+        if problem is not None:
+            self.diffusion_model = ConstrainedDiffusion(T, (dx + du), context_dim,
+                                                        timesteps=timesteps, sampling_timesteps=timesteps,
+                                                        z_dim=problem.dz,
+                                                        opt_problem=problem)
+        else:
+            self.diffusion_model = GaussianDiffusion(T, (dx + du), context_dim, timesteps=timesteps,
+                                                     sampling_timesteps=timesteps)
 
     def sample(self, start, goal, constraints):
         B, N, _ = constraints.shape
@@ -128,6 +135,15 @@ class TrajectoryDiffusionModel(nn.Module):
         context = torch.cat((start, goal, constraints), dim=1)
         return self.diffusion_model.loss(trajectories.reshape(B, -1), context=context).mean()
 
+    def set_norm_constants(self, x_mu, x_mean):
+        self.diffusion_model.set_norm_constants(x_mu, x_mean)
+
+    def grad(self, trajectories, t, start, goal, constraints):
+        B, N, _ = constraints.shape
+        context = torch.cat((start.unsqueeze(1).repeat(1, N, 1),
+                             goal.unsqueeze(1).repeat(1, N, 1),
+                             constraints), dim=-1)
+        return self.diffusion_model.model_predictions(trajectories, t, context=context).pred_noise
 
 class TrajectoryCNFModel(TrajectoryCNF):
 
@@ -143,9 +159,10 @@ class TrajectoryCNFModel(TrajectoryCNF):
         return self.flow_matching_loss(x, context)
 
 
+
 class TrajectorySampler(nn.Module):
 
-    def __init__(self, T, dx, du, context_dim, type='nf', dynamics=None):
+    def __init__(self, T, dx, du, context_dim, type='nf', dynamics=None, problem=None, timesteps=20):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -158,7 +175,7 @@ class TrajectorySampler(nn.Module):
         elif type == 'cnf':
             self.model = TrajectoryCNFModel(T, dx, du, context_dim)
         else:
-            self.model = TrajectoryDiffusionModel(T, dx, du, context_dim)
+            self.model = TrajectoryDiffusionModel(T, dx, du, context_dim, problem, timesteps)
 
         self.register_buffer('x_mean', torch.zeros(dx + du))
         self.register_buffer('x_std', torch.ones(dx + du))
@@ -167,9 +184,15 @@ class TrajectorySampler(nn.Module):
         self.x_mean.data = torch.from_numpy(x_mean).to(device=self.x_mean.device, dtype=self.x_mean.dtype)
         self.x_std.data = torch.from_numpy(x_std).to(device=self.x_std.device, dtype=self.x_std.dtype)
 
+    def send_norm_constants_to_submodels(self):
+        self.model.set_norm_constants(self.x_mean, self.x_std)
+
     def sample(self, start, goal, constraints=None):
         samples = self.model.sample(start, goal, constraints)
         return samples * self.x_std + self.x_mean
 
     def loss(self, trajectories, start, goal, constraints=None):
         return self.model.loss(trajectories, start, goal, constraints)
+
+    def grad(self, trajectories, t, start, goal, constraints=None):
+        return self.model.grad(trajectories, t, start, goal, constraints)
