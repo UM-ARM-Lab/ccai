@@ -827,7 +827,8 @@ if __name__ == "__main__":
     """
     results = {}
 
-    for i in tqdm(range(config['num_trials'])):
+    for i in tqdm(range(config['num_trials']), initial=config['start_trial']):
+        i += config['start_trial']
         # table_height = None if config['include_table'] else 0.1
         # obstacles_1 = None if config['include_obstacles'] else [3, 3]
         # obstacles_2 = None if config['include_obstacles'] else [-3, -3]
