@@ -2,10 +2,11 @@
 T: 12
 receding_horizon: True
 num_steps: 10
-num_trials: 5000
+start_trial: 0
+num_trials: 3500
 visualize: False
 simulate: False
-experiment_name: 'victor_table_jointspace_train_new_1'
+experiment_name: 'victor_table_jointspace_train_new_8'
 random_env: True
 include_obstacles: False
 include_table: True

@@ -105,7 +105,7 @@ class TrajectoryFlowModel(nn.Module):
 
 class TrajectoryDiffusionModel(nn.Module):
 
-    def __init__(self, T, dx, du, context_dim, problem=None, timesteps=20):
+    def __init__(self, T, dx, du, context_dim, problem=None, timesteps=20, hidden_dim=64):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -118,7 +118,7 @@ class TrajectoryDiffusionModel(nn.Module):
                                                         opt_problem=problem)
         else:
             self.diffusion_model = GaussianDiffusion(T, (dx + du), context_dim, timesteps=timesteps,
-                                                     sampling_timesteps=timesteps)
+                                                     sampling_timesteps=timesteps, hidden_dim=hidden_dim)
 
     def sample(self, start, goal, constraints):
         B, N, _ = constraints.shape
@@ -133,6 +133,7 @@ class TrajectoryDiffusionModel(nn.Module):
     def loss(self, trajectories, start, goal, constraints):
         B = trajectories.shape[0]
         context = torch.cat((start, goal, constraints), dim=1)
+        #context=None
         return self.diffusion_model.loss(trajectories.reshape(B, -1), context=context).mean()
 
     def set_norm_constants(self, x_mu, x_mean):
@@ -144,6 +145,7 @@ class TrajectoryDiffusionModel(nn.Module):
                              goal.unsqueeze(1).repeat(1, N, 1),
                              constraints), dim=-1)
         return self.diffusion_model.model_predictions(trajectories, t, context=context).pred_noise
+
 
 class TrajectoryCNFModel(TrajectoryCNF):
 
@@ -159,10 +161,9 @@ class TrajectoryCNFModel(TrajectoryCNF):
         return self.flow_matching_loss(x, context)
 
 
-
 class TrajectorySampler(nn.Module):
 
-    def __init__(self, T, dx, du, context_dim, type='nf', dynamics=None, problem=None, timesteps=20):
+    def __init__(self, T, dx, du, context_dim, type='nf', dynamics=None, problem=None, timesteps=20, hidden_dim=64):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -175,7 +176,7 @@ class TrajectorySampler(nn.Module):
         elif type == 'cnf':
             self.model = TrajectoryCNFModel(T, dx, du, context_dim)
         else:
-            self.model = TrajectoryDiffusionModel(T, dx, du, context_dim, problem, timesteps)
+            self.model = TrajectoryDiffusionModel(T, dx, du, context_dim, problem, timesteps, hidden_dim)
 
         self.register_buffer('x_mean', torch.zeros(dx + du))
         self.register_buffer('x_std', torch.ones(dx + du))

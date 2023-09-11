@@ -108,7 +108,7 @@ class GaussianDiffusion(nn.Module):
             min_snr_loss_weight=False,  # https://arxiv.org/abs/2303.09556
             min_snr_gamma=5,
             guidance_w=1.2,
-            hidden_dim=32
+            hidden_dim=64
     ):
         super().__init__()
         self.guidance_w = guidance_w
@@ -216,7 +216,7 @@ class GaussianDiffusion(nn.Module):
         return posterior_mean, posterior_variance, posterior_log_variance_clipped
 
     def model_predictions(self, x, t, context):
-        guidance_weights = [1.2, 0.8]
+        guidance_weights = [1.0, 1.0]
         if context is not None:
             num_constraints = context.shape[1]
             # classifier free guidance
