@@ -225,7 +225,11 @@ class VictorTableHeightDataset(VictorConstraintDataset):
                 goal[:2] = data['goal'][:2]
                 goal[2] = data['height']
                 goals.append(goal.copy())
-                trajectories.append(data['traj'])
+                traj = data['traj']
+                n = traj.shape[1]
+                # add start state to trajectories
+                traj = np.concatenate([traj, data['x'][:-1, None, None].repeat(n, axis=1)], axis=2)
+                trajectories.append(traj)
 
         self.goals = np.stack(goals, axis=0)
         self.trajectories = np.stack(trajectories, axis=0)
@@ -246,6 +250,7 @@ class VictorReachingDataset(VictorConstraintDataset):
         trajectories = []
         constraints = []
         constraint_type = []
+        starts = []
         print('running init')
         for fpath in fpaths:
             path = pathlib.Path(fpath)
@@ -253,13 +258,16 @@ class VictorReachingDataset(VictorConstraintDataset):
                 data = np.load(p, allow_pickle=True)
                 constraints.append(np.float32(np.array([data['sdf_grid']]).reshape((1, 64, 64, 64))))
                 goals.append(data['goal'])
-                trajectories.append(data['traj'])
+                traj = data['traj']
+                n = traj.shape[1]
+                # add start state to trajectories
+                traj = np.concatenate([traj, data['x'][:-1, None, None].repeat(n, axis=1)], axis=2)
+                trajectories.append(traj)
 
         self.goals = np.stack(goals, axis=0)
         self.trajectories = np.stack(trajectories, axis=0)
         self.constraints = np.stack(constraints, axis=0)
         self.num_trials, self.num_steps, self.num_particles, horizon, xu_dim = self.trajectories.shape
-        print(self.trajectories.shape)
         self.goals = torch.from_numpy(self.goals).to(dtype=torch.float32)
         self.trajectories = torch.from_numpy(self.trajectories).to(dtype=torch.float32)
         self.constraints = torch.from_numpy(self.constraints).to(dtype=torch.float32)
