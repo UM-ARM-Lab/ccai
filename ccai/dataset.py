@@ -235,7 +235,7 @@ class VictorTableHeightDataset(VictorConstraintDataset):
         self.trajectories = np.stack(trajectories, axis=0)
         self.constraints = np.stack(constraints, axis=0)
         self.num_trials, self.num_steps, self.num_particles, horizon, xu_dim = self.trajectories.shape
-        print(self.ddtrajectories.shape)
+        print(self.trajectories.shape)
 
         self.goals = torch.from_numpy(self.goals).to(dtype=torch.float32)
         self.trajectories = torch.from_numpy(self.trajectories).to(dtype=torch.float32)

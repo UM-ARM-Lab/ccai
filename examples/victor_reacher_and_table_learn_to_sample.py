@@ -100,6 +100,7 @@ def train_model(trajectory_sampler, env_encoder, height_encoder, train_loader_re
         step = checkpoint['step']
 
     pbar = tqdm.tqdm(range(config['epochs']), initial=start_epoch)
+
     test_loss = 1000.0
     for epoch in pbar:
         train_loss = 0.0
@@ -400,9 +401,9 @@ def test_samples(trajectory_sampler, env_encoder, height_encoder, config):
 
         # now we can save the results, including object ids for identifying diffferent environments
         np.savez(f'{CCAI_PATH}/data/victor_table_{config["test_name"]}.npz',
-                 costs=costs[:b1+1].cpu().numpy(),
-                 av_h=av_h[:b1+1].cpu().numpy(),
-                 av_g=av_g[:b1+1].cpu().numpy(),
+                 costs=costs[:b1 + 1].cpu().numpy(),
+                 av_h=av_h[:b1 + 1].cpu().numpy(),
+                 av_g=av_g[:b1 + 1].cpu().numpy(),
                  object_ids=object_ids[:b1])
 
     print(costs.mean(), costs.std())

@@ -138,7 +138,7 @@ class TrajectoryDiffusionModel(nn.Module):
     def loss(self, trajectories, start, goal, constraints):
         B = trajectories.shape[0]
         context = torch.cat((start, goal, constraints), dim=1)
-        #context=None
+        # context=None
         return self.diffusion_model.loss(trajectories.reshape(B, -1), context=context).mean()
 
     def set_norm_constants(self, x_mu, x_std):
@@ -214,7 +214,8 @@ class TrajectorySampler(nn.Module):
         norm_start = (start - self.x_mean[:self.dx]) / self.x_std[:self.dx]
         norm_initial_trajectory = (initial_trajectory - self.x_mean) / self.x_std
 
-        return self.model.resample(norm_start, goal, constraints, norm_initial_trajectory, timestep) * self.x_std + self.x_mean
+        return self.model.resample(norm_start, goal, constraints, norm_initial_trajectory,
+                                   timestep) * self.x_std + self.x_mean
 
     def loss(self, trajectories, start, goal, constraints=None):
         return self.model.loss(trajectories, start, goal, constraints)

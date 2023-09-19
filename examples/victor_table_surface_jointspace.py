@@ -883,5 +883,3 @@ def do_trial(env, params, fpath):
              obs_constr=obs_constraint_val,
              )
     return torch.min(final_distance_to_goal).cpu().numpy()
-
-
