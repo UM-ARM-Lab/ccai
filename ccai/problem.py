@@ -55,7 +55,7 @@ class Problem(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def update(self, start, goal, T):
+    def update(self, start, goal, T, *args, **kwargs):
         pass
 
     def get_cost(self, x):
@@ -210,10 +210,11 @@ class ConstrainedSVGDProblem(Problem):
         return c, grad_c, hess_c
 
     def get_initial_z(self, x):
+        N, T, _ = x.shape
         h, _, _ = self._con_ineq(x, compute_grads=False)
         if h is not None:
             z = torch.where(h < 0, torch.sqrt(-2 * h), 0)
-            return z.reshape(-1, self.T, self.dz)
+            return z.reshape(N, T, self.dz)
 
 
 class IpoptProblem(Problem):
