@@ -507,15 +507,15 @@ if __name__ == "__main__":
 
     results = {}
     device = 'cuda:0'
-    for i in tqdm(range(config['num_trials'])):
-
+    for i in tqdm(range(config['num_trials']), initial=config['start_trial']):
+        i += config['start_trial']
         if config['random_sphere_world']:
             while True:
                 attempts = 0
                 sdf_grid, sdf_mesh = generate_random_sphere_world(7,
                                                                   3,
-                                                                  0.2,
-                                                                  0.1,
+                                                                  0.15,
+                                                                  0.075,
                                                                   np.array([[-0.5, 0.5], [-0.5, 0.5], [-0.5, 0.5]]),
                                                                   64,
                                                                   device=device)

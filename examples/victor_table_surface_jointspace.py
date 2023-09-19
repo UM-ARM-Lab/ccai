@@ -1,7 +1,6 @@
 import numpy as np
-from isaacgym.torch_utils import quat_apply
-from isaac_victor_envs.tasks.victor import VictorPuckObstacleEnv2, orientation_error, quat_change_convention, \
-    VictorFloatingSpheresTableEnv, VictorPuckObstacleEnv
+np.float = np.float64
+
 from isaac_victor_envs.utils import get_assets_dir
 import torch
 import time
@@ -18,6 +17,7 @@ from ccai.mpc.csvgd import Constrained_SVGD_MPC
 from ccai.mpc.mppi import MPPI
 from ccai.mpc.svgd import SVMPC
 from ccai.mpc.ipopt import IpoptMPC
+from ccai.mpc.diffusion_mpc import Diffusion_MPC
 import time
 import pytorch_kinematics as pk
 
@@ -41,6 +41,26 @@ collision_check_links = [
     'victor_left_arm_striker_base',
     'victor_left_arm_striker_mallet'
 ]
+def update_chain(device):
+    chain.to(device=device)
+    chain_cc.to(device=device)
+
+def create_grid_from_sdf(sdf, device):
+    range_per_dim = np.array([[-0.5, 0.5], [-0.5, 0.5], [-0.5, 0.5]])
+    sdf_size = 64
+    xx, yy, zz = np.meshgrid(np.linspace(range_per_dim[0, 0], range_per_dim[0, 1], sdf_size),
+                             np.linspace(range_per_dim[1, 0], range_per_dim[1, 1], sdf_size),
+                             np.linspace(range_per_dim[2, 0], range_per_dim[2, 1], sdf_size), indexing='ij')
+
+    pts = np.stack((xx, yy, zz), axis=-1)
+    # add origin to pts
+    pts = pts + np.array([0.75, 0.25, 1.0]).reshape((1, 1, 1, 3))
+    print(pts.shape)
+    pts = torch.from_numpy(pts).to(device=device).float()
+
+    vals, _ = sdf(pts)
+    vals = vals.reshape(sdf_size, sdf_size, sdf_size)
+    return vals
 
 
 class VictorTableProblem(ConstrainedSVGDProblem):
@@ -88,8 +108,7 @@ class VictorTableProblem(ConstrainedSVGDProblem):
         if obstacle_type != 'none':
             import pytorch_volumetric as pv
             sdf = pv.RobotSDF(chain_cc, path_prefix=asset_dir + '/victor')
-
-        if 'obstacle_type' == 'tabletop_ycb':
+        if obstacle_type == 'tabletop_ycb':
             # Load SDFs
             mug1_sdf = pv.MeshSDF(pv.MeshObjectFactory(f"{asset_dir}/obstacles/mug/mug.obj"))
             mug2_sdf = pv.MeshSDF(pv.MeshObjectFactory(f"{asset_dir}/obstacles/mug/mug.obj"))
@@ -103,11 +122,48 @@ class VictorTableProblem(ConstrainedSVGDProblem):
             # Compose SDFs
             scene_sdf = pv.ComposedSDF([mug1_sdf, mug2_sdf, pitcher_sdf],
                                        pk.Transform3d(matrix=obstacle_transforms))
+
+            # convert into sdf grid
+            #grid = create_grid_from_sdf(scene_sdf, self.device)
+            #np.savez('tabletop_ycb.npz', sdf_grid=grid.cpu().numpy())
+            #exit(0)
             scene_sdf_cached = pv.CachedSDF('scene', resolution=0.01, gt_sdf=scene_sdf, range_per_dim=np.array([
                 [0.4, 1.0],
                 [-0.3, 1.0],
                 [0.6, 1.5]
-            ]), device=self.device, cache_sdf_hessian=True, clean_cache=False)
+            ]), device=self.device, cache_sdf_hessian=False, clean_cache=False)
+
+            self.robot_scene = pv.RobotScene(sdf, scene_sdf_cached,
+                                             pk.Transform3d(matrix=torch.eye(4,
+                                                                             device=self.device
+                                                                             )
+                                                            ),
+                                             collision_check_links=collision_check_links
+                                             )
+        elif obstacle_type == 'tabletop_ycb_2':
+            # Load SDFs
+            mustard_bottle_sdf = pv.MeshSDF(pv.MeshObjectFactory(f"{asset_dir}/obstacles/mug/mustard_bottle.obj"))
+            cracker_box_sdf = pv.MeshSDF(pv.MeshObjectFactory(f"{asset_dir}/obstacles/mug/cracker_box.obj"))
+            pitcher_sdf = pv.MeshSDF(pv.MeshObjectFactory(f"{asset_dir}/obstacles/pitcher/pitcher.obj"))
+            # Get transforms
+            obstacle_transforms = torch.stack([
+                obstacle_poses['mustard_bottle'],
+                obstacle_poses['cracker_box'],
+                obstacle_poses['pitcher']
+            ]).reshape(-1, 4, 4).inverse()
+            # Compose SDFs
+            scene_sdf = pv.ComposedSDF([mustard_bottle_sdf, cracker_box_sdf, pitcher_sdf],
+                                       pk.Transform3d(matrix=obstacle_transforms))
+
+            # convert into sdf grid
+            grid = create_grid_from_sdf(scene_sdf, self.device)
+            np.savez('../tabletop_ycb_2.npz', sdf_grid=grid.cpu().numpy())
+            #exit(0)
+            scene_sdf_cached = pv.CachedSDF('scene', resolution=0.01, gt_sdf=scene_sdf, range_per_dim=np.array([
+                [0.4, 1.0],
+                [-0.3, 1.0],
+                [0.6, 1.5]
+            ]), device=self.device, cache_sdf_hessian=False, clean_cache=False)
 
             self.robot_scene = pv.RobotScene(sdf, scene_sdf_cached,
                                              pk.Transform3d(matrix=torch.eye(4,
@@ -169,7 +225,7 @@ class VictorTableProblem(ConstrainedSVGDProblem):
 
         ret_scene = self.robot_scene.scene_collision_check(q, compute_grads, compute_hessian=False)
 
-        h = -ret_scene.get('sdf') + 0.05
+        h = -ret_scene.get('sdf') + 0.025
         grad_h = ret_scene.get('grad_sdf', None)
         hess_h = ret_scene.get('hess_sdf', None)
 
@@ -205,6 +261,7 @@ class VictorTableProblem(ConstrainedSVGDProblem):
         # J, grad_J, hess_J = self.cost(x)
         J, grad_J, hess_J = self.cost(x), self.grad_cost(x), self.hess_cost(x)
 
+
         if term_grad_g is not None:
             term_grad_g_extended = term_grad_g.reshape(N, self.T, self.dx)
             term_hess_g_extended = term_hess_g.reshape(N, self.T, self.dx, self.dx).permute(0, 2, 3, 1)
@@ -217,7 +274,7 @@ class VictorTableProblem(ConstrainedSVGDProblem):
             hess_J = hess_J.reshape(N, self.T, self.dx, self.T, self.dx) + term_hess_g_extended
 
         # add auxiliary grad from diffusion model
-        if self.flow_model is not None:
+        if False:#self.flow_model is not None:
             cparams = self.constr_params.expand(N, -1, -1)
             start_normalized = (self.start - self.flow_model.x_mean[:self.dx]) / self.flow_model.x_std[:self.dx]
             x_normalized = (x - self.flow_model.x_mean[:self.dx]) / self.flow_model.x_std[:self.dx]
@@ -350,7 +407,7 @@ class VictorTableProblem(ConstrainedSVGDProblem):
         # grad_J = grad_J_augmented
         # hess_J = hess_J_augmented.mean(dim=0)
 
-        # print(G.abs().max(), G.abs().mean(), J)
+        #print(G.abs().max(), G.abs().mean(), J.mean())
         return grad_J.detach(), hess_J, K.detach(), grad_K.detach(), G.detach(), dG.detach(), hessG.detach()
 
     def update(self, start, goal=None, T=None):
@@ -584,7 +641,7 @@ def do_trial(env, params, fpath):
     else:
         env.frame_fpath = None
         env.frame_id = None
-
+    sim, gym, viewer = env.get_sim()
     # ee_pos, ee_ori = state['ee_pos'], state['ee_ori']
     # start = torch.cat((ee_pos, ee_ori), dim=-1).reshape(7).to(device=params['device'])
     start = state['q'].reshape(7).to(device=params['device'])
@@ -603,7 +660,7 @@ def do_trial(env, params, fpath):
     env_encoder = None
     height_encoder = None
     constr_params = None
-    if 'csvgd' in params['controller']:
+    if 'csvgd' in params['controller'] or 'diffmpc' in params['controller']:
         if params['flow_model'] != 'none':
             if 'diffusion' in params['flow_model']:
                 flow_type = 'diffusion'
@@ -611,9 +668,6 @@ def do_trial(env, params, fpath):
                 flow_type = 'cnf'
             else:
                 raise ValueError('Invalid flow model type')
-            flow_model = TrajectorySampler(T=params['T'], dx=7, du=0, context_dim=7 + 3 + 64 + 2, type=flow_type)
-            flow_model.load_state_dict(torch.load(f'{CCAI_PATH}/{params["flow_model"]}')['ema'])
-            flow_model.to(device=params['device'])
 
             if 'obstacle' in params['controller']:
                 env_encoder = Conv3DEncoder(64)
@@ -626,8 +680,8 @@ def do_trial(env, params, fpath):
             # parameterize constraints
             constr_params = []
             constr_codes = []
-            if 'floating_spheres' in config['obstacle_type']:
-                sdf_grid = np.load(f'{CCAI_PATH}/{config["obstacle_type"]}.npz')['sdf_grid']
+            if 'floating_spheres' in params['obstacle_type'] or params['obstacle_type'] == 'tabletop_ycb':
+                sdf_grid = np.load(f'{CCAI_PATH}/{params["obstacle_type"]}.npz')['sdf_grid']
                 sdf_grid = torch.from_numpy(sdf_grid).to(device=params['device']).reshape(1, 1, 64, 64, 64).to(
                     dtype=torch.float32)
                 if env_encoder is not None:
@@ -644,27 +698,65 @@ def do_trial(env, params, fpath):
                 constr_codes = torch.stack(constr_codes, dim=0).reshape(1, -1, 2)
                 constr_params = torch.cat((constr_params, constr_codes), dim=-1)
 
-        params['flow_model'] = flow_model
         problem = VictorTableProblem(start, params['goal'], params['T'], device=params['device'],
                                      obstacle_poses=obstacle_poses,
                                      table_height=table_height,
                                      obstacle_type=params['obstacle_type'],
-                                     flow_model=flow_model,
+                                     flow_model=None,
                                      constr_params=constr_params)
-        controller = Constrained_SVGD_MPC(problem, params)
+
+        if 'diffmpc' in params['controller']:
+            flow_problem = problem
+            constrain = params['constrained']
+        else:
+            flow_problem = None
+            constrain = None
+
+        if params['flow_model'] != 'none':
+            flow_model = TrajectorySampler(T=params['T']+1, dx=7, du=0, context_dim=7 + 3 + 64 + 2, type=flow_type,
+                                           timesteps=params['timesteps'], hidden_dim=params['hidden_dim'],
+                                           problem=flow_problem, constrain=constrain,
+                                           unconditional=params['unconditional'])
+
+            flow_model.load_state_dict(torch.load(f'{CCAI_PATH}/{params["flow_model"]}')['ema'])
+            flow_model.to(device=params['device'])
+            flow_model.send_norm_constants_to_submodels()
+
+            params['flow_model'] = flow_model
+        else:
+            params['flow_model'] = None
+
+        if 'csvgd' in params['controller']:
+            controller = Constrained_SVGD_MPC(problem, params)
+        else:
+            controller = Diffusion_MPC(problem, params)
+
     elif params['controller'] == 'ipopt':
-        problem = VictorTableIpoptProblem(start, params['goal'], params['T'], obstacle_poses=obstacle_poses,
-                                          table_height=env.table_height)
+        problem = VictorTableIpoptProblem(start, params['goal'], params['T'],
+                                                  obstacle_poses=obstacle_poses,
+                                                  table_height=table_height,
+                                                  obstacle_type=params['obstacle_type'],
+                                                  flow_model=None,
+                                                  constr_params=constr_params)
+
         controller = IpoptMPC(problem, params)
     elif 'svgd' in params['controller']:
         problem = VictorTableUnconstrainedProblem(start, params['goal'], params['T'], device=params['device'],
-                                                  penalty=params['penalty'], obstacle_poses=obstacle_poses,
-                                                  table_height=env.table_height)
+                                     obstacle_poses=obstacle_poses,
+                                     table_height=table_height,
+                                     obstacle_type=params['obstacle_type'],
+                                     flow_model=None,
+                                     constr_params=constr_params,
+                                    penalty=params['penalty'])
         controller = SVMPC(problem, params)
     elif 'mppi' in params['controller']:
         problem = VictorTableUnconstrainedProblem(start, params['goal'], params['T'], device=params['device'],
-                                                  penalty=params['penalty'], obstace_centres=centres,
-                                                  obstcale_rads=rads, table_height=env.table_height)
+                                     obstacle_poses=obstacle_poses,
+                                     table_height=table_height,
+                                     obstacle_type=params['obstacle_type'],
+                                     flow_model=None,
+                                     constr_params=constr_params,
+                                    penalty=params['penalty'])
         controller = MPPI(problem, params)
     else:
         raise ValueError('Invalid controller')
@@ -694,12 +786,12 @@ def do_trial(env, params, fpath):
         x = best_traj[0, :7]
 
         if params['visualize']:
-            # add goal lines to sim
+            # add params['goal'] lines to sim
             line_vertices = np.array([
-                [goal[0].item() - 0.025, goal[1].item() - 0.025, env.table_height + 0.005],
-                [goal[0].item() + 0.025, goal[1].item() + 0.025, env.table_height + 0.005],
-                [goal[0].item() - 0.025, goal[1].item() + 0.025, env.table_height + 0.005],
-                [goal[0].item() + 0.025, goal[1].item() - 0.025, env.table_height + 0.005],
+                [params['goal'][0].item() - 0.025, params['goal'][1].item() - 0.025, env.table_height + 0.005],
+                [params['goal'][0].item() + 0.025, params['goal'][1].item() + 0.025, env.table_height + 0.005],
+                [params['goal'][0].item() - 0.025, params['goal'][1].item() + 0.025, env.table_height + 0.005],
+                [params['goal'][0].item() + 0.025, params['goal'][1].item() - 0.025, env.table_height + 0.005],
             ], dtype=np.float32)
 
             line_colors = np.array([
@@ -778,6 +870,8 @@ def do_trial(env, params, fpath):
     )
     # print(f'Controller: {params["controller"]} Final distance to goal: {torch.min(final_distance_to_goal)}')
     #print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
+    if params['visualize']:
+        env.gym.write_viewer_image_to_file(env.viewer, f'{env.frame_fpath}/frame_{env.frame_id+1:06d}.png')
 
     np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
              constr=constraint_val,
@@ -791,95 +885,3 @@ def do_trial(env, params, fpath):
     return torch.min(final_distance_to_goal).cpu().numpy()
 
 
-if __name__ == "__main__":
-    torch.set_float32_matmul_precision('high')
-    # get config
-    config = yaml.safe_load(
-        pathlib.Path(f'{CCAI_PATH}/config/planning_configs/victor_table_jointspace.yaml').read_text())
-    from tqdm import tqdm
-
-    # instantiate environment
-    if config['include_obstacles']:
-        if config['obstacle_type'] == 'tabletop_ycb':
-            env = VictorPuckObstacleEnv2(1, control_mode='joint_impedance',
-                                         viewer=config['visualize'])
-        elif 'floating_spheres' in config['obstacle_type']:
-            env = VictorFloatingSpheresTableEnv(1, control_mode='joint_impedance',
-                                                viewer=config['visualize'], obs_name=config['obstacle_type'])
-    else:
-        env = VictorPuckObstacleEnv(1, control_mode='joint_impedance',
-                                     viewer=config['visualize'], randomize_start=True,
-                                    randomize_obstacles=config['random_env'])
-
-    sim, gym, viewer = env.get_sim()
-
-    """
-    state = env.get_state()
-    ee_pos, ee_ori = state['ee_pos'], state['ee_ori']
-    try:
-        while True:
-            start = torch.cat((ee_pos, ee_ori), dim=-1).reshape(1, 7)
-            env.step(start)
-            print('waiting for you to finish camera adjustment, ctrl-c when done')
-            time.sleep(0.1)
-    except KeyboardInterrupt:
-        pass
-    """
-    results = {}
-
-    for i in tqdm(range(config['num_trials'])):
-        # table_height = None if config['include_table'] else 0.1
-        # obstacles_1 = None if config['include_obstacles'] else [3, 3]
-        # obstacles_2 = None if config['include_obstacles'] else [-3, -3]
-        # env.reset(table_height, obstacles_1, obstacles_2, start_on_table=config['include_table'])
-        if not config['include_obstacles']:
-            env.reset(table_height=config['table_height'], start_on_table=config['include_table'],
-                      obstacles_1=[3, 3], obstacles_2=[-3, -3])
-        else:
-            env.reset(table_height=config['table_height'])
-
-        # set goal
-        if config['random_env']:
-            ct = 0
-            goal = torch.tensor([0.45, -0.1]) + torch.rand(2) * torch.tensor([0.5, 0.7])
-            state = env.get_state()
-            obs1, obs2 = state['obs1_pos'][0, :2].cpu(), state['obs2_pos'][0, :2].cpu()
-            while (torch.linalg.norm(goal - obs1) < 0.1 or
-                   torch.linalg.norm(goal - obs2) < 0.1):
-                goal = torch.tensor([0.45, -0.1]) + torch.rand(2) * torch.tensor([0.5, 0.7])
-                ct += 1
-                if ct > 100:
-                    break
-        else:
-            if config['obstacle_type'] == 'tabletop_ycb':
-                goal = torch.tensor([0.85, 0.1]) + 0.025 * torch.randn(2)
-            elif config['obstacle_type'] == 'floating_spheres_1':
-                goal = torch.tensor([0.65, 0.05])
-                goal = goal + 0.05 * torch.randn(2)  # torch.tensor([0.25, 0.1]) * torch.rand(2)
-            elif config['obstacle_type'] == 'floating_spheres_5':
-                goal = torch.tensor([0.85, 0.0]) + 0.025 * torch.randn(2)
-        g = torch.zeros(3)
-        g[:2] = goal
-        g[2] = env.table_height
-        goal = g
-        for controller in config['controllers'].keys():
-            # env.reset()
-            env.reset_arm_only()
-            fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_{i + 1}')
-            pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
-            # set up params
-            params = config.copy()
-            params.pop('controllers')
-            params.update(config['controllers'][controller])
-            params['controller'] = controller
-            params['goal'] = goal.to(device=params['device'])
-            final_distance_to_goal = do_trial(env, params, fpath)
-
-            if controller not in results.keys():
-                results[controller] = [final_distance_to_goal]
-            else:
-                results[controller].append(final_distance_to_goal)
-        #print(results)
-
-    gym.destroy_viewer(viewer)
-    gym.destroy_sim(sim)
