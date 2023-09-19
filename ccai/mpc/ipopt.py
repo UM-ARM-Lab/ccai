@@ -22,7 +22,7 @@ class IpoptMPC:
 
         self.warmed_up = False
 
-    def step(self, state, **kwargs):
+    def step(self, state, *args, **kwargs):
         if self.fix_T or (not self.warmed_up):
             new_T = None
         else:
