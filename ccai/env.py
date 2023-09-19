@@ -85,7 +85,15 @@ def generate_random_sphere_sdf(max_spheres, min_spheres, max_rad, min_rad, range
     """
     num_obstacles = np.random.randint(low=min_spheres, high=max_spheres)
     obstacle_positions = np.random.uniform(low=range_per_dim[:, 0], high=range_per_dim[:, 1], size=(num_obstacles, 3))
+    #obstacle_positions = np.array([
+    #    [0.7, 0.2, 0.8],
+    #    [0.9, 0.6, 1.1],
+    #    [0.7, 0.3, 0.9],
+    #])
+    #obstacle_positions -= np.array([0.75, 0.25, 1.0])
     obstacle_radii = np.random.uniform(low=min_rad, high=max_rad, size=(num_obstacles))
+
+    #print(obstacle_radii.shape, obstacle_positions.shape, num_obstacles)
 
     xx, yy, zz = np.meshgrid(np.linspace(range_per_dim[0, 0], range_per_dim[0, 1], sdf_size),
                              np.linspace(range_per_dim[1, 0], range_per_dim[1, 1], sdf_size),
@@ -169,20 +177,18 @@ def generate_random_sphere_world(max_spheres, min_spheres, max_rad, min_rad, ran
 if __name__ == "__main__":
     np.random.seed(2464)
     #np.random.seed(1234)
+    i = 2
     sdf_size = 64
     range_per_dim = np.array([[-0.5, 0.5], [-0.5, 0.5], [-0.5, 0.5]])
-    for i in range(1, 21):
-        if i in [1, 10, 12, 19]:
-            continue
-        sdf_grid, sdf_grad, sdf_hess = generate_random_sphere_sdf(7,
-                                                               3,
-                                                               0.15,
-                                                               0.075,
-                                                               range_per_dim,
-                                                               sdf_size)
-        sdf_mesh = convert_sdf_to_mesh(sdf_grid, range_per_dim, name=f'floating_spheres_{i}')
+    sdf_grid, sdf_grad, sdf_hess = generate_random_sphere_sdf(4,
+                                                           3,
+                                                           0.1,
+                                                           0.075,
+                                                           range_per_dim,
+                                                           sdf_size)
+    sdf_mesh = convert_sdf_to_mesh(sdf_grid, range_per_dim, name=f'floating_spheres_{i}')
 
-        np.savez(f'floating_spheres_{i}.npz', sdf_grid=sdf_grid, sdf_grad=sdf_grad, sdf_hess=sdf_hess)
+    np.savez(f'floating_spheres_{i}.npz', sdf_grid=sdf_grid, sdf_grad=sdf_grad, sdf_hess=sdf_hess)
 
     # reconstruct sdf_grid from mesh
     xx, yy, zz = np.meshgrid(np.linspace(range_per_dim[0, 0], range_per_dim[0, 1], sdf_size),
