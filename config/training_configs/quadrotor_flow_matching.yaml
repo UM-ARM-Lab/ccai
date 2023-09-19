@@ -1,14 +1,20 @@
 ---
-model_name: 'quadrotor_multi_constraint'
-load_model: 'none'
+model_name: 'quadrotor_compose'
+load_checkpoint: False
 epochs: 100
-batch_size: 512
+batch_size: 256
 lr: 1.0e-4
 model_type: 'cnf'
 data_directory: 'quadrotor_multi_constraint'
 device: 'cuda:0'
 test_every: 10
+save_every: 10
 normalize_data: True
+constrained: False
+guided: False
+timesteps: None
+hidden_dim: 64
+unconditional: False
 # only applied to training with csvto gradient
 use_csvto_gradient: False
 num_samples: 16
@@ -18,3 +24,7 @@ use_ema: True
 ema_decay: 0.995
 ema_warmup_steps: 1000
 ema_update_every: 10
+
+test_directory: 'quadrotor_compose'
+test_samples: False
+test_name: None

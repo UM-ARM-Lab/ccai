@@ -147,6 +147,7 @@ def train_model(trajectory_sampler, env_encoder, height_encoder, train_loader_re
             if config['use_ema']:
                 if step % config['ema_update_every'] == 0:
                     update_ema(trajectory_sampler)
+            break
 
         if (epoch + 1) % config['test_every'] == 0:
             if config['use_ema']:
@@ -229,7 +230,6 @@ def train_model(trajectory_sampler, env_encoder, height_encoder, train_loader_re
                     }
                 }
                 np.savez(f'{fpath}/data_vis_{epoch}.npz', **data)
-                break
 
         train_loss /= min(len(train_loader_reach), len(train_loader_table))
 
@@ -245,8 +245,9 @@ def train_model(trajectory_sampler, env_encoder, height_encoder, train_loader_re
                 'env_encoder': env_encoder.state_dict(),
                 'height_encoder': height_encoder.state_dict(),
                 'step': step,
+                'test_loss': test_loss,
             }
-            torch.save(checkpoint, f'{fpath}/checkpoint.pth')
+            torch.save(checkpoint, f'{fpath}/checkpoint_{epoch}.pth')
 
 
 def test_samples(trajectory_sampler, env_encoder, height_encoder, config):
@@ -413,10 +414,26 @@ def test_samples(trajectory_sampler, env_encoder, height_encoder, config):
     print(av_h.mean(), av_h.std())
 
 
+import argparse
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', type=str, default='victor_table_flow_matching.yaml')
+    parser.add_argument('--device', type=str, default=None)
+    args = parser.parse_args()
+    return args
+
+
 if __name__ == "__main__":
-    torch.set_float32_matmul_precision('high')
+    args = parse_arguments()
+    # load config
     config = yaml.safe_load(
-        pathlib.Path(f'{CCAI_PATH}/config/training_configs/victor_table_diffusion.yaml').read_text())
+        pathlib.Path(f'{CCAI_PATH}/config/training_configs/{args.config}').read_text())
+
+    # overwrite config device with argument, just to make it easier to launch multiple jobs from command line
+    if args.device is not None:
+        config['device'] = args.device
 
     if config['constrained'] or config['guided']:
         constrained = config['constrained']

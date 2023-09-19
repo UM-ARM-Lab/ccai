@@ -25,64 +25,17 @@ from ccai.models.training import EMA
 from ccai.models.trajectory_samplers import TrajectorySampler
 
 
-def cost(trajectory, goal):
-    x = trajectory[:, :12]
-    u = trajectory[:, 12:]
-    T = x.shape[0]
-    Q = torch.eye(12, device=trajectory.device)
-    Q[5, 5] = 1e-2
-    Q[2, 2] = 1e-3
-    Q[3:, 3:] *= 0.5
-    P = Q * 100
-    R = 1 * torch.eye(4, device=trajectory.device)
-    P[5, 5] = 1e-2
-    d2goal = x - goal.reshape(-1, 12)
-
-    running_state_cost = d2goal.reshape(-1, 1, 12) @ Q.reshape(1, 12, 12) @ d2goal.reshape(-1, 12, 1)
-    running_control_cost = u.reshape(-1, 1, 4) @ R.reshape(1, 4, 4) @ u.reshape(-1, 4, 1)
-    terminal_state_cost = d2goal[-1].reshape(1, 12) @ P @ d2goal[-1].reshape(12, 1)
-
-    cost = torch.sum(running_control_cost + running_state_cost, dim=0) + terminal_state_cost
-
-    # Compute cost grad analytically
-    grad_running_state_cost = Q.reshape(1, 12, 12) @ d2goal.reshape(-1, 12, 1)
-    grad_running_control_cost = R.reshape(1, 4, 4) @ u.reshape(-1, 4, 1)
-    grad_terminal_cost = P @ d2goal[-1].reshape(12, 1)  # only on terminal
-    grad_terminal_cost = torch.cat((torch.zeros(T - 1, 12, 1, device=trajectory.device),
-                                    grad_terminal_cost.unsqueeze(0)), dim=0)
-
-    grad_cost = torch.cat((grad_running_state_cost + grad_terminal_cost, grad_running_control_cost), dim=1)
-    grad_cost = grad_cost.reshape(T * 16)
-
-    # compute hessian of cost analytically
-    running_state_hess = Q.reshape(1, 12, 12).repeat(T, 1, 1)
-    running_control_hess = R.reshape(1, 4, 4).repeat(T, 1, 1)
-    terminal_hess = torch.cat((torch.zeros(T - 1, 12, 12, device=trajectory.device), P.unsqueeze(0)), dim=0)
-
-    state_hess = running_state_hess + terminal_hess
-    hess_cost = torch.cat((
-        torch.cat((state_hess, torch.zeros(T, 4, 12, device=trajectory.device)), dim=1),
-        torch.cat((torch.zeros(T, 12, 4, device=trajectory.device), running_control_hess), dim=1)
-    ), dim=2)  # will be N x T x 16 x 16
-
-    # now we need to refactor hess to be (N x Td x Td)
-    hess_cost = torch.diag_embed(hess_cost.permute(1, 2, 0)).permute(2, 0, 3, 1).reshape(T * 16, T * 16)
-
-    return cost.flatten(), grad_cost, hess_cost
-
-def test_model_multi(model, loader, problem):
+def test_model_multi(model, loader):
     model.eval()
     val_ll = 0.0
-    val_sample_loss = 0.0
-    val_av_constraint_volation = 0.0
 
     for i, (trajectories, starts, goals, constraints, constraint_type) in enumerate(loader):
-        trajectories = trajectories.to(device='cuda:0')
+        trajectories = trajectories.to(device=config['device'])
         B, T, dxu = trajectories.shape
-        starts = starts.to(device='cuda:0')
-        goals = goals.to(device='cuda:0')
-        constraints = constraints.to(device='cuda:0')
-        constraint_type = constraint_type.to(device='cuda:0').reshape(B)
+        starts = starts.to(device=config['device'])
+        goals = goals.to(device=config['device'])
+        constraints = constraints.to(device=config['device'])
+        constraint_type = constraint_type.to(device=config['device']).reshape(B)
 
         # make one hot
         constraint_type = torch.nn.functional.one_hot(constraint_type, num_classes=2).float()
@@ -90,30 +43,17 @@ def test_model_multi(model, loader, problem):
         c = torch.cat([constraints, constraint_type], dim=-1)
 
         with torch.no_grad():
-            log_prob = model.loss(trajectories.reshape(B, T, dxu),
-                                  starts.reshape(B, -1),
-                                  goals.reshape(B, -1),
-                                  c.reshape(B, -1))
+            loss = model.loss(trajectories.reshape(B, T, dxu),
+                              starts.reshape(B, -1),
+                              goals.reshape(B, -1),
+                              c.reshape(B, -1))
 
-        loss = -log_prob.mean()
+        loss = loss.mean()
         val_ll += loss.item()
 
-        sampled_trajectories = model.sample(starts.reshape(B, -1),
-                                            goals.reshape(B, -1),
-                                            c.reshape(B, -1)).reshape(B, T, dxu)
-        goals = torch.cat((goals, torch.zeros(B, 9).to(device='cuda:0')), dim=-1)
-        # J, _, _, _, _, C, _, _ = problem.eval(sampled_trajectories, starts[:, 0], goals[:, 0], constraints[:, 0])
-        J, _, _ = problem._objective(sampled_trajectories.unsqueeze(1), goals.unsqueeze(1))
-        C, _, _ = problem.batched_combined_constraints(sampled_trajectories.unsqueeze(1), starts, constraints,
-                                                       compute_grads=False)
-
-        val_sample_loss += J.mean().item()
-        val_av_constraint_volation += C[:, :, -11:].abs().mean().item()
-
     val_ll /= len(loader)
-    val_sample_loss /= len(loader)
-    val_av_constraint_volation /= len(loader)
-    return val_ll, val_sample_loss, val_av_constraint_volation
+
+    return val_ll
 
 
 def fine_tune_model_with_stein(model, train_loader, val_loader, problem, config):
@@ -133,8 +73,9 @@ def fine_tune_model_with_stein(model, train_loader, val_loader, problem, config)
 
             # sample trajectories
             s = starts.reshape(B, 1, 12).repeat(1, N, 1).reshape(B * N, 12)
-            goals = torch.cat((goals.reshape(N, 1, 3).repeat(1, N, 1), torch.zeros(B, N, 9).to(device='cuda:0')),
-                              dim=-1)
+            goals = torch.cat(
+                (goals.reshape(N, 1, 3).repeat(1, N, 1), torch.zeros(B, N, 9).to(device=config['device'])),
+                dim=-1)
             g = goals.reshape(B * N, 12)
             c = constraints.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
             trajectories = model.sample(s, g[:, :3], c).reshape(B, N, T, 16)
@@ -142,11 +83,11 @@ def fine_tune_model_with_stein(model, train_loader, val_loader, problem, config)
                                                      starts,
                                                      goals,
                                                      constraints,
-                                                     batched_problem,
+                                                     problem,
                                                      alpha_J=1,
                                                      alpha_C=1)
             # Update plot
-            phi = phi.reshape(B, N, batched_problem.T, -1)
+            phi = phi.reshape(B, N, problem.T, -1)
             trajectories.backward(phi)
 
             if (batch_no + 1) % config['optim_update_every'] == 0:
@@ -159,19 +100,19 @@ def fine_tune_model_with_stein(model, train_loader, val_loader, problem, config)
                 # generate samples and plot them
 
         if (epoch + 1) % 10 == 0:
-            demo_ll, sample_cost, constraint_violation = test_model_multi(model, val_loader, problem)
+            demo_ll = test_model_multi(model, val_loader)
             print(
-                f'Epoch: {epoch + 1}  Demonstration log-likelihood: {demo_ll}   Sample Cost: {sample_cost}   Constraint Violation: {constraint_violation}')
+                f'Epoch: {epoch + 1}  Test loss: {demo_ll}')
             # PLOT FIRST 16 EXAMPLES
             for i, (_, starts, goals, constraints) in enumerate(val_loader):
-                starts = starts.to(device='cuda:0')
-                goals = goals.to(device='cuda:0')
+                starts = starts.to(device=config['device'])
+                goals = goals.to(device=config['device'])
                 N = starts.shape[1]
                 starts = starts[:16].reshape(-1, 12)
                 goals = goals[:16].reshape(-1, 3)
-                constraints = constraints[:16].reshape(-1, 100).to(device='cuda:0')
+                constraints = constraints[:16].reshape(-1, 100).to(device=config['device'])
                 with torch.no_grad():
-                    trajectories = model.sample(starts, goals, constraints)
+                    trajectories = model.sample(starts, goals, constraints.unsqueeze(1))
                 trajectories = trajectories.reshape(16, N, 12, 16)
                 starts = starts.reshape(16, N, 12)
                 goals = goals.reshape(16, N, 3)
@@ -204,7 +145,7 @@ def update_plot_with_trajectories(ax, trajectory, color='g'):
                                   traj_np[1:, 2], color=color, alpha=0.5, linestyle='--'))
 
 
-def train_model_from_demonstrations(trajectory_sampler, train_loader, val_loader, problem, config):
+def train_model_from_demonstrations(trajectory_sampler, train_loader, val_loader, config):
     fpath = f'{CCAI_PATH}/data/training/quadrotor/{config["model_name"]}_{config["model_type"]}'
 
     if config['use_ema']:
@@ -236,16 +177,17 @@ def train_model_from_demonstrations(trajectory_sampler, train_loader, val_loader
 
     pbar = tqdm.tqdm(range(config['epochs']), initial=start_epoch)
 
+    test_loss = 0.0
     for epoch in pbar:
         train_loss = 0.0
         trajectory_sampler.train()
         for trajectories, starts, goals, constraints, constraint_type in train_loader:
-            trajectories = trajectories.to(device='cuda:0')
+            trajectories = trajectories.to(device=config['device'])
             B, T, dxu = trajectories.shape
-            starts = starts.to(device='cuda:0')
-            goals = goals.to(device='cuda:0')
-            constraints = constraints.to(device='cuda:0')
-            constraint_type = constraint_type.to(device='cuda:0').reshape(B)
+            starts = starts.to(device=config['device'])
+            goals = goals.to(device=config['device'])
+            constraints = constraints.to(device=config['device'])
+            constraint_type = constraint_type.to(device=config['device']).reshape(B)
 
             # make one hot
             constraint_type = torch.nn.functional.one_hot(constraint_type, num_classes=2).float()
@@ -286,23 +228,23 @@ def train_model_from_demonstrations(trajectory_sampler, train_loader, val_loader
             print('TRAINING')
             print(
                 f'Epoch: {epoch + 1}  Demonstration loss: {demo_ll}  Sample Cost: {sample_cost} Constraint Violation: {constraint_violation}')
-            demo_ll, sample_cost, constraint_violation = test_model_multi(test_model,
-                                                                          val_loader,
-                                                                          problem)
+                        """
+
+            test_loss = test_model_multi(test_model, val_loader)
             print('VALIDATION')
             print(
-                f'Epoch: {epoch + 1}  Demonstration loss: {demo_ll}  Sample Cost: {sample_cost} Constraint Violation: {constraint_violation}')
-            """
+                f'Epoch: {epoch + 1}  Demonstration loss: {test_loss}')
+
             for trajectories, starts, goals, constraints, constraint_type in val_loader:
-                starts = starts.to(device='cuda:0')
-                goals = goals.to(device='cuda:0')
+                starts = starts.to(device=config['device'])
+                goals = goals.to(device=config['device'])
                 N = 16  # trajectories.shape[1]
                 B = 9
                 starts = starts[:B].reshape(-1, 12)
                 goals = goals[:B].reshape(-1, 3)
-                true_trajectories = trajectories[:B].to(device='cuda:0')
-                constraints = constraints[:B].reshape(-1, 100).to(device='cuda:0')
-                constraint_type = constraint_type[:B].to(device='cuda:0').reshape(B)
+                true_trajectories = trajectories[:B].to(device=config['device'])
+                constraints = constraints[:B].reshape(-1, 100).to(device=config['device'])
+                constraint_type = constraint_type[:B].to(device=config['device']).reshape(B)
 
                 # make one hot
                 constraint_type = torch.nn.functional.one_hot(constraint_type, num_classes=2).float()
@@ -310,7 +252,8 @@ def train_model_from_demonstrations(trajectory_sampler, train_loader, val_loader
                 g = goals.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
                 c = constraints.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
                 ctype = constraint_type.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
-                c = torch.cat([c, ctype], dim=1)
+                c = torch.cat([c, ctype], dim=1).unsqueeze(1)
+
                 with torch.no_grad():
                     trajectories = trajectory_sampler.sample(s, g, c)
 
@@ -353,8 +296,9 @@ def train_model_from_demonstrations(trajectory_sampler, train_loader, val_loader
                 'optimizer': optimizer.state_dict(),
                 'ema': ema_model.state_dict(),
                 'step': step,
+                'test_loss': test_loss
             }
-            torch.save(checkpoint, f'{fpath}/checkpoint.pth')
+            torch.save(checkpoint, f'{fpath}/checkpoint_{epoch}.pth')
 
     if config['use_ema']:
         torch.save(ema_model.state_dict(), f'{fpath}/from_demonstrations_ema.pt')
@@ -463,7 +407,6 @@ def test_samples(trajectory_sampler, config):
             g, _, _ = problem._con_ineq(samples, compute_grads=False)
             h, _, _ = problem._con_eq(samples, compute_grads=False)
 
-
             # collect together all costs and constraint violations
             costs[b1, b2, :] = J.squeeze(1)
             av_h[b1, b2, :] = torch.mean(torch.abs(h), dim=-1)
@@ -471,11 +414,11 @@ def test_samples(trajectory_sampler, config):
 
             print(J.mean(), h.abs().mean())
 
-        print(costs[:b1+1].mean(), costs[:b1+1].std())
+        print(costs[:b1 + 1].mean(), costs[:b1 + 1].std())
         print('inequality')
-        print(av_g[:b1+1].mean(), av_g[:b1+1].std())
+        print(av_g[:b1 + 1].mean(), av_g[:b1 + 1].std())
         print('equality')
-        print(av_h[:b1+1].mean(), av_h[:b1+1].std())
+        print(av_h[:b1 + 1].mean(), av_h[:b1 + 1].std())
 
     # now we can save the results, including object ids for identifying diffferent environments
     np.savez(f'{CCAI_PATH}/data/quadrotor_{config["test_name"]}.npz',
@@ -484,10 +427,19 @@ def test_samples(trajectory_sampler, config):
              av_g=av_g.cpu().numpy(),
              object_ids=object_ids)
 
+import argparse
+
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', type=str, default='quadrotor_flow_matching.yaml')
+    args = parser.parse_args()
+    return args
 
 if __name__ == "__main__":
+    args = parse_arguments()
     # load config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/config/training_configs/quadrotor_diffusion.yaml').read_text())
+    config = yaml.safe_load(
+        pathlib.Path(f'{CCAI_PATH}/config/training_configs/{args.config}').read_text())
     torch.set_float32_matmul_precision('high')
 
     # make path for saving model and plots
@@ -532,13 +484,9 @@ if __name__ == "__main__":
         train_loader = DataLoader(train_dataset, batch_size=config['batch_size'],
                                   sampler=train_sampler, num_workers=4)
         val_loader = DataLoader(val_dataset, sampler=val_sampler, batch_size=256)
-
-        if config['load_model'] != 'none':
-            model.load_state_dict(torch.load(config['load_model']))
         model.to(device=config['device'])
 
         if config['use_csvto_gradient']:
-            fine_tune_model_with_stein(model, train_loader, val_loader, batched_problem, config)
+            raise NotImplementedError  # fine_tune_model_with_stein(model, train_loader, val_loader, config)
         else:
-            train_model_from_demonstrations(model, train_loader, val_loader, batched_problem, config)
-
+            train_model_from_demonstrations(model, train_loader, val_loader, config)

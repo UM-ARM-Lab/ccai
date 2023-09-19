@@ -9,8 +9,8 @@ from ccai.models.temporal import TemporalUnet
 from ccai.models.cnf.ffjord.layers import CNF, ODEfunc
 
 from ccai.models.helpers import SinusoidalPosEmb
-
-#import ot
+import ot
+import numpy as np
 
 
 class MLP(nn.Module):
@@ -122,26 +122,30 @@ class TrajectoryCNF(nn.Module):
     def __init__(
             self,
             horizon,
-            xu_dim,
+            x_dim,
+            u_dim,
             context_dim,
+            hidden_dim=32,
             inflation_noise=0.0
     ):
         super().__init__()
 
         self.horizon = horizon
-        self.xu_dim = xu_dim
+        self.dx = x_dim
+        self.du = u_dim
+        self.xu_dim = x_dim + u_dim
         self.context_dim = context_dim
         self.loss_type = 'ot'
 
         self.model = TemporalUnet(self.horizon, self.xu_dim,
                                   cond_dim=context_dim,
-                                  dim=32, dim_mults=(1, 2, 4, 8),
+                                  dim=hidden_dim, dim_mults=(1, 2, 4, 8),
                                   attention=False)
         # self.model = MLP(horizon * xu_dim, context_dim, 256, num_layers=4)
         # self.model = TrajectoryConvNet(xu_dim, context_dim)
 
-        self.register_buffer('prior_mu', torch.zeros(horizon, xu_dim))
-        self.register_buffer('prior_sigma', torch.ones(horizon, xu_dim))
+        self.register_buffer('prior_mu', torch.zeros(horizon, self.xu_dim))
+        self.register_buffer('prior_sigma', torch.ones(horizon, self.xu_dim))
 
         self.inflation_noise = inflation_noise
         self.sigma_min = 1e-4
@@ -197,7 +201,7 @@ class TrajectoryCNF(nn.Module):
         # ut = (xu - (1 - self.sigma_min) * xut) / (1 - t * (1 - self.sigma_min))
 
         # faster for training
-        vt = self.model.compiled_fwd(t.reshape(-1), xut, context)
+        vt = self.model.compiled_conditional_train(t.reshape(-1), xut, context)
 
         # compute loss
         return mse_loss(ut, vt)
@@ -228,7 +232,7 @@ class TrajectoryCNF(nn.Module):
         xu = xu[j]
 
         # sample t from [0, 1]
-        t = torch.rand(B, 1, 1, device=xu.device)# * (1 - 1.0e-5)
+        t = torch.rand(B, 1, 1, device=xu.device)  # * (1 - 1.0e-5)
         sigma = 0.1
         mu_t = t * xu + (1 - t) * x0
         # sample
@@ -237,10 +241,32 @@ class TrajectoryCNF(nn.Module):
         ut = (xu - x0)
 
         # faster for training
-        vt = self.model.compiled_fwd(t.reshape(-1), xut, context)
+        vt = self.model.compiled_conditional_train(t.reshape(-1), xut, context)
 
         # compute loss
         return mse_loss(ut, vt)
+
+    def rectified_flow_matching_loss(self, xu, context):
+        # Using OT flow matching from https://arxiv.org/pdf/2210.02747.pdf
+        B, T, _ = xu.shape
+
+        # Inflate xu with noise
+        xu = xu + self.inflation_noise * torch.randn_like(xu)
+        # sample initial noise
+        x0 = torch.randn_like(xu)
+
+        # sample t from [0, 1]
+        t = torch.rand(B, 1, 1, device=xu.device)  # * (1 - 1.0e-5)
+        xut = t * xu + (1 - t) * x0
+        # get GT velocity
+        ut = (xu - x0)
+
+        # faster for training
+        vt = self.model.compiled_conditional_train(t.reshape(-1), xut, context)
+
+        # compute loss
+        return mse_loss(ut, vt)
+
     def conditional_flow_matching_loss_sb(self, xu, context):
         sigma = 1
         B = xu.shape[0]
@@ -248,7 +274,7 @@ class TrajectoryCNF(nn.Module):
         xu = xu + self.inflation_noise * torch.randn_like(xu)
         # sample initial noise
         x0 = torch.randn_like(xu)
-        t = torch.rand(B, 1, 1, device=xu.device)# * (1 - 1.0e-5)
+        t = torch.rand(B, 1, 1, device=xu.device)  # * (1 - 1.0e-5)
 
         a, b = ot.unif(x0.size()[0]), ot.unif(xu.size()[0])
         M = torch.cdist(x0.reshape(B, -1), xu.reshape(B, -1)) ** 2
@@ -271,8 +297,7 @@ class TrajectoryCNF(nn.Module):
         # compute loss
         return mse_loss(ut, vt)
 
-
-    def _sample(self, context=None):
+    def _sample(self, context=None, start=None):
         N = context.shape[0]
         prior = torch.distributions.Normal(self.prior_mu, self.prior_sigma)
         noise = prior.sample(sample_shape=torch.Size([N])).to(context)

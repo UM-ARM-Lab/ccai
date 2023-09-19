@@ -164,12 +164,18 @@ class TrajectoryDiffusionModel(nn.Module):
 
 class TrajectoryCNFModel(TrajectoryCNF):
 
-    def __init__(self, horizon, dx, du, context_dim):
-        super().__init__(horizon, dx + du, context_dim)
+    def __init__(self, horizon, dx, du, context_dim, hidden_dim=32):
+        super().__init__(horizon, dx, du, context_dim, hidden_dim=hidden_dim)
 
     def sample(self, start, goal, constraints):
-        context = torch.cat((start, goal, constraints), dim=1)
-        return self._sample(context)
+        B, N, _ = constraints.shape
+        #context = torch.cat((start.unsqueeze(1).repeat(1, N, 1),
+        #                     goal.unsqueeze(1).repeat(1, N, 1),
+        #                     constraints), dim=-1)
+        if N > 1:
+            raise NotImplementedError('composability TODO')
+        context = torch.cat((start, goal, constraints.reshape(B, -1)), dim=1)
+        return self._sample(context=context, start=start)
 
     def loss(self, x, start, goal, constraints):
         context = torch.cat((start, goal, constraints), dim=1)
@@ -190,7 +196,7 @@ class TrajectorySampler(nn.Module):
         if type == 'nf':
             self.model = TrajectoryFlowModel(T, dx, du, context_dim, dynamics)
         elif type == 'cnf':
-            self.model = TrajectoryCNFModel(T, dx, du, context_dim)
+            self.model = TrajectoryCNFModel(T, dx, du, context_dim, hidden_dim=hidden_dim)
         else:
             self.model = TrajectoryDiffusionModel(T, dx, du, context_dim, problem, timesteps, hidden_dim, constrain,
                                                   unconditional)
