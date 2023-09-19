@@ -105,7 +105,8 @@ class TrajectoryFlowModel(nn.Module):
 
 class TrajectoryDiffusionModel(nn.Module):
 
-    def __init__(self, T, dx, du, context_dim, problem=None, timesteps=20):
+    def __init__(self, T, dx, du, context_dim, problem=None, timesteps=20, hidden_dim=64, constrained=False,
+                 unconditional=False):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -115,10 +116,14 @@ class TrajectoryDiffusionModel(nn.Module):
             self.diffusion_model = ConstrainedDiffusion(T, (dx + du), context_dim,
                                                         timesteps=timesteps, sampling_timesteps=timesteps,
                                                         z_dim=problem.dz,
-                                                        opt_problem=problem)
+                                                        opt_problem=problem,
+                                                        constrain=constrained,
+                                                        hidden_dim=hidden_dim,
+                                                        unconditional=unconditional)
         else:
             self.diffusion_model = GaussianDiffusion(T, (dx + du), context_dim, timesteps=timesteps,
-                                                     sampling_timesteps=timesteps)
+                                                     sampling_timesteps=timesteps, hidden_dim=hidden_dim,
+                                                     unconditional=unconditional)
 
     def sample(self, start, goal, constraints):
         B, N, _ = constraints.shape
@@ -133,10 +138,11 @@ class TrajectoryDiffusionModel(nn.Module):
     def loss(self, trajectories, start, goal, constraints):
         B = trajectories.shape[0]
         context = torch.cat((start, goal, constraints), dim=1)
+        #context=None
         return self.diffusion_model.loss(trajectories.reshape(B, -1), context=context).mean()
 
-    def set_norm_constants(self, x_mu, x_mean):
-        self.diffusion_model.set_norm_constants(x_mu, x_mean)
+    def set_norm_constants(self, x_mu, x_std):
+        self.diffusion_model.set_norm_constants(x_mu, x_std)
 
     def grad(self, trajectories, t, start, goal, constraints):
         B, N, _ = constraints.shape
@@ -144,6 +150,17 @@ class TrajectoryDiffusionModel(nn.Module):
                              goal.unsqueeze(1).repeat(1, N, 1),
                              constraints), dim=-1)
         return self.diffusion_model.model_predictions(trajectories, t, context=context).pred_noise
+
+    def resample(self, start, goal, constraints, initial_trajectory, timestep):
+        B, N, _ = constraints.shape
+        context = torch.cat((start.unsqueeze(1).repeat(1, N, 1),
+                             goal.unsqueeze(1).repeat(1, N, 1),
+                             constraints), dim=-1)
+        condition = {0: start}
+        samples = self.diffusion_model.resample(x=initial_trajectory, context=context, condition=condition,
+                                                timestep=timestep).reshape(-1, self.T, self.dx + self.du)
+        return samples
+
 
 class TrajectoryCNFModel(TrajectoryCNF):
 
@@ -159,10 +176,10 @@ class TrajectoryCNFModel(TrajectoryCNF):
         return self.flow_matching_loss(x, context)
 
 
-
 class TrajectorySampler(nn.Module):
 
-    def __init__(self, T, dx, du, context_dim, type='nf', dynamics=None, problem=None, timesteps=20):
+    def __init__(self, T, dx, du, context_dim, type='nf', dynamics=None, problem=None, timesteps=20, hidden_dim=64,
+                 constrain=False, unconditional=False):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -175,7 +192,8 @@ class TrajectorySampler(nn.Module):
         elif type == 'cnf':
             self.model = TrajectoryCNFModel(T, dx, du, context_dim)
         else:
-            self.model = TrajectoryDiffusionModel(T, dx, du, context_dim, problem, timesteps)
+            self.model = TrajectoryDiffusionModel(T, dx, du, context_dim, problem, timesteps, hidden_dim, constrain,
+                                                  unconditional)
 
         self.register_buffer('x_mean', torch.zeros(dx + du))
         self.register_buffer('x_std', torch.ones(dx + du))
@@ -188,8 +206,15 @@ class TrajectorySampler(nn.Module):
         self.model.set_norm_constants(self.x_mean, self.x_std)
 
     def sample(self, start, goal, constraints=None):
-        samples = self.model.sample(start, goal, constraints)
+        norm_start = (start - self.x_mean[:self.dx]) / self.x_std[:self.dx]
+        samples = self.model.sample(norm_start, goal, constraints)
         return samples * self.x_std + self.x_mean
+
+    def resample(self, start, goal, constraints, initial_trajectory, timestep):
+        norm_start = (start - self.x_mean[:self.dx]) / self.x_std[:self.dx]
+        norm_initial_trajectory = (initial_trajectory - self.x_mean) / self.x_std
+
+        return self.model.resample(norm_start, goal, constraints, norm_initial_trajectory, timestep) * self.x_std + self.x_mean
 
     def loss(self, trajectories, start, goal, constraints=None):
         return self.model.loss(trajectories, start, goal, constraints)

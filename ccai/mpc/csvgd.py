@@ -12,6 +12,8 @@ class Constrained_SVGD_MPC:
         self.N = params.get('N')
         self.resample_steps = params.get('resample_steps', 1)
         self.flow_model = params.get('flow_model', None)
+        self.add_start = params.get('add_start', True)
+
         self.problem = problem
         self.solver = ConstrainedSteinTrajOpt(problem, params)
 
@@ -32,24 +34,42 @@ class Constrained_SVGD_MPC:
         self.problem.update(state, T=new_T, **kwargs)
         if self.flow_model is not None:
             self.flow_model.model.diffusion_model.problem = self.problem
-            state_norm = (state - self.flow_model.x_mean[:self.problem.dx]) / self.flow_model.x_std[:self.problem.dx]
+            if not self.warmed_up:
+                sampled_x = self.flow_model.sample(state.expand(self.N, -1),
+                                                   self.problem.goal[:3].expand(self.N, -1),
+                                                   constr_param.expand(self.N, -1, -1))
+            else:
+                if self.add_start:
+                    initial_traj = torch.cat((state.expand(self.N, 1, -1), self.x), dim=1)
+                else:
+                    initial_traj = self.x
+                sampled_x = self.flow_model.resample(state.expand(self.N, -1),
+                                                     self.problem.goal[:3].expand(self.N, -1),
+                                                     constr_param.expand(self.N, -1, -1),
+                                                     initial_trajectory=initial_traj,
+                                                     timestep=self.online_iters)
 
-            sampled_x = self.flow_model.sample(state_norm.expand(self.N, -1),
-                                               self.problem.goal[:3].expand(self.N, -1),
-                                               constr_param.expand(self.N, -1, -1))
+            if self.add_start:
+                sampled_x = sampled_x[:, 1:]
+
             sampled_x = sampled_x.detach()
-            # want to choose between sampled x and current x
-            all_x = torch.cat((sampled_x, self.x), dim=0)
+            if self.warmed_up:
+                # want to choose between sampled x and current x
+                all_x = torch.cat((sampled_x, self.x), dim=0)
 
-            # get values for z
-            all_z = self.problem.get_initial_z(all_x)
-            all_x = torch.cat((all_x, all_z), dim=-1)
+                # get values for z
+                all_z = self.problem.get_initial_z(all_x)
+                all_x = torch.cat((all_x, all_z), dim=-1)
 
-            J = self.problem.get_cost(all_x.reshape(2*self.N, self.problem.T, -1)[:, :, :self.problem.dx + self.problem.du])
-            C, _, _ = self.problem.combined_constraints(all_x.reshape(2*self.N, self.problem.T, -1))
-            penalty = J.reshape(2*self.N) + self.solver.penalty * torch.sum(C.reshape(2*self.N, -1).abs(), dim=1)
-            idx = torch.argsort(penalty, descending=False)
-            self.x = all_x[idx[:self.N], :, :self.problem.dx + self.problem.du]
+                J = self.problem.get_cost(
+                    all_x.reshape(2 * self.N, self.problem.T, -1)[:, :, :self.problem.dx + self.problem.du])
+                C, _, _ = self.problem.combined_constraints(all_x.reshape(2 * self.N, self.problem.T, -1))
+                penalty = J.reshape(2 * self.N) + self.solver.penalty * torch.sum(C.reshape(2 * self.N, -1).abs(),
+                                                                                  dim=1)
+                idx = torch.argsort(penalty, descending=False)
+                self.x = all_x[idx[:self.N], :, :self.problem.dx + self.problem.du]
+            else:
+                self.x = sampled_x
 
         # warm starting
         if self.warmed_up:

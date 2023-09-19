@@ -196,14 +196,11 @@ class TemporalUnet(nn.Module):
         x = einops.rearrange(x, 'b t h -> b h t')
         return x
 
-    #@torch.compile(mode='reduce-overhead')
     def compiled_conditional_test(self, t, x, context):
         return self(t, x, context, dropout=False)
 
-    #@torch.compile(mode='reduce-overhead')
     def compiled_unconditional_test(self, t, x):
         return self(t, x, context=None, dropout=False)
 
-    #@torch.compile(mode='reduce-overhead')
     def compiled_conditional_train(self, t, x, context):
-        return self(t, x, context, dropout=False)
+        return self(t, x, context, dropout=True)

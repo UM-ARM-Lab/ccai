@@ -5,6 +5,7 @@ import numpy as np
 from ccai.models.temporal import TemporalUnet
 
 from einops import reduce
+import math
 
 
 def cosine_beta_schedule(timesteps, s=0.008, dtype=torch.float32):
@@ -104,19 +105,17 @@ class GaussianDiffusion(nn.Module):
             objective='pred_noise',
             schedule_fn_kwargs=dict(),
             ddim_sampling_eta=0.,
-            auto_normalize=True,
             min_snr_loss_weight=False,  # https://arxiv.org/abs/2303.09556
             min_snr_gamma=5,
-            guidance_w=1.2,
-            hidden_dim=32
+            hidden_dim=32,
+            unconditional=False
     ):
         super().__init__()
-        self.guidance_w = guidance_w
         self.horizon = horizon
         self.xu_dim = xu_dim
         self.model = TemporalUnet(self.horizon, self.xu_dim, cond_dim=context_dim, dim=hidden_dim)
         self.objective = objective
-
+        self.unconditional = unconditional
         beta_schedule_fn = cosine_beta_schedule
         betas = beta_schedule_fn(timesteps, **schedule_fn_kwargs)
 
@@ -216,18 +215,30 @@ class GaussianDiffusion(nn.Module):
         return posterior_mean, posterior_variance, posterior_log_variance_clipped
 
     def model_predictions(self, x, t, context):
-        guidance_weights = [1.2, 0.8]
-        if context is not None:
+        B, N, _ = context.shape
+        guidance_weights = torch.tensor([0.5, 0.5], device=x.device)
+        w_total = 1.0
+        unconditional = self.model.compiled_unconditional_test(t, x)
+        # print(context.shape)
+        if not (context is None or self.unconditional):
             num_constraints = context.shape[1]
+
+            conditional = self.model.compiled_conditional_test(t.unsqueeze(1).expand(-1, N).reshape(-1),
+                                                               x.unsqueeze(1).expand(-1, N, -1, -1).reshape(B * N,
+                                                                                                            self.horizon,
+                                                                                                            -1),
+                                                               context.reshape(B * N, -1))
+            conditional = conditional.reshape(B, N, self.horizon, -1)
             # classifier free guidance
-            unconditional = self.model.compiled_unconditional_test(t, x)
             model_output = unconditional
             # compose multiple constraints
-            for i in range(context.shape[1]):
-                conditional = self.model.compiled_conditional_test(t, x, context[:, i])
-                model_output += guidance_weights[i] * (conditional - unconditional) / num_constraints
+            if num_constraints == 1:
+                model_output += w_total * (conditional.squeeze(1) - unconditional)
+            else:
+                diff = conditional - unconditional.unsqueeze(1)
+                model_output += w_total * torch.sum(guidance_weights.reshape(1, -1, 1, 1) * diff, dim=1)
         else:
-            model_output = self.model(t, x, context)
+            model_output = unconditional
         pred_noise = model_output
         x_start = self.predict_start_from_noise(x, t, pred_noise)
         return ModelPrediction(pred_noise, x_start)
@@ -249,21 +260,31 @@ class GaussianDiffusion(nn.Module):
 
     def _apply_conditioning(self, x, condition):
         for t, val in condition.items():
-            x[:, t, :12] = val.clone()
+            n, d = val.shape
+            x[:, t, :d] = val.clone()
         return x
 
     @torch.no_grad()
-    def p_sample_loop(self, shape, condition, context, return_all_timesteps=False):
+    def p_sample_loop(self, shape, condition, context, return_all_timesteps=False,
+                      start_timestep=None,
+                      trajectory=None):
         batch, device = shape[0], self.betas.device
 
-        img = torch.randn(shape, device=device)
+        if trajectory is None:
+            img = torch.randn(shape, device=device)
+        else:
+            img = trajectory
+        if start_timestep is None:
+            start_timestep = self.num_timesteps
+
         img = self._apply_conditioning(img, condition)
         imgs = [img]
 
-        for t in reversed(range(0, self.num_timesteps)):
+        for t in reversed(range(0, start_timestep)):
             img, x_start = self.p_sample(img, t, context)
             img = self._apply_conditioning(img, condition)
             imgs.append(img)
+
         ret = img if not return_all_timesteps else torch.stack(imgs, dim=1)
 
         return ret
@@ -353,6 +374,28 @@ class GaussianDiffusion(nn.Module):
         self.mu = mu
         self.std = std
 
+    def resample(self, x, condition, context, timestep):
+        B, num_constraints, dc = context.shape
+        N, _, _ = x.shape
+        assert(B == N)
+
+        ##context = context.reshape(B, 1, num_constraints, dc).repeat(1, N, 1, 1).reshape(B * N, num_constraints, -1)
+
+        # for replanning
+        # takes a current data estimate x_0, samples from forward diffusion to noise to x_timestep < T
+        # then runs reverse diffusion to get a new updated sample
+        # what if we noise it a little less than we were supposed to
+        batched_times = torch.full((B,), timestep, device=x.device, dtype=torch.long)
+
+        x_noised = self.q_sample(x, batched_times)
+        #x_noised = x
+        # return resampled
+        return self.p_sample_loop(x.shape, condition, context,
+                                  return_all_timesteps=False,
+                                  start_timestep=timestep,
+                                  trajectory=x_noised)
+
+
 class ConstrainedDiffusion(GaussianDiffusion):
 
     def __init__(
@@ -365,13 +408,11 @@ class ConstrainedDiffusion(GaussianDiffusion):
             timesteps=1000,
             sampling_timesteps=10,
             loss_type='l2',
-            objective='pred_noise',
-            schedule_fn_kwargs=dict(),
-            ddim_sampling_eta=0.,
-            auto_normalize=True,
-            min_snr_loss_weight=False,  # https://arxiv.org/abs/2303.09556
-            min_snr_gamma=5,
-            guidance_w=1.2
+            constrain=True,
+            hidden_dim=32,
+            unconditional=False,
+            alpha_J=1e-4,
+            alpha_C=0.1
     ):
         super().__init__(
             horizon,
@@ -380,87 +421,186 @@ class ConstrainedDiffusion(GaussianDiffusion):
             timesteps=timesteps,
             sampling_timesteps=sampling_timesteps,
             loss_type=loss_type,
+            hidden_dim=hidden_dim,
+            unconditional=unconditional,
         )
         self.problem = opt_problem
         self.z_dim = z_dim  # dimension of auxiliary variable z (number of inequality constraints)
+        self.constrain = constrain
+        self.alpha_J = alpha_J
+        self.alpha_C = alpha_C
 
-    def p_sample(self, x, t, context):
+        if constrain:
+            self.use_gauss_newton = True
+
+        self.skip_first = False
+        self.anneal_factor = .1
+        self.noise_factor = 0.707
+        self.max_norm = 10
+
+    def p_sample(self, x, t, context, anneal=True):
         b, *_, device = *x.shape, x.device
         batched_times = torch.full((b,), t, device=x.device, dtype=torch.long)
         with torch.no_grad():
-            model_mean, _, model_log_variance, x_start = self.p_mean_variance(x=x[:, :, :self.xu_dim], t=batched_times, context=context)
-        noise = torch.randn_like(x)[:, :, :self.xu_dim] if t > 0 else 0.  # no noise if t == 0
-
+            model_mean, _, model_log_variance, x_start = self.p_mean_variance(x=x[:, :, :self.xu_dim],
+                                                                              t=batched_times,
+                                                                              context=context)
         # we have to unnormalize first
-        x[:, :, :self.xu_dim] = x[:, :, :self.xu_dim] * self.std + self.mu
+        if self.skip_first:
+            _x = x[:, 1:].clone()
+            _model_mean = model_mean[:, 1:]
+            H = self.horizon - 1
+        else:
+            _x = x.clone()
+            _model_mean = model_mean
+            H = self.horizon
 
-        _, dJ, _ = self.problem._objective(x[:, :, :self.xu_dim])
-        C, dC, _ = self.problem.combined_constraints(x)
-        # renormalize
-        x[:, :, :self.xu_dim] = (x[:, :, :self.xu_dim] - self.mu.reshape(1, 1, self.xu_dim)) / self.std.reshape(1, 1, self.xu_dim)
+        noise = self.noise_factor * torch.randn_like(_x)[:, :, :self.xu_dim] if t > 0 else 0.  # no noise if t == 0
 
-        # normalize grads
-        dJ = dJ.reshape(b, self.horizon, self.xu_dim) / self.std
-        dC = dC.reshape(b, -1, self.horizon, self.xu_dim + self.z_dim) #/ self.std
-        dC[:, :, :, :self.xu_dim] /= self.std
-        dC = dC.reshape(b, -1, self.horizon * (self.xu_dim + self.z_dim))
+        x_norm = _x.clone()
+        x_norm[:, :, :self.xu_dim] *= self.std
+        x_norm[:, :, :self.xu_dim] += self.mu
 
-        #print(t, C.abs().mean())
+        J, dJ, _ = self.problem._objective(x_norm[:, :, :self.xu_dim])
+        C, dC, _ = self.problem.combined_constraints(x_norm)
 
-        with torch.no_grad():
-            unconstrained_new_x = model_mean - 0.015 * dJ.reshape(b, self.horizon, self.xu_dim) + (0.5 * model_log_variance).exp() * noise
+        dJ = dJ.reshape(b, H, self.xu_dim)
+        dC = dC.reshape(b, -1, H * (self.xu_dim + self.z_dim))
 
-            unconstrained_delta_x = unconstrained_new_x - x[:, :, :self.xu_dim]
-            unconstrained_delta_x = torch.cat((unconstrained_delta_x,
-                                               torch.zeros(b, self.horizon, self.problem.dz, device=device)), dim=2)
-            eye = torch.eye(C.shape[1]).repeat(b, 1, 1).to(device=C.device)
+        # compute unconstrained update with cost guide
+        update = _model_mean + (0.5 * model_log_variance).exp() * self.noise_factor * noise - _x[:, :, :self.xu_dim]
 
-            try:
-                dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1), eye)
-            except Exception as e:
-                dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1))
+        # make update be unnormalized
+        update = update * self.std - self.alpha_J * dJ
 
-            projection = dC.permute(0, 2, 1) @ dCdCT_inv @ dC
-            # we linearly increase the weight of the projection
-            import math
-            projection_factor = math.exp(-t)#(1.0 - (float(t) / self.num_timesteps))**2
+        # add zero update for z
+        update = torch.cat((update, torch.zeros(b, H, self.problem.dz, device=device)), dim=2)
 
-            eye = torch.eye(x.shape[1] * x.shape[2], device=x.device, dtype=x.dtype).unsqueeze(0)
-            constrained_tau_update = (eye - projection_factor * projection) @ unconstrained_delta_x.reshape(b, -1, 1)
+        xi_C = None
+        if self.constrain:
+            with (torch.no_grad()):
+                # convert to float64
+                dtype = torch.float64
+                C = C.to(dtype=dtype)
+                dC = dC.to(dtype=dtype)
+                eye = torch.eye(C.shape[1]).repeat(b, 1, 1).to(device=C.device, dtype=dtype)
+                update = update.to(dtype=dtype)
 
-            xi_C = dCdCT_inv @ C.unsqueeze(-1)
-            xi_C = (dC.permute(0, 2, 1) @ xi_C).squeeze(-1)
+                # Damping anneals from 1 to 0
+                if anneal:
+                    max_damping = 1
+                    damping = min_damping + (max_damping - min_damping) * t / self.num_timesteps
+                else:
+                    damping = 0
 
-            #xi_C = torch.mean(dC, dim=1)
-            eta = 0.1 * (1.0 - (float(t) / self.num_timesteps))
-            # new constrained update rule
-            pred_x = x + constrained_tau_update.reshape(b, self.horizon, -1) - eta * xi_C.reshape(b, self.horizon, -1)
+                # Compute damped projection matrix
+                try:
+                    dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1) +
+                                                   damping * eye
+                                                   , eye)
+                except Exception as e:
+                    dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1) * damping * eye)
+                projection = dC.permute(0, 2, 1) @ dCdCT_inv @ dC
 
+                # Compute constrained update
+                eye2 = torch.eye(_x.shape[1] * _x.shape[2], device=x.device, dtype=dtype).unsqueeze(0)
+                update = (eye2 - projection) @ update.reshape(b, -1, 1)
+                update = update.squeeze(-1)
+
+                # Update to decrease constraint violation
+                if self.use_gauss_newton:
+                    xi_C = dCdCT_inv @ C.unsqueeze(-1)
+                    xi_C = (dC.permute(0, 2, 1) @ xi_C).squeeze(-1)
+                else:
+                    grad_C_sq = 2 * C.unsqueeze(-1) * dC
+                    xi_C = torch.sum(grad_C_sq, dim=1)
+
+        # Update to minimize constraint if no projection
+        if xi_C is None:
+            grad_C_sq = 2 * C.unsqueeze(-1) * dC
+            xi_C = torch.sum(grad_C_sq, dim=1)
+
+        # Convert back to single precision
+        dtype = torch.float32
+        update = update.to(dtype=dtype)
+        update = update.reshape(b, -1)
+
+        # total update
+        update -= self.alpha_C * xi_C
+
+        # maximum norm on xi_C
+        norm_update = torch.linalg.norm(update, dim=1, keepdim=True)
+        update = torch.where(norm_update < self.max_norm, update, update * self.max_norm / norm_update)
+
+        # normalize update
+        update = update.reshape(b, H, -1)
+        update[:, :, :self.xu_dim] = update[:, :, :self.xu_dim] / self.std
+
+        # update
+        pred_x = _x + update
+
+        if self.skip_first:
+            pred_x = torch.cat((x[:, 0].unsqueeze(1), pred_x), dim=1)
+
+        #print(J.mean(), C.abs().mean(), t)
+        pred_x.detach_()
         return pred_x, x_start
 
-    def p_sample_loop(self, shape, condition, context, return_all_timesteps=False):
+    def p_sample_loop(self, shape, condition, context, return_all_timesteps=False,
+                      start_timestep=None,
+                      trajectory=None,
+                      anneal=True):
+
         batch, T, xu_dim = shape
         device = context.device
+        if trajectory is None:
+            trajectory = torch.randn(shape, device=device)
 
-        trajectory = torch.randn(shape, device=device)
-        z = self.problem.get_initial_z(trajectory)
+        if self.skip_first:
+            z = torch.zeros(batch, T, self.problem.dz, device=device)
+            z[:, 1:] = self.problem.get_initial_z(trajectory[:, 1:])
+        else:
+            z = self.problem.get_initial_z(trajectory)
 
-        # what should we initialize z to? try zero to start
+        if start_timestep is None:
+            start_timestep = self.num_timesteps
 
         augmented_trajectory = torch.cat((trajectory, z), dim=-1)
         augmented_trajectory = self._apply_conditioning(augmented_trajectory, condition)
         trajectories = [augmented_trajectory]
 
-        for t in reversed(range(0, self.num_timesteps)):
-            augmented_trajectory, x_start = self.p_sample(augmented_trajectory, t, context)
+        for t in reversed(range(0, start_timestep)):
+            augmented_trajectory, x_start = self.p_sample(augmented_trajectory, t, context, anneal)
             augmented_trajectory = self._apply_conditioning(augmented_trajectory, condition)
-            trajectories.append(augmented_trajectory)
-        ret = augmented_trajectory[:, :, :self.xu_dim] if not return_all_timesteps else torch.stack(trajectories, dim=1)
+            # also clamp between bounds
+            self._clamp_in_bounds(augmented_trajectory[:, :, :self.xu_dim])
 
+            trajectories.append(augmented_trajectory)
+
+        ret = augmented_trajectory[:, :, :self.xu_dim] if not return_all_timesteps else torch.stack(trajectories, dim=1)
         return ret
 
-    def model_predictions(self, x, t, context):
-        model_output = self.model.compiled_unconditional_test(t, x)
-        pred_noise = model_output
-        x_start = self.predict_start_from_noise(x, t, pred_noise)
-        return ModelPrediction(pred_noise, x_start)
+    def _clamp_in_bounds(self, xuz):
+        min_x = self.problem.x_min.reshape(1, 1, -1).expand(-1, self.horizon, -1)
+        max_x = self.problem.x_max.reshape(1, 1, -1).expand(-1, self.horizon, -1)
+        torch.clamp_(xuz[:, :, :self.xu_dim], min=min_x.to(device=xuz.device)/self.std,
+                     max=max_x.to(device=xuz.device)/self.std)
+
+    def resample(self, x, condition, context, timestep):
+        B, num_constraints, dc = context.shape
+        N, _, _ = x.shape
+        assert(B == N)
+        # for replanning
+        # takes a current data estimate x_0, samples from forward diffusion to noise to x_timestep < T
+        # then runs reverse diffusion to get a new updated sample
+        # what if we noise it a little less than we were supposed to
+        batched_times = torch.full((B,), timestep, device=x.device, dtype=torch.long)
+
+        x_noised = self.q_sample(x, batched_times)
+        # return resampled
+        return self.p_sample_loop(x.shape, condition, context,
+                                  return_all_timesteps=False,
+                                  start_timestep=timestep,
+                                  trajectory=x_noised,
+                                  anneal=False)
+
