@@ -478,9 +478,7 @@ if __name__ == "__main__":
 
         data_path = pathlib.Path(f'{CCAI_PATH}/data/training_data/{config["data_directory"]}')
         train_dataset = QuadrotorMultiConstraintTrajectoryDataset([p for p in data_path.glob('*train_data*')])
-        val_dataset = QuadrotorMultiConstraintTrajectoryDataset([p for p in data_path.glob('*train_data*')])
-
-        #val_dataset = QuadrotorMultiConstraintTrajectoryDataset([p for p in data_path.glob('*test_data*')])
+        val_dataset = QuadrotorMultiConstraintTrajectoryDataset([p for p in data_path.glob('*test_data*')])
 
         # Get Normalization Constants
         if config['normalize_data']:
