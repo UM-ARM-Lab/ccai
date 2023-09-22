@@ -17,7 +17,6 @@ import pathlib
 from torch import nn
 import tqdm
 import copy
-from quadrotor_example import QuadrotorProblem
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 from ccai.models.training import EMA
@@ -246,6 +245,10 @@ def train_model_from_demonstrations(trajectory_sampler, train_loader, val_loader
                 constraints = constraints[:B].reshape(-1, 100).to(device=config['device'])
                 constraint_type = constraint_type[:B].to(device=config['device']).reshape(B)
 
+                # unnormalize starts, sample takes in unnormalized starts
+                starts = starts * trajectory_sampler.x_std[:12] + trajectory_sampler.x_mean[:12]
+                true_trajectories = true_trajectories * trajectory_sampler.x_std + trajectory_sampler.x_mean
+
                 # make one hot
                 constraint_type = torch.nn.functional.one_hot(constraint_type, num_classes=2).float()
                 s = starts.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
@@ -260,9 +263,7 @@ def train_model_from_demonstrations(trajectory_sampler, train_loader, val_loader
                 trajectories = trajectories.reshape(B, N, 12, 16)
                 starts = s.reshape(B, N, 12)
 
-                # unnormalize starts
-                starts = starts * trajectory_sampler.x_std[:12] + trajectory_sampler.x_mean[:12]
-                true_trajectories = true_trajectories * trajectory_sampler.x_std + trajectory_sampler.x_mean
+
 
                 goals = g.reshape(B, N, 3)
                 constraints = constraints.reshape(B, 100)
@@ -308,6 +309,7 @@ def train_model_from_demonstrations(trajectory_sampler, train_loader, val_loader
 
 
 def test_samples(trajectory_sampler, config):
+    from quadrotor_example import QuadrotorProblem
     fpath = f'{CCAI_PATH}/data/training/quadrotor/{config["model_name"]}_{config["model_type"]}'
     data_path = pathlib.Path(f'{CCAI_PATH}/data/test_data/{config["test_directory"]}')
     print(data_path)
@@ -432,6 +434,7 @@ import argparse
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, default='quadrotor_flow_matching.yaml')
+    parser.add_argument('--device', type=str, default=None)
     args = parser.parse_args()
     return args
 
@@ -442,11 +445,15 @@ if __name__ == "__main__":
         pathlib.Path(f'{CCAI_PATH}/config/training_configs/{args.config}').read_text())
     torch.set_float32_matmul_precision('high')
 
+    if args.device is not None:
+        config['device'] = args.device
+
     # make path for saving model and plots
     fpath = pathlib.Path(f'{CCAI_PATH}/data/training/quadrotor/{config["model_name"]}_{config["model_type"]}')
     pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
 
     if config['constrained'] or config['guided']:
+        from quadrotor_example import QuadrotorProblem
         problem = QuadrotorProblem(T=12, start=torch.zeros(12, device=config['device']),
                                    goal=torch.zeros(12, device=config['device']),
                                    device=config['device'], include_obstacle=True, alpha=0.1)
@@ -471,7 +478,9 @@ if __name__ == "__main__":
 
         data_path = pathlib.Path(f'{CCAI_PATH}/data/training_data/{config["data_directory"]}')
         train_dataset = QuadrotorMultiConstraintTrajectoryDataset([p for p in data_path.glob('*train_data*')])
-        val_dataset = QuadrotorMultiConstraintTrajectoryDataset([p for p in data_path.glob('*test_data*')])
+        val_dataset = QuadrotorMultiConstraintTrajectoryDataset([p for p in data_path.glob('*train_data*')])
+
+        #val_dataset = QuadrotorMultiConstraintTrajectoryDataset([p for p in data_path.glob('*test_data*')])
 
         # Get Normalization Constants
         if config['normalize_data']:

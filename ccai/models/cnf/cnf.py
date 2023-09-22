@@ -9,7 +9,7 @@ from ccai.models.temporal import TemporalUnet
 from ccai.models.cnf.ffjord.layers import CNF, ODEfunc
 
 from ccai.models.helpers import SinusoidalPosEmb
-import ot
+# import ot
 import numpy as np
 
 
@@ -152,7 +152,7 @@ class TrajectoryCNF(nn.Module):
         noise_dist = torch.distributions.Normal(self.prior_mu, self.prior_sigma)
 
         odefunc = ODEfunc(
-            diffeq=self.model,
+            diffeq=self.masked_grad,
             divergence_fn='approximate',
             residual=False,
             rademacher=False,
@@ -166,6 +166,14 @@ class TrajectoryCNF(nn.Module):
                         )
 
         set_cnf_options(solver, self.flow)
+
+        start_mask = torch.ones(self.horizon, self.xu_dim)
+        start_mask[0, self.dx:] = 0
+        self.register_buffer('start_mask', start_mask)
+
+    def masked_grad(self, t, x, context):
+        dx = self.model(t, x, context)
+        return dx * self.start_mask[None]
 
     def flow_matching_loss(self, xu, context):
         if self.loss_type == 'diffusion':
@@ -301,6 +309,10 @@ class TrajectoryCNF(nn.Module):
         N = context.shape[0]
         prior = torch.distributions.Normal(self.prior_mu, self.prior_sigma)
         noise = prior.sample(sample_shape=torch.Size([N])).to(context)
+        # manually set the start
+        if start is not None:
+            noise[:, 0, :self.dx] = start
+
         log_prob = torch.zeros(N, device=noise.device)
         out = self.flow(noise, logpx=log_prob, context=context, reverse=False)
         return out[0]
