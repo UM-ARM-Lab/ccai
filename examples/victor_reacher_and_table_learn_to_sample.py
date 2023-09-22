@@ -163,6 +163,16 @@ def train_model(trajectory_sampler, env_encoder, height_encoder, train_loader_re
                 trajectories_table, starts_table, goals_table, constraints_table = batch_table
                 B1, B2 = trajectories_reach.shape[0], trajectories_table.shape[0]
 
+                # unnormalize true trajectories
+                trajectories_table = trajectories_table.to(
+                    device=config['device']) * test_model.x_std + test_model.x_mean
+                trajectories_reach = trajectories_reach.to(
+                    device=config['device']) * test_model.x_std + test_model.x_mean
+
+                # unnormalize starts
+                starts_table = starts_table.to(device=config['device']) * test_model.x_std + test_model.x_mean
+                starts_reach = starts_reach.to(device=config['device']) * test_model.x_std + test_model.x_mean
+
                 # encode constraints
                 constraints_reach = constraints_reach.to(device=config['device'])
                 constraints_table = constraints_table.to(device=config['device'])
@@ -203,15 +213,7 @@ def train_model(trajectory_sampler, env_encoder, height_encoder, train_loader_re
                 sampled_trajectories_reach = sampled_trajectories[:B1]
                 sampled_trajectories_table = sampled_trajectories[B1:]
 
-                # unnormalize true trajectories
-                trajectories_table = trajectories_table.to(
-                    device=config['device']) * test_model.x_std + test_model.x_mean
-                trajectories_reach = trajectories_reach.to(
-                    device=config['device']) * test_model.x_std + test_model.x_mean
 
-                # unnormalize starts
-                starts_table = starts_table.to(device=config['device']) * test_model.x_std + test_model.x_mean
-                starts_reach = starts_reach.to(device=config['device']) * test_model.x_std + test_model.x_mean
 
                 data = {
                     'table': {
