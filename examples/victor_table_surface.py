@@ -396,7 +396,6 @@ if __name__ == "__main__":
     # instantiate environment
     env = VictorPuckObstacleEnv(1)
     sim, gym, viewer = env.get_sim()
-
     """
     state = env.get_state()
     ee_pos, ee_ori = state['ee_pos'], state['ee_ori']

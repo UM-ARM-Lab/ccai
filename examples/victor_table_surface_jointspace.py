@@ -605,7 +605,6 @@ def ee_equality_constraint(p, mat, height):
     return torch.cat((
         constraints_z.reshape(-1), constraints.reshape(1) + 1), dim=0
     )
-    return 1 + constraints.reshape(1)
 
 
 def ee_inequality_constraint(p, mat, centres, rads):
@@ -626,7 +625,6 @@ def ee_inequality_constraint(p, mat, centres, rads):
     # constraint on obstacles
     obs_constraints = obstacle_constraint(p, centres, rads)
     return obs_constraints
-    return torch.cat((constraints_z, obs_constraints), dim=0)
 
 
 def do_trial(env, params, fpath):
@@ -806,3 +804,4 @@ def do_trial(env, params, fpath):
              obs_constr=obs_constraint_val,
              )
     return torch.min(final_distance_to_goal).cpu().numpy()
+
