@@ -116,6 +116,7 @@ if __name__ == "__main__":
 
     # get config
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/victor_wrench.yaml').read_text())
+
     from tqdm import tqdm
 
     asset = f'{get_assets_dir()}/victor/victor_grippers.urdf'

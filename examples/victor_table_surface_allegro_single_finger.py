@@ -1,6 +1,6 @@
 import numpy as np
 from isaacgym.torch_utils import quat_apply
-from isaac_victor_envs.tasks.victor import VictorPuckObstacleEnv, orientation_error, quat_change_convention
+from isaac_victor_envs.tasks.victor_allegro import VictorAllegroSingleFingerEnv, orientation_error, quat_change_convention
 
 import torch
 import time
@@ -21,8 +21,8 @@ import time
 import pytorch_kinematics as pk
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
-asset = '/home/fanyang/github/isaacgym-arm-envs/isaac_victor_envs/assets/victor/victor.urdf'
-ee_name = 'victor_left_arm_striker_mallet_tip'
+asset = '/home/fanyang/github/isaacgym-arm-envs/isaac_victor_envs/assets/victor/victor_allegro.urdf'
+ee_name = 'index_biotac_tip'
 
 chain = pk.build_serial_chain_from_urdf(open(asset).read(), ee_name)
 
@@ -33,8 +33,8 @@ class VictorTableProblem(ConstrainedSVGDProblem):
         super().__init__(start, goal, T, device)
         self.dz = 2
         self.dh = self.dz * T
-        self.dg = 2 * T# + 2
-        self.dx = 7
+        self.dg = 1 * T# + 2
+        self.dx = 11
         self.du = 0
         self.dt = 0.1
         self.T = T
@@ -57,7 +57,7 @@ class VictorTableProblem(ConstrainedSVGDProblem):
             chain, partial(ee_terminal_constraint, goal=self.goal)
         )
 
-        self.x_max = torch.tensor([2.96, 2.09, 2.96, 2.09, 2.96, 2.09, 3.05])
+        self.x_max = torch.tensor([2.96, 2.09, 2.96, 2.09, 2.96, 2.09, 3.05, 8 ,8 ,8 ,8])
         self.x_min = -self.x_max
 
         self.dynamics_constraint = vmap(self._dynamics_constraint)
@@ -132,23 +132,6 @@ class VictorTableProblem(ConstrainedSVGDProblem):
         hess_g = hess_g.permute(0, 4, 1, 5, 2, 6, 3).reshape(N, -1,
                                                              self.T * (self.dx),
                                                              self.T * (self.dx))
-
-        return g, grad_g, hess_g
-
-        # now need to get gradients and hessian for terminal constraint
-        term_grad_g_extended = torch.zeros(N, term_g.shape[1], self.T, self.dx + self.du,
-                                           device=self.device)
-        term_grad_g_extended[:, :, -1, :] = term_grad_g
-        term_grad_g_extended = term_grad_g_extended.reshape(N, -1, self.T * (self.dx + self.du))
-        term_hess_g_extended = torch.zeros(N, term_g.shape[1], self.T, self.dx + self.du,
-                                           self.T, self.dx + self.du, device=self.device)
-        term_hess_g_extended[:, :, -1, :, -1, :] = term_hess_g
-        term_hess_g_extended = term_hess_g_extended.reshape(N, -1, self.T * (self.dx + self.du),
-                                                            self.T * (self.dx + self.du))
-
-        # Combine gradients and hessians
-        grad_g = torch.cat((grad_g, term_grad_g_extended), dim=1)
-        hess_g = torch.cat((hess_g, term_hess_g_extended), dim=1)
 
         return g, grad_g, hess_g
 
@@ -239,7 +222,7 @@ class VictorTableProblem(ConstrainedSVGDProblem):
 
     def get_initial_xu(self, N):
 
-        u = torch.randn(N, self.T, 7, device=self.device)
+        u = torch.randn(N, self.T, 11, device=self.device)
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
         for t in range(self.T):
             x.append(self.dynamics(x[-1], u[:, t]))
@@ -262,19 +245,20 @@ class VictorTableUnconstrainedProblem(VictorTableProblem, UnconstrainedPenaltyPr
         super().__init__(start, goal, T, device=device)
         self.penalty = penalty
         self.dt = 0.1
-        self.du = 7
-        self.x_min = torch.cat((self.x_min, -torch.ones(7)))
-        self.x_max = torch.cat((self.x_max, torch.ones(7)))
+        self.du = 11
+        self.x_min = torch.cat((self.x_min, -torch.ones(11)))
+        self.x_max = torch.cat((self.x_max, torch.ones(11)))
 
 
 def cost(x, start):
-    x = torch.cat((start.reshape(1, 7), x[:, :7]), dim=0)
+    x = torch.cat((start.reshape(1, 11), x[:, :11]), dim=0)
     weight = torch.tensor([
-        0.2, 0.25, 0.4, 0.4, 0.6, 0.75, 1.0], device=x.device, dtype=torch.float32)
+        0.2, 0.25, 0.4, 0.4, 0.6, 0.75, 1.0, 3.0, 3.0, 3.0, 3.0], device=x.device, dtype=torch.float32)
     weight = 1.0 / weight
     diff = x[1:] - x[:-1]
-    weighted_diff = diff.reshape(-1, 1, 7) @ torch.diag(weight).unsqueeze(0) @ diff.reshape(-1, 7, 1)
+    weighted_diff = diff.reshape(-1, 1, 11) @ torch.diag(weight).unsqueeze(0) @ diff.reshape(-1, 11, 1)
     return 10 * torch.sum(weighted_diff)
+    # return 10 * torch.sum(diff ** 2)
 
 def obstacle_constraint(x):
     xy = x[:2]
@@ -325,7 +309,7 @@ class EndEffectorConstraint:
         T = q.shape[0]
 
         # robot joint configuration
-        joint_config = q[:, :7]
+        joint_config = q[:, :11]
 
         # Get end effector pose
         m = self.chain.forward_kinematics(joint_config)
@@ -373,11 +357,11 @@ class EndEffectorConstraint:
 
         # Use kinematic hessian and jacobian to get 2nd derivative
         DDg = self._J.unsqueeze(1).permute(0, 1, 3, 2) @ hessian_pose @ self._J.unsqueeze(1)
-        DDg_part_2 = torch.sum(self._H.reshape(T, 1, 6, 7, 7) * dpose.reshape(T, n_constraints, 6, 1, 1),
+        DDg_part_2 = torch.sum(self._H.reshape(T, 1, 6, 11, 11) * dpose.reshape(T, n_constraints, 6, 1, 1),
                                dim=2).reshape(
             T,
             n_constraints,
-            7, 7)
+            11, 11)
         DDg = DDg + DDg_part_2.permute(0, 1, 3, 2)
 
         return constraints, Dg, DDg
@@ -397,6 +381,25 @@ def ee_terminal_constraint(p, mat, goal):
     return 10 * torch.sum((p[:2] - goal.reshape(2))**2).reshape(-1)
 
 
+# def ee_equality_constraint(p, mat):
+#     """
+
+#     :param p: torch.Tensor (N, 3) end effector position
+#     :param mat: torch.Tensor (N, 3, 3) end effector rotation matrix
+
+#     :return constraints: torch.Tensor(N, 1) contsraints as specified above
+
+#     """
+#     z_axis = mat[:, 2]  # (tensor of 2 - is 3rd column of rotation matrix
+#     # orientation constraint - dot product should be 1
+#     constraints = z_axis.reshape(1, 3) @ torch.tensor([0., 0., 1.], device=p.device).reshape(3, 1)
+
+#     constraints_z = p[2] - 0.8
+#     #return constraints_z.reshape(-1)
+#     return torch.cat((
+#         constraints_z.reshape(-1), constraints.reshape(1) + 1), dim=0
+#     )
+
 def ee_equality_constraint(p, mat):
     """
 
@@ -406,15 +409,12 @@ def ee_equality_constraint(p, mat):
     :return constraints: torch.Tensor(N, 1) contsraints as specified above
 
     """
-    z_axis = mat[:, 2]  # (tensor of 2 - is 3rd column of rotation matrix
     # orientation constraint - dot product should be 1
-    constraints = z_axis.reshape(1, 3) @ torch.tensor([0., 0., 1.], device=p.device).reshape(3, 1)
 
     constraints_z = p[2] - 0.8
     #return constraints_z.reshape(-1)
-    return torch.cat((
-        constraints_z.reshape(-1), constraints.reshape(1) + 1), dim=0
-    )
+    return constraints_z.reshape(-1)
+        
 
 
 def ee_inequality_constraint(p, mat):
@@ -448,31 +448,31 @@ def do_trial(env, params, fpath):
 
     # ee_pos, ee_ori = state['ee_pos'], state['ee_ori']
     # start = torch.cat((ee_pos, ee_ori), dim=-1).reshape(7).to(device=params['device'])
-    start = state['q'].reshape(7).to(device=params['device'])
+    start = state['q'].reshape(11).to(device=params['device'])
     chain.to(device=params['device'])
 
     if params['controller'] == 'csvgd':
         problem = VictorTableProblem(start, params['goal'], params['T'], device=params['device'])
         controller = Constrained_SVGD_MPC(problem, params)
-    elif params['controller'] == 'ipopt':
-        problem = VictorTableIpoptProblem(start, params['goal'], params['T'])
-        controller = IpoptMPC(problem, params)
-    elif 'svgd' in params['controller']:
-        problem = VictorTableUnconstrainedProblem(start, params['goal'], params['T'], device=params['device'],
-                                                  penalty=params['penalty'])
-        controller = SVMPC(problem, params)
-    elif 'mppi' in params['controller']:
-        problem = VictorTableUnconstrainedProblem(start, params['goal'], params['T'], device=params['device'],
-                                                  penalty=params['penalty'])
-        controller = MPPI(problem, params)
-    else:
-        raise ValueError('Invalid controller')
+    # elif params['controller'] == 'ipopt':
+    #     problem = VictorTableIpoptProblem(start, params['goal'], params['T'])
+    #     controller = IpoptMPC(problem, params)
+    # elif 'svgd' in params['controller']:
+    #     problem = VictorTableUnconstrainedProblem(start, params['goal'], params['T'], device=params['device'],
+    #                                               penalty=params['penalty'])
+    #     controller = SVMPC(problem, params)
+    # elif 'mppi' in params['controller']:
+    #     problem = VictorTableUnconstrainedProblem(start, params['goal'], params['T'], device=params['device'],
+    #                                               penalty=params['penalty'])
+    #     controller = MPPI(problem, params)
+    # else:
+    #     raise ValueError('Invalid controller')
 
     actual_trajectory = []
     duration = 0
     for k in range(params['num_steps']):
         state = env.get_state()
-        start = state['q'].reshape(7).to(device=params['device'])
+        start = state['q'].reshape(11).to(device=params['device'])
 
         actual_trajectory.append(start.clone())
         if k > 0:
@@ -483,7 +483,7 @@ def do_trial(env, params, fpath):
             torch.cuda.synchronize()
             duration += time.time() - start_time
 
-        x = best_traj[0, :7]
+        x = best_traj[0, :11]
         # add goal lines to sim
         line_vertices = np.array([
             [goal[0].item() - 0.025, goal[1].item() - 0.025, 0.808],
@@ -505,7 +505,7 @@ def do_trial(env, params, fpath):
         # traj_line_colors = np.array([[0.5, 0., 0.5]*M], dtype=np.float32)
         M = len(trajectories)
         if M > 0:
-            trajectories = chain.forward_kinematics(trajectories[:, :, :7].reshape(-1, 7)).reshape(M, -1, 4, 4)
+            trajectories = chain.forward_kinematics(trajectories[:, :, :11].reshape(-1, 11)).reshape(M, -1, 4, 4)
             trajectories = trajectories[:, :, :3, 3]
 
             traj_line_colors = np.random.random((1, M)).astype(np.float32)
@@ -526,20 +526,20 @@ def do_trial(env, params, fpath):
                 gym.draw_viewer(viewer, sim, False)
                 gym.sync_frame_time(sim)
 
-        env.step(x.reshape(1, 7).to(device=env.device))
+        env.step(x.reshape(1, 11).to(device=env.device))
 
         gym.clear_lines(viewer)
 
     state = env.get_state()
-    state = state['q'].reshape(7).to(device=params['device'])
+    state = state['q'].reshape(11).to(device=params['device'])
     actual_trajectory.append(state.clone())
 
-    actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 7)
+    actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 11)
     problem.T = actual_trajectory.shape[0]
     constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
 
     final_distance_to_goal = torch.linalg.norm(
-        chain.forward_kinematics(actual_trajectory[:, :7].reshape(-1, 7)).reshape(-1, 4, 4)[:, :2, 3] - params['goal'].unsqueeze(0),
+        chain.forward_kinematics(actual_trajectory[:, :11].reshape(-1, 11)).reshape(-1, 4, 4)[:, :2, 3] - params['goal'].unsqueeze(0),
         dim=1
     )
 
@@ -562,9 +562,26 @@ if __name__ == "__main__":
     del config['controllers']['svgd_grad_1000']
     from tqdm import tqdm
 
+    # env = VictorAllegroSingleFingerEnv(1, control_mode='joint_impedance', viewer=True,  steps_per_action=10)
+    # sim, gym, viewer = env.get_sim()
+    # env.reset()
+    # done = False
+    # while not done:
+    #     # action = torch.zeros((1, 30)).cuda()
+    #     action = torch.ones(11).cuda()
+    #     next_state = env.step(action)
+    #     print(next_state['ee_pos'][0][0])
+    # gym.destroy_viewer(viewer)
+    # gym.destroy_sim(sim)
+
+
     # instantiate environment
-    env = VictorPuckObstacleEnv(1, control_mode='joint_impedance', viewer=True)
+    env = VictorAllegroSingleFingerEnv(1, control_mode='joint_impedance', viewer=True,
+    use_cartesian_controller=False,
+    )
     sim, gym, viewer = env.get_sim()
+
+
 
     """
     state = env.get_state()
