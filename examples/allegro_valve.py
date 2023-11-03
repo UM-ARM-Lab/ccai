@@ -23,12 +23,18 @@ import pytorch_kinematics.transforms as tf
 
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
+# path for nvidia dextreme
 asset = '/home/fanyang/github/isaacgym-arm-envs/isaac_victor_envs/assets/victor/allegro.urdf'
-index_name = 'index_ee'
-thumb_name = 'thumb_ee'
+index_ee_name = 'index_ee'
+thumb_ee_name = 'thumb_ee'
+# path for honda allegro
+# asset = '/home/fanyang/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/urdf/allegro_hand_right.urdf'
+# index_ee_name = 'hitosashi_finger_ee'
+# thumb_ee_name = 'oya_finger_ee'
 
-index_chain = pk.build_serial_chain_from_urdf(open(asset).read(), 'index_ee')
-thumb_chain = pk.build_serial_chain_from_urdf(open(asset).read(), 'thumb_ee')
+
+index_chain = pk.build_serial_chain_from_urdf(open(asset).read(), index_ee_name)
+thumb_chain = pk.build_serial_chain_from_urdf(open(asset).read(), thumb_ee_name)
 valve_location = torch.tensor([0.85, 0.70 ,1.405]).to('cuda:0')
 # instantiate environment
 env = AllegroValveTurningEnv(1, control_mode='joint_impedance', use_cartesian_controller=False, 
@@ -38,15 +44,15 @@ world_trans = env.world_trans
 
 class AllegroValveProblem(ConstrainedSVGDProblem):
 
-    def __init__(self, start, goal, T, chain, valve_location, finger_name, device='cuda:0'):
+    def __init__(self, start, goal, T, chains, valve_location, finger_name, device='cuda:0'):
         """
         valve location: the root location of the valve
         """
         super().__init__(start, goal, T, device)
-        self.dz = 2
+        self.dz = 4
         self.dh = self.dz * T
-        self.dg = 2 * T# + 2
-        self.dx = 5
+        self.dg = 4 * T# + 2
+        self.dx = 9
         self.du = 0
         self.dt = 0.1
         self.T = T
@@ -58,36 +64,36 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         self.finger_name = finger_name
         self.valve_location = valve_location
 
-        self.chain = chain
+        self.chains = chains
         self.grad_kernel = jacrev(rbf_kernel, argnums=0)
         self.alpha = 10
 
-        # self._equality_constraints = EndEffectorConstraint(
-        #     self.chain, ee_equality_constraint, self.victor_ee_m
-        # )
-        if finger_name == "index":
-            target_valve_offset = 0 
-            # the offset denotes in an ideal case, how much does the finger tip angel differ from the valve angel
-        elif finger_name == "thumb":
-            target_valve_offset = -np.pi * 0.99
         self._equality_constraints = JointConstraint(
-            self.chain, partial(joint_equality_constraint, chain=self.chain, target_valve_offset=target_valve_offset)
+            partial(get_joint_constraint, chains=self.chains, constraint_function=finger_tip_equality_constraints)
         )
 
         self._inequality_constraints = JointConstraint(
-            self.chain, partial(joint_inequality_constraint, chain=self.chain)
+            partial(get_joint_constraint, chains=self.chains, constraint_function=finger_tip_inequality_constraint)
         )
 
         self._terminal_constraints = JointConstraint(
-            self.chain, partial(joint_terminal_constraint, goal=self.goal)
+            partial(joint_terminal_constraint, goal=self.goal)
         )
-        # for the index finger TODO: change it for different fingers 
-        if finger_name == "index":
-            self.x_max = torch.tensor([0.558488888889, 1.727825, 1.727825, 1.727825, 1.5*np.pi])
-            self.x_min = torch.tensor([-0.558488888889, -0.279244444444, -0.279244444444, -0.279244444444, -1.5*np.pi])
-        elif finger_name == "thumb":
-            self.x_max = torch.tensor([1.57075, 1.15188333333, 1.727825, 1.76273055556, 1.5*np.pi])
-            self.x_min = torch.tensor([0.279244444444, -0.331602777778, -0.279244444444, -0.279244444444, -1.5*np.pi])
+        # for nvidia hand
+        index_x_max = torch.tensor([0.558488888889, 1.727825, 1.727825, 1.727825])
+        index_x_min = torch.tensor([-0.558488888889, -0.279244444444, -0.279244444444, -0.279244444444])
+        thumb_x_max = torch.tensor([1.57075, 1.15188333333, 1.727825, 1.76273055556])
+        thumb_x_min = torch.tensor([0.279244444444, -0.331602777778, -0.279244444444, -0.279244444444])
+        # for honda hand
+        # index_x_max = torch.tensor([0.47, 1.6099999999, 1.7089999, 1.61799999])
+        # index_x_min = torch.tensor([-0.47, -0.195999999999, -0.174000000, -0.227])
+        # thumb_x_max = torch.tensor([1.396, 1.1629999999999, 1.644, 1.71899999])
+        # thumb_x_min = torch.tensor([0.26, -0.1049999999, -0.1889999999, -0.162])
+
+        valve_x_max = torch.tensor([1.5 * np.pi])
+        valve_x_min = torch.tensor([-1.5 * np.pi])
+        self.x_max = torch.cat((index_x_max, thumb_x_max, valve_x_max))
+        self.x_min = torch.cat((index_x_min, thumb_x_min, valve_x_min))
 
         self.dynamics_constraint = vmap(self._dynamics_constraint)
         self.grad_dynamics_constraint = vmap(jacrev(self._dynamics_constraint))
@@ -100,7 +106,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
     def dynamics(self, x, u):
         N = x.shape[0]
         x_finger_prime = x[:, :-1] + self.dt * u
-        m_prime = self.chain.forward_kinematics(x_finger_prime, world=world_trans) 
+        m_prime = self.chains['index'].forward_kinematics(x_finger_prime[:, :4], world=world_trans) 
         p_prime, mat_prime = m_prime[:, :3, 3], m_prime[:, :3, :3]
         # p_vec = p - self.valve_location
         p_prime_vec = p_prime - self.valve_location
@@ -108,8 +114,6 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         # theta = torch.zeros(theta.shape).to(p_prime.device)
         # TODO: Update the dynamics 
         return torch.cat((x_finger_prime, theta.unsqueeze(-1)), dim=-1)
-        
-        # return x + self.dt * u
 
     def _dynamics_constraint(self, trajectory):
         x = trajectory[:, :self.dx]
@@ -202,10 +206,6 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         return h, grad_h, hess_h
 
 
-    # def _con_ineq(self, x, compute_grads=True):
-
-    #     return None, None, None
-
     def eval(self, augmented_trajectory):
         N = augmented_trajectory.shape[0]
         augmented_trajectory = augmented_trajectory.clone().reshape(N, self.T, -1)
@@ -260,7 +260,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
 
     def get_initial_xu(self, N):
 
-        u = torch.randn(N, self.T, 4, device=self.device)
+        u = torch.randn(N, self.T, 8, device=self.device)
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
         for t in range(self.T):
             x.append(self.dynamics(x[-1], u[:, t]))
@@ -273,21 +273,19 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
 
 
 def cost(x, start):
-    x = torch.cat((start.reshape(1, 5), x[:, :5]), dim=0)
-    x = x[:, :5]
+    x = torch.cat((start.reshape(1, 9), x[:, :9]), dim=0)
     weight = torch.tensor([
-        0.2, 0.2, 0.2, 0.2, 0.05], device=x.device, dtype=torch.float32)
+        0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.05], device=x.device, dtype=torch.float32)
     weight = 1.0 / weight
     diff = x[1:] - x[:-1]
-    weighted_diff = diff.reshape(-1, 1, 5) @ torch.diag(weight).unsqueeze(0) @ diff.reshape(-1, 5, 1)
+    weighted_diff = diff.reshape(-1, 1, 9) @ torch.diag(weight).unsqueeze(0) @ diff.reshape(-1, 9, 1)
     return 10 * torch.sum(weighted_diff)
 
 
 class JointConstraint:
 
-    def __init__(self, chain, joint_constraint_function):
-        self.chain = chain
-        self._fn = partial(joint_constraint_function, chain)
+    def __init__(self, joint_constraint_function):
+        self._fn = joint_constraint_function
         self.joint_constraint_fn = vmap(joint_constraint_function)
 
         self._grad_fn = jacrev(joint_constraint_function, argnums=0)
@@ -331,68 +329,57 @@ def joint_terminal_constraint(q, goal):
     return 20 * torch.sum((q[-1] - goal.reshape(1))**2).reshape(-1)
 
 
-# def ee_equality_constraint(p, mat, theta):
-#     """
-
-#     :param p: torch.Tensor (N, 3) end effector position
-#     :param mat: torch.Tensor (N, 3, 3) end effector rotation matrix
-#     :theta: the angel of the valve (N)
-
-#     :return constraints: torch.Tensor(N, 1) contsraints as specified above
-
-#     """
-#     constraint_dist = torch.sqrt((p[2] - valve_location[2]) ** 2 + (p[0] - valve_location[0])**2) - 0.025
-#     p_vec = p - valve_location
-#     finger_theta = torch.atan2(p_vec[0], p_vec[2])
-#     constraint_theta = finger_theta - theta
-#     return torch.cat((constraint_dist.reshape(-1), constraint_theta.reshape(-1)), dim=0)
-
-def joint_equality_constraint(q, chain, target_valve_offset=0):
+def get_joint_constraint(q, chains, constraint_function):
     """
 
-    :param p: torch.Tensor (N, 3) end effector position
-    :param mat: torch.Tensor (N, 3, 3) end effector rotation matrix
-    :theta: the angel of the valve (N)
+    :param q: torch.Tensor (N, DoF) joint positions
+    :param chains: pytorch kinematics chains
 
     :return constraints: torch.Tensor(N, 1) contsraints as specified above
 
     """
+    valve_offset_for_thumb = np.pi / 2 * 0.99
     theta = q[-1]
-    finger_m = chain.forward_kinematics(q, world=world_trans) 
-    finger_m = finger_m[0]
-    p, mat = finger_m[:3, 3], finger_m[:3, :3]
+    index_q = q[:4]
+    thumb_q = q[4:]
+    finger_qs = [index_q, thumb_q]
+    finger_names = ['index', 'thumb']
+    constraint_list = []
+    for finger_q, finger_name in zip(finger_qs, finger_names):
+        m = chains[finger_name].forward_kinematics(finger_q, world=world_trans) 
+        m = m[0]
+        p, mat = m[:3, 3], m[:3, :3]
+        if finger_name == "thumb":
+            # for thumb, it is tracking a differnet theta angles, which has an offset.
+            # NOTE: make leads to bug if we want to use the original theta 
+            constraint_list.append(constraint_function(p, theta - valve_offset_for_thumb))
+        elif finger_name == 'index':
+            constraint_list.append(constraint_function(p, theta))
+    return torch.cat(constraint_list, dim=0)
+        
+def finger_tip_equality_constraints(p, theta):
+    """
+    sub function called in the joint_constraint function. It takes in the end effector of a single 
+    finger and output the equality constraint. 
+    : params p: finger tip position
+    : params theta: the desired valve angle we needs to track. Note that it is different for different fingers.
+    """
     # finger tip should be on the surface of the object
     constraint_dist = torch.sqrt((p[2] - valve_location[2]) ** 2 + (p[0] - valve_location[0])**2) - 0.035
-    # the y coordinate of the finger tip should be fixed
-    constraint_y = valve_location[1] - p[1] - 0.08
     # The finger should align with the valve angel
     p_vec = p - valve_location
 
     # if it is not close enough to the valve, we don't chaneg the valve angel
     finger_theta = torch.atan2(p_vec[0], p_vec[2])
     # finger_theta = (constraint_dist < 0.02)*torch.atan2(p_vec[0], p_vec[2]) + (constraint_dist >= 0.02)* theta
-    constraint_theta = finger_theta - theta - target_valve_offset
-    # return torch.cat((constraint_dist.reshape(-1), constraint_theta.reshape(-1), constraint_y.reshape(-1)), dim=0)
+    constraint_theta = finger_theta - theta
+
     return torch.cat((constraint_dist.reshape(-1), constraint_theta.reshape(-1)), dim=0)
 
-def joint_inequality_constraint(q, chain):
-    """
-
-    :param p: torch.Tensor (N, 3) end effector position
-    :param mat: torch.Tensor (N, 3, 3) end effector rotation matrix
-    :theta: the angel of the valve (N)
-
-    :return constraints: torch.Tensor(N, 1) contsraints as specified above
-
-    """
-    finger_m = chain.forward_kinematics(q, world=world_trans) 
-    finger_m = finger_m[0]
-    p, mat = finger_m[:3, 3], finger_m[:3, :3]
-    # the y coordinate of the finger tip should be fixed
+def finger_tip_inequality_constraint(p, theta):
     constraint_y_1 = -(valve_location[1] - p[1]) + 0.01
     constraint_y_2 = (valve_location[1] - p[1]) - 0.09
     return torch.cat((constraint_y_1.reshape(-1), constraint_y_2.reshape(-1)), dim=0)
-
 
 
 def do_trial(env, params, fpath):
@@ -406,31 +393,20 @@ def do_trial(env, params, fpath):
 
     # ee_pos, ee_ori = state['ee_pos'], state['ee_ori']
     # start = torch.cat((ee_pos, ee_ori), dim=-1).reshape(7).to(device=params['device'])
-    index_start = torch.cat((state['index_q'], state['valve']), axis=-1).reshape(5).to(device=params['device'])
-    thumb_start = torch.cat((state['thumb_q'], state['valve']), axis=-1).reshape(5).to(device=params['device'])
+    start = state['q'].reshape(9).to(device=params['device'])
     index_chain.to(device=params['device'])
     thumb_chain.to(device=params['device'])
+    chains = {'index': index_chain, 'thumb': thumb_chain}
 
     if params['controller'] == 'csvgd':
-        index_problem = AllegroValveProblem(index_start, 
-                                            params['goal'],
-                                            params['T'], 
-                                            device=params['device'], 
-                                            chain=index_chain, 
-                                            finger_name='index', 
-                                            valve_location=valve_location)
-        index_controller = Constrained_SVGD_MPC(index_problem, params)
-        thumb_problem = AllegroValveProblem(thumb_start, 
-                                            params['goal'],
-                                            params['T'], 
-                                            device=params['device'], 
-                                            chain=thumb_chain, 
-                                            finger_name='thumb', 
-                                            valve_location=valve_location)
-        thumb_controller = Constrained_SVGD_MPC(thumb_problem, params)
-    # elif params['controller'] == 'ipopt':
-    #     problem = VictorTableIpoptProblem(start, params['goal'], params['T'])
-    #     controller = IpoptMPC(problem, params)
+        problem = AllegroValveProblem(start, 
+                                      params['goal'],
+                                      params['T'], 
+                                      device=params['device'], 
+                                      chains=chains, 
+                                      finger_name='index', 
+                                      valve_location=valve_location)
+        controller = Constrained_SVGD_MPC(problem, params)
     else:
         raise ValueError('Invalid controller')
 
@@ -438,66 +414,28 @@ def do_trial(env, params, fpath):
     duration = 0
     for k in range(params['num_steps']):
         state = env.get_state()
-        index_start = state['index_q_valve'].reshape(5).to(device=params['device'])
-        thumb_start = state['thumb_q_valve'].reshape(5).to(device=params['device'])
+        start = state['q'].reshape(9).to(device=params['device'])
 
         actual_trajectory.append(state['q'].reshape(9).clone())
         if k > 0:
             torch.cuda.synchronize()
             start_time = time.time()
-        index_best_traj, index_trajectories = index_controller.step(index_start)
-        # thumb_best_traj, thumb_trajectories = thumb_controller.step(index_start)
+        best_traj, trajectories = controller.step(start)
         if k > 0:
             torch.cuda.synchronize()
             duration += time.time() - start_time
 
-        index_x = index_best_traj[0, :5]
-        # thumb_x = thumb_best_traj[0, :5]
+        x = best_traj[0, :9]
 
 
         # add trajectory lines to sim
-        add_trajectories(index_trajectories, index_best_traj, index_chain)
-        # add_trajectories(thumb_trajectories, thumb_best_traj, thumb_chain)
-        # M = len(trajectories)
-        # if M > 0:
-        #     trajectories = index_chain.forward_kinematics(trajectories[:, :, :4].reshape(-1, 4), world=world_trans).reshape(M, -1, 4, 4)
-        #     trajectories = trajectories[:, :, :3, 3]
-        #     best_traj_ee = index_chain.forward_kinematics(best_traj[:, :4].reshape(-1, 4), world=world_trans).reshape(-1, 4, 4)
-        #     best_traj_ee = best_traj_ee[:, :3, 3]
-
-        #     traj_line_colors = np.random.random((3, M)).astype(np.float32)
-        #     best_traj_line_colors = np.array([0, 1, 0]).astype(np.float32)
-
-        #     for e in env.envs:
-        #         s = env.get_state()['index_pos'].reshape(1, 3).to(device=params['device'])
-        #         # breakpoint()
-        #         p = torch.stack((s[:3].reshape(1, 3).repeat(M, 1),
-        #                          trajectories[:, 0, :3]), dim=1).reshape(2 * M, 3).cpu().numpy()
-        #         # p_best = torch.stack((s[:3].reshape(1, 3).repeat(1, 1), best_traj_ee[0, :3].unsqueeze(0)), dim=1).reshape(2, 3).cpu().numpy()
-        #         # p[:, 2] += 0.005
-        #         # gym.add_lines(viewer, e, 1, p_best, best_traj_line_colors)
-        #         # gym.add_lines(viewer, e, M, p, traj_line_colors)
-        #         T = trajectories.shape[1]
-        #         for t in range(T - 1):
-        #             p = torch.stack((trajectories[:, t, :3], trajectories[:, t + 1, :3]), dim=1).reshape(2 * M, 3)
-        #             p = p.cpu().numpy()
-        #             # p[:, 2] += 0.01
-        #             p_best = torch.stack((best_traj_ee[t, :3], best_traj_ee[t + 1, :3]), dim=0).reshape(2, 3).cpu().numpy()
-        #             gym.add_lines(viewer, e, 1, p_best, best_traj_line_colors)                    
-        #             # gym.add_lines(viewer, e, M, p, traj_line_colors)
-        #         gym.step_graphics(sim)
-        #         gym.draw_viewer(viewer, sim, False)
-        #         gym.sync_frame_time(sim)
-        index_action = index_x.reshape(1,5)[:,:4].to(device=env.device)
-        # index_action = torch.zeros((1,4)).to(device=env.device)
-        # thumb_action = thumb_x.reshape(1,5)[:,:4].to(device=env.device)
-        thumb_action = torch.zeros((1,4)).to(device=env.device)
-        action = torch.cat((index_action, thumb_action), dim=-1)
-        # thumb_action_ee = thumb_chain.forward_kinematics(thumb_action.reshape(-1, 4), world=world_trans).reshape(-1, 4, 4)
-        # print(thumb_best_traj[:, -1])
+        # TODO: fix the plotting for different fingers
+        # add_trajectories(trajectories, best_traj, chains)
+        action = x.reshape(1,9)[:,:8].to(device=env.device)
         # distance = torch.sqrt((best_traj_ee[:, 2] - valve_location[2].unsqueeze(0)) ** 2 + (best_traj_ee[:, 0] - valve_location[0].unsqueeze(0))**2)
         # print(best_traj[:, -1])
-        # print(best_traj_ee)
+        # print(best_traj_ee)git l
+        # print(action)
         env.step(action)
 
         gym.clear_lines(viewer)
@@ -506,8 +444,8 @@ def do_trial(env, params, fpath):
     state = state['q'].reshape(9).to(device=params['device'])
     actual_trajectory.append(state.clone())
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 9)
-    index_problem.T = actual_trajectory.shape[0]
-    constraint_val = index_problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
+    problem.T = actual_trajectory.shape[0]
+    constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
     final_distance_to_goal = actual_trajectory[:, -1] - params['goal']
     # final_distance_to_goal = torch.linalg.norm(
     #     chain.forward_kinematics(actual_trajectory[:, :7].reshape(-1, 7)).reshape(-1, 4, 4)[:, :2, 3] - params['goal'].unsqueeze(0),
