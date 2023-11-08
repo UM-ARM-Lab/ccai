@@ -332,7 +332,7 @@ def joint_terminal_constraint(q, goal, initial_valve_angle=0):
     :param mat:
     :return:
     """
-    return 50 * torch.sum(((q[-1] - initial_valve_angle) - goal.reshape(1))**2).reshape(-1)
+    return 5 * torch.sum(((q[-1] - initial_valve_angle) - goal.reshape(1))**2).reshape(-1)
 
 
 def get_joint_constraint(q, chains, constraint_function, initial_valve_angle=0):
@@ -370,18 +370,14 @@ def finger_tip_equality_constraints(p, theta):
     : params p: finger tip position
     : params theta: the desired valve angle we needs to track. Note that it is different for different fingers.
     """
-    # finger tip should be on the surface of the object
-    # constraint_dist = torch.sqrt((p[2] - valve_location[2]) ** 2 + (p[0] - valve_location[0])**2) - 0.035
-    constraint_dist = torch.sqrt((p[2] - valve_location[2]) ** 2 + (p[0] - valve_location[0])**2) - 0.025
-    # The finger should align with the valve angel
-    p_vec = p - valve_location
-
-    # if it is not close enough to the valve, we don't chaneg the valve angel
-    finger_theta = torch.atan2(p_vec[0], p_vec[2])
-    # finger_theta = (constraint_dist < 0.02)*torch.atan2(p_vec[0], p_vec[2]) + (constraint_dist >= 0.02)* theta
-    constraint_theta = finger_theta - theta
-
-    return torch.cat((constraint_dist.reshape(-1), constraint_theta.reshape(-1)), dim=0)
+    # we use theta to compute desired finger x,z positions
+    r = 0.0275
+    x_pos = torch.sin(theta) * r + valve_location[0]
+    z_pos = torch.cos(theta) * r + valve_location[2]
+    return torch.cat((
+        p[0] - x_pos.reshape(-1),
+        p[2] - z_pos.reshape(-1))
+    )
 
 def finger_tip_inequality_constraint(p, theta):
     constraint_y_1 = -(valve_location[1] - p[1]) + 0.005
@@ -390,6 +386,7 @@ def finger_tip_inequality_constraint(p, theta):
 
 
 def do_trial(env, params, fpath):
+    "only turn the valve once"
     state = env.get_state()
     if params['visualize']:
         env.frame_fpath = fpath
@@ -437,7 +434,7 @@ def do_trial(env, params, fpath):
 
         # add trajectory lines to sim
         # TODO: fix the plotting for different fingers
-        # add_trajectories(trajectories, best_traj, chains)
+        add_trajectories(trajectories, best_traj, chains)
         action = x.reshape(1,9)[:,:8].to(device=env.device)
         # distance2surface = torch.sqrt((best_traj_ee[:, 2] - valve_location[2].unsqueeze(0)) ** 2 + (best_traj_ee[:, 0] - valve_location[0].unsqueeze(0))**2)
         env.step(action)
@@ -467,6 +464,7 @@ def do_trial(env, params, fpath):
     return torch.min(final_distance_to_goal).cpu().numpy()
 
 def turn(env, params, fpath):
+    "turn the valve multiple times"
     state = env.get_state()
     if params['visualize']:
         env.frame_fpath = fpath
@@ -504,13 +502,13 @@ def turn(env, params, fpath):
 
         # add trajectory lines to sim
         # TODO: fix the plotting for different fingers
-        # add_trajectories(trajectories, best_traj, chains)
+        add_trajectories(trajectories, best_traj, chains)
         action = x.reshape(1,9)[:,:8].to(device=env.device)
         # distance2surface = torch.sqrt((best_traj_ee[:, 2] - valve_location[2].unsqueeze(0)) ** 2 + (best_traj_ee[:, 0] - valve_location[0].unsqueeze(0))**2)
         env.step(action)
         distance2goal = (env.get_state()['q'][:, -1] - (- np.pi / 2 * num_turns) - params['goal']).detach().cpu().item()
         print(distance2goal)
-        if distance2goal < np.pi * 0.2:
+        if distance2goal < np.pi * 0.15:
             action = torch.tensor([[0.3, 0, 0, 0, 1.0, 0, 0, 0]]).to(device=env.device)
             print("resetting")
             env.step(action)
@@ -537,13 +535,17 @@ def turn(env, params, fpath):
     constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
     return 0
 
-def add_trajectories(trajectories, best_traj, chain):
+def add_trajectories(trajectories, best_traj, chains):
+    index_chain = chains['index']
+    thumb_chain = chains['thumb']
     M = len(trajectories)
     if M > 0:
-        trajectories = chain.forward_kinematics(trajectories[:, :, :4].reshape(-1, 4), world=world_trans).reshape(M, -1, 4, 4)
-        trajectories = trajectories[:, :, :3, 3]
-        best_traj_ee = chain.forward_kinematics(best_traj[:, :4].reshape(-1, 4), world=world_trans).reshape(-1, 4, 4)
-        best_traj_ee = best_traj_ee[:, :3, 3]
+        # trajectories = chain.forward_kinematics(trajectories[:, :, :4].reshape(-1, 4), world=world_trans).reshape(M, -1, 4, 4)
+        # trajectories = trajectories[:, :, :3, 3]
+        index_best_traj_ee = index_chain.forward_kinematics(best_traj[:, :4].reshape(-1, 4), world=world_trans).reshape(-1, 4, 4)
+        index_best_traj_ee = index_best_traj_ee[:, :3, 3]
+        thumb_best_traj_ee = thumb_chain.forward_kinematics(best_traj[:, 4:8].reshape(-1, 4), world=world_trans).reshape(-1, 4, 4)
+        thumb_best_traj_ee = thumb_best_traj_ee[:, :3, 3]
 
         traj_line_colors = np.random.random((3, M)).astype(np.float32)
         best_traj_line_colors = np.array([0, 1, 0]).astype(np.float32)
@@ -557,13 +559,17 @@ def add_trajectories(trajectories, best_traj, chain):
             # p[:, 2] += 0.005
             # gym.add_lines(viewer, e, 1, p_best, best_traj_line_colors)
             # gym.add_lines(viewer, e, M, p, traj_line_colors)
+            index_best_traj_ee[:, 0] -= 0.05
+            thumb_best_traj_ee[:, 0] -= 0.05
             T = trajectories.shape[1]
             for t in range(T - 1):
-                p = torch.stack((trajectories[:, t, :3], trajectories[:, t + 1, :3]), dim=1).reshape(2 * M, 3)
-                p = p.cpu().numpy()
+                # p = torch.stack((trajectories[:, t, :3], trajectories[:, t + 1, :3]), dim=1).reshape(2 * M, 3)
+                # p = p.cpu().numpy()
                 # p[:, 2] += 0.01
-                p_best = torch.stack((best_traj_ee[t, :3], best_traj_ee[t + 1, :3]), dim=0).reshape(2, 3).cpu().numpy()
-                gym.add_lines(viewer, e, 1, p_best, best_traj_line_colors)                    
+                index_p_best = torch.stack((index_best_traj_ee[t, :3], index_best_traj_ee[t + 1, :3]), dim=0).reshape(2, 3).cpu().numpy()
+                thumb_p_best = torch.stack((thumb_best_traj_ee[t, :3], thumb_best_traj_ee[t + 1, :3]), dim=0).reshape(2, 3).cpu().numpy()
+                gym.add_lines(viewer, e, 1, index_p_best, best_traj_line_colors)                    
+                gym.add_lines(viewer, e, 1, thumb_p_best, best_traj_line_colors)                    
                 # gym.add_lines(viewer, e, M, p, traj_line_colors)
             gym.step_graphics(sim)
             gym.draw_viewer(viewer, sim, False)
