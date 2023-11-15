@@ -1,0 +1,21 @@
+---
+T: 12
+receding_horizon: True
+num_steps: 250
+num_trials: 20
+visualize: False
+experiment_name: 'victor_table_jointspace'
+controllers:
+  csvgd:
+    N: 8
+    alpha_J: 5.0e-3
+    alpha_C: 1
+    step_size: 0.25
+    momentum: 0.
+    device: 'cuda:0'
+    online_iters: 10
+    warmup_iters: 100
+    resample_steps: 1
+    resample_sigma: 0.01
+    resample_temperature: 0.1
+    penalty: 100
