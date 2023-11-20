@@ -241,6 +241,8 @@ class ConstrainedSteinTrajOpt:
             s = time.time()
             if T > 50:
                 self.gamma = self.max_gamma * driving_force(iter + 1)
+            else:
+                self.gamma = self.max_gamma
             #    self.sigma = 0.1 * (1.0 - iter / T) + 1e-2
 
             #if (iter + 1) % resample_period == 0 and (iter < T - 1):
