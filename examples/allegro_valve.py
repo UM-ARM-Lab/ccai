@@ -106,9 +106,6 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
                     initial_valve_angle=initial_valve_angle)
         )
 
-        self._goal_cost = JointConstraint(
-            partial(joint_terminal_constraint, goal=self.goal)
-        )
         # for nvidia hand
         # index_x_max = torch.tensor([0.558488888889, 1.727825, 1.727825, 1.727825])
         # index_x_min = torch.tensor([-0.558488888889, -0.279244444444, -0.279244444444, -0.279244444444])
@@ -129,9 +126,9 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         self.grad_dynamics_constraint = vmap(jacrev(self._dynamics_constraint))
         self.hess_dynamics_constraint = vmap(hessian(self._dynamics_constraint))
 
-        self.cost = vmap(partial(cost, start=self.start))
-        self.grad_cost = vmap(jacrev(partial(cost, start=self.start)))
-        self.hess_cost = vmap(hessian(partial(cost, start=self.start)))
+        self.cost = vmap(partial(cost, start=self.start, goal=self.goal))
+        self.grad_cost = vmap(jacrev(partial(cost, start=self.start, goal=self.goal)))
+        self.hess_cost = vmap(hessian(partial(cost, start=self.start, goal=self.goal)))
 
     def dynamics(self, x, u):
         N = x.shape[0]
@@ -161,26 +158,12 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
     def _objective(self, x):
         x = x[:, :, :self.dx]
         N = x.shape[0]
-        goal_g, goal_grad_g, goal_hess_g = self._goal_cost.eval(x.reshape(-1, self.dx))
         # goal_grad_g_extended = torch.zeros(N, self.T, self.dx, device=self.device)
         # goal_hess_g_extended = torch.zeros(N, self.T, self.dx, self.T, self.dx, device=self.device)
         # goal_grad_g_extended[:, -1, :] = goal_grad_g.reshape(N, -1)
         # goal_hess_g_extended[:, -1, :, -1, :] = goal_hess_g.reshape(N, self.dx, self.dx)
         # J, grad_J, hess_J = self.cost(x)
         J, grad_J, hess_J = self.cost(x), self.grad_cost(x), self.hess_cost(x)
-
-        if goal_grad_g is not None:
-            with torch.no_grad():
-                goal_grad_g_extended = goal_grad_g.reshape(N, self.T, self.dx)
-                goal_hess_g_extended = goal_hess_g.reshape(N, self.T, self.dx, self.dx).permute(0, 2, 3, 1)
-                goal_hess_g_extended = torch.diag_embed(goal_hess_g_extended).permute(0, 3, 1, 4, 2)
-                # add greater weight to final
-                goal_grad_g_extended[:, -1] *= 10
-                goal_hess_g_extended[:, -1, :, -1] *= 10
-
-                J = J.reshape(-1) + goal_g.reshape(N, self.T).sum(dim=1)
-                grad_J = grad_J.reshape(N, self.T, -1) + goal_grad_g_extended
-                hess_J = hess_J.reshape(N, self.T, self.dx, self.T, self.dx) + goal_hess_g_extended
 
         N = x.shape[0]
         return (self.alpha * J.reshape(N),
@@ -274,11 +257,13 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
 
     def update(self, start, goal=None, T=None):
         self.start = start
+        if goal is not None:
+            self.goal = goal
 
         # update functions that require start
-        self.cost = vmap(partial(cost, start=self.start))
-        self.grad_cost = vmap(jacrev(partial(cost, start=self.start)))
-        self.hess_cost = vmap(hessian(partial(cost, start=self.start)))
+        self.cost = vmap(partial(cost, start=self.start, goal=self.goal))
+        self.grad_cost = vmap(jacrev(partial(cost, start=self.start, goal=self.goal)))
+        self.hess_cost = vmap(hessian(partial(cost, start=self.start, goal=self.goal)))
 
         # want the offset between the current angle and the angle according to end effectors
         # we will use position of index fingertip
@@ -307,10 +292,6 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         if goal is not None:
             self.goal = goal
 
-            self._terminal_constraints = JointConstraint(
-                self.chain, partial(joint_terminal_constraint, goal=self.goal, initial_valve_angle=theta_offset)
-            )
-
         if T is not None:
             self.T = T
             self.dh = self.dz * T
@@ -324,19 +305,27 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
             x.append(self.dynamics(x[-1], u[:, t]))
 
         # particles = torch.cumsum(particles, dim=1) + self.start.reshape(1, 1, self.dx)
+        # interpolate the valve angle to intiialize the trajectory. 
+        # intialization does matter, otherwise it will get stuck to local optima or takes a much longer time to converge 
+        theta = torch.linspace(self.start[-1], -np.pi/2, self.T)
         x = torch.stack(x[1:], dim=1)
+        x[:, :, -1] = theta
         xu = torch.cat((x, u), dim=2)
         return x
 
 
-def cost(x, start):
-    x = torch.cat((start.reshape(1, 9), x[:, :9]), dim=0)[:, :8]
+def cost(x, start, goal):
+    x = torch.cat((start.reshape(1, 9), x[:, :9]), dim=0)
     weight = torch.tensor([
         0.2, 0.3, 0.4, 0.5, 0.2, 0.3, 0.4, 0.5], device=x.device, dtype=torch.float32)
     weight = 1.0 / weight
-    diff = x[1:] - x[:-1]
+    diff = x[1:, :8] - x[:-1, :8]
     weighted_diff = diff.reshape(-1, 1, 8) @ torch.diag(weight).unsqueeze(0) @ diff.reshape(-1, 8, 1)
-    return torch.sum(weighted_diff)
+    # incoporate the goal cost
+    goal_cost = (10 * (x[-1, -1] - goal)**2)[0]
+    # this goal cost is not very informative and takes a long time for the gradients to back propagate to each state. 
+    # thus, a better initialization is necessary for faster convergence
+    return torch.sum(weighted_diff) + goal_cost
 
 
 class JointConstraint:
@@ -375,15 +364,6 @@ class JointConstraint:
     def reset(self):
         self._J, self._h, self._dH = None, None, None
 
-
-def joint_terminal_constraint(q, goal, initial_valve_angle=0):
-    """
-
-    :param p:
-    :param mat:
-    :return:
-    """
-    return torch.sum(((q[-1] - initial_valve_angle) - goal.reshape(1)) ** 2).reshape(-1)
 
 
 def get_joint_constraint(q, chain, constraint_function, initial_valve_angle=0):
@@ -735,7 +715,6 @@ def add_trajectories(trajectories, best_traj, chain):
         index_colors = np.array([0, 0, 1]).astype(np.float32)
         for e in env.envs:
             s = env.get_state()['index_pos'].reshape(1, 3).to(device=params['device'])
-            # breakpoint()
             p = torch.stack((s[:3].reshape(1, 3).repeat(M, 1),
                              trajectories[:, 0, :3]), dim=1).reshape(2 * M, 3).cpu().numpy()
             # p_best = torch.stack((s[:3].reshape(1, 3).repeat(1, 1), best_traj_ee[0, :3].unsqueeze(0)), dim=1).reshape(2, 3).cpu().numpy()

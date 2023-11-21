@@ -1,7 +1,7 @@
 ---
 T: 12
 receding_horizon: True
-num_steps: 10
+num_steps: 15
 num_trials: 20
 visualize: False
 experiment_name: 'allegro_test'
