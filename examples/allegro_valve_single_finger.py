@@ -201,11 +201,6 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
 
         return h, grad_h, hess_h
 
-
-    # def _con_ineq(self, x, compute_grads=True):
-
-    #     return None, None, None
-
     def eval(self, augmented_trajectory):
         N = augmented_trajectory.shape[0]
         augmented_trajectory = augmented_trajectory.clone().reshape(N, self.T, -1)
@@ -282,6 +277,18 @@ def cost(x, start):
     weighted_diff = diff.reshape(-1, 1, 5) @ torch.diag(weight).unsqueeze(0) @ diff.reshape(-1, 5, 1)
     return 10 * torch.sum(weighted_diff)
 
+def cost_print(x, start):
+    x = torch.cat((start.reshape(1, 5), x[:, :5]), dim=0)
+    x = x[:, :5]
+    weight = torch.tensor([
+        1.0, 1.0, 1.0, 1.0, 1.0], device=x.device, dtype=torch.float32)
+    weight = 1.0 / weight
+    diff = x[1:] - x[:-1]
+    weighted_diff = diff.reshape(-1, 1, 5) @ torch.diag(weight).unsqueeze(0) @ diff.reshape(-1, 5, 1)
+    print(weighted_diff)
+    print("-----------")
+
+
 
 class JointConstraint:
 
@@ -328,10 +335,10 @@ def joint_terminal_constraint(q, goal):
     :param mat:
     :return:
     """
-    return 10 * torch.sum((q[-1] - goal.reshape(1))**2).reshape(-1)
+    return 1 * torch.sum((q[-1] - goal.reshape(1))**2).reshape(-1)
 
 
-# def ee_equality_constraint(p, mat, theta):
+# def joint_equality_constraint(q, chain, target_valve_offset=0):
 #     """
 
 #     :param p: torch.Tensor (N, 3) end effector position
@@ -341,39 +348,43 @@ def joint_terminal_constraint(q, goal):
 #     :return constraints: torch.Tensor(N, 1) contsraints as specified above
 
 #     """
-#     constraint_dist = torch.sqrt((p[2] - valve_location[2]) ** 2 + (p[0] - valve_location[0])**2) - 0.025
+#     theta = q[-1]
+#     finger_m = chain.forward_kinematics(q, world=world_trans) 
+#     finger_m = finger_m[0]
+#     p, mat = finger_m[:3, 3], finger_m[:3, :3]
+#     # finger tip should be on the surface of the object
+#     constraint_dist = torch.sqrt((p[2] - valve_location[2]) ** 2 + (p[0] - valve_location[0])**2) - 0.030
+#     # the y coordinate of the finger tip should be fixed
+#     constraint_y = valve_location[1] - p[1] - 0.08
+#     # The finger should align with the valve angel
 #     p_vec = p - valve_location
+
+#     # if it is not close enough to the valve, we don't chaneg the valve angel
 #     finger_theta = torch.atan2(p_vec[0], p_vec[2])
-#     constraint_theta = finger_theta - theta
+#     # finger_theta = (constraint_dist < 0.02)*torch.atan2(p_vec[0], p_vec[2]) + (constraint_dist >= 0.02)* theta
+#     constraint_theta = finger_theta - theta - target_valve_offset
+#     # return torch.cat((constraint_dist.reshape(-1), constraint_theta.reshape(-1), constraint_y.reshape(-1)), dim=0)
 #     return torch.cat((constraint_dist.reshape(-1), constraint_theta.reshape(-1)), dim=0)
 
 def joint_equality_constraint(q, chain, target_valve_offset=0):
     """
-
-    :param p: torch.Tensor (N, 3) end effector position
-    :param mat: torch.Tensor (N, 3, 3) end effector rotation matrix
-    :theta: the angel of the valve (N)
-
-    :return constraints: torch.Tensor(N, 1) contsraints as specified above
-
+    sub function called in the joint_constraint function. It takes in the end effector of a single 
+    finger and output the equality constraint. 
+    : params p: finger tip position
+    : params theta: the desired valve angle we needs to track. Note that it is different for different fingers.
     """
+    # we use theta to compute desired finger x,z positions
     theta = q[-1]
     finger_m = chain.forward_kinematics(q, world=world_trans) 
     finger_m = finger_m[0]
     p, mat = finger_m[:3, 3], finger_m[:3, :3]
-    # finger tip should be on the surface of the object
-    constraint_dist = torch.sqrt((p[2] - valve_location[2]) ** 2 + (p[0] - valve_location[0])**2) - 0.028
-    # the y coordinate of the finger tip should be fixed
-    constraint_y = valve_location[1] - p[1] - 0.08
-    # The finger should align with the valve angel
-    p_vec = p - valve_location
-
-    # if it is not close enough to the valve, we don't chaneg the valve angel
-    finger_theta = torch.atan2(p_vec[0], p_vec[2])
-    # finger_theta = (constraint_dist < 0.02)*torch.atan2(p_vec[0], p_vec[2]) + (constraint_dist >= 0.02)* theta
-    constraint_theta = finger_theta - theta - target_valve_offset
-    # return torch.cat((constraint_dist.reshape(-1), constraint_theta.reshape(-1), constraint_y.reshape(-1)), dim=0)
-    return torch.cat((constraint_dist.reshape(-1), constraint_theta.reshape(-1)), dim=0)
+    r = 0.0275
+    x_pos = torch.sin(theta) * r + valve_location[0]
+    z_pos = torch.cos(theta) * r + valve_location[2]
+    return torch.cat((
+        p[0] - x_pos.reshape(-1),
+        p[2] - z_pos.reshape(-1))
+    )
 
 def joint_inequality_constraint(q, chain):
     """
@@ -446,6 +457,7 @@ def do_trial(env, params, fpath):
             torch.cuda.synchronize()
             start_time = time.time()
         index_best_traj, index_trajectories = index_controller.step(index_start)
+        cost_print(index_best_traj, index_start)
         # thumb_best_traj, thumb_trajectories = thumb_controller.step(index_start)
         if k > 0:
             torch.cuda.synchronize()
@@ -544,10 +556,10 @@ def add_trajectories(trajectories, best_traj, chain):
             # gym.add_lines(viewer, e, 1, p_best, best_traj_line_colors)
             # gym.add_lines(viewer, e, M, p, traj_line_colors)
             T = trajectories.shape[1]
+            # best_traj_ee[:, 0] -= 0.05
             for t in range(T - 1):
                 p = torch.stack((trajectories[:, t, :3], trajectories[:, t + 1, :3]), dim=1).reshape(2 * M, 3)
                 p = p.cpu().numpy()
-                # p[:, 2] += 0.01
                 p_best = torch.stack((best_traj_ee[t, :3], best_traj_ee[t + 1, :3]), dim=0).reshape(2, 3).cpu().numpy()
                 gym.add_lines(viewer, e, 1, p_best, best_traj_line_colors)                    
                 # gym.add_lines(viewer, e, M, p, traj_line_colors)
@@ -584,7 +596,7 @@ if __name__ == "__main__":
     results = {}
 
     for i in tqdm(range(config['num_trials'])):
-        goal = torch.tensor([-np.pi + 0.1]) 
+        goal = torch.tensor([-np.pi * 0.5]) 
         # goal = goal + 0.025 * torch.randn(1) + 0.2
         for controller in config['controllers'].keys():
             env.reset()
@@ -602,7 +614,7 @@ if __name__ == "__main__":
                 results[controller] = [final_distance_to_goal]
             else:
                 results[controller].append(final_distance_to_goal)
-        print(results)
+        # print(results)
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)

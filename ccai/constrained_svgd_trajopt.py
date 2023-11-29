@@ -149,9 +149,11 @@ class ConstrainedSteinTrajOpt:
         N = xuz.shape[0]
         min_x = self.problem.x_min.reshape(1, 1, -1).repeat(1, self.problem.T, 1)
         max_x = self.problem.x_max.reshape(1, 1, -1).repeat(1, self.problem.T, 1)
+        min_u = self.problem.u_min.reshape(1, 1, -1).repeat(1, self.problem.T, 1)
+        max_u = self.problem.u_max.reshape(1, 1, -1).repeat(1, self.problem.T, 1)
         if self.problem.dz > 0:
-            min_x = torch.cat((min_x, -1e3 * torch.ones(1, self.problem.T, self.problem.dz)), dim=-1)
-            max_x = torch.cat((max_x, 1e3 * torch.ones(1, self.problem.T, self.problem.dz)), dim=-1)
+            min_x = torch.cat((min_x, min_u, -1e3 * torch.ones(1, self.problem.T, self.problem.dz)), dim=-1)
+            max_x = torch.cat((max_x, max_u, 1e3 * torch.ones(1, self.problem.T, self.problem.dz)), dim=-1)
 
         torch.clamp_(xuz, min=min_x.to(device=xuz.device).reshape(1, -1),
                      max=max_x.to(device=xuz.device).reshape(1, -1))
