@@ -51,7 +51,7 @@ valve_location = torch.tensor([0.85, 0.70, 1.405]).to('cuda:0')
 # env = AllegroValveTurningEnv(1, control_mode='joint_torque_position',
 #                              viewer=True, steps_per_action=60)
 env = AllegroValveTurningEnv(1, control_mode='joint_impedance', use_cartesian_controller=False,
-                             viewer=True, steps_per_action=60)
+                             viewer=False, steps_per_action=60)
 world_trans = env.world_trans
 friction_coefficient = 0.8
 
@@ -145,6 +145,9 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         self.u_max = torch.tensor([999, 999, 999, 999, 999, 999])
         self.u_min = torch.tensor([-999, -999, -999, -999, -999, -999])
 
+        self.x_max = torch.cat((self.x_max, self.u_max))
+        self.x_min = torch.cat((self.x_min, self.u_min))
+
         self.cost = vmap(partial(cost, start=self.start, goal=self.goal))
         self.grad_cost = vmap(jacrev(partial(cost, start=self.start, goal=self.goal)))
         self.hess_cost = vmap(hessian(partial(cost, start=self.start, goal=self.goal)))
@@ -198,17 +201,17 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
                 self.alpha * grad_J.reshape(N, -1),
                 self.alpha * hess_J.reshape(N, self.T * (self.dx+self.du), self.T * (self.dx+self.du)))
 
-    def _con_eq(self, x, compute_grads=True):
-        N = x.shape[0]
-        g, grad_g, hess_g = self._equality_constraints.eval(x.reshape(-1, self.dx+self.du), compute_grads)
-        g_dynamics, grad_g_dynamics, hess_g_dynamics = self._dynamics_constraints.eval(x, compute_grads)
+    def _con_eq(self, xu, compute_grads=True):
+        N = xu.shape[0]
+        g, grad_g, hess_g = self._equality_constraints.eval(xu.reshape(-1, self.dx+self.du), compute_grads)
+        g_dynamics, grad_g_dynamics, hess_g_dynamics = self._dynamics_constraints.eval(xu, compute_grads)
         # term_g, term_grad_g, term_hess_g = self._terminal_constraints.eval(x[:, -1])
 
         g = g.reshape(N, -1)
         # combine terminal constraint with running constraints
         # g = torch.cat((g, term_g), dim=1)
 
-        N = x.shape[0]
+        N = xu.shape[0]
         if not compute_grads:
             return g, None, None
             # Expand gradient to include time dimensions
@@ -233,13 +236,13 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         hess_g = torch.cat((hess_g, hess_g_dynamics), axis=1)
         return g, grad_g, hess_g
 
-    def _con_ineq(self, x, compute_grads=True):
+    def _con_ineq(self, xu, compute_grads=True):
         # x = x[:, :, :self.dx]
-        N = x.shape[0]
-        h, grad_h, hess_h = self._inequality_constraints.eval(x.reshape(-1, self.dx+self.du), compute_grads)
+        N = xu.shape[0]
+        h, grad_h, hess_h = self._inequality_constraints.eval(xu.reshape(-1, self.dx+self.du), compute_grads)
 
         h = h.reshape(N, -1)
-        N = x.shape[0]
+        N = xu.shape[0]
         if not compute_grads:
             return h, None, None
             # Expand gradient to include time dimensions
@@ -315,14 +318,14 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
 
         else:
             theta_offset = 0
-        self._equality_constraints = JointConstraint(
-            partial(get_joint_constraint, chain=self.chain, constraint_function=finger_tip_equality_constraints)
-        )
+        # self._equality_constraints = JointConstraint(
+        #     partial(get_joint_constraint, chain=self.chain, constraint_function=finger_tip_equality_constraints)
+        # )
 
-        self._inequality_constraints = JointConstraint(
-            partial(get_joint_constraint, chain=self.chain, constraint_function=finger_tip_inequality_constraint)
-        )
-        # TODO: update the dynamics constraint
+        # self._inequality_constraints = JointConstraint(
+        #     partial(get_joint_constraint, chain=self.chain, constraint_function=finger_tip_inequality_constraint)
+        # )
+        # # TODO: update the dynamics constraint
 
         if goal is not None:
             self.goal = goal
@@ -382,7 +385,8 @@ class JointConstraint:
         self._fn = joint_constraint_function
         self.joint_constraint_fn = vmap(joint_constraint_function)
 
-        self._grad_fn = jacrev(joint_constraint_function, argnums=0)
+        self._grad_fn = jacrev(joint_constraint_function, argnums=(0))
+        # TODO: fix it, now it only takes gradients to the joint angles
 
         self.grad_constraint = vmap(self._grad_g)
         self.hess_constraint = vmap(jacfwd(self._grad_g, argnums=0))
@@ -393,19 +397,19 @@ class JointConstraint:
         dq = self._grad_fn(q)
         return dq
 
-    def eval(self, q, compute_grads=True):
+    def eval(self, qu, compute_grads=True):
         """
-        :param q: torch.Tensor of shape (N, 7) containing set of robot joint config
+        :param qu: torch.Tensor of shape (N, 10) containing set of robot joint config + acton
         :return g: constraint values
         :return Dg: constraint gradient
         :return DDg: constraint hessian
         """
-        T = q.shape[0]
-        constraints = self.joint_constraint_fn(q)
+        T = qu.shape[0]
+        constraints = self.joint_constraint_fn(qu)
         if not compute_grads:
             return constraints, None, None
-        dq = self.grad_constraint(q)
-        ddq = self.hess_constraint(q)
+        dq = self.grad_constraint(qu)
+        ddq = self.hess_constraint(qu)
 
         return constraints, dq, ddq
 
@@ -414,7 +418,7 @@ class JointConstraint:
 
 
 
-def get_joint_constraint(q, chain, constraint_function, initial_valve_angle=0):
+def get_joint_constraint(qu, chain, constraint_function, initial_valve_angle=0):
     """
 
     :param q: torch.Tensor (N, DoF) joint positions
@@ -425,11 +429,11 @@ def get_joint_constraint(q, chain, constraint_function, initial_valve_angle=0):
     """
     valve_offset_for_index = -np.pi / 2.0
     valve_offset_for_thumb = np.pi / 2.0  # * 0.99
-    theta = q[8]
-    w = q[9]
-    index_q = q[:4]
-    thumb_q = q[4:8]
-    action = q[10:16]
+    theta = qu[8]
+    w = qu[9]
+    index_q = qu[:4]
+    thumb_q = qu[4:8]
+    action = qu[10:16]
     index_f = action[:3]
     thumb_f = action[3:]
     finger_qs = [index_q, thumb_q]
@@ -437,12 +441,13 @@ def get_joint_constraint(q, chain, constraint_function, initial_valve_angle=0):
     radii = [0.040, 0.038]
     constraint_list = []
     # frame_indices = torch.tensor([index_ee_link, thumb_ee_link])
-    fk_dict = chain.forward_kinematics(partial_to_full_state(q[:8]), frame_indices=frame_indices)
+    fk_dict = chain.forward_kinematics(partial_to_full_state(qu[:8]), frame_indices=frame_indices)
 
     for finger_q, finger_name, r in zip(finger_qs, finger_names, radii):
         m = world_trans.compose(fk_dict[finger_name])
-        points_finger_frame = torch.tensor([0.00, 0.03, 0.00], device=q.device).unsqueeze(0)
-        normals_finger_tip_frame = torch.tensor([0.0, 0.0, 1.0], device=q.device).unsqueeze(0)
+        points_finger_frame = torch.tensor([0.00, 0.03, 0.00], device=qu.device).unsqueeze(0)
+        normals_finger_tip_frame = torch.tensor([0.0, 0.0, 1.0], device=qu.device).unsqueeze(0)
+        # it is just the thrid column of the rotation matrix
         normals_finger_tip_frame = normals_finger_tip_frame / torch.norm(normals_finger_tip_frame, dim=1, keepdim=True)
         p = m.transform_points(points_finger_frame).reshape(-1)
         normals_world_frame = m.transform_normals(normals_finger_tip_frame).reshape(3)
@@ -521,8 +526,11 @@ def finger_tip_inequality_constraint(p, f, theta, normal, *args, **kwargs):
     constraint_y_1 = -(valve_location[1] - p[1]) + 0.02
     constraint_y_2 = (valve_location[1] - p[1]) - 0.065
     constraint_normal = 0.25 + normal_alignment
-    fn_mag = torch.dot(f, normal)
-    fn = normal * fn_mag
+    # NOTE: it assumes that the finger tip is at the center of the valve surface, since we are using the orientation to define surface normal. 
+    surface_normal = torch.cat((torch.sin(theta).unsqueeze(0), torch.zeros_like(theta).unsqueeze(0), torch.cos(theta).unsqueeze(0)))
+    
+    fn_mag = torch.dot(f.double(), surface_normal.double()).float()
+    fn = surface_normal * fn_mag
     ft = f - fn
     constraint_friction = torch.linalg.norm(ft) - torch.linalg.norm(fn) * friction_coefficient
     constraint_finger_push_in = -fn_mag
