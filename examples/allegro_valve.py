@@ -45,7 +45,7 @@ thumb_ee_link = chain.frame_to_idx[thumb_ee_name]
 valve_location = torch.tensor([0.85, 0.70, 1.405]).to('cuda:0')
 # instantiate environment
 env = AllegroValveTurningEnv(1, control_mode='joint_impedance', use_cartesian_controller=False,
-                             viewer=True, steps_per_action=60)
+                             viewer=True, steps_per_action=60, valve_velocity_in_state=False)
 world_trans = env.world_trans
 
 
