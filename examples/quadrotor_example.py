@@ -6,18 +6,15 @@ import time
 from functools import partial
 from functorch import vmap, jacrev, hessian
 
+# ccai stuff
 from ccai.kernels import rbf_kernel, structured_rbf_kernel
 from ccai.quadrotor_env import QuadrotorEnv
 from ccai.quadrotor import Quadrotor12DDynamics
 from ccai.gp import GPSurfaceModel
+from ccai.mpc import Constrained_SVGD_MPC, IpoptMPC, MPPI, SVMPC, SQPMPC
+from ccai.problem import ConstrainedSVGDProblem, IpoptProblem, UnconstrainedPenaltyProblem, NLOptProblem
 
-from ccai.mpc.csvgd import Constrained_SVGD_MPC
-from ccai.mpc.ipopt import IpoptMPC
-from ccai.mpc.mppi import MPPI
-from ccai.mpc.svgd import SVMPC
-import argparse
 import yaml
-from ccai.problem import ConstrainedSVGDProblem, IpoptProblem, UnconstrainedPenaltyProblem
 
 import pathlib
 
@@ -72,7 +69,8 @@ def cost(trajectory, goal):
 
 class QuadrotorProblem(ConstrainedSVGDProblem):
 
-    def __init__(self, start, goal, T, device='cuda:0', alpha=1, include_obstacle=False):
+    def __init__(self, start, goal, T, device='cuda:0', alpha=1, include_obstacle=False,
+                 gp_sdf_model=None, use_squared_slack=True):
         super().__init__(start, goal, T, device)
         self.T = T
         self.dx = 12
@@ -81,16 +79,28 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
             self.dz = 1
         else:
             self.dz = 0
-
+        self.squared_slack = use_squared_slack
         self.dh = self.dz * T
         self.dg = 12 * T + T - 1
         self.alpha = alpha
+        self.alpha = 0.1
         self.include_obstacle = include_obstacle
         # self.dg = 2 * T - 1
         data = np.load('surface_data.npz')
         # GP which models surface
         self.surface_gp = GPSurfaceModel(torch.from_numpy(data['xy']).to(dtype=torch.float32, device=device),
                                          torch.from_numpy(data['z']).to(dtype=torch.float32, device=device))
+
+        # GP which models sdf
+        if gp_sdf_model is not None:
+            gp_sdf_model.train_y = torch.where(gp_sdf_model.train_y > 0, gp_sdf_model.train_y * 2,
+                                               gp_sdf_model.train_y)
+
+            self.obs_gp = GPSurfaceModel(gp_sdf_model.train_x.to(device=device),
+                                         gp_sdf_model.train_y.to(device=device))
+
+        else:
+            self.obs_gp = None
 
         # gradient and hessian of dynamics
         self._dynamics = Quadrotor12DDynamics(dt=0.1)
@@ -99,7 +109,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         self.hess_dynamics = vmap(hessian(self._dynamics_constraint))
 
         self.height_constraint = vmap(self._height_constraint)
-
+        self.sdf_constraint = vmap(self._sdf_constraint)
         self._objective = vmap(partial(cost, goal=goal))
 
         self.start = start
@@ -109,7 +119,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         # self.hess_g = vmap(hessian(self._combined_contraints))
 
         kernel = structured_rbf_kernel
-        #kernel = rbf_kernel
+        # kernel = rbf_kernel
         self.K = kernel
         self.dK = jacrev(kernel, argnums=0)
         self.x_max = torch.ones(self.dx + self.du)
@@ -222,14 +232,43 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
 
         return g, Dg, DDg
 
-    def _con_ineq(self, trajectory, compute_grads=True):
-        if not self.include_obstacle:
-            return None, None, None
+    def _sdf_constraint(self, trajectory):
+        T = trajectory.shape[0]
+        xy, z = trajectory[:, :2], trajectory[:, 2]
 
+        # compute z of surface and gradient and hessian
+        sdf, grad_sdf, hess_sdf = self.obs_gp.posterior_mean(xy)
+
+        constr = sdf + 0.05
+        grad_constr = torch.cat((grad_sdf,
+                                 torch.zeros(T, 14, device=trajectory.device)), dim=1)
+        hess_constr = torch.cat((
+            torch.cat((hess_sdf, torch.zeros(T, 2, 14, device=trajectory.device)), dim=2),
+            torch.zeros(T, 14, 16, device=trajectory.device)), dim=1)
+
+        return constr, grad_constr, hess_constr
+
+    def _obs_sdf(self, trajectory, compute_grads=True):
+        N = trajectory.shape[0]
+        prob_dim = self.T * (self.dx + self.du)
+
+        # surface constraint
+        sdf_constr, grad_sdf_constr, hess_sdf_constr = self.sdf_constraint(trajectory)
+        # currently only take derivative of height at time t wrt state at time t - need to include other times
+        # (all derivatives and hessians will be zero)
+        grad_sdf_constr = torch.diag_embed(grad_sdf_constr.permute(0, 2, 1))
+        grad_sdf_constr = grad_sdf_constr.permute(0, 2, 3, 1).reshape(N, self.T, prob_dim)
+        hess_sdf_constr = torch.diag_embed(torch.diag_embed(hess_sdf_constr.permute(0, 2, 3, 1)))
+        hess_sdf_constr = hess_sdf_constr.permute(0, 3, 4, 1, 5, 2).reshape(N, self.T, prob_dim, prob_dim)
+
+        return sdf_constr, grad_sdf_constr, hess_sdf_constr
+
+    def _obs_disc(self, trajectory, compute_grads=True):
         N = trajectory.shape[0]
         xy = trajectory.reshape(N, self.T, -1)[:, :, :2] - self.obstacle_centre.reshape(1, 1, 2)
 
         h = self.obstacle_rad ** 2 - torch.sum(xy ** 2, dim=-1)  # N x T
+
         if not compute_grads:
             return h, None, None
 
@@ -248,7 +287,19 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         hess_h[:, :, :, :2, :, :2] = hess_h_xy
         hess_h = hess_h.reshape(N, self.T, self.T * (self.dx + self.du),
                                 self.T * (self.dx + self.du))
+
         return h, grad_h, hess_h
+
+    def _con_ineq(self, trajectory, compute_grads=True):
+        if not self.include_obstacle:
+            return None, None, None
+
+        # If no gp we assume disc obstacle
+        if self.obs_gp is None:
+            return self._obs_disc(trajectory, compute_grads=compute_grads)
+
+        # Otherwise we use the GP sdf function
+        return self._obs_sdf(trajectory, compute_grads=compute_grads)
 
     def eval(self, augmented_trajectory):
         N = augmented_trajectory.shape[0]
@@ -273,19 +324,23 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
 
         # Now we need to compute constraints and their first and second partial derivatives
         g, Dg, DDg = self.combined_constraints(augmented_trajectory)
-        #print(g.abs().max())
+        #print(g.abs().max(), g.abs().mean(), cost.mean())
+
         # print(cost.reshape(-1))
         # print(g[0])
         if M is not None:
             hess_cost_ext = torch.zeros(N, self.T, self.dx + self.du + self.dz, self.T, self.dx + self.du + self.dz,
                                         device=self.device)
-            hess_cost_ext[:, :, :self.dx + self.du, :, :self.dx + self.du] = hess_cost.reshape(N, self.T, self.dx + self.du,
-                                                                                               self.T, self.dx + self.du)
+            hess_cost_ext[:, :, :self.dx + self.du, :, :self.dx + self.du] = hess_cost.reshape(N, self.T,
+                                                                                               self.dx + self.du,
+                                                                                               self.T,
+                                                                                               self.dx + self.du)
             hess_cost = hess_cost_ext.reshape(N, self.T * (self.dx + self.du + self.dz),
                                               self.T * (self.dx + self.du + self.dz))
 
             grad_cost_augmented = grad_cost + 2 * (g.reshape(N, 1, -1) @ Dg).reshape(N, -1)
-            hess_J_augmented = hess_cost + 2 * (torch.sum(g.reshape(N, -1, 1, 1) * DDg, dim=1) + Dg.permute(0, 2, 1) @ Dg)
+            hess_J_augmented = hess_cost + 2 * (
+                    torch.sum(g.reshape(N, -1, 1, 1) * DDg, dim=1) + Dg.permute(0, 2, 1) @ Dg)
             grad_cost = grad_cost_augmented
             hess_cost = hess_J_augmented.mean(dim=0)
         else:
@@ -317,13 +372,18 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
 
 class QuadrotorIpoptProblem(QuadrotorProblem, IpoptProblem):
 
-    def __init__(self, start, goal, T, include_obstacle=False):
-        super().__init__(start, goal, T, device='cpu', include_obstacle=include_obstacle)
+    def __init__(self, start, goal, T, include_obstacle=False, gp_sdf_model=None):
+        super().__init__(start, goal, T, device='cpu', include_obstacle=include_obstacle, gp_sdf_model=gp_sdf_model)
+
+
+class QuadrotorSQPProblem(QuadrotorProblem, NLOptProblem):
+    def __init__(self, start, goal, T, include_obstacle=False, gp_sdf_model=None):
+        super().__init__(start, goal, T, device='cpu', include_obstacle=include_obstacle, gp_sdf_model=gp_sdf_model)
 
 
 class QuadrotorUnconstrainedProblem(QuadrotorProblem, UnconstrainedPenaltyProblem):
-    def __init__(self, start, goal, T, device, penalty, include_obstacle=False):
-        super().__init__(start, goal, T, device=device, include_obstacle=include_obstacle)
+    def __init__(self, start, goal, T, device, penalty, include_obstacle=False, gp_sdf_model=None):
+        super().__init__(start, goal, T, device=device, include_obstacle=include_obstacle, gp_sdf_model=gp_sdf_model)
         self.penalty = penalty
 
 
@@ -362,22 +422,31 @@ def do_trial(env, params, fpath):
     goal[:2] = 4
 
     include_obstacle = True if params['obstacle_mode'] is not None else False
+    sdf_model = env.obstacle_model if params['obstacle_mode'] == 'gp' else None
 
-    if params['controller'] == 'csvgd':
-        problem = QuadrotorProblem(start, goal, params['T'], device=params['device'], include_obstacle=include_obstacle)
+    if 'csvgd' in params['controller']:
+        problem = QuadrotorProblem(start, goal, params['T'], device=params['device'], include_obstacle=include_obstacle,
+                                   gp_sdf_model=sdf_model, use_squared_slack=params['squared_slack'])
         controller = Constrained_SVGD_MPC(problem, params)
-    elif params['controller'] == 'ipopt':
-        problem = QuadrotorIpoptProblem(start, goal, params['T'], include_obstacle=include_obstacle)
+    elif 'ipopt' in params['controller']:
+        problem = QuadrotorIpoptProblem(start, goal, params['T'], include_obstacle=include_obstacle,
+                                        gp_sdf_model=sdf_model)
         controller = IpoptMPC(problem, params)
+    elif 'sqp' in params['controller']:
+        problem = QuadrotorSQPProblem(start, goal, params['T'], include_obstacle=include_obstacle,
+                                      gp_sdf_model=sdf_model)
+        controller = SQPMPC(problem, params)
     elif 'mppi' in params['controller']:
         problem = QuadrotorUnconstrainedProblem(start, goal, params['T'],
                                                 device=params['device'], penalty=params['penalty'],
-                                                include_obstacle=include_obstacle)
+                                                include_obstacle=include_obstacle,
+                                                gp_sdf_model=sdf_model)
         controller = MPPI(problem, params)
     elif 'svgd' in params['controller']:
         problem = QuadrotorUnconstrainedProblem(start, goal, params['T'],
                                                 device=params['device'], penalty=params['penalty'],
-                                                include_obstacle=include_obstacle)
+                                                include_obstacle=include_obstacle,
+                                                gp_sdf_model=sdf_model)
         controller = SVMPC(problem, params)
     else:
         raise ValueError('Invalid controller')
@@ -385,7 +454,8 @@ def do_trial(env, params, fpath):
     ax = env.ax
     traj_lines = None
     collision = False
-    actual_traj = []
+    actual_traj = [env.state]
+    plans = []
     all_violation = []
 
     duration = 0.0
@@ -397,15 +467,17 @@ def do_trial(env, params, fpath):
                 torch.cuda.synchronize()
                 start_time = time.time()
             best_traj, trajectories = controller.step(start, obstacle_pos=env.obstacle_pos)
+            plans.append(trajectories.detach().cpu().numpy())
+
             if step > 0:
                 torch.cuda.synchronize()
                 duration += time.time() - start_time
 
             u = best_traj[0, -4:].detach().cpu().numpy()
             _, violation = env.step(u)
-
+            #print(violation)
             if include_obstacle:
-                if violation[1] > 0:
+                if violation['obstacle'] > 0:
                     collision = True
         actual_traj.append(env.state)
         all_violation.append(violation)
@@ -416,10 +488,13 @@ def do_trial(env, params, fpath):
             plt.savefig(f'{fpath.resolve()}/im_{step:02d}.png')
             plt.gcf().canvas.flush_events()
 
-    print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"]- 1)}')
+    print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
     actual_traj = np.stack(actual_traj)
     all_violation = np.stack(all_violation)
-    np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_traj, constr=all_violation)
+    plans = np.stack(plans)
+    np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_traj,
+             constr=all_violation,
+             plans=plans, goal=goal.cpu().numpy())
 
     if params['visualize']:
         plt.close()
@@ -428,7 +503,7 @@ def do_trial(env, params, fpath):
 
 
 if __name__ == "__main__":
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/quadrotor.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/config/quadrotor.yaml').read_text())
     from tqdm import tqdm
 
     if config['obstacle_mode'] == 'none':
@@ -436,9 +511,18 @@ if __name__ == "__main__":
 
     results = {}
     for i in tqdm(range(config['num_trials'])):
-        env = QuadrotorEnv('surface_data.npz', obstacle_mode=config['obstacle_mode'])
+        env = QuadrotorEnv(False, 'surface_data.npz', obstacle_mode=config['obstacle_mode'],
+                           obstacle_data_fname='obstacle_data_20.npz')
+
+        data = dict(np.load(f'../data/experiments/quadrotor_test_obs_sdf_20/csvgd/trial_{i+1}/trajectory.npz',
+                            allow_pickle=True))
+        x = data['x']
         env.reset()
         start_state = env.state.copy()
+        #print(env.state)
+        #print(x[0])
+        #env.state = x[0]
+        #start_state = env.state.copy()
 
         for controller in config['controllers'].keys():
             env.reset()

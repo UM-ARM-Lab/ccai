@@ -3,6 +3,7 @@ from ccai.kernels import RBFKernel
 from torch.distributions import MultivariateNormal
 import numpy as np
 
+
 class GPSurfaceModel:
 
     def __init__(self, train_x, train_y, lengthscale=1.5, outputscale=0.5):
@@ -130,4 +131,3 @@ def get_random_obs(start, goal):
     # want to make environment slightly clearer so that it is more traversable on average
     samples = samples - 0.5
     return GPSurfaceModel(train_x, samples, lengthscale=lengthscale, outputscale=outputscale)
-

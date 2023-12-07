@@ -44,7 +44,7 @@ class ConstrainedSteinTrajOpt:
             dCdCT = dC @ dC.permute(0, 2, 1)
             A_bmm = lambda x: dCdCT @ x
             #
-
+            #damping_factor = 1e-1
             try:
                 dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1), eye)
                 if torch.any(torch.isnan(dCdCT_inv)):
@@ -131,17 +131,16 @@ class ConstrainedSteinTrajOpt:
             xi_J = -phi
             if False:
                 # Normalize gradient
-                normxiC = torch.clamp(torch.linalg.norm(xi_C, dim=1, keepdim=True, ord=np.inf), min=1e-6)
-                normxiC = torch.min(0.9 * torch.ones_like(normxiC) / self.dt, normxiC)
+                normxiC = torch.clamp(torch.linalg.norm(xi_C, dim=1, keepdim=True, ord=np.inf), min=1e-9)
+                # normxiC = torch.min(0.9 * torch.ones_like(normxiC) / self.dt, normxiC)
                 xi_C = self.alpha_C * xi_C / normxiC
 
-                if self.normxiJ is None:
-                    self.normxiJ = torch.clamp(torch.linalg.norm(xi_J, dim=1, keepdim=True, ord=np.inf), min=1e-6)
-                    xi_J = self.alpha_J * xi_J / self.normxiJ
-                else:
-                    normxiJ = torch.clamp(torch.linalg.norm(xi_J, dim=1, keepdim=True, ord=np.inf), min=1e-6)
-                    normxiJ = torch.max(normxiJ, self.normxiJ)
-                    xi_J = self.alpha_J * xi_J / normxiJ
+                # if self.normxiJ is None:
+                #    self.normxiJ = torch.clamp(torch.linalg.norm(xi_J, dim=1, keepdim=True, ord=np.inf), min=1e-6)
+                #    xi_J = self.alpha_J * xi_J / self.normxiJ
+                # else:
+                normxiJ = torch.clamp(torch.linalg.norm(xi_J, dim=1, keepdim=True, ord=np.inf), min=1e-6)
+                xi_J = self.alpha_J * xi_J / normxiJ
 
         return (self.alpha_J * xi_J + self.alpha_C * xi_C).detach()
 
@@ -150,7 +149,11 @@ class ConstrainedSteinTrajOpt:
         min_x = self.problem.x_min.reshape(1, 1, -1).repeat(1, self.problem.T, 1)
         max_x = self.problem.x_max.reshape(1, 1, -1).repeat(1, self.problem.T, 1)
         if self.problem.dz > 0:
-            min_x = torch.cat((min_x, -1e3 * torch.ones(1, self.problem.T, self.problem.dz)), dim=-1)
+            if not self.problem.squared_slack:
+                min_val = 0
+            else:
+                min_val = -1e3
+            min_x = torch.cat((min_x, min_val * torch.ones(1, self.problem.T, self.problem.dz)), dim=-1)
             max_x = torch.cat((max_x, 1e3 * torch.ones(1, self.problem.T, self.problem.dz)), dim=-1)
 
         torch.clamp_(xuz, min=min_x.to(device=xuz.device).reshape(1, -1),
@@ -218,10 +221,12 @@ class ConstrainedSteinTrajOpt:
         else:
             xuz = x0.clone().reshape(N, -1)
 
+        import torch.optim.lr_scheduler as lr_scheduler
         optim = torch.optim.SGD(params=[xuz], lr=self.dt, momentum=self.momentum,
                                 nesterov=True if self.momentum > 0 else False)
+        # scheduler = lr_scheduler.LinearLR(optim, start_factor=1.0, end_factor=0.1, total_iters=self.iters)
 
-        # optim = torch.optim.Adagrad(params=[xuz], lr=1e-1)
+        optim = torch.optim.RMSprop(params=[xuz], lr=self.dt)
 
         # driving force useful for helping exploration -- currently unused
         T = self.iters
@@ -237,31 +242,55 @@ class ConstrainedSteinTrajOpt:
 
         resample_period = 25
         path = [xuz.data.clone()]
+        self.gamma = self.max_gamma
         for iter in range(T):
+            # reset slack variables
+            #if self.problem.dz > 0:
+            #    xu = xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du]
+            #    z_init = self.problem.get_initial_z(xu)
+            #    xuz = torch.cat((xu, z_init), dim=2).reshape(N, -1)
+
             s = time.time()
             if T > 50:
-                self.gamma = self.max_gamma * driving_force(iter + 1)
+                self.gamma = self.max_gamma * driving_force(iter)
             #    self.sigma = 0.1 * (1.0 - iter / T) + 1e-2
 
-            #if (iter + 1) % resample_period == 0 and (iter < T - 1):
+            # if (iter + 1) % resample_period == 0 and (iter < T - 1):
             #    print('resampling', iter)
             #    xuz.data = self.resample(xuz.data)
-
-            optim.zero_grad()
+            # old C
+            #oldC, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1), compute_grads=False)
+            #
+            # optim.zero_grad()
             grad = self.compute_update(xuz)
-            xuz.grad = grad
+            #for k in range(10):
+            #    dt = self.dt / (2 ** k)
+            #    new_xuz = xuz.data - dt * grad
+            #    self._clamp_in_bounds(new_xuz)
+            #    # now we compute the new constraint val
+            #    newC, _, _ = self.problem.combined_constraints(new_xuz.reshape(N, self.T, -1), compute_grads=False)
+            #    if torch.sum(newC ** 2) < torch.sum(oldC ** 2):
+            #        xuz.data = new_xuz
+            #        break
+
+            #xuz.data = #new_xuz
+            xuz.data = xuz.data - self.dt * grad
+
+            # xuz.grad = grad
             # print(torch.linalg.norm(grad))
             torch.nn.utils.clip_grad_norm_(xuz, 10)
             # new_xuz = xuz + self.dt * grad
-            optim.step()
+            # optim.step()
+            # scheduler.step()
             # clamp within bounds for simple bounds
-            if self.problem.x_max is not None:
-                self._clamp_in_bounds(xuz)
+            # if self.problem.x_max is not None:
+            self._clamp_in_bounds(xuz)
+
             path.append(xuz.data.clone())
 
         # sort particles by penalty
         J = self.problem.get_cost(xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du])
-        C, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1))
+        C, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1), compute_grads=False)
         penalty = J.reshape(N) + self.penalty * torch.sum(C.reshape(N, -1).abs(), dim=1)
         idx = torch.argsort(penalty, descending=False)
         path = torch.stack(path, dim=0).reshape(len(path), N, self.T, -1)[:, :, :, :self.dx + self.du]

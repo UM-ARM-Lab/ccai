@@ -83,8 +83,10 @@ class QuadrotorEnv:
         # positions
         got_sg = False
         while not got_sg:
-            start[:2] = 10 * np.random.rand(2) - 5  # np.array([-4, -4]) - 1. * np.random.rand(2)
-            goal = 10 * np.random.rand(3) - 5
+            start[:2] = 10 * np.random.rand(2) - 5  #
+            start[:2] = np.array([-3.0, -3.0]) - 1.5 * np.random.rand(2)
+            goal[:2] = np.array([4, 4])
+            #goal = 10 * np.random.rand(3) - 5
 
             if np.linalg.norm(start[:2] - goal[:2]) > 4:
                 got_sg = True
@@ -128,6 +130,8 @@ class QuadrotorEnv:
         if self.obstacle_mode is not None:
             if self.obstacle_mode == 'gp':
                 sdf = self._get_gp_obs_sdf(self.state)
+                print(sdf)
+                print(self.state[:2])
                 obstacle_violation = np.clip(sdf, a_min=0, a_max=None)
             else:
                 obstacle_violation = self.obstacle_r ** 2 - np.sum((self.state[:2] - self.obstacle_pos) ** 2)
@@ -247,6 +251,7 @@ class QuadrotorEnv:
         return self.ax
 
     def render_update(self):
+        print(self.state[:2], 'rendering')
         self._render_pos._offsets3d = ([self.state[0]], [self.state[1]], [self.state[2]])
         if self.obstacle_mode == 'dynamic':
             self._surf.set_facecolors(self._get_surface_colours()[:-1, :-1].reshape(-1, 4))
@@ -263,3 +268,22 @@ class QuadrotorEnv:
             params['obstacle'] = self.obstacle_model.train_y.reshape(-1).cpu().numpy()
 
         return params
+
+
+if __name__ == "__main__":
+    env = QuadrotorEnv(randomize_GP=False, surface_data_fname='../examples/surface_data.npz', obstacle_mode='gp')
+    for i in range(100):
+        env.state = np.zeros(12)
+        env.state[:2] = np.array([-4, -4])
+        env.goal[:2] = np.array([4, 4])
+        env.obstacle_model = get_random_obs(env.state, env.goal)
+        env.obs_plotting_vars = env._get_plotting_vars(env.obstacle_model)
+        ax = env.render_init()
+
+        plt.savefig(f'obstacle_data_{i}.png')
+
+        data = {
+            'xy': env.obstacle_model.train_x.numpy(),
+            'z': env.obstacle_model.train_y.numpy()
+        }
+        np.savez(f'obstacle_data_{i}.npz', **data)

@@ -63,6 +63,11 @@ class Problem(metaclass=ABCMeta):
 
 
 class ConstrainedSVGDProblem(Problem):
+    slack_weight = 1
+
+    @abstract_attribute
+    def squared_slack(self):
+        pass
 
     @abstract_attribute
     def dz(self):
@@ -72,23 +77,48 @@ class ConstrainedSVGDProblem(Problem):
     def eval(self, x):
         pass
 
-    def combined_constraints(self, augmented_x):
+    def combined_constraints(self, augmented_x, compute_grads=True):
         N = augmented_x.shape[0]
         augmented_x = augmented_x.reshape(N, self.T, self.dx + self.du + self.dz)
         xu = augmented_x[:, :, :(self.dx + self.du)]
         z = augmented_x[:, :, -self.dz:]
 
-        g, grad_g, hess_g = self._con_eq(xu)
-        h, grad_h, hess_h = self._con_ineq(xu)
+        g, grad_g, hess_g = self._con_eq(xu, compute_grads=compute_grads)
+        h, grad_h, hess_h = self._con_ineq(xu, compute_grads=compute_grads)
 
-        if h is None or grad_h is None or hess_h is None:
+        # self.slack_weight = torch.linalg.norm(grad_h)
+
+        if h is None:
             return g, grad_g, hess_g
 
-        h_aug = h + 0.5 * z.reshape(-1, self.dz * self.T) ** 2
+        if self.squared_slack:
+            h_aug = h + 0.5 * z.reshape(-1, self.dz * self.T) ** 2
+            #print('--')
+            # print(z.reshape(-1, self.dz * self.T)[0])
+            # print(h.reshape(-1, self.dz * self.T)[0])
+            #print(torch.min(z.abs()))
+        else:
+            h_aug = h + self.slack_weight * z.reshape(-1, self.dz * self.T)
+            # print('--')
+            # print(z.reshape(-1, self.dz * self.T)[0])
+            # print(torch.linalg.norm(grad_h.reshape(N, -1), dim=1))
+            # print(h.reshape(-1, self.dz * self.T)[0])
+            # print(h_aug.reshape(-1, self.dz * self.T)[0])
+            # h_aug *= 100
 
-        # Gradients - gradient wrt z should be z
-        z_extended = torch.diag_embed(torch.diag_embed(z).permute(0, 2, 3, 1)
-                                      ).permute(0, 3, 1, 4, 2)  # (N, T, dz, T dz)
+        if not compute_grads:
+            if g is None:
+                return h_aug, None, None
+            return torch.cat((g, h_aug), dim=1), None, None
+
+            # Gradients - gradient wrt z should be z
+        if self.squared_slack:
+            z_extended = torch.diag_embed(torch.diag_embed(z).permute(0, 2, 3, 1)
+                                          ).permute(0, 3, 1, 4, 2)  # (N, T, dz, T dz)
+        else:
+            z_extended = self.slack_weight * torch.diag_embed(torch.diag_embed(torch.ones_like(z)).permute(0, 2, 3, 1)
+                                                              ).permute(0, 3, 1, 4, 2)  # (N, T, dz, T dz)
+
         grad_h_aug = torch.cat((
             grad_h.reshape(N, self.T, self.dz, self.T, -1),
             z_extended), dim=-1)
@@ -106,13 +136,15 @@ class ConstrainedSVGDProblem(Problem):
         hess_h_aug = torch.zeros(N, self.T, self.dz, self.T, self.dx + self.du + self.dz,
                                  self.T, self.dx + self.du + self.dz, device=self.device)
         hess_h_aug[:, :, :, :, :self.dx + self.du, :, :self.dx + self.du] = hess_h
-        hess_h_aug[:, :, :, :, -self.dz:, :, -self.dz:] = eye
+
+        if self.squared_slack:
+            hess_h_aug[:, :, :, :, -self.dz:, :, -self.dz:] = eye
 
         hess_h_aug = hess_h_aug.reshape(N, self.dh, self.T * (self.dx + self.du + self.dz),
                                         self.T * (self.dx + self.du + self.dz))
 
-        #grad_h_aug = torch.where(h.unsqueeze(-1) > -0.1, grad_h_aug, torch.zeros_like(grad_h_aug))
-        #hess_h_aug = torch.where(h.unsqueeze(-1).unsqueeze(-1) > -0.1, hess_h_aug, torch.zeros_like(hess_h_aug))
+        # grad_h_aug = torch.where(h.unsqueeze(-1) > -0.1, grad_h_aug, torch.zeros_like(grad_h_aug))
+        # hess_h_aug = torch.where(h.unsqueeze(-1).unsqueeze(-1) > -0.1, hess_h_aug, torch.zeros_like(hess_h_aug))
 
         if g is None:
             return h_aug, grad_h_aug, hess_h_aug
@@ -138,12 +170,21 @@ class ConstrainedSVGDProblem(Problem):
         c = torch.cat((g, h_aug), dim=1)  # (N, dg + dh)
         grad_c = torch.cat((grad_g_aug, grad_h_aug), dim=1)
         hess_c = torch.cat((hess_g_aug, hess_h_aug), dim=1)
+
         return c, grad_c, hess_c
 
     def get_initial_z(self, x):
-        h, _, _ = self._con_ineq(x, compute_grads=False)
+        N = x.shape[0]
+        h, grad_h, _ = self._con_ineq(x, compute_grads=True)
+        # self.slack_weight = 1 / torch.mean(torch.linalg.norm(h.reshape(N, -1), dim=1)) ** 2
+        # print(self.slack_weight)
         if h is not None:
-            z = torch.where(h < 0, torch.sqrt(-2 * h), 0)
+            if self.squared_slack:
+                #z = torch.where(h < 0, torch.sqrt(-2 * h), 0)
+                z = torch.sqrt(2 * torch.abs(h))
+            else:
+                z = torch.where(h < 0, -h / self.slack_weight, 0)
+
             return z.reshape(-1, self.T, self.dz)
 
 
@@ -231,6 +272,42 @@ class IpoptProblem(Problem):
         if hess is None:
             return None
         return np.sum(v.reshape(-1, 1, 1) * hess, axis=0)
+
+
+class NLOptProblem(Problem):
+    def __init__(self, start, goal, T, *args, **kwargs):
+        super().__init__(start, goal, T, device='cpu')
+
+    def objective(self, x, grad):
+        tensor_x = torch.from_numpy(x).reshape(1, self.T, -1).to(torch.float32)
+        J, grad_J, _ = self._objective(tensor_x)
+        if grad.size > 0:
+            grad[:] = grad_J.reshape(-1).detach().numpy()
+        return J.detach().reshape(-1).item()
+
+    def con_eq(self, result, x, grad):
+        tensor_x = torch.from_numpy(x).reshape(1, self.T, -1).to(torch.float32)
+        g, grad_g, _ = self._con_eq(tensor_x)
+
+        if grad.size > 0:
+            grad[:] = grad_g.detach().numpy()
+
+        result[:] = g.reshape(-1).detach().numpy()
+
+    def con_ineq(self, result, x, grad):
+        tensor_x = torch.from_numpy(x).reshape(1, self.T, -1).to(torch.float32)
+        h, grad_h, _ = self._con_ineq(tensor_x)
+
+        if grad.size > 0:
+            grad[:] = grad_h.detach().numpy()
+
+        result[:] = h.reshape(-1).detach().numpy()
+
+    def get_bounds(self):
+        prob_dim = self.T * (self.dx + self.du)
+        ub = self.x_max.reshape(1, self.dx + self.du).repeat(self.T, 1).reshape(-1)
+        lb = - ub
+        return lb.numpy(), ub.numpy()
 
 
 class UnconstrainedPenaltyProblem(Problem):

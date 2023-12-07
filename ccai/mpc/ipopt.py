@@ -59,7 +59,10 @@ class IpoptMPC:
                                      hess=self.problem.objective_hess, x0=x,
                                      bounds=bnds,
                                      constraints=cons, options={'disp': 0,
-                                                                'max_iter': iters})
+                                                                'max_iter': iters,
+                                                                'tol': 1e-4,
+                                                                'acceptable_tol': 1e-4,
+                                                                'hessian_approximation': 'limited-memory'})
 
         self.x = torch.from_numpy(res.x).reshape(self.problem.T, -1).to(dtype=torch.float32)
         ret_x = self.x.clone()
