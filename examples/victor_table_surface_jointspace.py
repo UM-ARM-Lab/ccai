@@ -490,11 +490,15 @@ class EndEffectorConstraint:
 
     def _grad_g(self, p, mat):
         dp, dmat = self._grad_fn(p, mat)
-
         dmat = dmat @ mat.reshape(1, 3, 3).permute(0, 2, 1)
+
+        # project dmat to be skew-symmetric
+        dmat = 0.5 * (dmat - dmat.permute(0, 2, 1))
+
         omega1 = torch.stack((-dmat[:, 1, 2], dmat[:, 0, 2], -dmat[:, 0, 1]), dim=-1)
         omega2 = torch.stack((dmat[:, 2, 1], -dmat[:, 2, 0], dmat[:, 1, 0]), dim=-1)
-        omega = (omega1 + omega2)  # this doesn't seem correct? Surely I should be halfing it
+        omega = 0.5*(omega1 + omega2)
+
         return dp, omega
 
     def eval(self, q, compute_grads=True):
