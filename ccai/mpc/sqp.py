@@ -45,8 +45,8 @@ class SQPMPC:
         opt.add_inequality_mconstraint(self.problem.con_ineq, np.zeros(self.problem.dh))
         opt.add_equality_mconstraint(self.problem.con_eq, np.zeros(self.problem.dg))
         opt.set_maxeval(iters)
-        opt.set_ftol_abs(1e-4)
-        opt.set_xtol_abs(1e-4)
+        # opt.set_ftol_abs(1e-4)
+        opt.set_xtol_abs(1e-6)
         x = self.x.numpy().reshape(-1)
         # initial x must be within bounds
         x = np.clip(x, lower, upper)
@@ -66,11 +66,12 @@ class SQPMPC:
         return ret_x, ret_x.unsqueeze(0)
 
     def shift(self):
-        if self.fix_T:
-            self.x = torch.roll(self.x, shifts=-1, dims=0)
-            self.x[-1] = self.x[-2]
-        else:
-            self.x = self.x[1:]
+        # if self.fix_T:
+        #    self.x = torch.roll(self.x, shifts=-1, dims=0)
+        #    self.x[-1] = self.x[-2]
+        # else:
+        #    self.x = self.x[1:]
+        self.x = self.problem.shift(self.x.unsqueeze(0)).squeeze(0)
 
     def reset(self, start, **kwargs):
         self.problem.update(start, **kwargs)

@@ -130,13 +130,14 @@ class QuadrotorEnv:
         if self.obstacle_mode is not None:
             if self.obstacle_mode == 'gp':
                 sdf = self._get_gp_obs_sdf(self.state)
-                print(sdf)
-                print(self.state[:2])
+                #print(sdf)
+                #print(self.state[:2])
                 obstacle_violation = np.clip(sdf, a_min=0, a_max=None)
             else:
                 obstacle_violation = self.obstacle_r ** 2 - np.sum((self.state[:2] - self.obstacle_pos) ** 2)
                 obstacle_violation = np.clip(obstacle_violation, a_min=0, a_max=None)
             constraints['obstacle'] = obstacle_violation.item()
+        #print(constraints)
         return constraints
 
     def step(self, control):
@@ -251,7 +252,7 @@ class QuadrotorEnv:
         return self.ax
 
     def render_update(self):
-        print(self.state[:2], 'rendering')
+        #print(self.state[:2], 'rendering')
         self._render_pos._offsets3d = ([self.state[0]], [self.state[1]], [self.state[2]])
         if self.obstacle_mode == 'dynamic':
             self._surf.set_facecolors(self._get_surface_colours()[:-1, :-1].reshape(-1, 4))

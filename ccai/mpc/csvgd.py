@@ -47,11 +47,12 @@ class Constrained_SVGD_MPC:
         return best_trajectory, all_trajectories
 
     def shift(self):
-        if self.fix_T:
-            self.x = torch.roll(self.x, shifts=-1, dims=1)
-            self.x[:, -1] = self.x[:, -2]  # just copy over previous last
-        else:
-            self.x = self.x[:, 1:]
+        # if self.fix_T:
+        ##    self.x = torch.roll(self.x, shifts=-1, dims=1)
+        #   self.x[:, -1] = self.x[:, -2]  # just copy over previous last
+        # else:
+        #    self.x = self.x[:, 1:]
+        self.x = self.problem.shift(self.x)
 
     def reset(self, start, initial_x=None, **kwargs):
         self.problem.update(start, **kwargs)
