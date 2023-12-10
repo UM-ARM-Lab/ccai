@@ -168,7 +168,7 @@ class ConstrainedSVGDProblem(Problem):
 
     def get_initial_z(self, x):
         N = x.shape[0]
-        h, grad_h, _ = self._con_ineq(x, compute_grads=True)
+        h, grad_h, _ = self._con_ineq(x, compute_grads=False, compute_hess=False)
         # self.slack_weight = 1 / torch.mean(torch.linalg.norm(h.reshape(N, -1), dim=1)) ** 2
         # print(self.slack_weight)
         if h is not None:
