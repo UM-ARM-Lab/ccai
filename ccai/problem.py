@@ -86,6 +86,8 @@ class ConstrainedSVGDProblem(Problem):
         g, grad_g, hess_g = self._con_eq(xu, compute_grads=compute_grads, compute_hess=compute_hess)
         h, grad_h, hess_h = self._con_ineq(xu, compute_grads=compute_grads, compute_hess=compute_hess)
 
+        #print(g.max(), g.min(), h.max(), h.min())
+
         if h is None:
             return g, grad_g, hess_g
 
@@ -168,7 +170,7 @@ class ConstrainedSVGDProblem(Problem):
 
     def get_initial_z(self, x):
         N = x.shape[0]
-        h, grad_h, _ = self._con_ineq(x, compute_grads=True)
+        h, _, _ = self._con_ineq(x, compute_grads=False, compute_hess=False)
         # self.slack_weight = 1 / torch.mean(torch.linalg.norm(h.reshape(N, -1), dim=1)) ** 2
         # print(self.slack_weight)
         if h is not None:
