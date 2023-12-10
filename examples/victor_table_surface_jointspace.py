@@ -805,3 +805,58 @@ def do_trial(env, params, fpath):
              )
     return torch.min(final_distance_to_goal).cpu().numpy()
 
+<<<<<<< HEAD
+=======
+
+if __name__ == "__main__":
+    # get config
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/victor_table_jointspace.yaml').read_text())
+    del config['controllers']['ipopt']
+    del config['controllers']['mppi_1000']
+    del config['controllers']['svgd_100']
+    del config['controllers']['svgd_grad_100']
+    del config['controllers']['svgd_grad_1000']
+    from tqdm import tqdm
+
+    # instantiate environment
+    env = VictorPuckObstacleEnv(1, control_mode='joint_impedance', viewer=True)
+    sim, gym, viewer = env.get_sim()
+
+    """
+    state = env.get_state()
+    ee_pos, ee_ori = state['ee_pos'], state['ee_ori']
+    try:
+        while True:
+            start = torch.cat((ee_pos, ee_ori), dim=-1).reshape(1, 7)
+            env.step(start)
+            print('waiting for you to finish camera adjustment, ctrl-c when done')
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        pass
+    """
+    results = {}
+
+    for i in tqdm(range(config['num_trials'])):
+        goal = torch.tensor([0.8, 0.15])
+        goal = goal + 0.025 * torch.randn(2)#torch.tensor([0.25, 0.1]) * torch.rand(2)
+        for controller in config['controllers'].keys():
+            env.reset()
+            fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_{i + 1}')
+            pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
+            # set up params
+            params = config.copy()
+            params.pop('controllers')
+            params.update(config['controllers'][controller])
+            params['controller'] = controller
+            params['goal'] = goal.to(device=params['device'])
+            final_distance_to_goal = do_trial(env, params, fpath)
+
+            if controller not in results.keys():
+                results[controller] = [final_distance_to_goal]
+            else:
+                results[controller].append(final_distance_to_goal)
+        print(results)
+
+    gym.destroy_viewer(viewer)
+    gym.destroy_sim(sim)
+>>>>>>> cf866c75a19b69a71e891fa5b7bf56ae9b762e73
