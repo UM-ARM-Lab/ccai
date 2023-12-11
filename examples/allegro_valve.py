@@ -185,9 +185,9 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
             return g, None, None
             # Expand gradient to include time dimensions
 
-        grad_g = grad_g.reshape(N, self.T, -1, self.dx).permute(0, 2, 3, 1)
+        grad_g = grad_g.reshape(N, self.T, -1, self.dx).permute(0, 2, 3, 1) # [N, num_constraints for each time step, DOf, T]
         grad_g = torch.diag_embed(grad_g)  # (N, n_constraints, dx + du, T, T)
-        grad_g = grad_g.permute(0, 3, 1, 4, 2).reshape(N, -1, self.T * (self.dx))
+        grad_g = grad_g.permute(0, 3, 1, 4, 2).reshape(N, -1, self.T * (self.dx)) # [N, num_constraints * T, Dof * T]
 
         # Now do hessian
         hess_g = hess_g.reshape(N, self.T, -1, self.dx, self.dx).permute(0, 2, 3, 4, 1)
