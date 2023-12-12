@@ -52,6 +52,7 @@ class Constrained_SVGD_MPC:
             self.x[:, -1] = self.x[:, -2]  # just copy over previous last
         else:
             self.x = self.x[:, 1:]
+        #self.x = self.problem.shift(self.x)
 
     def reset(self, start, initial_x=None, **kwargs):
         self.problem.update(start, **kwargs)

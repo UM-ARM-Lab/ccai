@@ -1,3 +1,6 @@
+"""
+This is the original code for the 2nd meeting with Honda.
+"""
 import numpy as np
 from isaacgym.torch_utils import quat_apply
 from isaac_victor_envs.tasks.allegro import AllegroValveTurningEnv, orientation_error, quat_change_convention
@@ -10,7 +13,6 @@ import pathlib
 from functools import partial
 from functorch import vmap, jacrev, hessian, jacfwd
 
-import pytorch_volumetric as pv
 from ccai.constrained_svgd_trajopt import ConstrainedSteinTrajOpt
 from ccai.kernels import rbf_kernel, structured_rbf_kernel
 
@@ -46,7 +48,7 @@ thumb_ee_link = chain.frame_to_idx[thumb_ee_name]
 valve_location = torch.tensor([0.85, 0.70, 1.405]).to('cuda:0')
 # instantiate environment
 env = AllegroValveTurningEnv(1, control_mode='joint_impedance', use_cartesian_controller=False,
-                             viewer=True, steps_per_action=60, valve_velocity_in_state=False, friction_coefficient=100.0,)
+                             viewer=True, steps_per_action=60, friction_coefficient=0.5,)
 world_trans = env.world_trans
 
 
@@ -77,7 +79,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         If we only care about one turn, we can leave it to 0
         """
         super().__init__(start, goal, T, device)
-        self.dz = 6
+        self.dz = 4
         self.dh = self.dz * T
         self.dg = 4 * T  # + 2
         self.dx = 9
@@ -87,7 +89,6 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         self.start = start
         self.goal = goal
         self.K = rbf_kernel
-        self.squared_slack = True
         # self.K = structured_rbf_kernel
 
         self.finger_name = finger_name
@@ -97,56 +98,20 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         self.chain = chain
         self.grad_kernel = jacrev(rbf_kernel, argnums=0)
         self.alpha = 10
-        self.compute_hessian = False
 
         self._equality_constraints = JointConstraint(
             partial(get_joint_constraint, chain=self.chain, constraint_function=finger_tip_equality_constraints,
                     initial_valve_angle=initial_valve_angle)
         )
 
-        self._joint_inequality_constraints = JointConstraint(
+        self._inequality_constraints = JointConstraint(
             partial(get_joint_constraint, chain=self.chain, constraint_function=finger_tip_inequality_constraint,
                     initial_valve_angle=initial_valve_angle)
         )
 
-        # add collision checking
-        # collision check all of the non-finger tip links
-        collision_check_oya = ['allegro_hand_oya_finger_link_13',
-                               'allegro_hand_oya_finger_link_14',
-                               # 'allegro_hand_oya_finger_link_15'
-                               ]
-        collision_check_hitosashi = [  # 'allegro_hand_hitosashi_finger_finger_link_3',
-            'allegro_hand_hitosashi_finger_finger_link_2',
-            'allegro_hand_hitosashi_finger_finger_link_1'
-        ]
-
-        asset_valve = get_assets_dir() + '/valve/valve.urdf'
-        chain_valve = pk.build_chain_from_urdf(open(asset_valve).read())
-        chain_valve = chain_valve.to(device=device)
-        valve_sdf = pv.RobotSDF(chain_valve, path_prefix=get_assets_dir() + '/valve')
-        robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models')
-
-        # TODO: retrieve transformations from environment rather than hard-coded
-        p = [0.89, 0.52, 1.375]
-        r = [0.2425619, 0.2423688, 0.6639723, 0.6645012]
-        rob_trans = pk.Transform3d(pos=torch.tensor(p, device=device),
-                                   rot=torch.tensor([r[3], r[0], r[1], r[2]], device=device),
-                                   device=device)
-
-        scene_trans = rob_trans.inverse().compose(pk.Transform3d(device=device).translate(0.85, 0.75, 0.705))
-
-        # TODO: right now we are using seperate collision checkers for each finger to avoid gradients swapping
-        # between fingers - alteratively we can get the collision checker to return a list of collisions and gradients batched
-        self.index_scene = pv.RobotScene(robot_sdf, valve_sdf, scene_trans,
-                                         collision_check_links=collision_check_hitosashi,
-                                         softmin_temp=100.0)
-        self.thumb_scene = pv.RobotScene(robot_sdf, valve_sdf, scene_trans,
-                                         collision_check_links=collision_check_oya,
-                                         softmin_temp=100.0)
-
-        # self._goal_cost = JointConstraint(
-        #     partial(joint_terminal_constraint, goal=self.goal)
-        # )
+        self._goal_cost = JointConstraint(
+            partial(joint_terminal_constraint, goal=self.goal)
+        )
         # for nvidia hand
         # index_x_max = torch.tensor([0.558488888889, 1.727825, 1.727825, 1.727825])
         # index_x_min = torch.tensor([-0.558488888889, -0.279244444444, -0.279244444444, -0.279244444444])
@@ -167,9 +132,9 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         self.grad_dynamics_constraint = vmap(jacrev(self._dynamics_constraint))
         self.hess_dynamics_constraint = vmap(hessian(self._dynamics_constraint))
 
-        self.cost = vmap(partial(cost, start=self.start, goal=self.goal))
-        self.grad_cost = vmap(jacrev(partial(cost, start=self.start, goal=self.goal)))
-        self.hess_cost = vmap(hessian(partial(cost, start=self.start, goal=self.goal)))
+        self.cost = vmap(partial(cost, start=self.start))
+        self.grad_cost = vmap(jacrev(partial(cost, start=self.start)))
+        self.hess_cost = vmap(hessian(partial(cost, start=self.start)))
 
     def dynamics(self, x, u):
         N = x.shape[0]
@@ -184,6 +149,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         p_prime_vec = p_prime - self.valve_location
         theta = torch.atan2(p_prime_vec[:, 0], p_prime_vec[:, 2])
 
+        # TODO: Update the dynamics
         return torch.cat((x_finger_prime, theta.unsqueeze(-1)), dim=-1)
 
     def _dynamics_constraint(self, trajectory):
@@ -198,6 +164,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
     def _objective(self, x):
         x = x[:, :, :self.dx]
         N = x.shape[0]
+        goal_g, goal_grad_g, goal_hess_g = self._goal_cost.eval(x.reshape(-1, self.dx))
         # goal_grad_g_extended = torch.zeros(N, self.T, self.dx, device=self.device)
         # goal_hess_g_extended = torch.zeros(N, self.T, self.dx, self.T, self.dx, device=self.device)
         # goal_grad_g_extended[:, -1, :] = goal_grad_g.reshape(N, -1)
@@ -205,19 +172,29 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         # J, grad_J, hess_J = self.cost(x)
         J, grad_J, hess_J = self.cost(x), self.grad_cost(x), self.hess_cost(x)
 
+        if goal_grad_g is not None:
+            with torch.no_grad():
+                goal_grad_g_extended = goal_grad_g.reshape(N, self.T, self.dx)
+                goal_hess_g_extended = goal_hess_g.reshape(N, self.T, self.dx, self.dx).permute(0, 2, 3, 1)
+                goal_hess_g_extended = torch.diag_embed(goal_hess_g_extended).permute(0, 3, 1, 4, 2)
+                # add greater weight to final
+                goal_grad_g_extended[:, -1] *= 10
+                goal_hess_g_extended[:, -1, :, -1] *= 10
+
+                J = J.reshape(-1) + goal_g.reshape(N, self.T).sum(dim=1)
+                grad_J = grad_J.reshape(N, self.T, -1) + goal_grad_g_extended
+                hess_J = hess_J.reshape(N, self.T, self.dx, self.T, self.dx) + goal_hess_g_extended
+
         N = x.shape[0]
         return (self.alpha * J.reshape(N),
                 self.alpha * grad_J.reshape(N, -1),
-                None)
-        # self.alpha * hess_J.reshape(N, self.T * self.dx, self.T * self.dx))
+                self.alpha * hess_J.reshape(N, self.T * self.dx, self.T * self.dx))
 
-    def _con_eq(self, x, compute_grads=True, compute_hess=True):
+    def _con_eq(self, x, compute_grads=True):
         x = x[:, :, :self.dx]
         N = x.shape[0]
         theta = x[:, :, -1]
-        g, grad_g, hess_g = self._equality_constraints.eval(x.reshape(-1, self.dx),
-                                                            compute_grads=compute_grads,
-                                                            compute_hess=compute_hess)
+        g, grad_g, hess_g = self._equality_constraints.eval(x.reshape(-1, self.dx), compute_grads)
         # term_g, term_grad_g, term_hess_g = self._terminal_constraints.eval(x[:, -1])
 
         g = g.reshape(N, -1)
@@ -229,12 +206,9 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
             return g, None, None
             # Expand gradient to include time dimensions
 
-        grad_g = grad_g.reshape(N, self.T, -1, self.dx).permute(0, 2, 3, 1) # [N, num_constraints for each time step, DOf, T]
+        grad_g = grad_g.reshape(N, self.T, -1, self.dx).permute(0, 2, 3, 1)
         grad_g = torch.diag_embed(grad_g)  # (N, n_constraints, dx + du, T, T)
-        grad_g = grad_g.permute(0, 3, 1, 4, 2).reshape(N, -1, self.T * (self.dx)) # [N, num_constraints * T, Dof * T]
-
-        if not compute_hess:
-            return g, grad_g, None
+        grad_g = grad_g.permute(0, 3, 1, 4, 2).reshape(N, -1, self.T * (self.dx))
 
         # Now do hessian
         hess_g = hess_g.reshape(N, self.T, -1, self.dx, self.dx).permute(0, 2, 3, 4, 1)
@@ -245,81 +219,21 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
 
         return g, grad_g, hess_g
 
-    def _collision_check_finger(self, x, finger_scene, compute_grads=True, compute_hess=True):
-        N = x.shape[0]
-        q = x[:, :8]
-        theta = x[:, -1].unsqueeze(-1)
-        full_q = partial_to_full_state(q)
-        ret_scene = finger_scene.scene_collision_check(full_q, theta,
-                                                       compute_gradient=compute_grads,
-                                                       compute_hessian=compute_hess)
-        h = -ret_scene.get('sdf').unsqueeze(1)
-        grad_h_q = ret_scene.get('grad_sdf', None)
-        hess_h_q = ret_scene.get('hess_sdf', None)
-        grad_h_theta = ret_scene.get('grad_env_sdf', None)
-        hess_h_theta = ret_scene.get('hess_env_sdf', None)
-        grad_h = None
-        hess_h = None
-        if grad_h_q is not None:
-            grad_h = -torch.cat((grad_h_q[:, (0, 1, 2, 3, 12, 13, 14, 15)], grad_h_theta), dim=-1).unsqueeze(1)
-        if hess_h_q is not None:
-            hess_h = torch.zeros(N, 1, self.dx, self.dx, device=x.device)
-            hess_h_q = hess_h_q[:, (0, 1, 2, 3, 12, 13, 14, 15)]
-            hess_h_q = hess_h_q[:, :, (0, 1, 2, 3, 12, 13, 14, 15)]
-            hess_h[:, :, :8, :8] = -hess_h_q.unsqueeze(1)
-            hess_h[:, :, 8, 8] = -hess_h_theta.reshape(N, -1)
-        return h, grad_h, hess_h
-
-    def _collision_check(self, x, compute_grads=True, compute_hess=True):
-        h_thumb, grad_h_thumb, hess_h_thumb = self._collision_check_finger(x,
-                                                                           self.thumb_scene,
-                                                                           compute_grads=compute_grads,
-                                                                           compute_hess=compute_hess)
-
-        h_index, grad_h_index, hess_h_index = self._collision_check_finger(x,
-                                                                           self.index_scene,
-                                                                           compute_grads=compute_grads,
-                                                                           compute_hess=compute_hess)
-
-        h = torch.cat((h_thumb, h_index), dim=1)
-        if not compute_grads:
-            return h, None, None
-
-        grad_h = torch.cat((grad_h_thumb, grad_h_index), dim=1)
-
-        if not compute_hess:
-            return h, grad_h, None
-
-        hess_h = torch.cat((hess_h_thumb, hess_h_index), dim=1)
-
-        return h, grad_h, hess_h
-
-    def _con_ineq(self, x, compute_grads=True, compute_hess=True):
+    def _con_ineq(self, x, compute_grads=True):
         x = x[:, :, :self.dx]
         N = x.shape[0]
-        h, grad_h, hess_h = self._inequality_constraints.eval(x.reshape(-1, self.dx), compute_grads=compute_grads,
-                                                              compute_hess=compute_hess)
+        h, grad_h, hess_h = self._inequality_constraints.eval(x.reshape(-1, self.dx), compute_grads)
 
-        h_collision, grad_h_collision, hess_h_collision = self._collision_check(x.reshape(-1, self.dx),
-                                                                                compute_grads=compute_grads,
-                                                                                compute_hess=compute_hess)
-
-        h = torch.cat((h, h_collision), dim=1)
         h = h.reshape(N, -1)
         N = x.shape[0]
         if not compute_grads:
             return h, None, None
             # Expand gradient to include time dimensions
 
-        grad_h = torch.cat((grad_h, grad_h_collision), dim=1)
         grad_h = grad_h.reshape(N, self.T, -1, self.dx).permute(0, 2, 3, 1)
         grad_h = torch.diag_embed(grad_h)  # (N, n_constraints, dx + du, T, T)
         grad_h = grad_h.permute(0, 3, 1, 4, 2).reshape(N, -1, self.T * (self.dx))
 
-        if not compute_hess:
-            return h, grad_h, None
-
-        hess_h = torch.cat((hess_h, hess_h_collision), dim=1)
         # Now do hessian
         hess_h = hess_h.reshape(N, self.T, -1, self.dx, self.dx).permute(0, 2, 3, 4, 1)
         hess_h = torch.diag_embed(torch.diag_embed(hess_h))  # (N, n_constraints, dx + du, dx + du, T, T, T)
@@ -335,7 +249,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         x = augmented_trajectory[:, :, :self.dx + self.du]
 
         J, grad_J, hess_J = self._objective(x)
-        # hess_J = hess_J + 0.1 * torch.eye(self.T * (self.dx + self.du), device=self.device).unsqueeze(0)
+        hess_J = hess_J + 0.1 * torch.eye(self.T * (self.dx + self.du), device=self.device).unsqueeze(0)
         hess_J = None
         grad_J = torch.cat((grad_J.reshape(N, self.T, -1),
                             torch.zeros(N, self.T, self.dz, device=x.device)), dim=2).reshape(N, -1)
@@ -348,8 +262,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         grad_K = torch.cat((grad_K.reshape(N, N, self.T, self.dx + self.du),
                             torch.zeros(N, N, self.T, self.dz, device=x.device)), dim=-1)
         grad_K = grad_K.reshape(N, N, -1)
-        G, dG, hessG = self.combined_constraints(augmented_trajectory, compute_grads=True,
-                                                 compute_hess=self.compute_hessian)
+        G, dG, hessG = self.combined_constraints(augmented_trajectory)
 
         if hess_J is not None:
             hess_J_ext = torch.zeros(N, self.T, self.dx + self.du + self.dz, self.T, self.dx + self.du + self.dz,
@@ -359,22 +272,16 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
             hess_J = hess_J_ext.reshape(N, self.T * (self.dx + self.du + self.dz),
                                         self.T * (self.dx + self.du + self.dz))
 
-        print(G.abs().max(), G.abs().mean(), J.mean())
-
-        if hessG is not None:
-            hessG.detach_()
-
-        return grad_J.detach(), hess_J, K.detach(), grad_K.detach(), G.detach(), dG.detach(), hessG
+        # print(G.abs().max(), G.abs().mean(), J.mean())
+        return grad_J.detach(), hess_J, K.detach(), grad_K.detach(), G.detach(), dG.detach(), hessG.detach()
 
     def update(self, start, goal=None, T=None):
         self.start = start
-        if goal is not None:
-            self.goal = goal
 
         # update functions that require start
-        self.cost = vmap(partial(cost, start=self.start, goal=self.goal))
-        self.grad_cost = vmap(jacrev(partial(cost, start=self.start, goal=self.goal)))
-        self.hess_cost = vmap(hessian(partial(cost, start=self.start, goal=self.goal)))
+        self.cost = vmap(partial(cost, start=self.start))
+        self.grad_cost = vmap(jacrev(partial(cost, start=self.start)))
+        self.hess_cost = vmap(hessian(partial(cost, start=self.start)))
 
         # want the offset between the current angle and the angle according to end effectors
         # we will use position of index fingertip
@@ -403,6 +310,10 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         if goal is not None:
             self.goal = goal
 
+            self._terminal_constraints = JointConstraint(
+                self.chain, partial(joint_terminal_constraint, goal=self.goal, initial_valve_angle=theta_offset)
+            )
+
         if T is not None:
             self.T = T
             self.dh = self.dz * T
@@ -416,34 +327,19 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
             x.append(self.dynamics(x[-1], u[:, t]))
 
         # particles = torch.cumsum(particles, dim=1) + self.start.reshape(1, 1, self.dx)
-        # interpolate the valve angle to intiialize the trajectory. 
-        # intialization does matter, otherwise it will get stuck to local optima or takes a much longer time to converge 
-        theta = torch.linspace(self.start[-1], -np.pi/2, self.T)
         x = torch.stack(x[1:], dim=1)
-        x[:, :, -1] = theta
         xu = torch.cat((x, u), dim=2)
         return x
 
-    def shift(self, xu):
-        N, T, _ = xu.shape
-        u = torch.randn(N, 8, device=self.device)
-        xu = torch.roll(xu, -1, dims=1)
-        xu[:, -1] = self.dynamics(xu[:, -2], u)
-        return xu
 
-
-def cost(x, start, goal):
-    x = torch.cat((start.reshape(1, 9), x[:, :9]), dim=0)
+def cost(x, start):
+    x = torch.cat((start.reshape(1, 9), x[:, :9]), dim=0)[:, :8]
     weight = torch.tensor([
         0.2, 0.3, 0.4, 0.5, 0.2, 0.3, 0.4, 0.5], device=x.device, dtype=torch.float32)
     weight = 1.0 / weight
-    diff = x[1:, :8] - x[:-1, :8]
+    diff = x[1:] - x[:-1]
     weighted_diff = diff.reshape(-1, 1, 8) @ torch.diag(weight).unsqueeze(0) @ diff.reshape(-1, 8, 1)
-    # incoporate the goal cost
-    goal_cost = (10 * (x[-1, -1] - goal)**2)[0]
-    # this goal cost is not very informative and takes a long time for the gradients to back propagate to each state. 
-    # thus, a better initialization is necessary for faster convergence
-    return torch.sum(weighted_diff) + goal_cost
+    return torch.sum(weighted_diff)
 
 
 class JointConstraint:
@@ -463,7 +359,7 @@ class JointConstraint:
         dq = self._grad_fn(q)
         return dq
 
-    def eval(self, q, compute_grads=True, compute_hess=True):
+    def eval(self, q, compute_grads=True):
         """
         :param q: torch.Tensor of shape (N, 7) containing set of robot joint config
         :return g: constraint values
@@ -475,10 +371,6 @@ class JointConstraint:
         if not compute_grads:
             return constraints, None, None
         dq = self.grad_constraint(q)
-
-        if not compute_hess:
-            return constraints, dq, None
-
         ddq = self.hess_constraint(q)
 
         return constraints, dq, ddq
@@ -486,6 +378,15 @@ class JointConstraint:
     def reset(self):
         self._J, self._h, self._dH = None, None, None
 
+
+def joint_terminal_constraint(q, goal, initial_valve_angle=0):
+    """
+
+    :param p:
+    :param mat:
+    :return:
+    """
+    return torch.sum(((q[-1] - initial_valve_angle) - goal.reshape(1)) ** 2).reshape(-1)
 
 
 def get_joint_constraint(q, chain, constraint_function, initial_valve_angle=0):
@@ -555,13 +456,14 @@ def finger_tip_equality_constraints(p, theta, normal, r):
 
 def finger_tip_inequality_constraint(p, theta, normal, *args, **kwargs):
     # we don't care normal has components aligned with the y axis, so we remove y and normalize (if [0 1 0] could have issues)
-    normal = normal / (1.0 - normal[1] ** 2)**0.5
+    # normal = normal / (1.0 - normal[1] ** 2)**0.5
     normal_alignment = torch.sin(theta) * normal[0] + torch.cos(theta) * normal[2]
     constraint_y_1 = -(valve_location[1] - p[1]) + 0.02
     constraint_y_2 = (valve_location[1] - p[1]) - 0.065
-    constraint_normal = 0.95 + normal_alignment
-    # return torch.cat((constraint_y_1.reshape(-1), constraint_y_2.reshape(-1)), dim=0)
+    # constraint_normal = 0.25 + normal_alignment
     return torch.cat((constraint_y_1.reshape(-1), constraint_y_2.reshape(-1)), dim=0)
+    return torch.cat((constraint_y_1.reshape(-1), constraint_y_2.reshape(-1),
+                      constraint_normal.reshape(-1)), dim=0)
 
 
 def do_trial(env, params, fpath):
@@ -698,17 +600,12 @@ def turn(env, params, fpath):
     # now ready to do the turn
     actual_trajectory = []
     num_turns = 1
-    import time
-    duration = 0
     for k in range(params['num_steps']):
         state = env.get_state()
         start = state['q'].reshape(9).to(device=params['device'])
 
         actual_trajectory.append(state['q'].reshape(9).clone())
-        s = time.time()
         best_traj, trajectories = controller.step(start)
-        torch.cuda.synchronize()
-        duration += time.time() - s
         x = best_traj[0, :9]
 
         # add trajectory lines to sim
@@ -722,12 +619,12 @@ def turn(env, params, fpath):
         # check if task complete
         distance2goal = torch.linalg.norm(env.get_state()['q'][:, -1] - params[
             'goal']).detach().cpu().item()
+        print(distance2goal)
         gym.clear_lines(viewer)
         if distance2goal < 0.1:
             break
 
-    print(duration / (k + 1))
-    exit(0)
+
     # Now we will do the turn again
     # first we need to release the valve in a way that does not disturb the valve
     # use Jacobian IK to back the thumb up
@@ -737,12 +634,11 @@ def turn(env, params, fpath):
     # let's do some ik
     for _ in range(10):
         J = chain.jacobian(partial_to_full_state(q), link_indices=torch.tensor([thumb_ee_link],
-                                                                               device=params['device']))[:, :3, -4:]
+                                                          device=params['device']))[:, :3, -4:]
 
         # get update in robot frame
         dx = world_trans.inverse().transform_normals(torch.tensor([[-1.0, 0.0, 0.0]],
-                                                                  device=params['device']).reshape(1, 3)).reshape(1, 3,
-                                                                                                                  1)
+                                                                  device=params['device']).reshape(1, 3)).reshape(1, 3, 1)
         # joint update
         dq = J.permute(0, 2, 1) @ torch.linalg.inv(J @ J.permute(0, 2, 1) + 1e-5 * eye) @ dx
         q[:, 4:] += eps * dq.reshape(1, 4)
@@ -843,6 +739,7 @@ def add_trajectories(trajectories, best_traj, chain):
         index_colors = np.array([0, 0, 1]).astype(np.float32)
         for e in env.envs:
             s = env.get_state()['index_pos'].reshape(1, 3).to(device=params['device'])
+            # breakpoint()
             p = torch.stack((s[:3].reshape(1, 3).repeat(M, 1),
                              trajectories[:, 0, :3]), dim=1).reshape(2 * M, 3).cpu().numpy()
             # p_best = torch.stack((s[:3].reshape(1, 3).repeat(1, 1), best_traj_ee[0, :3].unsqueeze(0)), dim=1).reshape(2, 3).cpu().numpy()

@@ -10,11 +10,13 @@ class MPPI:
         self.fixed_H = params.get('receding_horizon', True)
         self.N = params.get('N', 100)
         self.device = params.get('device', 'cuda:0')
-        self.sigma = params.get('sigma', torch.ones(self.du))
+        self.sigma = params.get('sigma', [1.0] * self.du)
         self.lambda_ = params.get('lambda', 0.1)
         self.warmup_iters = params.get('warmup_iters', 100)
         self.online_iters = params.get('online_iters', 100)
         self.includes_x0 = params.get('include_x0', False)
+
+        self.sigma = torch.tensor(self.sigma, device=self.device)
 
         # randomly generate actions
         self.U = self.sigma * torch.randn(self.H, self.du, device=self.device)
@@ -69,15 +71,11 @@ class MPPI:
             self.U = torch.sum((omega.reshape(-1, 1, 1) * peturbed_actions), dim=0)
 
         out_U = self.U.clone()
-        self.U = torch.roll(self.U, -1, dims=0)
-        self.U[-1] = torch.zeros(self.du, device=self.device)
-
         out_X = self._rollout_dynamics(x, out_U.reshape(1, self.H, self.du)).reshape(self.H, self.dx)
-
         out_trajectory = torch.cat((out_X, out_U), dim=-1)
         sampled_trajectories = torch.cat((pred_x, peturbed_actions), dim=-1)
         # only return best 10% trajectories for visualization
-        sampled_trajectories = sampled_trajectories[torch.argsort(total_cost, descending=False)][:self.N//20]
+        sampled_trajectories = sampled_trajectories[torch.argsort(total_cost, descending=False)][:32]
 
         self.shift()
 

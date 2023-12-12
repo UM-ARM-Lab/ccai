@@ -137,6 +137,8 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         self.start = start
         self.goal = goal
         self.K = rbf_kernel
+        self.squared_slack = True
+        self.compute_hess = False
 
         self.finger_name = finger_name
         self.valve_location = valve_location
@@ -188,10 +190,10 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
                 self.alpha * grad_J.reshape(N, -1),
                 self.alpha * hess_J.reshape(N, self.T * (self.dx+self.du), self.T * (self.dx+self.du)))
     
-    def _con_eq(self, xu, compute_grads=True):
+    def _con_eq(self, xu, compute_grads=True, compute_hess=False):
         N = xu.shape[0]
         T = xu.shape[1]
-        g, grad_g, hess_g = self._equality_constraints.eval(xu.reshape(N, T, self.dx+self.du), compute_grads)
+        g, grad_g, hess_g = self._equality_constraints.eval(xu.reshape(N, T, self.dx+self.du), compute_grads, compute_hess=compute_hess)
 
         g = g.reshape(N, -1)
 
@@ -202,10 +204,10 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         hess_g = hess_g.reshape(N, g.shape[1], self.T * (self.dx + self.du), self.T * (self.dx + self.du))
         return g, grad_g, hess_g
 
-    def _con_ineq(self, xu, compute_grads=True):
+    def _con_ineq(self, xu, compute_grads=True, compute_hess=False):
         N = xu.shape[0]
         T = xu.shape[1]
-        h, grad_h, hess_h = self._inequality_constraints.eval(xu.reshape(-1, T, self.dx+self.du), compute_grads)
+        h, grad_h, hess_h = self._inequality_constraints.eval(xu.reshape(-1, T, self.dx+self.du), compute_grads, compute_hess=compute_hess)
 
         h = h.reshape(N, -1)
         N = xu.shape[0]
@@ -235,7 +237,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         grad_K = torch.cat((grad_K.reshape(N, N, self.T, self.dx + self.du),
                             torch.zeros(N, N, self.T, self.dz, device=x.device)), dim=-1)
         grad_K = grad_K.reshape(N, N, -1)
-        G, dG, hessG = self.combined_constraints(augmented_trajectory)
+        G, dG, hessG = self.combined_constraints(augmented_trajectory, compute_hess=self.compute_hess)
 
         if hess_J is not None:
             hess_J_ext = torch.zeros(N, self.T, self.dx + self.du + self.dz, self.T, self.dx + self.du + self.dz,
@@ -245,8 +247,9 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
             hess_J = hess_J_ext.reshape(N, self.T * (self.dx + self.du + self.dz),
                                         self.T * (self.dx + self.du + self.dz))
 
-        # print(G.abs().max(), G.abs().mean(), J.mean())
-        return grad_J.detach(), hess_J, K.detach(), grad_K.detach(), G.detach(), dG.detach(), hessG.detach()
+        if hessG is not None:
+            hessG.detach_()
+        return grad_J.detach(), hess_J, K.detach(), grad_K.detach(), G.detach(), dG.detach(), hessG
 
     def update(self, start, goal=None, T=None):
         self.start = start
@@ -343,7 +346,7 @@ class JointConstraint:
         dq = self._grad_fn(q)
         return dq
 
-    def eval(self, qu, compute_grads=True):
+    def eval(self, qu, compute_grads=True, compute_hess=False):
         """
         :param qu: torch.Tensor of shape (T, 9 + 8) containing set of state + acton
         :return g: constraint values
@@ -358,7 +361,10 @@ class JointConstraint:
         dq = self.grad_constraint(qu)
         dq = torch.stack([dq[i, :, i] for i in range(N)], dim=0) # data from different batches should not affect each other
         # dumb_ddq = torch.eye(qu.shape[-1]).repeat((constraints.shape[0], constraints.shape[1], 1, 1))
-        ddq = torch.zeros(dq.shape + dq.shape[2:])
+        if compute_hess:
+            ddq = self.hess_constraint(qu)
+        else:
+            ddq = torch.zeros(dq.shape + dq.shape[2:])
         # ddq = self.hess_constraint(qu)
         # assert ddq.shape == dumb_ddq.shape
 

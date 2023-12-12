@@ -59,7 +59,10 @@ class IpoptMPC:
                                      hess=self.problem.objective_hess, x0=x,
                                      bounds=bnds,
                                      constraints=cons, options={'disp': 0,
-                                                                'max_iter': iters})
+                                                                'max_iter': iters,
+                                                                'tol': 1e-4,
+                                                                'acceptable_tol': 1e-4,
+                                                                'hessian_approximation': 'limited-memory'})
 
         self.x = torch.from_numpy(res.x).reshape(self.problem.T, -1).to(dtype=torch.float32)
         ret_x = self.x.clone()
@@ -68,11 +71,12 @@ class IpoptMPC:
         return ret_x, ret_x.unsqueeze(0)
 
     def shift(self):
-        if self.fix_T:
-            self.x = torch.roll(self.x, shifts=-1, dims=0)
-            self.x[-1] = self.x[-2]
-        else:
-            self.x = self.x[1:]
+        # if self.fix_T:
+        #    self.x = torch.roll(self.x, shifts=-1, dims=0)
+        #    self.x[-1] = self.x[-2]
+        # else:
+        #    self.x = self.x[1:]
+        self.x = self.problem.shift(self.x.unsqueeze(0)).squeeze(0)
 
     def reset(self, start, **kwargs):
         self.problem.update(start, **kwargs)
