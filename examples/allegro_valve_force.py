@@ -46,7 +46,7 @@ frame_indices = torch.tensor([index_ee_link, thumb_ee_link])
 
 valve_location = torch.tensor([0.85, 0.70, 1.405]).to('cuda:0') # the root of the valve
 # instantiate environment
-friction_coefficient = 0.7 # this one is used for planning, not simulation
+friction_coefficient = 0.95 # this one is used for planning, not simulation
 # env = AllegroValveTurningEnv(1, control_mode='joint_torque_position',
 #                              viewer=True, steps_per_action=60)
 env = AllegroValveTurningEnv(1, control_mode='joint_impedance', use_cartesian_controller=False,
@@ -594,6 +594,7 @@ def do_trial(env, params, fpath):
         equality_eval, _, _ = problem._con_eq(best_traj.unsqueeze(0))
         print(f"max equality constraint violation: {equality_eval.max()}")
         inequality_eval, _, _ = problem._con_ineq(best_traj.unsqueeze(0))
+        print(f"max inequality constraint violation: {inequality_eval.max()}")
         # index_jac = rotate_jac(chain.jacobian(partial_to_full_state(start[:8]), link_indices=index_ee_link)[0][:3, :4]) # only cares about the translation
         # thumb_jac = rotate_jac(chain.jacobian(partial_to_full_state(start[:8]), link_indices=thumb_ee_link)[0][:3, 12:16])
         # index_torque = index_jac.T @ action[0, :3]
