@@ -55,7 +55,7 @@ env = AllegroValveTurningEnv(1, control_mode='joint_impedance', use_cartesian_co
                              viewer=True, steps_per_action=60, valve_velocity_in_state=False)
 world_trans = env.world_trans
 # NOTE: DEBUG ONLY, set the friction coefficient extremely large
-friction_coefficient = 0.8
+friction_coefficient = 0.5
 
 
 def partial_to_full_state(partial):
@@ -466,7 +466,7 @@ def get_joint_equality_constraint(qu, chain, start_q, initial_valve_angle=0):
         # jac = full_to_partial_state(jac)
         # jac = rotate_jac(jac, env.world_trans.get_matrix()[0, :3, :3]) # rotate jac into world frame 
 
-        # 1 st equality constraints, the finger tip movement in the tangential direction should match with the commanded movement
+        "1 st equality constraints, the finger tip movement in the tangential direction should match with the commanded movement"
         # jac = jac[:, :T] # do not consider the last state, since no action matches the last state
         # translation_jac = jac[:, :, :3, :]
         # delta_p_action = torch.matmul(translation_jac, action.unsqueeze(-1)).squeeze(-1) # FK(q_{i,t) + delta q_{i,t}} - FK(q_{i,t})
@@ -499,7 +499,7 @@ def get_joint_equality_constraint(qu, chain, start_q, initial_valve_angle=0):
         constraint_list.append(tan_delta_p_x_hat - tan_delta_p_desired_x_hat)
         constraint_list.append(tan_delta_p_y_hat - tan_delta_p_desired_y_hat)
 
-        #2nd constraint, finger tip has to be on the surface
+        "2nd constraint, finger tip has to be on the surface"
         if finger_name == finger_names[0]:
             # for thumb, it is tracking a differnet theta angles, which has an offset.
             # NOTE: make leads to bug if we want to use the original theta
