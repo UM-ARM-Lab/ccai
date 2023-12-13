@@ -26,9 +26,8 @@ class QuadrotorEnv:
         self.surface_plotting_vars = self._get_plotting_vars(self.surface_model)
 
         self.obstacle_pos = np.array([0.0, 0.0])
-        self.obstacle_r = 1
+        self.obstacle_r = 1.
         self.obstacle_mode = obstacle_mode
-        self.reset()
 
         if self.obstacle_mode == 'gp':
             if obstacle_data_fname is None:
@@ -46,6 +45,7 @@ class QuadrotorEnv:
         self.ax = None
         self._surf = None
         self._render_pos = None
+        self.reset()
 
     def _get_plotting_vars(self, gp_model=None):
         # For rendering height
@@ -88,6 +88,12 @@ class QuadrotorEnv:
             goal[:2] = np.array([4, 4])
             #goal = 10 * np.random.rand(3) - 5
 
+            # check collision of start
+            if self.obstacle_mode == 'gp':
+                sdf = self._get_gp_obs_sdf(start)
+                #print(sdf)
+                #obstacle_violation = np.clip(sdf, a_min=0, a_max=None)
+
             if np.linalg.norm(start[:2] - goal[:2]) > 4:
                 got_sg = True
 
@@ -115,7 +121,7 @@ class QuadrotorEnv:
         self.state = start
         self.goal = goal
         if self.obstacle_mode == 'dynamic':
-            self.obstacle_pos = np.array([-1.0, 1.5])
+            self.obstacle_pos = np.array([-2.25, 1.75])
         else:
             self.obstacle_pos = np.array([0.0, 0.0])
 
@@ -200,8 +206,9 @@ class QuadrotorEnv:
 
         if self.obstacle_mode == 'dynamic':
             # if self.obstacle_pos[0] < 3:
-            self.obstacle_pos += np.array([0.3, -0.15])
+            self.obstacle_pos += np.array([0.3, -0.2])
 
+        #print(self.state[:2], self._get_gp_obs_sdf(self.state))
         return self.state, self.get_constraint_violation()
 
     def _get_surface_colours(self):
