@@ -17,7 +17,7 @@ class MPPI:
         self.includes_x0 = params.get('include_x0', False)
 
         self.sigma = torch.tensor(self.sigma, device=self.device)
-
+        self.sigma = torch.ones_like(self.sigma) * 0.1
         # randomly generate actions
         self.U = self.sigma * torch.randn(self.H, self.du, device=self.device)
 

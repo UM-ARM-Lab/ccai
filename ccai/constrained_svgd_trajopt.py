@@ -38,24 +38,26 @@ class ConstrainedSteinTrajOpt:
         if self.Bk is None:
             # initialize with Gauss-Newton approx
             eye = torch.eye(dC.shape[2]).repeat(dC.shape[0], self.dh + self.dg, 1, 1).to(device=dC.device)
-            self.Bk = 1e-3 * eye
+            self.Bk = 1e-6 * eye
         else:
             dx = self.delta_x.unsqueeze(1).repeat(1, self.dh + self.dg, 1).unsqueeze(-1)
             y = (dC - self.old_grad_C).unsqueeze(-1)  # N x (dg+dh) x (dx+du+dz)
-
             # Use damped BFGS update from Nocedal & Wright Chap 18
             yx = y.transpose(-1, -2) @ dx
             xBx = dx.transpose(-1, 2) @ self.Bk @ dx
             theta = 0.8 * (xBx) / (xBx - yx)
             theta = torch.where(yx < 0.2 * xBx, theta, torch.ones_like(theta))
             r = y * theta + (1 - theta) * self.Bk @ dx
-
             first_term = r @ r.transpose(-1, -2)
             first_term = first_term / (r.transpose(-1, -2) @ dx)
             second_term = self.Bk @ dx @ dx.transpose(-1, 2) @ self.Bk.transpose(-1, -2)
             second_term = second_term / (dx.transpose(-1, 2) @ self.Bk @ dx)
             self.Bk = self.Bk + first_term - second_term
 
+            # restrict norm of Bk
+            Bk_norm = torch.linalg.matrix_norm(self.Bk, dim=(-1, -2), keepdim=True, ord=np.inf)
+            max_norm = 100
+            self.Bk = torch.where(Bk_norm > max_norm, max_norm * self.Bk / Bk_norm, self.Bk)
         self.old_grad_C = dC
 
     def compute_update(self, xuz):
@@ -72,13 +74,15 @@ class ConstrainedSteinTrajOpt:
             self._bfgs_update(dC)
             hess_C = self.Bk
 
+        # print(hess_C.min(), hess_C.max())
+
         with torch.no_grad():
             # we try and invert the dC dCT, if it is singular then we use the psuedo-inverse
             eye = torch.eye(self.dg + self.dh).repeat(N, 1, 1).to(device=C.device, dtype=self.dtype)
             dCdCT = dC @ dC.permute(0, 2, 1)
             A_bmm = lambda x: dCdCT @ x
             #
-            #damping_factor = 1e-1
+            # damping_factor = 1e-1
             try:
                 dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1), eye)
                 if torch.any(torch.isnan(dCdCT_inv)):
@@ -88,6 +92,7 @@ class ConstrainedSteinTrajOpt:
                 # dCdCT_inv = torch.linalg.lstsq(dC @ dC.permute(0, 2, 1), eye).solution
                 # dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1))
                 dCdCT_inv, _ = cg_batch(A_bmm, eye, verbose=False)
+
             # get projection operator
             projection = dCdCT_inv @ dC
             eye = torch.eye(d * self.T + self.dh, device=xuz.device, dtype=xuz.dtype).unsqueeze(0)
@@ -176,6 +181,13 @@ class ConstrainedSteinTrajOpt:
                 normxiJ = torch.clamp(torch.linalg.norm(xi_J, dim=1, keepdim=True, ord=np.inf), min=1e-6)
                 xi_J = self.alpha_J * xi_J / normxiJ
 
+            # make both xi_C and xi_J have a maximum norm of 10
+            # norm_xi_C = torch.linalg.norm(xi_C, dim=1, keepdim=True)
+            # norm_xi_J = torch.linalg.norm(xi_J, dim=1, keepdim=True)
+
+            # xi_C = torch.where(norm_xi_C > 10, xi_C / norm_xi_C * 10, xi_C)
+            # xi_J = torch.where(norm_xi_J > 10, xi_J / norm_xi_J * 10, xi_J)
+
         return (self.alpha_J * xi_J + self.alpha_C * xi_C).detach()
 
     def _clamp_in_bounds(self, xuz):
@@ -259,15 +271,16 @@ class ConstrainedSteinTrajOpt:
             xuz = x0.clone().reshape(N, -1)
 
         import torch.optim.lr_scheduler as lr_scheduler
-        optim = torch.optim.SGD(params=[xuz], lr=self.dt, momentum=self.momentum,
-                                nesterov=True if self.momentum > 0 else False)
+        # optim = torch.optim.SGD(params=[xuz], lr=self.dt, momentum=self.momentum,
+        #                        nesterov=True if self.momentum > 0 else False)
         # scheduler = lr_scheduler.LinearLR(optim, start_factor=1.0, end_factor=0.1, total_iters=self.iters)
 
         # optim = torch.optim.RMSprop(params=[xuz], lr=self.dt)
 
         # driving force useful for helping exploration -- currently unused
+        resample_period = 100
         T = self.iters
-        C = 1
+        C = T // resample_period
         p = 1
         self.max_gamma = 1
         import time
@@ -277,12 +290,11 @@ class ConstrainedSteinTrajOpt:
         if resample:
             xuz.data = self.resample(xuz.data)
 
-        resample_period = 50
         path = [xuz.data.clone()]
         self.gamma = self.max_gamma
         for iter in range(T):
             # reset slack variables
-            #if self.problem.dz > 0:
+            # if self.problem.dz > 0:
             #    xu = xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du]
             #    z_init = self.problem.get_initial_z(xu)
             #    xuz = torch.cat((xu, z_init), dim=2).reshape(N, -1)
@@ -290,18 +302,19 @@ class ConstrainedSteinTrajOpt:
             s = time.time()
             if T > 50:
                 self.gamma = self.max_gamma * driving_force(iter)
+
             #    self.sigma = 0.1 * (1.0 - iter / T) + 1e-2
 
-            #if (iter + 1) % resample_period == 0 and (iter < T - 1):
-            #    xuz.data = self.resample(xuz.data)
+            if (iter + 1) % resample_period == 0 and (iter < T - 1):
+                xuz.data = self.resample(xuz.data)
 
             # old C
-            #oldC, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1), compute_grads=False)
+            # oldC, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1), compute_grads=False)
             #
             # optim.zero_grad()
             grad = self.compute_update(xuz)
-            #print(torch.linalg.norm(grad, dim=-1))
-            #for k in range(10):
+            # print(torch.linalg.norm(grad, dim=-1))
+            # for k in range(10):
             #    dt = self.dt / (2 ** k)
             #    new_xuz = xuz.data - dt * grad
             #    self._clamp_in_bounds(new_xuz)
@@ -311,12 +324,15 @@ class ConstrainedSteinTrajOpt:
             #        xuz.data = new_xuz
             #        break
 
-            #xuz.data = #new_xuz
+            # xuz.data = #new_xuz
+            grad_norm = torch.linalg.norm(grad, dim=1, keepdim=True)
+            max_norm = 10
+            grad = torch.where(grad > max_norm, max_norm * grad / grad_norm, grad)
             xuz.data = xuz.data - self.dt * grad
             self.delta_x = self.dt * grad
             # xuz.grad = grad
             # print(torch.linalg.norm(grad))
-            torch.nn.utils.clip_grad_norm_(xuz, 10)
+            # torch.nn.utils.clip_grad_norm_(xuz, 10)
             # new_xuz = xuz + self.dt * grad
             # optim.step()
             # scheduler.step()
@@ -326,11 +342,12 @@ class ConstrainedSteinTrajOpt:
 
             path.append(xuz.data.clone())
 
-
         # sort particles by penalty
         xuz = xuz.to(dtype=torch.float32)
         J = self.problem.get_cost(xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du])
-        C, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1), compute_grads=False)
+        C, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1),
+                                                    compute_grads=False,
+                                                    compute_hess=False)
         penalty = J.reshape(N) + self.penalty * torch.sum(C.reshape(N, -1).abs(), dim=1)
         idx = torch.argsort(penalty, descending=False)
         path = torch.stack(path, dim=0).reshape(len(path), N, self.T, -1)[:, :, :, :self.dx + self.du]

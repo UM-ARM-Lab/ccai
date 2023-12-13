@@ -48,23 +48,22 @@ def get_chunk(X, num_chunks, expected_chunk_size):
     return x
 
 
+def get_window_splits(X, window_size=3):
+    splits = [X[:, i:i + window_size] for i in range(0, X.shape[1] - window_size + 1, 1)]
+    return torch.stack(splits, dim=0)
+
+
 def structured_rbf_kernel(X, Xbar, Q=None):
     # X is N x T x d
     n, T, d = X.shape
-    mod = T % 3
-    num_chunks = T // 3
     if Q is not None:
         Xbar = (Q.reshape(1, T * d, T * d) @ Xbar.reshape(n, T * d, 1)).reshape(n, T, d)
 
-    x1 = get_chunk(X, num_chunks, 3)
-    x2 = get_chunk(X[:, 1:], num_chunks, 3)
-    x3 = get_chunk(X[:, 2:], num_chunks, 3)
-    x1bar = get_chunk(Xbar, num_chunks, 3)
-    x2bar = get_chunk(Xbar[:, 1:], num_chunks, 3)
-    x3bar = get_chunk(Xbar[:, 2:], num_chunks, 3)
+    # when only one window is used, switch to normal RBF kernel
+    if T < 4:
+        return rbf_kernel(X.reshape(n, T*d), Xbar.reshape(n, T*d), Q)
 
-    x = torch.stack((*x1, *x2, *x3), dim=0)
-    xbar = torch.stack((*x1bar, *x2bar, *x3bar), dim=0)
+    x, xbar = get_window_splits(X), get_window_splits(Xbar)
 
     M = x.shape[0]
     x = x.reshape(M, n, -1)

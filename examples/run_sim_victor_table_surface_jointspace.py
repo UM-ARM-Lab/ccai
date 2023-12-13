@@ -1,4 +1,4 @@
-from isaac_victor_envs.tasks.victor import VictorPuckObstacleEnv2, orientation_error, quat_change_convention, \
+from isaac_victor_envs.tasks.victor import VictorPuckObstacleEnv2, VictorPuckObstacleEnv3, orientation_error, quat_change_convention, \
     VictorFloatingSpheresTableEnv, VictorPuckObstacleEnv
 from victor_table_surface_jointspace import do_trial
 
@@ -61,6 +61,9 @@ if __name__ == "__main__":
         if config['obstacle_type'] == 'tabletop_ycb':
             env = VictorPuckObstacleEnv2(1, control_mode='joint_impedance',
                                          viewer=config['visualize'])
+        if config['obstacle_type'] == 'tabletop_ycb2':
+            env = VictorPuckObstacleEnv3(1, control_mode='joint_impedance',
+                                         viewer=config['visualize'])
         elif 'floating_spheres' in config['obstacle_type']:
             env = VictorFloatingSpheresTableEnv(1, control_mode='joint_impedance',
                                                 viewer=config['visualize'], obs_name=config['obstacle_type'])
@@ -111,6 +114,8 @@ if __name__ == "__main__":
         else:
             if config['obstacle_type'] == 'tabletop_ycb':
                 goal = torch.tensor([0.8, 0.1]) + 0.05 * goal_offsets[i, :2]
+            elif config['obstacle_type'] == 'tabletop_ycb2':
+                goal = torch.tensor([0.85, 0.1]) + 0.05 * goal_offsets[i, :2]
             elif config['obstacle_type'] == 'floating_spheres_1':
                 goal = torch.tensor([0.65, 0.05])
                 goal = goal + 0.05 * goal_offsets[i, :2]  # torch.tensor([0.25, 0.1]) * torch.rand(2)
@@ -140,7 +145,7 @@ if __name__ == "__main__":
                 results[controller] = [final_distance_to_goal]
             else:
                 results[controller].append(final_distance_to_goal)
-        # print(results)
+        print(results)
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)

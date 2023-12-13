@@ -1,4 +1,5 @@
 import numpy as np
+np.float = np.float64
 import rospy
 from arc_utilities import ros_init
 from arm_robots.victor import Victor
@@ -21,7 +22,7 @@ from victor_wrench import VictorWrenchProblem, VictorWrenchIpoptProblem, VictorU
 
 def stop_condition(feedback):
     time_error = (feedback.actual.time_from_start - feedback.desired.time_from_start).secs
-    if time_error > 0.05:
+    if time_error > 1:
         print('Timeout')
         return True
 
@@ -30,7 +31,7 @@ def robot_get_state(robot, chain, wrench_centre):
     q = robot.get_joint_positions()[:7]
     # compute theta?
     q = torch.tensor(q).to(device=chain.device, dtype=torch.float32)
-    ee_pos = chain.forward_kinematics(q).reshape(4, 4)[:3, 3]
+    ee_pos = chain.forward_kinematics(q).get_matrix().reshape(4, 4)[:3, 3]
     theta = - torch.atan2(ee_pos[0] - wrench_centre[0], ee_pos[1] - wrench_centre[1])
     print(theta)
     state = torch.cat((q, torch.zeros(1, device=chain.device), theta.reshape(-1)), dim=0).reshape(9)
@@ -52,7 +53,7 @@ def do_trial(robot, params, fpath):
     ], device=params['device'])
 
     # get wrench configs
-    start_ee_pos = params['chain'].forward_kinematics(start[:7]).reshape(4, 4)[:3, -1]
+    start_ee_pos = params['chain'].forward_kinematics(start[:7]).get_matrix().reshape(4, 4)[:3, -1]
     wrench_length = 0.13
     wrench_centre = [start_ee_pos[0].item(), start_ee_pos[1].item() - wrench_length, start_ee_pos[2].item()]
 
@@ -155,7 +156,7 @@ def do_trial(robot, params, fpath):
 @ros_init.with_ros("cstvo_wrench")
 def main():
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/victor_wrench_real.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/config/victor_wrench_real.yaml').read_text())
     from tqdm import tqdm
 
     asset = f'{get_assets_dir()}/victor/victor_grippers.urdf'

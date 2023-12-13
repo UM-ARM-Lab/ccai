@@ -1,85 +1,113 @@
 ---
-T: 10
+T: 12
 receding_horizon: False
-num_steps: 10
-num_trials: 1
-visualize: False
-experiment_name: 'victor_wrench_timing'
+num_steps: 12
+num_trials: 20
+visualize: True
+experiment_name: 'victor_wrench_bfgs'
 controllers:
-  csvgd:
-    N: 4
-    alpha_J: 0.01
-    alpha_C: 1
-    step_size: 0.1
-    momentum: .0
-    device: 'cuda:0'
-    online_iters: 10
-    warmup_iters: 100
-    resample_steps: 1
-    resample_sigma: 0.01
-    resample_temperature: 0.1
-    penalty: 1000
+#  csvgd:
+#    N: 4
+#    alpha_J: 0.01
+#    alpha_C: 1
+#    step_size: 0.25
+#    momentum: .0
+#    device: 'cuda:0'
+#    online_iters: 10
+#    warmup_iters: 100
+#    resample_steps: 1
+#    resample_sigma: 0.01
+#    resample_temperature: 0.5
+#    penalty: 1000
   ipopt:
     device: 'cpu'
+    online_iters: 1000
+    warmup_iters: 1000
+  sqp_until_convergence:
+    device: 'cpu'
+    online_iters: 1000
+    warmup_iters: 1000
+  mppi_1000:
+    N: 1024
+    lambda: 1.0e-3
+    sigma: [ 0.025, 0.03, 0.03, 0.035, 0.035, 0.04, 0.04 ]
+    device: 'cuda:0'
+    penalty: [10000, 100000]
     online_iters: 10
     warmup_iters: 100
-  mppi_1000:
-    N: 1000
-    lambda: 1.0e-4
-    sigma: 0.25
-    device: 'cuda:0'
-    penalty: 1000
-    online_iters: 25
-    warmup_iters: 250
-  svgd_1000:
-    M: 4
-    N: 128
-    step_size: 0.1
-    sigma: 0.5
-    lambda: 1.0e-4
-    use_grad: False
-    penalty: 1000
-    online_iters: 25
-    warmup_iters: 250
-    device: 'cuda:0'
   mppi_100:
-    N: 100
-    lambda: 1.0e-4
-    sigma: 0.25
+    N: 1024
+    lambda: 1.0e-3
+    sigma: [ 0.025, 0.03, 0.03, 0.035, 0.035, 0.04, 0.04 ]
     device: 'cuda:0'
-    penalty: 100
-    online_iters: 25
-    warmup_iters: 250
-  svgd_100:
-    M: 4
+    penalty: [10000, 10000]
+    online_iters: 10
+    warmup_iters: 100
+  svgd_1000:
+    M: 8
     N: 128
-    step_size: 0.1
-    sigma: 0.5
-    lambda: 1.0e-4
+    step_size: 0.05
+    sigma: [ 0.025, 0.03, 0.03, 0.035, 0.035, 0.04, 0.04 ]
+    lambda: 1.0e-3
     use_grad: False
-    penalty: 100
-    online_iters: 50
-    warmup_iters: 500
+    penalty: [10000, 100000]
+    online_iters: 10
+    warmup_iters: 100
+    device: 'cuda:0'
+  svgd_100:
+    M: 8
+    N: 128
+    step_size: 0.05
+    sigma: [ 0.025, 0.03, 0.03, 0.035, 0.035, 0.04, 0.04 ]
+    lambda: 1.0e-3
+    use_grad: False
+    penalty: [10000, 10000]
+    online_iters: 10
+    warmup_iters: 100
     device: 'cuda:0'
   svgd_grad_100:
-    M: 4
-    N: 128
-    step_size: 0.1
-    sigma: 0.05
-    lambda: 500
+    M: 8
+    step_size: 0.025
+    sigma: [ 0.025, 0.03, 0.03, 0.035, 0.035, 0.04, 0.04 ]
+    prior_sigma: [ 0.25, 0.3, 0.3, 0.35, 0.35, 0.4, 0.4 ]
+    lambda: 100
     use_grad: True
-    penalty: 100
+    penalty: [10000, 10000]
     online_iters: 10
     warmup_iters: 100
     device: 'cuda:0'
+    grad_fn: 'f3'
   svgd_grad_1000:
-    M: 4
-    N: 128
-    step_size: 0.1
-    sigma: 0.05
-    lambda: 500
+    M: 8
+    step_size: 0.025
+    sigma: [ 0.025, 0.03, 0.03, 0.035, 0.035, 0.04, 0.4 ]
+    prior_sigma: [ 0.25, 0.3, 0.3, 0.35, 0.35, 0.4, 0.4 ]
+    lambda: 100
     use_grad: True
-    penalty: 1000
+    penalty: [10000, 100000]
+    online_iters: 10
+    warmup_iters: 100
+    device: 'cuda:0'
+    grad_fn: 'f3'
+  icem_100:
+    N: 1024
+    K: 64
+    elites_keep_fraction: 0.3
+    alpha: 0.1
+    noise_beta: 2.0
+    sigma: [ 0.025, 0.03, 0.03, 0.035, 0.035, 0.04, 0.04]
+    penalty: [10000, 100000]
+    online_iters: 10
+    warmup_iters: 100
+    device: 'cuda:0'
+  icem_1000:
+    N: 1024
+    K: 64
+    elites_keep_fraction: 0.3
+    alpha: 0.1
+    noise_beta: 2.0
+    sigma: [ 0.025, 0.03, 0.03, 0.035, 0.035, 0.04, 0.04 ]
+    penalty: [10000, 100000]
     online_iters: 10
     warmup_iters: 100
     device: 'cuda:0'

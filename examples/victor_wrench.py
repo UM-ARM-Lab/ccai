@@ -4,8 +4,8 @@ import torch
 from functools import partial
 from functorch import vmap, jacrev, hessian, jacfwd
 import pytorch_kinematics as pk
-from ccai.kernels import rbf_kernel
-from ccai.problem import ConstrainedSVGDProblem, IpoptProblem, UnconstrainedPenaltyProblem
+from ccai.kernels import rbf_kernel, structured_rbf_kernel
+from ccai.problem import ConstrainedSVGDProblem, IpoptProblem, UnconstrainedPenaltyProblem, NLOptProblem
 from isaac_victor_envs.utils import get_assets_dir
 
 
@@ -25,7 +25,7 @@ class VictorWrenchProblem(ConstrainedSVGDProblem):
         :param chain: kinematic chain as a pytorch_kinematics.chain
         """
         super().__init__(start, goal, T, device)
-
+        self.squared_slack = False
         # Problem dimensions setup
         self.dz = 14
         self.dh = self.dz * T
@@ -35,20 +35,28 @@ class VictorWrenchProblem(ConstrainedSVGDProblem):
         self.T = T
         self.start = start
         self.goal = goal
-
+        self.compute_hessian = False
         self.device = device
         self.chain = chain
+        self.alpha = 1
         if chain is None:
             asset = f'{get_assets_dir()}/victor/victor_grippers.urdf'
             ee_name = 'l_palm'
             self.chain = pk.build_serial_chain_from_urdf(open(asset).read(), ee_name)
 
         self.chain.to(device=device)
+        self.prior_sigma = torch.tensor([0.05, 0.075, 0.075, 0.1, 0.1, 0.15, 0.2],
+                                        device=self.device,
+                                        dtype=torch.float32)
 
-        self.cost = vmap(partial(_cost_steps, start=self.start))
-        self.grad_cost = vmap(jacrev(partial(_cost_steps, start=self.start)))
-        self.hess_cost = vmap(hessian(partial(_cost_steps, start=self.start)))
-        self.grad_kernel = jacrev(rbf_kernel, argnums=0)
+        self.prior_sigma = 0.1 * torch.ones_like(self.prior_sigma)
+
+        self.cost = vmap(partial(_cost_steps, start=self.start, weight=1 / self.prior_sigma ** 2))
+        self.grad_cost = vmap(jacrev(partial(_cost_steps, start=self.start, weight=1 / self.prior_sigma ** 2)))
+        self.hess_cost = vmap(hessian(partial(_cost_steps, start=self.start, weight=1 / self.prior_sigma ** 2)))
+
+        self.kernel = structured_rbf_kernel
+        self.grad_kernel = jacrev(self.kernel, argnums=0)
 
         self.wrench_centre = wrench_centre
         self.wrench_length = wrench_length
@@ -62,9 +70,9 @@ class VictorWrenchProblem(ConstrainedSVGDProblem):
         self.x_min = -self.x_max
 
     def _objective(self, x):
-        return self.cost(x), self.grad_cost(x), self.hess_cost(x)
+        return self.alpha * self.cost(x), self.alpha * self.grad_cost(x), None  # , self.hess_cost(x)
 
-    def _con_ineq(self, x, compute_grads=True):
+    def _con_ineq(self, x, compute_grads=True, compute_hess=True):
         N = x.shape[0]
         q_theta = x.reshape(N, self.T, -1)[:, :, :self.dx]
         z = x.reshape(N, self.T, -1)[:, :, self.dx:]
@@ -75,7 +83,9 @@ class VictorWrenchProblem(ConstrainedSVGDProblem):
                                             self.ee_constraint._H,
                                             self.ee_constraint._dH,
                                             self.wrench_length,
-                                            self.chain
+                                            self.chain,
+                                            compute_grads=compute_grads,
+                                            compute_hess=compute_hess,
                                             )
 
         if compute_grads is False:
@@ -84,13 +94,16 @@ class VictorWrenchProblem(ConstrainedSVGDProblem):
         Dh = Dh.reshape(N, self.T, self.dz, self.dx)
         Dh = torch.diag_embed(Dh.permute(0, 2, 3, 1)).permute(0, 3, 1, 4, 2).reshape(N, self.T * self.dz, -1)
 
+        if not compute_hess:
+            return h.reshape(N, -1), Dh, None
+
         DDh = DDh.reshape(N, self.T, self.dz, self.dx, self.dx)
         DDh = torch.diag_embed(torch.diag_embed(DDh.permute(0, 2, 3, 4, 1)))
         DDh = DDh.permute(0, 4, 1, 5, 2, 6, 3).reshape(N, self.T * self.dz, self.T * self.dx, -1)
 
         return h.reshape(N, -1), Dh, DDh
 
-    def _con_eq(self, q_theta, compute_grads=True):
+    def _con_eq(self, q_theta, compute_grads=True, compute_hess=True):
         """
             Computes equality constraints and
             returns their first and second derivatives
@@ -104,16 +117,33 @@ class VictorWrenchProblem(ConstrainedSVGDProblem):
         q_theta = q_theta[:, :, :self.dx]
 
         # Compute end effector constraints
-        g_ee, Dg_ee, DDg_ee = self.ee_constraint.eval(q_theta.reshape(N * T, -1), compute_grads=compute_grads)
+        g_ee, Dg_ee, DDg_ee = self.ee_constraint.eval(q_theta.reshape(N * T, -1),
+                                                      compute_grads=compute_grads,
+                                                      compute_hess=compute_hess)
         n_ee = g_ee.shape[1]
         g_ee = g_ee.reshape(N, -1)
 
+        # now we need the goal constraint
+        final_wrench_angle = q_theta[:, -1, -1]
+        goal_constr = final_wrench_angle.reshape(-1, 1) - self.goal.reshape(-1, 1)
+
+        g = torch.cat((g_ee, goal_constr), dim=1)
+
         if not compute_grads:
-            return g_ee, None, None
+            return g, None, None
 
         # Currently computed with N T as batch dimensions, convert so T is decision variable
         Dg_ee = Dg_ee.reshape(N, T, n_ee, self.dx)
+        # N x n_ee, dx, T
         Dg_ee = torch.diag_embed(Dg_ee.permute(0, 2, 3, 1)).permute(0, 3, 1, 4, 2).reshape(N, self.T * n_ee, -1)
+        # then to N, T, n_ee, T, dx
+        Dgoal_constr = torch.zeros(N, 1, self.T, self.dx, device=q_theta.device)
+        Dgoal_constr[:, :, -1, 8] = 1
+        Dgoal_constr = Dgoal_constr.reshape(N, 1, -1)
+        Dg = torch.cat((Dg_ee, Dgoal_constr), dim=1)
+
+        if not compute_hess:
+            return g, Dg, None
 
         DDg_ee = DDg_ee.reshape(N, self.T, n_ee, self.dx, self.dx)
         DDg_ee = DDg_ee.permute(0, 2, 3, 4, 1)  # permute to be (N, n_ee, dx, dx, T)
@@ -122,20 +152,9 @@ class VictorWrenchProblem(ConstrainedSVGDProblem):
         DDg_ee_extended = torch.diag_embed(torch.diag_embed(DDg_ee)).permute(0, 4, 1, 5, 2, 6, 3)
         DDg_ee_extended = DDg_ee_extended.reshape(N, self.T * n_ee, self.T * self.dx, -1)
 
-        # now we need the goal constraint
-        final_wrench_angle = q_theta[:, -1, -1]
-        goal_constr = final_wrench_angle.reshape(-1, 1) - self.goal.reshape(-1, 1)
-
-        Dgoal_constr = torch.zeros(N, 1, self.T, self.dx, device=q_theta.device)
-        Dgoal_constr[:, :, -1, 8] = 1
-        Dgoal_constr = Dgoal_constr.reshape(N, 1, -1)
-
         DDgoal_constr = torch.zeros(N, 1, self.T * self.dx, self.T * self.dx,
                                     device=q_theta.device)
-
         # Combine
-        g = torch.cat((g_ee, goal_constr), dim=1)
-        Dg = torch.cat((Dg_ee, Dgoal_constr), dim=1)
         DDg = torch.cat((DDg_ee_extended, DDgoal_constr), dim=1)
 
         return g, Dg, DDg
@@ -151,30 +170,34 @@ class VictorWrenchProblem(ConstrainedSVGDProblem):
 
         q_theta = augmented_trajectory.reshape(N, self.T, -1)[:, :, :self.dx]
 
-
         # compute gradient of cost first
         grad_cost = self.grad_cost(q_theta)
         grad_cost = torch.cat((grad_cost, torch.zeros(N, self.T, self.dz, device=q_theta.device)), dim=2).reshape(N, -1)
 
         # compute kernel and grad kernel
-        Xk = q_theta.reshape(N, -1)
-        K = rbf_kernel(Xk, Xk)
-        grad_K = -self.grad_kernel(Xk, Xk)
-        grad_K = torch.einsum('nmmi->nmi', grad_K)
+        Xk = q_theta#.reshape(N, -1)
+        K = self.kernel(Xk, Xk)
+        grad_K = -self.grad_kernel(Xk, Xk).reshape(N, N, N, self.T, -1)
+        grad_K = torch.einsum('nmmij->nmij', grad_K)
         grad_K = torch.cat((grad_K.reshape(N, N, self.T, self.dx),
                             torch.zeros(N, N, self.T, self.dz, device=q_theta.device)), dim=-1)
         grad_K = grad_K.reshape(N, N, -1)
 
         # Now we need to compute constraints and their first and second partial derivatives
-        g, Dg, DDg = self.combined_constraints(augmented_trajectory)
-
+        g, Dg, DDg = self.combined_constraints(augmented_trajectory,
+                                               compute_grads=True,
+                                               compute_hess=self.compute_hessian)
+        if DDg is not None:
+            DDg = DDg.detach_()
         self.ee_constraint.reset()
-        #print(self.cost(q_theta), g.abs().max())
+        #print(self.cost(q_theta).mean(), g.abs().max(), g.abs().mean())
 
-        return grad_cost.detach(), None, K.detach(), grad_K.detach(), g.detach(), Dg.detach(), DDg.detach()
+        return grad_cost.detach(), None, K.detach(), grad_K.detach(), g.detach(), Dg.detach(), DDg
 
     def get_initial_xu(self, N):
-        particles = 0.1 * torch.randn(N, self.T, self.dx, device=self.device)
+        particles = torch.randn(N, self.T, self.dx, device=self.device)
+        particles[:, :, :7] *= self.prior_sigma
+        particles[:, :, 7:] *= 0.1
         particles = torch.cumsum(particles, dim=1) + self.start.reshape(1, 1, 9)
         return particles
 
@@ -189,23 +212,27 @@ class VictorWrenchProblem(ConstrainedSVGDProblem):
             self.T = T
             self.dh = self.dz * self.T
             self.dg = 4 * T + 1
-        self.cost = vmap(partial(_cost_steps, start=self.start))
-        self.grad_cost = vmap(jacrev(partial(_cost_steps, start=self.start)))
+        self.cost = vmap(partial(_cost_steps, start=self.start, weight=1 / self.prior_sigma ** 2))
+        self.grad_cost = vmap(jacrev(partial(_cost_steps, start=self.start, weight=1 / self.prior_sigma ** 2)))
 
 
-def _cost_steps(x, start):
-    T, _ = x.shape
+def _cost_steps(x, start, weight):
     x = torch.cat((start[:7].reshape(1, 7), x[:, :7]), dim=0)
     diff = x[1:] - x[:-1]
-    return 100 * torch.sum(diff ** 2)
+    weighted_diff = diff.reshape(-1, 1, 7) @ torch.diag(weight).unsqueeze(0) @ diff.reshape(-1, 7, 1)
+    #angle = x[:, -1]
+    #angle_diff = angle[1:] - angle[:-1]
+    return torch.sum(weighted_diff)# + 100 * torch.sum(angle_diff ** 2)
 
 
 class EndEffectorConstraint:
 
     def __init__(self, chain, ee_constraint_function, wrench_centre, wrench_length, start):
         self.chain = chain
+        self.ee_idx = self.chain.frame_to_idx['l_palm']
+
         self._fn = partial(ee_constraint_function, wrench_centre=wrench_centre, wrench_length=wrench_length)
-        start_pos = self.chain.forward_kinematics(start.reshape(1, 9)[:, :7])[:, :3, 3]
+        start_pos = self.chain.forward_kinematics(start.reshape(1, 9)[:, :7]).get_matrix()[:, :3, 3]
         start_pos = torch.cat((start_pos, start.reshape(1, 9)[:, 7:]), dim=1).reshape(5)
 
         self.ee_constraint_fn = vmap(partial(ee_constraint_function,
@@ -227,13 +254,15 @@ class EndEffectorConstraint:
         dp, dmat, dtheta = self._grad_fn(p, mat, theta)
 
         dmat = dmat @ mat.reshape(1, 3, 3).permute(0, 2, 1)
+        # project dmat to be skew-symmetric
+        dmat = 0.5 * (dmat - dmat.permute(0, 2, 1))
 
         omega1 = torch.stack((-dmat[:, 1, 2], dmat[:, 0, 2], -dmat[:, 0, 1]), dim=-1)
         omega2 = torch.stack((dmat[:, 2, 1], -dmat[:, 2, 0], dmat[:, 1, 0]), dim=-1)
-        omega = (omega1 + omega2)  # this doesn't seem correct? Surely I should be halfing it
+        omega = 0.5 * (omega1 + omega2)  # this doesn't seem correct? Surely I should be halfing it
         return dp, omega, dtheta
 
-    def eval(self, q, compute_grads=True):
+    def eval(self, q, compute_grads=True, compute_hess=True):
         """
 
         :param q: torch.Tensor of shape (N, 9) containing set of robot joint config + wrench joint configs
@@ -251,7 +280,7 @@ class EndEffectorConstraint:
         theta = q[:, 7:].reshape(T, -1)
 
         # Get end effector pose
-        m = self.chain.forward_kinematics(joint_config)
+        m = self.chain.forward_kinematics(joint_config).get_matrix()
         p, mat = m[:, :3, 3], m[:, :3, :3]
 
         # Compute constraints
@@ -268,52 +297,59 @@ class EndEffectorConstraint:
         # Note: we could use autograd for the whole pipeline but computing the manipulator Jacobian and Hessian
         # manually is much faster than using autograd
         dp, omega, dtheta = self.grad_constraint(p, mat, theta)
-        ddp, domega, ddtheta = self.hess_constraint(p, mat, theta)
 
-        ddp, dp_dmat, dp_dtheta = ddp
-        domega_dp, domega, omega_dtheta = domega
-        dtheta_dp, dtheta_omega, ddtheta = ddtheta
-
-        dp_omega = domega_dp
-        dtheta_omega = omega_dtheta
-
-        tmp = domega @ mat.reshape(-1, 1, 1, 3, 3).permute(0, 1, 2, 4, 3)
-        domega1 = torch.stack((-tmp[:, :, :, 1, 2], tmp[:, :, :, 0, 2], -tmp[:, :, :, 0, 1]), dim=-1)
-        domega2 = torch.stack((tmp[:, :, :, 2, 1], -tmp[:, :, :, 2, 0], tmp[:, :, :, 1, 0]), dim=-1)
-        domega = (domega1 + domega2)
-
-        # Finally have computed derivative of constraint wrt pose as a (N, num_constraints, 6) tensor
+        # derivative of constraint wrt pose as a (N, num_constraints, 6) tensor
         dpose = torch.cat((dp, omega), dim=-1)
+        link_indices = torch.ones(T, device=q.device, dtype=torch.long) * self.ee_idx
 
-        # cache computation for later
-        self._J, self._H, self._dH = self.chain.jacobian_and_hessian_and_dhessian(joint_config)
+        if compute_hess:
+            ddp, domega, ddtheta = self.hess_constraint(p, mat, theta)
+
+            ddp, dp_dmat, dp_dtheta = ddp
+            domega_dp, domega, omega_dtheta = domega
+            dtheta_dp, dtheta_omega, ddtheta = ddtheta
+
+            dp_omega = domega_dp
+            dtheta_omega = omega_dtheta
+
+            tmp = domega @ mat.reshape(-1, 1, 1, 3, 3).permute(0, 1, 2, 4, 3)
+            domega1 = torch.stack((-tmp[:, :, :, 1, 2], tmp[:, :, :, 0, 2], -tmp[:, :, :, 0, 1]), dim=-1)
+            domega2 = torch.stack((tmp[:, :, :, 2, 1], -tmp[:, :, :, 2, 0], tmp[:, :, :, 1, 0]), dim=-1)
+            domega = 0.5 * (domega1 + domega2)
+
+            # cache computation for later
+            self._J, self._H, self._dH = self.chain.jacobian_and_hessian_and_dhessian(joint_config,
+                                                                                      link_indices=link_indices)
+            # now to compute hessian
+            hessian_pose_r1 = torch.cat((ddp, dp_omega.permute(0, 1, 3, 2)), dim=-1)
+            hessian_pose_r2 = torch.cat((dp_omega, domega), dim=-1)
+            hessian_pose = torch.cat((hessian_pose_r1, hessian_pose_r2), dim=-2)
+
+            # Use kinematic hessian and jacobian to get 2nd derivative
+            DDg = self._J.unsqueeze(1).permute(0, 1, 3, 2) @ hessian_pose @ self._J.unsqueeze(1)
+            DDg_part_2 = torch.sum(self._H.reshape(T, 1, 6, 7, 7) * dpose.reshape(T, n_constraints, 6, 1, 1),
+                                   dim=2).reshape(
+                T,
+                n_constraints,
+                7, 7)
+            DDg = DDg + DDg_part_2.permute(0, 1, 3, 2)
+            dtheta_dpose = torch.cat((dtheta_dp, dtheta_omega.permute(0, 1, 3, 2)), dim=-1)
+
+            dtheta_dq = (dtheta_dpose.unsqueeze(2) @ self._J.unsqueeze(1).unsqueeze(1)).squeeze(2)
+
+            DDg = torch.cat((
+                torch.cat((DDg, dtheta_dq.permute(0, 1, 3, 2)), dim=-1),
+                torch.cat((dtheta_dq, ddtheta), dim=-1)),
+                dim=-2
+            )
+        else:
+            self._J, self._H = self.chain.jacobian_and_hessian(joint_config, link_indices=link_indices)
+            DDg = None
 
         # Use Jacobian to get derivative wrt joint configuration
         djoint_config = (dpose.unsqueeze(-2) @ self._J.unsqueeze(1)).squeeze(-2)
         Dg = torch.cat((djoint_config, dtheta), dim=-1)
 
-        # now to compute hessian
-        hessian_pose_r1 = torch.cat((ddp, dp_omega.permute(0, 1, 3, 2)), dim=-1)
-        hessian_pose_r2 = torch.cat((dp_omega, domega), dim=-1)
-        hessian_pose = torch.cat((hessian_pose_r1, hessian_pose_r2), dim=-2)
-
-        # Use kinematic hessian and jacobian to get 2nd derivative
-        DDg = self._J.unsqueeze(1).permute(0, 1, 3, 2) @ hessian_pose @ self._J.unsqueeze(1)
-        DDg_part_2 = torch.sum(self._H.reshape(T, 1, 6, 7, 7) * dpose.reshape(T, n_constraints, 6, 1, 1),
-                               dim=2).reshape(
-            T,
-            n_constraints,
-            7, 7)
-        DDg = DDg + DDg_part_2.permute(0, 1, 3, 2)
-        dtheta_dpose = torch.cat((dtheta_dp, dtheta_omega.permute(0, 1, 3, 2)), dim=-1)
-
-        dtheta_dq = (dtheta_dpose.unsqueeze(2) @ self._J.unsqueeze(1).unsqueeze(1)).squeeze(2)
-
-        DDg = torch.cat((
-            torch.cat((DDg, dtheta_dq.permute(0, 1, 3, 2)), dim=-1),
-            torch.cat((dtheta_dq, ddtheta), dim=-1)),
-            dim=-2
-        )
         return constraints, Dg, DDg
 
     def reset(self):
@@ -362,7 +398,9 @@ def ee_constraint(p, mat, theta, wrench_centre, wrench_length, start):
 
     mat_diff = desired_mat @ mat
     cosangle = (torch.trace(mat_diff) - 1) / 2
-    cosangle = torch.clamp(cosangle, min=-1 + 1e-7, max=1 - 1e-7)
+    #cosangle = torch.clamp(cosangle, min=-1 + 1e-4, max=1 - 1e-4)
+    cosangle = torch.where(cosangle.abs() > 1.0 - 1e-6, cosangle-1e-4, cosangle)
+
     constraint_ori = torch.arccos(cosangle)
 
     constraints = torch.cat((
@@ -375,7 +413,7 @@ def ee_constraint(p, mat, theta, wrench_centre, wrench_length, start):
     return constraints
 
 
-def torque_limits_modified(x, J, H, dH, wrench_length, chain):
+def torque_limits_modified(x, J, H, dH, wrench_length, chain, compute_grads=True, compute_hess=True):
     """
         Computes torque limit inequality constraint as
         torque_min <= J.T F <= torque_max
@@ -415,6 +453,29 @@ def torque_limits_modified(x, J, H, dH, wrench_length, chain):
         torch.zeros_like(theta),
     ), dim=1)
 
+    # if pre-computed values were not given then we compute them
+    if J is None:
+        ee_idx = chain.frame_to_idx['l_palm']
+        link_indices = torch.ones(N, device=q.device, dtype=torch.long) * ee_idx
+
+        if not compute_grads:
+            J = chain.jacobian(q, link_indices=link_indices)
+        elif not compute_hess:
+            J, h = chain.jacobian_and_dhessian(q, link_indices=link_indices)
+        else:
+            J, H, dH = chain.jacobian_and_hessian_and_dhessian(q, link_indices=link_indices)
+
+        # Compute joint torques via J.T @ F
+    joint_torques = J.permute(0, 2, 1) @ F.reshape(-1, 6, 1)
+
+    # Constraint values
+    constr_upper = joint_torques.reshape(N, -1) - max_torque
+    constr_lower = -max_torque - joint_torques.reshape(N, -1)
+    constr = torch.cat((constr_lower, constr_upper), dim=1)
+
+    if not compute_grads:
+        return constr, None, None
+
     # Derivative of end effector wrench wrt theta
     dF = desired_force * torch.stack((
         torch.cos(theta),
@@ -425,20 +486,6 @@ def torque_limits_modified(x, J, H, dH, wrench_length, chain):
         torch.zeros_like(theta),
     ), dim=1)
 
-    # 2nd derivative of end-effector wrench wrt theta
-    ddF = -F
-
-    # if pre-computed values were not given then we compute them
-    if J is None:
-        J, H, dH = chain.jacobian_and_hessian_and_dhessian(q)
-
-    # Compute joint torques via J.T @ F
-    joint_torques = J.permute(0, 2, 1) @ F.reshape(-1, 6, 1)
-
-    # Constraint values
-    constr_upper = joint_torques.reshape(N, -1) - max_torque
-    constr_lower = -max_torque - joint_torques.reshape(N, -1)
-
     # jacobian of constraint wrt joint_config
     grad_constr_upper = (H.permute(0, 2, 3, 1) @ F.reshape(-1, 1, 6, 1)).reshape(-1, 7, 7)
     grad_constr_lower = -grad_constr_upper
@@ -447,6 +494,14 @@ def torque_limits_modified(x, J, H, dH, wrench_length, chain):
     grad_constr_upper_theta = (J.permute(0, 2, 1) @ dF.reshape(-1, 6, 1)).reshape(-1, 7, 1)
     grad_constr_lower_theta = -grad_constr_upper_theta
     grad_constr_theta = torch.cat((grad_constr_lower_theta, grad_constr_upper_theta), dim=1)
+    grad_constr = torch.cat((grad_constr_lower, grad_constr_upper), dim=1)
+    # add zero for wrench angle
+    grad_constr = torch.cat((grad_constr, torch.zeros_like(grad_constr_theta), grad_constr_theta), dim=2)
+    if not compute_hess:
+        return constr, grad_constr, None
+
+    # 2nd derivative of end-effector wrench wrt theta
+    ddF = -F
 
     # hessian of the constraint wrt q
     hess_constr_upper = (dH.permute(0, 2, 3, 4, 1) @ F.reshape(-1, 1, 1, 6, 1)).reshape(-1, 7, 7, 7)
@@ -462,13 +517,10 @@ def torque_limits_modified(x, J, H, dH, wrench_length, chain):
     partial_constr_q_theta_lower = - partial_constr_q_theta_upper
 
     # combine them all together
-    constr = torch.cat((constr_lower, constr_upper), dim=1)
-    grad_constr = torch.cat((grad_constr_lower, grad_constr_upper), dim=1)
     hess_constr = torch.cat((hess_constr_lower, hess_constr_upper), dim=1)
     partial_q_theta = torch.cat((partial_constr_q_theta_lower, partial_constr_q_theta_upper), dim=1)
 
     # add zeros for wrench angle
-    grad_constr = torch.cat((grad_constr, torch.zeros_like(grad_constr_theta), grad_constr_theta), dim=2)
     hess_constr = torch.cat((
         torch.cat((hess_constr, torch.zeros_like(partial_q_theta), partial_q_theta), dim=3),
         torch.cat((torch.zeros_like(partial_q_theta.permute(0, 1, 3, 2)), torch.zeros_like(hess_constr_theta),
@@ -484,6 +536,11 @@ class VictorWrenchIpoptProblem(VictorWrenchProblem, IpoptProblem):
         super().__init__(start, goal, T, wrench_centre, wrench_length, device='cpu', chain=chain)
 
 
+class VictorWrenchSQPProblem(VictorWrenchProblem, NLOptProblem):
+    def __init__(self, start, goal, T, *args, **kwargs):
+        super().__init__(start, goal, T, device='cpu', *args, **kwargs)
+
+
 class VictorUnconstrainedPenaltyProblem(VictorWrenchProblem, UnconstrainedPenaltyProblem):
     def __init__(self, start, goal, T, wrench_centre, wrench_length, chain, penalty):
         super().__init__(start, goal, T, wrench_centre, wrench_length, device='cuda:0', chain=chain)
@@ -492,6 +549,7 @@ class VictorUnconstrainedPenaltyProblem(VictorWrenchProblem, UnconstrainedPenalt
         self.dt = 0.1
         self.x_min = torch.cat((self.x_min, -torch.ones(7)))
         self.x_max = torch.cat((self.x_max, torch.ones(7)))
+
     def dynamics(self, x, u):
         q = x[:, :7]
         next_q = q + self.dt * u
@@ -502,18 +560,18 @@ class VictorUnconstrainedPenaltyProblem(VictorWrenchProblem, UnconstrainedPenalt
         # but when the constraint is not satisfied,
         # they may not.
         # For now we just assume constraint satisfied and see how it breaks
-        next_mat = self.chain.forward_kinematics(next_q)
+        next_mat = self.chain.forward_kinematics(next_q).get_matrix()
         p = next_mat[:, :3, 3]
         # wrench length is new distance between p and wrench centre
         c = torch.tensor(self.wrench_centre, dtype=torch.float32, device=self.device).reshape(1, 3)
         next_offset = 100 * (torch.norm(p - c, dim=1) - self.wrench_length)
 
         # next angle is angle between px, py and [0, 1]
-        #norm_p = (p[:, :2] / torch.norm(p[:, :2], dim=1, keepdim=True)).reshape(-1, 2)
-        #e = torch.tensor([0, 1], dtype=torch.float32, device=self.device).reshape(1, 2)
-        #cos_angle = torch.sum(norm_p * e, dim=1)
+        # norm_p = (p[:, :2] / torch.norm(p[:, :2], dim=1, keepdim=True)).reshape(-1, 2)
+        # e = torch.tensor([0, 1], dtype=torch.float32, device=self.device).reshape(1, 2)
+        # cos_angle = torch.sum(norm_p * e, dim=1)
 
-        #next_angle = torch.arccos(cos_angle)
+        # next_angle = torch.arccos(cos_angle)
         next_angle = -torch.atan2(p[:, 0], p[:, 1])
         next_x = torch.cat((next_q, next_offset.reshape(-1, 1), next_angle.reshape(-1, 1)), dim=1)
         return next_x

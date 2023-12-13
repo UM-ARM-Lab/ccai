@@ -1,7 +1,7 @@
 ---
-T: 10
+T: 12
 receding_horizon: False
-num_steps: 10
+num_steps: 12
 num_trials: 1
 visualize: True
 experiment_name: 'victor_wrench_real'
@@ -10,7 +10,7 @@ controllers:
     N: 4
     alpha_J: 0.01
     alpha_C: 1
-    step_size: 0.1
+    step_size: 0.25
     momentum: .0
     device: 'cuda:0'
     online_iters: 10

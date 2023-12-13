@@ -91,6 +91,7 @@ class ConstrainedSVGDProblem(Problem):
 
         if self.squared_slack:
             h_aug = h + 0.5 * z.reshape(-1, self.dz * self.T) ** 2
+
         else:
             h_aug = h + self.slack_weight * z.reshape(-1, self.dz * self.T)
 
@@ -208,7 +209,7 @@ class IpoptProblem(Problem):
 
     def con_eq(self, x):
         tensor_x = torch.from_numpy(x).reshape(1, self.T, -1).to(torch.float32)
-        g, _, _ = self._con_eq(tensor_x, compute_grads=False)
+        g, _, _ = self._con_eq(tensor_x, compute_grads=False, compute_hess=False)
         if g is None:
             return None
         return g.reshape(-1).detach().numpy()
@@ -241,7 +242,7 @@ class IpoptProblem(Problem):
 
     def con_ineq(self, x):
         tensor_x = torch.from_numpy(x).reshape(1, self.T, -1).to(torch.float32)
-        h, _, _ = self._con_ineq(tensor_x)
+        h, _, _ = self._con_ineq(tensor_x, compute_grads=False, compute_hess=False)
         if h is None:
             return None
         return -h.reshape(-1).detach().numpy()
@@ -318,6 +319,7 @@ class UnconstrainedPenaltyProblem(Problem):
         g, _, _ = self._con_eq(x, compute_grads=compute_grads, compute_hess=False)
         h, _, _ = self._con_ineq(x, compute_grads=compute_grads, compute_hess=False)
         J = J.reshape(-1)
+
         if h is not None:
             J = J + self.penalty[0] * torch.sum(torch.clamp(h, min=0), dim=1)
         if g is not None:

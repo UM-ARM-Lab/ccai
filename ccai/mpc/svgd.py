@@ -58,6 +58,7 @@ class SVMPC:
         self.device = params.get('device', 'cuda:0')
         self.sigma = params.get('sigma', [1.0] * self.du)
         self.prior_sigma = params.get('prior_sigma', [1.0] * self.du)
+        self.grad_fn = params.get('grad_fn', 'f1')
 
         self.lambda_ = params.get('lambda', 1)
         self.warmup_iters = params.get('warmup_iters', 100)
@@ -68,7 +69,14 @@ class SVMPC:
         self.kernel = structured_rbf_kernel
         self.kernel_grad = jacrev(self.kernel, argnums=0)
 
-        self.grad_cost = jacrev(self._combined_rollout_cost, argnums=1)
+        if self.grad_fn == 'f1':
+            self.grad_cost = jacrev(self._combined_rollout_cost, argnums=1)
+        elif self.grad_fn == 'f2':
+            self.grad_cost = self._grad_cost2
+        elif self.grad_fn == 'f3':
+            self.grad_cost = self.grad_cost3
+        else:
+            raise ValueError('invalid grad fn')
         self.warmed_up = False
 
         self.sigma = torch.tensor(self.sigma, device=self.device)
@@ -84,7 +92,7 @@ class SVMPC:
         pred_x = self._rollout_dynamics(x, u)
         return self._cost(pred_x, u, False)
 
-    def _grad_cost(self, x, u):
+    def _grad_cost2(self, x, u):
         N, T, du = u.shape
         pred_x = self._rollout_dynamics(x, u)
 
@@ -92,10 +100,11 @@ class SVMPC:
         g, grad_g, _ = self.problem._con_eq(pred_x, compute_grads=True, compute_hess=False)
         h, grad_h, _ = self.problem._con_ineq(pred_x, compute_grads=True, compute_hess=False)
         total_grad = grad_J.clone()
+        #print(J.mean(), torch.clamp(h, min=0).mean(), g.abs().mean())
 
-        total_grad += torch.sum(self.problem.penalty * 2 * g.unsqueeze(-1) * grad_g, dim=1)
-        total_grad += torch.sum(self.problem.penalty * 2 * h.unsqueeze(-1) * torch.where(h.unsqueeze(-1) > -0.1,
-                                                                                         grad_h, 0), dim=1)
+        total_grad += torch.sum(self.problem.penalty[1] * grad_g, dim=1)
+        total_grad += torch.sum(self.problem.penalty[0] * torch.where(h.unsqueeze(-1) > 0,
+                                                                      grad_h, 0), dim=1)
 
         # need dynamics grad
         trajectory = torch.cat((pred_x, u), dim=-1)
@@ -105,7 +114,15 @@ class SVMPC:
         grad_dx_du = grad_dx_du.reshape(N, T * self.dx, T * self.du)
 
         total_grad = grad_dx_du.permute(0, 2, 1) @ total_grad
+
         return total_grad.reshape(N, T, self.du)
+
+    def grad_cost3(self, x, u):
+        pred_x = self._rollout_dynamics(x, u)
+        xu = torch.cat((pred_x, u), dim=-1)
+        J = self.problem.objective(xu)
+        grad_J = torch.autograd.grad(J.sum(), u)[0]
+        return grad_J
 
     def _cost(self, x, u, normalize=True):
         xu = torch.cat((x, u), dim=-1)
@@ -148,12 +165,8 @@ class SVMPC:
             self.warmed_up = True
         # backup previous U incase solve fails
         prev_U = self.U.clone()
-        #try:
         for _ in range(iterations):
             self.update_particles(state)
-        ##except:
-        # #   print('SVGD update failed, defaulting to previous trajectory')
-        #    self.U = prev_U.clone()
 
         with torch.no_grad():
             pred_x = self._rollout_dynamics(state, self.U)
@@ -168,7 +181,7 @@ class SVMPC:
 
         self.U = U[torch.argsort(weights, descending=True)[:self.M]]
         self.weights = weights[torch.argsort(weights, descending=True)[:self.M]]
-        self.prior = MoG(weights=self.weights, means=self.U, sigma=self.prior_sigma, td=self.device)
+        #self.prior = MoG(weights=self.weights, means=self.U, sigma=self.prior_sigma, td=self.device)
 
         pred_X = self._rollout_dynamics(state, self.U)
         pred_traj = torch.cat((pred_X, self.U), dim=-1)
@@ -185,12 +198,13 @@ class SVMPC:
         grad_K = self.kernel_grad(self.U, self.U)
         grad_K = grad_K.reshape(self.M, self.M, self.M, self.H, self.du)
         grad_K = torch.mean(torch.einsum('nmmti->nmti', grad_K), dim=0)
-        #prior_ll = self.prior.log_prob(self.U)
-        #grad_prior = torch.autograd.grad(prior_ll.sum(), self.U)[0]
+        # prior_ll = self.prior.log_prob(self.U)
+        # grad_prior = torch.autograd.grad(prior_ll.sum(), self.U)[0]
 
         if self.use_true_grad:
             grad_lik = - self.grad_cost(state, self.U) / self.lambda_
-            grad_lik = torch.einsum('nnti->nti', grad_lik)
+            if len(grad_lik.shape) == 4:
+                grad_lik = torch.einsum('nnti->nti', grad_lik)
         else:
             # first N actions from each mixture
             with torch.no_grad():
@@ -218,8 +232,8 @@ class SVMPC:
 
         # clip to be in bounds
         self.U.data = torch.clamp(self.U.data,
-                                  min=self.problem.x_min[-self.problem.du:],
-                                  max=self.problem.x_max[-self.problem.du:]
+                                  min=self.problem.x_min[-self.problem.du:].to(device=self.device),
+                                  max=self.problem.x_max[-self.problem.du:].to(device=self.device)
                                   )
 
     def shift(self):
