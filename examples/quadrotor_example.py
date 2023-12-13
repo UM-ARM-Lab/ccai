@@ -86,7 +86,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         self.dh = self.dz * T
         self.dg = 12 * T + T - 1
         self.alpha = alpha
-        self.alpha = 1
+        self.alpha = 0.1
         self.include_obstacle = include_obstacle
         # self.dg = 2 * T - 1
         data = np.load('surface_data.npz')
@@ -137,7 +137,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         self.x_min = -self.x_max
 
         self.obstacle_centre = torch.tensor([0.0, 0.0], device=self.device)
-        self.obstacle_rad = 1.01
+        self.obstacle_rad = 1.05
 
     def _objective(self, x):
         J, dJ, HJ = cost(x, self.goal)
@@ -237,14 +237,15 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
 
         # compute z of surface and gradient and hessian
         sdf, grad_sdf, hess_sdf = self.obs_gp.posterior_mean(xy)
-
-        constr = sdf + 0.05
-        grad_constr = torch.cat((grad_sdf,
+        m = 1
+        constr = m*sdf + 0.05
+        grad_constr = torch.cat((m*grad_sdf,
                                  torch.zeros(T, 14, device=trajectory.device)), dim=1)
         hess_constr = torch.cat((
-            torch.cat((hess_sdf, torch.zeros(T, 2, 14, device=trajectory.device)), dim=2),
+            torch.cat((m*hess_sdf, torch.zeros(T, 2, 14, device=trajectory.device)), dim=2),
             torch.zeros(T, 14, 16, device=trajectory.device)), dim=1)
 
+        #print(torch.clamp(sdf, min=0).mean(), sdf.max())
         return constr, grad_constr, hess_constr
 
     def _obs_sdf(self, trajectory, compute_grads=True, compute_hess=True):
@@ -339,6 +340,8 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
 
         if DDg is not None:
             DDg.detach_()
+
+        # print(cost.mean(), g.abs().mean(), g.abs().max())
         return grad_cost.detach(), hess_cost, K.detach(), grad_K.detach(), g.detach(), Dg.detach(), DDg
 
     def update(self, start, goal=None, T=None, obstacle_pos=None):
@@ -369,6 +372,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         N, T, _ = xu.shape
         u = torch.randn(N, self.du, device=self.device)
         u[:, 1:] *= 0.25
+        #u[:, 0] *= 0.5
         next_x = self.dynamics(xu[:, -1, :self.dx], u)
         xu = torch.roll(xu, -1, dims=1)
         xu[:, -2, self.dx:] = u
@@ -490,7 +494,11 @@ def do_trial(env, params, fpath):
 
             u = best_traj[0, -4:].detach().cpu().numpy()
 
-            _, violation = env.step(u)
+            if torch.any(torch.isnan(best_traj)):
+                collision = True
+            else:
+                _, violation = env.step(u)
+
             # print(violation)
             if include_obstacle:
                 if violation['obstacle'] > 0:
@@ -518,9 +526,17 @@ def do_trial(env, params, fpath):
 
     return np.min(np.linalg.norm(actual_traj[:, :2] - np.array([[4, 4]]), axis=1))
 
+import argparse
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', type=str, default='quadrotor_no_obs.yaml')
+    parser.add_argument('--load-starts', action='store_true')
+    args = parser.parse_args()
+    return args
 
 if __name__ == "__main__":
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/config/quadrotor.yaml').read_text())
+    args = parse_arguments()
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/config/{args.config}').read_text())
     from tqdm import tqdm
 
     if config['obstacle_mode'] == 'none':
@@ -530,16 +546,15 @@ if __name__ == "__main__":
     for i in tqdm(range(config['num_trials'])):
         env = QuadrotorEnv(False, 'surface_data.npz', obstacle_mode=config['obstacle_mode'],
                            obstacle_data_fname='obstacle_data_20.npz')
-
-        ##data = dict(np.load(f'../data/experiments/quadrotor_test_obs_sdf_20/csvgd/trial_{i+1}/trajectory.npz',
-        #                    allow_pickle=True))
-        # x = data['x']
         env.reset()
+
+        if args.load_starts:
+            data = dict(np.load(f'../data/experiments/{config["experiment_name"]}/csvgd/trial_{i+1}/trajectory.npz',
+                            allow_pickle=True))
+            x = data['x']
+            env.state = x[0]
+
         start_state = env.state.copy()
-        # print(env.state)
-        # print(x[0])
-        # env.state = x[0]
-        # start_state = env.state.copy()
 
         for controller in config['controllers'].keys():
             env.reset()

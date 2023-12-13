@@ -56,6 +56,9 @@ class ConstrainedSteinTrajOpt:
             second_term = second_term / (dx.transpose(-1, 2) @ self.Bk @ dx)
             self.Bk = self.Bk + first_term - second_term
 
+            norm_Bk = torch.linalg.matrix_norm(self.Bk, dim=(-1, -2), keepdim=True, ord=np.inf)
+            max_norm = 100
+            self.Bk = torch.where(norm_Bk > max_norm, self.Bk * max_norm / norm_Bk, self.Bk)
         self.old_grad_C = dC
 
     def compute_update(self, xuz):
@@ -187,8 +190,10 @@ class ConstrainedSteinTrajOpt:
                 min_val = 0
             else:
                 min_val = -1e3
-            min_x = torch.cat((min_x, min_val * torch.ones(1, self.problem.T, self.problem.dz)), dim=-1)
-            max_x = torch.cat((max_x, 1e3 * torch.ones(1, self.problem.T, self.problem.dz)), dim=-1)
+            min_x = torch.cat((min_x,
+                               min_val * torch.ones(1, self.problem.T, self.problem.dz, device=min_x.device)), dim=-1)
+            max_x = torch.cat((max_x,
+                               1e3 * torch.ones(1, self.problem.T, self.problem.dz, device=max_x.device)), dim=-1)
 
         torch.clamp_(xuz, min=min_x.to(device=xuz.device).reshape(1, -1),
                      max=max_x.to(device=xuz.device).reshape(1, -1))
@@ -312,11 +317,14 @@ class ConstrainedSteinTrajOpt:
             #        break
 
             #xuz.data = #new_xuz
+            norm_grad = torch.linalg.norm(grad, dim=1, keepdim=True)
+            max_norm = 10
+            grad = torch.where(norm_grad > max_norm, max_norm * grad / norm_grad, grad)
             xuz.data = xuz.data - self.dt * grad
             self.delta_x = self.dt * grad
             # xuz.grad = grad
             # print(torch.linalg.norm(grad))
-            torch.nn.utils.clip_grad_norm_(xuz, 10)
+            #torch.nn.utils.clip_grad_norm_(xuz, 10)
             # new_xuz = xuz + self.dt * grad
             # optim.step()
             # scheduler.step()
@@ -335,4 +343,5 @@ class ConstrainedSteinTrajOpt:
         idx = torch.argsort(penalty, descending=False)
         path = torch.stack(path, dim=0).reshape(len(path), N, self.T, -1)[:, :, :, :self.dx + self.du]
         path = path[:, idx]
+        #print(C[idx].abs().max())
         return path

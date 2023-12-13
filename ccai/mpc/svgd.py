@@ -162,13 +162,15 @@ class SVMPC:
             if not self.use_true_grad:
                 costs -= torch.min(costs)
                 costs /= torch.max(costs)
+
+            costs = torch.where(torch.isnan(costs), 1e7, costs)
             # Update weights
             weights = torch.softmax(-costs / self.lambda_, dim=0)
-            U = self.U
+            U = torch.where(torch.isnan(self.U), 0, self.U)
 
         self.U = U[torch.argsort(weights, descending=True)[:self.M]]
         self.weights = weights[torch.argsort(weights, descending=True)[:self.M]]
-        self.prior = MoG(weights=self.weights, means=self.U, sigma=self.prior_sigma, td=self.device)
+        #self.prior = MoG(weights=self.weights, means=self.U, sigma=self.prior_sigma, td=self.device)
 
         pred_X = self._rollout_dynamics(state, self.U)
         pred_traj = torch.cat((pred_X, self.U), dim=-1)

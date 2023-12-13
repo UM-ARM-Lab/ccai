@@ -5,38 +5,53 @@ obstacle_mode: 'none'
 num_steps: 100
 num_trials: 20
 visualize: False
-experiment_name: 'quadrotor_no_obs_2023_12_08'
+experiment_name: 'quadrotor_no_obs_2023_12_13'
 include_x0: True
 controllers:
-  csvgd:
+#  csvgd:
+#    N: 8
+#    alpha_J: 0.1
+#    alpha_C: 1
+#    step_size: 0.5
+#    momentum: 0.
+#    device: 'cuda:1'
+#    online_iters: 20
+#    warmup_iters: 100
+#    resample_steps: 10
+#    resample_sigma: 0.1
+#    resample_temperature: 0.5
+#    penalty: 1000
+#    squared_slack: True
+#    use_true_hess: False
+  csvgd_10_steps:
     N: 8
     alpha_J: 0.1
     alpha_C: 1
     step_size: 0.5
     momentum: 0.
-    device: 'cuda:0'
-    online_iters: 20
+    device: 'cuda:1'
+    online_iters: 10
     warmup_iters: 100
     resample_steps: 10
     resample_sigma: 0.1
     resample_temperature: 0.5
-    penalty: 1000.00
+    penalty: 1000
     squared_slack: True
     use_true_hess: False
-#  csvgd_nonnegative_slack:
-#    N: 8
-#    alpha_J: 0.1
-#    alpha_C: 1
-#    step_size: 1
-#    momentum: 0.
-#    device: 'cuda:0'
-#    online_iters: 10
-#    warmup_iters: 500
-#    resample_steps: 5
-#    resample_sigma: 0.1
-#    resample_temperature: 0.25
-#    penalty: 1000.00
-#    squared_slack: False
+##  csvgd_nonnegative_slack:
+##    N: 8
+##    alpha_J: 0.1
+##    alpha_C: 1
+##    step_size: 1
+##    momentum: 0.
+##    device: 'cuda:1'
+##    online_iters: 10
+##    warmup_iters: 500
+##    resample_steps: 5
+##    resample_sigma: 0.1
+##    resample_temperature: 0.25
+##    penalty: 1000.00
+##    squared_slack: False
   ipopt:
     device: 'cpu'
     online_iters: 10
@@ -45,10 +60,10 @@ controllers:
     device: 'cpu'
     online_iters: 1000
     warmup_iters: 1000
-#  sqp:
-#    device: 'cpu'
-#    online_iters: 50
-#    warmup_iters: 500
+  sqp:
+    device: 'cpu'
+    online_iters: 10
+    warmup_iters: 100
   sqp_to_convergence:
     device: 'cpu'
     online_iters: 1000
@@ -57,7 +72,7 @@ controllers:
     N: 2048
     lambda: 1.0e-4
     sigma: [1.0, 0.1, 0.1, 0.1]
-    device: 'cuda:0'
+    device: 'cuda:1'
     penalty: [2000, 100]
     online_iters: 25
     warmup_iters: 250
@@ -65,7 +80,7 @@ controllers:
     N: 2048
     lambda: 1.0e-4
     sigma: [1.0, 0.1, 0.1, 0.1]
-    device: 'cuda:0'
+    device: 'cuda:1'
     penalty: [2000, 1000]
     online_iters: 25
     warmup_iters: 250
@@ -80,7 +95,7 @@ controllers:
     penalty: [ 2000, 100 ]
     online_iters: 25
     warmup_iters: 250
-    device: 'cuda:0'
+    device: 'cuda:1'
   svgd_1000:
     M: 8
     N: 256
@@ -92,7 +107,7 @@ controllers:
     penalty: [2000, 1000]
     online_iters: 25
     warmup_iters: 250
-    device: 'cuda:0'
+    device: 'cuda:1'
   svgd_grad_1000:
     M: 8
     N: 128
@@ -104,7 +119,7 @@ controllers:
     penalty: [2000, 1000]
     online_iters: 25
     warmup_iters: 250
-    device: 'cuda:0'
+    device: 'cuda:1'
   svgd_grad_100:
     M: 8
     N: 128
@@ -116,7 +131,7 @@ controllers:
     penalty: [2000, 100]
     online_iters: 25
     warmup_iters: 250
-    device: 'cuda:0'
+    device: 'cuda:1'
   icem_100:
       N: 2048
       K: 256
@@ -127,7 +142,7 @@ controllers:
       penalty: [2000, 100]
       online_iters: 25
       warmup_iters: 250
-      device: 'cuda:0'
+      device: 'cuda:1'
   icem_1000:
     N: 2048
     K: 256
@@ -138,4 +153,4 @@ controllers:
     penalty: [2000, 1000]
     online_iters: 25
     warmup_iters: 250
-    device: 'cuda:0'
+    device: 'cuda:1'

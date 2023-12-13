@@ -56,9 +56,14 @@ class SQPMPC:
         except Exception as e:
             print(e)
             print('retrying with perturbed initialization')
-            x = x + np.random.randn(x.shape[0]) * 1e-2
+            x = x + np.random.randn(x.shape[0]) * 1e-1
             x = np.clip(x, lower, upper)
-            xopt = opt.optimize(x)
+            try:
+                xopt = opt.optimize(x)
+            except Exception as e:
+                print('Re-attempt failed, defaulting to previous trajectory')
+                xopt = self.x.numpy().reshape(-1)
+
         self.x = torch.from_numpy(xopt).reshape(self.problem.T, -1).to(dtype=torch.float32)
         ret_x = self.x.clone()
         self.shift()
