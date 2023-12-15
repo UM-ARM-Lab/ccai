@@ -89,6 +89,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         self.start = start
         self.goal = goal
         self.K = rbf_kernel
+        self.squared_slack = True
         # self.K = structured_rbf_kernel
 
         self.finger_name = finger_name

@@ -46,7 +46,7 @@ thumb_ee_link = chain.frame_to_idx[thumb_ee_name]
 valve_location = torch.tensor([0.85, 0.70, 1.405]).to('cuda:0')
 # instantiate environment
 env = AllegroValveTurningEnv(1, control_mode='joint_impedance', use_cartesian_controller=False,
-                             viewer=True, steps_per_action=60, valve_velocity_in_state=False, friction_coefficient=100.0,)
+                             viewer=True, steps_per_action=60, valve_velocity_in_state=False, friction_coefficient=1.0,)
 world_trans = env.world_trans
 
 
@@ -359,7 +359,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
             hess_J = hess_J_ext.reshape(N, self.T * (self.dx + self.du + self.dz),
                                         self.T * (self.dx + self.du + self.dz))
 
-        print(G.abs().max(), G.abs().mean(), J.mean())
+        # print(G.abs().max(), G.abs().mean(), J.mean())
 
         if hessG is not None:
             hessG.detach_()
