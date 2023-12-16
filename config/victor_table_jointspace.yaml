@@ -1,17 +1,17 @@
 ---
 T: 15
 receding_horizon: True
-num_steps: 20
+num_steps: 25
 num_trials: 20
 visualize: True
 simulate: True
-experiment_name: 'victor_table_jointspace_bfgs_2023_12_14'
+experiment_name: 'victor_table_jointspace_zero_hess_2023_12_15'
 include_obstacles: True
 include_table: True
 table_height: 0.8
 obstacle_type: 'tabletop_ycb2'
 random_env: False
-start_trial: 18
+start_trial: 14
 controllers:
   csvgd:
     N: 8
@@ -30,14 +30,14 @@ controllers:
     device: 'cpu'
     online_iters: 10
     warmup_iters: 100
-  #ipopt_until_convergence:
-  #  device: 'cpu'
-  #  online_iters: 1000
-  #  warmup_iters: 1000
-  sqp_until_convergence:
-    device: 'cpu'
-    online_iters: 1000
-    warmup_iters: 1000
+#  #ipopt_until_convergence:
+#  #  device: 'cpu'
+#  #  online_iters: 1000
+#  #  warmup_iters: 1000
+#  sqp_until_convergence:
+#    device: 'cpu'
+#    online_iters: 1000
+#    warmup_iters: 1000
   mppi_1000:
     N: 1024
     lambda: 1.0e-3
@@ -100,25 +100,25 @@ controllers:
     warmup_iters: 100
     device: 'cuda:0'
     grad_fn: 'f2'
-  icem_100:
-    N: 1024
-    K: 128
-    elites_keep_fraction: 0.3
-    alpha: 0.1
-    noise_beta: 2.0
-    sigma: [ 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05 ]
-    penalty: [ 2000, 100 ]
-    online_iters: 10
-    warmup_iters: 100
-    device: 'cuda:0'
-  icem_1000:
-    N: 1024
-    K: 128
-    elites_keep_fraction: 0.3
-    alpha: 0.1
-    noise_beta: 2.0
-    sigma: [ 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05 ]
-    penalty: [ 2000, 1000 ]
-    online_iters: 10
-    warmup_iters: 100
-    device: 'cuda:0'
+#  icem_100:
+#    N: 1024
+#    K: 128
+#    elites_keep_fraction: 0.3
+#    alpha: 0.1
+#    noise_beta: 2.0
+#    sigma: [ 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05 ]
+#    penalty: [ 2000, 100 ]
+#    online_iters: 10
+#    warmup_iters: 100
+#    device: 'cuda:0'
+#  icem_1000:
+#    N: 1024
+#    K: 128
+#    elites_keep_fraction: 0.3
+#    alpha: 0.1
+#    noise_beta: 2.0
+#    sigma: [ 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05 ]
+#    penalty: [ 2000, 1000 ]
+#    online_iters: 10
+#    warmup_iters: 100
+#    device: 'cuda:0'

@@ -88,7 +88,7 @@ class VictorTableProblem(ConstrainedSVGDProblem):
         self.goal = goal
         # self.K = rbf_kernel
         self.K = structured_rbf_kernel
-        self.compute_hessian = False
+        self.compute_hessian = True
 
         self.grad_kernel = jacrev(rbf_kernel, argnums=0)
         self.alpha = 1
@@ -236,7 +236,7 @@ class VictorTableProblem(ConstrainedSVGDProblem):
                                                         [0.2, 1.0],
                                                         [-0.2, 1.0],
                                                         [0.7, 1.5]
-                                                    ]), device=self.device, cache_sdf_hessian=self.compute_hessian,
+                                                    ]), device=self.device, cache_sdf_hessian=False,
                                                     clean_cache=False, cache_path=cache_path)
                     cached_scene_sdfs.append(scene_sdf_cached)
                 scene_sdfs = cached_scene_sdfs
@@ -330,9 +330,10 @@ class VictorTableProblem(ConstrainedSVGDProblem):
             if grad_h is not None:
                 grad_h = -grad_h[:, :7].unsqueeze(1)
                 all_grad_h.append(grad_h)
-            if hess_h is not None:
-                hess_h = -hess_h[:, :7, :7].unsqueeze(1)
-                hess_h *= 0
+            if compute_hess:
+                #hess_h = -hess_h[:, :7, :7].unsqueeze(1)
+                #hess_h *= 0
+                hess_h = torch.zeros(N, 1, 7, 7, device=self.device)
                 all_hess_h.append(hess_h)
         h = torch.stack(all_h, dim=1)
 
