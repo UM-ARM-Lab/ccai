@@ -65,10 +65,14 @@ class VictorTableProblem(ConstrainedSVGDProblem):
 
     def __init__(self, start, goal, T, obstacle_poses, table_height, obstacle_type, device='cuda:0'):
         super().__init__(start, goal, T, device)
+        combine_sdf = True
         if obstacle_poses is None:
             self.dz = 0
         else:
-            self.dz = 3
+            if combine_sdf:
+                self.dz = 1
+            else:
+                self.dz = 3
         self.squared_slack = True
         self.dh = self.dz * T
         if table_height is None:
@@ -194,42 +198,39 @@ class VictorTableProblem(ConstrainedSVGDProblem):
                 obstacle_poses['pitcher'][:, :3, 3] += pitcher_centre
 
             ## Compose SDFs
-            obstacle_transforms = torch.stack([
-                obstacle_poses['mustard_bottle'],
-                obstacle_poses['cracker_box'],
-                obstacle_poses['pitcher']
-            ]).reshape(-1, 4, 4).inverse().to(device=self.device)
-            # scene_sdf = pv.ComposedSDF([mustard_bottle_sdf, cracker_box_sdf, pitcher_sdf],
-            #                            pk.Transform3d(matrix=obstacle_transforms))
-            # z = 1.0
-            # query_range = np.array([
-            #    [0.2, 1.2],
-            #    [-0.4, 1.2],
-            #    [z, z],
-            # ])
-            # pv.draw_sdf_slice(scene_sdf, query_range, device=self.device)
-            pitcher_sdf = pv.ComposedSDF([pitcher_sdf],
-                                         pk.Transform3d(
-                                             matrix=obstacle_poses['pitcher'].inverse().to(device=self.device)))
+            scene_sdfs = None
+            if combine_sdf:
+                obstacle_transforms = torch.stack([
+                    obstacle_poses['mustard_bottle'],
+                    obstacle_poses['cracker_box'],
+                    obstacle_poses['pitcher']
+                ]).reshape(-1, 4, 4).inverse().to(device=self.device)
+                scene_sdfs = [pv.ComposedSDF([mustard_bottle_sdf, cracker_box_sdf, pitcher_sdf],
+                                            pk.Transform3d(matrix=obstacle_transforms))]
 
-            mustard_bottle_sdf = pv.ComposedSDF([mustard_bottle_sdf],
-                                                pk.Transform3d(matrix=obstacle_poses['mustard_bottle'].inverse().to(
-                                                    device=self.device)
-                                                               ))
-            cracker_box_sdf = pv.ComposedSDF([cracker_box_sdf],
+            else:
+                pitcher_sdf = pv.ComposedSDF([pitcher_sdf],
                                              pk.Transform3d(
+                                                 matrix=obstacle_poses['pitcher'].inverse().to(device=self.device)))
+
+                mustard_bottle_sdf = pv.ComposedSDF([mustard_bottle_sdf],
+                                                    pk.Transform3d(matrix=obstacle_poses['mustard_bottle'].inverse().to(
+                                                        device=self.device)
+                                                                   ))
+                cracker_box_sdf = pv.ComposedSDF([cracker_box_sdf],
+                                                 pk.Transform3d(
                                                  matrix=obstacle_poses['cracker_box'].inverse().to(device=self.device)
                                                  ))
 
-            # sdf = pitcher_sdf
-            scene_sdfs = [pitcher_sdf, mustard_bottle_sdf, cracker_box_sdf]
+                # sdf = pitcher_sdf
+                scene_sdfs = [pitcher_sdf, mustard_bottle_sdf, cracker_box_sdf]
 
             # if we don't approximate with a box, construct a cached sdf grid for computational reasons
             cached_scene_sdfs = []
             if not approximate_with_box:
                 for i, scene_sdf in enumerate(scene_sdfs):
                     cache_path = f'{CCAI_PATH}/examples/object_cache_{i}.pkl'
-                    scene_sdf_cached = pv.CachedSDF(f'scene_{i}', resolution=0.005,
+                    scene_sdf_cached = pv.CachedSDF(f'scene_{i}', resolution=0.0025,
                                                     gt_sdf=scene_sdf,
                                                     range_per_dim=np.array([
                                                         [0.2, 1.0],
@@ -256,7 +257,8 @@ class VictorTableProblem(ConstrainedSVGDProblem):
                                                                                        )
                                                                       ),
                                                        collision_check_links=collision_check_links,
-                                                       softmin_temp=100
+                                                       softmin_temp=1000,
+                                                       points_per_link=100
                                                        ))
 
         elif 'floating_spheres' in obstacle_type:
@@ -282,7 +284,7 @@ class VictorTableProblem(ConstrainedSVGDProblem):
                                             device=self.device)
 
             self.robot_scene = pv.RobotScene(sdf, scene_sdf_cached, T, collision_check_links=collision_check_links,
-                                             softmin_temp=100)
+                                             softmin_temp=100, points_per_link=200)
         else:
             self._inequality_constraints = None
 
@@ -320,7 +322,7 @@ class VictorTableProblem(ConstrainedSVGDProblem):
                                                           compute_gradient=compute_grads,
                                                           compute_hessian=False)
 
-            h = -ret_scene.get('sdf') + 0.02
+            h = -ret_scene.get('sdf') + 0.04
             grad_h = ret_scene.get('grad_sdf', None)
             hess_h = ret_scene.get('hess_sdf', None)
 

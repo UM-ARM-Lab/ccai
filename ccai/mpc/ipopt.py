@@ -36,13 +36,15 @@ class IpoptMPC:
             cons.append(
                 {'type': 'eq', 'fun': self.problem.con_eq,
                  'jac': self.problem.con_eq_grad,
-                 'hess': self.problem.con_eq_hvp}
+                 'hess': None#self.problem.con_eq_hvp
+                 }
             )
         if self.ineq is True:
             cons.append(
                 {'type': 'ineq', 'fun': self.problem.con_ineq,
                  'jac': self.problem.con_ineq_grad,
-                 'hess': self.problem.con_ineq_hvp}
+                 'hess': None#self.problem.con_ineq_hvp
+                 }
             )
 
         lower, upper = self.problem.get_bounds()
@@ -56,13 +58,16 @@ class IpoptMPC:
 
         x = self.x.numpy().reshape(-1)
         res = cyipopt.minimize_ipopt(self.problem.objective, jac=self.problem.objective_grad,
-                                     hess=self.problem.objective_hess, x0=x,
+                                     hess=None,#self.problem.objective_hess,
+                                     x0=x,
                                      bounds=bnds,
                                      constraints=cons, options={'disp': 0,
                                                                 'max_iter': iters,
                                                                 'tol': 1e-4,
                                                                 'acceptable_tol': 1e-4,
-                                                                'hessian_approximation': 'limited-memory'})
+                                                                'hessian_approximation': 'limited-memory'
+                                     }
+                                     )
 
         self.x = torch.from_numpy(res.x).reshape(self.problem.T, -1).to(dtype=torch.float32)
         ret_x = self.x.clone()

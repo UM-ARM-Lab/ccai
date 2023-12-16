@@ -32,7 +32,7 @@ def do_trial(env, params, fpath):
 
     wrench_length = 0.2
     wrench_centre = [0.6, 0.15, 0.975]
-    if params['controller'] == 'csvgd':
+    if 'csvgd' in params['controller']:
         problem = VictorWrenchProblem(start, goal, params['T'], wrench_centre=wrench_centre,
                                       wrench_length=wrench_length, device=params['device'],
                                       chain=params['chain'])
@@ -153,7 +153,7 @@ if __name__ == "__main__":
 
     results = {}
 
-    for i in tqdm(range(13, config['num_trials'])):
+    for i in tqdm(range(config['num_trials'])):
         for controller in config['controllers'].keys():
             env.reset()
             fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_{i + 1}')

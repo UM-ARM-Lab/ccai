@@ -115,7 +115,7 @@ if __name__ == "__main__":
             if config['obstacle_type'] == 'tabletop_ycb':
                 goal = torch.tensor([0.8, 0.1]) + 0.05 * goal_offsets[i, :2]
             elif config['obstacle_type'] == 'tabletop_ycb2':
-                goal = torch.tensor([0.85, 0.1]) + 0.05 * goal_offsets[i, :2]
+                goal = torch.tensor([0.9, 0.15]) + 0.05 * goal_offsets[i, :2]
             elif config['obstacle_type'] == 'floating_spheres_1':
                 goal = torch.tensor([0.65, 0.05])
                 goal = goal + 0.05 * goal_offsets[i, :2]  # torch.tensor([0.25, 0.1]) * torch.rand(2)
