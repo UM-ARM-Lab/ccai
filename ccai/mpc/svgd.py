@@ -115,7 +115,7 @@ class SVMPC:
 
         total_grad = grad_dx_du.permute(0, 2, 1) @ total_grad
 
-        return total_grad.reshape(N, T, self.du)
+        return total_grad.reshape(N, T, self.du).detach()
 
     def grad_cost3(self, x, u):
         pred_x = self._rollout_dynamics(x, u)

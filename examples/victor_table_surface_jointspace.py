@@ -686,7 +686,7 @@ def ee_terminal_constraint(p, mat, goal):
     :return:
     """
 
-    return 250 * torch.sum((p[:2] - goal.reshape(-1)[:2]) ** 2).reshape(-1)
+    return 300 * torch.sum((p[:2] - goal.reshape(-1)[:2]) ** 2).reshape(-1)
 
 
 def ee_equality_constraint(p, mat, height):

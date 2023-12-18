@@ -330,4 +330,4 @@ class UnconstrainedPenaltyProblem(Problem):
         J = J + torch.where(x < self.x_min.repeat(N, T, 1).to(device=self.device), self.penalty[0] * torch.ones_like(x),
                             torch.zeros_like(x)).sum(dim=1).sum(dim=1)
 
-        return J.detach()
+        return J#.detach()

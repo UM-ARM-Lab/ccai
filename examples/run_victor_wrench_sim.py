@@ -79,9 +79,9 @@ def do_trial(env, params, fpath):
         state = env.get_state()
         state = torch.cat((state['q'], state['offset'], state['theta']), dim=1).to(device=params['device']).reshape(9)
         actual_trajectory.append(state)
-        if k > 0:
-            torch.cuda.synchronize()
-            start_time = time.time()
+        # if k > 0:
+        torch.cuda.synchronize()
+        start_time = time.time()
         best_traj, trajectories = controller.step(state)
 
         if torch.any(torch.isnan(best_traj)):
@@ -92,6 +92,8 @@ def do_trial(env, params, fpath):
         if k > 0:
             torch.cuda.synchronize()
             duration += time.time() - start_time
+        else:
+            print('Time to initial plan: ', time.time() - start_time)
 
         M = len(trajectories)
         K = len(trajectories[0])

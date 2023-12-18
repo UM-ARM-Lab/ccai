@@ -68,7 +68,7 @@ class IpoptMPC:
                                                                 'hessian_approximation': 'limited-memory'
                                      }
                                      )
-
+        print(res.nit)
         self.x = torch.from_numpy(res.x).reshape(self.problem.T, -1).to(dtype=torch.float32)
         ret_x = self.x.clone()
         self.shift()
