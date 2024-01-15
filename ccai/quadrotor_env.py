@@ -49,7 +49,7 @@ class QuadrotorEnv:
 
     def _get_plotting_vars(self, gp_model=None):
         # For rendering height
-        N = 100
+        N = 200
         xs = torch.linspace(-6, 6, steps=N)
         ys = torch.linspace(-6, 6, steps=N)
         x, y = torch.meshgrid(xs, ys, indexing='xy')
@@ -85,6 +85,7 @@ class QuadrotorEnv:
         while not got_sg:
             start[:2] = 10 * np.random.rand(2) - 5  #
             start[:2] = np.array([-3.0, -3.0]) - 1.5 * np.random.rand(2)
+            #start[:2] = np.array([-2.5, -4.5])
             goal[:2] = np.array([4, 4])
             #goal = 10 * np.random.rand(3) - 5
 
@@ -114,6 +115,7 @@ class QuadrotorEnv:
         # Angles in rad
         start[3:6] = 0.05 * (-np.pi + 2 * np.pi * np.random.rand(3))
 
+        #start[5] = 0.7
         # Initial velocity
         start[6:] = 0.05 * np.random.randn(6)
 
@@ -211,7 +213,7 @@ class QuadrotorEnv:
         #print(self.state[:2], self._get_gp_obs_sdf(self.state))
         return self.state, self.get_constraint_violation()
 
-    def _get_surface_colours(self):
+    def _get_surface_colours(self, decay=False):
         x, y, z = self.surface_plotting_vars
         N = x.shape[0]
         if self.obstacle_mode is None:
@@ -226,9 +228,28 @@ class QuadrotorEnv:
                               1, 0)
 
         c = np.where(in_obs[:, :, None],
-                     np.array([1.0, 0.0, 0.0, self.alpha])[None, None, :],
+                     np.array([1.0, 1.0, 0.0, self.alpha])[None, None, :],
                      np.array([0, 0.0, .7, self.alpha])[None, None, :]
                      )
+
+        if decay:
+            if self._surf is not None:
+                # check we have already done one plot
+                # if check used to be obstacle
+                old_c = self.c
+                new_c = c.copy()
+                # check where old obstacle has turned to obstacle free
+                alpha = 0.1
+                obs_c = np.array([1.0, 0.0, 0.0, self.alpha])
+                free_c = np.array([0.0, 0.0, 0.7, self.alpha])
+                c = np.where(np.logical_and(new_c == free_c, old_c != free_c),
+                             (1 - alpha) * old_c + alpha * free_c, new_c)
+        self.c = c.copy()
+
+        # now we make actual in contact now slightly more noticable
+        c = np.where(in_obs[:, :, None],
+                     np.array([1., 0., 0., self.alpha])[None, None, :],
+                     c)
         return c
 
     def render_init(self):
@@ -256,13 +277,15 @@ class QuadrotorEnv:
         self.ax.set_xticks([])
         self.ax.set_yticks([])
         self.ax.set_zticks([])
+        self.ax.set_axis_off()
+        self.ax.get_figure().tight_layout()
         return self.ax
 
     def render_update(self):
         #print(self.state[:2], 'rendering')
         self._render_pos._offsets3d = ([self.state[0]], [self.state[1]], [self.state[2]])
         if self.obstacle_mode == 'dynamic':
-            self._surf.set_facecolors(self._get_surface_colours()[:-1, :-1].reshape(-1, 4))
+            self._surf.set_facecolors(self._get_surface_colours(decay=True)[:-1, :-1].reshape(-1, 4))
 
     def get_constraint_params(self):
         params = {

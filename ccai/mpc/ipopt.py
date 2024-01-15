@@ -9,6 +9,7 @@ class IpoptMPC:
         self.device = params.get('device', 'cuda:0')
         self.online_iters = params.get('online_iters', 10)
         self.warmup_iters = params.get('warmup_iters', 100)
+        self.use_true_hess = params.get('use_true_hess', False)
         self.problem = problem
         # self.solver = ConstrainedSteinTrajOpt(problem, params)
 
@@ -55,20 +56,20 @@ class IpoptMPC:
         else:
             iters = self.warmup_iters
         self.warmed_up = True
+        options = {'disp': 0,
+                   'max_iter': iters,
+                   'tol': 1e-4,
+                   'acceptable_tol': 1e-4}
+
+        if not self.use_true_hess:
+            options['hessian_approximation'] ='limited-memory'
 
         x = self.x.numpy().reshape(-1)
         res = cyipopt.minimize_ipopt(self.problem.objective, jac=self.problem.objective_grad,
                                      hess=None,#self.problem.objective_hess,
                                      x0=x,
                                      bounds=bnds,
-                                     constraints=cons, options={'disp': 0,
-                                                                'max_iter': iters,
-                                                                'tol': 1e-4,
-                                                                'acceptable_tol': 1e-4,
-                                                                'hessian_approximation': 'limited-memory'
-                                     }
-                                     )
-        print(res.nit)
+                                     constraints=cons, options=options)
         self.x = torch.from_numpy(res.x).reshape(self.problem.T, -1).to(dtype=torch.float32)
         ret_x = self.x.clone()
         self.shift()
