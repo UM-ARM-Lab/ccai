@@ -69,8 +69,8 @@ class VictorWrenchProblem(ConstrainedSVGDProblem):
         self.x_max = torch.tensor([2.96, 2.09, 2.96, 2.09, 2.96, 2.09, 3.05, 2, torch.pi])
         self.x_min = -self.x_max
 
-    def _objective(self, x):
-        return self.alpha * self.cost(x), self.alpha * self.grad_cost(x), None  # , self.hess_cost(x)
+    def _objective(self, x, compute_hess=False):
+        return self.alpha * self.cost(x), self.alpha * self.grad_cost(x), self.hess_cost(x) if compute_hess else None
 
     def _con_ineq(self, x, compute_grads=True, compute_hess=True):
         N = x.shape[0]

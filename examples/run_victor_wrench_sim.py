@@ -73,6 +73,7 @@ def do_trial(env, params, fpath):
 
     actual_trajectory = []
     duration = 0
+    initial_duration = 0
     planned_trajectories = []
     for k in range(params['num_steps']):
         # print(k)
@@ -93,7 +94,7 @@ def do_trial(env, params, fpath):
             torch.cuda.synchronize()
             duration += time.time() - start_time
         else:
-            print('Time to initial plan: ', time.time() - start_time)
+            initial_duration = time.time() - start_time
 
         M = len(trajectories)
         K = len(trajectories[0])
@@ -129,6 +130,8 @@ def do_trial(env, params, fpath):
     # h = problem._con_ineq(actual_trajectory.unsqueeze(0), False)[0].reshape(-1)
     np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
              g=g.cpu().numpy(),
+             initial_time=initial_duration,
+             online_time=duration / (params['num_steps'] - 1),
              )
     final_distance_to_goal = (actual_trajectory[-1, -1] - goal[0, 0]).abs().item()
     print(f'Final distance to goal: {final_distance_to_goal}')

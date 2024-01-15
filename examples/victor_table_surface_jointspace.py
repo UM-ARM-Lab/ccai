@@ -686,7 +686,7 @@ def ee_terminal_constraint(p, mat, goal):
     :return:
     """
 
-    return 300 * torch.sum((p[:2] - goal.reshape(-1)[:2]) ** 2).reshape(-1)
+    return 100 * torch.sum((p[:2] - goal.reshape(-1)[:2]) ** 2).reshape(-1)
 
 
 def ee_equality_constraint(p, mat, height):
@@ -803,7 +803,7 @@ def do_trial(env, params, fpath):
     actual_trajectory = []
     planned_trajectories = []
     duration = 0
-
+    initial_duration = 0
     for k in range(params['num_steps']):
         if params['simulate'] or k == 0:
             state = env.get_state()
@@ -813,14 +813,15 @@ def do_trial(env, params, fpath):
             start = x + torch.randn_like(x) * 0.01
 
         actual_trajectory.append(start.clone())
-        if k > 0:
-            torch.cuda.synchronize()
-            start_time = time.time()
+        torch.cuda.synchronize()
+        start_time = time.time()
         best_traj, trajectories = controller.step(start)
         planned_trajectories.append(trajectories)
         if k > 0:
             torch.cuda.synchronize()
             duration += time.time() - start_time
+        else:
+            initial_duration = time.time() - start_time
 
         x = best_traj[0, :7]
 
@@ -920,5 +921,7 @@ def do_trial(env, params, fpath):
              height=table_height,
              goal=params['goal'].cpu().numpy(),
              obs_constr=obs_constraint_val,
+             initial_time=initial_duration,
+             online_time=duration / (params['num_steps'] - 1),
              )
     return torch.min(final_distance_to_goal).cpu().numpy()
