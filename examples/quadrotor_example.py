@@ -29,6 +29,7 @@ def cost(trajectory, goal):
     Q[5, 5] = 1e-2
     Q[2, 2] = 0.1
     Q[3:, 3:] *= 0.5
+    #Q[6:9] *= 2.0
     Q *= 5
     P = Q
     R = 16 * torch.eye(4, device=trajectory.device)
@@ -131,6 +132,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         self.x_max[3:5] = 0.4 * torch.pi
         self.x_max[5] = 1000  # torch.pi
         self.x_max[6:12] = 100
+        # self.x_max[6:9] = 100
         self.x_max[12:] = 100
         # self.x_max = 1000 * torch.ones(self.dx + self.du)
         self.x_max = self.x_max.to(self.device)
@@ -481,9 +483,9 @@ def do_trial(env, params, fpath):
         if not collision:
             start = torch.from_numpy(env.state).to(dtype=torch.float32, device=params['device'])
 
-            if step > 0:
-                torch.cuda.synchronize()
-                start_time = time.time()
+            #if step > 0:
+            torch.cuda.synchronize()
+            start_time = time.time()
             best_traj, trajectories = controller.step(start, obstacle_pos=env.obstacle_pos)
 
             plans.append(trajectories.detach().cpu().numpy())
@@ -491,6 +493,9 @@ def do_trial(env, params, fpath):
             if step > 0:
                 torch.cuda.synchronize()
                 duration += time.time() - start_time
+            else:
+                torch.cuda.synchronize()
+                print('Time to initial plan', time.time() - start_time)
 
             u = best_traj[0, -4:].detach().cpu().numpy()
 
