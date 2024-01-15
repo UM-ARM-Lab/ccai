@@ -37,14 +37,14 @@ class IpoptMPC:
             cons.append(
                 {'type': 'eq', 'fun': self.problem.con_eq,
                  'jac': self.problem.con_eq_grad,
-                 'hess': None#self.problem.con_eq_hvp
+                 'hess': self.problem.con_eq_hvp
                  }
             )
         if self.ineq is True:
             cons.append(
                 {'type': 'ineq', 'fun': self.problem.con_ineq,
                  'jac': self.problem.con_ineq_grad,
-                 'hess': None#self.problem.con_ineq_hvp
+                 'hess': self.problem.con_ineq_hvp
                  }
             )
 
