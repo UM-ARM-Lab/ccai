@@ -37,7 +37,7 @@ class Problem(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def _objective(self, x):
+    def _objective(self, x, *args, **kwargs):
         pass
 
     @abstractmethod
@@ -174,8 +174,8 @@ class ConstrainedSVGDProblem(Problem):
         # print(self.slack_weight)
         if h is not None:
             if self.squared_slack:
-                z = torch.where(h < 0, torch.sqrt(-2 * h), 0)
-                #z = torch.sqrt(2 * torch.abs(h))
+                #z = torch.where(h < 0, torch.sqrt(-2 * h), 0)
+                z = torch.sqrt(2 * torch.abs(h))
             else:
                 z = torch.where(h < 0, -h / self.slack_weight, 0)
 
