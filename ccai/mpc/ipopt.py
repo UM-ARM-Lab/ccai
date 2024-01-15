@@ -66,7 +66,7 @@ class IpoptMPC:
 
         x = self.x.numpy().reshape(-1)
         res = cyipopt.minimize_ipopt(self.problem.objective, jac=self.problem.objective_grad,
-                                     hess=None,#self.problem.objective_hess,
+                                     hess=self.problem.objective_hess,
                                      x0=x,
                                      bounds=bnds,
                                      constraints=cons, options=options)
