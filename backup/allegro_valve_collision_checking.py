@@ -1,3 +1,6 @@
+"""
+This file turns the valve without considering friciton, but with collision checking
+"""
 import numpy as np
 from isaacgym.torch_utils import quat_apply
 from isaac_victor_envs.tasks.allegro import AllegroValveTurningEnv, orientation_error, quat_change_convention
