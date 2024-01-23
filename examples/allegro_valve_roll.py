@@ -53,7 +53,7 @@ frame_indices = torch.tensor([index_ee_link, thumb_ee_link])
 valve_location = torch.tensor([0.85, 0.70, 1.405]).to('cuda:0') # the root of the valve
 # instantiate environment
 friction_coefficient = 0.95 # this one is used for planning, not simulation
-valve_type = 'cuboid'
+valve_type = 'cylinder' # 'cuboid' or 'cylinder
 env = AllegroValveTurningEnv(1, control_mode='joint_impedance', use_cartesian_controller=False,
                              viewer=True, steps_per_action=60, valve_velocity_in_state=False,
                              friction_coefficient=1.0, valve=valve_type)
@@ -134,7 +134,19 @@ class PositionControlConstrainedSVGDMPC(Constrained_SVGD_MPC):
 
 class AllegroValveProblem(ConstrainedSVGDProblem):
 
-    def __init__(self, start, goal, T, chain, valve_location, finger_name, initial_valve_angle=0, collision_checking=False, device='cuda:0'):
+    def __init__(self, 
+                 start, 
+                 goal, 
+                 T, 
+                 chain, 
+                 valve_location, 
+                 finger_name, 
+                 robot_p,
+                 robot_r,
+                 valve_asset_pos,
+                 initial_valve_angle=0, 
+                 collision_checking=False, 
+                 device='cuda:0'):
         """
         valve location: the root location of the valve
         initial_valve_angle: it is designed for continuously turning the valve. For each turn, 
@@ -204,14 +216,13 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         valve_sdf = pv.RobotSDF(chain_valve, path_prefix=get_assets_dir() + '/valve')
         robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models')
 
-        # TODO: retrieve transformations from environment rather than hard-coded
-        p = [0.89, 0.52, 1.375]
-        r = [0.2425619, 0.2423688, 0.6639723, 0.6645012]
-        rob_trans = pk.Transform3d(pos=torch.tensor(p, device=device),
-                                   rot=torch.tensor([r[3], r[0], r[1], r[2]], device=device),
+        rob_trans = pk.Transform3d(pos=torch.tensor(robot_p, device=device),
+                                   rot=torch.tensor([robot_r[3], robot_r[0], robot_r[1], robot_r[2]], device=device),
                                    device=device)
+        # TODO: retrieve transformations from environment rather than hard-coded
 
-        scene_trans = rob_trans.inverse().compose(pk.Transform3d(device=device).translate(0.85, 0.75, 0.705))
+        # scene_trans = rob_trans.inverse().compose(pk.Transform3d(device=device).translate(0.85, 0.75, 1.405))
+        scene_trans = rob_trans.inverse().compose(pk.Transform3d(device=device).translate(valve_asset_pos[0], valve_asset_pos[1], valve_asset_pos[2]))
 
         # TODO: right now we are using seperate collision checkers for each finger to avoid gradients swapping
         # between fingers - alteratively we can get the collision checker to return a list of collisions and gradients batched
@@ -791,6 +802,9 @@ def do_trial(env, params, fpath):
                                       device = params['device'],
                                       chain = chain,
                                       finger_name = 'index',
+                                      robot_r = env.robot_r,
+                                      robot_p = env.robot_p,
+                                      valve_asset_pos=env.valve_pose,
                                       valve_location = valve_location,
                                       collision_checking = params['collision_checking'])
         controller = PositionControlConstrainedSVGDMPC(problem, params)
