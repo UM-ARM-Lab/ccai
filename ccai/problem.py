@@ -37,6 +37,10 @@ class Problem(metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def _preprocess(self, x):
+        pass
+
+    @abstractmethod
     def _objective(self, x):
         pass
 
@@ -86,7 +90,7 @@ class ConstrainedSVGDProblem(Problem):
         g, grad_g, hess_g = self._con_eq(xu, compute_grads=compute_grads, compute_hess=compute_hess)
         h, grad_h, hess_h = self._con_ineq(xu, compute_grads=compute_grads, compute_hess=compute_hess)
 
-        #print(g.max(), g.min(), h.max(), h.min())
+        # print(g.max(), g.min(), h.max(), h.min())
 
         if h is None:
             return g, grad_g, hess_g
@@ -139,7 +143,6 @@ class ConstrainedSVGDProblem(Problem):
 
         if g is None:
             return h_aug, grad_h_aug, hess_h_aug
-
         grad_g_aug = torch.cat((
             grad_g.reshape(N, self.dg, self.T, -1),
             torch.zeros(N, self.dg, self.T, self.dz, device=self.device)),
@@ -169,13 +172,14 @@ class ConstrainedSVGDProblem(Problem):
         return c, grad_c, hess_c
 
     def get_initial_z(self, x):
+        self._preprocess(x)
         N = x.shape[0]
         h, _, _ = self._con_ineq(x, compute_grads=False, compute_hess=False)
         # self.slack_weight = 1 / torch.mean(torch.linalg.norm(h.reshape(N, -1), dim=1)) ** 2
         # print(self.slack_weight)
         if h is not None:
             if self.squared_slack:
-                #z = torch.where(h < 0, torch.sqrt(-2 * h), 0)
+                # z = torch.where(h < 0, torch.sqrt(-2 * h), 0)
                 z = torch.sqrt(2 * torch.abs(h))
             else:
                 z = torch.where(h < 0, -h / self.slack_weight, 0)

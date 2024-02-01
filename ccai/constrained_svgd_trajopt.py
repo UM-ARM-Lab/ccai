@@ -30,33 +30,10 @@ class ConstrainedSteinTrajOpt:
         self.use_hessian = False  # True
         self.use_constraint_hessian = True
         self.normxiJ = None
-        self.dtype = torch.float32
+        #self.dtype = torch.float32
+        self.dtype = torch.float64
         self.delta_x = None
         self.Bk = None
-
-    def _bfgs_update(self, dC):
-        if self.Bk is None:
-            # initialize with Gauss-Newton approx
-            eye = torch.eye(dC.shape[2]).repeat(dC.shape[0], self.dh + self.dg, 1, 1).to(device=dC.device)
-            self.Bk = 1e-3 * eye
-        else:
-            dx = self.delta_x.unsqueeze(1).repeat(1, self.dh + self.dg, 1).unsqueeze(-1)
-            y = (dC - self.old_grad_C).unsqueeze(-1)  # N x (dg+dh) x (dx+du+dz)
-
-            # Use damped BFGS update from Nocedal & Wright Chap 18
-            yx = y.transpose(-1, -2) @ dx
-            xBx = dx.transpose(-1, 2) @ self.Bk @ dx
-            theta = 0.8 * (xBx) / (xBx - yx)
-            theta = torch.where(yx < 0.2 * xBx, theta, torch.ones_like(theta))
-            r = y * theta + (1 - theta) * self.Bk @ dx
-
-            first_term = r @ r.transpose(-1, -2)
-            first_term = first_term / (r.transpose(-1, -2) @ dx)
-            second_term = self.Bk @ dx @ dx.transpose(-1, 2) @ self.Bk.transpose(-1, -2)
-            second_term = second_term / (dx.transpose(-1, 2) @ self.Bk @ dx)
-            self.Bk = self.Bk + first_term - second_term
-
-        self.old_grad_C = dC
 
     def compute_update(self, xuz):
         N = xuz.shape[0]
@@ -67,20 +44,20 @@ class ConstrainedSteinTrajOpt:
         xuz = xuz.to(dtype=torch.float32)
         grad_J, hess_J, K, grad_K, C, dC, hess_C = self.problem.eval(xuz.to(dtype=torch.float32))
 
-        # use approximation for hessian
         if hess_C is None:
-            self._bfgs_update(dC)
-            hess_C = self.Bk
+            hess_C = torch.zeros(N, self.dh + self.dg, self.T * d + self.dh, self.T * d + self.dh, device=xuz.device)
 
         with torch.no_grad():
             # we try and invert the dC dCT, if it is singular then we use the psuedo-inverse
             eye = torch.eye(self.dg + self.dh).repeat(N, 1, 1).to(device=C.device, dtype=self.dtype)
             dCdCT = dC @ dC.permute(0, 2, 1)
+            dCdCT = dCdCT.to(dtype=self.dtype)
             A_bmm = lambda x: dCdCT @ x
+            print(torch.linalg.matrix_rank(dCdCT))
             #
-            #damping_factor = 1e-1
+            # damping_factor = 1e-1
             try:
-                dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1), eye)
+                dCdCT_inv = torch.linalg.solve(dCdCT, eye)
                 if torch.any(torch.isnan(dCdCT_inv)):
                     raise ValueError('nan in inverse')
             except Exception as e:
@@ -88,6 +65,7 @@ class ConstrainedSteinTrajOpt:
                 # dCdCT_inv = torch.linalg.lstsq(dC @ dC.permute(0, 2, 1), eye).solution
                 # dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1))
                 dCdCT_inv, _ = cg_batch(A_bmm, eye, verbose=False)
+            dCdCT_inv = dCdCT_inv.to(dtype=torch.float32)
             # get projection operator
             projection = dCdCT_inv @ dC
             eye = torch.eye(d * self.T + self.dh, device=xuz.device, dtype=xuz.dtype).unsqueeze(0)
@@ -176,7 +154,7 @@ class ConstrainedSteinTrajOpt:
                 normxiJ = torch.clamp(torch.linalg.norm(xi_J, dim=1, keepdim=True, ord=np.inf), min=1e-6)
                 xi_J = self.alpha_J * xi_J / normxiJ
 
-        return (self.alpha_J * xi_J + self.alpha_C * xi_C).detach()
+        return (self.alpha_J * xi_J + self.alpha_C * xi_C).detach().to(dtype=torch.float32)
 
     def _clamp_in_bounds(self, xuz):
         N = xuz.shape[0]
@@ -260,13 +238,6 @@ class ConstrainedSteinTrajOpt:
         else:
             xuz = x0.clone().reshape(N, -1)
 
-        import torch.optim.lr_scheduler as lr_scheduler
-        optim = torch.optim.SGD(params=[xuz], lr=self.dt, momentum=self.momentum,
-                                nesterov=True if self.momentum > 0 else False)
-        # scheduler = lr_scheduler.LinearLR(optim, start_factor=1.0, end_factor=0.1, total_iters=self.iters)
-
-        # optim = torch.optim.RMSprop(params=[xuz], lr=self.dt)
-
         # driving force useful for helping exploration -- currently unused
         T = self.iters
         C = 1
@@ -283,8 +254,9 @@ class ConstrainedSteinTrajOpt:
         path = [xuz.data.clone()]
         self.gamma = self.max_gamma
         for iter in range(T):
+            print(iter)
             # reset slack variables
-            #if self.problem.dz > 0:
+            # if self.problem.dz > 0:
             #    xu = xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du]
             #    z_init = self.problem.get_initial_z(xu)
             #    xuz = torch.cat((xu, z_init), dim=2).reshape(N, -1)
@@ -294,42 +266,20 @@ class ConstrainedSteinTrajOpt:
                 self.gamma = self.max_gamma * driving_force(iter)
             else:
                 self.gamma = self.max_gamma
-            #    self.sigma = 0.1 * (1.0 - iter / T) + 1e-2
 
-            #if (iter + 1) % resample_period == 0 and (iter < T - 1):
+            # if (iter + 1) % resample_period == 0 and (iter < T - 1):
             #    xuz.data = self.resample(xuz.data)
-
-            # old C
-            #oldC, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1), compute_grads=False)
-            #
-            # optim.zero_grad()
             grad = self.compute_update(xuz)
-            #print(torch.linalg.norm(grad, dim=-1))
-            #for k in range(10):
-            #    dt = self.dt / (2 ** k)
-            #    new_xuz = xuz.data - dt * grad
-            #    self._clamp_in_bounds(new_xuz)
-            #    # now we compute the new constraint val
-            #    newC, _, _ = self.problem.combined_constraints(new_xuz.reshape(N, self.T, -1), compute_grads=False)
-            #    if torch.sum(newC ** 2) < torch.sum(oldC ** 2):
-            #        xuz.data = new_xuz
-            #        break
 
-            #xuz.data = #new_xuz
+            grad_norm = torch.linalg.norm(grad, keepdim=True, dim=-1)
+            max_norm = 1
+            grad = torch.where(grad_norm > max_norm, grad / grad_norm * max_norm, grad)
             xuz.data = xuz.data - self.dt * grad
-            self.delta_x = self.dt * grad
-            # xuz.grad = grad
-            # print(torch.linalg.norm(grad))
+            #self.delta_x = self.dt * grad
             torch.nn.utils.clip_grad_norm_(xuz, 10)
-            # new_xuz = xuz + self.dt * grad
-            # optim.step()
-            # scheduler.step()
-            # clamp within bounds for simple bounds
-            # if self.problem.x_max is not None:
             self._clamp_in_bounds(xuz)
 
             path.append(xuz.data.clone())
-
 
         # sort particles by penalty
         xuz = xuz.to(dtype=torch.float32)
