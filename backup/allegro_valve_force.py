@@ -825,6 +825,10 @@ def do_trial(env, params, fpath):
         action = x[:, problem.dx:problem.dx+problem.du].to(device=env.device)
         action = action + start.unsqueeze(0)[:, :8] # NOTE: this is required since we define action as delta action
         env.step(action)
+        if params['hardware']:
+            # ros_node.apply_action(action[0].detach().cpu().numpy())
+            ros_node.apply_action(partial_to_full_state(action[0]).detach().cpu().numpy())
+
         # TODO: need to fix the compute hessian part
         # print(best_traj[:, 8])
         equality_eval = problem._equality_constraints.joint_constraint_fn(best_traj.unsqueeze(0), report=True)
@@ -987,6 +991,10 @@ if __name__ == "__main__":
             pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
             # set up params
             params = config.copy()
+            if params['hardware']:
+                from hardware.allegro_ros import Ros_Node
+                ros_node = Ros_Node()
+
             params.pop('controllers')
             params.update(config['controllers'][controller])
             params['controller'] = controller
