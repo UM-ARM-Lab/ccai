@@ -92,7 +92,7 @@ def main():
         # ros_node.get_object_pose()
         # obs = ros_node.get_observation()
         action = torch.randn(16) / 3
-        print(action)
+        print(ros_node.allegroz_joint_pos)
         ros_node.apply_action(action, weight=1)
         
         
