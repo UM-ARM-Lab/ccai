@@ -13,7 +13,6 @@ import yaml
 import pathlib
 from functools import partial
 from torch.func import vmap, jacrev, hessian, jacfwd
-# from functorch import vmap, jacrev, hessian, jacfwd
 
 from ccai.constrained_svgd_trajopt import ConstrainedSteinTrajOpt
 from ccai.kernels import rbf_kernel, structured_rbf_kernel
@@ -37,12 +36,7 @@ import pickle as pkl
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
-# asset = f'{get_assets_dir()}/victor/allegro.urdf'
-# index_ee_name = 'index_ee'
-# thumb_ee_name = 'thumb_ee'
 asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
-# thumb_ee_name = 'allegro_hand_oya_finger_link_15'
-# index_ee_name = 'allegro_hand_hitosashi_finger_finger_link_3'
 index_ee_name = 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link'
 thumb_ee_name = 'allegro_hand_oya_finger_3_aftc_base_link'
 
@@ -128,6 +122,8 @@ class PositionControlConstrainedSteinTrajOpt(ConstrainedSteinTrajOpt):
         robot_joint_angles = torch.cat((self.problem.start[:8].reshape((1, 1, 8)).repeat((N, 1, 1)), robot_joint_angles), dim=1)
         min_u = self.problem.robot_joint_x_min.repeat((N, self.problem.T, 1)).to(xuz.device) - robot_joint_angles
         max_u = self.problem.robot_joint_x_max.repeat((N, self.problem.T, 1)).to(xuz.device) - robot_joint_angles
+        min_u = torch.maximum(min_u, self.problem.u_min.repeat((N, self.problem.T, 1)).to(xuz.device))
+        max_u = torch.minimum(max_u, self.problem.u_max.repeat((N, self.problem.T, 1)).to(xuz.device))
         min_x = min_x.repeat((N, 1, 1)).to(device=xuz.device)
         max_x = max_x.repeat((N, 1, 1)).to(device=xuz.device)
         min_x[:, :, 9:17] = min_u
@@ -212,9 +208,8 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         # collision check all of the non-finger tip links
         collision_check_oya = ['allegro_hand_oya_finger_link_13',
                                'allegro_hand_oya_finger_link_14',
-                               # 'allegro_hand_oya_finger_link_15'
                                ]
-        collision_check_hitosashi = [  # 'allegro_hand_hitosashi_finger_finger_link_3',
+        collision_check_hitosashi = [
             'allegro_hand_hitosashi_finger_finger_link_2',
             'allegro_hand_hitosashi_finger_finger_link_1'
         ]
@@ -233,16 +228,8 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         valve_sdf = pv.RobotSDF(chain_valve, path_prefix=get_assets_dir() + '/valve')
         robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models')
 
-        # rob_trans = pk.Transform3d(pos=torch.tensor(robot_p, device=device),
-        #                            rot=torch.tensor([robot_r[3], robot_r[0], robot_r[1], robot_r[2]], device=device),
-        #                            device=device)
-        # TODO: retrieve transformations from environment rather than hard-coded
-
-        # scene_trans = rob_trans.inverse().compose(pk.Transform3d(device=device).translate(0.85, 0.75, 1.405))
         scene_trans = world_trans.inverse().compose(pk.Transform3d(device=device).translate(valve_asset_pos[0], valve_asset_pos[1], valve_asset_pos[2]))
 
-        # TODO: right now we are using seperate collision checkers for each finger to avoid gradients swapping
-        # between fingers - alteratively we can get the collision checker to return a list of collisions and gradients batched
         self.index_collision_scene = pv.RobotScene(robot_sdf, valve_sdf, scene_trans,
                                          collision_check_links=collision_check_hitosashi,
                                          softmin_temp=100.0)
@@ -258,7 +245,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
                                          collision_check_links=contact_check_oya,
                                          softmin_temp=100.0,
                                          points_per_link=500)
-        self.index_contact_scene.visualize_robot(partial_to_full_state(self.start[:8]), self.start[-1])
+        # self.index_contact_scene.visualize_robot(partial_to_full_state(self.start[:8]), self.start[-1])
 
         self.friction_constr = vmap(self._friction_constr, randomness='same')
         self.grad_friction_constr = vmap(jacrev(self._friction_constr, argnums=(0, 1, 2)))
@@ -280,8 +267,10 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         self.robot_joint_x_min = torch.cat([index_x_min, thumb_x_min])
 
         # TODO: this is not perfect, need a better way to define the limit of u
-        self.u_max = torch.tensor([np.pi, np.pi, np.pi, np.pi, np.pi, np.pi, np.pi, np.pi]) / 5
-        self.u_min = torch.tensor([-np.pi, -np.pi, -np.pi, -np.pi, -np.pi, -np.pi, -np.pi, -np.pi]) / 5
+        # self.u_max = torch.tensor([np.pi, np.pi, np.pi, np.pi, np.pi, np.pi, np.pi, np.pi]) / 5
+        # self.u_min = torch.tensor([-np.pi, -np.pi, -np.pi, -np.pi, -np.pi, -np.pi, -np.pi, -np.pi]) / 5
+        self.u_max = torch.ones(8) * 0.2
+        self.u_min = - torch.ones(8) * 0.2
 
         self.x_max = torch.cat((self.x_max, self.u_max))
         self.x_min = torch.cat((self.x_min, self.u_min))
@@ -387,7 +376,6 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         hess_sdf_theta = ret_scene.get('hess_env_sdf', None)
         djacobian_dcontact = ret_scene.get('djacobian_dcontact', None)
 
-        # print(sdf[:, 1:].abs().mean(), sdf[:, 1:].abs().max())
 
         if self.plan_in_contact:
             # approximate q dot and theta dot
@@ -859,9 +847,6 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
             hess_h[:, :, :8, :8] = -hess_h_q.unsqueeze(1)
             hess_h[:, :, 8, 8] = -hess_h_theta.reshape(N, -1)
 
-        if grad_h is not None:
-            print(h.abs().mean(), h.abs().max(), torch.any(torch.isnan(grad_h)), torch.any(torch.isinf(grad_h)))
-        # print(h)
         return h, grad_h, hess_h
 
     def _collision_check(self, x, check_flag, compute_grads=True, compute_hess=True):
@@ -1023,7 +1008,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         #     dG[:, :, i] = (Gplus - Gneg) / (2 * eps)
         #     # print(Gplus[0, -2:])
         #     # print(Gneg[0, -2:])
-        print(J.mean(), G.abs().mean(), G.abs().max())
+        # print(J.mean(), G.abs().mean(), G.abs().max())
 
         if hess_J is not None:
             hess_J_ext = torch.zeros(N, self.T, self.dx + self.du + self.dz, self.T, self.dx + self.du + self.dz,
@@ -1388,7 +1373,7 @@ def do_trial(env, params, fpath):
     if params['controller'] == 'csvgd':
         problem_to_grasp = AllegroValveProblem(start,
                                       params['goal'] * 0,
-                                      4,
+                                      8,
                                       device=params['device'],
                                       chain=chain,
                                       finger_name='index',
@@ -1490,7 +1475,10 @@ def do_trial(env, params, fpath):
 
         # add trajectory lines to sim
         if k >= 1:
-            add_trajectories(trajectories, best_traj, chain, axes)
+            if params['hardware']:
+                add_trajectories_hardware(trajectories, best_traj, chain, axes)
+            else:
+                add_trajectories(trajectories, best_traj, chain, axes)
 
         # process the action
         ## end effector force to torque
@@ -1500,10 +1488,11 @@ def do_trial(env, params, fpath):
         if params['joint_friction'] > 0:
             action = action + params['joint_friction'] / env.joint_stiffness * torch.sign(action)
         action = action + start.unsqueeze(0)[:, :8] # NOTE: this is required since we define action as delta action
+        # action = best_traj[0, :8]
         env.step(action)
-        if params['hardware']:
-            # ros_node.apply_action(action[0].detach().cpu().numpy())
-            ros_node.apply_action(partial_to_full_state(action[0]).detach().cpu().numpy())
+        # if params['hardware']:
+        #     # ros_node.apply_action(action[0].detach().cpu().numpy())
+        #     ros_node.apply_action(partial_to_full_state(action[0]).detach().cpu().numpy())
         # TODO: need to fix the compute hessian part
         # plan_thumb_ee = state2ee_pos(x[0, :8], thumb_ee_name).squeeze(0)
         # plan_index_ee = state2ee_pos(x[0, :8], index_ee_name).squeeze(0)
@@ -1531,7 +1520,7 @@ def do_trial(env, params, fpath):
         print(problem.thumb_contact_scene.scene_collision_check(partial_to_full_state(x[:, :8]), x[:, 8],
                                                                 compute_gradient=False, compute_hessian=False))
         # distance2surface = torch.sqrt((best_traj_ee[:, 2] - valve_location[2].unsqueeze(0)) ** 2 + (best_traj_ee[:, 0] - valve_location[0].unsqueeze(0))**2)
-        distance2goal = (env.get_state()['q'][:, -1] - params['goal']).detach().cpu().item()
+        distance2goal = (params['goal'].cpu() - env.get_state()['q'][:, -1].cpu()).detach().cpu().item()
         print(distance2goal)
         info_list.append({
                         #   'distance': distance, 
@@ -1627,9 +1616,10 @@ def add_trajectories(trajectories, best_traj, chain, axes=None):
         thumb_colors = np.array([0, 1, 0]).astype(np.float32)
         index_colors = np.array([0, 0, 1]).astype(np.float32)
         force_colors = np.array([0, 1, 1]).astype(np.float32)
+        
         for e in env.envs:
-            index_p = env.get_state()['index_pos'].reshape(1, 3).to(device=params['device'])
-            thumb_p = env.get_state()['thumb_pos'].reshape(1, 3).to(device=params['device'])
+            index_p = state2ee_pos(initial_state, index_ee_name).reshape(1, 3).to(device=params['device'])
+            thumb_p = state2ee_pos(initial_state, thumb_ee_name).reshape(1, 3).to(device=params['device'])
             # p = torch.stack((s[:3].reshape(1, 3).repeat(M, 1),
             #                  trajectories[:, 0, :3]), dim=1).reshape(2 * M, 3).cpu().numpy()
             # p_best = torch.stack((s[:3].reshape(1, 3).repeat(1, 1), best_traj_ee[0, :3].unsqueeze(0)), dim=1).reshape(2, 3).cpu().numpy()
@@ -1671,6 +1661,38 @@ def add_trajectories(trajectories, best_traj, chain, axes=None):
             gym.step_graphics(sim)
             gym.draw_viewer(viewer, sim, False)
             gym.sync_frame_time(sim)
+def add_trajectories_hardware(trajectories, best_traj, chain, axes=None):
+    M = len(trajectories)
+    if M > 0:
+        best_traj_ee_fk_dict = chain.forward_kinematics(partial_to_full_state(best_traj[:, :8]),
+                                                        frame_indices=frame_indices)
+        initial_state = env.get_state()['q'][:, :8]
+        whole_state = torch.cat((initial_state, best_traj[:-1, :8]), dim=0)
+        desired_state = whole_state + best_traj[:, 9:17]
+        desired_traj_ee_fk_dict = chain.forward_kinematics(partial_to_full_state(desired_state),
+                                                        frame_indices=frame_indices)
+
+        index_best_traj_ee = world_trans.compose(best_traj_ee_fk_dict[index_ee_name])  # .get_matrix()
+        thumb_best_traj_ee = world_trans.compose(best_traj_ee_fk_dict[thumb_ee_name])  # .get_matrix()
+
+        index_desired_best_traj_ee = world_trans.compose(desired_traj_ee_fk_dict[index_ee_name])
+        thumb_desired_best_traj_ee = world_trans.compose(desired_traj_ee_fk_dict[thumb_ee_name])
+        points_finger_frame = torch.tensor([0.00, 0.03, 0.00], device=best_traj.device).unsqueeze(0)
+        index_best_traj_ee = index_best_traj_ee.transform_points(points_finger_frame).squeeze(1)
+        thumb_best_traj_ee = thumb_best_traj_ee.transform_points(points_finger_frame).squeeze(1)
+        desired_index_best_traj_ee = index_desired_best_traj_ee.transform_points(points_finger_frame).squeeze(1)
+        desired_thumb_best_traj_ee = thumb_desired_best_traj_ee.transform_points(points_finger_frame).squeeze(1)
+
+        initial_thumb_ee = state2ee_pos(initial_state, thumb_ee_name).squeeze(0)
+        thumb_state_traj = torch.stack((initial_thumb_ee, thumb_best_traj_ee[0]), dim=0).cpu().numpy()
+        thumb_action_traj = torch.stack((initial_thumb_ee, desired_thumb_best_traj_ee[0]), dim=0).cpu().numpy()
+        axes[1].plot3D(thumb_state_traj[:, 0], thumb_state_traj[:, 1], thumb_state_traj[:, 2], 'blue', label='desired next state')
+        axes[1].plot3D(thumb_action_traj[:, 0], thumb_action_traj[:, 1], thumb_action_traj[:, 2], 'green', label='raw commanded position')
+        initial_index_ee = state2ee_pos(initial_state, index_ee_name).squeeze(0)
+        index_state_traj = torch.stack((initial_index_ee, index_best_traj_ee[0]), dim=0).cpu().numpy()
+        index_action_traj = torch.stack((initial_index_ee, desired_index_best_traj_ee[0]), dim=0).cpu().numpy()
+        axes[0].plot3D(index_state_traj[:, 0], index_state_traj[:, 1], index_state_traj[:, 2], 'blue', label='desired next state')
+        axes[0].plot3D(index_action_traj[:, 0], index_action_traj[:, 1], index_action_traj[:, 2], 'green', label='raw commanded position')
 
 
 if __name__ == "__main__":
@@ -1692,10 +1714,24 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         pass
     """
+
+    if config['hardware']:
+        sim_env = env
+        from hardware.hardware_env import HardwareEnv
+        env = HardwareEnv(sim_env.default_dof_pos, finger_list=['index', 'thumb'])
+        env.world_trans = world_trans
+        env.joint_stiffness = sim_env.joint_stiffness
+        env.device = sim_env.device
+        env.valve_pose = sim_env.valve_pose
+
+        del sim_env
+
+
+
     results = {}
 
     for i in tqdm(range(config['num_trials'])):
-        goal = -0.5 * torch.tensor([np.pi])
+        goal = 0.5 * torch.tensor([np.pi])
         # goal = goal + 0.025 * torch.randn(1) + 0.2
         for controller in config['controllers'].keys():
             env.reset()
@@ -1703,9 +1739,6 @@ if __name__ == "__main__":
             pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
             # set up params
             params = config.copy()
-            if params['hardware']:
-                from hardware.allegro_ros import Ros_Node
-                ros_node = Ros_Node()
             params.pop('controllers')
             params.update(config['controllers'][controller])
             params['controller'] = controller

@@ -6,17 +6,17 @@ from sensor_msgs.msg import JointState
 import torch
 from copy import deepcopy
 
-class Ros_Node(object):
+class RosNode(object):
     '''
     Ros Node for communication with the hardware
     '''
-    def __init__(self, node_name='run_policy', freq=2):
+    def __init__(self, node_name='run_policy', num_repeat=10):
         try:
             rospy.init_node('allegro_hand_node')
         except:
             pass
         self.node_name = node_name
-        self.freq = freq
+        self.num_repeat = num_repeat
         self.get_allegro_bounds()
         # rospy.init_node(self.node_name)
         self.tfBuffer = tf2_ros.Buffer()
@@ -75,14 +75,18 @@ class Ros_Node(object):
         print('joint command publisher initialized.')
         
     def apply_action(self, action, weight=0.5):
-        action = list(action.detach().numpy())
+        if len(action.shape) == 2:
+            action = action.squeeze(0)
+        action = list(action.detach().cpu().numpy())
         desired_js = deepcopy(self.current_joint_pose) # We copy the message type from the last current joint pose recieved to have the format
         desired_js.position = action # We change the position to have the commanded joint angles
         desired_js.effort = list([]) # We set the effort command to zero because we are doing position control and not torque control
-        self.joint_comm_publisher.publish(desired_js) # Publish the desired command
+        for i in range(self.num_repeat):
+            self.joint_comm_publisher.publish(desired_js) # Publish the desired command
+            rospy.sleep(0.25)
 
 def main():
-    ros_node = Ros_Node()
+    ros_node = RosNode()
     while not rospy.is_shutdown():
         # The rospy sleep set the seconds before running another iteration. During this time, we will recieve multiple joint state, but we will used the last one
         # recieved for the ros_node.step(obs) and ros_node.apply_action. If we want to compute the action after each joint state update, we can put the apply_action inside 

@@ -1,3 +1,6 @@
 __pycache__/
 .vscode/
 *.pkl
+venv/
+ccai.egg-info/
+data/
