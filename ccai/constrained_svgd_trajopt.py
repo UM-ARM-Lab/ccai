@@ -53,7 +53,7 @@ class ConstrainedSteinTrajOpt:
             dCdCT = dC @ dC.permute(0, 2, 1)
             dCdCT = dCdCT.to(dtype=self.dtype)
             A_bmm = lambda x: dCdCT @ x
-            print(torch.linalg.matrix_rank(dCdCT))
+            # print(torch.linalg.matrix_rank(dCdCT))
             #
             # damping_factor = 1e-1
             try:
@@ -254,7 +254,7 @@ class ConstrainedSteinTrajOpt:
         path = [xuz.data.clone()]
         self.gamma = self.max_gamma
         for iter in range(T):
-            print(iter)
+            # print(iter)
             # reset slack variables
             # if self.problem.dz > 0:
             #    xu = xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du]

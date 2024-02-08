@@ -33,6 +33,7 @@ import pytorch_kinematics.transforms as tf
 from pytorch_volumetric import RobotSDF, RobotScene, MeshSDF
 import matplotlib.pyplot as plt
 import pickle as pkl
+from utils.allegro_utils import partial_to_full_state, full_to_partial_state
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
@@ -63,35 +64,6 @@ env = AllegroValveTurningEnv(1, control_mode='joint_impedance', use_cartesian_co
 world_trans = env.world_trans
 
 
-def partial_to_full_state(partial):
-    """
-    :params partial: B x 8 joint configurations for index and thumb
-    :return full: B x 16 joint configuration for full hand
-
-    # assume that default is zeros, but could change
-    """
-    index, thumb = torch.chunk(partial, chunks=2, dim=-1)
-    full = torch.cat((
-        index,
-        torch.zeros_like(index),
-        torch.zeros_like(index),
-        thumb
-    ), dim=-1)
-    return full
-
-def full_to_partial_state(full):
-    """
-    :params partial: B x 8 joint configurations for index and thumb
-    :return full: B x 16 joint configuration for full hand
-
-    # assume that default is zeros, but could change
-    """
-    index, mid, ring, thumb = torch.chunk(full, chunks=4, dim=-1)
-    partial = torch.cat((
-        index,
-        thumb
-    ), dim=-1)
-    return partial
 def state2ee_pos(state, finger_name):
     """
     :params state: B x 8 joint configuration for full hand
@@ -194,15 +166,6 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         self.grad_kernel = jacrev(rbf_kernel, argnums=0)
         self.alpha = 10
 
-        self._equality_constraints = JointConstraint(
-            partial(get_joint_equality_constraint, chain=self.chain, start_q=self.start, 
-                    initial_valve_angle=initial_valve_angle)
-        )
-
-        self._inequality_constraints = JointConstraint(
-            partial(get_joint_inequality_constraint, chain=self.chain, start_q=self.start)
-        )
-
 
         # add collision checking
         # collision check all of the non-finger tip links
@@ -247,11 +210,16 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
                                          points_per_link=500)
         # self.index_contact_scene.visualize_robot(partial_to_full_state(self.start[:8]), self.start[-1])
 
+        # equality constraints
+
         self.friction_constr = vmap(self._friction_constr, randomness='same')
         self.grad_friction_constr = vmap(jacrev(self._friction_constr, argnums=(0, 1, 2)))
 
         self.dynamics_constr = vmap(self._dynamics_constr)
         self.grad_dynamics_constr = vmap(jacrev(self._dynamics_constr, argnums=(0, 1, 2, 3, 4)))
+
+        # inequality constraints
+        self.grad_y_axis_constraint = jacrev(self._y_axis_constr, argnums=0)
 
         # for honda hand
         index_x_max = torch.tensor([0.47, 1.6099999999, 1.7089999, 1.61799999]) - 0.05
@@ -391,11 +359,6 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
             contact_loc = ret_scene.get('closest_pt_world', None)
             d_contact_loc_dq = ret_scene.get('closest_pt_q_grad', None)
 
-            # contact_jacobian = contact_jacobian.reshape(N, T + 1, 3, 16)[:, :, :, (0, 1, 2, 3, 12, 13, 14, 15)]
-            # contact_hessian = contact_hessian.reshape(N, T + 1, 3, 16, 16)[:, :, :, (0, 1, 2, 3, 12, 13, 14, 15)]
-            # contact_hessian = contact_hessian[:, :, :, :, (0, 1, 2, 3, 12, 13, 14, 15)]  # shape (N, T+1, 3, 8, 8)
-            # d_contact_loc_dq = d_contact_loc_dq.reshape(N, T + 1, 3, 16)[:, :, :, (0, 1, 2, 3, 12, 13, 14, 15)]
-
             contact_point_v = (contact_jacobian[:, :-1] @ dq.reshape(N, T, 8, 1)).squeeze(-1)  # should be N x T x 3
             # valve location in robot frame
             valve_robot_frame = world_trans.inverse().transform_points(valve_location.reshape(1, 3))
@@ -475,27 +438,6 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         return g, grad_g, None
 
     def contact_constraints(self, x, compute_grads=True, compute_hess=False):
-        # if self.plan_in_contact:
-        #     N, T, d = x.shape
-        #     numerical_grad = torch.zeros(N, T, 3, T, 9, device=self.device)
-        #     g, grad_g, hess_g = self._contact_constraints(x, self.index_contact_scene,
-        #                                                   index_ee_link, compute_grads, compute_hess)
-        #     grad_g = grad_g.reshape(N, T, 4, T, d)[:, :, 1:, :, :9]
-        #     delta = 1e-4
-        #     for i in range(T):
-        #         for j in range(9):
-        #             dx = torch.zeros_like(x)
-        #             dx[:, i, j] = delta
-        #             # finite difference test
-        #             g_plus, _, _ = self._contact_constraints(x + dx, self.index_contact_scene,
-        #                                                      index_ee_link, False, False)
-        #             g_neg, _, _ = self._contact_constraints(x - dx, self.index_contact_scene,
-        #                                                     index_ee_link, False, False)
-        #             print(g_plus.shape)
-        #             print(g_neg.shape)
-        #             numerical_grad[:, :, :, i, j] = (g_plus.reshape(N, T, 4)[:, :, 1:] - g_neg.reshape(N, T, 4)[:, :, 1:]) / (2 * delta)
-        #     print('done')
-
         # compute contact constraints for index finger
         g_i, grad_g_i, hess_g_i = self._contact_constraints(x, self.index_contact_scene, 'index',
                                                             compute_grads, compute_hess)
@@ -568,9 +510,6 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
 
         # geometrically using contact_v
         return 50*(torch.linalg.norm(contact_v_contact_frame[0]) + friction_coefficient * contact_v_contact_frame[2]).reshape(-1)
-
-        # using pinv(J^T) dq
-        # return 0.1*(torch.linalg.norm(force_contact_frame[0]) + friction_coefficient * force_contact_frame[2])
 
     def get_friction_polytope(self):
         """
@@ -645,6 +584,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         contact_v = (contact_jacobian @ dq.unsqueeze(-1)).squeeze(-1)  # should be 3 vector
         # from commanded
         contact_v_u = (contact_jacobian @ u.unsqueeze(-1)).squeeze(-1)  # should be 3 vector
+        # TODO: check if this is the reason that the trajectory is not smooth enough
 
         # convert to world frame
         contact_v_world = world_trans.transform_normals(contact_v.unsqueeze(0)).squeeze(0)
@@ -759,66 +699,38 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
 
         return g, grad_g, None
 
-    def _con_eq(self, xu, compute_grads=True, compute_hess=False):
+    def _y_axis_constr(self, xu):
         N = xu.shape[0]
         T = xu.shape[1]
-        g_contact, grad_g_contact, hess_g_contact = self.contact_constraints(xu.reshape(N, T, self.dx + self.du),
-                                                                             compute_grads=compute_grads,
-                                                                             compute_hess=compute_hess)
+        q = xu[:, :, :9]
+        finger_names = [index_ee_name, thumb_ee_name]
+        constraint = {}
+        fk_dict = chain.forward_kinematics(partial_to_full_state(q[:, :, :8].reshape(-1, 8)),
+                                        frame_indices=frame_indices)  # pytorch_kinematics only supprts one additional dim
 
-        if self.plan_in_contact:
-            g_dynamics, grad_g_dynamics, hess_g_dynamics = self.dynamics_constraints(
-                xu.reshape(N, T, self.dx + self.du),
-                compute_grads=compute_grads,
-                compute_hess=compute_hess)
-            g_contact = torch.cat((g_contact, g_dynamics), dim=1)
-            if grad_g_contact is not None:
-                grad_g_contact = torch.cat((grad_g_contact, grad_g_dynamics), dim=1)
-            if hess_g_contact is not None:
-                hess_g_contact = torch.cat((hess_g_contact, hess_g_dynamics), dim=1)
-
-        return g_contact, grad_g_contact, hess_g_contact
-        # print(g_contact.shape, grad_g_contact.shape, hess_g_contact.shape)
-        ## # TODO: hard code the hessian for collision check for now, need to fix it in the future
-        # g_contact, grad_g_contact, hess_g_contact = self._collision_check(xu.reshape(-1, self.dx + self.du),
-        #                                                                  check_flag='contact',
-        #                                                                  compute_grads=compute_grads,
-        #                                                                  compute_hess=False)
-        # g_contact = g_contact
-        # if grad_g_contact is not None:
-        #    grad_g_contact = grad_g_contact
-        # if hess_g_contact is not None:
-        #    hess_g_contact = -hess_g_contact
-
-        g_contact = g_contact.reshape(N, T, -1)
-        num_contacts = g_contact.shape[2]
-        g_contact = g_contact.reshape(N, -1)
-        g = torch.cat((g, g_contact), dim=1)
-        g = g.reshape(N, -1)
-
-        # g = g_contact
-
+        for finger_name in finger_names:
+            m = world_trans.compose(fk_dict[finger_name])
+            points_finger_frame = torch.tensor([0.00, 0.03, 0.00], device=xu.device).unsqueeze(0)
+            # it is just the thrid column of the rotation matrix
+            ee_p = m.transform_points(points_finger_frame).reshape((N, T, 3))
+            "2nd constraint y range of the finger tip should be within a range"
+            constraint_y_1 = -(valve_location[1] - ee_p[:, :, 1]) + 0.02 # do not consider the current time step
+            constraint_y_2 = (valve_location[1] - ee_p[:, :, 1]) - 0.2
+            constraint[f'{finger_name}_y_range_1'] = constraint_y_1
+            constraint[f'{finger_name}_y_range_2'] = constraint_y_2
+        return torch.cat(list(constraint.values()), dim=-1)
+    
+    def y_axis_constraint(self, xu, compute_grads=True, compute_hess=False):
+        N = xu.shape[0]
+        T = xu.shape[1]
+        h = self._y_axis_constr(xu)
+        grad_h, hess_h = None, None
         if compute_grads:
-            # grad_g = grad_g.reshape(N, non_contact_con_dim, self.T * (self.dx + self.du))
-            # grad_h_collision = torch.cat((grad_h_collision, torch.zeros((grad_h_collision.shape[0], grad_h_collision.shape[1], self.du)).to(grad_h_collision.device)), dim=-1)
-            # grad_g_contact = grad_g_contact.reshape(N, self.T, -1, self.dx + self.du).permute(0, 2, 3, 1)
-            # grad_g_contact = torch.diag_embed(grad_g_contact)  # (N, n_constraints, dx + du, T, T)
-            # grad_g_contact = grad_g_contact.permute(0, 3, 1, 4, 2).reshape(N, -1, self.T * (self.dx + self.du))
-            grad_g = torch.cat((grad_g.reshape(N, -1, self.T * (self.dx + self.du)), grad_g_contact), dim=1)
-            # grad_g = grad_g_contact
-            grad_g = grad_g.reshape(N, g.shape[1], self.T * (self.dx + self.du))
-
-        else:
-            return g, None, None
-
-        if hess_g_contact is None:
-            hess_g_contact = torch.zeros(
-                (N, num_contacts * self.T, self.T, self.dx + self.du, self.T, self.dx + self.du)).to(
-                hess_g.device)
-        hess_g = hess_g.reshape(N, -1, self.T * (self.dx + self.du), self.T * (self.dx + self.du))
-        hess_g = torch.cat((hess_g, hess_g_contact), dim=1)
-        # hess_g = hess_g_contact
-        return g, grad_g, hess_g
+            grad_h = self.grad_y_axis_constraint(xu)
+            grad_h = torch.stack([grad_h[i, :, i] for i in range(len(grad_h))], dim=0)  # data from different batches should not affect each other
+        if compute_hess:
+            hess_h = torch.zeros(grad_h.shape + grad_h.shape[2:], device=self.device)
+        return h, grad_h, hess_h
 
     def _collision_check_finger(self, x, finger_scene, compute_grads=True, compute_hess=True):
         N = x.shape[0]
@@ -848,6 +760,26 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
             hess_h[:, :, 8, 8] = -hess_h_theta.reshape(N, -1)
 
         return h, grad_h, hess_h
+
+    def _con_eq(self, xu, compute_grads=True, compute_hess=False):
+        N = xu.shape[0]
+        T = xu.shape[1]
+        g_contact, grad_g_contact, hess_g_contact = self.contact_constraints(xu.reshape(N, T, self.dx + self.du),
+                                                                             compute_grads=compute_grads,
+                                                                             compute_hess=compute_hess)
+
+        if self.plan_in_contact:
+            g_dynamics, grad_g_dynamics, hess_g_dynamics = self.dynamics_constraints(
+                xu.reshape(N, T, self.dx + self.du),
+                compute_grads=compute_grads,
+                compute_hess=compute_hess)
+            g_contact = torch.cat((g_contact, g_dynamics), dim=1)
+            if grad_g_contact is not None:
+                grad_g_contact = torch.cat((grad_g_contact, grad_g_dynamics), dim=1)
+            if hess_g_contact is not None:
+                hess_g_contact = torch.cat((hess_g_contact, hess_g_dynamics), dim=1)
+
+        return g_contact, grad_g_contact, hess_g_contact
 
     def _collision_check(self, x, check_flag, compute_grads=True, compute_hess=True):
         # this returns NEGATIVE sdf value
@@ -885,26 +817,8 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         N = xu.shape[0]
         T = xu.shape[1]
 
-        # numerical_grad = torch.zeros(N, T * 3, T, 8, device=self.device)
-        # delta = 1e-4
-        # for i in range(T):
-        #     for j in range(8):
-        #         dx = torch.zeros_like(xu)
-        #         dx[:, i, j] = delta
-        #         # finite difference test
-        #         self._preprocess_finger(xu + dx, self.index_contact_scene, index_ee_link, 'index')
-        #         g_plus, _, _ = self._dynamics_constraints(xu + dx, 'index', False, False)
-        #         self._preprocess_finger(xu - dx, self.index_contact_scene, index_ee_link, 'index')
-        #         g_neg, _, _ = self._dynamics_constraints(xu - dx, 'index', False, False)
-        #         print(g_neg.shape)
-        #         numerical_grad[:, :, i, j] = (g_plus.reshape(N, -1) - g_neg.reshape(N, -1)) / (2 * delta)
-        #
-        h, grad_h, hess_h = self._inequality_constraints.eval(xu.reshape(-1, T, self.dx + self.du), compute_grads,
-                                                              compute_hess=compute_hess)
-        #
-        # h, grad_h, hess_h = self._dynamics_constraints(xu, 'index', True, compute_hess)
-        # grad_h = grad_h.reshape(N, -1, T, self.dx + self.du)[:, :, :, :8]
-        #
+        h, grad_h, hess_h = self.y_axis_constraint(xu, compute_grads, compute_hess)
+
         if self.plan_in_contact:
             h_friction, grad_h_friction, hess_h_friction = self.friction_constraints(
                 xu.reshape(-1, T, self.dx + self.du),
@@ -943,19 +857,8 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
                 grad_h = grad_h.reshape(N, h.shape[1], self.T * (self.dx + self.du))
         else:
             return h, None, None
-        # TODO: use zero for now, we might need to fix it if we want to use hessian
-        # hess_h_collision = hess_h_collision.reshape(N, self.T, -1, self.dx, self.dx).permute(0, 2, 3, 4, 1)
-        # hess_h_collision = torch.diag_embed(torch.diag_embed(hess_h_collision))  # (N, n_constraints, dx + du, dx + du, T, T, T)
-        # hess_h_collision = hess_h_collision.permute(0, 4, 1, 5, 2, 6, 3).reshape(N, -1,
-        #                                                     self.T * (self.dx),
-        #                                                     self.T * (self.dx))
-        # if self._collision_checking_flag:
-        #    if hess_h_collision is None:
-        #        hess_h_collision = torch.zeros(
-        #            (N, 2 * self.T, self.T, self.dx + self.du, self.T, self.dx + self.du)).to(hess_h.device)
-        #    hess_h = torch.cat((hess_h, hess_h_collision), dim=1)
-        # hess_h = hess_h.reshape(N, h.shape[1], self.T * (self.dx + self.du), self.T * (self.dx + self.du))
         if compute_hess:
+            # TODO: use zero for now, we might need to fix it if we want to use hessian
             hess_h = torch.zeros(N, h.shape[1], self.T * (self.dx + self.du), self.T * (self.dx + self.du),
                                  device=self.device)
             return h, grad_h, hess_h
@@ -983,32 +886,6 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         grad_K = grad_K.reshape(N, N, -1)
         G, dG, hessG = self.combined_constraints(augmented_trajectory, compute_hess=self.compute_hess)
 
-        # eps = 1e-4
-        # dG = torch.zeros_like(dG)
-        # print(dG.shape)
-
-        # for i in range(dG.shape[2]):
-        #     x = augmented_trajectory.clone().reshape(N, -1)
-        #     dx = torch.zeros_like(augmented_trajectory.reshape(N, -1))
-        #     dx[:, i] = eps
-        #     dx = dx.reshape(N, self.T, -1)
-        #
-        #     if (i % self.T) in range(0, 10):
-        #         self._preprocess(augmented_trajectory + dx)
-        #
-        #     Gplus, _, _ = self.combined_constraints(augmented_trajectory + dx,
-        #                                             compute_grads=False,
-        #                                             compute_hess=self.compute_hess)
-        #     if (i % self.T) in range(0, 21):
-        #         self._preprocess(augmented_trajectory - dx)
-        #
-        #     Gneg, _, _ = self.combined_constraints(augmented_trajectory - dx,
-        #                                            compute_grads=False,
-        #                                            compute_hess=self.compute_hess)
-        #     dG[:, :, i] = (Gplus - Gneg) / (2 * eps)
-        #     # print(Gplus[0, -2:])
-        #     # print(Gneg[0, -2:])
-        # print(J.mean(), G.abs().mean(), G.abs().max())
 
         if hess_J is not None:
             hess_J_ext = torch.zeros(N, self.T, self.dx + self.du + self.dz, self.T, self.dx + self.du + self.dz,
@@ -1031,30 +908,6 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         self.cost = vmap(partial(cost, start=self.start, goal=self.goal))
         self.grad_cost = vmap(jacrev(partial(cost, start=self.start, goal=self.goal)))
         self.hess_cost = vmap(hessian(partial(cost, start=self.start, goal=self.goal)))
-
-        # want the offset between the current angle and the angle according to end effectors
-        # we will use position of index fingertip
-        fk_dict = chain.forward_kinematics(partial_to_full_state(self.start[:8]),
-                                           frame_indices=torch.tensor([index_ee_link]))
-
-        points_finger_frame = torch.tensor([0.005, 0.005, 0.0], device=self.start.device).unsqueeze(0)
-        p = world_trans.compose(fk_dict[index_ee_name]).transform_points(points_finger_frame).reshape(
-            -1) - valve_location
-        if torch.sqrt(p[0] ** 2 + p[2] ** 2) < 0.05:
-            # we are probably close enough to valve to have begun rask
-            geometric_theta = torch.atan2(p[0], p[2])
-            actual_theta = self.start[-1]
-            theta_offset = geometric_theta - actual_theta
-
-        else:
-            theta_offset = 0
-        self._equality_constraints = JointConstraint(
-            partial(get_joint_equality_constraint, chain=self.chain, start_q=self.start)
-        )
-
-        self._inequality_constraints = JointConstraint(
-            partial(get_joint_inequality_constraint, chain=self.chain, start_q=self.start)
-        )
 
         if goal is not None:
             self.goal = goal
@@ -1104,256 +957,6 @@ def cost(xu, start, goal):
     # this goal cost is not very informative and takes a long time for the gradients to back propagate to each state. 
     # thus, a better initialization is necessary for faster convergence
     return smoothness_cost + 10 * action_cost + goal_cost
-
-
-class JointConstraint:
-
-    def __init__(self, joint_constraint_function):
-        self._fn = joint_constraint_function
-        self.joint_constraint_fn = joint_constraint_function
-
-        self._grad_fn = jacrev(joint_constraint_function, argnums=(0))
-
-        self.grad_constraint = self._grad_g
-        self.hess_constraint = jacfwd(self._grad_g, argnums=0)
-
-        self._J, self._H, self._dH = None, None, None
-
-    def _grad_g(self, q):
-        dq = self._grad_fn(q)
-        return dq
-
-    def eval(self, qu, compute_grads=True, compute_hess=False):
-        """
-        :param qu: torch.Tensor of shape (T, 9 + 8) containing set of state + acton
-        :return g: constraint values
-        :return Dg: constraint gradient
-        :return DDg: constraint hessian
-        """
-        N = qu.shape[0]
-        T = qu.shape[1]
-        constraints = self.joint_constraint_fn(qu)
-        if not compute_grads:
-            return constraints, None, None
-        dq = self.grad_constraint(qu)
-        dq = torch.stack([dq[i, :, i] for i in range(N)], dim=0) # data from different batches should not affect each other
-        # dumb_ddq = torch.eye(qu.shape[-1]).repeat((constraints.shape[0], constraints.shape[1], 1, 1))
-        # if compute_hess:
-        #     ddq = self.hess_constraint(qu)
-        # else:
-        #     ddq = torch.zeros(dq.shape + dq.shape[2:])
-        # TODO: this is a hack for now to make it work. We should compute hessian in the future
-        ddq = torch.zeros(dq.shape + dq.shape[2:], device=qu.device)
-
-        return constraints, dq, ddq
-
-    def reset(self):
-        self._J, self._h, self._dH = None, None, None
-
-def get_joint_equality_constraint(qu, chain, start_q, initial_valve_angle=0, report=False):
-    """
-
-    :param qu: torch.Tensor (T, DoF) joint positions
-    :param chain: pytorch kinematics chain
-
-    :return constraints: torch.Tensor(N, 1) contsraints as specified above
-
-    """
-    N = qu.shape[0]
-    T = qu.shape[1]
-    valve_offset_for_index = -np.pi / 2.0
-    valve_offset_for_thumb = np.pi / 2.0  # * 0.99
-    theta = qu[:, :, 8]
-    index_q = qu[:, :, :4]
-    thumb_q = qu[:, :, 4:8]
-    action = qu[:, :, 9:17]
-    index_action = action[:, :, :4]
-    thumb_action = action[:, :, 4:]
-    finger_qs = [index_q, thumb_q]
-    finger_names = [index_ee_name, thumb_ee_name]
-    action_list = [index_action, thumb_action]
-    # radii = [0.040, 0.038]
-    # radii = [0.033, 0.035]
-    radii = [0.0445, 0.038]
-    constraint = {}
-    q = torch.cat((start_q.repeat((N, 1, 1)), qu[:, :, :9]), dim=1)  # add the current time step in
-    fk_dict = chain.forward_kinematics(partial_to_full_state(q[:, :, :8].reshape(-1, 8)),
-                                       frame_indices=frame_indices)  # pytorch_kinematics only supprts one additional dim
-    fk_desired_dict = chain.forward_kinematics(partial_to_full_state((q[:, :-1, :8] + action).reshape(-1, 8)),
-                                               frame_indices=frame_indices)
-    for finger_q, finger_name, r, ee_index, finger_action in zip(finger_qs, finger_names, radii, frame_indices, action_list):
-        m = world_trans.compose(fk_dict[finger_name])
-        points_finger_frame = torch.tensor([0.00, 0.03, 0.00], device=qu.device).unsqueeze(0)
-        normals_finger_tip_frame = torch.tensor([0.0, 0.0, 1.0], device=qu.device).unsqueeze(0)
-        # it is just the thrid column of the rotation matrix
-        normals_finger_tip_frame = normals_finger_tip_frame / torch.norm(normals_finger_tip_frame, dim=1, keepdim=True)
-        ee_p = m.transform_points(points_finger_frame).reshape((N, (T + 1), 1, 3))  # TODO: check if the dimension match
-        ee_p = ee_p.squeeze(-2)
-        # normals_world_frame = m.transform_normals(normals_finger_tip_frame).reshape(3)
-        ee_mat = m.get_matrix().reshape(N, (T + 1), 4, 4)[:, :, :3, :3]
-        # jac = chain.jacobian(partial_to_full_state(q[:, :, :8].reshape(-1, 8)), link_indices=ee_index) # pytorch_kinematics only supprts one additional dim
-        # jac = jac.reshape((N, (T+1), jac.shape[-2], jac.shape[-1]))
-        # jac = full_to_partial_state(jac)
-        # jac = rotate_jac(jac, env.world_trans.get_matrix()[0, :3, :3]) # rotate jac into world frame 
-
-        "1 st equality constraints, the finger tip movement in the tangential direction should match with the commanded movement"
-        # jac = jac[:, :T] # do not consider the last state, since no action matches the last state
-        # translation_jac = jac[:, :, :3, :]
-        # delta_p_action = torch.matmul(translation_jac, action.unsqueeze(-1)).squeeze(-1) # FK(q_{i,t) + delta q_{i,t}} - FK(q_{i,t})
-        # TODO: need to look at the actual contact point really, what is the jacobian on the contact point
-        # NOTE: we could use jacobian to simulate the delta action to speed up, but we use ground truth now
-        m_desired = world_trans.compose(fk_desired_dict[finger_name])
-        ee_p_desired = m_desired.transform_points(points_finger_frame).reshape((N, T, 1, 3)).squeeze(-2)
-        delta_p_desired = ee_p_desired - ee_p[:, :-1]
-
-        delta_p = ee_p[:, 1:] - ee_p[:, :-1]
-        # get the surface normal
-        radial_vec = ee_p[:, :-1] - valve_location.unsqueeze(0).unsqueeze(
-            0)  # do not consider action at the final timestep
-        radial_vec[:, :, 1] = 0  # do not consider y axis
-        # in our simple task, might need to ignore one dimension
-        # surface_normal = - radial_vec / torch.linalg.norm(radial_vec, dim=-1).unsqueeze(-1) # the normal goes inwards for friction cone computation
-        # tan_delta_p_desired = delta_p_desired - (delta_p_desired.unsqueeze(-2)@surface_normal.unsqueeze(-1)).squeeze(-1) * surface_normal
-        # tan_delta_p = delta_p - (delta_p.unsqueeze(-2) @ surface_normal.unsqueeze(-1)).squeeze(-1) * surface_normal
-        # constraint_list.append((tan_delta_p_desired - tan_delta_p).reshape(N, -1))
-        # This version specifies a redundant constraint, which might not fit well with CSVTO
-        surface_normal = - radial_vec / torch.linalg.norm(radial_vec, dim=-1).unsqueeze(
-            -1)  # the normal goes inwards for friction cone computation
-        tan_delta_p = delta_p - (delta_p.unsqueeze(-2) @ surface_normal.unsqueeze(-1)).squeeze(-1) * surface_normal
-        base_x = torch.tensor([1, 0, 0]).float().to(surface_normal.device)
-        base_x_hat = base_x - (base_x.repeat((surface_normal.shape[0], surface_normal.shape[1], 1)).unsqueeze(
-            -2) @ surface_normal.unsqueeze(-1)).squeeze(-1) * surface_normal
-        # base_x_hat = tan_delta_p / torch.linalg.norm(tan_delta_p, dim=-1).unsqueeze(-1)
-        base_y_hat = torch.cross(surface_normal, base_x_hat, dim=-1)
-        tan_delta_p_desired = delta_p_desired - (delta_p_desired.unsqueeze(-2) @ surface_normal.unsqueeze(-1)).squeeze(
-            -1) * surface_normal
-        tan_delta_p_desired_x_hat = (base_x_hat.unsqueeze(-2) @ tan_delta_p_desired.unsqueeze(-1)).squeeze((-1, -2))
-        tan_delta_p_desired_y_hat = (base_y_hat.unsqueeze(-2) @ tan_delta_p_desired.unsqueeze(-1)).squeeze((-1, -2))
-        tan_delta_p_x_hat = (base_x_hat.unsqueeze(-2) @ tan_delta_p.unsqueeze(-1)).squeeze((-1, -2))
-        tan_delta_p_y_hat = (base_y_hat.unsqueeze(-2) @ tan_delta_p.unsqueeze(-1)).squeeze((-1, -2))
-        constraint[f'{finger_name}_dynamics_x'] = tan_delta_p_x_hat - tan_delta_p_desired_x_hat
-        constraint[f'{finger_name}_dynamics_y'] = tan_delta_p_y_hat - tan_delta_p_desired_y_hat
-    
-    if report:
-        return constraint
-    else:
-        return torch.cat(list(constraint.values()), dim=-1)
-    
-def get_joint_inequality_constraint(qu, chain, start_q, report=False):
-    """
-
-    :param qu: torch.Tensor (Batch, T, DoF) joint positions
-    :param chain: pytorch kinematics chain
-
-    :return constraints: torch.Tensor(N, 1) contsraints as specified above
-
-    """
-    N = qu.shape[0]
-    T = qu.shape[1]
-    valve_offset_for_index = -np.pi / 2.0
-    valve_offset_for_thumb = np.pi / 2.0  # * 0.99
-    theta = qu[:, :, 8]
-    index_q = qu[:, :, :4]
-    thumb_q = qu[:, :, 4:8]
-    action = qu[:, :, 9:17]
-    index_action = action[:, :, :4]
-    thumb_action = action[:, :, 4:]
-    finger_qs = [index_q, thumb_q]
-    finger_names = [index_ee_name, thumb_ee_name]
-    action_list = [index_action, thumb_action]
-    # radii = [0.040, 0.038]
-    # radii = [0.033, 0.035]
-    radii = [0.0445, 0.038]
-    constraint = {}
-    q = torch.cat((start_q.repeat((N, 1, 1)), qu[:, :, :9]), dim=1)  # add the current time step in
-    fk_dict = chain.forward_kinematics(partial_to_full_state(q[:, :, :8].reshape(-1, 8)),
-                                       frame_indices=frame_indices)  # pytorch_kinematics only supprts one additional dim
-    fk_desired_dict = chain.forward_kinematics(partial_to_full_state((q[:, :-1, :8] + action).reshape(-1, 8)),
-                                               frame_indices=frame_indices)
-
-    for finger_q, finger_name, r, ee_index, finger_action in zip(finger_qs, finger_names, radii, frame_indices, action_list):
-        m = world_trans.compose(fk_dict[finger_name])
-        points_finger_frame = torch.tensor([0.00, 0.03, 0.00], device=qu.device).unsqueeze(0)
-        normals_finger_tip_frame = torch.tensor([0.0, 0.0, 1.0], device=qu.device).unsqueeze(0)
-        # it is just the thrid column of the rotation matrix
-        normals_finger_tip_frame = normals_finger_tip_frame / torch.norm(normals_finger_tip_frame, dim=1, keepdim=True)
-        ee_p = m.transform_points(points_finger_frame).reshape((N, (T + 1), 3))
-        # ee_p = ee_p.squeeze(-2)
-        # normals_world_frame = m.transform_normals(normals_finger_tip_frame).reshape(3)
-        ee_mat = m.get_matrix().reshape(N, (T + 1), 4, 4)[:, :, :3, :3]
-        jac = chain.jacobian(partial_to_full_state(q[:, :, :8].reshape(-1, 8)),
-                             link_indices=ee_index)  # pytorch_kinematics only supprts one additional dim
-        jac = jac.reshape((N, (T + 1), jac.shape[-2], jac.shape[-1]))
-        jac = full_to_partial_state(jac)
-        jac = rotate_jac(jac, env.world_trans.get_matrix()[0, :3, :3]) # rotate jac into world frame 
-        
-        " 1st constraint: friction cone constraints"
-        jac = jac[:, :T]  # do not consider the last state, since no action matches the last state
-        translation_jac = jac[:, :, :3, :]
-        translation_jac_T = translation_jac.permute(0, 1, 3, 2)
-        force = (torch.linalg.inv(torch.matmul(translation_jac, translation_jac_T)) @ translation_jac) @ (
-                env.joint_stiffness * torch.eye(8).to(jac.device)) @ action.unsqueeze(-1)
-        radial_vec = ee_p[:, :-1] - valve_location.unsqueeze(0).unsqueeze(
-            0)  # do not consider action at the final timestep
-        radial_vec[:, :, 1] = 0  # do not consider y axis
-        # # in our simple task, might need to ignore one dimension
-        surface_normal = - radial_vec / torch.linalg.norm(radial_vec, dim=-1).unsqueeze(
-            -1)  # the normal goes inwards for friction cone computation
-        f_normal = (surface_normal.unsqueeze(-2) @ force).squeeze(-1) * surface_normal
-        f_tan = force.squeeze(-1) - f_normal
-        # TODO: f_tan @ f_normal is not 0, but a relatively small value.  might need to double check
-        # constraint[f'{finger_name}_friction_cone'] = (torch.linalg.norm(f_tan, dim=-1) - friction_coefficient * torch.linalg.norm(f_normal, dim=-1)) / 1000
-        # NOTE: we need to scale it down, since this constraint is not of the same magnitute as the other constraints
-
-        "2nd constraint y range of the finger tip should be within a range"
-        constraint_y_1 = -(valve_location[1] - ee_p[:, 1:, 1]) + 0.02 # do not consider the current time step
-        constraint_y_2 = (valve_location[1] - ee_p[:, 1:, 1]) - 0.2
-        constraint[f'{finger_name}_y_range_1'] = constraint_y_1
-        constraint[f'{finger_name}_y_range_2'] = constraint_y_2
-
-
-        # "3rd constraint: action should push in more than the actual movement"
-        # m_desired = world_trans.compose(fk_desired_dict[finger_name])
-        # ee_p_desired = m_desired.transform_points(points_finger_frame).reshape((N, T, 1, 3)).squeeze(-2)
-        # delta_p_desired = ee_p_desired - ee_p[:, :-1]
-        # delta_p = ee_p[:, 1:] - ee_p[:, :-1]
-        # normal_delta_p = (delta_p.unsqueeze(-2) @ surface_normal.unsqueeze(-1)).squeeze((-1, -2))
-        # normal_delta_p_desired = (delta_p_desired.unsqueeze(-2) @ surface_normal.unsqueeze(-1)).squeeze((-1,-2))
-        # constraint[f'{finger_name}_push_in'] = (normal_delta_p - normal_delta_p_desired)
-
-        "4th constraint: the surface normal should align"
-        # for state
-        # only consider x and z axis
-        normals_world_frame = m.transform_normals(normals_finger_tip_frame).reshape((N, (T + 1), 3))
-        normals_world_frame = normals_world_frame / ((1.0 - normals_world_frame[:, :, 1] ** 2) ** 0.5).unsqueeze(-1)
-        normals_world_frame = normals_world_frame[:, 1:]  # do not consider the current time step
-        normal_alignment = torch.sin(theta) * normals_world_frame[:, :, 0] + torch.cos(theta) * normals_world_frame[:,
-                                                                                                :, 2]
-        if finger_name == index_ee_name:
-            normal_alignment += 0.0
-        elif finger_name == thumb_ee_name:
-            normal_alignment += 0.0
-        else:
-            raise ValueError('Invalid finger name')
-        # for state + action
-        # only consider x and z axis
-        # normals_world_frame_desired = m_desired.transform_normals(normals_finger_tip_frame).reshape((N, T, 3))
-        # normals_world_frame_desired = normals_world_frame_desired / ((1.0 - normals_world_frame_desired[:, :, 1] ** 2)**0.5).unsqueeze(-1)
-        # normal_desired_alignment = torch.sin(theta) * normals_world_frame_desired[:, :, 0] + torch.cos(theta) * normals_world_frame_desired[:, :, 2]
-        # if finger_name == index_ee_name:
-        #     normal_desired_alignment += 0.0
-        # elif finger_name == thumb_ee_name:
-        #     normal_desired_alignment += 0.0
-        # else:
-        #     raise ValueError('Invalid finger name')
-
-        # constraint[f'{finger_name}_normal_alignment'] = normal_alignment
-        # constraint[f'{finger_name}_normal_desired_alignment'] = normal_desired_alignment
-
-    if report:
-        return constraint
-    else:
-        return torch.cat(list(constraint.values()), dim=-1)
 
 
 def do_trial(env, params, fpath):
@@ -1460,17 +1063,9 @@ def do_trial(env, params, fpath):
         # print(f"current theta: {current_theta}")
 
         actual_trajectory.append(state['q'].reshape(9).clone())
-        # if k > 0:
-        #     torch.cuda.synchronize()
-        #     start_time = time.time()
-        # if k == 0:
-        # for debugging
-        # if controller.x is not None:
-        #     initial_theta = controller.x[0, 0, 8]
-        #     print(f"initial theta: {initial_theta}")
-            # fk_initial = chain.forward_kinematics(partial_to_full_state(controller.x[0, :8]), frame_indices=frame_indices)
         start_time = time.time()
         best_traj, trajectories = controller.step(start)
+
         print(f"solve time: {time.time() - start_time}")
         # for debugging
         # planned_theta = best_traj[0, 8]
@@ -1506,20 +1101,14 @@ def do_trial(env, params, fpath):
         # print(f'index_ee_diff: {torch.linalg.norm(plan_index_ee - actual_index_ee):.4f}, thumb_ee_diff: {torch.linalg.norm(plan_thumb_ee - actual_thumb_ee):.4f}')
         problem._preprocess(best_traj.unsqueeze(0))
         
-        equality_eval_dict = problem._equality_constraints.joint_constraint_fn(best_traj.unsqueeze(0), report=True)
-        equality_eval = torch.stack(list(equality_eval_dict.values()), dim=2)
         # distance = problem._con_eq(best_traj.unsqueeze(0), compute_grads=False, compute_hess=False)
         # print(f'1st step distance {distance[:, 0]}')
         # print(f'max_distance {torch.max(distance)}, min_distance {torch.min(distance)}')
 
         # TODO: this is not correct, this one does not include sdf constraint
-        print(f"max equality constraint violation: 1st step: {equality_eval[0][0].max()}, all: {equality_eval.max()}")
-        inequality_eval_dict = problem._inequality_constraints.joint_constraint_fn(best_traj.unsqueeze(0), report=True)
         # index_friction_constraint = inequality_eval_dict['allegro_hand_hitosashi_finger_finger_0_aftc_base_link_friction_cone']
         # thumb_friction_constraint = inequality_eval_dict['allegro_hand_oya_finger_3_aftc_base_link_friction_cone']
         # print(f"1st step friction cone constraint: index: {index_friction_constraint[0,0]}, thumb: {thumb_friction_constraint[0,0]}")
-        inequality_eval = torch.stack(list(inequality_eval_dict.values()), dim=2)
-        print(f"max inequality constraint violation: 1st step: {inequality_eval[0][0].max()}, all: {inequality_eval.max()}")
         print(problem.thumb_contact_scene.scene_collision_check(partial_to_full_state(x[:, :8]), x[:, 8],
                                                                 compute_gradient=False, compute_hessian=False))
         # distance2surface = torch.sqrt((best_traj_ee[:, 2] - valve_location[2].unsqueeze(0)) ** 2 + (best_traj_ee[:, 0] - valve_location[0].unsqueeze(0))**2)
@@ -1528,8 +1117,6 @@ def do_trial(env, params, fpath):
         info_list.append({
                         #   'distance': distance, 
                           'distance2goal': distance2goal, 
-                          'equality_eval': equality_eval_dict, 
-                          'inequality_eval': inequality_eval_dict
                         })
 
         gym.clear_lines(viewer)
