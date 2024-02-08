@@ -5,7 +5,7 @@ import cv2
 import matplotlib.pyplot as plt
 import torch
 
-directory = '/home/fanyang/github/ccai/data/experiments/allegro_test/csvgd/trial_5'
+directory = '/home/fanyang/github/ccai/data/experiments/allegro_test/csvgd/trial_1'
 
 if __name__ == '__main__':
     with open(directory + '/info.pkl', 'rb') as f:
@@ -17,7 +17,7 @@ if __name__ == '__main__':
     for i, png_path in enumerate(png_paths):
         img = cv2.imread(png_path)
         frame_info = result[i]
-        contact_distance = frame_info['distance']
+        # contact_distance = frame_info['distance']
         dist2goal = frame_info['distance2goal']
         con_eq_dict = frame_info['equality_eval']
         con_ineq_dict = frame_info['inequality_eval']
@@ -30,14 +30,14 @@ if __name__ == '__main__':
                     'dist2goal: {:.4f}'.format(dist2goal), 
                     (20, 40), 
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-        img = cv2.putText(img,
-                    'next dist index: {:.4f}, thumb: {:4f}'.format(contact_distance[0,0,0], contact_distance[0,0,1]),
-                    (20, 80),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-        img = cv2.putText(img,
-                    'max dist: {:.4f}, min dist: {:.4f}'.format(contact_distance.max(), contact_distance.min()),
-                    (20, 120),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        # img = cv2.putText(img,
+        #             'next dist index: {:.4f}, thumb: {:4f}'.format(contact_distance[0,0,0], contact_distance[0,0,1]),
+        #             (20, 80),
+        #             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        # img = cv2.putText(img,
+        #             'max dist: {:.4f}, min dist: {:.4f}'.format(contact_distance.max(), contact_distance.min()),
+        #             (20, 120),
+        #             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         img = cv2.putText(img,
                     'next max equality(abs): {:.4f}, max equality(abs): {:.4f}'.format(equality_eval[0][0].abs().max(), equality_eval[0].abs().max()),
                     (20, 160),
