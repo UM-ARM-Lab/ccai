@@ -33,7 +33,7 @@ import pytorch_kinematics.transforms as tf
 from pytorch_volumetric import RobotSDF, RobotScene, MeshSDF
 import matplotlib.pyplot as plt
 import pickle as pkl
-from utils.allegro_utils import partial_to_full_state, full_to_partial_state
+from utils.allegro_utils import partial_to_full_state, full_to_partial_state, combine_finger_grads
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
@@ -321,7 +321,9 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         return (self.alpha * J.reshape(N),
                 self.alpha * grad_J.reshape(N, -1),
                 self.alpha * hess_J.reshape(N, self.T * (self.dx + self.du), self.T * (self.dx + self.du)))
-    def _contact_constraints(self, xu, finger, finger_name, compute_grads=True, compute_hess=False):
+    
+    @combine_finger_grads
+    def _contact_constraints(self, xu, finger, compute_grads=True, compute_hess=False):
         """ Computes contact constraints
             constraint that sdf value is zero
             also constraint on contact kinematics to get the valve dynamics
@@ -336,7 +338,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
 
         # reshape to batch across time
         q_b = q.reshape(-1, 8)
-        ret_scene = self.data[finger_name]
+        ret_scene = self.data[finger]
         sdf = ret_scene.get('sdf').reshape(N, T + 1, 1)  # - 0.0025
         grad_sdf_q = ret_scene.get('grad_sdf', None)
         hess_sdf_q = ret_scene.get('hess_sdf', None)
@@ -437,24 +439,6 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
 
         return g, grad_g, None
 
-    def contact_constraints(self, x, compute_grads=True, compute_hess=False):
-        # compute contact constraints for index finger
-        g_i, grad_g_i, hess_g_i = self._contact_constraints(x, self.index_contact_scene, 'index',
-                                                            compute_grads, compute_hess)
-        g_t, grad_g_t, hess_g_t = self._contact_constraints(x, self.thumb_contact_scene, 'thumb',
-                                                            compute_grads, compute_hess)
-        g = torch.cat((g_i, g_t), dim=1)
-        if compute_grads:
-            grad_g = torch.cat((grad_g_i, grad_g_t), dim=1)
-        else:
-            return g, None, None
-
-        if compute_hess:
-            hess_g = torch.cat((hess_g_i, hess_g_t), dim=1)
-            return g, grad_g, hess_g
-
-        return g, grad_g, None
-
     @staticmethod
     def get_rotation_from_normal(normal_vector):
         """
@@ -526,6 +510,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         normal_vectors = torch.stack(normal_vectors, dim=0)
         return normal_vectors
 
+    @combine_finger_grads
     def _friction_cone_constraint(self, xu, finger, compute_grads=True, compute_hess=False):
 
         # assume access to class member variables which have already done some of the computation
@@ -609,6 +594,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         # TODO: this constraint value is super small
         return (R @ (contact_v_tan - contact_v_u_tan).unsqueeze(-1)).squeeze(-1)
 
+    @combine_finger_grads
     def _dynamics_constraints(self, xu, finger, compute_grads=True, compute_hess=False):
         """ Computes dynamics constraints
             constraint that sdf value is zero
@@ -661,43 +647,6 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
             return g.reshape(N, -1), grad_g.reshape(N, -1, T * (self.dx + self.du)), hess_g
 
         return g.reshape(N, -1), grad_g.reshape(N, -1, T * (self.dx + self.du)), None
-
-    def dynamics_constraints(self, xu, compute_grads=True, compute_hess=True):
-        # compute contact constraints for index finger
-        g_i, grad_g_i, hess_g_i = self._dynamics_constraints(xu, 'index',
-                                                             compute_grads, compute_hess)
-        g_t, grad_g_t, hess_g_t = self._dynamics_constraints(xu, 'thumb',
-                                                             compute_grads, compute_hess)
-        g = torch.cat((g_i, g_t), dim=1)
-        if compute_grads:
-            grad_g = torch.cat((grad_g_i, grad_g_t), dim=1)
-        else:
-            return g, None, None
-
-        if compute_hess:
-            hess_g = torch.cat((hess_g_i, hess_g_t), dim=1)
-            return g, grad_g, hess_g
-
-        return g, grad_g, None
-
-    def friction_constraints(self, xu, compute_grads=True, compute_hess=False):
-        # compute contact constraints for index finger
-        g_i, grad_g_i, hess_g_i = self._friction_cone_constraint(xu, 'index',
-                                                                 compute_grads, compute_hess)
-
-        g_t, grad_g_t, hess_g_t = self._friction_cone_constraint(xu, 'thumb',
-                                                                 compute_grads, compute_hess)
-        g = torch.cat((g_i, g_t), dim=1)
-        if compute_grads:
-            grad_g = torch.cat((grad_g_i, grad_g_t), dim=1)
-        else:
-            return g, None, None
-
-        if compute_hess:
-            hess_g = torch.cat((hess_g_i, hess_g_t), dim=1)
-            return g, grad_g, hess_g
-
-        return g, grad_g, None
 
     def _y_axis_constr(self, xu):
         N = xu.shape[0]
@@ -764,12 +713,12 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
     def _con_eq(self, xu, compute_grads=True, compute_hess=False):
         N = xu.shape[0]
         T = xu.shape[1]
-        g_contact, grad_g_contact, hess_g_contact = self.contact_constraints(xu.reshape(N, T, self.dx + self.du),
+        g_contact, grad_g_contact, hess_g_contact = self._contact_constraints(xu.reshape(N, T, self.dx + self.du),
                                                                              compute_grads=compute_grads,
                                                                              compute_hess=compute_hess)
 
         if self.plan_in_contact:
-            g_dynamics, grad_g_dynamics, hess_g_dynamics = self.dynamics_constraints(
+            g_dynamics, grad_g_dynamics, hess_g_dynamics = self._dynamics_constraints(
                 xu.reshape(N, T, self.dx + self.du),
                 compute_grads=compute_grads,
                 compute_hess=compute_hess)
@@ -820,7 +769,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         h, grad_h, hess_h = self.y_axis_constraint(xu, compute_grads, compute_hess)
 
         if self.plan_in_contact:
-            h_friction, grad_h_friction, hess_h_friction = self.friction_constraints(
+            h_friction, grad_h_friction, hess_h_friction = self._friction_cone_constraint(
                 xu.reshape(-1, T, self.dx + self.du),
                 compute_grads=compute_grads,
                 compute_hess=compute_hess)
