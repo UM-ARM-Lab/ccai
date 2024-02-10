@@ -61,4 +61,4 @@ class Constrained_SVGD_MPC:
         self.x = self.problem.get_initial_xu(self.N)
         if initial_x is not None:
             self.x = initial_x
-            self.warmup_iters = 10
+            self.warmup_iters = self.online_iters
