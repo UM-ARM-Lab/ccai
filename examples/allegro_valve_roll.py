@@ -73,7 +73,7 @@ def state2ee_pos(state, finger_name):
     fk_dict = chain.forward_kinematics(partial_to_full_state(state), frame_indices=frame_indices)
     m = world_trans.compose(fk_dict[finger_name])
     points_finger_frame = torch.tensor([0.00, 0.03, 0.00], device=m.device).unsqueeze(0)
-    ee_p = m.transform_points(points_finger_frame)
+    ee_p = m.transform_points(points_finger_frame).squeeze(-2)
     return ee_p
 
 class PositionControlConstrainedSteinTrajOpt(ConstrainedSteinTrajOpt):
@@ -1020,9 +1020,9 @@ def do_trial(env, params, fpath):
     index_traj_history = []
     state = env.get_state()
     start = state['q'].reshape(9).to(device=params['device'])
-    thumb_ee = state2ee_pos(start[:8], thumb_ee_name).squeeze(0)
+    thumb_ee = state2ee_pos(start[:8], thumb_ee_name)
     thumb_traj_history.append(thumb_ee.detach().cpu().numpy())
-    index_ee = state2ee_pos(start[:8], index_ee_name).squeeze(0)
+    index_ee = state2ee_pos(start[:8], index_ee_name)
     index_traj_history.append(index_ee.detach().cpu().numpy())
 
     info_list = []
@@ -1110,12 +1110,12 @@ def do_trial(env, params, fpath):
         # for debugging
         state = env.get_state()
         start = state['q'].reshape(9).to(device=params['device'])
-        thumb_ee = state2ee_pos(start[:8], thumb_ee_name).squeeze(0)
+        thumb_ee = state2ee_pos(start[:8], thumb_ee_name)
         thumb_traj_history.append(thumb_ee.detach().cpu().numpy())
         temp_for_plot = np.stack(thumb_traj_history, axis=0)
         if k >= 2:
             ax_thumb.plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray', label='actual')
-        index_ee = state2ee_pos(start[:8], index_ee_name).squeeze(0)
+        index_ee = state2ee_pos(start[:8], index_ee_name)
         index_traj_history.append(index_ee.detach().cpu().numpy())
         temp_for_plot = np.stack(index_traj_history, axis=0)
         if k>= 2:
@@ -1164,30 +1164,15 @@ def do_trial(env, params, fpath):
 def add_trajectories(trajectories, best_traj, chain, axes=None):
     M = len(trajectories)
     if M > 0:
-        # print(partial_to_full_state(best_traj[:, :8]).shape)
-        # frame_indices = torch.tensor([index_ee_link, thumb_ee_link])
-        best_traj_ee_fk_dict = chain.forward_kinematics(partial_to_full_state(best_traj[:, :8]),
-                                                        frame_indices=frame_indices)
         initial_state = env.get_state()['q'][:, :8]
-        whole_state = torch.cat((initial_state, best_traj[:-1, :8]), dim=0)
-        desired_state = whole_state + best_traj[:, 9:17]
-        desired_traj_ee_fk_dict = chain.forward_kinematics(partial_to_full_state(desired_state),
-                                                        frame_indices=frame_indices)
+        all_state = torch.cat((initial_state, best_traj[:-1, :8]), dim=0)
+        desired_state = all_state + best_traj[:, 9:17]
 
-        index_best_traj_ee = world_trans.compose(best_traj_ee_fk_dict[index_ee_name])  # .get_matrix()
-        thumb_best_traj_ee = world_trans.compose(best_traj_ee_fk_dict[thumb_ee_name])  # .get_matrix()
+        desired_index_best_traj_ee = state2ee_pos(desired_state, index_ee_name)
+        desired_thumb_best_traj_ee = state2ee_pos(desired_state, thumb_ee_name)
 
-        index_desired_best_traj_ee = world_trans.compose(desired_traj_ee_fk_dict[index_ee_name])
-        thumb_desired_best_traj_ee = world_trans.compose(desired_traj_ee_fk_dict[thumb_ee_name])
-        # index_best_traj_ee = best_traj_ee_fk_dict[index_ee_name].compose(world_trans).get_matrix()
-        # thumb_best_traj_ee = best_traj_ee_fk_dict[thumb_ee_name].compose(world_trans).get_matrix()
-        points_finger_frame = torch.tensor([0.00, 0.03, 0.00], device=best_traj.device).unsqueeze(0)
-        index_best_traj_ee = index_best_traj_ee.transform_points(points_finger_frame).squeeze(1)
-        thumb_best_traj_ee = thumb_best_traj_ee.transform_points(points_finger_frame).squeeze(1)
-        desired_index_best_traj_ee = index_desired_best_traj_ee.transform_points(points_finger_frame).squeeze(1)
-        desired_thumb_best_traj_ee = thumb_desired_best_traj_ee.transform_points(points_finger_frame).squeeze(1)
-        # index_best_traj_ee = index_best_traj_ee[:, :3, 3]
-        # thumb_best_traj_ee = thumb_best_traj_ee[:, :3, 3]
+        index_best_traj_ee = state2ee_pos(best_traj[:, :8], index_ee_name)
+        thumb_best_traj_ee = state2ee_pos(best_traj[:, :8], thumb_ee_name)
 
         traj_line_colors = np.random.random((3, M)).astype(np.float32)
         thumb_colors = np.array([0, 1, 0]).astype(np.float32)
@@ -1195,22 +1180,8 @@ def add_trajectories(trajectories, best_traj, chain, axes=None):
         force_colors = np.array([0, 1, 1]).astype(np.float32)
         
         for e in env.envs:
-            index_p = state2ee_pos(initial_state, index_ee_name).reshape(1, 3).to(device=params['device'])
-            thumb_p = state2ee_pos(initial_state, thumb_ee_name).reshape(1, 3).to(device=params['device'])
-            # p = torch.stack((s[:3].reshape(1, 3).repeat(M, 1),
-            #                  trajectories[:, 0, :3]), dim=1).reshape(2 * M, 3).cpu().numpy()
-            # p_best = torch.stack((s[:3].reshape(1, 3).repeat(1, 1), best_traj_ee[0, :3].unsqueeze(0)), dim=1).reshape(2, 3).cpu().numpy()
-            # p[:, 2] += 0.005
-            # gym.add_lines(viewer, e, 1, p_best, best_traj_line_colors)
-            # gym.add_lines(viewer, e, M, p, traj_line_colors)
-            # gym.add_lines(viewer, e, 1, index_best_force, force_colors)
-            # gym.add_lines(viewer, e, 1, thumb_best_force, force_colors)
-
             T = best_traj.shape[0]
             for t in range(T - 1):
-                # p = torch.stack((trajectories[:, t, :3], trajectories[:, t + 1, :3]), dim=1).reshape(2 * M, 3)
-                # p = p.cpu().numpy()
-                # p[:, 2] += 0.01
                 index_p_best = torch.stack((index_best_traj_ee[t, :3], index_best_traj_ee[t + 1, :3]), dim=0).reshape(2,
                                                                                                                       3).cpu().numpy()
                 thumb_p_best = torch.stack((thumb_best_traj_ee[t, :3], thumb_best_traj_ee[t + 1, :3]), dim=0).reshape(2,
@@ -1220,12 +1191,12 @@ def add_trajectories(trajectories, best_traj, chain, axes=None):
                 desired_thumb_p_best = torch.stack((thumb_best_traj_ee[t, :3], desired_thumb_best_traj_ee[t + 1, :3]), dim=0).reshape(2,
                                                                                                                       3).cpu().numpy()
                 if t == 0:
-                    initial_thumb_ee = state2ee_pos(initial_state, thumb_ee_name).squeeze(0)
+                    initial_thumb_ee = state2ee_pos(initial_state, thumb_ee_name)
                     thumb_state_traj = torch.stack((initial_thumb_ee, thumb_best_traj_ee[0]), dim=0).cpu().numpy()
                     thumb_action_traj = torch.stack((initial_thumb_ee, desired_thumb_best_traj_ee[0]), dim=0).cpu().numpy()
                     axes[1].plot3D(thumb_state_traj[:, 0], thumb_state_traj[:, 1], thumb_state_traj[:, 2], 'blue', label='desired next state')
                     axes[1].plot3D(thumb_action_traj[:, 0], thumb_action_traj[:, 1], thumb_action_traj[:, 2], 'green', label='raw commanded position')
-                    initial_index_ee = state2ee_pos(initial_state, index_ee_name).squeeze(0)
+                    initial_index_ee = state2ee_pos(initial_state, index_ee_name)
                     index_state_traj = torch.stack((initial_index_ee, index_best_traj_ee[0]), dim=0).cpu().numpy()
                     index_action_traj = torch.stack((initial_index_ee, desired_index_best_traj_ee[0]), dim=0).cpu().numpy()
                     axes[0].plot3D(index_state_traj[:, 0], index_state_traj[:, 1], index_state_traj[:, 2], 'blue', label='desired next state')
@@ -1238,34 +1209,26 @@ def add_trajectories(trajectories, best_traj, chain, axes=None):
             gym.step_graphics(sim)
             gym.draw_viewer(viewer, sim, False)
             gym.sync_frame_time(sim)
+
 def add_trajectories_hardware(trajectories, best_traj, chain, axes=None):
     M = len(trajectories)
     if M > 0:
-        best_traj_ee_fk_dict = chain.forward_kinematics(partial_to_full_state(best_traj[:, :8]),
-                                                        frame_indices=frame_indices)
         initial_state = env.get_state()['q'][:, :8]
-        whole_state = torch.cat((initial_state, best_traj[:-1, :8]), dim=0)
-        desired_state = whole_state + best_traj[:, 9:17]
-        desired_traj_ee_fk_dict = chain.forward_kinematics(partial_to_full_state(desired_state),
-                                                        frame_indices=frame_indices)
+        all_state = torch.cat((initial_state, best_traj[:-1, :8]), dim=0)
+        desired_state = all_state + best_traj[:, 9:17]
 
-        index_best_traj_ee = world_trans.compose(best_traj_ee_fk_dict[index_ee_name])  # .get_matrix()
-        thumb_best_traj_ee = world_trans.compose(best_traj_ee_fk_dict[thumb_ee_name])  # .get_matrix()
+        desired_index_best_traj_ee = state2ee_pos(desired_state, index_ee_name)
+        desired_thumb_best_traj_ee = state2ee_pos(desired_state, thumb_ee_name)
 
-        index_desired_best_traj_ee = world_trans.compose(desired_traj_ee_fk_dict[index_ee_name])
-        thumb_desired_best_traj_ee = world_trans.compose(desired_traj_ee_fk_dict[thumb_ee_name])
-        points_finger_frame = torch.tensor([0.00, 0.03, 0.00], device=best_traj.device).unsqueeze(0)
-        index_best_traj_ee = index_best_traj_ee.transform_points(points_finger_frame).squeeze(1)
-        thumb_best_traj_ee = thumb_best_traj_ee.transform_points(points_finger_frame).squeeze(1)
-        desired_index_best_traj_ee = index_desired_best_traj_ee.transform_points(points_finger_frame).squeeze(1)
-        desired_thumb_best_traj_ee = thumb_desired_best_traj_ee.transform_points(points_finger_frame).squeeze(1)
+        index_best_traj_ee = state2ee_pos(best_traj[:, :8], index_ee_name)
+        thumb_best_traj_ee = state2ee_pos(best_traj[:, :8], thumb_ee_name)
 
-        initial_thumb_ee = state2ee_pos(initial_state, thumb_ee_name).squeeze(0)
+        initial_thumb_ee = state2ee_pos(initial_state, thumb_ee_name)
         thumb_state_traj = torch.stack((initial_thumb_ee, thumb_best_traj_ee[0]), dim=0).cpu().numpy()
         thumb_action_traj = torch.stack((initial_thumb_ee, desired_thumb_best_traj_ee[0]), dim=0).cpu().numpy()
         axes[1].plot3D(thumb_state_traj[:, 0], thumb_state_traj[:, 1], thumb_state_traj[:, 2], 'blue', label='desired next state')
         axes[1].plot3D(thumb_action_traj[:, 0], thumb_action_traj[:, 1], thumb_action_traj[:, 2], 'green', label='raw commanded position')
-        initial_index_ee = state2ee_pos(initial_state, index_ee_name).squeeze(0)
+        initial_index_ee = state2ee_pos(initial_state, index_ee_name)
         index_state_traj = torch.stack((initial_index_ee, index_best_traj_ee[0]), dim=0).cpu().numpy()
         index_action_traj = torch.stack((initial_index_ee, desired_index_best_traj_ee[0]), dim=0).cpu().numpy()
         axes[0].plot3D(index_state_traj[:, 0], index_state_traj[:, 1], index_state_traj[:, 2], 'blue', label='desired next state')
