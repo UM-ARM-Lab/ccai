@@ -79,6 +79,9 @@ def state2ee_pos(state, finger_name):
 class PositionControlConstrainedSteinTrajOpt(ConstrainedSteinTrajOpt):
     def __init__(self, problem, params):
         super().__init__(problem, params)
+        self.torque_limit = params.get('torque_limit', 500.0)
+        self.kp = params.get('kp', 500.0)
+
     def _clamp_in_bounds(self, xuz):
         N = xuz.shape[0]
         min_x = self.problem.x_min.reshape(1, 1, -1).repeat(1, self.problem.T, 1)
@@ -89,18 +92,38 @@ class PositionControlConstrainedSteinTrajOpt(ConstrainedSteinTrajOpt):
 
         torch.clamp_(xuz, min=min_x.to(device=xuz.device).reshape(1, -1),
                      max=max_x.to(device=xuz.device).reshape(1, -1))
-        xuz_copy = xuz.reshape((N, self.problem.T, -1))
-        robot_joint_angles = xuz_copy[:, :-1, :8]
-        robot_joint_angles = torch.cat((self.problem.start[:8].reshape((1, 1, 8)).repeat((N, 1, 1)), robot_joint_angles), dim=1)
-        min_u = self.problem.robot_joint_x_min.repeat((N, self.problem.T, 1)).to(xuz.device) - robot_joint_angles
-        max_u = self.problem.robot_joint_x_max.repeat((N, self.problem.T, 1)).to(xuz.device) - robot_joint_angles
-        min_u = torch.maximum(min_u, self.problem.u_min.repeat((N, self.problem.T, 1)).to(xuz.device))
-        max_u = torch.minimum(max_u, self.problem.u_max.repeat((N, self.problem.T, 1)).to(xuz.device))
-        min_x = min_x.repeat((N, 1, 1)).to(device=xuz.device)
-        max_x = max_x.repeat((N, 1, 1)).to(device=xuz.device)
-        min_x[:, :, 9:17] = min_u
-        max_x[:, :, 9:17] = max_u
-        torch.clamp_(xuz, min=min_x.reshape((N, -1)), max=max_x.reshape((N, -1)))
+
+        if self.problem.du > 0:
+            xuz_copy = xuz.reshape((N, self.problem.T, -1))
+            robot_joint_angles = xuz_copy[:, :-1, :8]
+            robot_joint_angles = torch.cat(
+                (self.problem.start[:8].reshape((1, 1, 8)).repeat((N, 1, 1)), robot_joint_angles), dim=1)
+
+            # make the commanded delta position respect the joint limits
+            min_u_jlim = self.problem.robot_joint_x_min.repeat((N, self.problem.T, 1)).to(
+                xuz.device) - robot_joint_angles
+            max_u_jlim = self.problem.robot_joint_x_max.repeat((N, self.problem.T, 1)).to(
+                xuz.device) - robot_joint_angles
+
+            # make the commanded delta position respect the torque limits
+            min_u_tlim = -self.torque_limit / self.kp * torch.ones_like(min_u_jlim)
+            max_u_tlim = self.torque_limit / self.kp * torch.ones_like(max_u_jlim)
+
+            # overall commanded delta position limits
+            min_u = torch.where(min_u_jlim > min_u_tlim, min_u_jlim, min_u_tlim)
+            max_u = torch.where(max_u_tlim > max_u_jlim, max_u_jlim, max_u_tlim)
+            min_x = min_x.repeat((N, 1, 1)).to(device=xuz.device)
+            max_x = max_x.repeat((N, 1, 1)).to(device=xuz.device)
+            min_x[:, :, self.problem.dx:self.problem.dx + self.problem.du] = min_u
+            max_x[:, :, self.problem.dx:self.problem.dx + self.problem.du] = max_u
+
+            # print(min_u)
+            # print(max_u)
+            # print(xuz.shape)
+            _x = xuz.reshape(N, self.problem.T, -1)
+
+            # print(torch.where(_x[:, :, :self.problem.dx:self.problem.dx+self.problem.du] > max_u, 1, 0))
+            torch.clamp_(xuz, min=min_x.reshape((N, -1)), max=max_x.reshape((N, -1)))
 
 class PositionControlConstrainedSVGDMPC(Constrained_SVGD_MPC):
 
