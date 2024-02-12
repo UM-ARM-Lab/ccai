@@ -124,7 +124,10 @@ class PositionControlConstrainedSteinTrajOpt(ConstrainedSteinTrajOpt):
 
             # print(torch.where(_x[:, :, :self.problem.dx:self.problem.dx+self.problem.du] > max_u, 1, 0))
             torch.clamp_(xuz, min=min_x.reshape((N, -1)), max=max_x.reshape((N, -1)))
-
+    def resample(self, xuz):
+        xuz = xuz.to(dtype=torch.float32)
+        self.problem._preprocess(xuz)
+        return super().resample(xuz)
 class PositionControlConstrainedSVGDMPC(Constrained_SVGD_MPC):
 
     def __init__(self, problem, params):
@@ -225,11 +228,11 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         # contact checking
         self.index_contact_scene = pv.RobotScene(robot_sdf, valve_sdf, scene_trans,
                                          collision_check_links=contact_check_hitosashi,
-                                         softmin_temp=100.0,
+                                         softmin_temp=1.0e3,
                                          points_per_link=500)
         self.thumb_contact_scene = pv.RobotScene(robot_sdf, valve_sdf, scene_trans,
                                          collision_check_links=contact_check_oya,
-                                         softmin_temp=100.0,
+                                         softmin_temp=1.0e3,
                                          points_per_link=500)
         # self.index_contact_scene.visualize_robot(partial_to_full_state(self.start[:8]), self.start[-1])
 
@@ -447,7 +450,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
             # Compute gradient w.r.t q
             dcontact_v_dq = (dJ_dq[:, 1:] @ dq.reshape(N, T, 1, 8, 1)).squeeze(-1) - contact_jacobian[:, 1:]
             tmp = torch.cross(d_contact_loc_dq[:, 1:], valve_omega.reshape(N, T, 3, 1), dim=2)  # N x T x 3 x 8
-            dg_dq = dcontact_v_dq + tmp
+            dg_dq = dcontact_v_dq - tmp
 
             # Compute gradient w.r.t valve angle
             d_omega_dtheta = torch.stack((torch.zeros_like(dtheta),
@@ -510,8 +513,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         # A = torch.tensor([[0.0, 1.0, 0.0],
         #                  [0.707, 0.0, 0.707]], device=self.device)
         # force_tan = A @ force_tan.unsqueeze(-1)
-        R = self.get_rotation_from_normal(contact_normal_world.unsqueeze(0)).squeeze(0).detach()
-        force_contact_frame = R.transpose(0, 1) @ force_world_frame.unsqueeze(-1)
+        R = self.get_rotation_from_normal(contact_normal_world.unsqueeze(0)).squeeze(0)
         #force_normal = torch.sum(force_contact_frame[2]).reshape(1, 1)
 
         # print(torch.sum(force_world_frame.reshape(-1) * contact_normal_world.reshape(-1)))
@@ -917,7 +919,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         for t in range(self.T):
             next_q = x[-1][:, :8] + u[:, t]
             x.append(next_q)
-        theta = torch.linspace(self.start[-1], self.goal.item(), self.T)
+        theta = torch.linspace(self.start[-1], self.goal.item(), self.T + 1)[:self.T]
         theta = theta.repeat((N, 1)).unsqueeze(-1).to(self.start.device)
         x = torch.stack(x[1:], dim=1)
         x = torch.cat((x, theta), dim=-1)

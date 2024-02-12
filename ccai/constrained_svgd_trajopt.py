@@ -53,7 +53,6 @@ class ConstrainedSteinTrajOpt:
             dCdCT = dC @ dC.permute(0, 2, 1)
             dCdCT = dCdCT.to(dtype=self.dtype)
             A_bmm = lambda x: dCdCT @ x
-            # print(torch.linalg.matrix_rank(dCdCT))
             #
             # damping_factor = 1e-1
             try:
