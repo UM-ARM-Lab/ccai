@@ -369,37 +369,8 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         hess_sdf_theta = ret_scene.get('hess_env_sdf', None)
         djacobian_dcontact = ret_scene.get('djacobian_dcontact', None)
 
-
         if self.plan_in_contact:
-            # approximate q dot and theta dot
-            dq = (x[:, 1:, :8] - x[:, :-1, :8])
-            dtheta = (x[:, 1:, 8] - x[:, :-1, 8])
-
-            # angular velocity of the valve
-            valve_omega = torch.stack((torch.zeros_like(dtheta), dtheta, torch.zeros_like(dtheta)),
-                                       -1)  # should be N x T-1 x 3
-
-            contact_jacobian = ret_scene.get('contact_jacobian', None)
-            contact_hessian = ret_scene.get('contact_hessian', None)
-            contact_loc = ret_scene.get('closest_pt_world', None)
-            d_contact_loc_dq = ret_scene.get('closest_pt_q_grad', None)
-
-            contact_point_v = (contact_jacobian[:, :-1] @ dq.reshape(N, T, 8, 1)).squeeze(-1)  # should be N x T x 3
-            # valve location in robot frame
-            valve_robot_frame = world_trans.inverse().transform_points(valve_location.reshape(1, 3))
-            contact_point_r_valve = contact_loc.reshape(N, T + 1, 3) - valve_robot_frame.reshape(1, 1, 3)
-
-            # valve omega in robot frame
-            valve_omega_robot_frame = world_trans.inverse().transform_normals(valve_omega)
-            #object_contact_point_v = torch.cross(contact_point_r_valve[:, :-1],
-            #                                     valve_omega_robot_frame)
-            object_contact_point_v = torch.cross(valve_omega_robot_frame, contact_point_r_valve[:, :-1])
-
-            # kinematics constraint, should be 3-dimensional
-            kinematics_constraint = contact_point_v - object_contact_point_v  # we actually ended up computing T+1 contact constraints, but start state is fixed so we throw that away
-            # for T kinematic constraints and T sdf constraints
-            g = torch.cat((sdf[:, 1:].reshape(N, -1),
-                           kinematics_constraint.reshape(N, -1)), dim=-1)  # should be N x T*4
+            g = sdf[:, 1:].reshape(N, T)
         else:
             g = sdf[:, -1].reshape(N, -1)
 
@@ -413,43 +384,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
             grad_sdf[:, T_range, T_range, :8] = grad_sdf_q[:, 1:]
             grad_sdf[:, T_range, T_range, 9] = grad_sdf_theta.reshape(N, T + 1)[:, 1:]
             grad_g = grad_sdf.reshape(N, -1, T, self.dx + self.du)
-
-            if self.plan_in_contact:
-
-                # retrieve and make shape (N, T+1, 3, 3, 8)
-                # djacobian_dcontact = djacobian_dcontact.reshape(N, -1, 3, 6, 16)[:, :, :, :3,
-                #                     (0, 1, 2, 3, 12, 13, 14, 15)]
-
-                dJ_dq = djacobian_dcontact.reshape(N, T + 1, 3, 3, 8, 1) * d_contact_loc_dq.reshape(N, T + 1, 3, 1, 1,
-                                                                                                    8)
-                dJ_dq = dJ_dq.sum(dim=2)  # should be N x T x 3 x 8 x 8
-
-                dJ_dq = dJ_dq + contact_hessian
-                dcontact_v_dq = (dJ_dq[:, 1:] @ dq.reshape(N, T, 1, 8, 1)).squeeze(-1) - contact_jacobian[:,
-                                                                                         1:]  # should be N x T x 3 x 8
-                tmp = torch.cross(d_contact_loc_dq[:, 1:], valve_omega.reshape(N, T, 3, 1), dim=2)  # N x T x 3 x 8
-                dkinematics_constraint_dq = dcontact_v_dq + tmp
-
-                d_omega_dtheta = torch.stack((torch.zeros_like(dtheta),
-                                               torch.ones_like(dtheta),
-                                               torch.zeros_like(dtheta)), dim=-1)  # N x T x 3
-                d_omega_dtheta = world_trans.inverse().transform_normals(d_omega_dtheta)
-
-                dkinematics_constraint_dtheta = torch.cross(d_omega_dtheta, contact_point_r_valve[:, :-1], dim=-1)  # N x T x 3
-
-                # print('--')
-                # print(world_trans.transform_normals(contact_point_v))
-                # print(world_trans.transform_normals(object_contact_point_v))
-                grad_kinematics_constraint = torch.zeros((N, T, T, 3, self.dx + self.du), device=x.device)
-                grad_kinematics_constraint[:, T_range_plus, T_range_minus, :, :8] = dkinematics_constraint_dq[:, 1:]
-                grad_kinematics_constraint[:, T_range_plus, T_range_minus, :, 8] = dkinematics_constraint_dtheta[:, 1:]
-                grad_kinematics_constraint[:, T_range, T_range, :, :8] = contact_jacobian[:, :-1]  # looks correct
-                grad_kinematics_constraint[:, T_range, T_range, :, 8] = -dkinematics_constraint_dtheta  # looks correct
-                grad_kinematics_constraint = grad_kinematics_constraint.permute(0, 1, 3, 2, 4)
-
-                grad_g = torch.cat((grad_g,
-                                    grad_kinematics_constraint.reshape(N, -1, T, self.dx + self.du)), dim=1)
-            else:
+            if not self.plan_in_contact:
                 grad_g = grad_g[:, -1].unsqueeze(1)
             grad_g = grad_g.reshape(N, -1, T * (self.dx + self.du))
 
@@ -462,6 +397,80 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
 
         return g, grad_g, None
 
+    @combine_finger_grads
+    def _valve_kinematics_constraint(self, xu, finger, compute_grads=True, compute_hess=False):
+        """
+            Computes on the kinematics of the valve and the finger being consistant
+        """
+        x = xu[:, :, :self.dx]
+        N, T, _ = x.shape
+
+        # we want to add the start state to x, this x is now T + 1
+        x = torch.cat((self.start.reshape(1, 1, -1).repeat(N, 1, 1), x), dim=1)
+
+        # Retrieve pre-processed data
+        ret_scene = self.data[finger]
+        djacobian_dcontact = ret_scene.get('djacobian_dcontact', None)
+        contact_jacobian = ret_scene.get('contact_jacobian', None)
+        contact_hessian = ret_scene.get('contact_hessian', None)
+        contact_loc = ret_scene.get('closest_pt_world', None)
+        d_contact_loc_dq = ret_scene.get('closest_pt_q_grad', None)
+        dJ_dq = ret_scene.get('dJ_dq', None)
+
+        # approximate q dot and theta dot
+        dq = (x[:, 1:, :8] - x[:, :-1, :8])
+        dtheta = (x[:, 1:, 8] - x[:, :-1, 8])
+
+        # angular velocity of the valve
+        valve_omega = torch.stack((torch.zeros_like(dtheta),
+                                   dtheta,
+                                   torch.zeros_like(dtheta)), -1)  # should be N x T-1 x 3
+
+        # compute robot contact point velocity
+        contact_point_v = (contact_jacobian[:, :-1] @ dq.reshape(N, T, 8, 1)).squeeze(-1)  # should be N x T x 3
+
+        # compute valve contact point velocity
+        valve_robot_frame = world_trans.inverse().transform_points(self.valve_location.reshape(1, 3))
+        contact_point_r_valve = contact_loc.reshape(N, T + 1, 3) - valve_robot_frame.reshape(1, 1, 3)
+        valve_omega_robot_frame = world_trans.inverse().transform_normals(valve_omega)
+        object_contact_point_v = torch.cross(valve_omega_robot_frame, contact_point_r_valve[:, :-1])
+
+        # kinematics constraint, should be 3-dimensional
+        # we actually ended up computing T+1 contact constraints, but start state is fixed so we throw that away
+        g = (contact_point_v - object_contact_point_v).reshape(N, -1)
+
+        if compute_grads:
+            T_range = torch.arange(T, device=x.device)
+            T_range_minus = torch.arange(T - 1, device=x.device)
+            T_range_plus = torch.arange(1, T, device=x.device)
+
+            # Compute gradient w.r.t q
+            dcontact_v_dq = (dJ_dq[:, 1:] @ dq.reshape(N, T, 1, 8, 1)).squeeze(-1) - contact_jacobian[:, 1:]
+            tmp = torch.cross(d_contact_loc_dq[:, 1:], valve_omega.reshape(N, T, 3, 1), dim=2)  # N x T x 3 x 8
+            dg_dq = dcontact_v_dq + tmp
+
+            # Compute gradient w.r.t valve angle
+            d_omega_dtheta = torch.stack((torch.zeros_like(dtheta),
+                                          torch.ones_like(dtheta),
+                                          torch.zeros_like(dtheta)), dim=-1)  # N x T x 3
+            d_omega_dtheta = world_trans.inverse().transform_normals(d_omega_dtheta)
+            dg_dtheta = torch.cross(d_omega_dtheta, contact_point_r_valve[:, :-1], dim=-1)  # N x T x 3
+
+            # assemble gradients into a single (sparse) tensor
+            grad_g = torch.zeros((N, T, T, 3, self.dx + self.du), device=x.device)
+            grad_g[:, T_range_plus, T_range_minus, :, :8] = dg_dq[:, 1:]
+            grad_g[:, T_range_plus, T_range_minus, :, 8] = dg_dtheta[:, 1:]
+            grad_g[:, T_range, T_range, :, :8] = contact_jacobian[:, :-1]
+            grad_g[:, T_range, T_range, :, 8] = -dg_dtheta
+            grad_g = grad_g.permute(0, 1, 3, 2, 4).reshape(N, -1, T * (self.dx + self.du))
+        else:
+            return g, None, None
+
+        if compute_hess:
+            hess = torch.zeros(N, g.shape[1], T * (self.dx + self.du), T * (self.dx + self.du), device=self.device)
+            return g, grad_g, hess
+
+        return g, grad_g, None
     @staticmethod
     def get_rotation_from_normal(normal_vector):
         """
@@ -740,18 +749,24 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
                                                                              compute_grads=compute_grads,
                                                                              compute_hess=compute_hess)
 
+        g_kine, grad_g_kine, hess_g_kine = self._valve_kinematics_constraint(xu.reshape(N, T, self.dx + self.du),
+                                                                                 compute_grads=compute_grads,
+                                                                                 compute_hess=compute_hess)
+        g, grad_g, hess_g = None, None, None
         if self.plan_in_contact:
             g_dynamics, grad_g_dynamics, hess_g_dynamics = self._dynamics_constraints(
                 xu.reshape(N, T, self.dx + self.du),
                 compute_grads=compute_grads,
                 compute_hess=compute_hess)
-            g_contact = torch.cat((g_contact, g_dynamics), dim=1)
+            g = torch.cat((g_contact, g_kine, g_dynamics), dim=1)
             if grad_g_contact is not None:
-                grad_g_contact = torch.cat((grad_g_contact, grad_g_dynamics), dim=1)
+                grad_g = torch.cat((grad_g_contact, grad_g_kine, grad_g_dynamics), dim=1)
             if hess_g_contact is not None:
-                hess_g_contact = torch.cat((hess_g_contact, hess_g_dynamics), dim=1)
+                hess_g = torch.cat((hess_g_contact, hess_g_kine, hess_g_dynamics), dim=1)
+        else:
+            g, grad_g, hess_g = g_contact, grad_g_contact, hess_g_contact
 
-        return g_contact, grad_g_contact, hess_g_contact
+        return g, grad_g, hess_g
 
     def _collision_check(self, x, check_flag, compute_grads=True, compute_hess=True):
         # this returns NEGATIVE sdf value
