@@ -6,10 +6,13 @@ num_trials: 20
 visualize: True
 experiment_name: 'allegro_test'
 hardware: False
+valve_type: 'cylinder'
+sim_device: 'cuda:0'
+friction_coefficient: 0.95
 controllers:
   csvgd:
     # N: 16
-    N: 2
+    N: 4
     alpha_J: 5.0e-3
     alpha_C: 1
     step_size: 0.1
