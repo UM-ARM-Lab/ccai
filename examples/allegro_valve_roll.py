@@ -1076,6 +1076,7 @@ def do_trial(env, params, fpath):
             action = action + params['joint_friction'] / env.joint_stiffness * torch.sign(action)
         action = action + start.unsqueeze(0)[:, :8] # NOTE: this is required since we define action as delta action
         # action = best_traj[0, :8]
+        # action[:, 4:] = 0
         env.step(action)
         # if params['hardware']:
         #     # ros_node.apply_action(action[0].detach().cpu().numpy())
