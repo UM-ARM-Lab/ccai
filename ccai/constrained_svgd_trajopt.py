@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from torch.profiler import profile, record_function, ProfilerActivity
 
-from torch_cg import cg_batch
+from torch_cg import cg_batch   
 
 
 class ConstrainedSteinTrajOpt:
@@ -34,6 +34,8 @@ class ConstrainedSteinTrajOpt:
         self.dtype = torch.float32
         self.delta_x = None
         self.Bk = None
+        self.gamma = 1
+        self.max_gamma = 1
 
     def _bfgs_update(self, dC):
         if self.Bk is None:
@@ -74,6 +76,7 @@ class ConstrainedSteinTrajOpt:
 
         # use approximation for hessian
         if hess_C is None:
+
             # self._bfgs_update(dC)
             # hess_C = self.Bk
             hess_C = torch.zeros(N, self.dh + self.dg,
@@ -99,6 +102,7 @@ class ConstrainedSteinTrajOpt:
             projection = dCdCT_inv @ dC
             eye = torch.eye(d * self.T + self.dh, device=xuz.device, dtype=xuz.dtype).unsqueeze(0)
             projection = eye - dC.permute(0, 2, 1) @ projection
+
             # compute term for repelling towards constraint
             xi_C = dCdCT_inv @ C.unsqueeze(-1)
             xi_C = (dC.permute(0, 2, 1) @ xi_C).squeeze(-1)
@@ -170,25 +174,6 @@ class ConstrainedSteinTrajOpt:
             phi = self.gamma * kernelized_score.squeeze(-1) / N + grad_matrix_K / N  # maximize phi
 
             xi_J = -phi
-            if False:
-                # Normalize gradient
-                normxiC = torch.clamp(torch.linalg.norm(xi_C, dim=1, keepdim=True, ord=np.inf), min=1e-9)
-                # normxiC = torch.min(0.9 * torch.ones_like(normxiC) / self.dt, normxiC)
-                xi_C = self.alpha_C * xi_C / normxiC
-
-                # if self.normxiJ is None:
-                #    self.normxiJ = torch.clamp(torch.linalg.norm(xi_J, dim=1, keepdim=True, ord=np.inf), min=1e-6)
-                #    xi_J = self.alpha_J * xi_J / self.normxiJ
-                # else:
-                normxiJ = torch.clamp(torch.linalg.norm(xi_J, dim=1, keepdim=True, ord=np.inf), min=1e-6)
-                xi_J = self.alpha_J * xi_J / normxiJ
-
-            # make both xi_C and xi_J have a maximum norm of 10
-            # norm_xi_C = torch.linalg.norm(xi_C, dim=1, keepdim=True)
-            # norm_xi_J = torch.linalg.norm(xi_J, dim=1, keepdim=True)
-
-            # xi_C = torch.where(norm_xi_C > 10, xi_C / norm_xi_C * 10, xi_C)
-            # xi_J = torch.where(norm_xi_J > 10, xi_J / norm_xi_J * 10, xi_J)
 
         return (self.alpha_J * xi_J + self.alpha_C * xi_C).detach()
 
@@ -316,6 +301,7 @@ class ConstrainedSteinTrajOpt:
             #
             # optim.zero_grad()
             grad = self.compute_update(xuz)
+
             # print(torch.linalg.norm(grad, dim=-1))
             # for k in range(10):
             #    dt = self.dt / (2 ** k)

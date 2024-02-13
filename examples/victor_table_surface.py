@@ -389,7 +389,8 @@ def do_trial(env, params, fpath):
 
 if __name__ == "__main__":
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/victor_table.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/config/victor_table.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/victor_table.yaml').read_text())
 
     from tqdm import tqdm
 

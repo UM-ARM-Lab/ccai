@@ -20,7 +20,6 @@ import pathlib
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
-
 def cost(trajectory, goal):
     x = trajectory[:, :12]
     u = trajectory[:, 12:]
@@ -384,7 +383,6 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         return xu
 
 class QuadrotorIpoptProblem(QuadrotorProblem, IpoptProblem):
-
     def __init__(self, start, goal, T, include_obstacle=False, gp_sdf_model=None):
         super().__init__(start, goal, T, device='cpu', include_obstacle=include_obstacle, gp_sdf_model=gp_sdf_model)
 
