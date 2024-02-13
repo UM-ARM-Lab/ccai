@@ -41,7 +41,7 @@ img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 class PositionControlConstrainedSteinTrajOpt(ConstrainedSteinTrajOpt):
     def __init__(self, problem, params):
         super().__init__(problem, params)
-        self.torque_limit = params.get('torque_limit', 500.0)
+        self.torque_limit = params.get('torque_limit', 200.0)
         self.kp = params.get('kp', 500.0)
 
     def _clamp_in_bounds(self, xuz):
@@ -1231,15 +1231,7 @@ def add_trajectories(trajectories, best_traj, chain, axes=None):
         
         for e in env.envs:
             T = best_traj.shape[0]
-            for t in range(T - 1):
-                index_p_best = torch.stack((index_best_traj_ee[t, :3], index_best_traj_ee[t + 1, :3]), dim=0).reshape(2,
-                                                                                                                      3).cpu().numpy()
-                thumb_p_best = torch.stack((thumb_best_traj_ee[t, :3], thumb_best_traj_ee[t + 1, :3]), dim=0).reshape(2,
-                                                                                                                      3).cpu().numpy()
-                desired_index_p_best = torch.stack((index_best_traj_ee[t, :3], desired_index_best_traj_ee[t + 1, :3]), dim=0).reshape(2,
-                                                                                                                      3).cpu().numpy()
-                desired_thumb_p_best = torch.stack((thumb_best_traj_ee[t, :3], desired_thumb_best_traj_ee[t + 1, :3]), dim=0).reshape(2,
-                                                                                                                      3).cpu().numpy()
+            for t in range(T):
                 if t == 0:
                     initial_thumb_ee = state2ee_pos(initial_state, thumb_ee_name)
                     thumb_state_traj = torch.stack((initial_thumb_ee, thumb_best_traj_ee[0]), dim=0).cpu().numpy()
@@ -1251,10 +1243,21 @@ def add_trajectories(trajectories, best_traj, chain, axes=None):
                     index_action_traj = torch.stack((initial_index_ee, desired_index_best_traj_ee[0]), dim=0).cpu().numpy()
                     axes[0].plot3D(index_state_traj[:, 0], index_state_traj[:, 1], index_state_traj[:, 2], 'blue', label='desired next state')
                     axes[0].plot3D(index_action_traj[:, 0], index_action_traj[:, 1], index_action_traj[:, 2], 'green', label='raw commanded position')
-                gym.add_lines(viewer, e, 1, index_p_best, index_colors)
-                gym.add_lines(viewer, e, 1, thumb_p_best, thumb_colors)
-                gym.add_lines(viewer, e, 1, desired_index_p_best, np.array([0, 1, 1]).astype(np.float32))
-                gym.add_lines(viewer, e, 1, desired_thumb_p_best, np.array([1, 1, 1]).astype(np.float32))
+                else:
+                    thumb_state_traj = torch.stack((thumb_best_traj_ee[t - 1, :3], thumb_best_traj_ee[t, :3]), dim=0).cpu().numpy()
+                    thumb_action_traj = torch.stack((thumb_best_traj_ee[t - 1, :3], desired_thumb_best_traj_ee[t, :3]), dim=0).cpu().numpy()
+                    index_state_traj = torch.stack((index_best_traj_ee[t - 1, :3], index_best_traj_ee[t, :3]), dim=0).cpu().numpy()
+                    index_action_traj = torch.stack((index_best_traj_ee[t - 1, :3], desired_index_best_traj_ee[t, :3]), dim=0).cpu().numpy()
+                
+                thumb_state_traj = thumb_state_traj.reshape(2, 3)
+                thumb_action_traj = thumb_action_traj.reshape(2, 3)
+                index_state_traj = index_state_traj.reshape(2, 3)
+                index_action_traj = index_action_traj.reshape(2, 3)
+                
+                gym.add_lines(viewer, e, 1, index_state_traj, index_colors)
+                gym.add_lines(viewer, e, 1, thumb_state_traj, thumb_colors)
+                gym.add_lines(viewer, e, 1, index_action_traj, np.array([0, 1, 1]).astype(np.float32))
+                gym.add_lines(viewer, e, 1, thumb_action_traj, np.array([1, 1, 1]).astype(np.float32))
                 # gym.add_lines(viewer, e, M, p, traj_line_colors)
             gym.step_graphics(sim)
             gym.draw_viewer(viewer, sim, False)
