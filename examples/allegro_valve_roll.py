@@ -983,8 +983,6 @@ def do_trial(env, params, fpath):
 
     start = state['q'].reshape(9).to(device=params['device'])
     # start = torch.cat((state['q'].reshape(10), torch.zeros(1).to(state['q'].device))).to(device=params['device'])
-    chain.to(device=params['device'])
-
     if params['controller'] == 'csvgd':
         pregrasp_problem = AllegroValveTurning(
             start=start,
@@ -1051,11 +1049,9 @@ def do_trial(env, params, fpath):
     index_traj_history = []
     state = env.get_state()
     start = state['q'].reshape(9).to(device=params['device'])
-    thumb_ee = state2ee_pos(start[:8], turn_problem.thumb_ee_name, 
-                            turn_problem.chain, turn_problem.frame_indices, turn_problem.world_trans)
+    thumb_ee = state2ee_pos(start[:8], turn_problem.thumb_ee_name)
     thumb_traj_history.append(thumb_ee.detach().cpu().numpy())
-    index_ee = state2ee_pos(start[:8], turn_problem.index_ee_name, 
-                            turn_problem.chain, turn_problem.frame_indices, turn_problem.world_trans)
+    index_ee = state2ee_pos(start[:8], turn_problem.index_ee_name)
     index_traj_history.append(index_ee.detach().cpu().numpy())
 
     info_list = []
@@ -1070,11 +1066,11 @@ def do_trial(env, params, fpath):
 
         print(f"solve time: {time.time() - start_time}")
         # add trajectory lines to sim
-        # if k >= 1:
-        #     if params['hardware']:
-        #         add_trajectories_hardware(trajectories, best_traj, chain, axes)
-        #     else:
-        #         add_trajectories(trajectories, best_traj, chain, axes)
+        if k >= 1:
+            if params['hardware']:
+                add_trajectories_hardware(trajectories, best_traj, chain, axes)
+            else:
+                add_trajectories(trajectories, best_traj, chain, axes)
 
         # process the action
         ## end effector force to torque
@@ -1117,14 +1113,12 @@ def do_trial(env, params, fpath):
         # for debugging
         state = env.get_state()
         start = state['q'].reshape(9).to(device=params['device'])
-        thumb_ee = state2ee_pos(start[:8], turn_problem.thumb_ee_name, 
-                                turn_problem.chain, turn_problem.frame_indices, turn_problem.world_trans)
+        thumb_ee = state2ee_pos(start[:8], turn_problem.thumb_ee_name)
         thumb_traj_history.append(thumb_ee.detach().cpu().numpy())
         temp_for_plot = np.stack(thumb_traj_history, axis=0)
         if k >= 2:
             ax_thumb.plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray', label='actual')
-        index_ee = state2ee_pos(start[:8], turn_problem.index_ee_name, 
-                                turn_problem.chain, turn_problem.frame_indices, turn_problem.world_trans)
+        index_ee = state2ee_pos(start[:8], turn_problem.index_ee_name)
         index_traj_history.append(index_ee.detach().cpu().numpy())
         temp_for_plot = np.stack(index_traj_history, axis=0)
         if k>= 2:
@@ -1300,6 +1294,8 @@ if __name__ == "__main__":
     index_ee_link = chain.frame_to_idx[index_ee_name]
     thumb_ee_link = chain.frame_to_idx[thumb_ee_name]
     frame_indices = torch.tensor([index_ee_link, thumb_ee_link])
+    state2ee_pos = partial(state2ee_pos, chain=chain, frame_indices=frame_indices, world_trans=env.world_trans)
+
 
     for i in tqdm(range(config['num_trials'])):
         goal = 0.5 * torch.tensor([np.pi])
