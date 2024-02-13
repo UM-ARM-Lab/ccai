@@ -31,7 +31,7 @@ def full_to_partial_state(full):
     ), dim=-1)
     return partial
 
-def combine_finger_grads(func):
+def combine_finger_constraints(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         # Get values from dict
@@ -43,9 +43,9 @@ def combine_finger_grads(func):
         compute_hess = kwargs.pop('compute_hess', False)
 
         # compute contact constraints for index finger
-        g_i, grad_g_i, hess_g_i = func(args[0], xu, finger='index',
+        g_i, grad_g_i, hess_g_i = func(args[0], xu, finger_name='index',
                                        compute_grads=compute_grads, compute_hess=compute_hess, **kwargs)
-        g_t, grad_g_t, hess_g_t = func(args[0], xu, finger='thumb',
+        g_t, grad_g_t, hess_g_t = func(args[0], xu, finger_name='thumb',
                                        compute_grads=compute_grads, compute_hess=compute_hess, **kwargs)
 
         g = torch.cat((g_i, g_t), dim=1)
@@ -61,3 +61,15 @@ def combine_finger_grads(func):
         return g, grad_g, None
 
     return wrapper
+
+def state2ee_pos(state, finger_name, chain, frame_indices, world_trans):
+    """
+    :params state: B x 8 joint configuration for full hand
+    :return ee_pos: B x 3 position of ee
+
+    """
+    fk_dict = chain.forward_kinematics(partial_to_full_state(state), frame_indices=frame_indices)
+    m = world_trans.compose(fk_dict[finger_name])
+    points_finger_frame = torch.tensor([0.00, 0.03, 0.00], device=m.device).unsqueeze(0)
+    ee_p = m.transform_points(points_finger_frame).squeeze(-2)
+    return ee_p
