@@ -53,7 +53,7 @@ thumb_ee_link = chain.frame_to_idx[thumb_ee_name]
 frame_indices = torch.tensor([index_ee_link, thumb_ee_link])
 
 device = 'cuda:0'
-device = 'cpu'
+# device = 'cpu'
 valve_location = torch.tensor([0.85, 0.70, 1.405]).to(device)  # the root of the valve
 # instantiate environment
 friction_coefficient = 0.95  # this one is used for planning, not simulation
@@ -2076,7 +2076,7 @@ if __name__ == "__main__":
     results = {}
 
     for i in tqdm(range(config['num_trials'])):
-        goal = -0.5 * torch.tensor([np.pi])
+        goal = 0.5 * torch.tensor([np.pi])
         # goal = goal + 0.025 * torch.randn(1) + 0.2
         for controller in config['controllers'].keys():
             env.reset()

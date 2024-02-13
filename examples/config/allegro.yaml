@@ -1,7 +1,7 @@
 ---
-T: 5
+T: 10
 receding_horizon: True
-num_steps: 5
+num_steps: 15
 num_trials: 1
 num_turns: 4
 visualize: True
@@ -14,9 +14,9 @@ controllers:
   csvgd:
     # N: 16
     N: 4
-    alpha_J: 1.0e-4
+    alpha_J: 5.0e-3
     alpha_C: 1
-    step_size: 0.01
+    step_size: 0.1
     momentum: 0.
     device: 'cuda:0'
     online_iters: 20
