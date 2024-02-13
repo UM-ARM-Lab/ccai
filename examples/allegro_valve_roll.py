@@ -954,11 +954,6 @@ class AllegroValveRegrasping(AllegroContactProblem):
         N = xu.shape[0]
         T = xu.shape[1]
 
-        # g, grad_g, hess_g = self._contact_constraints(xu=xu.reshape(N, T, self.dx + self.du),
-        #                                               compute_grads=compute_grads,
-        #                                               compute_hess=compute_hess,
-        #                                               terminal=True)
-        # return g, grad_g, hess_g
         g_dynamics, grad_g_dynamics, hess_g_dynamics = self._dynamics_constraints(
             xu=xu.reshape(N, T, self.dx + self.du),
             compute_grads=compute_grads,
@@ -969,36 +964,13 @@ class AllegroValveRegrasping(AllegroContactProblem):
             compute_grads=compute_grads,
             compute_hess=compute_hess)
 
-        # return g_contact_target, grad_g_contact_target, hess_g_contact_target
-        #
-        # grad_g_contact_target_fd = torch.zeros_like(grad_g_contact_target)
-        # eps = 1e-3
-        # for i in range(grad_g_contact_target_fd.shape[2]):
-        #     print(i)
-        #     d = torch.zeros(N, grad_g_contact_target_fd.shape[2], device=self.device)
-        #     d[:, i] = eps
-        #     d = d.reshape(N, T, -1)
-        #     self._preprocess(xu + d)
-        #     g_pos, _, _ = self._contact_target_constraints(xu + d, compute_grads=False)
-        #     self._preprocess(xu - d)
-        #     g_neg, _, _ = self._contact_target_constraints(xu - d, compute_grads=False)
-        #     grad_g_contact_target_fd[:, :, i] = (g_pos - g_neg) / (2 * eps)
-        #
-        # print(torch.max(torch.abs(grad_g_contact_target -)))
-        # grad_g_contact_target = grad_g_contact_target.reshape(N, 6, T, -1)
-        # grad_g_contact_target_fd = grad_g_contact_target_fd.reshape(N, 6, T, -1)
         g = torch.cat((g_dynamics, g_contact_target), dim=1)
+        
         grad_g, hess_g = None, None
         if compute_grads:
             grad_g = torch.cat((grad_g_dynamics, grad_g_contact_target), dim=1)
         if compute_hess:
             hess_g = torch.cat((hess_g_dynamics, hess_g_contact_target), dim=1)
-
-        # g = torch.cat((g, g_contact_target), dim=1)
-        # if grad_g is not None:
-        #     grad_g = torch.cat((grad_g, grad_g_contact_target), dim=1)
-        # if hess_g is not None:
-        #     hess_g = torch.cat((hess_g, hess_g_contact_target), dim=1)
 
         return g, grad_g, hess_g
 
@@ -1035,11 +1007,11 @@ def do_trial(env, params, fpath):
             du=8,
             start=start[:8],
             goal=params['valve_goal'] * 0,
-            T=8,
+            T=4,
             chain=params['chain'],
             device=params['device'],
             valve_asset_pos=env.valve_pose,
-            valve_location=valve_location,
+            valve_location=params['valve_location'],
             valve_type=params['valve_type'],
             world_trans=env.world_trans
         )
@@ -1053,7 +1025,7 @@ def do_trial(env, params, fpath):
             chain=params['chain'],
             device=params['device'],
             valve_asset_pos=env.valve_pose,
-            valve_location=valve_location,
+            valve_location=params['valve_location'],
             valve_type=params['valve_type'],
             friction_coefficient=params['friction_coefficient'],
             world_trans=env.world_trans
@@ -1133,19 +1105,8 @@ def do_trial(env, params, fpath):
         # if params['hardware']:
         #     # ros_node.apply_action(action[0].detach().cpu().numpy())
         #     ros_node.apply_action(partial_to_full_state(action[0]).detach().cpu().numpy())
-        # TODO: need to fix the compute hessian part
-
-        # print(f'index_ee_diff: {torch.linalg.norm(plan_index_ee - actual_index_ee):.4f}, thumb_ee_diff: {torch.linalg.norm(plan_thumb_ee - actual_thumb_ee):.4f}')
         turn_problem._preprocess(best_traj.unsqueeze(0))
         
-        # distance = turn_problem._con_eq(best_traj.unsqueeze(0), compute_grads=False, compute_hess=False)
-        # print(f'1st step distance {distance[:, 0]}')
-        # print(f'max_distance {torch.max(distance)}, min_distance {torch.min(distance)}')
-
-        # TODO: this is not correct, this one does not include sdf constraint
-        # index_friction_constraint = inequality_eval_dict['allegro_hand_hitosashi_finger_finger_0_aftc_base_link_friction_cone']
-        # thumb_friction_constraint = inequality_eval_dict['allegro_hand_oya_finger_3_aftc_base_link_friction_cone']
-        # print(f"1st step friction cone constraint: index: {index_friction_constraint[0,0]}, thumb: {thumb_friction_constraint[0,0]}")
         print(turn_problem.thumb_contact_scene.scene_collision_check(partial_to_full_state(x[:, :8]), x[:, 8],
                                                                 compute_gradient=False, compute_hessian=False))
         # distance2surface = torch.sqrt((best_traj_ee[:, 2] - valve_location[2].unsqueeze(0)) ** 2 + (best_traj_ee[:, 0] - valve_location[0].unsqueeze(0))**2)
