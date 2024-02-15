@@ -41,8 +41,8 @@ img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 class PositionControlConstrainedSteinTrajOpt(ConstrainedSteinTrajOpt):
     def __init__(self, problem, params):
         super().__init__(problem, params)
-        self.torque_limit = params.get('torque_limit', 200.0)
-        self.kp = params.get('kp', 500.0)
+        self.torque_limit = params.get('torque_limit', 10.0)
+        self.kp = params.get('kp', 50.0)
 
     def _clamp_in_bounds(self, xuz):
         N = xuz.shape[0]
@@ -214,7 +214,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         G, dG, hessG = self.combined_constraints(augmented_trajectory, compute_hess=self.compute_hess)
 
         # print(J.mean(), G.abs().mean(), G.abs().max())
-
+        
         if hessG is not None:
             hessG.detach_()
 
@@ -255,7 +255,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         if self.dx == 9:
             theta = torch.linspace(self.start[-1], self.goal.item(), self.T + 1)[:self.T]
             theta = theta.repeat((N, 1)).unsqueeze(-1).to(self.start.device)
-            theta = torch.ones_like(theta) * self.start[-1]
+            # theta = torch.ones_like(theta) * self.start[-1]
             x = torch.cat((x, theta), dim=-1)
 
         xu = torch.cat((x, u), dim=2)
@@ -324,12 +324,12 @@ class AllegroContactProblem(AllegroValveProblem):
         self.index_contact_scene = pv.RobotScene(robot_sdf, valve_sdf, scene_trans,
                                                  collision_check_links=contact_check_hitosashi,
                                                  softmin_temp=1.0e3,
-                                                 points_per_link=500,
+                                                 points_per_link=1000,
                                                  )
         self.thumb_contact_scene = pv.RobotScene(robot_sdf, valve_sdf, scene_trans,
                                                  collision_check_links=contact_check_oya,
                                                  softmin_temp=1.0e3,
-                                                 points_per_link=500)
+                                                 points_per_link=1000)
         # self.index_contact_scene.visualize_robot(partial_to_full_state(self.start[:8]), self.start[-1])
     def _preprocess(self, xu):
         N = xu.shape[0]
@@ -420,7 +420,7 @@ class AllegroContactProblem(AllegroValveProblem):
             grad_g[:, T_range, T_range, :8] = grad_g_q[:, 1:]
             # is valve in state
             if self.dx == 9:
-                grad_g[:, T_range, T_range, 9] = grad_g_theta.reshape(N, T + 1)[:, 1:]
+                grad_g[:, T_range, T_range, 8] = grad_g_theta.reshape(N, T + 1)[:, 1:]
             grad_g = grad_g.reshape(N, -1, T, self.dx + self.du)
             grad_g = grad_g.reshape(N, -1, T * (self.dx + self.du))
             if terminal:
@@ -493,15 +493,17 @@ class AllegroValveTurning(AllegroContactProblem):
         # TODO: check if the addtional term of the smoothness cost and running goal cost is necessary
         state = xu[:, :self.dx]  # state dim = 9
         state = torch.cat((start.reshape(1, self.dx), state), dim=0)  # combine the first time step into it
+        
         action = xu[:, self.dx:]  # action dim = 8
         next_q = state[:-1, :-1] + action
         action_cost = torch.sum((state[1:, :-1] - next_q) ** 2)
         action_cost = action_cost + 10 * torch.sum(action ** 2)
+
         smoothness_cost = 10 * torch.sum((state[1:] - state[:-1]) ** 2)
-        # smoothness_cost += 10 * torch.sum(
-        #    (state[1:, -1] - state[:-1, -1]) ** 2)  # weight the smoothness of theta more
+        smoothness_cost += 50 * torch.sum((state[1:, -1] - state[:-1, -1]) ** 2)
+
         goal_cost = torch.sum((10 * (state[:, -1] - goal) ** 2),
-                              dim=0)  # + (10 * (state[-1, -1] - goal) ** 2).reshape(-1)
+                              dim=0) + (10 * (state[-1, -1] - goal) ** 2).reshape(-1)
 
         return smoothness_cost + 10 * action_cost + goal_cost
     
@@ -994,11 +996,6 @@ def do_trial(env, params, fpath):
         env.frame_fpath = None
         env.frame_id = None
 
-    desired_contact_loc = {
-        'index': torch.tensor([0.0924, 0.0717, 0.0463], device=params['device']),
-        'thumb': torch.tensor([0.0920, 0.0657, 0.0027], device=params['device'])
-    }
-
     start = state['q'].reshape(9).to(device=params['device'])
     # start = torch.cat((state['q'].reshape(10), torch.zeros(1).to(state['q'].device))).to(device=params['device'])
     if params['controller'] == 'csvgd':
@@ -1085,11 +1082,10 @@ def do_trial(env, params, fpath):
 
         print(f"solve time: {time.time() - start_time}")
         # add trajectory lines to sim
-        if k >= 1:
-            if params['hardware']:
-                add_trajectories_hardware(trajectories, best_traj, chain, axes)
-            else:
-                add_trajectories(trajectories, best_traj, chain, axes)
+        if params['hardware']:
+            add_trajectories_hardware(trajectories, best_traj, chain, axes)
+        else:
+            add_trajectories(trajectories, best_traj, chain, axes)
 
         # process the action
         ## end effector force to torque
@@ -1129,7 +1125,7 @@ def do_trial(env, params, fpath):
         index_ee = state2ee_pos(start[:8], turn_problem.index_ee_name)
         index_traj_history.append(index_ee.detach().cpu().numpy())
         temp_for_plot = np.stack(index_traj_history, axis=0)
-        if k>= 2:
+        if k >= 2:
             ax_index.plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray', label='actual')
     with open(f'{fpath.resolve()}/info.pkl', 'wb') as f:
         pkl.dump(info_list, f)
@@ -1150,18 +1146,11 @@ def do_trial(env, params, fpath):
 
     state = env.get_state()
     state = state['q'].reshape(9).to(device=params['device'])
-
-    # now weee want to turn it again!
-
-    # actual_trajectory.append(state.clone())
+    actual_trajectory.append(state.clone())
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 9)
     turn_problem.T = actual_trajectory.shape[0]
     # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
-    final_distance_to_goal = actual_trajectory[:, -1] - params['valve_goal']
-    # final_distance_to_goal = torch.linalg.norm(
-    #     chain.forward_kinematics(actual_trajectory[:, :7].reshape(-1, 7)).reshape(-1, 4, 4)[:, :2, 3] - params['goal'].unsqueeze(0),
-    #     dim=1
-    # )
+    final_distance_to_goal = (actual_trajectory[:, -1] - params['valve_goal']).abs
 
     print(f'Controller: {params["controller"]} Final distance to goal: {torch.min(final_distance_to_goal)}')
     print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
@@ -1240,12 +1229,12 @@ def add_trajectories_hardware(trajectories, best_traj, chain, axes=None):
         initial_thumb_ee = state2ee_pos(initial_state, thumb_ee_name)
         thumb_state_traj = torch.stack((initial_thumb_ee, thumb_best_traj_ee[0]), dim=0).cpu().numpy()
         thumb_action_traj = torch.stack((initial_thumb_ee, desired_thumb_best_traj_ee[0]), dim=0).cpu().numpy()
-        axes[1].plot3D(thumb_state_traj[:, 0], thumb_state_traj[:, 1], thumb_state_traj[:, 2], 'blue', label='desired next state')
+        # axes[1].plot3D(thumb_state_traj[:, 0], thumb_state_traj[:, 1], thumb_state_traj[:, 2], 'blue', label='desired next state')
         axes[1].plot3D(thumb_action_traj[:, 0], thumb_action_traj[:, 1], thumb_action_traj[:, 2], 'green', label='raw commanded position')
         initial_index_ee = state2ee_pos(initial_state, index_ee_name)
         index_state_traj = torch.stack((initial_index_ee, index_best_traj_ee[0]), dim=0).cpu().numpy()
         index_action_traj = torch.stack((initial_index_ee, desired_index_best_traj_ee[0]), dim=0).cpu().numpy()
-        axes[0].plot3D(index_state_traj[:, 0], index_state_traj[:, 1], index_state_traj[:, 2], 'blue', label='desired next state')
+        # axes[0].plot3D(index_state_traj[:, 0], index_state_traj[:, 1], index_state_traj[:, 2], 'blue', label='desired next state')
         axes[0].plot3D(index_action_traj[:, 0], index_action_traj[:, 1], index_action_traj[:, 2], 'green', label='raw commanded position')
 
 
