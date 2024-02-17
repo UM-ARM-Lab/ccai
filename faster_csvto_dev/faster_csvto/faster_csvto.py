@@ -1,8 +1,96 @@
 import torch
 from torch.profiler import profile
+
 import csvgd
+import numpy as np
+import jax
+import jax.numpy as jnp
 
 from torch_cg import cg_batch
+
+
+def compute_step_jax(xuz: jnp.array,  # Tau^i's stacked as rows in a matrix  (N, d * T)
+                     grad_J: jnp.array,  # nabla log(p(Tau^j | o)) stacked as rows in a matrix (N, d * T)
+                     K: jnp.array,  # K(Tau^i, Tau^j) as (i, j) entries in a matrix (N, N)
+                     grad_K: jnp.array,
+                     # Add third dimension with the length of the trajectory to hold derivatives (N, N, d * T)
+                     C: jnp.array,
+                     # Evaluation of constraint functions for each trajectory as rows in a matrix (N, dg + dh)
+                     dC: jnp.array,
+                     # Add third dimension with the length of the trajectory to hold derivatives (N, dg + dh, d * T)
+                     hess_C: jnp.array,
+                     # Add fourth dimension with the length of the trajectory to hold derivatives (N, dg + dh, d * T, d * T)
+                     N: int, T: int, d: int, dg: int, dh: int, gamma: int,
+                     dtype,
+                     alpha_C: float, alpha_J: float) -> torch.Tensor:
+    """
+    Args:
+    Returns:
+    """
+    # Get inv(dC * dCT), shape (N, dg + dh, dg + dh).
+    dCdCT_inv = jnp.linalg.inv(dC @ dC.transpose((0, 2, 1)))
+
+    # Get projection tensor via equation (36), shape (N, d * T, d * T).
+    projection = jnp.expand_dims(jnp.eye(d * T + dh), axis=0) - dC.transpose((0, 2, 1)) @ dCdCT_inv @ dC
+
+    # Get constraint step from equation (39), shape (N, d * T).
+    phi_C = (dC.transpose((0, 2, 1)) @ dCdCT_inv @ jnp.expand_dims(C, axis=-1)).squeeze(-1)
+
+    # Get the tangent space kernel from equation (29), shape (N, N, d * T, d * T).
+    K_tangent = K.reshape(N, N, 1, 1) * jnp.expand_dims(projection, axis=0) @ jnp.expand_dims(projection, axis=1)
+
+    # compute gradient for projection
+    # now the second index (1) is the
+    # x with which we are differentiating
+    # dCdCT_inv = dCdCT_inv.unsqueeze(1)
+    dCdCT_inv = jnp.expand_dims(dCdCT_inv, axis=1)
+
+    # dCT = dC.permute(0, 2, 1).unsqueeze(1)
+    dCT = jnp.expand_dims(dC.transpose(0, 2, 1), axis=1)
+    # dC = dC.unsqueeze(1)
+    dC = jnp.expand_dims(dC, axis=1)
+
+    # hess_C = hess_C.permute(0, 3, 1, 2)
+    hess_C = hess_C.transpose(0, 3, 1, 2)
+    # hess_CT = hess_C.permute(0, 1, 3, 2)
+    hess_CT = hess_C.transpose(0, 1, 3, 2)
+
+    # compute first term
+    first_term = hess_CT @ (dCdCT_inv @ dC)
+    second_term = dCT @ dCdCT_inv @ (hess_C @ dCT + dC @ hess_CT) @ dCdCT_inv @ dC
+    third_term = dCT @ dCdCT_inv @ hess_C
+
+    # add terms and permute so last dimension is the x which we are differentiating w.r.t
+    # grad_projection = (first_term - second_term + third_term).permute(0, 2, 3, 1)
+    grad_projection = (first_term - second_term + third_term).transpose(0, 2, 3, 1)
+    # grad_proj = torch.einsum('mijj->mij', grad_projection)
+    grad_proj = jnp.einsum('mijj->mij', grad_projection)
+
+    # now we need to combine all the different projections together
+    # PP = projection.unsqueeze(0) @ projection.unsqueeze(1)  # should now be N x N x D x D
+    PP = jnp.expand_dims(projection, axis=0) @ jnp.expand_dims(projection, axis=1)  # should now be N x N x D x D
+    PQ = projection
+    # first_term = torch.einsum('nmj, nmij->nmi', grad_K, PP)
+    first_term = jnp.einsum('nmj, nmij->nmi', grad_K, PP)
+    grad_matrix_K = first_term
+
+    # second_term = K.reshape(N, N, 1, 1) * PQ.unsqueeze(0) @ grad_proj.unsqueeze(1)
+    second_term = jnp.expand_dims(jnp.expand_dims(K, axis=-1), axis=-1) * jnp.expand_dims(PQ, axis=0) @ jnp.expand_dims(grad_proj, axis=1)
+    # second_term = torch.sum(second_term, dim=3)
+    second_term = jnp.sum(second_term, axis=3)
+    # grad_matrix_K = grad_matrix_K + second_term
+    grad_matrix_K = grad_matrix_K + second_term
+    # grad_matrix_K = torch.sum(grad_matrix_K, dim=0)
+    grad_matrix_K = jnp.sum(grad_matrix_K, axis=0)
+
+    # Get tangent space step from equation (46).
+    # kernelized_score = torch.sum(K_tangent @ -grad_J.reshape(N, 1, -1, 1), dim=0)
+    kernelized_score = jnp.sum(K_tangent @ -grad_J.reshape(N, 1, -1, 1), axis=0)
+    # phi_tangent = -(gamma * kernelized_score.squeeze(-1) / N + grad_matrix_K / N)  # maximize phi
+    phi_tangent = -(gamma * kernelized_score.squeeze(-1) / N + grad_matrix_K / N)  # maximize phi
+
+    # Return second two terms in equation (26).
+    return alpha_J * phi_tangent + alpha_C * phi_C
 
 
 class FasterConstrainedSteinTrajOpt:
@@ -10,6 +98,7 @@ class FasterConstrainedSteinTrajOpt:
     Attributes:
     Methods:
     """
+
     def __init__(self, problem, params):
         self.dt = params.get('step_size', 1e-2)  # Full gradient step scale
         self.alpha_J = params.get('alpha_J', 1)  # Tanget step scale
@@ -60,7 +149,22 @@ class FasterConstrainedSteinTrajOpt:
             hess_C = torch.zeros(N, self.dh + self.dg,
                                  self.T * (self.dx + self.du + self.dz),
                                  self.T * (self.dx + self.du + self.dz), device=xuz.device)
-        return self._compute_step(xuz, grad_J, K, grad_K, C, dC, hess_C, N, self.T, d, self.dg, self.dh, self.gamma, self.dtype, self.alpha_C, self.alpha_J)
+
+        # # Compute step with pytorch.
+        # return self._compute_step(xuz, grad_J, K, grad_K, C, dC, hess_C, N, self.T, d, self.dg, self.dh, self.gamma,
+        #                           self.dtype, self.alpha_C, self.alpha_J)
+
+        # Compute step with Jax.
+        xuz = jnp.asarray(xuz.detach().cpu().numpy())
+        grad_J = jnp.asarray(grad_J.detach().cpu().numpy())
+        K = jnp.asarray(K.detach().cpu().numpy())
+        grad_K = jnp.asarray(grad_K.detach().cpu().numpy())
+        C = jnp.asarray(C.detach().cpu().numpy())
+        dC = jnp.asarray(dC.detach().cpu().numpy())
+        hess_C = jnp.asarray(hess_C.detach().cpu().numpy())
+        jax_return: jnp.array = compute_step_jax(xuz, grad_J, K, grad_K, C, dC, hess_C, N, self.T, d, self.dg, self.dh, self.gamma,
+                                self.dtype, self.alpha_C, self.alpha_J)
+        return torch.from_numpy(np.asarray(jax_return)).cuda()
 
     def _compute_step(self,
                       xuz: torch.Tensor,
@@ -78,6 +182,7 @@ class FasterConstrainedSteinTrajOpt:
         Returns:
         """
         with torch.no_grad():
+            # Solve Ax = I to get A^-1, where A = dC * dCT. dCdCT_inv is of shape (N, dg + dh, dg + dh).
             eye = torch.eye(dg + dh).repeat(N, 1, 1).to(device=C.device, dtype=dtype)
             dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1), eye)
 
@@ -235,6 +340,7 @@ class FasterConstrainedSteinTrajOpt:
         C = T // resample_period
         p = 1
         self.max_gamma = 1
+
         def driving_force(t):
             return ((t % (T / C)) / (T / C)) ** p
 
