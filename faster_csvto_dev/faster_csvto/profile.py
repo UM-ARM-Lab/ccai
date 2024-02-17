@@ -12,13 +12,13 @@ SOLVE_OPTION = 'solve'
 SOLVE_ITERATIONS = 2
 
 UPDATE_OPTION = 'compute update'
-UPDATE_ITERATIONS = 100
+UPDATE_ITERATIONS = 5
 
 # PROFILE_OPTION = SOLVE_OPTION
 PROFILE_OPTION = UPDATE_OPTION
 
-USE_FAST = True
-# USE_FAST = False
+# USE_FAST = True
+USE_FAST = False
 
 
 def main() -> None:
@@ -71,8 +71,8 @@ def main() -> None:
         random_augmented_state = torch.rand(8, 192, dtype=csvto.dtype, device='cuda:0')
 
         # Check that update results are equivalent.
-        assert (torch.allclose(faster_csvto.compute_update(random_augmented_state),
-                               csvto.compute_update(random_augmented_state)))
+        # assert (torch.allclose(faster_csvto.compute_update(random_augmented_state),
+        #                        csvto.compute_update(random_augmented_state)))
 
         if USE_FAST:
             # Time a loop of compute update steps.

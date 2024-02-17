@@ -20,9 +20,14 @@ def compute_step_jax(xuz: jnp.array,  # Tau^i's stacked as rows in a matrix  (N,
                      # Add third dimension with the length of the trajectory to hold derivatives (N, dg + dh, d * T)
                      hess_C: jnp.array,
                      # Add fourth dimension with the length of the trajectory to hold derivatives (N, dg + dh, d * T, d * T)
-                     N: int, T: int, d: int, dg: int, dh: int, gamma: int,
-                     dtype,
-                     alpha_C: float, alpha_J: float) -> torch.Tensor:
+                     N: int,
+                     T: int,
+                     d: int,
+                     dg: int,
+                     dh: int,
+                     gamma: float,
+                     alpha_C: float,
+                     alpha_J: float) -> jnp.array:
     """
     Args:
     Returns:
@@ -39,58 +44,45 @@ def compute_step_jax(xuz: jnp.array,  # Tau^i's stacked as rows in a matrix  (N,
     # Get the tangent space kernel from equation (29), shape (N, N, d * T, d * T).
     K_tangent = K.reshape(N, N, 1, 1) * jnp.expand_dims(projection, axis=0) @ jnp.expand_dims(projection, axis=1)
 
-    # compute gradient for projection
-    # now the second index (1) is the
-    # x with which we are differentiating
-    # dCdCT_inv = dCdCT_inv.unsqueeze(1)
+    # Reshape inputs for computing the gradient of the projection tensor.
     dCdCT_inv = jnp.expand_dims(dCdCT_inv, axis=1)
-
-    # dCT = dC.permute(0, 2, 1).unsqueeze(1)
     dCT = jnp.expand_dims(dC.transpose(0, 2, 1), axis=1)
-    # dC = dC.unsqueeze(1)
     dC = jnp.expand_dims(dC, axis=1)
-
-    # hess_C = hess_C.permute(0, 3, 1, 2)
     hess_C = hess_C.transpose(0, 3, 1, 2)
-    # hess_CT = hess_C.permute(0, 1, 3, 2)
     hess_CT = hess_C.transpose(0, 1, 3, 2)
 
-    # compute first term
-    first_term = hess_CT @ (dCdCT_inv @ dC)
-    second_term = dCT @ dCdCT_inv @ (hess_C @ dCT + dC @ hess_CT) @ dCdCT_inv @ dC
+    # Get the A term in equation (57) using equation (58) for all trajectories.
+    first_term = hess_CT @ dCdCT_inv @ dC
     third_term = dCT @ dCdCT_inv @ hess_C
 
-    # add terms and permute so last dimension is the x which we are differentiating w.r.t
-    # grad_projection = (first_term - second_term + third_term).permute(0, 2, 3, 1)
-    grad_projection = (first_term - second_term + third_term).transpose(0, 2, 3, 1)
-    # grad_proj = torch.einsum('mijj->mij', grad_projection)
-    grad_proj = jnp.einsum('mijj->mij', grad_projection)
+    # Get the B term in equation (57) using equation (59) and equation (60).
+    second_term = dCT @ dCdCT_inv @ (hess_C @ dCT + dC @ hess_CT) @ dCdCT_inv @ dC
 
-    # now we need to combine all the different projections together
-    # PP = projection.unsqueeze(0) @ projection.unsqueeze(1)  # should now be N x N x D x D
-    PP = jnp.expand_dims(projection, axis=0) @ jnp.expand_dims(projection, axis=1)  # should now be N x N x D x D
-    PQ = projection
-    # first_term = torch.einsum('nmj, nmij->nmi', grad_K, PP)
+    # Get the gradient of the projection tensor from equation (57).
+    grad_projection = jnp.einsum('mijj->mij',
+                                 (first_term + third_term - second_term).transpose(0, 2, 3, 1))
+
+    # Get the first term for the gradient of the projection tensor from equation (32).
+    PP = jnp.expand_dims(projection, axis=0) @ jnp.expand_dims(projection, axis=1)
     first_term = jnp.einsum('nmj, nmij->nmi', grad_K, PP)
-    grad_matrix_K = first_term
 
-    # second_term = K.reshape(N, N, 1, 1) * PQ.unsqueeze(0) @ grad_proj.unsqueeze(1)
-    second_term = jnp.expand_dims(jnp.expand_dims(K, axis=-1), axis=-1) * jnp.expand_dims(PQ, axis=0) @ jnp.expand_dims(grad_proj, axis=1)
-    # second_term = torch.sum(second_term, dim=3)
+    # Get the second term for the gradient of the projection tensor from equation (32).
+    second_term = (jnp.expand_dims(jnp.expand_dims(K, axis=-1), axis=-1) *
+                   jnp.expand_dims(projection, axis=0) @ jnp.expand_dims(grad_projection, axis=1))
     second_term = jnp.sum(second_term, axis=3)
-    # grad_matrix_K = grad_matrix_K + second_term
-    grad_matrix_K = grad_matrix_K + second_term
-    # grad_matrix_K = torch.sum(grad_matrix_K, dim=0)
-    grad_matrix_K = jnp.sum(grad_matrix_K, axis=0)
+
+    # Get the gradient of the projection tensor from equation (32).
+    grad_K_tangent = jnp.sum(first_term + second_term, axis=0)
 
     # Get tangent space step from equation (46).
-    # kernelized_score = torch.sum(K_tangent @ -grad_J.reshape(N, 1, -1, 1), dim=0)
     kernelized_score = jnp.sum(K_tangent @ -grad_J.reshape(N, 1, -1, 1), axis=0)
-    # phi_tangent = -(gamma * kernelized_score.squeeze(-1) / N + grad_matrix_K / N)  # maximize phi
-    phi_tangent = -(gamma * kernelized_score.squeeze(-1) / N + grad_matrix_K / N)  # maximize phi
+    phi_tangent = -(gamma * kernelized_score.squeeze(-1) / N + grad_K_tangent / N)
 
-    # Return second two terms in equation (26).
+    # Return the update terms from equation (26).
     return alpha_J * phi_tangent + alpha_C * phi_C
+
+
+jit_compute_step_jax = jax.jit(compute_step_jax, static_argnums=(7, 8, 9, 10, 11, 12, 13, 14))
 
 
 class FasterConstrainedSteinTrajOpt:
@@ -162,8 +154,8 @@ class FasterConstrainedSteinTrajOpt:
         C = jnp.asarray(C.detach().cpu().numpy())
         dC = jnp.asarray(dC.detach().cpu().numpy())
         hess_C = jnp.asarray(hess_C.detach().cpu().numpy())
-        jax_return: jnp.array = compute_step_jax(xuz, grad_J, K, grad_K, C, dC, hess_C, N, self.T, d, self.dg, self.dh, self.gamma,
-                                self.dtype, self.alpha_C, self.alpha_J)
+        jax_return: jnp.array = jit_compute_step_jax(xuz, grad_J, K, grad_K, C, dC, hess_C, N, self.T, d, self.dg, self.dh, self.gamma,
+                                self.alpha_C, self.alpha_J)
         return torch.from_numpy(np.asarray(jax_return)).cuda()
 
     def _compute_step(self,
