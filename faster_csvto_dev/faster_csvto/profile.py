@@ -8,18 +8,29 @@ from ccai.quadrotor_env import QuadrotorEnv
 from examples.quadrotor_example import QuadrotorProblem
 from faster_csvto import FasterConstrainedSteinTrajOpt
 
+import timeit
+
 SOLVE_OPTION = 'solve'
 SOLVE_ITERATIONS = 2
 
 UPDATE_OPTION = 'compute update'
-UPDATE_ITERATIONS = 5
+UPDATE_ITERATIONS = 100
 
 # PROFILE_OPTION = SOLVE_OPTION
 PROFILE_OPTION = UPDATE_OPTION
 
-# USE_FAST = True
-USE_FAST = False
+USE_FAST = True
+# USE_FAST = False
 
+# Setting XLA performance flags
+import os
+os.environ['XLA_FLAGS'] = (
+    '--xla_gpu_enable_triton_softmax_fusion=true '
+    '--xla_gpu_triton_gemm_any=True '
+    '--xla_gpu_enable_async_collectives=true '
+    '--xla_gpu_enable_latency_hiding_scheduler=true '
+    '--xla_gpu_enable_highest_priority_async_stream=true '
+)
 
 def main() -> None:
     # Initialize QuadrotorProblem.
@@ -74,35 +85,19 @@ def main() -> None:
         # assert (torch.allclose(faster_csvto.compute_update(random_augmented_state),
         #                        csvto.compute_update(random_augmented_state)))
 
-        if USE_FAST:
-            # Time a loop of compute update steps.
-            with profile(activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
-                         record_shapes=True,
-                         profile_memory=True,
-                         with_stack=True) as faster_csvto_profiler:
-                with record_function("faster csvto compute_update()"):
-                    for _ in range(UPDATE_ITERATIONS):
-                        faster_csvto.compute_update(random_augmented_state)
-        else:
-            # Time a loop of compute update steps.
-            with profile(activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
-                         record_shapes=True,
-                         profile_memory=True,
-                         with_stack=True) as csvto_profiler:
-                with record_function("csvto compute_update()"):
-                    for _ in range(UPDATE_ITERATIONS):
-                        csvto.compute_update(random_augmented_state)
+        # Compile the jax update function ahead of time.
+        faster_csvto.compute_update(random_augmented_state)
 
-    if USE_FAST:
-        # Print profiling results for faster csvto.
-        print('Profile for Faster CSVTO')
-        print(faster_csvto_profiler.key_averages().table(sort_by="cpu_time_total", row_limit=10))
-        print(faster_csvto_profiler.key_averages().table(sort_by="self_cuda_time_total", row_limit=10))
-    else:
-        # Print profiling results for original csvto.
-        print('Profile for Original CSVTO')
-        print(csvto_profiler.key_averages().table(sort_by="cpu_time_total", row_limit=10))
-        print(csvto_profiler.key_averages().table(sort_by="self_cuda_time_total", row_limit=10))
+        if USE_FAST:
+            start = timeit.default_timer()
+            for _ in range(UPDATE_ITERATIONS):
+                faster_csvto.run_compute_update_jax()
+            print('Fast time: ', timeit.default_timer() - start)
+        else:
+            start = timeit.default_timer()
+            for _ in range(UPDATE_ITERATIONS):
+                faster_csvto.run_compute_update()
+            print('Original time: ', timeit.default_timer() - start)
 
 
 if __name__ == '__main__':

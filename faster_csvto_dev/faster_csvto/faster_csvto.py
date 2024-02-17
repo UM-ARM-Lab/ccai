@@ -9,8 +9,7 @@ import jax.numpy as jnp
 from torch_cg import cg_batch
 
 
-def compute_step_jax(xuz: jnp.array,  # Tau^i's stacked as rows in a matrix  (N, d * T)
-                     grad_J: jnp.array,  # nabla log(p(Tau^j | o)) stacked as rows in a matrix (N, d * T)
+def compute_step_jax(grad_J: jnp.array,  # nabla log(p(Tau^j | o)) stacked as rows in a matrix (N, d * T)
                      K: jnp.array,  # K(Tau^i, Tau^j) as (i, j) entries in a matrix (N, N)
                      grad_K: jnp.array,
                      # Add third dimension with the length of the trajectory to hold derivatives (N, N, d * T)
@@ -18,20 +17,21 @@ def compute_step_jax(xuz: jnp.array,  # Tau^i's stacked as rows in a matrix  (N,
                      # Evaluation of constraint functions for each trajectory as rows in a matrix (N, dg + dh)
                      dC: jnp.array,
                      # Add third dimension with the length of the trajectory to hold derivatives (N, dg + dh, d * T)
-                     hess_C: jnp.array,
+                     hess_C: jnp.array
                      # Add fourth dimension with the length of the trajectory to hold derivatives (N, dg + dh, d * T, d * T)
-                     N: int,
-                     T: int,
-                     d: int,
-                     dg: int,
-                     dh: int,
-                     gamma: float,
-                     alpha_C: float,
-                     alpha_J: float) -> jnp.array:
+                     ) -> jnp.array:
     """
     Args:
     Returns:
     """
+    N = 8
+    T = 12
+    d = 16
+    dh = 0
+    gamma = 1
+    alpha_C = 1
+    alpha_J = 0.1
+
     # Get inv(dC * dCT), shape (N, dg + dh, dg + dh).
     dCdCT_inv = jnp.linalg.inv(dC @ dC.transpose((0, 2, 1)))
 
@@ -82,7 +82,7 @@ def compute_step_jax(xuz: jnp.array,  # Tau^i's stacked as rows in a matrix  (N,
     return alpha_J * phi_tangent + alpha_C * phi_C
 
 
-jit_compute_step_jax = jax.jit(compute_step_jax, static_argnums=(7, 8, 9, 10, 11, 12, 13, 14))
+jit_compute_step_jax = jax.jit(compute_step_jax)
 
 
 class FasterConstrainedSteinTrajOpt:
@@ -97,8 +97,6 @@ class FasterConstrainedSteinTrajOpt:
         self.alpha_C = params.get('alpha_C', 1)  # Constraint step scale
         self.iters = params.get('iters', 100)  # Number of gradient steps to take in sequence
         self.penalty = params.get('penalty', 1e2)  # Weight on 1 norm of equality constraint violation
-        self.resample_sigma = params.get('resample_sigma', 1e-2)  # Weight on diagonal covariance for resampling
-        self.resample_temperature = params.get('resample_temperature', 0.1)  # Temperature parameter for resampling
 
         self.problem = problem  # Problem object
         self.dx: int = problem.dx  # Dimension of state
@@ -116,6 +114,22 @@ class FasterConstrainedSteinTrajOpt:
         self.dtype = torch.float32  # Data type used to maintain all data
         self.gamma = 1
         self.max_gamma = 1
+
+        self.xuz = None
+        self.grad_J = None
+        self.K = None
+        self.grad_K = None
+        self.C = None
+        self.dC = None
+        self.hess_C = None
+
+        self.grad_J_jax = None
+        self.K_jax = None
+        self.grad_K_jax = None
+        self.C_jax = None
+        self.dC_jax = None
+        self.hess_C_jax = None
+        self.compiled_step_jax = None
 
     def compute_update(self, xuz):
         """Compute the combined tangent and constraint gradient for a given augmented state.
@@ -142,11 +156,19 @@ class FasterConstrainedSteinTrajOpt:
                                  self.T * (self.dx + self.du + self.dz),
                                  self.T * (self.dx + self.du + self.dz), device=xuz.device)
 
-        # # Compute step with pytorch.
-        # return self._compute_step(xuz, grad_J, K, grad_K, C, dC, hess_C, N, self.T, d, self.dg, self.dh, self.gamma,
-        #                           self.dtype, self.alpha_C, self.alpha_J)
+        # Store values for run_compute_update.
+        self.N = N
+        self.d = d
 
-        # Compute step with Jax.
+        self.xuz = xuz
+        self.grad_J = grad_J
+        self.K = K
+        self.grad_K = grad_K
+        self.C = C
+        self.dC = dC
+        self.hess_C = hess_C
+
+        # Store values for run_compute_update_jax.
         xuz = jnp.asarray(xuz.detach().cpu().numpy())
         grad_J = jnp.asarray(grad_J.detach().cpu().numpy())
         K = jnp.asarray(K.detach().cpu().numpy())
@@ -154,8 +176,21 @@ class FasterConstrainedSteinTrajOpt:
         C = jnp.asarray(C.detach().cpu().numpy())
         dC = jnp.asarray(dC.detach().cpu().numpy())
         hess_C = jnp.asarray(hess_C.detach().cpu().numpy())
-        jax_return: jnp.array = jit_compute_step_jax(xuz, grad_J, K, grad_K, C, dC, hess_C, N, self.T, d, self.dg, self.dh, self.gamma,
-                                self.alpha_C, self.alpha_J)
+
+        self.grad_J_jax =  grad_J
+        self.K_jax = K
+        self.grad_K_jax = grad_K
+        self.C_jax = C
+        self.dC_jax = dC
+        self.hess_C_jax = hess_C
+
+        self.compiled_step = jit_compute_step_jax.lower(grad_J, K, grad_K, C, dC, hess_C).compile()
+
+    def run_compute_update(self):
+        return self._compute_step(self.xuz, self.grad_J, self.K, self.grad_K, self.C, self.dC, self.hess_C, self.N, self.T, self.d, self.dg, self.dh, self.gamma,
+                                  self.dtype, self.alpha_C, self.alpha_J)
+    def run_compute_update_jax(self):
+        jax_return: jnp.array = self.compiled_step(self.grad_J_jax, self.K_jax, self.grad_K_jax, self.C_jax, self.dC_jax, self.hess_C_jax)
         return torch.from_numpy(np.asarray(jax_return)).cuda()
 
     def _compute_step(self,
@@ -251,66 +286,10 @@ class FasterConstrainedSteinTrajOpt:
         torch.clamp_(xuz, min=min_x.to(device=xuz.device).reshape(1, -1),
                      max=max_x.to(device=xuz.device).reshape(1, -1))
 
-    def resample(self, xuz):
-        """
-        Args:
-            xuz (torch.tensor): Augmented state tensor of shape
-                (#particles, time_horizon * (state_dimension + control_dimension) + slack_variable_dimension).
-        Returns:
-        """
-        N = xuz.shape[0]
-        xuz = xuz.to(dtype=torch.float32)
-        J = self.problem.get_cost(xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du])
-        C, dC, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1),
-                                                     compute_grads=True,
-                                                     compute_hess=False)
-
-        penalty = J.reshape(N) + self.penalty * torch.sum(C.reshape(N, -1).abs(), dim=1)
-        # normalize penalty
-        penalty = (penalty - penalty.min()) / (penalty.max() - penalty.min())
-        # now we sort particles
-        idx = torch.argsort(penalty, descending=False)
-        xuz = xuz[idx]
-        penalty = penalty[idx]
-        weights = torch.softmax(-penalty / self.resample_temperature, dim=0, )
-        weights = torch.cumsum(weights, dim=0)
-        # now we resample
-        p = torch.rand(N, device=xuz.device)
-        idx = torch.searchsorted(weights, p)
-
-        # compute projection for noise
-        dCdCT = dC @ dC.permute(0, 2, 1)
-        A_bmm = lambda x: dCdCT @ x
-        eye = torch.eye(self.dg + self.dh).repeat(N, 1, 1).to(device=C.device)
-        try:
-            dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1), eye)
-            if torch.any(torch.isnan(dCdCT_inv)):
-                raise ValueError('nan in inverse')
-        except Exception as e:
-            print(e)
-            # dCdCT_inv = torch.linalg.lstsq(dC @ dC.permute(0, 2, 1), eye).solution
-            # dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1))
-            dCdCT_inv, _ = cg_batch(A_bmm, eye, verbose=False)
-        projection = dCdCT_inv @ dC
-        eye = torch.eye((self.dx + self.du) * self.T + self.dh, device=xuz.device, dtype=xuz.dtype).unsqueeze(0)
-        projection = eye - dC.permute(0, 2, 1) @ projection
-
-        noise = self.resample_sigma * torch.randn_like(xuz)
-        eps = projection[idx] @ noise.unsqueeze(-1)
-        # print(penalty, weights)
-        # we need to add a very small amount of noise just so that the particles are distinct - otherwise
-        # they will never separate
-        xuz = xuz[idx] + eps.squeeze(-1)
-
-        return xuz
-
-        # weights = weights / torch.sum(weights)
-
-    def solve(self, x0, resample=False):
+    def solve(self, x0):
         """
         Args:
             x0 (torch.tensor):
-            resample (bool):
         Returns:
         """
         # Update from problem in case T has changed.
@@ -336,10 +315,6 @@ class FasterConstrainedSteinTrajOpt:
         def driving_force(t):
             return ((t % (T / C)) / (T / C)) ** p
 
-        # Optionally resample the augmented state.
-        if resample:
-            xuz.data = self.resample(xuz.data)
-
         path = [xuz.data.clone()]
         self.gamma = self.max_gamma
 
@@ -348,10 +323,6 @@ class FasterConstrainedSteinTrajOpt:
             # Update gamma with driving force function.
             if T > 50:
                 self.gamma = self.max_gamma * driving_force(iter)
-
-            # Resample if the resample period has been hit.
-            if (iter + 1) % resample_period == 0 and (iter < T - 1):
-                xuz.data = self.resample(xuz.data)
 
             # Compute the gradient update step.
             grad = self.compute_update(xuz)

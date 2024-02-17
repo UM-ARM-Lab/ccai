@@ -85,16 +85,12 @@ class ConstrainedSteinTrajOpt:
         with torch.no_grad():
             # we try and invert the dC dCT, if it is singular then we use the psuedo-inverse
             eye = torch.eye(self.dg + self.dh).repeat(N, 1, 1).to(device=C.device, dtype=self.dtype)
-            print('torch', eye.shape)
             dCdCT = dC @ dC.permute(0, 2, 1)
             A_bmm = lambda x: dCdCT @ x
             #
             # damping_factor = 1e-1
             try:
                 dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1), eye)
-                print('torch', dCdCT_inv.shape)
-                print('torch', dCdCT_inv.dtype)
-                return dCdCT_inv
                 if torch.any(torch.isnan(dCdCT_inv)):
                     raise ValueError('nan in inverse')
             except Exception as e:
@@ -106,13 +102,11 @@ class ConstrainedSteinTrajOpt:
             projection = dCdCT_inv @ dC
             eye = torch.eye(d * self.T + self.dh, device=xuz.device, dtype=xuz.dtype).unsqueeze(0)
             projection = eye - dC.permute(0, 2, 1) @ projection
-            print('torch', projection.shape)
 
             # compute term for repelling towards constraint
             xi_C = dCdCT_inv @ C.unsqueeze(-1)
             xi_C = (dC.permute(0, 2, 1) @ xi_C).squeeze(-1)
             # xi_C = (dC.permute(0, 2, 1) @ C.unsqueeze(-1)).squeeze(-1)
-            print('torch', xi_C.shape)
 
             # compute gradient for projection
             # now the second index (1) is the
@@ -166,7 +160,6 @@ class ConstrainedSteinTrajOpt:
                     PQ = projection
                     first_term = torch.einsum('nmj, nmij->nmi', grad_K, PP)
                     matrix_K = K.reshape(N, N, 1, 1) * projection.unsqueeze(0) @ projection.unsqueeze(1)
-                    print('torch', matrix_K.shape)
 
             grad_matrix_K = first_term
             if self.use_constraint_hessian:
