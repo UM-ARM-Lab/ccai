@@ -64,6 +64,8 @@ class HardwareEnv:
         valve_angle = self.get_valve_angle()
         valve_angle = torch.tensor([valve_angle]).float().to(self.device)
         q.append(valve_angle)
+        all_state = torch.cat((robot_state, valve_angle), dim=-1)
+        state['all_state'] = all_state
         state['q'] = torch.cat(q).unsqueeze(0)
         state['theta'] = valve_angle
         return state

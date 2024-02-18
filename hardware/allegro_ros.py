@@ -10,7 +10,7 @@ class RosNode(object):
     '''
     Ros Node for communication with the hardware
     '''
-    def __init__(self, node_name='run_policy', num_repeat=10):
+    def __init__(self, node_name='run_policy', num_repeat=5):
         try:
             rospy.init_node('allegro_hand_node')
         except:

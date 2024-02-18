@@ -1,8 +1,3 @@
-"""
-This script turns the valve assuming the contact point does not change, which means it does not considering rolling
-"""
-import os
-
 from isaac_victor_envs.utils import get_assets_dir
 from isaac_victor_envs.tasks.allegro import AllegroValveTurningEnv
 
@@ -41,8 +36,8 @@ img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 class PositionControlConstrainedSteinTrajOpt(ConstrainedSteinTrajOpt):
     def __init__(self, problem, params):
         super().__init__(problem, params)
-        self.torque_limit = params.get('torque_limit', 10.0)
-        self.kp = params.get('kp', 50.0)
+        self.torque_limit = params.get('torque_limit', 0.7)
+        self.kp = params.get('kp', 6)
 
     def _clamp_in_bounds(self, xuz):
         N = xuz.shape[0]
@@ -78,13 +73,6 @@ class PositionControlConstrainedSteinTrajOpt(ConstrainedSteinTrajOpt):
             max_x = max_x.repeat((N, 1, 1)).to(device=xuz.device)
             min_x[:, :, self.problem.dx:self.problem.dx + self.problem.du] = min_u
             max_x[:, :, self.problem.dx:self.problem.dx + self.problem.du] = max_u
-
-            # print(min_u)
-            # print(max_u)
-            # print(xuz.shape)
-            _x = xuz.reshape(N, self.problem.T, -1)
-
-            # print(torch.where(_x[:, :, :self.problem.dx:self.problem.dx+self.problem.du] > max_u, 1, 0))
             torch.clamp_(xuz, min=min_x.reshape((N, -1)), max=max_x.reshape((N, -1)))
     def resample(self, xuz):
         xuz = xuz.to(dtype=torch.float32)
@@ -212,8 +200,6 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
                             torch.zeros(N, N, self.T, self.dz, device=x.device)), dim=-1)
         grad_K = grad_K.reshape(N, N, -1)
         G, dG, hessG = self.combined_constraints(augmented_trajectory, compute_hess=self.compute_hess)
-
-        # print(J.mean(), G.abs().mean(), G.abs().max())
         
         if hessG is not None:
             hessG.detach_()
@@ -841,8 +827,6 @@ class AllegroValveTurning(AllegroContactProblem):
     #     if compute_hess:
     #         hess_h = torch.zeros(grad_h.shape + grad_h.shape[2:], device=self.device)
     #     return h, grad_h, hess_h
-
-
 class AllegroValveRegrasping(AllegroContactProblem):
     def get_constraint_dim(self, T):
         self.dz = 2  # collision constraint per finger
@@ -986,7 +970,7 @@ class AllegroValveRegrasping(AllegroContactProblem):
             return xu[:, :, :self.dx]
         return xu
     
-def do_trial(env, params, fpath):
+def do_trial(env, params, fpath, sim_viz_env=None):
     "only turn the valve once"
     state = env.get_state()
     if params['visualize']:
@@ -1039,6 +1023,8 @@ def do_trial(env, params, fpath):
     # we will just execute this open loop
     for x in best_traj[:, :8]:
         env.step(x.reshape(-1, 8).to(device=env.device))
+        if params['mode'] == 'hardware':
+            sim_viz_env.set_pose(env.get_state()['all_state'].to(device=env.device))
 
     actual_trajectory = []
     duration = 0
@@ -1058,9 +1044,6 @@ def do_trial(env, params, fpath):
         axes[i].set_xlim3d(0.8, 0.87)
         axes[i].set_ylim3d(0.52, 0.58)
         axes[i].set_zlim3d(1.36, 1.46)
-    # ax.set_xlim((0.8, 0.8))
-    # ax.set_ylim((0.6, 0.7))
-    # ax.set_zlim((1.35, 1.45))
     thumb_traj_history = []
     index_traj_history = []
     state = env.get_state()
@@ -1082,10 +1065,10 @@ def do_trial(env, params, fpath):
 
         print(f"solve time: {time.time() - start_time}")
         # add trajectory lines to sim
-        if params['hardware']:
-            add_trajectories_hardware(trajectories, best_traj, chain, axes)
+        if params['mode'] == 'hardware':
+            add_trajectories_hardware(trajectories, best_traj, axes)
         else:
-            add_trajectories(trajectories, best_traj, chain, axes)
+            add_trajectories(trajectories, best_traj, axes)
 
         # process the action
         ## end effector force to torque
@@ -1098,13 +1081,16 @@ def do_trial(env, params, fpath):
         # action = best_traj[0, :8]
         # action[:, 4:] = 0
         env.step(action)
+        if params['mode'] == 'hardware':
+            sim_viz_env.set_pose(env.get_state()['all_state'].to(device=env.device))
+
         # if params['hardware']:
         #     # ros_node.apply_action(action[0].detach().cpu().numpy())
         #     ros_node.apply_action(partial_to_full_state(action[0]).detach().cpu().numpy())
         turn_problem._preprocess(best_traj.unsqueeze(0))
         
-        print(turn_problem.thumb_contact_scene.scene_collision_check(partial_to_full_state(x[:, :8]), x[:, 8],
-                                                                compute_gradient=False, compute_hessian=False))
+        # print(turn_problem.thumb_contact_scene.scene_collision_check(partial_to_full_state(x[:, :8]), x[:, 8],
+        #                                                         compute_gradient=False, compute_hessian=False))
         # distance2surface = torch.sqrt((best_traj_ee[:, 2] - valve_location[2].unsqueeze(0)) ** 2 + (best_traj_ee[:, 0] - valve_location[0].unsqueeze(0))**2)
         distance2goal = (params['valve_goal'].cpu() - env.get_state()['q'][:, -1].cpu()).detach().cpu().item()
         print(distance2goal)
@@ -1161,7 +1147,7 @@ def do_trial(env, params, fpath):
     return torch.min(final_distance_to_goal).cpu().numpy()
 
 
-def add_trajectories(trajectories, best_traj, chain, axes=None):
+def add_trajectories(trajectories, best_traj, axes=None):
     M = len(trajectories)
     if M > 0:
         initial_state = env.get_state()['q'][:, :8]
@@ -1213,7 +1199,7 @@ def add_trajectories(trajectories, best_traj, chain, axes=None):
             gym.draw_viewer(viewer, sim, False)
             gym.sync_frame_time(sim)
 
-def add_trajectories_hardware(trajectories, best_traj, chain, axes=None):
+def add_trajectories_hardware(trajectories, best_traj, axes=None):
     M = len(trajectories)
     if M > 0:
         initial_state = env.get_state()['q'][:, :8]
@@ -1269,7 +1255,7 @@ if __name__ == "__main__":
         pass
     """
 
-    if config['hardware']:
+    if config['mode'] == 'hardware':
         sim_env = env
         from hardware.hardware_env import HardwareEnv
         env = HardwareEnv(sim_env.default_dof_pos, finger_list=['index', 'thumb'])
@@ -1277,8 +1263,8 @@ if __name__ == "__main__":
         env.joint_stiffness = sim_env.joint_stiffness
         env.device = sim_env.device
         env.valve_pose = sim_env.valve_pose
-
-        del sim_env
+    else:
+        sim_env = None
 
 
 
@@ -1313,7 +1299,7 @@ if __name__ == "__main__":
             params['chain'] = chain.to(device=params['device'])
             valve_location = torch.tensor([0.85, 0.70, 1.405]).to(device) # the root of the valve
             params['valve_location'] = valve_location
-            final_distance_to_goal = do_trial(env, params, fpath)
+            final_distance_to_goal = do_trial(env, params, fpath, sim_env)
             # final_distance_to_goal = turn(env, params, fpath)
 
             if controller not in results.keys():
