@@ -78,6 +78,9 @@ class ConstrainedSVGDProblem(Problem):
         pass
 
     def combined_constraints(self, augmented_x, compute_grads=True, compute_hess=True):
+        """Take the augmented state, evaluate and combines the constraint functions appropriately, and
+        return the constraint values along with their derivatives.
+        """
         N = augmented_x.shape[0]
         augmented_x = augmented_x.reshape(N, self.T, self.dx + self.du + self.dz)
         xu = augmented_x[:, :, :(self.dx + self.du)]

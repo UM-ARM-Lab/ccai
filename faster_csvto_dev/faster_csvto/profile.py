@@ -11,7 +11,7 @@ from faster_csvto import FasterConstrainedSteinTrajOpt
 import timeit
 
 SOLVE_OPTION = 'solve'
-SOLVE_ITERATIONS = 2
+SOLVE_ITERATIONS = 1
 
 UPDATE_OPTION = 'compute update'
 UPDATE_ITERATIONS = 100

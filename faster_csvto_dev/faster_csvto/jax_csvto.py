@@ -5,6 +5,8 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
+from torch_cg import cg_batch
+
 
 def compute_step_jax(grad_J: jnp.array,  # nabla log(p(Tau^j | o)) stacked as rows in a matrix (N, d * T)
                      K: jnp.array,  # K(Tau^i, Tau^j) as (i, j) entries in a matrix (N, N)
@@ -103,7 +105,7 @@ class FasterConstrainedSteinTrajOpt:
         self.dz: int = problem.dz  # Dimension of slack variables
         self.T: int = self.problem.T  # Time horizon
 
-        # TODO: Consider refactoring into params.
+        # TODO: Refactor everything below here eventually
         self.profiler = profile(activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
                                 record_shapes=True,
                                 profile_memory=True,
@@ -174,7 +176,7 @@ class FasterConstrainedSteinTrajOpt:
         dC = jnp.asarray(dC.detach().cpu().numpy())
         hess_C = jnp.asarray(hess_C.detach().cpu().numpy())
 
-        self.grad_J_jax =  grad_J
+        self.grad_J_jax = grad_J
         self.K_jax = K
         self.grad_K_jax = grad_K
         self.C_jax = C
