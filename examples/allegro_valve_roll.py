@@ -1,5 +1,6 @@
 from isaac_victor_envs.utils import get_assets_dir
 from isaac_victor_envs.tasks.allegro import AllegroValveTurningEnv
+from isaac_victor_envs.tasks.allegro_ros import RosAllegroValveTurningEnv
 
 import numpy as np
 import pickle as pkl
@@ -37,7 +38,9 @@ class PositionControlConstrainedSteinTrajOpt(ConstrainedSteinTrajOpt):
     def __init__(self, problem, params):
         super().__init__(problem, params)
         self.torque_limit = params.get('torque_limit', 0.7)
-        self.kp = params.get('kp', 6)
+        # self.kp =3.5
+        self.kp = params['kp']
+
 
     def _clamp_in_bounds(self, xuz):
         N = xuz.shape[0]
@@ -406,6 +409,7 @@ class AllegroContactProblem(AllegroValveProblem):
             grad_g[:, T_range, T_range, :8] = grad_g_q[:, 1:]
             # is valve in state
             if self.dx == 9:
+                # grad_g[:, T_range, T_range, 8] = grad_g_theta.reshape(N, T + 1)[:, 1:]
                 grad_g[:, T_range, T_range, 8] = grad_g_theta.reshape(N, T + 1)[:, 1:]
             grad_g = grad_g.reshape(N, -1, T, self.dx + self.du)
             grad_g = grad_g.reshape(N, -1, T * (self.dx + self.du))
@@ -970,7 +974,7 @@ class AllegroValveRegrasping(AllegroContactProblem):
             return xu[:, :, :self.dx]
         return xu
     
-def do_trial(env, params, fpath, sim_viz_env=None):
+def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     "only turn the valve once"
     state = env.get_state()
     if params['visualize']:
@@ -1022,9 +1026,14 @@ def do_trial(env, params, fpath, sim_viz_env=None):
 
     # we will just execute this open loop
     for x in best_traj[:, :8]:
-        env.step(x.reshape(-1, 8).to(device=env.device))
         if params['mode'] == 'hardware':
             sim_viz_env.set_pose(env.get_state()['all_state'].to(device=env.device))
+            sim_viz_env.step(x.reshape(-1, 8).to(device=env.device))
+        env.step(x.reshape(-1, 8).to(device=env.device))
+        if params['mode'] == 'hardware_copy':
+            ros_copy_node.apply_action(partial_to_full_state(x.reshape(-1, 8)[0]))
+            # ros_node.apply_action(action[0].detach().cpu().numpy())
+        
 
     actual_trajectory = []
     duration = 0
@@ -1064,6 +1073,9 @@ def do_trial(env, params, fpath, sim_viz_env=None):
         best_traj, trajectories = turn_planner.step(start)
 
         print(f"solve time: {time.time() - start_time}")
+        planned_theta_traj = best_traj[:, 8].detach().cpu().numpy()
+        print(f"current theta: {state['q'][0, -1].detach().cpu().numpy()}")
+        print(f"planned theta: {planned_theta_traj}")
         # add trajectory lines to sim
         if params['mode'] == 'hardware':
             add_trajectories_hardware(trajectories, best_traj, axes)
@@ -1075,14 +1087,15 @@ def do_trial(env, params, fpath, sim_viz_env=None):
         x = best_traj[0, :turn_problem.dx+turn_problem.du]
         x = x.reshape(1, turn_problem.dx+turn_problem.du)
         action = x[:, turn_problem.dx:turn_problem.dx+turn_problem.du].to(device=env.device)
-        if params['joint_friction'] > 0:
-            action = action + params['joint_friction'] / env.joint_stiffness * torch.sign(action)
         action = action + start.unsqueeze(0)[:, :8] # NOTE: this is required since we define action as delta action
         # action = best_traj[0, :8]
         # action[:, 4:] = 0
-        env.step(action)
         if params['mode'] == 'hardware':
             sim_viz_env.set_pose(env.get_state()['all_state'].to(device=env.device))
+            sim_viz_env.step(action)
+        elif params['mode'] == 'hardware_copy':
+            ros_copy_node.apply_action(partial_to_full_state(action[0]))
+        env.step(action)
 
         # if params['hardware']:
         #     # ros_node.apply_action(action[0].detach().cpu().numpy())
@@ -1136,7 +1149,7 @@ def do_trial(env, params, fpath, sim_viz_env=None):
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 9)
     turn_problem.T = actual_trajectory.shape[0]
     # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
-    final_distance_to_goal = (actual_trajectory[:, -1] - params['valve_goal']).abs
+    final_distance_to_goal = (actual_trajectory[:, -1] - params['valve_goal']).abs()
 
     print(f'Controller: {params["controller"]} Final distance to goal: {torch.min(final_distance_to_goal)}')
     print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
@@ -1229,7 +1242,8 @@ if __name__ == "__main__":
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro.yaml').read_text())
     from tqdm import tqdm
 
-    env = AllegroValveTurningEnv(1, control_mode='joint_impedance',
+    if config['mode'] == 'hardware':
+        env = RosAllegroValveTurningEnv(1, control_mode='joint_impedance',
                                  use_cartesian_controller=False,
                                  viewer=True,
                                  steps_per_action=60,
@@ -1238,7 +1252,22 @@ if __name__ == "__main__":
                                  device=config['sim_device'],
                                  valve=config['valve_type'],
                                  video_save_path=img_save_dir,
-                                 configuration='screw_driver')
+                                 configuration='screw_driver',
+                                 joint_stiffness=config['kp'],
+                                 )
+    else:
+        env = AllegroValveTurningEnv(1, control_mode='joint_impedance',
+                                    use_cartesian_controller=False,
+                                    viewer=True,
+                                    steps_per_action=60,
+                                    valve_velocity_in_state=False,
+                                    friction_coefficient=1.0,
+                                    device=config['sim_device'],
+                                    valve=config['valve_type'],
+                                    video_save_path=img_save_dir,
+                                    configuration='screw_driver',
+                                    joint_stiffness=config['kp'],
+                                    )
 
     sim, gym, viewer = env.get_sim()
 
@@ -1254,7 +1283,8 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         pass
     """
-
+    sim_env = None
+    ros_copy_node = None
     if config['mode'] == 'hardware':
         sim_env = env
         from hardware.hardware_env import HardwareEnv
@@ -1263,9 +1293,9 @@ if __name__ == "__main__":
         env.joint_stiffness = sim_env.joint_stiffness
         env.device = sim_env.device
         env.valve_pose = sim_env.valve_pose
-    else:
-        sim_env = None
-
+    elif config['mode'] == 'hardware_copy':
+        from hardware.hardware_env import RosNode
+        ros_copy_node = RosNode()
 
 
     results = {}
@@ -1299,7 +1329,7 @@ if __name__ == "__main__":
             params['chain'] = chain.to(device=params['device'])
             valve_location = torch.tensor([0.85, 0.70, 1.405]).to(device) # the root of the valve
             params['valve_location'] = valve_location
-            final_distance_to_goal = do_trial(env, params, fpath, sim_env)
+            final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node)
             # final_distance_to_goal = turn(env, params, fpath)
 
             if controller not in results.keys():

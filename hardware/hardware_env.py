@@ -100,7 +100,7 @@ class HardwareEnv:
 if __name__ == "__main__":
     env = HardwareEnv(default_pos=torch.zeros(16), finger_list=['index', 'thumb'])
     while True:
-        action = torch.randn(16) / 5
+        action = torch.randn(8) / 5
         state = env.step(action)
         print(state)
         rospy.sleep(1)

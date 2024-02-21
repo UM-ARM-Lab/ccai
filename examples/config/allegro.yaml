@@ -1,7 +1,7 @@
 ---
 T: 12
 receding_horizon: True
-num_steps: 14
+num_steps: 12
 num_trials: 20
 visualize: True
 experiment_name: 'allegro_test'
@@ -9,6 +9,7 @@ mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 valve_type: 'cylinder'
 sim_device: 'cuda:0'
 friction_coefficient: 0.95
+kp: 4.0
 controllers:
   csvgd:
     # N: 16

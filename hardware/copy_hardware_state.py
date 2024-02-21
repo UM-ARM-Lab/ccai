@@ -27,6 +27,7 @@ import pytorch_kinematics.transforms as tf
 import matplotlib.pyplot as plt
 import pickle as pkl
 from hardware.allegro_ros import RosNode
+from utils.allegro_utils import partial_to_full_state
 
 ros_node = RosNode()
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
@@ -64,4 +65,6 @@ env = AllegroValveTurningEnv(1, control_mode='joint_impedance', use_cartesian_co
 while True:
     state = torch.tensor(ros_node.current_joint_pose.position).to(env.device)
     input_state = torch.cat((state[:4], state[-4:])).unsqueeze(0)
-    env.step(input_state)
+    input_state = partial_to_full_state(input_state)
+    input_state = torch.cat((input_state, torch.zeros(1, 1).to(env.device)), dim=-1)
+    env.set_pose(input_state)

@@ -75,6 +75,7 @@ class RosNode(object):
         print('joint command publisher initialized.')
         
     def apply_action(self, action, weight=0.5):
+        "the action has to be full action (16 dimensional)"
         if len(action.shape) == 2:
             action = action.squeeze(0)
         action = list(action.detach().cpu().numpy())
@@ -96,7 +97,7 @@ def main():
         # ros_node.get_object_pose()
         # obs = ros_node.get_observation()
         action = torch.randn(16) / 3
-        print(ros_node.allegroz_joint_pos)
+        print(ros_node.allegro_joint_pos)
         ros_node.apply_action(action, weight=1)
         
         
