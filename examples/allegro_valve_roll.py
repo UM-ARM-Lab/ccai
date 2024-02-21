@@ -38,7 +38,6 @@ class PositionControlConstrainedSteinTrajOpt(ConstrainedSteinTrajOpt):
     def __init__(self, problem, params):
         super().__init__(problem, params)
         self.torque_limit = params.get('torque_limit', 0.7)
-        # self.kp =3.5
         self.kp = params['kp']
 
 
@@ -754,7 +753,7 @@ class AllegroValveTurning(AllegroContactProblem):
 
         return h, grad_h, None
 
-    def _con_ineq(self, xu, compute_grads=True, compute_hess=False):
+    def _con_ineq(self, xu, compute_grads=True, compute_hess=False, verbose=False):
         N = xu.shape[0]
         T = xu.shape[1]
 
@@ -762,6 +761,9 @@ class AllegroValveTurning(AllegroContactProblem):
             xu=xu.reshape(-1, T, self.dx + self.du),
             compute_grads=compute_grads,
             compute_hess=compute_hess)
+        
+        if verbose:
+            print(f"max friction constraint: {torch.max(h)}")
 
         h = h.reshape(N, -1)
         if compute_grads:
@@ -774,7 +776,7 @@ class AllegroValveTurning(AllegroContactProblem):
             return h, grad_h, hess_h
         return h, grad_h, None
 
-    def _con_eq(self, xu, compute_grads=True, compute_hess=False):
+    def _con_eq(self, xu, compute_grads=True, compute_hess=False, verbose=False):
         N = xu.shape[0]
         T = xu.shape[1]
         g_contact, grad_g_contact, hess_g_contact = self._contact_constraints(xu=xu.reshape(N, T, self.dx + self.du),
@@ -789,6 +791,11 @@ class AllegroValveTurning(AllegroContactProblem):
             xu=xu.reshape(N, T, self.dx + self.du),
             compute_grads=compute_grads,
             compute_hess=compute_hess)
+        
+        if verbose:
+            print(f"max contact constraint: {torch.max(g_contact)}")
+            print(f"max dynamics constraint: {torch.max(g_dynamics)}")
+            print(f"max valve kinematics constraint: {torch.max(g_valve)}")
 
         g_contact = torch.cat((g_contact, g_dynamics, g_valve), dim=1)
 
@@ -799,38 +806,6 @@ class AllegroValveTurning(AllegroContactProblem):
 
         return g_contact, grad_g_contact, hess_g_contact
     
-    # def _y_axis_constr(self, xu):
-    #     N = xu.shape[0]
-    #     T = xu.shape[1]
-    #     q = xu[:, :, :9]
-    #     finger_names = [index_ee_name, thumb_ee_name]
-    #     constraint = {}
-    #     fk_dict = chain.forward_kinematics(partial_to_full_state(q[:, :, :8].reshape(-1, 8)),
-    #                                     frame_indices=frame_indices)  # pytorch_kinematics only supprts one additional dim
-
-    #     for finger_name in finger_names:
-    #         m = world_trans.compose(fk_dict[finger_name])
-    #         points_finger_frame = torch.tensor([0.00, 0.03, 0.00], device=xu.device).unsqueeze(0)
-    #         # it is just the thrid column of the rotation matrix
-    #         ee_p = m.transform_points(points_finger_frame).reshape((N, T, 3))
-    #         "2nd constraint y range of the finger tip should be within a range"
-    #         constraint_y_1 = -(valve_location[1] - ee_p[:, :, 1]) + 0.02 # do not consider the current time step
-    #         constraint_y_2 = (valve_location[1] - ee_p[:, :, 1]) - 0.2
-    #         constraint[f'{finger_name}_y_range_1'] = constraint_y_1
-    #         constraint[f'{finger_name}_y_range_2'] = constraint_y_2
-    #     return torch.cat(list(constraint.values()), dim=-1)
-    
-    # def y_axis_constraint(self, xu, compute_grads=True, compute_hess=False):
-    #     N = xu.shape[0]
-    #     T = xu.shape[1]
-    #     h = self._y_axis_constr(xu)
-    #     grad_h, hess_h = None, None
-    #     if compute_grads:
-    #         grad_h = self.grad_y_axis_constraint(xu)
-    #         grad_h = torch.stack([grad_h[i, :, i] for i in range(len(grad_h))], dim=0)  # data from different batches should not affect each other
-    #     if compute_hess:
-    #         hess_h = torch.zeros(grad_h.shape + grad_h.shape[2:], device=self.device)
-    #     return h, grad_h, hess_h
 class AllegroValveRegrasping(AllegroContactProblem):
     def get_constraint_dim(self, T):
         self.dz = 2  # collision constraint per finger
@@ -1086,6 +1061,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         ## end effector force to torque
         x = best_traj[0, :turn_problem.dx+turn_problem.du]
         x = x.reshape(1, turn_problem.dx+turn_problem.du)
+        turn_problem._preprocess(best_traj.unsqueeze(0))
+        equality_constr = turn_problem._con_eq(best_traj.unsqueeze(0), compute_grads=False, compute_hess=False, verbose=True)[0]
+        inequality_constr = turn_problem._con_ineq(best_traj.unsqueeze(0), compute_grads=False, compute_hess=False, verbose=True)[0]
+        # print(f'Equality constraint violation: {torch.norm(equality_constr)}')
+        # print(f'Inequality constraint violation: {torch.norm(inequality_constr)}')
+
         action = x[:, turn_problem.dx:turn_problem.dx+turn_problem.du].to(device=env.device)
         action = action + start.unsqueeze(0)[:, :8] # NOTE: this is required since we define action as delta action
         # action = best_traj[0, :8]

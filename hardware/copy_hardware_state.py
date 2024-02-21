@@ -8,17 +8,6 @@ import torch
 import time
 import yaml
 import pathlib
-from functools import partial
-from torch.func import vmap, jacrev, hessian, jacfwd
-# from functorch import vmap, jacrev, hessian, jacfwd
-
-from ccai.constrained_svgd_trajopt import ConstrainedSteinTrajOpt
-from ccai.kernels import rbf_kernel, structured_rbf_kernel
-
-from ccai.problem import ConstrainedSVGDProblem
-from ccai.mpc.csvgd import Constrained_SVGD_MPC
-from ccai.valve import ValveDynamics
-from ccai.utils import rotate_jac
 import time
 import pytorch_volumetric as pv
 import pytorch_kinematics as pk
