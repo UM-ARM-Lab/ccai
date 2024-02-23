@@ -129,7 +129,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         self.x_max = torch.ones(self.dx + self.du)
         self.x_max[:3] = 6
         self.x_max[3:5] = 0.4 * torch.pi
-        self.x_max[5] = 1000  # torch.pi
+        self.x_max[5] = 1000
         self.x_max[6:12] = 100
         # self.x_max[6:9] = 100
         self.x_max[12:] = 100
