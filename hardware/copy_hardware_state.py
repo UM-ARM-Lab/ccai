@@ -57,3 +57,7 @@ while True:
     input_state = partial_to_full_state(input_state)
     input_state = torch.cat((input_state, torch.zeros(1, 1).to(env.device)), dim=-1)
     env.set_pose(input_state)
+    print('hardware -------------------')
+    print(torch.cat((state[:4], state[-4:])).unsqueeze(0))
+    print('simulation -------------------')
+    print(env.get_state()['q'])

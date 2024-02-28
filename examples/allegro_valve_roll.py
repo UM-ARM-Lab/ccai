@@ -37,7 +37,7 @@ img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 class PositionControlConstrainedSteinTrajOpt(ConstrainedSteinTrajOpt):
     def __init__(self, problem, params):
         super().__init__(problem, params)
-        self.torque_limit = params.get('torque_limit', 0.7)
+        self.torque_limit = params.get('torque_limit', 1)
         self.kp = params['kp']
 
 
@@ -103,6 +103,8 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
                  device='cuda:0'):
         super().__init__(start, goal, T, device)
         self.dx, self.du = dx, du
+        self.dg_per_t = 0
+        self.dg_constant = 0
         self.device = device
         self.dt = 0.1
         self.T = T
@@ -110,7 +112,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         self.goal = goal
         self.K = rbf_kernel
         self.squared_slack = True
-        self.compute_hess = True
+        self.compute_hess = False
 
         self.valve_location = valve_location
         self.initial_valve_angle = initial_valve_angle
@@ -161,6 +163,23 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         return (self.alpha * J.reshape(N),
                 self.alpha * grad_J.reshape(N, -1),
                 self.alpha * hess_J.reshape(N, self.T * (self.dx + self.du), self.T * (self.dx + self.du)))
+    def _step_size_limit(self, xu):
+        N, T, _ = xu.shape
+        u = xu[:, :, -self.du:]
+
+        max_step_size = 0.2
+        h_plus = u - max_step_size
+        h_minus = -u - max_step_size
+        h = torch.stack((h_plus, h_minus), dim=2)  # N x T x 2 x du
+
+        grad_h = torch.zeros(N, T, 2, self.du, T, self.dx + self.du, device=xu.device)
+        hess_h = torch.zeros(N, T * 2 * self.du, T * (self.dx + self.du), device=xu.device)
+        # assign gradients
+        T_range = torch.arange(0, T, device=xu.device)
+        grad_h[:, T_range, 0, :, T_range, -self.du:] = torch.eye(self.du, device=xu.device)
+        grad_h[:, T_range, 1, :, T_range, -self.du:] = -torch.eye(self.du, device=xu.device)
+
+        return h.reshape(N, -1), grad_h.reshape(N, -1, T * (self.dx + self.du)), hess_h
     
     @staticmethod
     def get_rotation_from_normal(normal_vector):
@@ -253,7 +272,9 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
 class AllegroContactProblem(AllegroValveProblem):
     
     def get_constraint_dim(self, T):
-        self.dg = 2  # # of fingers, only at the final step
+        self.dg_per_t = 0
+        self.dg_constant = 2
+        self.dg = self.dg_per_t * T + self.dg_constant
         self.dz = 0  # one friction constraints per finger
         self.dh = self.dz * T  # inequality
 
@@ -443,8 +464,11 @@ class AllegroContactProblem(AllegroValveProblem):
         return None, None, None
 class AllegroValveTurning(AllegroContactProblem):
     def get_constraint_dim(self, T):
+        self.friction_polytope_k = 4
+        self.dg_per_t = 2 * (1 + 3 + 2)
+        self.dg_constant = 0
         self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
-        self.dz = self.friction_polytope_k * 2  # one friction constraints per finger
+        self.dz = self.friction_polytope_k * 2 # one friction constraints per finger
         self.dh = self.dz * T  # inequality
     
     def __init__(self,
@@ -459,9 +483,6 @@ class AllegroValveTurning(AllegroContactProblem):
                  initial_valve_angle=0,
                  friction_coefficient=0.95,
                  device='cuda:0', **kwargs):
-        self.friction_polytope_k = 4
-        self.dg_per_t = 2 * (1 + 3 + 2)
-        self.dg_constant = 0
         super().__init__(dx=9, du=8, start=start, goal=goal, T=T, chain=chain, valve_location=valve_location,
                          valve_type=valve_type, world_trans=world_trans, valve_asset_pos=valve_asset_pos,
                          initial_valve_angle=initial_valve_angle, device=device)
@@ -486,13 +507,14 @@ class AllegroValveTurning(AllegroContactProblem):
         action = xu[:, self.dx:]  # action dim = 8
         next_q = state[:-1, :-1] + action
         action_cost = torch.sum((state[1:, :-1] - next_q) ** 2)
-        action_cost = action_cost + 10 * torch.sum(action ** 2)
+        # action_cost += 0.1 * torch.sum(action ** 2)
+        # action_cost = action_cost
 
         smoothness_cost = 10 * torch.sum((state[1:] - state[:-1]) ** 2)
         smoothness_cost += 50 * torch.sum((state[1:, -1] - state[:-1, -1]) ** 2)
 
-        goal_cost = torch.sum((10 * (state[:, -1] - goal) ** 2),
-                              dim=0) + (10 * (state[-1, -1] - goal) ** 2).reshape(-1)
+        goal_cost = (10 * (state[-1, -1] - goal) ** 2).reshape(-1)
+        # goal_cost += torch.sum((10 * (state[:, -1] - goal) ** 2), dim=0)
 
         return smoothness_cost + 10 * action_cost + goal_cost
     
@@ -762,18 +784,23 @@ class AllegroValveTurning(AllegroContactProblem):
             compute_grads=compute_grads,
             compute_hess=compute_hess)
         
+        # h_step_size, grad_h_step_size, hess_h_step_size = self._step_size_limit(xu)
+        
         if verbose:
             print(f"max friction constraint: {torch.max(h)}")
+            # print(f"max step size constraint: {torch.max(h_step_size)}")
 
-        h = h.reshape(N, -1)
+        # h = torch.cat((h, h_step_size), dim=1)
         if compute_grads:
             grad_h = grad_h.reshape(N, -1, self.T * (self.dx + self.du))
+            # grad_h = torch.cat((grad_h, grad_h_step_size), dim=1)
         else:
             return h, None, None
         if compute_hess:
             hess_h = torch.zeros(N, h.shape[1], self.T * (self.dx + self.du), self.T * (self.dx + self.du),
-                                 device=self.device)
+                                device=self.device)
             return h, grad_h, hess_h
+
         return h, grad_h, None
 
     def _con_eq(self, xu, compute_grads=True, compute_hess=False, verbose=False):
@@ -808,6 +835,8 @@ class AllegroValveTurning(AllegroContactProblem):
     
 class AllegroValveRegrasping(AllegroContactProblem):
     def get_constraint_dim(self, T):
+        self.dg_per_t = 8
+        self.dg_constant = 6
         self.dz = 2  # collision constraint per finger
         self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
         self.dh = self.dz * T
@@ -825,8 +854,6 @@ class AllegroValveRegrasping(AllegroContactProblem):
                  device='cuda:0'):
         dx = 8
         du = 8
-        self.dg_per_t = 8
-        self.dg_constant = 6
         super().__init__(dx=dx, du=du, start=start, goal=goal, T=T, chain=chain, valve_location=valve_location,
                          valve_type=valve_type, world_trans=world_trans, valve_asset_pos=valve_asset_pos,
                          initial_valve_angle=initial_valve_angle, device=device)
@@ -1008,6 +1035,28 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         if params['mode'] == 'hardware_copy':
             ros_copy_node.apply_action(partial_to_full_state(x.reshape(-1, 8)[0]))
             # ros_node.apply_action(action[0].detach().cpu().numpy())
+        # x = x.unsqueeze(0)
+        # time.sleep(0.1)
+        # hardware_joint_q = ros_copy_node.current_joint_pose.position
+        # hardware_joint_q = torch.tensor(hardware_joint_q).to(env.device)
+        # hardware_joint_q = full_to_partial_state(hardware_joint_q).unsqueeze(0)
+        # print("ee index commanded-----------------")
+        # print(state2ee_pos(x[:8], turn_problem.index_ee_name))
+        # print("ee index actual-----------------")
+        # print(state2ee_pos(hardware_joint_q, turn_problem.index_ee_name))
+        # print('ee index error-----------------')
+        # print(state2ee_pos(x[:, :8], turn_problem.index_ee_name) - state2ee_pos(hardware_joint_q, turn_problem.index_ee_name))
+
+        # print("ee thumb commanded-----------------")
+        # print(state2ee_pos(x[:, :8], turn_problem.thumb_ee_name))
+        # print("ee thumb actual-----------------")
+        # print(state2ee_pos(hardware_joint_q, turn_problem.thumb_ee_name))
+        # print('ee thumb error-----------------')
+        # print(state2ee_pos(x[:, :8], turn_problem.thumb_ee_name) - state2ee_pos(hardware_joint_q, turn_problem.thumb_ee_name))
+
+        # print('planned thumb index distance-----------------')
+        # print(torch.norm(state2ee_pos(x[:, :8], turn_problem.index_ee_name) - state2ee_pos(x[:, :8], turn_problem.thumb_ee_name)))
+
         
 
     actual_trajectory = []
@@ -1064,10 +1113,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         turn_problem._preprocess(best_traj.unsqueeze(0))
         equality_constr = turn_problem._con_eq(best_traj.unsqueeze(0), compute_grads=False, compute_hess=False, verbose=True)[0]
         inequality_constr = turn_problem._con_ineq(best_traj.unsqueeze(0), compute_grads=False, compute_hess=False, verbose=True)[0]
+        print("--------------------------------------")
         # print(f'Equality constraint violation: {torch.norm(equality_constr)}')
         # print(f'Inequality constraint violation: {torch.norm(inequality_constr)}')
 
         action = x[:, turn_problem.dx:turn_problem.dx+turn_problem.du].to(device=env.device)
+        print(action)
         action = action + start.unsqueeze(0)[:, :8] # NOTE: this is required since we define action as delta action
         # action = best_traj[0, :8]
         # action[:, 4:] = 0
@@ -1077,6 +1128,28 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         elif params['mode'] == 'hardware_copy':
             ros_copy_node.apply_action(partial_to_full_state(action[0]))
         env.step(action)
+        # time.sleep(3.0)
+        # current_theta = env.get_state()['q'][0, -1]
+        # if current_theta.detach().item() > best_traj[0, 8].detach().item() - 0.1:
+        #     print("satisfied")
+        #     break
+        # time.sleep(0.1)
+        # hardware_joint_q = ros_copy_node.current_joint_pose.position
+        # hardware_joint_q = torch.tensor(hardware_joint_q).to(env.device)
+        # hardware_joint_q = full_to_partial_state(hardware_joint_q).unsqueeze(0)
+        # print("ee index commanded-----------------")
+        # print(state2ee_pos(action[:, :8], turn_problem.index_ee_name))
+        # print("ee index actual-----------------")
+        # print(state2ee_pos(hardware_joint_q[:, :8], turn_problem.index_ee_name))
+        # print('ee index error-----------------')
+        # print(state2ee_pos(action[:, :8], turn_problem.index_ee_name) - state2ee_pos(hardware_joint_q[:, :8], turn_problem.index_ee_name))
+
+        # print("ee thumb commanded-----------------")
+        # print(state2ee_pos(action[:, :8], turn_problem.thumb_ee_name))
+        # print("ee thumb actual-----------------")
+        # print(state2ee_pos(hardware_joint_q[:, :8], turn_problem.thumb_ee_name))
+        # print('ee thumb error-----------------')
+        # print(state2ee_pos(action[:, :8], turn_problem.thumb_ee_name) - state2ee_pos(hardware_joint_q[:, :8], turn_problem.thumb_ee_name))
 
         # if params['hardware']:
         #     # ros_node.apply_action(action[0].detach().cpu().numpy())
@@ -1269,7 +1342,7 @@ if __name__ == "__main__":
     if config['mode'] == 'hardware':
         sim_env = env
         from hardware.hardware_env import HardwareEnv
-        env = HardwareEnv(sim_env.default_dof_pos, finger_list=['index', 'thumb'])
+        env = HardwareEnv(sim_env.default_dof_pos[:, :16], finger_list=['index', 'thumb'], kp=config['kp'])
         env.world_trans = sim_env.world_trans
         env.joint_stiffness = sim_env.joint_stiffness
         env.device = sim_env.device
@@ -1277,6 +1350,7 @@ if __name__ == "__main__":
     elif config['mode'] == 'hardware_copy':
         from hardware.hardware_env import RosNode
         ros_copy_node = RosNode()
+
 
 
     results = {}

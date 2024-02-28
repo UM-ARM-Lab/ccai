@@ -6,10 +6,10 @@ import torch
 import rospy
 
 class HardwareEnv:
-    def __init__(self, default_pos, finger_list=['index', 'middle', 'ring', 'thumb'], device='cuda:0'):
+    def __init__(self, default_pos, finger_list=['index', 'middle', 'ring', 'thumb'], kp=4, device='cuda:0'):
         self.__all_finger_list = ['index', 'middle', 'ring', 'thumb']
         self.__finger_list = finger_list
-        self.__ros_node = RosNode()
+        self.__ros_node = RosNode(kp=kp)
         self.__intrinsic = np.array([[742.76562131, 0., 627.8765477],
                           [0.,734.42057297, 310.25507405],
                           [0., 0.,1.]])
@@ -42,6 +42,9 @@ class HardwareEnv:
         return pose
     def get_valve_angle(self):
         while True:
+            for i in range(7):
+                # clear up the buffer
+                current_pose = self._get_valve_rot_vec()
             current_pose = self._get_valve_rot_vec()
             if current_pose is not None:
                 break

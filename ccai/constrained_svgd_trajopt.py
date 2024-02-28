@@ -56,7 +56,9 @@ class ConstrainedSteinTrajOpt:
             #
             # damping_factor = 1e-1
             try:
-                dCdCT_inv = torch.linalg.solve(dCdCT, eye)
+                damping_factor = 1e-6
+                dCdCT_inv = torch.linalg.solve(dCdCT + damping_factor * eye, eye)
+                # dCdCT_inv = torch.linalg.solve(dCdCT, eye)
                 if torch.any(torch.isnan(dCdCT_inv)):
                     raise ValueError('nan in inverse')
             except Exception as e:
