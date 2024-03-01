@@ -1,6 +1,6 @@
 from isaac_victor_envs.utils import get_assets_dir
 from isaac_victor_envs.tasks.allegro import AllegroValveTurningEnv
-from isaac_victor_envs.tasks.allegro_ros import RosAllegroValveTurningEnv
+# from isaac_victor_envs.tasks.allegro_ros import RosAllegroValveTurningEnv
 
 import numpy as np
 import pickle as pkl
@@ -39,6 +39,8 @@ class PositionControlConstrainedSteinTrajOpt(ConstrainedSteinTrajOpt):
         super().__init__(problem, params)
         self.torque_limit = params.get('torque_limit', 1)
         self.kp = params['kp']
+        self.fingers = params['fingers']
+        self.num_fingers = len(self.fingers)
 
 
     def _clamp_in_bounds(self, xuz):
@@ -54,9 +56,9 @@ class PositionControlConstrainedSteinTrajOpt(ConstrainedSteinTrajOpt):
 
         if self.problem.du > 0:
             xuz_copy = xuz.reshape((N, self.problem.T, -1))
-            robot_joint_angles = xuz_copy[:, :-1, :8]
+            robot_joint_angles = xuz_copy[:, :-1, :4*self.num_fingers]
             robot_joint_angles = torch.cat(
-                (self.problem.start[:8].reshape((1, 1, 8)).repeat((N, 1, 1)), robot_joint_angles), dim=1)
+                (self.problem.start[:4 * self.num_fingers].reshape((1, 1, 4 * self.num_fingers)).repeat((N, 1, 1)), robot_joint_angles), dim=1)
 
             # make the commanded delta position respect the joint limits
             min_u_jlim = self.problem.robot_joint_x_min.repeat((N, self.problem.T, 1)).to(
@@ -99,6 +101,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
                  valve_type,
                  world_trans,
                  valve_asset_pos,
+                 fingers=['index', 'middle', 'ring', 'thumb'],
                  initial_valve_angle=0, 
                  device='cuda:0'):
         super().__init__(start, goal, T, device)
@@ -113,16 +116,28 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         self.K = rbf_kernel
         self.squared_slack = True
         self.compute_hess = False
+        self.fingers = fingers
+        self.num_fingers = len(fingers)
 
         self.valve_location = valve_location
         self.initial_valve_angle = initial_valve_angle
 
         self.chain = chain
-        self.index_ee_name = 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link'
-        self.thumb_ee_name = 'allegro_hand_oya_finger_3_aftc_base_link'
-        self.index_ee_link = chain.frame_to_idx[self.index_ee_name]
-        self.thumb_ee_link = chain.frame_to_idx[self.thumb_ee_name]
-        self.frame_indices = torch.tensor([self.index_ee_link, self.thumb_ee_link])
+        self.joint_index = {
+            'index': [0, 1, 2, 3],
+            'middle': [4, 5, 6, 7],
+            'ring': [8, 9, 10, 11],
+            'thumb': [12, 13, 14, 15]
+        }
+        self.all_joint_index = sum([self.joint_index[finger] for finger in self.fingers], [])
+        self.ee_names = {
+            'index': 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
+            'middle': 'allegro_hand_naka_finger_finger_1_aftc_base_link',
+            'ring': 'allegro_hand_kusuri_finger_finger_2_aftc_base_link',
+            'thumb': 'allegro_hand_oya_finger_3_aftc_base_link',
+        }
+        self.ee_link_idx = {finger: chain.frame_to_idx[ee_name] for finger, ee_name in self.ee_names.items()}
+        self.frame_indices = torch.tensor([self.ee_link_idx[finger] for finger in self.fingers])
 
         self.grad_kernel = jacrev(rbf_kernel, argnums=0)
 
@@ -134,15 +149,16 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         index_x_min = torch.tensor([-0.47, -0.195999999999, -0.174000000, -0.227]) + 0.05
         thumb_x_max = torch.tensor([1.396, 1.1629999999999, 1.644, 1.71899999]) - 0.05
         thumb_x_min = torch.tensor([0.26, -0.1049999999, -0.1889999999, -0.162]) + 0.05
-        self.x_max = torch.cat((index_x_max, thumb_x_max))
-        self.x_min = torch.cat((index_x_min, thumb_x_min))
+        joint_min = {'index': index_x_min, 'middle': index_x_min, 'ring': index_x_min, 'thumb': thumb_x_min}
+        joint_max = {'index': index_x_max, 'middle': index_x_max, 'ring': index_x_max, 'thumb': thumb_x_max}
+        self.x_max = torch.cat([joint_max[finger] for finger in self.fingers])
+        self.x_min = torch.cat([joint_min[finger] for finger in self.fingers])
 
-        self.robot_joint_x_max = torch.cat([index_x_max, thumb_x_max])
-        self.robot_joint_x_min = torch.cat([index_x_min, thumb_x_min])
+        self.robot_joint_x_max = torch.cat([joint_max[finger] for finger in self.fingers])
+        self.robot_joint_x_min = torch.cat([joint_min[finger] for finger in self.fingers])
         if self.du > 0:
-            self.u_max = torch.tensor([np.pi, np.pi, np.pi, np.pi, np.pi, np.pi, np.pi, np.pi]) / 5
-            self.u_min = torch.tensor([-np.pi, -np.pi, -np.pi, -np.pi, -np.pi, -np.pi, -np.pi, -np.pi]) / 5
-
+            self.u_max = torch.ones(4 * self.num_fingers) * np.pi / 5 
+            self.u_min = - torch.ones(4 * self.num_fingers) * np.pi / 5
             self.x_max = torch.cat((self.x_max, self.u_max))
             self.x_min = torch.cat((self.x_min, self.u_min))
         self.data = {}
@@ -249,17 +265,17 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         the actual dynamics model is not used
         """
 
-        u = 0.025 * torch.randn(N, self.T, 8, device=self.device)
+        u = 0.025 * torch.randn(N, self.T, 4 * self.num_fingers, device=self.device)
 
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
         for t in range(self.T):
-            next_q = x[-1][:, :8] + u[:, t]
+            next_q = x[-1][:, :4 * self.num_fingers] + u[:, t]
             x.append(next_q)
 
         x = torch.stack(x[1:], dim=1)
 
         # if valve angle in state
-        if self.dx == 9:
+        if self.dx == (4 * self.num_fingers + 1):
             theta = torch.linspace(self.start[-1], self.goal.item(), self.T + 1)[:self.T]
             theta = theta.repeat((N, 1)).unsqueeze(-1).to(self.start.device)
             # theta = torch.ones_like(theta) * self.start[-1]
@@ -273,7 +289,7 @@ class AllegroContactProblem(AllegroValveProblem):
     
     def get_constraint_dim(self, T):
         self.dg_per_t = 0
-        self.dg_constant = 2
+        self.dg_constant = self.num_fingers
         self.dg = self.dg_per_t * T + self.dg_constant
         self.dz = 0  # one friction constraints per finger
         self.dh = self.dz * T  # inequality
@@ -289,27 +305,23 @@ class AllegroContactProblem(AllegroValveProblem):
                  valve_type,
                  world_trans,
                  valve_asset_pos,
+                 fingers=['index', 'middle', 'ring', 'thumb'],
                  initial_valve_angle=0, 
                  device='cuda:0'):
         super().__init__(dx=dx, du=du, start=start, goal=goal, T=T, chain=chain, valve_location=valve_location,
                          valve_type=valve_type, world_trans=world_trans, valve_asset_pos=valve_asset_pos,
-                         initial_valve_angle=initial_valve_angle, device=device)
+                         fingers=fingers, initial_valve_angle=initial_valve_angle, device=device)
         self.get_constraint_dim(T)
 
         # add collision checking
         # collision check all of the non-finger tip links
-        collision_check_oya = ['allegro_hand_oya_finger_link_13',
-                               'allegro_hand_oya_finger_link_14',
-                               ]
-        collision_check_hitosashi = [
-            'allegro_hand_hitosashi_finger_finger_link_2',
-            'allegro_hand_hitosashi_finger_finger_link_1'
-        ]
-
-        # add contact checking
-        contact_check_oya = ['allegro_hand_oya_finger_3_aftc_base_link']
-        contact_check_hitosashi = ['allegro_hand_hitosashi_finger_finger_0_aftc_base_link']
-
+        # collision_check_oya = ['allegro_hand_oya_finger_link_13',
+        #                        'allegro_hand_oya_finger_link_14',
+        #                        ]
+        # collision_check_hitosashi = [
+        #     'allegro_hand_hitosashi_finger_finger_link_2',
+        #     'allegro_hand_hitosashi_finger_finger_link_1'
+        # ]
         if valve_type == 'cuboid':
             asset_valve = get_assets_dir() + '/valve/valve_cuboid.urdf'
         elif valve_type == 'cylinder':
@@ -323,22 +335,20 @@ class AllegroContactProblem(AllegroValveProblem):
         scene_trans = world_trans.inverse().compose(
             pk.Transform3d(device=device).translate(valve_asset_pos[0], valve_asset_pos[1], valve_asset_pos[2]))
 
-        self.index_collision_scene = pv.RobotScene(robot_sdf, valve_sdf, scene_trans,
-                                                   collision_check_links=collision_check_hitosashi,
-                                                   softmin_temp=100.0)
-        self.thumb_collision_scene = pv.RobotScene(robot_sdf, valve_sdf, scene_trans,
-                                                   collision_check_links=collision_check_oya,
-                                                   softmin_temp=100.0)
+        # self.index_collision_scene = pv.RobotScene(robot_sdf, valve_sdf, scene_trans,
+        #                                            collision_check_links=collision_check_hitosashi,
+        #                                            softmin_temp=100.0)
+        # self.thumb_collision_scene = pv.RobotScene(robot_sdf, valve_sdf, scene_trans,
+        #                                            collision_check_links=collision_check_oya,
+        #                                            softmin_temp=100.0)
         # contact checking
-        self.index_contact_scene = pv.RobotScene(robot_sdf, valve_sdf, scene_trans,
-                                                 collision_check_links=contact_check_hitosashi,
-                                                 softmin_temp=1.0e3,
-                                                 points_per_link=1000,
-                                                 )
-        self.thumb_contact_scene = pv.RobotScene(robot_sdf, valve_sdf, scene_trans,
-                                                 collision_check_links=contact_check_oya,
-                                                 softmin_temp=1.0e3,
-                                                 points_per_link=1000)
+        self.contact_scenes = {}
+        for finger in self.fingers:
+            self.contact_scenes[finger] = pv.RobotScene(robot_sdf, valve_sdf, scene_trans,
+                                                          collision_check_links=[self.ee_names[finger]],
+                                                          softmin_temp=1.0e3,
+                                                          points_per_link=1000,
+                                                          )
         # self.index_contact_scene.visualize_robot(partial_to_full_state(self.start[:8]), self.start[-1])
     def _preprocess(self, xu):
         N = xu.shape[0]
@@ -348,45 +358,46 @@ class AllegroContactProblem(AllegroValveProblem):
         q = torch.cat((self.start.reshape(1, 1, -1).repeat(N, 1, 1), x), dim=1)
         theta = self.initial_valve_angle * torch.ones(N, self.T + 1, 1, device=self.device)
 
-        self._preprocess_finger(q, theta, self.index_contact_scene, self.index_ee_link, 'index')
-        self._preprocess_finger(q, theta, self.thumb_contact_scene, self.thumb_ee_link, 'thumb')
+        for finger in self.fingers:
+            self._preprocess_finger(q, theta, self.contact_scenes[finger], self.ee_link_idx[finger], finger)
 
     def _preprocess_finger(self, q, theta, finger_scene, finger_ee_link, finger_name):
+        # TODO: this function seems redundant and doesn't need to be called for each finger
         N, _, _ = q.shape
 
         # reshape to batch across time
-        q_b = q.reshape(-1, 8)
+        q_b = q.reshape(-1, 4 * self.num_fingers)
         theta_b = theta.reshape(-1, 1)
         full_q = partial_to_full_state(q_b)
         ret_scene = finger_scene.scene_collision_check(full_q, theta_b,
                                                        compute_gradient=True,
                                                        compute_hessian=False)
 
-        link_indices = torch.ones(full_q.shape[0], dtype=torch.int64, device=full_q.device) * finger_ee_link
+        # link_indices = torch.ones(full_q.shape[0], dtype=torch.int64, device=full_q.device) * finger_ee_link
 
         # reshape and throw away data for unused fingers
         grad_g_q = ret_scene.get('grad_sdf', None)
-        ret_scene['grad_sdf'] = grad_g_q[:, (0, 1, 2, 3, 12, 13, 14, 15)].reshape(N, self.T + 1, 8)
+        ret_scene['grad_sdf'] = grad_g_q[:, self.all_joint_index].reshape(N, self.T + 1, 4 * self.num_fingers)
 
         # contact jacobian
         contact_jacobian = ret_scene.get('contact_jacobian', None)
-        contact_jacobian = contact_jacobian.reshape(N, self.T + 1, 3, 16)[:, :, :, (0, 1, 2, 3, 12, 13, 14, 15)]
+        contact_jacobian = contact_jacobian.reshape(N, self.T + 1, 3, 16)[:, :, :, self.all_joint_index]
         ret_scene['contact_jacobian'] = contact_jacobian
 
         # contact hessian
         contact_hessian = ret_scene.get('contact_hessian', None)
-        contact_hessian = contact_hessian.reshape(N, self.T + 1, 3, 16, 16)[:, :, :, (0, 1, 2, 3, 12, 13, 14, 15)]
-        contact_hessian = contact_hessian[:, :, :, :, (0, 1, 2, 3, 12, 13, 14, 15)]  # shape (N, T+1, 3, 8, 8)
+        contact_hessian = contact_hessian.reshape(N, self.T + 1, 3, 16, 16)[:, :, :, self.all_joint_index]
+        contact_hessian = contact_hessian[:, :, :, :, self.all_joint_index]  # shape (N, T+1, 3, 8, 8)
 
         # gradient of contact point
         d_contact_loc_dq = ret_scene.get('closest_pt_q_grad', None)
-        d_contact_loc_dq = d_contact_loc_dq.reshape(N, self.T + 1, 3, 16)[:, :, :, (0, 1, 2, 3, 12, 13, 14, 15)]
+        d_contact_loc_dq = d_contact_loc_dq.reshape(N, self.T + 1, 3, 16)[:, :, :, self.all_joint_index]
         ret_scene['closest_pt_q_grad'] = d_contact_loc_dq
         ret_scene['contact_hessian'] = contact_hessian
 
         # gradient of contact normal
         ret_scene['dnormal_dq'] = ret_scene['dnormal_dq'].reshape(N, self.T + 1, 3, 16)[:, :, :,
-                                  (0, 1, 2, 3, 12, 13, 14, 15)]
+                                  self.all_joint_index]
 
         # Gradient of contact jacobian -- from tests just using contact hessian works best
         # djacobian_dcontact = finger_scene.robot_sdf.chain.calc_djacobian_dtool(full_q, link_indices=link_indices)
@@ -426,11 +437,11 @@ class AllegroContactProblem(AllegroValveProblem):
             T_range = torch.arange(T, device=xu.device)
             # compute gradient of sdf
             grad_g = torch.zeros(N, T, T, self.dx + self.du, device=xu.device)
-            grad_g[:, T_range, T_range, :8] = grad_g_q[:, 1:]
+            grad_g[:, T_range, T_range, :4 * self.num_fingers] = grad_g_q[:, 1:]
             # is valve in state
-            if self.dx == 9:
+            if self.dx == 4 * self.num_fingers + 1:
                 # grad_g[:, T_range, T_range, 8] = grad_g_theta.reshape(N, T + 1)[:, 1:]
-                grad_g[:, T_range, T_range, 8] = grad_g_theta.reshape(N, T + 1)[:, 1:]
+                grad_g[:, T_range, T_range, 4 * self.num_fingers] = grad_g_theta.reshape(N, T + 1)[:, 1:]
             grad_g = grad_g.reshape(N, -1, T, self.dx + self.du)
             grad_g = grad_g.reshape(N, -1, T * (self.dx + self.du))
             if terminal:
@@ -465,10 +476,10 @@ class AllegroContactProblem(AllegroValveProblem):
 class AllegroValveTurning(AllegroContactProblem):
     def get_constraint_dim(self, T):
         self.friction_polytope_k = 4
-        self.dg_per_t = 2 * (1 + 3 + 2)
+        self.dg_per_t = self.num_fingers * (1 + 3 + 2)
         self.dg_constant = 0
         self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
-        self.dz = self.friction_polytope_k * 2 # one friction constraints per finger
+        self.dz = self.friction_polytope_k * self.num_fingers # one friction constraints per finger
         self.dh = self.dz * T  # inequality
     
     def __init__(self,
@@ -480,12 +491,15 @@ class AllegroValveTurning(AllegroContactProblem):
                  valve_type,
                  world_trans,
                  valve_asset_pos,
+                 fingers=['index', 'middle', 'ring', 'thumb'],
                  initial_valve_angle=0,
                  friction_coefficient=0.95,
                  device='cuda:0', **kwargs):
-        super().__init__(dx=9, du=8, start=start, goal=goal, T=T, chain=chain, valve_location=valve_location,
+        self.num_fingers = len(fingers)
+        super().__init__(dx=4 * self.num_fingers + 1, du=4 * self.num_fingers, start=start, goal=goal, 
+                         T=T, chain=chain, valve_location=valve_location,
                          valve_type=valve_type, world_trans=world_trans, valve_asset_pos=valve_asset_pos,
-                         initial_valve_angle=initial_valve_angle, device=device)
+                         fingers=fingers, initial_valve_angle=initial_valve_angle, device=device)
         
         self.friction_coefficient = friction_coefficient
         self.dynamics_constr = vmap(self._dynamics_constr)
@@ -496,8 +510,8 @@ class AllegroValveTurning(AllegroContactProblem):
         # update x_max with valve angle
         valve_x_max = torch.tensor([10.0 * np.pi])
         valve_x_min = torch.tensor([-10.0 * np.pi])
-        self.x_max = torch.cat((self.x_max[:8], valve_x_max, self.x_max[8:]))
-        self.x_min = torch.cat((self.x_min[:8], valve_x_min, self.x_min[8:]))
+        self.x_max = torch.cat((self.x_max[:4 * self.num_fingers], valve_x_max, self.x_max[4 * self.num_fingers:]))
+        self.x_min = torch.cat((self.x_min[:4 * self.num_fingers], valve_x_min, self.x_min[4 * self.num_fingers:]))
 
     def _cost(self, xu, start, goal):
         # TODO: check if the addtional term of the smoothness cost and running goal cost is necessary
@@ -526,10 +540,10 @@ class AllegroValveTurning(AllegroContactProblem):
         # expand to include start
         x_expanded = torch.cat((self.start.reshape(1, 1, -1).repeat(N, 1, 1), x), dim=1)
 
-        q = x_expanded[:, :, :8]
-        theta = x_expanded[:, :, 8].unsqueeze(-1)
-        self._preprocess_finger(q, theta, self.index_contact_scene, self.index_ee_link, 'index')
-        self._preprocess_finger(q, theta, self.thumb_contact_scene, self.thumb_ee_link, 'thumb')
+        q = x_expanded[:, :, :4 * self.num_fingers]
+        theta = x_expanded[:, :, 4 * self.num_fingers].unsqueeze(-1)
+        for finger in self.fingers:
+            self._preprocess_finger(q, theta, self.contact_scenes[finger], self.ee_link_idx[finger], finger)
 
     def get_friction_polytope(self):
         """
@@ -565,8 +579,8 @@ class AllegroValveTurning(AllegroContactProblem):
         dJ_dq = ret_scene.get('dJ_dq', None)
 
         # approximate q dot and theta dot
-        dq = (x[:, 1:, :8] - x[:, :-1, :8])
-        dtheta = (x[:, 1:, 8] - x[:, :-1, 8])
+        dq = (x[:, 1:, :4 * self.num_fingers] - x[:, :-1, :4 * self.num_fingers])
+        dtheta = (x[:, 1:, 4 * self.num_fingers] - x[:, :-1, 4 * self.num_fingers])
 
         # angular velocity of the valve
         valve_omega = torch.stack((torch.zeros_like(dtheta),
@@ -574,7 +588,7 @@ class AllegroValveTurning(AllegroContactProblem):
                                    torch.zeros_like(dtheta)), -1)  # should be N x T-1 x 3
 
         # compute robot contact point velocity
-        contact_point_v = (contact_jacobian[:, :-1] @ dq.reshape(N, T, 8, 1)).squeeze(-1)  # should be N x T x 3
+        contact_point_v = (contact_jacobian[:, :-1] @ dq.reshape(N, T, 4 * self.num_fingers, 1)).squeeze(-1)  # should be N x T x 3
 
         # compute valve contact point velocity
         valve_robot_frame = self.world_trans.inverse().transform_points(self.valve_location.reshape(1, 3))
@@ -592,7 +606,7 @@ class AllegroValveTurning(AllegroContactProblem):
             T_range_plus = torch.arange(1, T, device=x.device)
 
             # Compute gradient w.r.t q
-            dcontact_v_dq = (dJ_dq[:, 1:] @ dq.reshape(N, T, 1, 8, 1)).squeeze(-1) - contact_jacobian[:, 1:]
+            dcontact_v_dq = (dJ_dq[:, 1:] @ dq.reshape(N, T, 1, 4 * self.num_fingers, 1)).squeeze(-1) - contact_jacobian[:, 1:]
             tmp = torch.cross(d_contact_loc_dq[:, 1:], valve_omega.reshape(N, T, 3, 1), dim=2)  # N x T x 3 x 8
             dg_dq = dcontact_v_dq - tmp
 
@@ -605,10 +619,10 @@ class AllegroValveTurning(AllegroContactProblem):
 
             # assemble gradients into a single (sparse) tensor
             grad_g = torch.zeros((N, T, T, 3, self.dx + self.du), device=x.device)
-            grad_g[:, T_range_plus, T_range_minus, :, :8] = dg_dq[:, 1:]
-            grad_g[:, T_range_plus, T_range_minus, :, 8] = dg_dtheta[:, 1:]
-            grad_g[:, T_range, T_range, :, :8] = contact_jacobian[:, :-1]
-            grad_g[:, T_range, T_range, :, 8] = -dg_dtheta
+            grad_g[:, T_range_plus, T_range_minus, :, :4 * self.num_fingers] = dg_dq[:, 1:]
+            grad_g[:, T_range_plus, T_range_minus, :, 4 * self.num_fingers] = dg_dtheta[:, 1:]
+            grad_g[:, T_range, T_range, :, :4 * self.num_fingers] = contact_jacobian[:, :-1]
+            grad_g[:, T_range, T_range, :, 4 * self.num_fingers] = -dg_dtheta
             grad_g = grad_g.permute(0, 1, 3, 2, 4).reshape(N, -1, T * (self.dx + self.du))
         else:
             return g, None, None
@@ -658,16 +672,17 @@ class AllegroValveTurning(AllegroContactProblem):
         # we want to add the start state to x, this x is now T + 1
         x = torch.cat((self.start.reshape(1, 1, -1).repeat(N, 1, 1), x), dim=1)
 
-        q = x[:, :-1, :8]
-        next_q = x[:, 1:, :8]
+        q = x[:, :-1, :4 * self.num_fingers]
+        next_q = x[:, 1:, :4 * self.num_fingers]
         u = xu[:, :, self.dx:]
-        contact_jac = self.data[finger_name]['contact_jacobian'].reshape(N, T + 1, 3, 8)[:, :-1]
+        contact_jac = self.data[finger_name]['contact_jacobian'].reshape(N, T + 1, 3, 4 * self.num_fingers)[:, :-1]
         contact_normal = self.data[finger_name]['contact_normal'].reshape(N, T + 1, 3)[:, :-1]
-        dnormal_dq = self.data[finger_name]['dnormal_dq'].reshape(N, T + 1, 3, 8)[:, :-1]
+        dnormal_dq = self.data[finger_name]['dnormal_dq'].reshape(N, T + 1, 3, 4 * self.num_fingers)[:, :-1]
         dnormal_dtheta = self.data[finger_name]['dnormal_denv_q'].reshape(N, T + 1, 3, 1)[:, :-1]
 
-        g = self.dynamics_constr(q.reshape(-1, 8), u.reshape(-1, 8), next_q.reshape(-1, 8),
-                                 contact_jac.reshape(-1, 3, 8),
+        g = self.dynamics_constr(q.reshape(-1, 4 * self.num_fingers), u.reshape(-1, 4 * self.num_fingers),
+                                 next_q.reshape(-1, 4 * self.num_fingers),
+                                 contact_jac.reshape(-1, 3, 4 * self.num_fingers),
                                  contact_normal.reshape(-1, 3)).reshape(N, T, -1)
 
         if compute_grads:
@@ -676,21 +691,21 @@ class AllegroValveTurning(AllegroContactProblem):
             T_minus = torch.arange(T - 1, device=x.device)
             grad_g = torch.zeros(N, g.shape[2], T, T, self.dx + self.du, device=self.device)
             # dnormal_dq = torch.zeros(N, T, 3, 8, device=self.device)  # assume zero SDF hessian
-            djac_dq = self.data[finger_name]['dJ_dq'].reshape(N, T + 1, 3, 8, 8)[:, :-1]
-            dg_dq, dg_du, dg_dnext_q, dg_djac, dg_dnormal = self.grad_dynamics_constr(q.reshape(-1, 8),
-                                                                                      u.reshape(-1, 8),
-                                                                                      next_q.reshape(-1, 8),
-                                                                                      contact_jac.reshape(-1, 3, 8),
+            djac_dq = self.data[finger_name]['dJ_dq'].reshape(N, T + 1, 3, 4 * self.num_fingers, 4 * self.num_fingers)[:, :-1]
+            dg_dq, dg_du, dg_dnext_q, dg_djac, dg_dnormal = self.grad_dynamics_constr(q.reshape(-1, 4 * self.num_fingers),
+                                                                                      u.reshape(-1, 4 * self.num_fingers),
+                                                                                      next_q.reshape(-1, 4 * self.num_fingers),
+                                                                                      contact_jac.reshape(-1, 3, 4 * self.num_fingers),
                                                                                       contact_normal.reshape(-1, 3))
 
             dg_dq = dg_dq.reshape(N, T, g.shape[2], -1) + dg_dnormal.reshape(N, T, g.shape[2], -1) @ dnormal_dq  #
-            dg_dq = dg_dq + dg_djac.reshape(N, T, g.shape[2], -1) @ djac_dq.reshape(N, T, -1, 8)
+            dg_dq = dg_dq + dg_djac.reshape(N, T, g.shape[2], -1) @ djac_dq.reshape(N, T, -1, 4 * self.num_fingers)
             dg_dtheta = dg_dnormal.reshape(N, T, g.shape[2], -1) @ dnormal_dtheta
 
-            grad_g[:, :, T_plus, T_minus, :8] = dg_dq[:, 1:].transpose(1, 2)  # first q is the start
+            grad_g[:, :, T_plus, T_minus, :4 * self.num_fingers] = dg_dq[:, 1:].transpose(1, 2)  # first q is the start
             grad_g[:, :, T_range, T_range, self.dx:] = dg_du.reshape(N, T, -1, self.du).transpose(1, 2)
-            grad_g[:, :, T_plus, T_minus, 8] = dg_dtheta[:, 1:].squeeze(-1).transpose(1, 2)
-            grad_g[:, :, T_range, T_range, :8] = dg_dnext_q.reshape(N, T, -1, 8).transpose(1, 2)
+            grad_g[:, :, T_plus, T_minus, 4 * self.num_fingers] = dg_dtheta[:, 1:].squeeze(-1).transpose(1, 2)
+            grad_g[:, :, T_range, T_range, :4 * self.num_fingers] = dg_dnext_q.reshape(N, T, -1, 4 * self.num_fingers).transpose(1, 2)
             grad_g = grad_g.transpose(1, 2)
         else:
             return g.reshape(N, -1), None, None
@@ -736,34 +751,34 @@ class AllegroValveTurning(AllegroContactProblem):
 
         # u is the delta q commanded
         # retrieved cached values
-        contact_jac = self.data[finger_name]['contact_jacobian'].reshape(N, T + 1, 3, 8)[:, :-1]
+        contact_jac = self.data[finger_name]['contact_jacobian'].reshape(N, T + 1, 3, 4 * self.num_fingers)[:, :-1]
         contact_normal = self.data[finger_name]['contact_normal'].reshape(N, T + 1, 3)[:, :-1]
-        dnormal_dq = self.data[finger_name]['dnormal_dq'].reshape(N, T + 1, 3, 8)[:, :-1]
+        dnormal_dq = self.data[finger_name]['dnormal_dq'].reshape(N, T + 1, 3, 4 * self.num_fingers)[:, :-1]
         dnormal_dtheta = self.data[finger_name]['dnormal_denv_q'].reshape(N, T + 1, 3, 1)[:, :-1]
 
         # compute constraint value
-        h = self.friction_constr(u.reshape(-1, 8),
+        h = self.friction_constr(u.reshape(-1, 4 * self.num_fingers),
                                  contact_normal.reshape(-1, 3),
-                                 contact_jac.reshape(-1, 3, 8)).reshape(N, -1)
+                                 contact_jac.reshape(-1, 3, 4 * self.num_fingers)).reshape(N, -1)
 
         # compute the gradient
         if compute_grads:
-            dh_du, dh_dnormal, dh_djac = self.grad_friction_constr(u.reshape(-1, 8),
+            dh_du, dh_dnormal, dh_djac = self.grad_friction_constr(u.reshape(-1, 4 * self.num_fingers),
                                                                    contact_normal.reshape(-1, 3),
-                                                                   contact_jac.reshape(-1, 3, 8))
+                                                                   contact_jac.reshape(-1, 3, 4 * self.num_fingers))
 
-            djac_dq = self.data[finger_name]['dJ_dq'].reshape(N, T + 1, 3, 8, 8)[:, :-1]
+            djac_dq = self.data[finger_name]['dJ_dq'].reshape(N, T + 1, 3, 4 * self.num_fingers, 4 * self.num_fingers)[:, :-1]
 
             dh = dh_dnormal.shape[1]
             dh_dq = dh_dnormal.reshape(N, T, dh, -1) @ dnormal_dq
-            dh_dq = dh_dq + dh_djac.reshape(N, T, dh, -1) @ djac_dq.reshape(N, T, -1, 8)
+            dh_dq = dh_dq + dh_djac.reshape(N, T, dh, -1) @ djac_dq.reshape(N, T, -1, 4 * self.num_fingers)
             dh_dtheta = dh_dnormal.reshape(N, T, dh, -1) @ dnormal_dtheta
             grad_h = torch.zeros(N, dh, T, T, d, device=self.device)
             T_range = torch.arange(T, device=self.device)
             T_range_minus = torch.arange(T - 1, device=self.device)
             T_range_plus = torch.arange(1, T, device=self.device)
-            grad_h[:, :, T_range_plus, T_range_minus, :8] = dh_dq[:, 1:].transpose(1, 2)
-            grad_h[:, :, T_range_plus, T_range_minus, 8] = dh_dtheta[:, 1:].squeeze(-1).transpose(1, 2)
+            grad_h[:, :, T_range_plus, T_range_minus, :4 * self.num_fingers] = dh_dq[:, 1:].transpose(1, 2)
+            grad_h[:, :, T_range_plus, T_range_minus, 4 * self.num_fingers] = dh_dtheta[:, 1:].squeeze(-1).transpose(1, 2)
             grad_h[:, :, T_range, T_range, self.dx:] = dh_du.reshape(N, T, dh, self.du).transpose(1, 2)
             grad_h = grad_h.transpose(1, 2).reshape(N, -1, T * d)
         else:
@@ -834,6 +849,7 @@ class AllegroValveTurning(AllegroContactProblem):
         return g_contact, grad_g_contact, hess_g_contact
     
 class AllegroValveRegrasping(AllegroContactProblem):
+    # TODO: update for multiple fingers
     def get_constraint_dim(self, T):
         self.dg_per_t = 8
         self.dg_constant = 6
@@ -850,13 +866,14 @@ class AllegroValveRegrasping(AllegroContactProblem):
                  valve_type,
                  world_trans,
                  valve_asset_pos,
+                 fingers=['index', 'middle', 'ring', 'thumb'],
                  initial_valve_angle=0,
                  device='cuda:0'):
         dx = 8
         du = 8
         super().__init__(dx=dx, du=du, start=start, goal=goal, T=T, chain=chain, valve_location=valve_location,
                          valve_type=valve_type, world_trans=world_trans, valve_asset_pos=valve_asset_pos,
-                         initial_valve_angle=initial_valve_angle, device=device)
+                         fingers=fingers, initial_valve_angle=initial_valve_angle, device=device)
 
         
 
@@ -914,7 +931,7 @@ class AllegroValveRegrasping(AllegroContactProblem):
         g = (contact_loc - self.goal[finger_name]).reshape(N, 3)
         if compute_grads:
             grad_g = torch.zeros(N, 3, T, (self.dx + self.du), device=self.device)
-            grad_g[:, :, -1, :8] = grad_contact_loc.reshape(N, 3, -1)
+            grad_g[:, :, -1, :4 * self.num_fingers] = grad_contact_loc.reshape(N, 3, -1)
             grad_g = grad_g.reshape(N, 3, -1)
         else:
             return g, None, None
@@ -978,6 +995,7 @@ class AllegroValveRegrasping(AllegroContactProblem):
     
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     "only turn the valve once"
+    num_fingers = len(params['fingers'])
     state = env.get_state()
     if params['visualize']:
         env.frame_fpath = fpath
@@ -986,13 +1004,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         env.frame_fpath = None
         env.frame_id = None
 
-    start = state['q'].reshape(9).to(device=params['device'])
+    start = state['q'].reshape(4 * num_fingers + 1).to(device=params['device'])
     # start = torch.cat((state['q'].reshape(10), torch.zeros(1).to(state['q'].device))).to(device=params['device'])
     if params['controller'] == 'csvgd':
         pregrasp_problem = AllegroContactProblem(
-            dx=8,
-            du=8,
-            start=start[:8],
+            dx=4 * num_fingers,
+            du=4 * num_fingers,
+            start=start[:4 * num_fingers],
             goal=params['valve_goal'] * 0,
             T=4,
             chain=params['chain'],
@@ -1000,7 +1018,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             valve_asset_pos=env.valve_pose,
             valve_location=params['valve_location'],
             valve_type=params['valve_type'],
-            world_trans=env.world_trans
+            world_trans=env.world_trans,
+            fingers=params['fingers']
         )
 
         pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
@@ -1015,7 +1034,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             valve_location=params['valve_location'],
             valve_type=params['valve_type'],
             friction_coefficient=params['friction_coefficient'],
-            world_trans=env.world_trans
+            world_trans=env.world_trans,
+            fingers=params['fingers'],
         )
 
         turn_planner = PositionControlConstrainedSVGDMPC(turn_problem, params)
@@ -1023,17 +1043,17 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         raise ValueError('Invalid controller')
     
     # first we move the hand to grasp the valve
-    start = state['q'].reshape(9).to(device=params['device'])
-    best_traj, _ = pregrasp_planner.step(start[:8])
+    start = state['q'].reshape(4 * num_fingers + 1).to(device=params['device'])
+    best_traj, _ = pregrasp_planner.step(start[:4 * num_fingers])
 
     # we will just execute this open loop
-    for x in best_traj[:, :8]:
+    for x in best_traj[:, :4 * num_fingers]:
         if params['mode'] == 'hardware':
             sim_viz_env.set_pose(env.get_state()['all_state'].to(device=env.device))
-            sim_viz_env.step(x.reshape(-1, 8).to(device=env.device))
-        env.step(x.reshape(-1, 8).to(device=env.device))
+            sim_viz_env.step(x.reshape(-1, 4 * num_fingers).to(device=env.device))
+        env.step(x.reshape(-1, 4 * num_fingers).to(device=env.device))
         if params['mode'] == 'hardware_copy':
-            ros_copy_node.apply_action(partial_to_full_state(x.reshape(-1, 8)[0]))
+            ros_copy_node.apply_action(partial_to_full_state(x.reshape(-1, 4 * num_fingers)[0]))
             # ros_node.apply_action(action[0].detach().cpu().numpy())
         # x = x.unsqueeze(0)
         # time.sleep(0.1)
@@ -1064,12 +1084,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
     # debug: plot the thumb traj
     fig = plt.figure()
-    ax_index = fig.add_subplot(122, projection='3d')
-    ax_thumb = fig.add_subplot(121, projection='3d')
-    ax_index.set_title('index')
-    ax_thumb.set_title('thumb')
-    axes = [ax_index, ax_thumb]
+    axes = [fig.add_subplot(int(f'1{num_fingers}{i+1}'), projection='3d') for i in range(num_fingers)]
     for i, ax in enumerate(axes):
+        axes[i].set_title(params['fingers'][i])
         axes[i].set_aspect('equal')
         axes[i].set_xlabel('x', labelpad=20)
         axes[i].set_ylabel('y', labelpad=20)
@@ -1077,27 +1094,27 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         axes[i].set_xlim3d(0.8, 0.87)
         axes[i].set_ylim3d(0.52, 0.58)
         axes[i].set_zlim3d(1.36, 1.46)
-    thumb_traj_history = []
-    index_traj_history = []
+    finger_traj_history = {}
+    for finger in params['fingers']:
+        finger_traj_history[finger] = []
     state = env.get_state()
-    start = state['q'].reshape(9).to(device=params['device'])
-    thumb_ee = state2ee_pos(start[:8], turn_problem.thumb_ee_name)
-    thumb_traj_history.append(thumb_ee.detach().cpu().numpy())
-    index_ee = state2ee_pos(start[:8], turn_problem.index_ee_name)
-    index_traj_history.append(index_ee.detach().cpu().numpy())
+    start = state['q'].reshape(4 * num_fingers + 1).to(device=params['device'])
+    for finger in params['fingers']:
+        ee = state2ee_pos(start[:4 * num_fingers], turn_problem.ee_names[finger])
+        finger_traj_history[finger].append(ee.detach().cpu().numpy())
 
     info_list = []
 
     for k in range(params['num_steps']):
         state = env.get_state()
-        start = state['q'].reshape(9).to(device=params['device'])
+        start = state['q'].reshape(4 * num_fingers + 1).to(device=params['device'])
 
-        actual_trajectory.append(state['q'].reshape(9).clone())
+        actual_trajectory.append(state['q'].reshape(4 * num_fingers + 1).clone())
         start_time = time.time()
         best_traj, trajectories = turn_planner.step(start)
 
         print(f"solve time: {time.time() - start_time}")
-        planned_theta_traj = best_traj[:, 8].detach().cpu().numpy()
+        planned_theta_traj = best_traj[:, 4 * num_fingers + 1].detach().cpu().numpy()
         print(f"current theta: {state['q'][0, -1].detach().cpu().numpy()}")
         print(f"planned theta: {planned_theta_traj}")
         # add trajectory lines to sim
@@ -1119,7 +1136,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
         action = x[:, turn_problem.dx:turn_problem.dx+turn_problem.du].to(device=env.device)
         print(action)
-        action = action + start.unsqueeze(0)[:, :8] # NOTE: this is required since we define action as delta action
+        action = action + start.unsqueeze(0)[:, :4 * num_fingers] # NOTE: this is required since we define action as delta action
         # action = best_traj[0, :8]
         # action[:, 4:] = 0
         if params['mode'] == 'hardware':
@@ -1169,17 +1186,16 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         gym.clear_lines(viewer)
         # for debugging
         state = env.get_state()
-        start = state['q'].reshape(9).to(device=params['device'])
-        thumb_ee = state2ee_pos(start[:8], turn_problem.thumb_ee_name)
-        thumb_traj_history.append(thumb_ee.detach().cpu().numpy())
-        temp_for_plot = np.stack(thumb_traj_history, axis=0)
-        if k >= 2:
-            ax_thumb.plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray', label='actual')
-        index_ee = state2ee_pos(start[:8], turn_problem.index_ee_name)
-        index_traj_history.append(index_ee.detach().cpu().numpy())
-        temp_for_plot = np.stack(index_traj_history, axis=0)
-        if k >= 2:
-            ax_index.plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray', label='actual')
+        start = state['q'].reshape(4 * num_fingers + 1).to(device=params['device'])
+        for finger in params['fingers']:
+            ee = state2ee_pos(start[:4 * num_fingers], turn_problem.ee_names[finger])
+            finger_traj_history[finger].append(ee.detach().cpu().numpy())
+        for i, ax in enumerate(axes):
+            finger = params['fingers'][i]
+            traj_history = finger_traj_history[finger]
+            temp_for_plot = np.stack(traj_history, axis=0)
+            if k >= 2:
+                axes[i].plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray', label='actual')
     with open(f'{fpath.resolve()}/info.pkl', 'wb') as f:
         pkl.dump(info_list, f)
     handles, labels = plt.gca().get_legend_handles_labels()
@@ -1196,11 +1212,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
 
 
-
+    env.reset()
     state = env.get_state()
-    state = state['q'].reshape(9).to(device=params['device'])
+    state = state['q'].reshape(4 * num_fingers + 1).to(device=params['device'])
     actual_trajectory.append(state.clone())
-    actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 9)
+    actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + 1)
     turn_problem.T = actual_trajectory.shape[0]
     # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
     final_distance_to_goal = (actual_trajectory[:, -1] - params['valve_goal']).abs()
@@ -1217,15 +1233,17 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 def add_trajectories(trajectories, best_traj, axes=None):
     M = len(trajectories)
     if M > 0:
-        initial_state = env.get_state()['q'][:, :8]
-        all_state = torch.cat((initial_state, best_traj[:-1, :8]), dim=0)
-        desired_state = all_state + best_traj[:, 9:17]
+        initial_state = env.get_state()['q']
+        num_fingers = initial_state.shape[1] // 4
+        initial_state = initial_state[:, :4 * num_fingers]
+        all_state = torch.cat((initial_state, best_traj[:-1, :4 * num_fingers]), dim=0)
+        desired_state = all_state + best_traj[:, 4 * num_fingers + 1: 4 * num_fingers +1 + 4 * num_fingers]
 
         desired_index_best_traj_ee = state2ee_pos(desired_state, index_ee_name)
         desired_thumb_best_traj_ee = state2ee_pos(desired_state, thumb_ee_name)
 
-        index_best_traj_ee = state2ee_pos(best_traj[:, :8], index_ee_name)
-        thumb_best_traj_ee = state2ee_pos(best_traj[:, :8], thumb_ee_name)
+        index_best_traj_ee = state2ee_pos(best_traj[:, :4 * num_fingers], index_ee_name)
+        thumb_best_traj_ee = state2ee_pos(best_traj[:, :4 * num_fingers], thumb_ee_name)
 
         traj_line_colors = np.random.random((3, M)).astype(np.float32)
         thumb_colors = np.array([0, 1, 0]).astype(np.float32)
@@ -1269,15 +1287,17 @@ def add_trajectories(trajectories, best_traj, axes=None):
 def add_trajectories_hardware(trajectories, best_traj, axes=None):
     M = len(trajectories)
     if M > 0:
-        initial_state = env.get_state()['q'][:, :8]
-        all_state = torch.cat((initial_state, best_traj[:-1, :8]), dim=0)
+        initial_state = env.get_state()['q']
+        num_fingers = initial_state.shape[1] // 4
+        initial_state = initial_state[:, :4 * num_fingers]
+        all_state = torch.cat((initial_state, best_traj[:-1, :4 * num_fingers]), dim=0)
         desired_state = all_state + best_traj[:, 9:17]
 
         desired_index_best_traj_ee = state2ee_pos(desired_state, index_ee_name)
         desired_thumb_best_traj_ee = state2ee_pos(desired_state, thumb_ee_name)
 
-        index_best_traj_ee = state2ee_pos(best_traj[:, :8], index_ee_name)
-        thumb_best_traj_ee = state2ee_pos(best_traj[:, :8], thumb_ee_name)
+        index_best_traj_ee = state2ee_pos(best_traj[:, :4 * num_fingers], index_ee_name)
+        thumb_best_traj_ee = state2ee_pos(best_traj[:, :4 * num_fingers], thumb_ee_name)
 
         initial_thumb_ee = state2ee_pos(initial_state, thumb_ee_name)
         thumb_state_traj = torch.stack((initial_thumb_ee, thumb_best_traj_ee[0]), dim=0).cpu().numpy()
@@ -1308,6 +1328,7 @@ if __name__ == "__main__":
                                  video_save_path=img_save_dir,
                                  configuration='screw_driver',
                                  joint_stiffness=config['kp'],
+                                 fingers=config['fingers'],
                                  )
     else:
         env = AllegroValveTurningEnv(1, control_mode='joint_impedance',
@@ -1321,22 +1342,22 @@ if __name__ == "__main__":
                                     video_save_path=img_save_dir,
                                     configuration='screw_driver',
                                     joint_stiffness=config['kp'],
+                                    fingers=config['fingers'],
                                     )
 
     sim, gym, viewer = env.get_sim()
 
-    """
+
     state = env.get_state()
-    ee_pos, ee_ori = state['ee_pos'], state['ee_ori']
     try:
         while True:
-            start = torch.cat((ee_pos, ee_ori), dim=-1).reshape(1, 7)
+            start = env.get_state()['q'][:, :-1]
             env.step(start)
             print('waiting for you to finish camera adjustment, ctrl-c when done')
             time.sleep(0.1)
     except KeyboardInterrupt:
         pass
-    """
+
     sim_env = None
     ros_copy_node = None
     if config['mode'] == 'hardware':
@@ -1357,15 +1378,21 @@ if __name__ == "__main__":
 
     # set up the kinematic chain
     asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
+    ee_names = {
+            'index': 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
+            'middle': 'allegro_hand_naka_finger_finger_1_aftc_base_link',
+            'ring': 'allegro_hand_kusuri_finger_finger_2_aftc_base_link',
+            'thumb': 'allegro_hand_oya_finger_3_aftc_base_link',
+            }
     index_ee_name = 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link'
     thumb_ee_name = 'allegro_hand_oya_finger_3_aftc_base_link'
 
-    # combined chain
     chain = pk.build_chain_from_urdf(open(asset).read())
-    index_ee_link = chain.frame_to_idx[index_ee_name]
-    thumb_ee_link = chain.frame_to_idx[thumb_ee_name]
-    frame_indices = torch.tensor([index_ee_link, thumb_ee_link])
-    state2ee_pos = partial(state2ee_pos, chain=chain, frame_indices=frame_indices, world_trans=env.world_trans)
+    frame_indices = [chain.frame_to_idx[ee_names[finger]] for finger in config['fingers']]    # combined chain
+    frame_indices = torch.tensor(frame_indices)
+    state2ee_pos = partial(state2ee_pos, fingers=config['fingers'], chain=chain, frame_indices=frame_indices, world_trans=env.world_trans)
+    full_to_partial_state = partial(full_to_partial_state, fingers=config['fingers'])
+    partial_to_full_state = partial(partial_to_full_state, fingers=config['fingers'])
 
 
     for i in tqdm(range(config['num_trials'])):
