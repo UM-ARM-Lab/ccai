@@ -49,7 +49,8 @@ env = AllegroValveTurningEnv(1, control_mode='joint_impedance', use_cartesian_co
                              device=device,
                              valve=valve_type,
                              video_save_path=img_save_dir,
-                             configuration='screw_driver')
+                             fingers=['index','thumb'],
+                             )
 
 while True:
     state = torch.tensor(ros_node.current_joint_pose.position).to(env.device)

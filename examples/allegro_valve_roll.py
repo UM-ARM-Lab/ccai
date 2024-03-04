@@ -362,7 +362,6 @@ class AllegroContactProblem(AllegroValveProblem):
             self._preprocess_finger(q, theta, self.contact_scenes[finger], self.ee_link_idx[finger], finger)
 
     def _preprocess_finger(self, q, theta, finger_scene, finger_ee_link, finger_name):
-        # TODO: this function seems redundant and doesn't need to be called for each finger
         N, _, _ = q.shape
 
         # reshape to batch across time
@@ -1326,7 +1325,6 @@ if __name__ == "__main__":
                                  device=config['sim_device'],
                                  valve=config['valve_type'],
                                  video_save_path=img_save_dir,
-                                 configuration='screw_driver',
                                  joint_stiffness=config['kp'],
                                  fingers=config['fingers'],
                                  )
@@ -1340,7 +1338,6 @@ if __name__ == "__main__":
                                     device=config['sim_device'],
                                     valve=config['valve_type'],
                                     video_save_path=img_save_dir,
-                                    configuration='screw_driver',
                                     joint_stiffness=config['kp'],
                                     fingers=config['fingers'],
                                     )
@@ -1349,14 +1346,14 @@ if __name__ == "__main__":
 
 
     state = env.get_state()
-    try:
-        while True:
-            start = env.get_state()['q'][:, :-1]
-            env.step(start)
-            print('waiting for you to finish camera adjustment, ctrl-c when done')
-            time.sleep(0.1)
-    except KeyboardInterrupt:
-        pass
+    # try:
+    #     while True:
+    #         start = env.get_state()['q'][:, :-1]
+    #         env.step(start)
+    #         print('waiting for you to finish camera adjustment, ctrl-c when done')
+    #         time.sleep(0.1)
+    # except KeyboardInterrupt:
+    #     pass
 
     sim_env = None
     ros_copy_node = None
