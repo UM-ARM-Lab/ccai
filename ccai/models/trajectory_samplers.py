@@ -68,14 +68,16 @@ class TrajectoryFlowModel(nn.Module):
         transforms = CompositeTransform(transforms)
         self.flow = Flow(transforms, base_dist)
 
-    def sample(self, start, goal, constraints=None, T=1):
-        B = start.shape[0]
-        context = torch.cat((start, goal), dim=1)
+    def sample(self, N, H=None, start=None, goal=None, constraints=None, T=1):
+        B = 1
+        if start is not None:
+            B = start.shape[0]
+            context = torch.cat((start, goal), dim=1)
         if constraints is not None:
             context = torch.cat((context, constraints), dim=1)
 
-        samples = self.flow.sample(num_samples=1, context=context)
-        trajectories = samples.reshape(B, self.T, -1)
+        samples = self.flow.sample(num_samples=N, context=context)
+        trajectories = samples.reshape(B, N, self.T, -1)
 
         if self.dynamics is not None:
             x = [start.clone()]
@@ -84,11 +86,17 @@ class TrajectoryFlowModel(nn.Module):
             x = torch.stack(x, dim=1)
             trajectories = torch.cat((x, trajectories), dim=-1)
 
-        return trajectories.reshape(B, self.T, self.dx + self.du)
+        trajectories = trajectories.reshape(B, N, self.T, self.dx + self.du)
+        if B == 1:
+            return trajectories[0]
+        return trajectories
 
-    def log_prob(self, trajectories, start, goal, constraints=None):
-        B = start.shape[0]
-        context = torch.cat((start, goal), dim=1)
+    def log_prob(self, trajectories, start=None, goal=None, constraints=None):
+        B = trajectories.shape[0]
+        context = None
+        if start is not None:
+            B = start.shape[0]
+            context = torch.cat((start, goal), dim=1)
 
         if constraints is not None:
             context = torch.cat((context, constraints), dim=1)
@@ -99,7 +107,7 @@ class TrajectoryFlowModel(nn.Module):
         log_prob = self.flow.log_prob(trajectories.reshape(B, -1), context=context)
         return log_prob.reshape(B)
 
-    def loss(self, trajectories, start, goal, constraints=None):
+    def loss(self, trajectories, start=None, goal=None, constraints=None):
         return -self.log_prob(trajectories, start, goal, constraints).mean()
 
 
@@ -125,21 +133,36 @@ class TrajectoryDiffusionModel(nn.Module):
                                                      sampling_timesteps=timesteps, hidden_dim=hidden_dim,
                                                      unconditional=unconditional)
 
-    def sample(self, start, goal, constraints):
-        B, N, _ = constraints.shape
-        context = torch.cat((start.unsqueeze(1).repeat(1, N, 1),
-                             goal.unsqueeze(1).repeat(1, N, 1),
-                             constraints), dim=-1)
-        condition = {0: start}
-        samples = self.diffusion_model.sample(N=1, context=context, condition=condition).reshape(-1, self.T,
-                                                                                                 self.dx + self.du)
+    def sample(self, N, H=None, start=None, goal=None, constraints=None):
+        # B, N, _ = constraints.shape
+        if constraints is not None:
+            B = constraints.shape[0]
+            context = torch.cat((start.unsqueeze(1).repeat(1, N, 1),
+                                 goal.unsqueeze(1).repeat(1, N, 1),
+                                 constraints), dim=-1)
+        else:
+            context = None
+        condition = {}
+        if start is not None:
+            condition[0] = [0, start]
+        if goal is not None:
+            condition[-1] = [8, goal]
+        if condition == {}:
+            condition = None
+
+        samples = self.diffusion_model.sample(N=N, H=H, context=context, condition=condition)#.reshape(-1, H#,
+                                                                                             #         self.dx + self.du)
         return samples
 
-    def loss(self, trajectories, start, goal, constraints):
+    def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
         B = trajectories.shape[0]
-        context = torch.cat((start, goal, constraints), dim=1)
+        if start is not None:
+            context = torch.cat((start, goal, constraints), dim=1)
+        else:
+            context = None
+
         # context=None
-        return self.diffusion_model.loss(trajectories.reshape(B, -1), context=context).mean()
+        return self.diffusion_model.loss(trajectories.reshape(B, -1), context=context, mask=mask).mean()
 
     def set_norm_constants(self, x_mu, x_std):
         self.diffusion_model.set_norm_constants(x_mu, x_std)
@@ -167,24 +190,29 @@ class TrajectoryCNFModel(TrajectoryCNF):
     def __init__(self, horizon, dx, du, context_dim, hidden_dim=32):
         super().__init__(horizon, dx, du, context_dim, hidden_dim=hidden_dim)
 
-    def sample(self, start, goal, constraints):
-        B, N, _ = constraints.shape
-        #context = torch.cat((start.unsqueeze(1).repeat(1, N, 1),
-        #                     goal.unsqueeze(1).repeat(1, N, 1),
-        #                     constraints), dim=-1)
-        if N > 1:
-            raise NotImplementedError('composability TODO')
-        context = torch.cat((start, goal, constraints.reshape(B, -1)), dim=1)
+    def sample(self, start=None, goal=None, constraints=None):
+        context = None
+        if constraints is not None:
+            B, N, _ = constraints.shape
+            context = torch.cat((start, goal, constraints.reshape(B, -1)), dim=1)
+
+            # context = torch.cat((start.unsqueeze(1).repeat(1, N, 1),
+            #                     goal.unsqueeze(1).repeat(1, N, 1),
+            #                     constraints), dim=-1)
+            if N > 1:
+                raise NotImplementedError('composability TODO')
         return self._sample(context=context, start=start)
 
-    def loss(self, x, start, goal, constraints):
-        context = torch.cat((start, goal, constraints), dim=1)
-        return self.flow_matching_loss(x, context)
+    def loss(self, x, start=None, goal=None, constraints=None, mask=None):
+        context = None
+        if start is not None:
+            context = torch.cat((start, goal, constraints), dim=1)
+        return self.flow_matching_loss(x, context, mask)
 
 
 class TrajectorySampler(nn.Module):
 
-    def __init__(self, T, dx, du, context_dim, type='nf', dynamics=None, problem=None, timesteps=20, hidden_dim=64,
+    def __init__(self, T, dx, du, context_dim, type='nf', dynamics=None, problem=None, timesteps=50, hidden_dim=64,
                  constrain=False, unconditional=False):
         super().__init__()
         self.T = T
@@ -205,15 +233,18 @@ class TrajectorySampler(nn.Module):
         self.register_buffer('x_std', torch.ones(dx + du))
 
     def set_norm_constants(self, x_mean, x_std):
-        self.x_mean.data = torch.from_numpy(x_mean).to(device=self.x_mean.device, dtype=self.x_mean.dtype)
-        self.x_std.data = torch.from_numpy(x_std).to(device=self.x_std.device, dtype=self.x_std.dtype)
+        self.x_mean.data = x_mean.to(device=self.x_mean.device, dtype=self.x_mean.dtype)
+        self.x_std.data = x_std.to(device=self.x_std.device, dtype=self.x_std.dtype)
 
     def send_norm_constants_to_submodels(self):
         self.model.set_norm_constants(self.x_mean, self.x_std)
 
-    def sample(self, start, goal, constraints=None):
-        norm_start = (start - self.x_mean[:self.dx]) / self.x_std[:self.dx]
-        samples = self.model.sample(norm_start, goal, constraints)
+    def sample(self, N, H=10, start=None, goal=None, constraints=None):
+        norm_start = None
+        if start is not None:
+            norm_start = (start - self.x_mean[:self.dx]) / self.x_std[:self.dx]
+
+        samples = self.model.sample(N, H, norm_start, goal, constraints)
         return samples * self.x_std + self.x_mean
 
     def resample(self, start, goal, constraints, initial_trajectory, timestep):
@@ -223,8 +254,8 @@ class TrajectorySampler(nn.Module):
         return self.model.resample(norm_start, goal, constraints, norm_initial_trajectory,
                                    timestep) * self.x_std + self.x_mean
 
-    def loss(self, trajectories, start, goal, constraints=None):
-        return self.model.loss(trajectories, start, goal, constraints)
+    def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
+        return self.model.loss(trajectories, mask=mask, start=start, goal=goal, constraints=constraints)
 
     def grad(self, trajectories, t, start, goal, constraints=None):
         return self.model.grad(trajectories, t, start, goal, constraints)

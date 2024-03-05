@@ -13,12 +13,13 @@ from ccai.models.helpers import (
     Residual,
     PreNorm,
     LinearAttention,
+    pad_to_multiple
 )
 
 
 class ResidualTemporalBlock(nn.Module):
 
-    def __init__(self, inp_channels, out_channels, embed_dim, horizon=None, kernel_size=5):
+    def __init__(self, inp_channels, out_channels, embed_dim, horizon=None, kernel_size=3):
         super().__init__()
 
         self.blocks = nn.ModuleList([
@@ -46,9 +47,11 @@ class ResidualTemporalBlock(nn.Module):
 
         embed = self.time_mlp(t)
         out = self.blocks[0](x)
+        #print(x.shape, out.shape)
         out = out + embed
         out = self.blocks[1](out)
-        return out + self.residual_conv(x)
+        out = out + self.residual_conv(x)
+        return out
 
 
 class TemporalUnet(nn.Module):
@@ -59,7 +62,7 @@ class TemporalUnet(nn.Module):
             transition_dim,
             cond_dim,
             dim=32,
-            dim_mults=(1, 2, 4, 8),
+            dim_mults=(1, 2, 4),
             attention=False,
             context_dropout_p=0.25
     ):
@@ -110,6 +113,7 @@ class TemporalUnet(nn.Module):
                 ResidualTemporalBlock(dim_out, dim_out, embed_dim=time_dim, horizon=horizon),
                 Residual(PreNorm(dim_out, LinearAttention(dim_out))) if attention else nn.Identity(),
                 Downsample1d(dim_out) if not is_last else nn.Identity()
+                # nn.Identity()
             ]))
 
             if not is_last:
@@ -119,23 +123,27 @@ class TemporalUnet(nn.Module):
         self.mid_block1 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
         self.mid_attn = Residual(PreNorm(mid_dim, LinearAttention(mid_dim))) if attention else nn.Identity()
         self.mid_block2 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
+        self.mid_block3 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
+        self.mid_block4 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
 
         feature_dims = feature_dims[::-1][1:]
         for ind, (dim_in, dim_out) in enumerate(reversed(in_out[1:])):
             is_last = ind >= (num_resolutions - 1)
-            kernel_size = 4 if feature_dims[ind + 1] % feature_dims[ind] == 0 else 3
+            # kernel_size = 4 if feature_dims[ind + 1] % feature_dims[ind] == 0 else 3
+            kernel_size = 3
             self.ups.append(nn.ModuleList([
                 ResidualTemporalBlock(dim_out * 2, dim_in, embed_dim=time_dim, horizon=horizon),
                 ResidualTemporalBlock(dim_in, dim_in, embed_dim=time_dim, horizon=horizon),
                 Residual(PreNorm(dim_in, LinearAttention(dim_in))) if attention else nn.Identity(),
                 Upsample1d(dim_in, kernel_size) if not is_last else nn.Identity()
+                # nn.Identity()
             ]))
 
             if not is_last:
                 horizon = horizon * 2
 
         self.final_conv = nn.Sequential(
-            Conv1dBlock(dim, dim, kernel_size=5),
+            Conv1dBlock(dim, dim, kernel_size=3),
             nn.Conv1d(dim, transition_dim, 1),
         )
 
@@ -151,17 +159,19 @@ class TemporalUnet(nn.Module):
             x : [ batch x horizon x transition ]
         '''
         # ensure t is a batched tensor
-        B = x.shape[0]
+        B, H, d = x.shape
         t = t.reshape(-1)
         if t.shape[0] == 1:
             t = t.repeat(B)
         t = self.time_embedding(t)
         x = einops.rearrange(x, 'b h t -> b t h')
+        x = pad_to_multiple(x, m=2 ** len(self.downs))
+
         if context is not None:
             constraint_type = context[:, -2:]
             context = context[:, :-2]
             ctype_embed = self.constraint_type_embed(constraint_type)
-            #c = context
+            # c = context
             c = torch.cat((context, ctype_embed), dim=-1)
             # need to do dropout on context embedding to train unconditional model alongside conditional
             if dropout:
@@ -184,6 +194,8 @@ class TemporalUnet(nn.Module):
         x = self.mid_block1(x, t)
         # x = self.mid_attn(x)
         x = self.mid_block2(x, t)
+        x = self.mid_block3(x, t)
+        x = self.mid_block4(x, t)
 
         for resnet, resnet2, attn, upsample in self.ups:
             x = torch.cat((x, h.pop()), dim=1)
@@ -194,6 +206,8 @@ class TemporalUnet(nn.Module):
         x = self.final_conv(x)
 
         x = einops.rearrange(x, 'b t h -> b h t')
+        # get rid of padding
+        x = x[:, :H]
         return x
 
     def compiled_conditional_test(self, t, x, context):

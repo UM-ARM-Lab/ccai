@@ -1,0 +1,30 @@
+---
+model_name: 'allegro_new_dataset_augment_angle_states_only_masked'
+T: 16
+dx: 9
+du: 0
+load_checkpoint: False
+epochs: 10000
+batch_size: 128
+lr: 1.0e-4
+model_type: 'diffusion'
+data_directory: 'allegro_valve_turning_new'
+device: 'cuda:0'
+test_every: 1000
+save_every: 1000
+normalize_data: True
+constraint_embedding_dim: 64
+constrained: False
+guided: False
+timesteps: 25
+hidden_dim: 128
+unconditional: True
+# Only applies to using EMA for training
+use_ema: True
+ema_decay: 0.995
+ema_warmup_steps: 1000
+ema_update_every: 10
+
+test_directory: 'quadrotor_compose'
+test_samples: False
+test_name: None

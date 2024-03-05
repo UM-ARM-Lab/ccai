@@ -93,8 +93,8 @@ def full_to_partial_state(full):
 class PositionControlConstrainedSteinTrajOpt(ConstrainedSteinTrajOpt):
     def __init__(self, problem, params):
         super().__init__(problem, params)
-        self.torque_limit = params.get('torque_limit', 20.0)
-        self.kp = params.get('kp', 50.0)
+        self.torque_limit = params.get('torque_limit', 70)
+        self.kp = params.get('kp', 7.0)
 
     def _clamp_in_bounds(self, xuz):
         N = xuz.shape[0]
@@ -170,7 +170,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         self.goal = goal
         self.K = rbf_kernel
         self.squared_slack = True
-        self.compute_hess = True
+        self.compute_hess = False
 
         self.valve_location = valve_location
         self.initial_valve_angle = initial_valve_angle
@@ -360,7 +360,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
             grad_g[:, T_range, T_range, :8] = grad_g_q[:, 1:]
             # is valve in state
             if self.dx == 9:
-                grad_g[:, T_range, T_range, 9] = grad_g_theta.reshape(N, T + 1)[:, 1:]
+                grad_g[:, T_range, T_range, 8] = 0 * grad_g_theta.reshape(N, T + 1)[:, 1:]
             grad_g = grad_g.reshape(N, -1, T, self.dx + self.du)
             grad_g = grad_g.reshape(N, -1, T * (self.dx + self.du))
             if terminal:
@@ -391,6 +391,24 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         R = torch.stack((x_axis, y_axis, z_axis), dim=2)
         return R
 
+    def _step_size_limit(self, xu):
+        N, T, _ = xu.shape
+        u = xu[:, :, -self.du:]
+
+        max_step_size = 0.1
+        h_plus = u - max_step_size
+        h_minus = -u - max_step_size
+        h = torch.stack((h_plus, h_minus), dim=2)  # N x T x 2 x du
+
+        grad_h = torch.zeros(N, T, 2, self.du, T, self.dx + self.du, device=xu.device)
+        hess_h = torch.zeros(N, T * 2 * self.du, T * (self.dx + self.du), device=xu.device)
+        # assign gradients
+        T_range = torch.arange(0, T, device=xu.device)
+        grad_h[:, T_range, 0, :, T_range, -self.du:] = torch.eye(self.du, device=xu.device)
+        grad_h[:, T_range, 1, :, T_range, -self.du:] = -torch.eye(self.du, device=xu.device)
+
+        return h.reshape(N, -1), grad_h.reshape(N, -1, T * (self.dx + self.du)), hess_h
+
     def eval(self, augmented_trajectory):
         N = augmented_trajectory.shape[0]
         augmented_trajectory = augmented_trajectory.clone().reshape(N, self.T, -1)
@@ -415,7 +433,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         grad_K = grad_K.reshape(N, N, -1)
         G, dG, hessG = self.combined_constraints(augmented_trajectory, compute_hess=self.compute_hess)
 
-        # print(J.mean(), G.abs().mean(), G.abs().max())
+        #print(J.mean(), G.abs().mean(), G.abs().max())
 
         if hessG is not None:
             hessG.detach_()
@@ -443,7 +461,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         the action (force at the finger tip) is not used. it is randomly intiailized
         the actual dynamics model is not used
         """
-        u = 0.025 * torch.randn(N, self.T, 8, device=self.device)
+        u = 0.005 * torch.randn(N, self.T, 8, device=self.device)
 
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
         for t in range(self.T):
@@ -484,7 +502,7 @@ class AllegroValveTurning(AllegroValveProblem):
         self.dg_constant = 0
         self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
 
-        self.dz = self.friction_polytope_k * 2  # one friction constraints per finger
+        self.dz = self.friction_polytope_k * 2 + 2 * 8  # one friction constraints per finger
         self.dh = self.dz * T  # inequality
         self.friction_coefficient = friction_coefficient
         self.dynamics_constr = vmap(self._dynamics_constr)
@@ -499,7 +517,6 @@ class AllegroValveTurning(AllegroValveProblem):
         self.x_min = torch.cat((self.x_min[:8], valve_x_min, self.x_min[8:]))
 
     def _cost(self, xu, start, goal):
-        # TODO: check if the addtional term of the smoothness cost and running goal cost is necessary
         state = xu[:, :self.dx]  # state dim = 9
         state = torch.cat((start.reshape(1, self.dx), state), dim=0)  # combine the first time step into it
         action = xu[:, self.dx:]  # action dim = 8
@@ -507,11 +524,10 @@ class AllegroValveTurning(AllegroValveProblem):
         action_cost = torch.sum((state[1:, :-1] - next_q) ** 2)
         action_cost = action_cost + 10 * torch.sum(action ** 2)
         smoothness_cost = 10 * torch.sum((state[1:] - state[:-1]) ** 2)
-        # smoothness_cost += 10 * torch.sum(
-        #    (state[1:, -1] - state[:-1, -1]) ** 2)  # weight the smoothness of theta more
-        goal_cost = torch.sum((10 * (state[:, -1] - goal) ** 2),
-                              dim=0)  # + (10 * (state[-1, -1] - goal) ** 2).reshape(-1)
+        smoothness_cost += 10 * torch.sum((state[1:, -1] - state[:-1, -1]) ** 2)  # weight the smoothness of theta more
+        goal_cost = torch.sum(((state[:, -1] - goal) ** 2), dim=0)  # + (10 * (state[-1, -1] - goal) ** 2).reshape(-1)
 
+        return goal_cost
         return smoothness_cost + 10 * action_cost + goal_cost
 
     def get_friction_polytope(self):
@@ -550,6 +566,10 @@ class AllegroValveTurning(AllegroValveProblem):
         # approximate q dot and theta dot
         dq = (x[:, 1:, :8] - x[:, :-1, :8])
         dtheta = (x[:, 1:, 8] - x[:, :-1, 8])
+
+        # wrap around for pi
+        dtheta = torch.where(dtheta > np.pi, dtheta - 2 * np.pi, dtheta)
+        dtheta = torch.where(dtheta < -np.pi, dtheta + 2 * np.pi, dtheta)
 
         # angular velocity of the valve
         valve_omega = torch.stack((torch.zeros_like(dtheta),
@@ -711,7 +731,7 @@ class AllegroValveTurning(AllegroValveProblem):
         return B @ contact_v_contact_frame
 
         # either geometrically based on the contact_v or using the pinv(J^T) method, the first seems to work better
-        # though it is less 'correct'
+        # though it is less 'correc
         # geometrically using contact_v
         return 50 * (
                 torch.linalg.norm(contact_v_contact_frame[0]) + self.friction_coefficient * contact_v_contact_frame[
@@ -776,16 +796,22 @@ class AllegroValveTurning(AllegroValveProblem):
             xu=xu.reshape(-1, T, self.dx + self.du),
             compute_grads=compute_grads,
             compute_hess=compute_hess)
+        h_step_size, grad_h_step_size, hess_h_step_size = self._step_size_limit(xu)
+        # h, grad_h, hess_h = self._step_size_limit(xu)
 
         h = h.reshape(N, -1)
+        h = torch.cat((h, h_step_size), dim=1)
         if compute_grads:
             grad_h = grad_h.reshape(N, -1, self.T * (self.dx + self.du))
+            grad_h = torch.cat((grad_h, grad_h_step_size), dim=1)
         else:
             return h, None, None
         if compute_hess:
             hess_h = torch.zeros(N, h.shape[1], self.T * (self.dx + self.du), self.T * (self.dx + self.du),
                                  device=self.device)
             return h, grad_h, hess_h
+
+        # print('friction', h.abs().mean(), h.abs().max())
         return h, grad_h, None
 
     def _con_eq(self, xu, compute_grads=True, compute_hess=False):
@@ -794,6 +820,7 @@ class AllegroValveTurning(AllegroValveProblem):
         g_contact, grad_g_contact, hess_g_contact = self._contact_constraints(xu=xu.reshape(N, T, self.dx + self.du),
                                                                               compute_grads=compute_grads,
                                                                               compute_hess=compute_hess)
+
         g_dynamics, grad_g_dynamics, hess_g_dynamics = self._dynamics_constraints(
             xu=xu.reshape(N, T, self.dx + self.du),
             compute_grads=compute_grads,
@@ -803,14 +830,22 @@ class AllegroValveTurning(AllegroValveProblem):
             xu=xu.reshape(N, T, self.dx + self.du),
             compute_grads=compute_grads,
             compute_hess=compute_hess)
+        # g_dynamics, grad_g_dynamics, hess_g_dynamics = g_valve, grad_g_valve, hess_g_valve
 
+        # g_contact = g_dynamics
+        # g_contact = torch.cat((g_contact, g_dynamics), dim=1)
         g_contact = torch.cat((g_contact, g_dynamics, g_valve), dim=1)
 
         if grad_g_contact is not None:
+            # grad_g_contact = grad_g_dynamics
+            # grad_g_contact = torch.cat((grad_g_contact, grad_g_dynamics), dim=1)
             grad_g_contact = torch.cat((grad_g_contact, grad_g_dynamics, grad_g_valve), dim=1)
         if hess_g_contact is not None:
             hess_g_contact = torch.cat((hess_g_contact, hess_g_dynamics, hess_g_valve), dim=1)
 
+        # print('contact', g_contact.abs().mean(), g_contact.abs().max())
+        # print('dynamics', g_dynamics.abs().mean(), g_dynamics.abs().max())
+        # print('valve', g_valve.abs().mean(), g_valve.abs().max())
         return g_contact, grad_g_contact, hess_g_contact
 
 
@@ -899,8 +934,10 @@ class AllegroValveRegrasping(AllegroValveProblem):
         contact_loc = ret_scene.get('closest_pt_world', None)
         grad_contact_loc = ret_scene.get('closest_pt_q_grad', None)[:, -1]
         contact_loc = contact_loc.reshape(N, T + 1, 3)[:, -1]
-
         g = (contact_loc - self.goal[finger_name]).reshape(N, 3)
+        # factor to make making contact more important than the target
+        #g *= 0.1
+
         if compute_grads:
             grad_g = torch.zeros(N, 3, T, (self.dx + self.du), device=self.device)
             grad_g[:, :, -1, :8] = grad_contact_loc.reshape(N, 3, -1)
@@ -934,7 +971,7 @@ class AllegroValveRegrasping(AllegroValveProblem):
     def _con_eq(self, xu, compute_grads=True, compute_hess=False):
         N = xu.shape[0]
         T = xu.shape[1]
-
+        # #
         # g, grad_g, hess_g = self._contact_constraints(xu=xu.reshape(N, T, self.dx + self.du),
         #                                               compute_grads=compute_grads,
         #                                               compute_hess=compute_hess,
@@ -944,11 +981,15 @@ class AllegroValveRegrasping(AllegroValveProblem):
             xu=xu.reshape(N, T, self.dx + self.du),
             compute_grads=compute_grads,
             compute_hess=compute_hess)
-
         g_contact_target, grad_g_contact_target, hess_g_contact_target = self._contact_target_constraints(
             xu=xu.reshape(N, T, self.dx + self.du),
             compute_grads=compute_grads,
             compute_hess=compute_hess)
+        # g_contact_target = g
+        # grad_g_contact_target = grad_g
+        # hess_g_contact_target = hess_g
+
+        #return g_dynamics, grad_g_dynamics, hess_g_dynamics
 
         # return g_contact_target, grad_g_contact_target, hess_g_contact_target
         #
@@ -974,13 +1015,18 @@ class AllegroValveRegrasping(AllegroValveProblem):
             grad_g = torch.cat((grad_g_dynamics, grad_g_contact_target), dim=1)
         if compute_hess:
             hess_g = torch.cat((hess_g_dynamics, hess_g_contact_target), dim=1)
-
+        # g = torch.cat((g, g_dynamics, g_contact_target), dim=1)
+        # if compute_grads:
+        #     grad_g = torch.cat((grad_g, grad_g_dynamics, grad_g_contact_target), dim=1)
+        # if compute_hess:
+        #     hess_g = torch.cat((hess_g, hess_g_dynamics, hess_g_contact_target), dim=1)
         # g = torch.cat((g, g_contact_target), dim=1)
         # if grad_g is not None:
         #     grad_g = torch.cat((grad_g, grad_g_contact_target), dim=1)
         # if hess_g is not None:
         #     hess_g = torch.cat((hess_g, hess_g_contact_target), dim=1)
 
+        # print(g_dynamics.abs().max(), g_contact_target.abs().max())
         return g, grad_g, hess_g
 
     def update(self, start, valve_angle=0.0, goal=None, T=None):
@@ -1007,6 +1053,8 @@ def do_trial(env, params, fpath):
     desired_contact_loc = {
         'index': torch.tensor([0.0924, 0.0717, 0.0463], device=params['device']),
         'thumb': torch.tensor([0.0920, 0.0657, 0.0027], device=params['device'])
+        #'thumb': torch.tensor([0.0872, 0.0653, -0.0023], device=params['device'])
+
     }
 
     start = state['q'].reshape(9).to(device=params['device'])
@@ -1053,43 +1101,57 @@ def do_trial(env, params, fpath):
 
         planned_trajectories = []
         actual_trajectory = []
-        for k in range(params['num_steps']):
+        contact_points = {
+        }
+        contact_distance = {
+        }
+
+        for k in range(planner.problem.T):  # range(params['num_steps']):
             state = env.get_state()
             state = state['q'].reshape(9).to(device=params['device'])
-            actual_trajectory.append(state)
             print('Step:', k, 'Valve angle: ', state[-1] * 180 / np.pi)
 
             state = state[:planner.problem.dx]
             best_traj, plans = planner.step(state)
-
             planned_trajectories.append(plans)
+            N, T, _ = plans.shape
+
+            contact_distance[T] = torch.stack((planner.problem.data['index']['sdf'].reshape(N, T + 1),
+                                               planner.problem.data['thumb']['sdf'].reshape(N, T + 1)), dim=1)
+            contact_points[T] = torch.stack((planner.problem.data['index']['closest_pt_world'].reshape(N, T + 1, 3),
+                                             planner.problem.data['thumb']['closest_pt_world'].reshape(N, T + 1, 3)),
+                                            dim=2)
 
             # execute the action
             action = best_traj[0, planner.problem.dx:planner.problem.dx + planner.problem.du]
+            xu = torch.cat((state, action))
+            actual_trajectory.append(xu)
             action = action + state.unsqueeze(0)[:, :8]
 
             # action = best_traj[0, :planner.problem.dx].reshape(-1, 8)
             env.step(action.to(device=env.device))
 
-        actual_trajectory.append(env.get_state()['q'].reshape(9).to(device=params['device']))
+            # print(action[0] - env.get_state()['q'].reshape(9)[:8])
+
+        # actual_trajectory.append(env.get_state()['q'].reshape(9).to(device=params['device']))
         actual_trajectory = torch.stack(actual_trajectory, dim=0)
         # can't stack plans as each is of a different length
-        return actual_trajectory, planned_trajectories
+        return actual_trajectory, planned_trajectories, contact_points, contact_distance
 
     regrasp_data = {}
     turn_data = {}
 
     for t in range(1, 1 + params['T']):
-        regrasp_data[t] = {'plans': [], 'starts': []}
-        turn_data[t] = {'plans': [], 'starts': []}
+        regrasp_data[t] = {'plans': [], 'starts': [], 'contact_points': [], 'contact_distance': []}
+        turn_data[t] = {'plans': [], 'starts': [], 'contact_points': [], 'contact_distance': []}
 
     for turn in range(params['num_turns']):
-        regrasp_traj, regrasp_plans = execute_traj(regrasp_planner)
+        regrasp_traj, regrasp_plans, regrasp_contact_points, regrasp_contact_distance = execute_traj(regrasp_planner)
         time.sleep(1)
         state = env.get_state()
         state = state['q'].reshape(9).to(device=params['device'])
         valve_goal = state[-1].reshape(-1) + 0.5 * np.pi
-        turn_traj, turn_plans = execute_traj(turn_planner, goal=valve_goal)
+        turn_traj, turn_plans, turn_contact_points, turn_contact_distance = execute_traj(turn_planner, goal=valve_goal)
         time.sleep(1)
 
         # add trajectories and starts to dataset
@@ -1097,11 +1159,15 @@ def do_trial(env, params, fpath):
             t = plan.shape[1]
             turn_data[t]['plans'].append(plan)
             turn_data[t]['starts'].append(turn_traj[i].reshape(1, -1).repeat(plan.shape[0], 1))
+            turn_data[t]['contact_points'].append(turn_contact_points[t])
+            turn_data[t]['contact_distance'].append(turn_contact_distance[t])
 
         for i, plan in enumerate(regrasp_plans):
             t = plan.shape[1]
             regrasp_data[t]['plans'].append(plan)
             regrasp_data[t]['starts'].append(regrasp_traj[i].reshape(1, -1).repeat(plan.shape[0], 1))
+            regrasp_data[t]['contact_points'].append(regrasp_contact_points[t])
+            regrasp_data[t]['contact_distance'].append(regrasp_contact_distance[t])
 
     # change to numpy and save data
     for t in range(1, 1 + params['T']):
@@ -1109,10 +1175,14 @@ def do_trial(env, params, fpath):
         regrasp_data[t]['starts'] = torch.stack(regrasp_data[t]['starts']).cpu().numpy()
         turn_data[t]['plans'] = torch.stack(turn_data[t]['plans']).cpu().numpy()
         turn_data[t]['starts'] = torch.stack(turn_data[t]['starts']).cpu().numpy()
+        regrasp_data[t]['contact_points'] = torch.stack(regrasp_data[t]['contact_points']).cpu().numpy()
+        regrasp_data[t]['contact_distance'] = torch.stack(regrasp_data[t]['contact_distance']).cpu().numpy()
+        turn_data[t]['contact_points'] = torch.stack(turn_data[t]['contact_points']).cpu().numpy()
+        turn_data[t]['contact_distance'] = torch.stack(turn_data[t]['contact_distance']).cpu().numpy()
 
     import pickle
     pickle.dump(turn_data, open(f"{fpath}/turn_data.p", "wb"))
-    pickle.dump(regrasp_data, open(f"{fpath}/turn_data.p", "wb"))
+    pickle.dump(regrasp_data, open(f"{fpath}/regrasp_data.p", "wb"))
 
     final_distance_to_goal = torch.norm(
         env.get_state()['q'].reshape(-1)[-1].to(device=params['device']) - params['valve_goal']).item()
@@ -1122,7 +1192,7 @@ def do_trial(env, params, fpath):
 
 if __name__ == "__main__":
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/config/allegro.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/config/planning/allegro.yaml').read_text())
 
     # Set up the environment
     img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
@@ -1147,7 +1217,7 @@ if __name__ == "__main__":
     #         time.sleep(0.1)
     # except KeyboardInterrupt:
     #     pass
-
+    #
     results = {}
 
     # set up the kinematic chain

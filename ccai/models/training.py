@@ -36,7 +36,6 @@ def to_device(x, device='cuda:0'):
         raise RuntimeError(f'Unrecognized type in `to_device`: {type(x)}')
 
 
-
 class EMA():
     '''
         empirical moving average
@@ -56,6 +55,7 @@ class EMA():
             return new
         return old * self.beta + (1 - self.beta) * new
 
+
 def update_plot_with_trajectories(ax, trajectory):
     traj_lines = []
     for traj in trajectory:
@@ -63,6 +63,7 @@ def update_plot_with_trajectories(ax, trajectory):
         traj_lines.extend(ax.plot(traj_np[1:, 0],
                                   traj_np[1:, 1],
                                   traj_np[1:, 2], color='g', alpha=0.5, linestyle='--'))
+
 
 class Trainer(object):
     def __init__(
@@ -129,7 +130,6 @@ class Trainer(object):
 
     def train(self, n_train_steps):
 
-
         timer = Timer()
         for step in range(n_train_steps):
             for i in range(self.gradient_accumulate_every):
@@ -137,7 +137,7 @@ class Trainer(object):
                 trajectories = batch[0]
                 trajectories = to_device(trajectories)
                 B, N = trajectories.shape[:2]
-                trajectories = trajectories.reshape(B*N, -1)
+                trajectories = trajectories.reshape(B * N, -1)
                 loss = self.model.loss(trajectories)
                 loss = loss / self.gradient_accumulate_every
                 loss.backward()
@@ -186,7 +186,6 @@ class Trainer(object):
         self.model.load_state_dict(data['model'])
         self.ema_model.load_state_dict(data['ema'])
 
-
     def val_samples(self):
 
         val_constr_violation = 0
@@ -208,7 +207,7 @@ class Trainer(object):
             # now we want to evaluate those trajectories
             J, _, _ = self.model.problem._objective(sampled_trajectories, goals[:, :N])
             C, _, _ = self.model.problem.batched_combined_constraints(sampled_trajectories, starts[:, 0], constr[:, 0],
-                                                           compute_grads=False)
+                                                                      compute_grads=False)
 
             val_sample_loss += J.mean().item()
             val_constr_violation += C[:, :, -11:].abs().mean().item()
