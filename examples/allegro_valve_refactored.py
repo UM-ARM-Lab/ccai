@@ -433,7 +433,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         grad_K = grad_K.reshape(N, N, -1)
         G, dG, hessG = self.combined_constraints(augmented_trajectory, compute_hess=self.compute_hess)
 
-        #print(J.mean(), G.abs().mean(), G.abs().max())
+        # print(J.mean(), G.abs().mean(), G.abs().max())
 
         if hessG is not None:
             hessG.detach_()
@@ -860,6 +860,7 @@ class AllegroValveRegrasping(AllegroValveProblem):
                  world_trans,
                  valve_asset_pos,
                  initial_valve_angle=0,
+                 default_q_pos=torch.zeros(8),
                  device='cuda:0'):
         dx = 8
         du = 8
@@ -869,9 +870,11 @@ class AllegroValveRegrasping(AllegroValveProblem):
 
         self.dz = 2  # collision constraint per finger
         self.dg_per_t = 8
-        self.dg_constant = 6
+        self.dg_constant = 2
         self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
         self.dh = self.dz * T
+
+        self.default_q = default_q_pos.reshape(1, 8).to(device=device)
 
     def _preprocess(self, xu):
         N = xu.shape[0]
@@ -890,7 +893,8 @@ class AllegroValveRegrasping(AllegroValveProblem):
         action = xu[:, self.dx:]
         action_cost = torch.sum(action ** 2)
         smoothness_cost = 10 * torch.sum((state[1:] - state[:-1]) ** 2)
-        return smoothness_cost + 10 * action_cost
+        default_q_pos_cost = 10 * torch.sum((state[:, :8] - self.default_q) ** 2)
+        return smoothness_cost + 10 * action_cost + default_q_pos_cost
 
     def _dynamics_constraints(self, xu, compute_grads=True, compute_hess=False):
         N, T, _ = xu.shape
@@ -936,7 +940,7 @@ class AllegroValveRegrasping(AllegroValveProblem):
         contact_loc = contact_loc.reshape(N, T + 1, 3)[:, -1]
         g = (contact_loc - self.goal[finger_name]).reshape(N, 3)
         # factor to make making contact more important than the target
-        #g *= 0.1
+        # g *= 0.1
 
         if compute_grads:
             grad_g = torch.zeros(N, 3, T, (self.dx + self.du), device=self.device)
@@ -972,24 +976,24 @@ class AllegroValveRegrasping(AllegroValveProblem):
         N = xu.shape[0]
         T = xu.shape[1]
         # #
-        # g, grad_g, hess_g = self._contact_constraints(xu=xu.reshape(N, T, self.dx + self.du),
-        #                                               compute_grads=compute_grads,
-        #                                               compute_hess=compute_hess,
-        #                                               terminal=True)
+        g, grad_g, hess_g = self._contact_constraints(xu=xu.reshape(N, T, self.dx + self.du),
+                                                      compute_grads=compute_grads,
+                                                      compute_hess=compute_hess,
+                                                      terminal=True)
         # return g, grad_g, hess_g
         g_dynamics, grad_g_dynamics, hess_g_dynamics = self._dynamics_constraints(
             xu=xu.reshape(N, T, self.dx + self.du),
             compute_grads=compute_grads,
             compute_hess=compute_hess)
-        g_contact_target, grad_g_contact_target, hess_g_contact_target = self._contact_target_constraints(
-            xu=xu.reshape(N, T, self.dx + self.du),
-            compute_grads=compute_grads,
-            compute_hess=compute_hess)
-        # g_contact_target = g
-        # grad_g_contact_target = grad_g
-        # hess_g_contact_target = hess_g
+        # g_contact_target, grad_g_contact_target, hess_g_contact_target = self._contact_target_constraints(
+        #     xu=xu.reshape(N, T, self.dx + self.du),
+        #     compute_grads=compute_grads,
+        #     compute_hess=compute_hess)
+        g_contact_target = g
+        grad_g_contact_target = grad_g
+        hess_g_contact_target = hess_g
 
-        #return g_dynamics, grad_g_dynamics, hess_g_dynamics
+        # return g_dynamics, grad_g_dynamics, hess_g_dynamics
 
         # return g_contact_target, grad_g_contact_target, hess_g_contact_target
         #
@@ -1053,9 +1057,10 @@ def do_trial(env, params, fpath):
     desired_contact_loc = {
         'index': torch.tensor([0.0924, 0.0717, 0.0463], device=params['device']),
         'thumb': torch.tensor([0.0920, 0.0657, 0.0027], device=params['device'])
-        #'thumb': torch.tensor([0.0872, 0.0653, -0.0023], device=params['device'])
+        # 'thumb': torch.tensor([0.0872, 0.0653, -0.0023], device=params['device'])
 
     }
+    default_q_pos = torch.cat((env.default_dof_pos.reshape(-1)[:4], env.default_dof_pos.reshape(-1)[12:16]))
 
     start = state['q'].reshape(9).to(device=params['device'])
     # start = torch.cat((state['q'].reshape(10), torch.zeros(1).to(state['q'].device))).to(device=params['device'])
@@ -1072,7 +1077,8 @@ def do_trial(env, params, fpath):
             valve_asset_pos=env.valve_pose,
             valve_location=valve_location,
             world_trans=env.world_trans,
-            initial_valve_angle=start[-1])
+            initial_valve_angle=start[-1],
+            default_q_pos=default_q_pos)
 
         regrasp_planner = PositionControlConstrainedSVGDMPC(regrasp_problem, params)
         turn_problem = AllegroValveTurning(
