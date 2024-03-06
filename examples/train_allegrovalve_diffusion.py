@@ -79,12 +79,11 @@ def visualize_trajectories(trajectories, scene, fpath, headless=False):
         pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/kin/gif'), parents=True, exist_ok=True)
         visualize_trajectory(trajectory, scene, f'{fpath}/trajectory_{n + 1}/kin', headless=headless)
         # Visualize what happens if we execute the actions in the trajectory in the simulator
-        #pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/sim/img'), parents=True, exist_ok=True)
-        #pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/sim/gif'), parents=True, exist_ok=True)
-        #:wvisualize_trajectory_in_sim(trajectory, config['env'], f'{fpath}/trajectory_{n + 1}/sim')
+        pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/sim/img'), parents=True, exist_ok=True)
+        pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/sim/gif'), parents=True, exist_ok=True)
+        visualize_trajectory_in_sim(trajectory, config['env'], f'{fpath}/trajectory_{n + 1}/sim')
         # save the trajectory
         np.save(f'{fpath}/trajectory_{n + 1}/traj.npz', trajectory.cpu().numpy())
-
 
 
 def train_model(trajectory_sampler, train_loader, config):
@@ -166,7 +165,7 @@ def train_model(trajectory_sampler, train_loader, config):
 
 
 def test_long_horizon(model, loader, config):
-    fpath = f'{CCAI_PATH}/data/training/allegro_valve/{config["model_name"]}_{config["model_type"]}/long_horizon'
+    fpath = f'{CCAI_PATH}/data/training/allegro_valve/{config["model_name"]}_{config["model_type"]}/long_horizon3'
     pathlib.Path.mkdir(pathlib.Path(fpath), parents=True, exist_ok=True)
     N = 16
 
@@ -175,10 +174,10 @@ def test_long_horizon(model, loader, config):
     goal = 0.5 * torch.tensor([-np.pi / 2.0], device=config['device'])
 
     start = start[None, :].repeat(N, 1)
-    #goal = (goal[None, :].repeat(N, 1) - model.x_mean[8]) / model.x_std[8]
-    #start=None
+    # goal = (goal[None, :].repeat(N, 1) - model.x_mean[8]) / model.x_std[8]
+    # start=None
     goal = None
-    #goal = None
+    # goal = None
     # print(model.x_mean[:8])
     # print(model.x_std[:8])
 
@@ -186,7 +185,7 @@ def test_long_horizon(model, loader, config):
     #    print(item[0, 0, :8].cuda() * model.x_std[:8] + model.x_mean[:8] - start[0, :8])
 
     # exit(0)
-    sampled_trajectories = model.sample(N=N, start=start, goal=goal, H=16)
+    sampled_trajectories = model.sample(N=N, start=start, goal=goal, H=32)
     visualize_trajectories(sampled_trajectories, config['scene'],
                            fpath, headless=False)
 
@@ -205,9 +204,9 @@ def vis_dataset(loader, config, N=100):
             visualize_trajectory(trajectory, config["scene"], f'{fpath}/trajectory_{n + 1}/kin', headless=False)
 
             # Visualize what happens if we execute the actions in the trajectory in the simulator
-            #pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/sim/img'), parents=True, exist_ok=True)
-            #pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/sim/gif'), parents=True, exist_ok=True)
-            #visualize_trajectory_in_sim(trajectory, config['env'], f'{fpath}/trajectory_{n + 1}/sim')
+            # pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/sim/img'), parents=True, exist_ok=True)
+            # pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/sim/gif'), parents=True, exist_ok=True)
+            # visualize_trajectory_in_sim(trajectory, config['env'], f'{fpath}/trajectory_{n + 1}/sim')
             n += 1
         if n > N:
             break
@@ -275,7 +274,6 @@ if __name__ == "__main__":
                                  rot=torch.tensor([r[3], r[0], r[1], r[2]], device=config['device']),
                                  device=config['device'])
     asset_valve = get_assets_dir() + '/valve/valve_cylinder.urdf'
-
     chain_valve = pk.build_chain_from_urdf(open(asset_valve).read())
     chain_valve = chain_valve.to(device=config['device'])
     chain = chain.to(device=config['device'])
@@ -305,8 +303,8 @@ if __name__ == "__main__":
     config['scene'] = scene
     config['env'] = env
 
-    train_model(model, train_loader, config)
-    #vis_dataset(train_loader, config, N=64)
+    # train_model(model, train_loader, config)
+    # vis_dataset(train_loader, config, N=64)
     model.load_state_dict(torch.load(
         f'{CCAI_PATH}/data/training/allegro_valve/{config["model_name"]}_{config["model_type"]}/allegro_valve_{config["model_type"]}.pt'
     ))

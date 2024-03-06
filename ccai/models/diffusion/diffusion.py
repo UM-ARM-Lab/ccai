@@ -281,12 +281,12 @@ class GaussianDiffusion(nn.Module):
             img = trajectory
         if start_timestep is None:
             start_timestep = self.num_timesteps
-
         img = self._apply_conditioning(img, condition)
         imgs = [img]
         for t in reversed(range(0, start_timestep)):
             img, x_start = self.p_sample(img, t, context)
             img = self._apply_conditioning(img, condition)
+            img[:, -1, 8] += 1.0e-3
             imgs.append(img)
 
         ret = img if not return_all_timesteps else torch.stack(imgs, dim=1)
@@ -324,11 +324,12 @@ class GaussianDiffusion(nn.Module):
 
             # combine subtrajectory updates
             for i in range(1, N):
-                tmp = img[:, i, 0].clone()
-                img[:, i, 0] = (tmp + img[:, i - 1, -1]) / 2
-                img[:, i - 1, -1] = img[:, i, 0]
+                tmp = img[:, i, 0, :9].clone()
+                img[:, i, 0, :9] = (tmp + img[:, i - 1, -1, :9]) / 2
+                img[:, i - 1, -1, :9] = img[:, i, 0, :9]
 
             img[:, 0] = self._apply_conditioning(img[:, 0], condition)
+            img[:, -1, -1, 8] += 1.0e-3
             imgs.append(img)
 
         ret = img if not return_all_timesteps else torch.stack(imgs, dim=1)
@@ -384,19 +385,19 @@ class GaussianDiffusion(nn.Module):
             context = context.reshape(B, 1, num_constraints, dc).repeat(1, N, 1, 1).reshape(B * N, num_constraints, -1)
 
         sample_fn = self.p_sample_loop if not self.is_ddim_sampling else self.ddim_sample
-        # if H > self.horizon:
-        #     # get closest multiple of horizon
-        #     factor = math.ceil(H / self.horizon)
-        #     #H_total = factor * self.horizon
-        #     sample = self.p_multi_sample_loop((B * N, factor, self.horizon, self.xu_dim),
-        #                                       condition=condition, context=context,
-        #                                       return_all_timesteps=return_all_timesteps)
-        #     # combine samples
-        #     combined_samples = [sample[:, i, 1:] for i in range(1, factor)]
-        #     combined_samples.insert(0, sample[:, 0])
-        #     # get combined trajectory
-        #     sample = torch.cat(combined_samples, dim=1)
-        #     return sample
+        if H > self.horizon:
+            # get closest multiple of horizon
+            factor = math.ceil(H / self.horizon)
+            #H_total = factor * self.horizon
+            sample = self.p_multi_sample_loop((B * N, factor, self.horizon, self.xu_dim),
+                                              condition=condition, context=context,
+                                              return_all_timesteps=return_all_timesteps)
+            # combine samples
+            combined_samples = [sample[:, i, :-1] for i in range(0, factor-1)]
+            combined_samples.append(sample[:, -1])
+            # get combined trajectory
+            sample = torch.cat(combined_samples, dim=1)
+            return sample
 
         return sample_fn((B * N, H, self.xu_dim), condition=condition, context=context,
                          return_all_timesteps=return_all_timesteps)
@@ -425,7 +426,6 @@ class GaussianDiffusion(nn.Module):
         # mask defines in-painting, model should receive un-noised copy of masked states
         masked_idx = (mask == 0).nonzero()
         x[masked_idx[:, 0], masked_idx[:, 1]] = x_start[masked_idx[:, 0], masked_idx[:, 1]]
-
         # predict and take gradient step
         model_out = self.model.compiled_conditional_train(t, x, context)
 

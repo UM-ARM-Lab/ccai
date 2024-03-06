@@ -1,8 +1,8 @@
 ---
-model_name: 'allegro_new_dataset_augment_angle_states_only_masked'
+model_name: 'allegro_new_dataset_augment_angle_masked'
 T: 16
 dx: 9
-du: 0
+du: 8
 load_checkpoint: False
 epochs: 10000
 batch_size: 128
@@ -16,7 +16,7 @@ normalize_data: True
 constraint_embedding_dim: 64
 constrained: False
 guided: False
-timesteps: 25
+timesteps: 100
 hidden_dim: 128
 unconditional: True
 # Only applies to using EMA for training

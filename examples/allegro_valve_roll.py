@@ -437,6 +437,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
             contact_jacobian = ret_scene.get('contact_jacobian', None)
             contact_hessian = ret_scene.get('contact_hessian', None)
             contact_loc = ret_scene.get('closest_pt_world', None)
+            print(contact_loc)
             # print(contact_loc.shape)
             # print(finger_name)
             # print(contact_loc.reshape(N, T + 1, 3)[:, 0])
