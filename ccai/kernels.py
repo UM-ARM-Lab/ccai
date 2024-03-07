@@ -77,7 +77,10 @@ def structured_rbf_kernel(X, Xbar, Q=None):
     # if Q is not None:
     #    h = d
     # h = 0.1
-    return torch.exp(-sq_diff / h.reshape(M, 1, 1)).mean(dim=0)
+    output = torch.exp(-sq_diff / h.reshape(M, 1, 1)).mean(dim=0)
+    print(output.shape)
+    assert(False)
+    return output
 
 
 class RBFKernel:

@@ -189,6 +189,12 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         g = torch.cat((dynamics_constr, start_constraint, surf_constr[:, 1:]), dim=1)
         # g = torch.cat((dynamics_constr, start_constraint), dim=1)
 
+        print(dynamics_constr.shape)
+        print(surf_constr[:, 1:].shape)
+        print(start_constraint.shape)
+        print(g.shape)
+        assert(False)
+
         if torch.any(torch.isinf(surf_constr)):
             print('inf in surface')
         if torch.any(torch.isinf(dynamics_constr)):

@@ -150,24 +150,30 @@ class JaxCSVTOpt:
         """Execute the CSVTO algorithm to solve for an optimal distribution of trajectories, given an initial guess.
 
         Args:
-            x0:
+            x0: The initialization for the trajectory distribution, shape (N, (dx + du) * T).
 
         Returns:
+            The optimal trajectory from the optimized distribution, shape ((dx + du) * T,).
         """
         # Calculate slack variable values via equation (33) and append to the trajectory according to equation (35).
         xuz: jnp.array = jnp.concatenate((x0, jnp.sqrt(-2*self.g(x0))), axis=1)
 
         # Loop over the gradient step iterations.
-        xuz = jax.lax.fori_loop(1, self.K+1, self._solve_iteration, xuz, unroll=True)
+        xuz = jax.lax.fori_loop(1, self.K+1, self._solve_iteration, xuz, xuz[:, :self.dx], unroll=True)
 
         # Find the lowest cost trajectory in the optimized distribution, and return it without slack variables.
         return xuz[:, :-self.dg][self.c(xuz[:, :-self.dg]).argmin()]
 
-    def _solve_iteration(self, iteration: int, xuz: jnp.array) -> jnp.array:
-        """Execute
+    def _solve_iteration(self, iteration: int, xuz: jnp.array, initial_state: jnp.array) -> jnp.array:
+        """Compute a single retraction step for the optimizer and return the updated state.
 
         Args:
+            iteration: The iteration number, in range [0, K).
+            xuz: All N trajectories including slack variables stacked as rows, shape (N, (dx + du) * T + dg).
+            initial_state: The state of the initial condition for the trajectories, shape (dx,).
+
         Returns:
+            The value of xuz after taking the retraction step.
         """
         # Set the annealing weight gamma if annealing is on.
         gamma: Optional[jnp.float32] = iteration / self.K if self.anneal else None
@@ -176,9 +182,9 @@ class JaxCSVTOpt:
         c_grad = jax.jacfwd(self.c)(xuz[:, :-self.dg])
 
         # Evaluate the combined constraint function, its gradient, and its hessian at the current augmented state.
-        constraint = self._combined_constraint(xuz)
-        constraint_grad = jax.jacfwd(self._combined_constraint)(xuz)
-        constraint_hess = jax.jacfwd(jax.jacrev(self._combined_constraint))(xuz)
+        constraint = self._combined_constraint(xuz, initial_state)
+        constraint_grad = jax.jacrev(self._combined_constraint)(xuz, initial_state)
+        constraint_hess = jax.jacfwd(jax.jacrev(self._combined_constraint))(xuz, initial_state)
 
         # Evaluate the kernel function and its gradient at the current state (without slack variables).
         k = self.k(xuz[:, :-self.dg], xuz[:, :-self.dg])
@@ -194,25 +200,27 @@ class JaxCSVTOpt:
         # Clamp the state in bounds and return.
         return self._bound_projection(xuz)
 
-    def _constraint_step(self, C: jnp.array, C_grad: jnp.array) -> jnp.array:
+    @staticmethod
+    def _constraint_step(self, constraint: jnp.array, constraint_grad: jnp.array) -> jnp.array:
         """Compute the constraint step according to equation (39).
 
         Args:
-            C: The combined constraint evaluated at the current state, TODO: shape ...
-            C_grad: The gradient of the combined constraint evaluated at the current state, TODO: shape ...
+            constraint: The combined constraint evaluated at the current state, TODO: shape ...
+            constraint_grad: The gradient of the combined constraint evaluated at the current state, TODO: shape ...
+
         Returns:
-            The constraint step.
+            The constraint step, shape (N, (dx + du) * T + dg).
         """
         # Get inv(dC * dCT) term to be used below, shape (N, dg + dh, dg + dh).
-        dCdCT_inv = jnp.linalg.inv(C_grad @ C_grad.transpose((0, 2, 1)))
+        dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)))
 
         # Get constraint step from equation (39), shape (N, d * T).
-        return (C_grad.transpose((0, 2, 1)) @ dCdCT_inv @ jnp.expand_dims(C, axis=-1)).squeeze(-1)
+        return (constraint_grad.transpose((0, 2, 1)) @ dCdCT_inv @ jnp.expand_dims(constraint, axis=-1)).squeeze(-1)
 
     def _tangent_step(self,
                       c_grad: jnp.array,
-                      C_grad: jnp.array,
-                      C_hess: jnp.array,
+                      constraint_grad: jnp.array,
+                      constraint_hess: jnp.array,
                       k: jnp.array,
                       k_grad: jnp.array,
                       gamma: Optional[jnp.float32]) -> jnp.array:
@@ -220,35 +228,39 @@ class JaxCSVTOpt:
 
         Args:
             c_grad: The gradient of the cost evaluated at the current state, TODO: shape ...
-            C_grad: The gradient of the constraint evaluated at the current state, TODO: shape ...
-            C_hess: The hessian of the constraint evaluated at the current state, TODO: shape ...
+            constraint_grad: The gradient of the constraint evaluated at the current state, TODO: shape ...
+            constraint_hess: The hessian of the constraint evaluated at the current state, TODO: shape ...
             k: The kernel function evaluated at the current state, shape (N, N).
-            k_grad: The gradient of the kernel function evaluated at the current state, shape (N, N, T * (dx + du)).
+            k_grad: The gradient of the kernel function evaluated at the current state, shape (N, N, (dx + du) * T).
+
         Returns:
-            The tangent step for the current state.
+            The tangent step for the current state, shape (N, (dx + du) * T + dg).
         """
         # Get inv(dC * dCT), shape (N, dg + dh, dg + dh).
-        dCdCT_inv = jnp.linalg.inv(C_grad @ C_grad.transpose((0, 2, 1)))
+        dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)))
 
         # Get projection tensor via equation (36), shape (N, d * T, d * T).
-        projection = jnp.expand_dims(jnp.eye((self.dx + self.du) * self.T + self.dh), axis=0) - C_grad.transpose((0, 2, 1)) @ dCdCT_inv @ C_grad
+        projection = (jnp.expand_dims(jnp.eye((self.dx + self.du) * self.T + self.dh), axis=0) -
+                      constraint_grad.transpose((0, 2, 1)) @ dCdCT_inv @ constraint_grad)
 
         # Get the tangent space kernel from equation (29), shape (N, N, d * T, d * T).
-        k_tangent = k.reshape(self.N, self.N, 1, 1) * jnp.expand_dims(projection, axis=0) @ jnp.expand_dims(projection, axis=1)
+        k_tangent = (k.reshape(self.N, self.N, 1, 1) * jnp.expand_dims(projection, axis=0) @
+                     jnp.expand_dims(projection, axis=1))
 
         # Reshape inputs for computing the gradient of the projection tensor.
         dCdCT_inv = jnp.expand_dims(dCdCT_inv, axis=1)
-        dCT = jnp.expand_dims(C_grad.transpose(0, 2, 1), axis=1)
-        C_grad = jnp.expand_dims(C_grad, axis=1)
-        C_hess = C_hess.transpose(0, 3, 1, 2)
-        hess_CT = C_hess.transpose(0, 1, 3, 2)
+        dCT = jnp.expand_dims(constraint_grad.transpose(0, 2, 1), axis=1)
+        constraint_grad = jnp.expand_dims(constraint_grad, axis=1)
+        constraint_hess = constraint_hess.transpose(0, 3, 1, 2)
+        hess_CT = constraint_hess.transpose(0, 1, 3, 2)
 
         # Get the A term in equation (57) using equation (58) for all trajectories.
-        first_term = hess_CT @ dCdCT_inv @ C_grad
-        third_term = dCT @ dCdCT_inv @ C_hess
+        first_term = hess_CT @ dCdCT_inv @ constraint_grad
+        third_term = dCT @ dCdCT_inv @ constraint_hess
 
         # Get the B term in equation (57) using equation (59) and equation (60).
-        second_term = dCT @ dCdCT_inv @ (C_hess @ dCT + C_grad @ hess_CT) @ dCdCT_inv @ C_grad
+        second_term = (dCT @ dCdCT_inv @ (constraint_hess @ dCT + constraint_grad @ hess_CT) @ dCdCT_inv @
+                       constraint_grad)
 
         # Get the gradient of the projection tensor from equation (57).
         grad_projection = jnp.einsum('mijj->mij',
@@ -275,36 +287,85 @@ class JaxCSVTOpt:
             # Get tangent space step from equation (38).
             return -(kernelized_score.squeeze(-1) / self.N + grad_K_tangent / self.N)
 
+    def _combined_constraint(self, xuz: jnp.array, initial_state: jnp.array) -> jnp.array:
+        """Compute the combined equality constraint function. This should be formed from composition of the specified
+        equality constraints, specified inequality constraints paired with slack variables, dynamics constraints, and an
+        additional constraint for keeping the initial state in place.
+
+        Args:
+            xuz: All N trajectories including slack variables stacked as rows, shape (N, (dx + du) * T + dg).
+            initial_state: The state of the initial condition for the trajectories, shape (dx,).
+
+        Returns:
+            The evaluated combined constraint, shape (N, dh + dg + dx * T).
+        """
+        combined_constraint = jnp.concatenate((self.h(xuz[:, :-self.dg]),
+                                               self._slack_constraint(xuz),
+                                               self._dynamics_constraint(xuz),
+                                               self._start_constraint(xuz, initial_state)), axis=1)
+        return combined_constraint
+
+    def _slack_constraint(self, xuz: jnp.array) -> jnp.array:
+        """Compute the slack constraint by evaluating the inequality constraint function and adding in the slack
+        variables according to equation (33). This function's output will be constrained to zero in the optimizer.
+
+        Args:
+            xuz: All N trajectories including slack variables stacked as rows, shape (N, (dx + du) * T + dg).
+
+        Returns:
+            The evaluated slack constraint, shape (N, dg).
+        """
+        inequality_with_slack = self.g(xuz[:, :-self.dg]) + 0.5 * xuz[:, -self.dg:] ** 2
+        return inequality_with_slack
+
+    def _dynamics_constraint(self, xuz: jnp.array) -> jnp.array:
+        """Compute the dynamics constraint which enforces that the points in each trajectory spline are in fact related
+        by the supplied dynamics function. This function's output will be constrained to zero in the optimizer.
+
+        Args:
+            xuz: All N trajectories including slack variables stacked as rows, shape (N, (dx + du) * T + dg).
+
+        Returns:
+            The dynamics error on every point except the first one in every trajectory, shape (N, dx * (T - 1)).
+        """
+        x_forward_one_without_last = self.f(xuz[:, :-self.dg])[:, :-(self.dx + self.du)]
+        x_without_first = xuz[:, self.dx + self.du::-self.dg]
+        dynamics_error = x_forward_one_without_last - x_without_first
+        return dynamics_error
+
+    def _start_constraint(self, xuz: jnp.array, initial_state: jnp.array) -> jnp.array:
+        """Compute the start constraint function which enforces that the starting state in the trajectories is the same
+        as the supplied initial state. This function's output will be constrained to zero in the optimizer.
+
+        Args:
+            xuz: All N trajectories including slack variables stacked as rows, shape (N, (dx + du) * T + dg).
+            initial_state: The state of the initial condition for the trajectories, shape (dx,).
+
+        Returns:
+            The start error on every trajectory, shape (N, dx).
+        """
+        start_error = xuz[:, :self.dx] - initial_state
+        return start_error
+
     def _bound_projection(self, xuz: jnp.array) -> jnp.array:
-        """Project the state inside the (min, max) bounds on state and control inputs.
+        """Clip the trajectories inside the (min, max) bounds on state and control inputs specified by self.x_bounds and
+        self.u_bounds.
 
         Args:
-        Returns:
-        """
-        min_x = self.x_bounds[0].reshape(1, 1, -1).repeat(1, self.T, 1)
-        max_x = self.x_bounds[1].reshape(1, 1, -1).repeat(1, self.T, 1)
-        if self.problem.dz > 0:
-            if not self.problem.squared_slack:
-                min_val = 0
-            min_x = torch.cat((min_x,
-                               min_val * torch.ones(1, self.problem.T, self.problem.dz, device=min_x.device)), dim=-1)
-            max_x = torch.cat((max_x,
-                               1e3 * torch.ones(1, self.problem.T, self.problem.dz, device=max_x.device)), dim=-1)
-
-        torch.clamp_(xuz, min=min_x.to(device=xuz.device).reshape(1, -1),
-                     max=max_x.to(device=xuz.device).reshape(1, -1))
-
-    def _combined_constraint(self) -> jnp.array:
-        """
+            xuz: All N trajectories including slack variables stacked as rows, shape (N, (dx + du) * T + dg).
 
         Returns:
+            The input array with state and control values clamped inside the range, shape (N, (dx + du) * T + dg).
         """
-        raise NotImplementedError
+        # Get bounding arrays for projection.
+        point_min = jnp.concatenate((jnp.ones((self.N, self.dx)) * self.x_bounds[0],
+                                     jnp.ones((self.N, self.du) * self.u_bounds[0])), axis=1)
+        point_max = jnp.concatenate((jnp.ones((self.N, self.dx)) * self.x_bounds[1],
+                                     jnp.ones((self.N, self.du) * self.u_bounds[1])), axis=1)
+        trajectory_min = jnp.tile(point_min, self.T)
+        trajectory_max = jnp.tile(point_max, self.T)
 
-    def _dynamics_constraint(self) -> jnp.array:
-        """
-
-        Args:
-        Returns:
-        """
-        raise NotImplementedError
+        # Project trajectories inside bounds and then append slack variables.
+        x_in_bounds = jnp.clip(xuz[:, :-self.dg], trajectory_min, trajectory_max)
+        xuz_in_bounds = jnp.concatenate((x_in_bounds, xuz[:, -self.dg:]))
+        return xuz_in_bounds
