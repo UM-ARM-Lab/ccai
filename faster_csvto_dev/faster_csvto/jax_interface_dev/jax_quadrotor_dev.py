@@ -160,13 +160,11 @@ class JaxCSVTOpt:
         # Loop over the gradient step iterations.
         xuz = jax.lax.fori_loop(1, self.K+1, self._solve_iteration, xuz, unroll=True)
 
-        # Find the lowest cost trajectory in the optimized distribution.
-
-        # Return the trajectory without slack variables.
-        raise NotImplementedError
+        # Find the lowest cost trajectory in the optimized distribution, and return it without slack variables.
+        return xuz[:, :-self.dg][self.c(xuz[:, :-self.dg]).argmin()]
 
     def _solve_iteration(self, iteration: int, xuz: jnp.array) -> jnp.array:
-        """
+        """Execute
 
         Args:
         Returns:
@@ -178,103 +176,135 @@ class JaxCSVTOpt:
         c_grad = jax.jacfwd(self.c)(xuz[:, :-self.dg])
 
         # Evaluate the combined constraint function, its gradient, and its hessian at the current augmented state.
-        constraint = self._hgf_combined(xuz)
-        constraint_grad = jax.jacfwd(self._hgf_combined)(xuz)
-        constraint_hess = jax.jacfwd(jax.jacrev(self._hgf_combined))(xuz)
+        constraint = self._combined_constraint(xuz)
+        constraint_grad = jax.jacfwd(self._combined_constraint)(xuz)
+        constraint_hess = jax.jacfwd(jax.jacrev(self._combined_constraint))(xuz)
 
         # Evaluate the kernel function and its gradient at the current state (without slack variables).
         k = self.k(xuz[:, :-self.dg], xuz[:, :-self.dg])
         k_grad = jax.jacrev(self.k)(xuz[:, :-self.dg])  # Differentiate w.r.t. first argument by default.
 
         # Compute the retraction steps.
-        constraint_step = self._compute_constraint_step(constraint, constraint_grad)
-        tangent_step = self._compute_tangent_step(c_grad, constraint, constraint_grad, constraint_hess, k, k_grad)
+        constraint_step = self._constraint_step(constraint, constraint_grad)
+        tangent_step = self._tangent_step(c_grad, constraint_grad, constraint_hess, k, k_grad, gamma)
 
         # Combine the steps according to equation (26) and use them to update the current augmented state.
         xuz -= self.step_scale * (self.alpha_J * tangent_step + self.alpha_C * constraint_step)
 
-        # Clamp the state in bounds.
+        # Clamp the state in bounds and return.
+        return self._bound_projection(xuz)
 
-    def _compute_constraint_step(self, constraint: jnp.array, constraint_grad: jnp.array) -> jnp.array:
+    def _constraint_step(self, C: jnp.array, C_grad: jnp.array) -> jnp.array:
+        """Compute the constraint step according to equation (39).
+
+        Args:
+            C: The combined constraint evaluated at the current state, TODO: shape ...
+            C_grad: The gradient of the combined constraint evaluated at the current state, TODO: shape ...
+        Returns:
+            The constraint step.
+        """
+        # Get inv(dC * dCT) term to be used below, shape (N, dg + dh, dg + dh).
+        dCdCT_inv = jnp.linalg.inv(C_grad @ C_grad.transpose((0, 2, 1)))
+
+        # Get constraint step from equation (39), shape (N, d * T).
+        return (C_grad.transpose((0, 2, 1)) @ dCdCT_inv @ jnp.expand_dims(C, axis=-1)).squeeze(-1)
+
+    def _tangent_step(self,
+                      c_grad: jnp.array,
+                      C_grad: jnp.array,
+                      C_hess: jnp.array,
+                      k: jnp.array,
+                      k_grad: jnp.array,
+                      gamma: Optional[jnp.float32]) -> jnp.array:
+        """Compute the tangent step according to either equation (38) or equation (46) based on the value of gamma.
+
+        Args:
+            c_grad: The gradient of the cost evaluated at the current state, TODO: shape ...
+            C_grad: The gradient of the constraint evaluated at the current state, TODO: shape ...
+            C_hess: The hessian of the constraint evaluated at the current state, TODO: shape ...
+            k: The kernel function evaluated at the current state, shape (N, N).
+            k_grad: The gradient of the kernel function evaluated at the current state, shape (N, N, T * (dx + du)).
+        Returns:
+            The tangent step for the current state.
+        """
+        # Get inv(dC * dCT), shape (N, dg + dh, dg + dh).
+        dCdCT_inv = jnp.linalg.inv(C_grad @ C_grad.transpose((0, 2, 1)))
+
+        # Get projection tensor via equation (36), shape (N, d * T, d * T).
+        projection = jnp.expand_dims(jnp.eye((self.dx + self.du) * self.T + self.dh), axis=0) - C_grad.transpose((0, 2, 1)) @ dCdCT_inv @ C_grad
+
+        # Get the tangent space kernel from equation (29), shape (N, N, d * T, d * T).
+        k_tangent = k.reshape(self.N, self.N, 1, 1) * jnp.expand_dims(projection, axis=0) @ jnp.expand_dims(projection, axis=1)
+
+        # Reshape inputs for computing the gradient of the projection tensor.
+        dCdCT_inv = jnp.expand_dims(dCdCT_inv, axis=1)
+        dCT = jnp.expand_dims(C_grad.transpose(0, 2, 1), axis=1)
+        C_grad = jnp.expand_dims(C_grad, axis=1)
+        C_hess = C_hess.transpose(0, 3, 1, 2)
+        hess_CT = C_hess.transpose(0, 1, 3, 2)
+
+        # Get the A term in equation (57) using equation (58) for all trajectories.
+        first_term = hess_CT @ dCdCT_inv @ C_grad
+        third_term = dCT @ dCdCT_inv @ C_hess
+
+        # Get the B term in equation (57) using equation (59) and equation (60).
+        second_term = dCT @ dCdCT_inv @ (C_hess @ dCT + C_grad @ hess_CT) @ dCdCT_inv @ C_grad
+
+        # Get the gradient of the projection tensor from equation (57).
+        grad_projection = jnp.einsum('mijj->mij',
+                                     (first_term + third_term - second_term).transpose(0, 2, 3, 1))
+
+        # Get the first term for the gradient of the projection tensor from equation (32).
+        PP = jnp.expand_dims(projection, axis=0) @ jnp.expand_dims(projection, axis=1)
+        first_term = jnp.einsum('nmj, nmij->nmi', k_grad, PP)
+
+        # Get the second term for the gradient of the projection tensor from equation (32).
+        second_term = (jnp.expand_dims(jnp.expand_dims(k, axis=-1), axis=-1) *
+                       jnp.expand_dims(projection, axis=0) @ jnp.expand_dims(grad_projection, axis=1))
+        second_term = jnp.sum(second_term, axis=3)
+
+        # Get the gradient of the projection tensor from equation (32).
+        grad_K_tangent = jnp.sum(first_term + second_term, axis=0)
+
+        # Get the first term for computing the tangent space step.
+        kernelized_score = jnp.sum(k_tangent @ -c_grad.reshape(self.N, 1, -1, 1), axis=0)
+        if gamma is not None:
+            # Get tangent space step from equation (46).
+            return -(gamma * kernelized_score.squeeze(-1) / self.N + grad_K_tangent / self.N)
+        else:
+            # Get tangent space step from equation (38).
+            return -(kernelized_score.squeeze(-1) / self.N + grad_K_tangent / self.N)
+
+    def _bound_projection(self, xuz: jnp.array) -> jnp.array:
+        """Project the state inside the (min, max) bounds on state and control inputs.
+
+        Args:
+        Returns:
+        """
+        min_x = self.x_bounds[0].reshape(1, 1, -1).repeat(1, self.T, 1)
+        max_x = self.x_bounds[1].reshape(1, 1, -1).repeat(1, self.T, 1)
+        if self.problem.dz > 0:
+            if not self.problem.squared_slack:
+                min_val = 0
+            min_x = torch.cat((min_x,
+                               min_val * torch.ones(1, self.problem.T, self.problem.dz, device=min_x.device)), dim=-1)
+            max_x = torch.cat((max_x,
+                               1e3 * torch.ones(1, self.problem.T, self.problem.dz, device=max_x.device)), dim=-1)
+
+        torch.clamp_(xuz, min=min_x.to(device=xuz.device).reshape(1, -1),
+                     max=max_x.to(device=xuz.device).reshape(1, -1))
+
+    def _combined_constraint(self) -> jnp.array:
+        """
+
+        Returns:
+        """
+        raise NotImplementedError
+
+    def _dynamics_constraint(self) -> jnp.array:
         """
 
         Args:
         Returns:
         """
-        # # Get inv(dC * dCT), shape (N, dg + dh, dg + dh).
-        # dCdCT_inv = jnp.linalg.inv(dC @ dC.transpose((0, 2, 1)))
-        #
-        # # Get projection tensor via equation (36), shape (N, d * T, d * T).
-        # projection = jnp.expand_dims(jnp.eye(d * T + dh), axis=0) - dC.transpose((0, 2, 1)) @ dCdCT_inv @ dC
-        #
-        # # Get constraint step from equation (39), shape (N, d * T).
-        # phi_C = (dC.transpose((0, 2, 1)) @ dCdCT_inv @ jnp.expand_dims(C, axis=-1)).squeeze(-1)
-        #
-        # # Get the tangent space kernel from equation (29), shape (N, N, d * T, d * T).
-        # K_tangent = K.reshape(N, N, 1, 1) * jnp.expand_dims(projection, axis=0) @ jnp.expand_dims(projection, axis=1)
-        #
-        # # Reshape inputs for computing the gradient of the projection tensor.
-        # dCdCT_inv = jnp.expand_dims(dCdCT_inv, axis=1)
-        # dCT = jnp.expand_dims(dC.transpose(0, 2, 1), axis=1)
-        # dC = jnp.expand_dims(dC, axis=1)
-        # hess_C = hess_C.transpose(0, 3, 1, 2)
-        # hess_CT = hess_C.transpose(0, 1, 3, 2)
-        #
-        # # Get the A term in equation (57) using equation (58) for all trajectories.
-        # first_term = hess_CT @ dCdCT_inv @ dC
-        # third_term = dCT @ dCdCT_inv @ hess_C
-        #
-        # # Get the B term in equation (57) using equation (59) and equation (60).
-        # second_term = dCT @ dCdCT_inv @ (hess_C @ dCT + dC @ hess_CT) @ dCdCT_inv @ dC
-        #
-        # # Get the gradient of the projection tensor from equation (57).
-        # grad_projection = jnp.einsum('mijj->mij',
-        #                              (first_term + third_term - second_term).transpose(0, 2, 3, 1))
-        #
-        # # Get the first term for the gradient of the projection tensor from equation (32).
-        # PP = jnp.expand_dims(projection, axis=0) @ jnp.expand_dims(projection, axis=1)
-        # first_term = jnp.einsum('nmj, nmij->nmi', grad_K, PP)
-        #
-        # # Get the second term for the gradient of the projection tensor from equation (32).
-        # second_term = (jnp.expand_dims(jnp.expand_dims(K, axis=-1), axis=-1) *
-        #                jnp.expand_dims(projection, axis=0) @ jnp.expand_dims(grad_projection, axis=1))
-        # second_term = jnp.sum(second_term, axis=3)
-        #
-        # # Get the gradient of the projection tensor from equation (32).
-        # grad_K_tangent = jnp.sum(first_term + second_term, axis=0)
-        #
-        # # Get tangent space step from equation (46).
-        # kernelized_score = jnp.sum(K_tangent @ -grad_J.reshape(N, 1, -1, 1), axis=0)
-        # phi_tangent = -(gamma * kernelized_score.squeeze(-1) / N + grad_K_tangent / N)
-        #
-        # # Return the update terms from equation (26).
-        # return alpha_J * phi_tangent + alpha_C * phi_C
         raise NotImplementedError
-
-    def _compute_tangent_step(self,
-                              c_grad: jnp.array,
-                              constraint: jnp.array,
-                              constraint_grad: jnp.array,
-                              constraint_hess: jnp.array,
-                              k: jnp.array,
-                              k_grad: jnp.array) -> jnp.array:
-        """
-
-        Args:
-        Returns:
-        """
-        raise NotImplementedError
-
-    def _project_in_bounds(self, xuz: jnp.array) -> jnp.array:
-        """
-
-        Args:
-        Returns:
-        """
-        raise NotImplementedError
-
-    def _hgf_combined(self) -> jnp.array:
-        """
-
-        Returns:
-        """

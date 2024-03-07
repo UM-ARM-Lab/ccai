@@ -25,7 +25,7 @@ def compute_step_jax(grad_J: jnp.array,  # nabla log(p(Tau^j | o)) stacked as ro
     """
     N = 8
     T = 12
-    d = 16
+    d = 16  # 12 dim state + 4 dim input
     dh = 0
     gamma = 1
     alpha_C = 1
