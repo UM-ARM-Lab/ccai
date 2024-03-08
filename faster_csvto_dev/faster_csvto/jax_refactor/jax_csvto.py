@@ -14,12 +14,12 @@ class JaxCSVTOProblem:
     """
 
     # TODO: It would be ideal to either deduce the dimensionality automatically, for now jax.experimental.checkify() is
-    #  used for runtime assertion in the jit compiled solve() function.
+    #   used for runtime assertion in the jit compiled solve() function.
     def __init__(self,
                  c: Callable[[jnp.array], jnp.array],
                  h: Callable[[jnp.array], jnp.array],
                  g: Callable[[jnp.array], jnp.array],
-                 f: Callable[[jnp.array], jnp.array],
+                 f: Callable[[jnp.array, jnp.array], jnp.array],
                  u_bounds: Tuple[int], x_bounds: Tuple[int],
                  dx: int, du: int, dh: int, dg: int) -> None:
         """Set the functions that define the optimization problem along with parameters that determine the size of the
@@ -32,7 +32,7 @@ class JaxCSVTOProblem:
             c: The batched cost function, mapping shapes (N, (dx + du) * T) -> (N, 1).
             h: The batched equality constraint function, mapping shapes (N, (dx + du) * T) -> (N, dh).
             g: The batched inequality constraint function, mapping shapes (N, (dx + du) * T) -> (N, dg).
-            f: The batched dynamics function, mapping shapes (N, dx) -> (N, dx).
+            f: The batched dynamics function, mapping shapes (N, dx), (N, du) -> (N, dx).
             u_bounds: The (min, max) bounds for control inputs u.
             x_bounds: The (min, max) bounds for states x.
             dx: The dimension of the state.
@@ -205,7 +205,7 @@ class JaxCSVTOpt:
         """Compute the constraint step according to equation (39).
 
         Args:
-            constraint: The combined constraint evaluated at the current state, TODO: shape ...
+            constraint: The combined constraint evaluated at the current state, shape (N, dh + dg + dx * T).
             constraint_grad: The gradient of the combined constraint evaluated at the current state, TODO: shape ...
 
         Returns:
@@ -328,7 +328,13 @@ class JaxCSVTOpt:
         Returns:
             The dynamics error on every point except the first one in every trajectory, shape (N, dx * (T - 1)).
         """
-        x_forward_one_without_last = self.f(xuz[:, :-self.dg])[:, :-(self.dx + self.du)]
+        # Index out the state-space points for each trajectory spline, to get inputs for batched dynamics function.
+        points = xuz[:, :-self.dg].reshape(self.N * self.T, self.dx + self.du)
+        states = points[:, :self.dx]
+        control_inputs = points[:, -self.du:]
+
+        # Compute the error of the dynamics function in predicting the next state along each spline.
+        x_forward_one_without_last = self.f(states, control_inputs)[:, :-(self.dx + self.du)]
         x_without_first = xuz[:, self.dx + self.du::-self.dg]
         dynamics_error = x_forward_one_without_last - x_without_first
         return dynamics_error

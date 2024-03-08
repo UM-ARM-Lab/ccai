@@ -28,7 +28,6 @@ def cost(trajectory, goal):
     Q[5, 5] = 1e-2
     Q[2, 2] = 0.1
     Q[3:, 3:] *= 0.5
-    #Q[6:9] *= 2.0
     Q *= 5
     P = Q
     R = 16 * torch.eye(4, device=trajectory.device)
