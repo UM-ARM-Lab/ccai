@@ -54,6 +54,7 @@ class KukaProblem(ConstrainedSVGDProblem):
 
         self.dh = self.dz * T
 
+        self.squared_slack = True
         self.slack_variable = False
         if not self.slack_variable:
             self.dz = 0
@@ -65,7 +66,6 @@ class KukaProblem(ConstrainedSVGDProblem):
         self.goal = goal
         # self.K = rbf_kernel
         self.K = structured_rbf_kernel
-        self.squared_slack = True
         self.grad_kernel = jacrev(rbf_kernel, argnums=0)
         self.alpha = 1
 
@@ -111,6 +111,9 @@ class KukaProblem(ConstrainedSVGDProblem):
                         bounds=bounds,
                         kinematic_chain=chain)
         self._tsr_data = {}
+        self.cost = vmap(partial(joint_path_cost, start=self.start))
+        self.grad_cost = vmap(jacrev(partial(joint_path_cost, start=self.start)))
+        self.hess_cost = vmap(hessian(partial(joint_path_cost, start=self.start)))
 
     def _preprocess(self, xu, compute_grads=True, compute_hess=False):
         N = xu.shape[0]
@@ -146,7 +149,7 @@ class KukaProblem(ConstrainedSVGDProblem):
                                                                  self.T * (self.dx)
                                                                  )
 
-        #print(h.max())
+        # print(h.max())
         self._tsr_data['equality'] = (g, grad_g, hess_g)
         self._tsr_data['inequality'] = (h, grad_h, hess_h)
 
@@ -183,6 +186,8 @@ class KukaProblem(ConstrainedSVGDProblem):
         x = x[:, :, :self.dx]
         N = x.shape[0]
         J, grad_J, hess_J = self._terminal_constraints.eval(x.reshape(-1, self.dx))
+        J2, grad_J2, hess_J2 = self.cost(x), self.grad_cost(x), self.hess_cost(x)
+
         J = J.reshape(N, -1)
         grad_J = grad_J.reshape(N, -1, self.dx)
 
@@ -190,6 +195,10 @@ class KukaProblem(ConstrainedSVGDProblem):
 
         # hess_J = hess_J.reshape(N, -1, self.dx, self.dx)
         hess_J = torch.zeros(N, self.T * self.dx, self.T * self.dx, device=x.device)
+
+        J = J + J2
+        grad_J = grad_J + grad_J2
+
         N = x.shape[0]
         return (self.alpha * J.reshape(N),
                 self.alpha * grad_J.reshape(N, -1),
@@ -233,13 +242,17 @@ class KukaProblem(ConstrainedSVGDProblem):
         grad_K = grad_K.reshape(N, N, -1)
         G, dG, hessG = self.combined_constraints(augmented_trajectory, compute_grads=True, compute_hess=False)
 
-        #print(G.max(), G.mean(), J.mean())
+        print(G.max(), G.mean(), J.mean())
         if hessG is not None:
             hessG.detach_()
         return grad_J.detach(), hess_J, K.detach(), grad_K.detach(), G.detach(), dG.detach(), hessG
 
     def update(self, start, goal=None, T=None):
         self.start = start
+        # update functions that require start
+        self.cost = vmap(partial(joint_path_cost, start=self.start))
+        self.grad_cost = vmap(jacrev(partial(joint_path_cost, start=self.start)))
+        self.hess_cost = vmap(hessian(partial(joint_path_cost, start=self.start)))
 
         if goal is not None:
             self.goal = self.base_transform.inverse().transform_points(goal.unsqueeze(0)).reshape(-1)
@@ -360,6 +373,17 @@ class EndEffectorConstraint:
         self._J, self._h, self._dH = None, None, None
 
 
+def joint_path_cost(x, start):
+    x = torch.cat((start.reshape(1, 7), x[:, :7]), dim=0)
+    weight = torch.tensor([
+        0.2, 0.25, 0.4, 0.4, 0.6, 0.75, 1.0], device=x.device, dtype=torch.float32)
+    weight = torch.ones_like(weight)
+    weight = 1.0 / weight
+    diff = x[1:] - x[:-1]
+    weighted_diff = diff.reshape(-1, 1, 7) @ torch.diag(weight).unsqueeze(0) @ diff.reshape(-1, 7, 1)
+    return 5 * torch.sum(weighted_diff)
+
+
 def ee_terminal_constraint(p, mat, goal):
     """
 
@@ -368,7 +392,7 @@ def ee_terminal_constraint(p, mat, goal):
     :return:
     """
 
-    return 10 * torch.sum((p - goal.reshape(-1)) ** 2).reshape(-1)
+    return 5 * torch.sum((p - goal.reshape(-1)) ** 2).reshape(-1)
 
 
 def do_trial(env, params, fpath):

@@ -214,7 +214,7 @@ class ConstrainedSteinTrajOpt:
         self.use_fisher = False
         self.use_hessian = False  # True
         self.use_constraint_hessian = False
-        self.active_constraint_method = True
+        self.active_constraint_method = False
         self.normxiJ = None
         self.dtype = torch.float32
         self.delta_x = None
@@ -252,15 +252,8 @@ class ConstrainedSteinTrajOpt:
             self.Bk = torch.where(Bk_norm > max_norm, max_norm * self.Bk / Bk_norm, self.Bk)
         self.old_grad_C = dC
 
-    def compute_update(self, xuz):
-        N = xuz.shape[0]
-        d = self.dx + self.du
-        xuz = xuz.detach()
-        xuz.requires_grad = True
-
-        xuz = xuz.to(dtype=torch.float32)
-        grad_J, hess_J, K, grad_K, C, dC, hess_C = self.problem.eval(xuz.to(dtype=torch.float32))
-
+    def _process_constraint_gradients(self, grad_J, C, dC):
+        N = grad_J.shape[0]
         if self.active_constraint_method and self.dh > 0:
             if self.dg == 0:
                 G, dG = None, None
@@ -290,6 +283,20 @@ class ConstrainedSteinTrajOpt:
 
             dCdCT_inv_active = dCdCT_inv
             dCdCT_inv_active_or_violated = dCdCT_inv
+
+        return C, dC_active, dC_active_or_violated, dCdCT_inv_active, dCdCT_inv_active_or_violated
+
+    def compute_update(self, xuz):
+        N = xuz.shape[0]
+        d = self.dx + self.du
+        xuz = xuz.detach()
+        xuz.requires_grad = True
+
+        xuz = xuz.to(dtype=torch.float32)
+        grad_J, hess_J, K, grad_K, C, dC, hess_C = self.problem.eval(xuz.to(dtype=torch.float32))
+
+        (C, dC_active, dC_active_or_violated,
+         dCdCT_inv_active, dCdCT_inv_active_or_violated) = self._process_constraint_gradients(grad_J, C, dC)
 
         # use approximation for hessian
         if hess_C is None:
@@ -417,10 +424,12 @@ class ConstrainedSteinTrajOpt:
     def resample(self, xuz):
         N = xuz.shape[0]
         xuz = xuz.to(dtype=torch.float32)
-        J = self.problem.get_cost(xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du])
+        J, grad_J, _ = self.problem._objective(xuz.reshape(N, self.T, -1))
         C, dC, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1),
                                                      compute_grads=True,
                                                      compute_hess=False)
+
+        (_, dC, _, dCdCT_inv, _) = self._process_constraint_gradients(grad_J, C, dC)
 
         penalty = J.reshape(N) + self.penalty * torch.sum(C.reshape(N, -1).abs(), dim=1)
         # normalize penalty
@@ -436,22 +445,9 @@ class ConstrainedSteinTrajOpt:
         idx = torch.searchsorted(weights, p)
 
         # compute projection for noise
-        dCdCT = dC @ dC.permute(0, 2, 1)
-        A_bmm = lambda x: dCdCT @ x
-        eye = torch.eye(self.dg + self.dh).repeat(N, 1, 1).to(device=C.device)
-        try:
-            dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1), eye)
-            if torch.any(torch.isnan(dCdCT_inv)):
-                raise ValueError('nan in inverse')
-        except Exception as e:
-            print(e)
-            # dCdCT_inv = torch.linalg.lstsq(dC @ dC.permute(0, 2, 1), eye).solution
-            # dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1))
-            dCdCT_inv, _ = cg_batch(A_bmm, eye, verbose=False)
         projection = dCdCT_inv @ dC
-        eye = torch.eye((self.dx + self.du) * self.T + self.dh, device=xuz.device, dtype=xuz.dtype).unsqueeze(0)
+        eye = torch.eye((self.dx + self.du + self.dz) * self.T, device=xuz.device, dtype=xuz.dtype).unsqueeze(0)
         projection = eye - dC.permute(0, 2, 1) @ projection
-
         noise = self.resample_sigma * torch.randn_like(xuz)
         eps = projection[idx] @ noise.unsqueeze(-1)
         # print(penalty, weights)
