@@ -18,14 +18,17 @@ def solve_dual_batched_no_G(dJ, dH, iters=100, eps=1e-3, tol=1e-4):
 
     B = dJ.shape[0]
     _mu = torch.zeros(B, dH.shape[1], 1).to(dH)
+
+    # initialize to least squares solution
+    # _mu = torch.linalg.lstsq(dH.transpose(1, 2), dJ.unsqueeze(-1)).solution
     Ab = (2 * dH @ dJ.unsqueeze(-1))
-    AtA = dH @ dH.transpose(1, 2)
+    AtA = 2 * dH @ dH.transpose(1, 2)
 
     def objective(dJ, dH, _mu):
         return torch.linalg.norm(dJ.unsqueeze(-1) + dH.transpose(1, 2) @ _mu, dim=1)
 
     obj = objective(dJ, dH, _mu)
-
+    max_line_search = 5
     for iter in range(iters):
         # Do update
         _step = Ab + AtA @ _mu
@@ -33,20 +36,25 @@ def solve_dual_batched_no_G(dJ, dH, iters=100, eps=1e-3, tol=1e-4):
         torch.clamp_(new_mu, min=0)
 
         # Backtracking line search
-        new_obj = objective(dJ, dH, _mu)
-        while torch.any(new_obj > obj):
+        new_obj = objective(dJ, dH, new_mu)
+        k = 0
+        while torch.any((new_obj - obj) > 1e-6):
+            k += 1
             _step = torch.where(new_obj.unsqueeze(-1) > obj.unsqueeze(-1), _step * 0.1, torch.zeros_like(_step))
             new_mu = _mu - eps * _step
             torch.clamp_(new_mu, min=0)
-            obj = objective(dJ, dH, _mu)
-
+            obj = objective(dJ, dH, new_mu)
+            if k == max_line_search:
+                break
         # check convergence
         diff = torch.linalg.norm(new_obj - obj, dim=1)
+
         if torch.all(diff < tol):
             break
         # for next time
         obj = new_obj
         _mu = new_mu
+    print(iter)
     return _mu
 
 
@@ -69,7 +77,7 @@ def solve_dual_batched(dJ, dG, dH, iters=100, eps=1e-3, tol=1e-4):
     _mu = torch.zeros(B, dH.shape[1], 1).to(dH)
     _lambda = torch.zeros(B, dG.shape[1], 1).to(dG)
     Ab = (2 * dC @ dJ.unsqueeze(-1))
-    AtA = dC @ dC.transpose(1, 2)
+    AtA = 2 * dC @ dC.transpose(1, 2)
 
     def objective(dJ, dG, dH, _lambda, _mu):
         return torch.linalg.norm(dJ.unsqueeze(-1) + dG.transpose(1, 2) @ _lambda + dH.transpose(1, 2) @ _mu, dim=1)
@@ -106,30 +114,53 @@ def solve_dual_batched(dJ, dG, dH, iters=100, eps=1e-3, tol=1e-4):
 
 def compute_inverse_with_masks(dC, mask):
     B, n, m = dC.shape
-    sorting_mask = torch.arange(n, 0, -1).to(device=dC.device)[None, :] * mask
-    standard_idx = torch.arange(n)[None, :].repeat(B, 1).to(device=dC.device)
-    unsorted_idx = standard_idx.clone()
-
-    sorted_idx = torch.argsort(sorting_mask, descending=True, dim=1)
     B_range = torch.arange(B).to(device=dC.device)
-    unsorted_idx[B_range.unsqueeze(-1), sorted_idx] = standard_idx
 
-    # mask out dC
-    dC_masked = dC * mask.unsqueeze(-1)
+    def get_masked_dC(dC, mask):
+        sorting_mask = torch.arange(n, 0, -1).to(device=dC.device)[None, :] * mask
+        standard_idx = torch.arange(n)[None, :].repeat(B, 1).to(device=dC.device)
+        unsorted_idx = standard_idx.clone()
 
-    # sort by the masking
-    dC_masked = dC_masked[B_range.unsqueeze(-1), sorted_idx]
+        sorted_idx = torch.argsort(sorting_mask, descending=True, dim=1)
+        unsorted_idx[B_range.unsqueeze(-1), sorted_idx] = standard_idx
+
+        # mask out dC
+        dC_masked = dC * mask.unsqueeze(-1)
+
+        # sort by the masking
+        dC_masked = dC_masked[B_range.unsqueeze(-1), sorted_idx]
+
+        return dC_masked, sorted_idx, unsorted_idx
+
+    dC_masked, sorted_idx, unsorted_idx = get_masked_dC(dC, mask)
+
+    # Remove linearly dependent active constraints
+    Q, R = torch.linalg.qr(dC_masked.transpose(1, 2))
+    diag_R = torch.diagonal(R, dim1=1, dim2=2)
+    # if we have more constraints than dimensions, then need to add zeros to R to make the difference between them
+    if n > m:
+        diag_R = torch.cat((diag_R, torch.zeros(B, n - m, device=dC.device)), dim=1)
+
+    # now check the value of R to remove diagonal
+    mask_R = torch.abs(diag_R) > 1e-6
+    mask = mask * mask_R[B_range.unsqueeze(-1), unsorted_idx]
+
+    # now have to recompute dC_masked with the updated mask
+    dC_masked, sorted_idx, unsorted_idx = get_masked_dC(dC, mask)
+
     A = dC_masked @ dC_masked.transpose(-1, -2)
+
     # add diagonal to allow inverse
     eye = torch.eye(n).to(device=dC.device)
     A += eye * (torch.logical_not(mask)[B_range.unsqueeze(-1), sorted_idx].unsqueeze(-1))
+
+    # damping for numerical stability
     damping = 1e-6
-    # now we invert
     A = A + damping * eye
 
     # we convert to double precision to avoid numerical issues
     A = A.to(torch.float64)
-    A_inv = torch.linalg.inv(A + damping * eye)
+    A_inv = torch.linalg.pinv(A)
     A_inv = A_inv.to(torch.float32)
 
     # now we unsort
@@ -145,7 +176,7 @@ def eliminate_constraints(dJ, H, dH, G, dG):
 
     # first we need to find violated inequality constraints
     # compute tolerance as ||H||_2 h
-    eps = torch.linalg.norm(dH, dim=2)
+    eps = torch.linalg.norm(dH, dim=2) * 0.1
     tol = 1e-6
 
     # now we need to find the violated constraints
@@ -156,7 +187,7 @@ def eliminate_constraints(dJ, H, dH, G, dG):
 
     # now we find active constraints by solving dual problem
     # where we have zeroed out the non-violateed constraints
-    _mu = solve_dual_batched(dJ, dG, dH * I_violated_eps.unsqueeze(-1), iters=100000, eps=1e-3, tol=1e-8)
+    _mu = solve_dual_batched(dJ, dG, dH * I_violated_eps.unsqueeze(-1), iters=10000, eps=1e-2, tol=1e-4)
 
     # make sure that _mu zero for inactive constraints
     _mu = _mu.squeeze(-1) + I_violated
