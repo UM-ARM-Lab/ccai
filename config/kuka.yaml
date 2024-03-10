@@ -10,7 +10,7 @@ start_trial: 0
 controllers:
   csvgd:
     N: 8
-    alpha_J: 0.5
+    alpha_J: 0.1
     alpha_C: 1.0
     step_size: 0.1
     momentum: 0.

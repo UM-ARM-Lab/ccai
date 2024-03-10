@@ -176,7 +176,7 @@ def eliminate_constraints(dJ, H, dH, G, dG):
 
     # first we need to find violated inequality constraints
     # compute tolerance as ||H||_2 h
-    eps = torch.linalg.norm(dH, dim=2) * 0.1
+    eps = torch.linalg.norm(dH, dim=2) * 0.01
     tol = 1e-6
 
     # now we need to find the violated constraints
