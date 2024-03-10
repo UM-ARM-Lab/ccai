@@ -37,6 +37,10 @@ class Problem(metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def _preprocess(self, x):
+        pass
+
+    @abstractmethod
     def _objective(self, x, *args, **kwargs):
         pass
 
@@ -66,6 +70,10 @@ class ConstrainedSVGDProblem(Problem):
     slack_weight = 1
 
     @abstract_attribute
+    def slack_variable(self):
+        pass
+
+    @abstract_attribute
     def squared_slack(self):
         pass
 
@@ -77,7 +85,34 @@ class ConstrainedSVGDProblem(Problem):
     def eval(self, x):
         pass
 
+    def combined_constraints_no_slack(self, xu, compute_grads=True, compute_hess=True):
+        N = xu.shape[0]
+        xu = xu.reshape(N, self.T, self.dx + self.du)
+
+        g, grad_g, hess_g = self._con_eq(xu, compute_grads=compute_grads, compute_hess=compute_hess)
+        h, grad_h, hess_h = self._con_ineq(xu, compute_grads=compute_grads, compute_hess=compute_hess)
+
+        if h is None:
+            return g, grad_g, hess_g
+
+        if g is None:
+            return h, grad_h, hess_h
+
+        c = torch.cat((g, h), dim=1)
+        if not compute_grads:
+            return c, None, None
+
+        grad_c = torch.cat((grad_g, grad_h), dim=1)
+        if not compute_hess:
+            return c, grad_c, None
+
+        hess_c = torch.cat((hess_g, hess_h), dim=1)
+        return c, grad_c, hess_c
+
     def combined_constraints(self, augmented_x, compute_grads=True, compute_hess=True):
+        if not self.slack_variable:
+            return self.combined_constraints_no_slack(augmented_x, compute_grads, compute_hess)
+
         N = augmented_x.shape[0]
         augmented_x = augmented_x.reshape(N, self.T, self.dx + self.du + self.dz)
         xu = augmented_x[:, :, :(self.dx + self.du)]
@@ -169,12 +204,13 @@ class ConstrainedSVGDProblem(Problem):
 
     def get_initial_z(self, x):
         N = x.shape[0]
+        self._preprocess(x)
         h, grad_h, _ = self._con_ineq(x, compute_grads=False, compute_hess=False)
         # self.slack_weight = 1 / torch.mean(torch.linalg.norm(h.reshape(N, -1), dim=1)) ** 2
         # print(self.slack_weight)
         if h is not None:
             if self.squared_slack:
-                #z = torch.where(h < 0, torch.sqrt(-2 * h), 0)
+                # z = torch.where(h < 0, torch.sqrt(-2 * h), 0)
                 z = torch.sqrt(2 * torch.abs(h))
             else:
                 z = torch.where(h < 0, -h / self.slack_weight, 0)
@@ -330,4 +366,4 @@ class UnconstrainedPenaltyProblem(Problem):
         J = J + torch.where(x < self.x_min.repeat(N, T, 1).to(device=self.device), self.penalty[0] * torch.ones_like(x),
                             torch.zeros_like(x)).sum(dim=1).sum(dim=1)
 
-        return J#.detach()
+        return J  # .detach()

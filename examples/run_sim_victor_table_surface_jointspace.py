@@ -1,6 +1,6 @@
 from isaac_victor_envs.tasks.victor import VictorPuckObstacleEnv2, VictorPuckObstacleEnv3, orientation_error, quat_change_convention, \
     VictorFloatingSpheresTableEnv, VictorPuckObstacleEnv
-from victor_table_surface_jointspace import do_trial
+from victor_table_surface_jointspace_tsr import do_trial
 
 
 import torch

@@ -5,6 +5,190 @@ from torch.profiler import profile, record_function, ProfilerActivity
 from torch_cg import cg_batch
 
 
+@torch.no_grad()
+def solve_dual_batched_no_G(dJ, dH, iters=100, eps=1e-3, tol=1e-4):
+    """
+           Solve dual NNLS problem min || dJ + \mu^T dH|| s.t. \mu >= 0
+
+           For batched inputs
+
+           Uses projected gradient descent with line search
+
+       """
+
+    B = dJ.shape[0]
+    _mu = torch.zeros(B, dH.shape[1], 1).to(dH)
+    Ab = (2 * dH @ dJ.unsqueeze(-1))
+    AtA = dH @ dH.transpose(1, 2)
+
+    def objective(dJ, dH, _mu):
+        return torch.linalg.norm(dJ.unsqueeze(-1) + dH.transpose(1, 2) @ _mu, dim=1)
+
+    obj = objective(dJ, dH, _mu)
+
+    for iter in range(iters):
+        # Do update
+        _step = Ab + AtA @ _mu
+        new_mu = _mu - eps * _step
+        torch.clamp_(new_mu, min=0)
+
+        # Backtracking line search
+        new_obj = objective(dJ, dH, _mu)
+        while torch.any(new_obj > obj):
+            _step = torch.where(new_obj.unsqueeze(-1) > obj.unsqueeze(-1), _step * 0.1, torch.zeros_like(_step))
+            new_mu = _mu - eps * _step
+            torch.clamp_(new_mu, min=0)
+            obj = objective(dJ, dH, _mu)
+
+        # check convergence
+        diff = torch.linalg.norm(new_obj - obj, dim=1)
+        if torch.all(diff < tol):
+            break
+        # for next time
+        obj = new_obj
+        _mu = new_mu
+    return _mu
+
+
+@torch.no_grad()
+def solve_dual_batched(dJ, dG, dH, iters=100, eps=1e-3, tol=1e-4):
+    """
+        Solve dual min || dJ + \mu^T dH + \lambda^T dG || s.t. \mu >= 0
+
+        For batched inputs
+
+        Uses projected gradient descent with line search
+
+    """
+    B = dJ.shape[0]
+
+    if dG is None:
+        return solve_dual_batched_no_G(dJ, dH, iters, eps, tol)
+
+    dC = torch.cat((dG, dH), dim=1)
+    _mu = torch.zeros(B, dH.shape[1], 1).to(dH)
+    _lambda = torch.zeros(B, dG.shape[1], 1).to(dG)
+    Ab = (2 * dC @ dJ.unsqueeze(-1))
+    AtA = dC @ dC.transpose(1, 2)
+
+    def objective(dJ, dG, dH, _lambda, _mu):
+        return torch.linalg.norm(dJ.unsqueeze(-1) + dG.transpose(1, 2) @ _lambda + dH.transpose(1, 2) @ _mu, dim=1)
+
+    obj = objective(dJ, dG, dH, _lambda, _mu)
+    x = torch.cat((_lambda, _mu), dim=1)
+
+    for iter in range(iters):
+        # Do update
+        _step = Ab + AtA @ x
+        new_x = x - eps * _step
+        torch.clamp_(new_x[:, _lambda.shape[1]:], min=0)
+
+        # Backtracking line search
+        new_obj = objective(dJ, dG, dH, new_x[:, :_lambda.shape[1]], new_x[:, _lambda.shape[1]:])
+        while torch.any(new_obj > obj):
+            _step = torch.where(new_obj.unsqueeze(-1) > obj.unsqueeze(-1), _step * 0.1, torch.zeros_like(_step))
+            new_x = x - eps * _step
+            torch.clamp_(new_x[:, _lambda.shape[1]:], min=0)
+            new_obj = objective(dJ, dG, dH, new_x[:, :_lambda.shape[1]], new_x[:, _lambda.shape[1]:])
+
+        # check convergence
+        diff = torch.linalg.norm(new_obj - obj, dim=1)
+        if torch.all(diff < tol):
+            break
+
+        # for next time
+        obj = new_obj
+        x = new_x
+    _lambda, _mu = x[:, _lambda.shape[1]], x[:, _lambda.shape[1]:]
+    # actually don't care about lambda
+    return _mu
+
+
+def compute_inverse_with_masks(dC, mask):
+    B, n, m = dC.shape
+    sorting_mask = torch.arange(n, 0, -1).to(device=dC.device)[None, :] * mask
+    standard_idx = torch.arange(n)[None, :].repeat(B, 1).to(device=dC.device)
+    unsorted_idx = standard_idx.clone()
+
+    sorted_idx = torch.argsort(sorting_mask, descending=True, dim=1)
+    B_range = torch.arange(B).to(device=dC.device)
+    unsorted_idx[B_range.unsqueeze(-1), sorted_idx] = standard_idx
+
+    # mask out dC
+    dC_masked = dC * mask.unsqueeze(-1)
+
+    # sort by the masking
+    dC_masked = dC_masked[B_range.unsqueeze(-1), sorted_idx]
+    A = dC_masked @ dC_masked.transpose(-1, -2)
+    # add diagonal to allow inverse
+    eye = torch.eye(n).to(device=dC.device)
+    A += eye * (torch.logical_not(mask)[B_range.unsqueeze(-1), sorted_idx].unsqueeze(-1))
+    damping = 1e-6
+    # now we invert
+    A = A + damping * eye
+
+    # we convert to double precision to avoid numerical issues
+    A = A.to(torch.float64)
+    A_inv = torch.linalg.inv(A + damping * eye)
+    A_inv = A_inv.to(torch.float32)
+
+    # now we unsort
+    A_inv = A_inv[B_range.unsqueeze(-1), unsorted_idx][B_range.unsqueeze(-1), :, unsorted_idx]
+    return A_inv
+
+
+def eliminate_constraints(dJ, H, dH, G, dG):
+    # H is B x dh
+    # G is B x dg
+    # dH is B x dh x dx
+    # dH is B x dg x dx
+
+    # first we need to find violated inequality constraints
+    # compute tolerance as ||H||_2 h
+    eps = torch.linalg.norm(dH, dim=2)
+    tol = 1e-6
+
+    # now we need to find the violated constraints
+    I_violated = torch.where(H > 0, torch.ones_like(H), torch.zeros_like(H))
+
+    # constraints within eps of violation (almost violating)
+    I_violated_eps = torch.where(H > -eps, torch.ones_like(H), torch.zeros_like(H))
+
+    # now we find active constraints by solving dual problem
+    # where we have zeroed out the non-violateed constraints
+    _mu = solve_dual_batched(dJ, dG, dH * I_violated_eps.unsqueeze(-1), iters=100000, eps=1e-3, tol=1e-8)
+
+    # make sure that _mu zero for inactive constraints
+    _mu = _mu.squeeze(-1) + I_violated
+
+    # used for the tangent-space projection
+    I_active = torch.where(_mu > tol, torch.ones_like(_mu), torch.zeros_like(_mu))
+
+    # used for the Gauss-Newton step
+    I_active_or_violated = torch.logical_or(I_violated, I_active)
+
+    if G is None:
+        C = H
+        dC = dH
+    else:
+        # TODO need to modify indices - maybe make H come before G?
+        C = torch.cat((G, H), dim=1)
+        dC = torch.cat((dG, dH), dim=1)
+
+    # now let's do the relevant computations
+    # first we need to inverse dC dCT for both I_active and I_active_or_violated - need to do some tricks to make it
+    # batched when we have different numbers of active constraints
+    # compute the two for active/inactive
+    dCdCT_inv_active = compute_inverse_with_masks(dC, I_active)
+    dCdCT_inv_active_or_violated = compute_inverse_with_masks(dC, I_active_or_violated)
+
+    dC_active = dC * I_active.unsqueeze(-1)
+    dC_active_or_violated = dC * I_active_or_violated.unsqueeze(-1)
+    C = C * I_active_or_violated
+
+    return C, dC_active, dC_active_or_violated, dCdCT_inv_active, dCdCT_inv_active_or_violated
+
+
 class ConstrainedSteinTrajOpt:
 
     def __init__(self, problem, params):
@@ -29,11 +213,16 @@ class ConstrainedSteinTrajOpt:
         self.matrix_kernel = False
         self.use_fisher = False
         self.use_hessian = False  # True
-        self.use_constraint_hessian = True
+        self.use_constraint_hessian = False
+        self.active_constraint_method = True
         self.normxiJ = None
         self.dtype = torch.float32
         self.delta_x = None
         self.Bk = None
+
+        if not self.problem.slack_variable:
+            self.active_constraint_method = True
+            assert self.dz == 0
 
     def _bfgs_update(self, dC):
         if self.Bk is None:
@@ -72,6 +261,36 @@ class ConstrainedSteinTrajOpt:
         xuz = xuz.to(dtype=torch.float32)
         grad_J, hess_J, K, grad_K, C, dC, hess_C = self.problem.eval(xuz.to(dtype=torch.float32))
 
+        if self.active_constraint_method and self.dh > 0:
+            if self.dg == 0:
+                G, dG = None, None
+                H, dH = C, dC
+            else:
+                G = C[:, :self.problem.dg]
+                H = C[:, self.problem.dg:]
+                dG = dC[:, :self.problem.dg]
+                dH = dC[:, self.problem.dg:]
+
+            # eliminate inactive constraints
+            C, dC_active, dC_active_or_violated, dCdCT_inv_active, dCdCT_inv_active_or_violated = \
+                eliminate_constraints(grad_J, H, dH, G, dG)
+
+        else:
+            dC_active = dC
+            dC_active_or_violated = dC
+            dtype = torch.float64
+
+            # Do inversion
+            eye = torch.eye(self.dg + self.dh).repeat(N, 1, 1).to(device=C.device, dtype=dtype)
+            dCdCT = dC @ dC.permute(0, 2, 1)
+            dCdCT = dCdCT.to(dtype=dtype)
+            damping_factor = 1e-6
+            dCdCT_inv = torch.linalg.inv(dCdCT + damping_factor * eye)
+            dCdCT_inv = dCdCT_inv.to(dtype=torch.float32)
+
+            dCdCT_inv_active = dCdCT_inv
+            dCdCT_inv_active_or_violated = dCdCT_inv
+
         # use approximation for hessian
         if hess_C is None:
             # self._bfgs_update(dC)
@@ -80,46 +299,32 @@ class ConstrainedSteinTrajOpt:
                                  self.T * (self.dx + self.du + self.dz),
                                  self.T * (self.dx + self.du + self.dz), device=xuz.device)
         with torch.no_grad():
-            # we try and invert the dC dCT, if it is singular then we use the psuedo-inverse
-            eye = torch.eye(self.dg + self.dh).repeat(N, 1, 1).to(device=C.device, dtype=self.dtype)
-            dCdCT = dC @ dC.permute(0, 2, 1)
-            A_bmm = lambda x: dCdCT @ x
-            #
-            # damping_factor = 1e-1
-            try:
-                dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1), eye)
-                if torch.any(torch.isnan(dCdCT_inv)):
-                    raise ValueError('nan in inverse')
-            except Exception as e:
-                print(e)
-                # dCdCT_inv = torch.linalg.lstsq(dC @ dC.permute(0, 2, 1), eye).solution
-                # dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1))
-                dCdCT_inv, _ = cg_batch(A_bmm, eye, verbose=False)
+
             # get projection operator
-            projection = dCdCT_inv @ dC
-            eye = torch.eye(d * self.T + self.dh, device=xuz.device, dtype=xuz.dtype).unsqueeze(0)
-            projection = eye - dC.permute(0, 2, 1) @ projection
+            projection = dCdCT_inv_active @ dC_active
+            eye = torch.eye((d + self.dz) * self.T, device=xuz.device, dtype=xuz.dtype).unsqueeze(0)
+            projection = eye - dC_active.permute(0, 2, 1) @ projection
             # compute term for repelling towards constraint
-            xi_C = dCdCT_inv @ C.unsqueeze(-1)
-            xi_C = (dC.permute(0, 2, 1) @ xi_C).squeeze(-1)
-            # xi_C = (dC.permute(0, 2, 1) @ C.unsqueeze(-1)).squeeze(-1)
+            xi_C = dCdCT_inv_active_or_violated @ C.unsqueeze(-1)
+            xi_C = (dC_active_or_violated.permute(0, 2, 1) @ xi_C).squeeze(-1)
 
             # compute gradient for projection
             # now the second index (1) is the
             # x with which we are differentiating
-            dCdCT_inv = dCdCT_inv.unsqueeze(1)
+            dCdCT_inv_active = dCdCT_inv_active.unsqueeze(1)
 
-            dCT = dC.permute(0, 2, 1).unsqueeze(1)
-            dC = dC.unsqueeze(1)
+            dCT_active = dC_active.permute(0, 2, 1).unsqueeze(1)
+            dC_active = dC_active.unsqueeze(1)
 
             if self.use_constraint_hessian:
                 hess_C = hess_C.permute(0, 3, 1, 2)
                 hess_CT = hess_C.permute(0, 1, 3, 2)
                 # compute first term
 
-                first_term = hess_CT @ (dCdCT_inv @ dC)
-                second_term = dCT @ dCdCT_inv @ (hess_C @ dCT + dC @ hess_CT) @ dCdCT_inv @ dC
-                third_term = dCT @ dCdCT_inv @ hess_C
+                first_term = hess_CT @ (dCdCT_inv_active @ dC_active)
+                second_term = dCT_active @ dCdCT_inv_active @ (
+                        hess_C @ dCdCT_inv_active + dC @ hess_CT) @ dCdCT_inv_active @ dC_active
+                third_term = dCT_active @ dCdCT_inv_active @ hess_C
 
                 # add terms and permute so last dimension is the x which we are differentiating w.r.t
                 grad_projection = (first_term - second_term + third_term).permute(0, 2, 3, 1)
@@ -308,8 +513,8 @@ class ConstrainedSteinTrajOpt:
                 self.gamma = self.max_gamma * driving_force(iter)
             #    self.sigma = 0.1 * (1.0 - iter / T) + 1e-2
 
-            if (iter + 1) % resample_period == 0 and (iter < T - 1):
-                xuz.data = self.resample(xuz.data)
+            # if (iter + 1) % resample_period == 0 and (iter < T - 1):
+            #    xuz.data = self.resample(xuz.data)
 
             # old C
             # oldC, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1), compute_grads=False)
