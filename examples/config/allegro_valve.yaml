@@ -4,10 +4,10 @@ receding_horizon: False
 num_steps: 11
 num_trials: 20
 visualize: True
-experiment_name: 'allegro_test'
+experiment_name: 'allegro_valve'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
-# fingers: ['index', 'thumb']
-fingers: ['index', 'middle', 'thumb']
+fingers: ['index', 'thumb']
+# fingers: ['index', 'middle', 'thumb']
 valve_type: 'cylinder'
 sim_device: 'cuda:0'
 friction_coefficient: 0.7
