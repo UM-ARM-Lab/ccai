@@ -206,9 +206,14 @@ def main() -> None:
 
     # Set up and solve the optimization.
     quadrotor_opt = JaxCSVTOpt(quadrotor_problem, quadrotor_parameters)
-    quadrotor_opt.compile()
     initial_guess = jnp.array(np.random.random([8, 16 * 12]), dtype=jnp.float32)
-    solution = quadrotor_opt.solve(initial_guess)
+
+    # Lower and compile JaxCSVTOpt.solve() ahead of time, marking the class (and all its attributes) as static.
+    solve_method = jax.jit(quadrotor_opt.solve, static_argnums=0).lower(initial_guess)
+    solve_method = solve_method.compile()
+
+    # Run the compiled solve() method.
+    solution = solve_method(initial_guess)
 
 
 if __name__ == '__main__':
