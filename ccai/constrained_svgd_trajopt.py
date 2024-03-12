@@ -37,6 +37,12 @@ class ConstrainedSteinTrajOpt:
         self.gamma = 1
         self.max_gamma = 1
 
+        print(self.dg)
+        print(self.dh)
+        print(self.problem.x_min)
+        print(self.problem.x_max)
+        assert(False)
+
     def _bfgs_update(self, dC):
         if self.Bk is None:
             # initialize with Gauss-Newton approx

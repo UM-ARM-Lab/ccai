@@ -1,7 +1,9 @@
+import numpy as np
 import jax
 import jax.numpy as jnp
 
 from jax_csvto import JaxCSVTOProblem, JaxCSVTOParams, JaxCSVTOpt
+from jax_gp import GPSurfaceModel
 from jax_rbf_kernels import structured_rbf_kernel
 
 
@@ -132,19 +134,40 @@ class QuadrotorGPHeightConstraint:
     example problem.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, surface_file_path: str) -> None:
         """
 
         Args:
         """
-        pass
+        data = np.load('surface_data.npz')
+        self.surface_gp = GPSurfaceModel(jnp.array(data['xy'], dtype=jnp.float32),
+                                         jnp.array(data['z'], dtype=jnp.float32))
+        self._call_batched = jax.vmap(self._call)
 
-    def __call__(self, trajectories: jnp.array) -> jnp.array:
+    def __call__(self, trajectory):
+        return self._call_batched(trajectory)
+
+    def _call(self, trajectory: jnp.array) -> jnp.array:
         """
 
         Args:
         Returns:
         """
+        T = trajectory.shape[0]
+        xy, z = trajectory[:, :2], trajectory[:, 2]
+
+        # compute z of surface and gradient and hessian
+        surface_z, grad_surface_z, hess_surface_z = self.surface_gp.posterior_mean(xy)
+
+        constr = surface_z - z
+        grad_constr = jnp.concatenate((grad_surface_z,
+                                       -jnp.ones((T, 1)),
+                                       jnp.zeros((T, 13))), axis=1)
+        hess_constr = jnp.concatenate((
+            jnp.concatenate((hess_surface_z, jnp.zeros((T, 2, 14))), axis=2),
+            jnp.zeros((T, 14, 16))), axis=1)
+
+        return constr, grad_constr, hess_constr
 
 
 def main() -> None:
@@ -153,17 +176,21 @@ def main() -> None:
     # Set up the problem.
     goal_state = None  # TODO
     cost_function = QuadrotorCost(goal_state)
-    equality_constraint_function = QuadrotorGPHeightConstraint()
+    equality_constraint_function = QuadrotorGPHeightConstraint('surface_data.npz')
     inequality_constraint_function = None
     dynamics_function = QuadrotorDynamics()
-    x_bounds = ()
-    u_bounds = ()
+    u_bounds = (jnp.array((-100.0000, -100.0000, -100.0000, -100.0000)),
+                jnp.array((100.0000, 100.0000, 100.0000, 100.0000)))
+    x_bounds = (jnp.array((-6.0000, -6.0000, -6.0000, -1.2566, -1.2566, -1000.0000, -100.0000, -100.0000, -100.0000,
+                           -100.0000, -100.0000, -100.0000)),
+                jnp.array((6.0000, 6.0000, 6.0000, 1.2566, 1.2566, 1000.0000, 100.0000,
+                          100.0000, 100.0000, 100.0000, 100.0000, 100.0000)))
     dx = 12
     du = 4
-    dh = None  # TODO
-    dg = None
+    dh = 155
+    dg = 0
     quadrotor_problem = JaxCSVTOProblem(cost_function, equality_constraint_function, inequality_constraint_function,
-                                        dynamics_function, x_bounds, u_bounds, dx, du, dh, dg)
+                                        dynamics_function, u_bounds, x_bounds, dx, du, dh, dg)
 
     # Set up the parameters.
     k = structured_rbf_kernel
@@ -180,7 +207,8 @@ def main() -> None:
     # Set up and solve the optimization.
     quadrotor_opt = JaxCSVTOpt(quadrotor_problem, quadrotor_parameters)
     quadrotor_opt.compile()
-    solution = quadrotor_opt.solve()
+    initial_guess = jnp.array(np.random.random([8, 16 * 12]), dtype=jnp.float32)
+    solution = quadrotor_opt.solve(initial_guess)
 
 
 if __name__ == '__main__':

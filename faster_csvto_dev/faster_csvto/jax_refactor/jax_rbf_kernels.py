@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import jax.numpy as jnp
 
 EPS = 1e-9
@@ -82,3 +84,38 @@ def structured_rbf_kernel(X: jnp.array, X_bar: jnp.array) -> jnp.array:
     # Compute the kernel according to equation (47) with an extra weight in the denominator for numerical stability.
     structured_rbf_kernel = jnp.exp(-difference_norm_squared / (h.reshape(M, 1, 1) + EPS)).mean(axis=0)
     return structured_rbf_kernel
+
+
+class RBFKernel:
+    """
+    """
+
+    def __init__(self, length_scale: jnp.float32, output_scale: jnp.float32) -> None:
+        """
+
+        Args:
+            length_scale:
+            output_scale:
+        """
+        self.l = length_scale
+        self.sigma_sq = output_scale
+
+    def __call__(self, X, X_bar) -> jnp.array:
+        """
+
+        Args:
+            X:
+            X_bar:
+
+        Returns:
+            The value of the kernel function applied to each (X, X_bar) pair, shape (N, N).
+        """
+        n, d = X.shape
+        m = X_bar.shape[0]
+        diff = jnp.expand_dims(X, axis=1) - jnp.expand_dims(X_bar, axis=0)  # diff should be n x m x d
+        sq_diff = (diff.reshape(n, m, 1, d) @ diff.reshape(n, m, d, 1)).reshape(n, m)
+        h = self.l ** 2
+        sigma_sq = self.sigma_sq
+
+        K = sigma_sq * jnp.exp(-0.5 * sq_diff / h)
+        return K

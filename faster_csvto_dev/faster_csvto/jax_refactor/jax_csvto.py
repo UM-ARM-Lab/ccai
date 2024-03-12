@@ -18,9 +18,9 @@ class JaxCSVTOProblem:
     def __init__(self,
                  c: Callable[[jnp.array], jnp.array],
                  h: Callable[[jnp.array], jnp.array],
-                 g: Callable[[jnp.array], jnp.array],
+                 g: Optional[Callable[[jnp.array], jnp.array]],
                  f: Callable[[jnp.array, jnp.array], jnp.array],
-                 u_bounds: Tuple[int], x_bounds: Tuple[int],
+                 u_bounds: Tuple[jnp.array, jnp.array], x_bounds: Tuple[jnp.array, jnp.array],
                  dx: int, du: int, dh: int, dg: int) -> None:
         """Set the functions that define the optimization problem along with parameters that determine the size of the
                 involved arrays.
@@ -110,11 +110,11 @@ class JaxCSVTOpt:
         # Store problem functions and bounds.
         self.c: Callable[[jnp.array], jnp.array] = problem.c
         self.h: Callable[[jnp.array], jnp.array] = problem.h
-        self.g: Callable[[jnp.array], jnp.array] = problem.g
-        self.f: Callable[[jnp.array], jnp.array] = problem.f
+        self.g: Optional[Callable[[jnp.array], jnp.array]] = problem.g
+        self.f: Callable[[jnp.array, jnp.array], jnp.array] = problem.f
         self.k: Callable[[jnp.array, jnp.array], jnp.array] = params.k
-        self.u_bounds: Tuple[int] = problem.u_bounds
-        self.x_bounds: Tuple[int] = problem.x_bounds
+        self.u_bounds: Tuple[jnp.array, jnp.array] = problem.u_bounds
+        self.x_bounds: Tuple[jnp.array, jnp.array] = problem.x_bounds
 
         # Store dimensionality constants.
         self.dx: int = problem.dx
@@ -156,7 +156,10 @@ class JaxCSVTOpt:
             The optimal trajectory from the optimized distribution, shape ((dx + du) * T,).
         """
         # Calculate slack variable values via equation (33) and append to the trajectory according to equation (35).
-        xuz: jnp.array = jnp.concatenate((x0, jnp.sqrt(-2*self.g(x0))), axis=1)
+        if self.g is not None:
+            xuz: jnp.array = jnp.concatenate((x0, jnp.sqrt(-2*self.g(x0))), axis=1)
+        else:
+            xuz = x0
 
         # Loop over the gradient step iterations.
         xuz = jax.lax.fori_loop(1, self.K+1, self._solve_iteration, xuz, xuz[:, :self.dx], unroll=True)
@@ -299,10 +302,15 @@ class JaxCSVTOpt:
         Returns:
             The evaluated combined constraint, shape (N, dh + dg + dx * T).
         """
-        combined_constraint = jnp.concatenate((self.h(xuz[:, :-self.dg]),
-                                               self._slack_constraint(xuz),
-                                               self._dynamics_constraint(xuz),
-                                               self._start_constraint(xuz, initial_state)), axis=1)
+        if self.g is not None:
+            combined_constraint = jnp.concatenate((self.h(xuz[:, :-self.dg]),
+                                                   self._slack_constraint(xuz),
+                                                   self._dynamics_constraint(xuz),
+                                                   self._start_constraint(xuz, initial_state)), axis=1)
+        else:
+            combined_constraint = jnp.concatenate((self.h(xuz[:, :-self.dg]),
+                                                   self._dynamics_constraint(xuz),
+                                                   self._start_constraint(xuz, initial_state)), axis=1)
         return combined_constraint
 
     def _slack_constraint(self, xuz: jnp.array) -> jnp.array:

@@ -78,7 +78,6 @@ class BatchGPSurfaceModel:
             grad_y: derivative of mean function wrt x
             hess_y: hessian of mean function wrt x
         """
-
         train_K, _, _ = self.kernel(train_x, train_x)
         K, grad_K, hess_K = self.kernel(x, train_x)
 

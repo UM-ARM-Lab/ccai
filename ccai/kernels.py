@@ -78,8 +78,6 @@ def structured_rbf_kernel(X, Xbar, Q=None):
     #    h = d
     # h = 0.1
     output = torch.exp(-sq_diff / h.reshape(M, 1, 1)).mean(dim=0)
-    print(output.shape)
-    assert(False)
     return output
 
 
