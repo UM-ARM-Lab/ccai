@@ -31,16 +31,19 @@ class GPSurfaceModel:
             Derivative of mean function evaluated at x.
             Hessian of mean function evaluated at x.
         """
+        print(x.shape)
+        assert False
+
         train_K = self.kernel(self.train_x, self.train_x)
         K = self.kernel(x, self.train_x)
-        grad_K = jax.jacrev(self.kernel)(x)
-        hess_K = jax.jacfwd(jax.jacrev(self.kernel))(x)
+        grad_K = jax.jacrev(self.kernel)(x, self.train_x)
+        hess_K = jax.jacfwd(jax.jacrev(self.kernel))(x, self.train_x)
         eye = jnp.eye(len(self.train_x))
 
         # compute [K + sigma_sq I]^-1 y
         tmp = jnp.linalg.solve(train_K + self.sigma_sq_noise * eye, self.train_y.reshape(-1, 1))
         y = K @ tmp
-        grad_y = grad_K.permute(0, 2, 1) @ tmp
-        hess_y = hess_K.permute(0, 2, 3, 1) @ tmp
+        grad_y = grad_K.transpose(0, 2, 1) @ tmp
+        hess_y = hess_K.transpose(0, 2, 3, 1) @ tmp
 
         return y.squeeze(-1), grad_y.squeeze(-1), hess_y.squeeze(-1)

@@ -155,6 +155,10 @@ class JaxCSVTOpt:
         Returns:
             The optimal trajectory from the optimized distribution, shape ((dx + du) * T,).
         """
+        assert x0.shape == (self.N, self._trajectory_dim())
+        # TODO: Assert that the initial state for each trajectory is the same, or add initial state as a second
+        #  parameter.
+
         # Calculate slack variable values via equation (33) and append to the trajectory according to equation (35).
         if self.g is not None:
             xuz: jnp.array = jnp.concatenate((x0, jnp.sqrt(-2*self.g(x0))), axis=1)
@@ -162,14 +166,16 @@ class JaxCSVTOpt:
             xuz = x0
 
         # Loop over the gradient step iterations.
-        xuz = jax.lax.fori_loop(1, self.K+1, self._solve_iteration, xuz, xuz[:, :self.dx], unroll=True)
+        xuz = jax.lax.fori_loop(1, self.K+1, self._solve_iteration, (xuz, xuz[0, :self.dx]), unroll=True)
 
         # Find the lowest cost trajectory in the optimized distribution, and return it without slack variables.
-        return xuz[:, :-self.dg][self.c(xuz[:, :-self.dg]).argmin()]
+        min_cost_trajectory = xuz[:, :self._trajectory_dim()][self.c(xuz[:, :self._trajectory_dim()]).argmin()]
+        assert min_cost_trajectory.shape == (self._trajectory_dim(),)
+        return min_cost_trajectory
 
-    def _solve_iteration(self, iteration: int, xuz: jnp.array, initial_state: jnp.array) -> jnp.array:
+    def _solve_iteration(self, iteration: int, xuz_initial_state: Tuple[jnp.array, jnp.array]) -> jnp.array:
         """Compute a single retraction step for the optimizer and return the updated state.
-
+        TODO: Fix Args.
         Args:
             iteration: The iteration number, in range [0, K).
             xuz: All N trajectories including slack variables stacked as rows, shape (N, (dx + du) * T + dg).
@@ -178,11 +184,15 @@ class JaxCSVTOpt:
         Returns:
             The value of xuz after taking the retraction step.
         """
+        xuz, initial_state = xuz_initial_state
+        assert xuz.shape == (self.N, self._slack_trajectory_dim())
+        assert initial_state.shape == (self.dx,)
+
         # Set the annealing weight gamma if annealing is on.
         gamma: Optional[jnp.float32] = iteration / self.K if self.anneal else None
 
         # Evaluate the gradient of the cost function at the current state (without slack variables).
-        c_grad = jax.jacfwd(self.c)(xuz[:, :-self.dg])
+        c_grad = jax.jacfwd(self.c)(xuz[:, :self._trajectory_dim()])
 
         # Evaluate the combined constraint function, its gradient, and its hessian at the current augmented state.
         constraint = self._combined_constraint(xuz, initial_state)
@@ -190,8 +200,8 @@ class JaxCSVTOpt:
         constraint_hess = jax.jacfwd(jax.jacrev(self._combined_constraint))(xuz, initial_state)
 
         # Evaluate the kernel function and its gradient at the current state (without slack variables).
-        k = self.k(xuz[:, :-self.dg], xuz[:, :-self.dg])
-        k_grad = jax.jacrev(self.k)(xuz[:, :-self.dg])  # Differentiate w.r.t. first argument by default.
+        k = self.k(xuz[:, :self._trajectory_dim()], xuz[:, :self._trajectory_dim])
+        k_grad = jax.jacrev(self.k)(xuz[:, :self._trajectory_dim()])  # Differentiate w.r.t. first argument by default.
 
         # Compute the retraction steps.
         constraint_step = self._constraint_step(constraint, constraint_grad)
@@ -201,9 +211,10 @@ class JaxCSVTOpt:
         xuz -= self.step_scale * (self.alpha_J * tangent_step + self.alpha_C * constraint_step)
 
         # Clamp the state in bounds and return.
-        return self._bound_projection(xuz)
+        xuz = self._bound_projection(xuz)
+        assert xuz.shape == (self.N, self._slack_trajectory_dim())
+        return xuz, initial_state
 
-    @staticmethod
     def _constraint_step(self, constraint: jnp.array, constraint_grad: jnp.array) -> jnp.array:
         """Compute the constraint step according to equation (39).
 
@@ -214,11 +225,17 @@ class JaxCSVTOpt:
         Returns:
             The constraint step, shape (N, (dx + du) * T + dg).
         """
+        assert constraint.shape == (self.N, self.dh + self.dg + self.dx * self.T)
+        assert constraint_grad.shape == (self.N, self.dh + self.dg + self.dx * self.T, self._slack_trajectory_dim())
+
         # Get inv(dC * dCT) term to be used below, shape (N, dg + dh, dg + dh).
         dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)))
 
         # Get constraint step from equation (39), shape (N, d * T).
-        return (constraint_grad.transpose((0, 2, 1)) @ dCdCT_inv @ jnp.expand_dims(constraint, axis=-1)).squeeze(-1)
+        constraint_step = (constraint_grad.transpose((0, 2, 1)) @ dCdCT_inv @
+                           jnp.expand_dims(constraint, axis=-1).squeeze(-1))
+        assert constraint_step.shape == (self.N, self._slack_trajectory_dim())
+        return constraint_step
 
     def _tangent_step(self,
                       c_grad: jnp.array,
@@ -239,6 +256,13 @@ class JaxCSVTOpt:
         Returns:
             The tangent step for the current state, shape (N, (dx + du) * T + dg).
         """
+        assert c_grad.shape == ()
+        assert constraint_grad.shape == (self.N, self.dh + self.dg + self.dx * self.T, self._slack_trajectory_dim())
+        assert constraint_hess.shape == (self.N, self.dh + self.dg + self.dx * self.T, self._slack_trajectory_dim(),
+                                         self._slack_trajectory_dim())
+        assert k.shape == (self.N, self.N)
+        assert k_grad.shape == (self.N, self.N, self._slack_trajectory_dim())
+
         # Get inv(dC * dCT), shape (N, dg + dh, dg + dh).
         dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)))
 
@@ -285,10 +309,14 @@ class JaxCSVTOpt:
         kernelized_score = jnp.sum(k_tangent @ -c_grad.reshape(self.N, 1, -1, 1), axis=0)
         if gamma is not None:
             # Get tangent space step from equation (46).
-            return -(gamma * kernelized_score.squeeze(-1) / self.N + grad_K_tangent / self.N)
+            tangent_step = -(gamma * kernelized_score.squeeze(-1) / self.N + grad_K_tangent / self.N)
+            assert tangent_step.shape == (self.N, self._slack_trajectory_dim())
+            return tangent_step
         else:
             # Get tangent space step from equation (38).
-            return -(kernelized_score.squeeze(-1) / self.N + grad_K_tangent / self.N)
+            tangent_step = -(kernelized_score.squeeze(-1) / self.N + grad_K_tangent / self.N)
+            assert tangent_step.shape == (self.N, self._slack_trajectory_dim())
+            return tangent_step
 
     def _combined_constraint(self, xuz: jnp.array, initial_state: jnp.array) -> jnp.array:
         """Compute the combined equality constraint function. This should be formed from composition of the specified
@@ -302,15 +330,19 @@ class JaxCSVTOpt:
         Returns:
             The evaluated combined constraint, shape (N, dh + dg + dx * T).
         """
+        assert xuz.shape == (self.N, self._slack_trajectory_dim())
+        assert initial_state.shape == (self.dx,)
+
         if self.g is not None:
-            combined_constraint = jnp.concatenate((self.h(xuz[:, :-self.dg]),
+            combined_constraint = jnp.concatenate((self.h(xuz[:, :self._trajectory_dim()]),
                                                    self._slack_constraint(xuz),
                                                    self._dynamics_constraint(xuz),
                                                    self._start_constraint(xuz, initial_state)), axis=1)
         else:
-            combined_constraint = jnp.concatenate((self.h(xuz[:, :-self.dg]),
+            combined_constraint = jnp.concatenate((self.h(xuz[:, :self._trajectory_dim()]),
                                                    self._dynamics_constraint(xuz),
                                                    self._start_constraint(xuz, initial_state)), axis=1)
+        assert combined_constraint.shape == (self.N, self._slack_trajectory_dim())
         return combined_constraint
 
     def _slack_constraint(self, xuz: jnp.array) -> jnp.array:
@@ -323,7 +355,10 @@ class JaxCSVTOpt:
         Returns:
             The evaluated slack constraint, shape (N, dg).
         """
-        inequality_with_slack = self.g(xuz[:, :-self.dg]) + 0.5 * xuz[:, -self.dg:] ** 2
+        assert xuz.shape == (self.N, self._slack_trajectory_dim())
+
+        inequality_with_slack = self.g(xuz[:, :self._trajectory_dim()]) + 0.5 * xuz[:, self._trajectory_dim()+1:] ** 2
+        assert inequality_with_slack.shape == (self.N, self.dg)
         return inequality_with_slack
 
     def _dynamics_constraint(self, xuz: jnp.array) -> jnp.array:
@@ -336,15 +371,18 @@ class JaxCSVTOpt:
         Returns:
             The dynamics error on every point except the first one in every trajectory, shape (N, dx * (T - 1)).
         """
+        assert xuz.shape == (self.N, self._slack_trajectory_dim())
+
         # Index out the state-space points for each trajectory spline, to get inputs for batched dynamics function.
-        points = xuz[:, :-self.dg].reshape(self.N * self.T, self.dx + self.du)
+        points = xuz[:, :self._trajectory_dim()].reshape(self.N * self.T, self.dx + self.du)
         states = points[:, :self.dx]
         control_inputs = points[:, -self.du:]
 
         # Compute the error of the dynamics function in predicting the next state along each spline.
         x_forward_one_without_last = self.f(states, control_inputs)[:, :-(self.dx + self.du)]
-        x_without_first = xuz[:, self.dx + self.du::-self.dg]
+        x_without_first = xuz[:, self.dx + self.du: self._trajectory_dim()]
         dynamics_error = x_forward_one_without_last - x_without_first
+        assert xuz.shape == (self.N, self.dx * (self.T - 1))
         return dynamics_error
 
     def _start_constraint(self, xuz: jnp.array, initial_state: jnp.array) -> jnp.array:
@@ -358,7 +396,10 @@ class JaxCSVTOpt:
         Returns:
             The start error on every trajectory, shape (N, dx).
         """
+        assert xuz.shape == (self.N, self._slack_trajectory_dim())
+
         start_error = xuz[:, :self.dx] - initial_state
+        assert start_error.shape == (self.N, self.dx)
         return start_error
 
     def _bound_projection(self, xuz: jnp.array) -> jnp.array:
@@ -371,6 +412,8 @@ class JaxCSVTOpt:
         Returns:
             The input array with state and control values clamped inside the range, shape (N, (dx + du) * T + dg).
         """
+        assert xuz.shape == (self.N, self._slack_trajectory_dim())
+
         # Get bounding arrays for projection.
         point_min = jnp.concatenate((jnp.ones((self.N, self.dx)) * self.x_bounds[0],
                                      jnp.ones((self.N, self.du) * self.u_bounds[0])), axis=1)
@@ -380,6 +423,17 @@ class JaxCSVTOpt:
         trajectory_max = jnp.tile(point_max, self.T)
 
         # Project trajectories inside bounds and then append slack variables.
-        x_in_bounds = jnp.clip(xuz[:, :-self.dg], trajectory_min, trajectory_max)
-        xuz_in_bounds = jnp.concatenate((x_in_bounds, xuz[:, -self.dg:]))
+        x_in_bounds = jnp.clip(xuz[:, :self._trajectory_dim()], trajectory_min, trajectory_max)
+        xuz_in_bounds = jnp.concatenate((x_in_bounds, xuz[:, self._trajectory_dim()+1:]))
+        assert xuz_in_bounds.shape == (self.N, self._slack_trajectory_dim())
         return xuz_in_bounds
+
+    def _trajectory_dim(self) -> int:
+        """Get the length of a single trajectory.
+        """
+        return (self.dx + self.du) * self.T
+
+    def _slack_trajectory_dim(self) -> int:
+        """Get the length of a single trajectory with slack variables.
+        """
+        return (self.dx + self.du) * self.T + self.dg

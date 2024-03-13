@@ -31,6 +31,10 @@ class QuadrotorCost:
         Returns:
             The cost of each trajectory, shape (N,).
         """
+        print(trajectories.shape)
+        assert len(trajectories.shape) == 2
+        assert trajectories.shape[1] == (self.dx + self.du) * self.T
+
         # Set Q, P, and R according to equations (54), (55), and (56), respectively.
         Q = jnp.eye(self.dx) * 2.5
         Q = Q.at[:2, :2].set(jnp.eye(2) * 5)
@@ -142,18 +146,22 @@ class QuadrotorGPHeightConstraint:
         data = np.load('surface_data.npz')
         self.surface_gp = GPSurfaceModel(jnp.array(data['xy'], dtype=jnp.float32),
                                          jnp.array(data['z'], dtype=jnp.float32))
-        self._call_batched = jax.vmap(self._call)
+    #     self._call_batched = jax.vmap(self._call)
+    #
+    # def __call__(self, trajectory):
+    #     return self._call_batched(trajectory)
 
-    def __call__(self, trajectory):
-        return self._call_batched(trajectory)
-
-    def _call(self, trajectory: jnp.array) -> jnp.array:
+    def __call__(self, trajectory: jnp.array) -> jnp.array:
         """
 
         Args:
+            trajectory:
         Returns:
         """
         T = trajectory.shape[0]
+        print(trajectory.shape)
+        print(trajectory[:, :2].shape)
+        print(trajectory[:, 2].shape)
         xy, z = trajectory[:, :2], trajectory[:, 2]
 
         # compute z of surface and gradient and hessian
@@ -174,7 +182,7 @@ def main() -> None:
     """Set up, compile, and solve a JaxCSVTOpt for the quadrotor problem with no obstacles.
     """
     # Set up the problem.
-    goal_state = None  # TODO
+    goal_state = jnp.zeros(12, dtype=jnp.float32)
     cost_function = QuadrotorCost(goal_state)
     equality_constraint_function = QuadrotorGPHeightConstraint('surface_data.npz')
     inequality_constraint_function = None
@@ -208,12 +216,15 @@ def main() -> None:
     quadrotor_opt = JaxCSVTOpt(quadrotor_problem, quadrotor_parameters)
     initial_guess = jnp.array(np.random.random([8, 16 * 12]), dtype=jnp.float32)
 
-    # Lower and compile JaxCSVTOpt.solve() ahead of time, marking the class (and all its attributes) as static.
-    solve_method = jax.jit(quadrotor_opt.solve, static_argnums=0).lower(initial_guess)
-    solve_method = solve_method.compile()
+    solution = quadrotor_opt.solve(initial_guess)
+    print(solution)
 
-    # Run the compiled solve() method.
-    solution = solve_method(initial_guess)
+    # # Lower and compile JaxCSVTOpt.solve() ahead of time, marking the class (and all its attributes) as static.
+    # solve_method = jax.jit(quadrotor_opt.solve).lower(initial_guess).compile()
+    #
+    # # Run the compiled solve() method.
+    # solution = solve_method(initial_guess)
+    # print(solution.shape)
 
 
 if __name__ == '__main__':
