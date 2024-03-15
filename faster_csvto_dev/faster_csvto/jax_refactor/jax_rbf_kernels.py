@@ -58,6 +58,8 @@ def structured_rbf_kernel(X: jnp.array, X_bar: jnp.array) -> jnp.array:
     Returns:
          The value of the kernel function applied to each (X, X_bar) pair of trajectories, shape (N, N).
     """
+    assert X.shape == (8, 12, 16)
+    assert X_bar.shape == X.shape
     N, T, d = X.shape
 
     # When only one window is used, switch to normal RBF kernel.
@@ -82,8 +84,8 @@ def structured_rbf_kernel(X: jnp.array, X_bar: jnp.array) -> jnp.array:
     h = jnp.median(jnp.sqrt(difference_norm_squared)) ** 2 / jnp.log(N)
 
     # Compute the kernel according to equation (47) with an extra weight in the denominator for numerical stability.
-    structured_rbf_kernel = jnp.exp(-difference_norm_squared / (h.reshape(M, 1, 1) + EPS)).mean(axis=0)
-    return structured_rbf_kernel
+    structured_rbf_kernel_output = jnp.exp(-difference_norm_squared / (h + EPS)).mean(axis=0)
+    return structured_rbf_kernel_output
 
 
 class RBFKernel:

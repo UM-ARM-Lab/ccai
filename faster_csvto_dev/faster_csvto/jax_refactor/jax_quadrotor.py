@@ -31,7 +31,6 @@ class QuadrotorCost:
         Returns:
             The cost of each trajectory, shape (N,).
         """
-        print(trajectories.shape)
         assert len(trajectories.shape) == 2
         assert trajectories.shape[1] == (self.dx + self.du) * self.T
 
@@ -132,6 +131,32 @@ class QuadrotorDynamics:
                                 new_q, new_r), axis=-1)
 
 
+def height_constraint(trajectory: jnp.array, surface_gp: GPSurfaceModel) -> jnp.array:
+    """
+
+    Args:
+        trajectory: Single trajectory, shape (N, dx + du).
+        surface_gp:
+    Returns:
+    """
+    trajectory = trajectory.reshape(12, 16)
+    T = trajectory.shape[0]
+    xy, z = trajectory[:, :2], trajectory[:, 2]
+
+    # compute z of surface and gradient and hessian
+    surface_z, grad_surface_z, hess_surface_z = surface_gp.posterior_mean(xy)
+
+    constr = surface_z - z
+    # grad_constr = jnp.concatenate((grad_surface_z,
+    #                                -jnp.ones((T, 1)),
+    #                                jnp.zeros((T, 13))), axis=1)
+    # hess_constr = jnp.concatenate((
+    #     jnp.concatenate((hess_surface_z, jnp.zeros((T, 2, 14))), axis=2),
+    #     jnp.zeros((T, 14, 16))), axis=1)
+    # return constr, grad_constr, hess_constr
+    return constr
+
+
 class QuadrotorGPHeightConstraint:
     """Equality constraint function to enforce that the vertical position of each point in each trajectory spline is on
     the surface of a gaussian process. The gaussian process is read in from a .npz file. Used for the 12 DOF quadrotor
@@ -146,36 +171,11 @@ class QuadrotorGPHeightConstraint:
         data = np.load('surface_data.npz')
         self.surface_gp = GPSurfaceModel(jnp.array(data['xy'], dtype=jnp.float32),
                                          jnp.array(data['z'], dtype=jnp.float32))
-    #     self._call_batched = jax.vmap(self._call)
-    #
-    # def __call__(self, trajectory):
-    #     return self._call_batched(trajectory)
 
-    def __call__(self, trajectory: jnp.array) -> jnp.array:
+    def __call__(self, trajectory):
         """
-
-        Args:
-            trajectory:
-        Returns:
         """
-        T = trajectory.shape[0]
-        print(trajectory.shape)
-        print(trajectory[:, :2].shape)
-        print(trajectory[:, 2].shape)
-        xy, z = trajectory[:, :2], trajectory[:, 2]
-
-        # compute z of surface and gradient and hessian
-        surface_z, grad_surface_z, hess_surface_z = self.surface_gp.posterior_mean(xy)
-
-        constr = surface_z - z
-        grad_constr = jnp.concatenate((grad_surface_z,
-                                       -jnp.ones((T, 1)),
-                                       jnp.zeros((T, 13))), axis=1)
-        hess_constr = jnp.concatenate((
-            jnp.concatenate((hess_surface_z, jnp.zeros((T, 2, 14))), axis=2),
-            jnp.zeros((T, 14, 16))), axis=1)
-
-        return constr, grad_constr, hess_constr
+        return jax.vmap(height_constraint, (0, None), 0)(trajectory, self.surface_gp)
 
 
 def main() -> None:
@@ -195,7 +195,7 @@ def main() -> None:
                           100.0000, 100.0000, 100.0000, 100.0000, 100.0000)))
     dx = 12
     du = 4
-    dh = 155
+    dh = 12
     dg = 0
     quadrotor_problem = JaxCSVTOProblem(cost_function, equality_constraint_function, inequality_constraint_function,
                                         dynamics_function, u_bounds, x_bounds, dx, du, dh, dg)

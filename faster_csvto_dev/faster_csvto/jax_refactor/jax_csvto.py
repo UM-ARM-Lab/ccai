@@ -192,16 +192,22 @@ class JaxCSVTOpt:
         gamma: Optional[jnp.float32] = iteration / self.K if self.anneal else None
 
         # Evaluate the gradient of the cost function at the current state (without slack variables).
-        c_grad = jax.jacfwd(self.c)(xuz[:, :self._trajectory_dim()])
+        c_grad = jax.jacfwd(self.c)(xuz[:, :self._trajectory_dim()]).mean(axis=1)
 
         # Evaluate the combined constraint function, its gradient, and its hessian at the current augmented state.
         constraint = self._combined_constraint(xuz, initial_state)
-        constraint_grad = jax.jacrev(self._combined_constraint)(xuz, initial_state)
-        constraint_hess = jax.jacfwd(jax.jacrev(self._combined_constraint))(xuz, initial_state)
+        constraint_grad = jax.jacrev(self._combined_constraint)(xuz, initial_state).mean(axis=2)
+        constraint_hess = jax.jacfwd(jax.jacrev(self._combined_constraint))(xuz, initial_state).mean(axis=2).mean(axis=3)
+        # print('constraint shape', constraint.shape)
+        # print('constraint_grad shape', constraint_grad.shape)
+        # print('constraint_hess shape', constraint_hess.shape)
 
         # Evaluate the kernel function and its gradient at the current state (without slack variables).
-        k = self.k(xuz[:, :self._trajectory_dim()], xuz[:, :self._trajectory_dim])
-        k_grad = jax.jacrev(self.k)(xuz[:, :self._trajectory_dim()])  # Differentiate w.r.t. first argument by default.
+        k = self.k(xuz[:, :self._trajectory_dim()].reshape(self.N, self.T, self.dx + self.du),
+                   xuz[:, :self._trajectory_dim()].reshape(self.N, self.T, self.dx + self.du))
+        k_grad = jax.jacrev(self.k)(xuz[:, :self._trajectory_dim()].reshape(self.N, self.T, self.dx + self.du),
+                                    xuz[:, :self._trajectory_dim()].reshape(self.N, self.T, self.dx + self.du)).mean(
+            axis=2).reshape(self.N, self.N, self._trajectory_dim())
 
         # Compute the retraction steps.
         constraint_step = self._constraint_step(constraint, constraint_grad)
@@ -220,7 +226,8 @@ class JaxCSVTOpt:
 
         Args:
             constraint: The combined constraint evaluated at the current state, shape (N, dh + dg + dx * T).
-            constraint_grad: The gradient of the combined constraint evaluated at the current state, TODO: shape ...
+            constraint_grad: The gradient of the combined constraint evaluated at the current state, shape (N, dh + dg +
+             dx * T).
 
         Returns:
             The constraint step, shape (N, (dx + du) * T + dg).
@@ -233,7 +240,7 @@ class JaxCSVTOpt:
 
         # Get constraint step from equation (39), shape (N, d * T).
         constraint_step = (constraint_grad.transpose((0, 2, 1)) @ dCdCT_inv @
-                           jnp.expand_dims(constraint, axis=-1).squeeze(-1))
+                           jnp.expand_dims(constraint, axis=-1)).squeeze(-1)
         assert constraint_step.shape == (self.N, self._slack_trajectory_dim())
         return constraint_step
 
@@ -256,7 +263,7 @@ class JaxCSVTOpt:
         Returns:
             The tangent step for the current state, shape (N, (dx + du) * T + dg).
         """
-        assert c_grad.shape == ()
+        assert c_grad.shape == (self.N, self._trajectory_dim())
         assert constraint_grad.shape == (self.N, self.dh + self.dg + self.dx * self.T, self._slack_trajectory_dim())
         assert constraint_hess.shape == (self.N, self.dh + self.dg + self.dx * self.T, self._slack_trajectory_dim(),
                                          self._slack_trajectory_dim())
@@ -267,8 +274,12 @@ class JaxCSVTOpt:
         dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)))
 
         # Get projection tensor via equation (36), shape (N, d * T, d * T).
-        projection = (jnp.expand_dims(jnp.eye((self.dx + self.du) * self.T + self.dh), axis=0) -
-                      constraint_grad.transpose((0, 2, 1)) @ dCdCT_inv @ constraint_grad)
+        print('first term', jnp.expand_dims(jnp.eye((self.dx + self.du) * self.T + self.dg), axis=0).shape)
+        print('second term', constraint_grad.transpose((0, 2, 1)).shape)
+        print('third term', dCdCT_inv.shape)
+        print('fourth term', constraint_grad.shape)
+        projection = ((jnp.expand_dims(jnp.eye((self.dx + self.du) * self.T + self.dg), axis=0) -
+                      constraint_grad.transpose((0, 2, 1))) @ dCdCT_inv @ constraint_grad)
 
         # Get the tangent space kernel from equation (29), shape (N, N, d * T, d * T).
         k_tangent = (k.reshape(self.N, self.N, 1, 1) * jnp.expand_dims(projection, axis=0) @
@@ -342,7 +353,7 @@ class JaxCSVTOpt:
             combined_constraint = jnp.concatenate((self.h(xuz[:, :self._trajectory_dim()]),
                                                    self._dynamics_constraint(xuz),
                                                    self._start_constraint(xuz, initial_state)), axis=1)
-        assert combined_constraint.shape == (self.N, self._slack_trajectory_dim())
+        assert combined_constraint.shape == (self.N, self.dh + self.dg + self.dx * self.T)
         return combined_constraint
 
     def _slack_constraint(self, xuz: jnp.array) -> jnp.array:
@@ -379,10 +390,10 @@ class JaxCSVTOpt:
         control_inputs = points[:, -self.du:]
 
         # Compute the error of the dynamics function in predicting the next state along each spline.
-        x_forward_one_without_last = self.f(states, control_inputs)[:, :-(self.dx + self.du)]
-        x_without_first = xuz[:, self.dx + self.du: self._trajectory_dim()]
-        dynamics_error = x_forward_one_without_last - x_without_first
-        assert xuz.shape == (self.N, self.dx * (self.T - 1))
+        states_forward_one_without_last = self.f(states, control_inputs).reshape(self.N, self.T * self.dx)[:, :-self.dx]
+        states_without_first = states.reshape(self.N, self.T * self.dx)[:, self.dx:]
+        dynamics_error = states_forward_one_without_last - states_without_first
+        assert dynamics_error.shape == (self.N, self.dx * (self.T - 1))
         return dynamics_error
 
     def _start_constraint(self, xuz: jnp.array, initial_state: jnp.array) -> jnp.array:
