@@ -20,6 +20,21 @@ def get_window_splits(X: jnp.array, window_size: int=3) -> jnp.array:
     return splits
 
 
+# def get_window_splits(X: jnp.array, window_size: int=4) -> jnp.array:
+#     """Break a trajectory into splits of size `window_size`, where windows are slid incrementally along each
+#     point in each trajectory spline (along axis 0) to generate individual splits.
+#
+#     Args:
+#         X: A trajectory, shape (T, d).
+#         window_size: The size of the sliding window.
+#
+#     Returns:
+#         The window splits for the trajectory, shape (T - window_size + 1, window_size, d).
+#     """
+#     splits = jnp.stack([X[i:i + window_size, :] for i in range(0, X.shape[0] - window_size + 1)], axis=0)
+#     return splits
+
+
 def rbf_kernel(X: jnp.array, X_bar: jnp.array) -> jnp.array:
     """Compute the RBF kernel between each pair in two distributions of trajectories, using the kernel bandwidth from
     equation (48).
@@ -58,8 +73,8 @@ def structured_rbf_kernel(X: jnp.array, X_bar: jnp.array) -> jnp.array:
     Returns:
          The value of the kernel function applied to each (X, X_bar) pair of trajectories, shape (N, N).
     """
-    assert X.shape == (8, 12, 16)
-    assert X_bar.shape == X.shape
+    # X = X.reshape(8, 12, 16)
+    # X_bar = X_bar.reshape(8, 12, 16)
     N, T, d = X.shape
 
     # When only one window is used, switch to normal RBF kernel.
