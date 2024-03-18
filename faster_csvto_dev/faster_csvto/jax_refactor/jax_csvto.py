@@ -274,12 +274,8 @@ class JaxCSVTOpt:
         dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)))
 
         # Get projection tensor via equation (36), shape (N, d * T, d * T).
-        print('first term', jnp.expand_dims(jnp.eye((self.dx + self.du) * self.T + self.dg), axis=0).shape)
-        print('second term', constraint_grad.transpose((0, 2, 1)).shape)
-        print('third term', dCdCT_inv.shape)
-        print('fourth term', constraint_grad.shape)
-        projection = ((jnp.expand_dims(jnp.eye((self.dx + self.du) * self.T + self.dg), axis=0) -
-                      constraint_grad.transpose((0, 2, 1))) @ dCdCT_inv @ constraint_grad)
+        projection = (jnp.expand_dims(jnp.eye((self.dx + self.du) * self.T + self.dg), axis=0) -
+                      constraint_grad.transpose((0, 2, 1)) @ dCdCT_inv @ constraint_grad)
 
         # Get the tangent space kernel from equation (29), shape (N, N, d * T, d * T).
         k_tangent = (k.reshape(self.N, self.N, 1, 1) * jnp.expand_dims(projection, axis=0) @
@@ -427,15 +423,18 @@ class JaxCSVTOpt:
 
         # Get bounding arrays for projection.
         point_min = jnp.concatenate((jnp.ones((self.N, self.dx)) * self.x_bounds[0],
-                                     jnp.ones((self.N, self.du) * self.u_bounds[0])), axis=1)
+                                     jnp.ones((self.N, self.du)) * self.u_bounds[0]), axis=1)
         point_max = jnp.concatenate((jnp.ones((self.N, self.dx)) * self.x_bounds[1],
-                                     jnp.ones((self.N, self.du) * self.u_bounds[1])), axis=1)
+                                     jnp.ones((self.N, self.du)) * self.u_bounds[1]), axis=1)
         trajectory_min = jnp.tile(point_min, self.T)
         trajectory_max = jnp.tile(point_max, self.T)
 
         # Project trajectories inside bounds and then append slack variables.
         x_in_bounds = jnp.clip(xuz[:, :self._trajectory_dim()], trajectory_min, trajectory_max)
-        xuz_in_bounds = jnp.concatenate((x_in_bounds, xuz[:, self._trajectory_dim()+1:]))
+        if self.dg > 0:
+            xuz_in_bounds = jnp.concatenate((x_in_bounds, xuz[:, self._trajectory_dim()+1:]), axis=1)
+        else:
+            xuz_in_bounds = x_in_bounds
         assert xuz_in_bounds.shape == (self.N, self._slack_trajectory_dim())
         return xuz_in_bounds
 

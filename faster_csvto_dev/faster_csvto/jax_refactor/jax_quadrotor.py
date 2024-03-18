@@ -204,7 +204,7 @@ def main() -> None:
     k = structured_rbf_kernel
     N = 8
     T = 12
-    K = 100
+    K = 1
     anneal = True
     alpha_J = 1
     alpha_C = 1
