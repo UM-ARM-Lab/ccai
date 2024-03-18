@@ -21,6 +21,7 @@ from ccai.mpc.csvgd import Constrained_SVGD_MPC
 from ccai.problem import ConstrainedSVGDProblem
 from ccai.kernels import rbf_kernel, structured_rbf_kernel
 from ccai.constrained_svgd_trajopt import ConstrainedSteinTrajOpt
+from ccai.models.trajectory_samplers import TrajectorySampler
 
 # global variable - path to the ccai directory
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
@@ -433,8 +434,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         grad_K = grad_K.reshape(N, N, -1)
         G, dG, hessG = self.combined_constraints(augmented_trajectory, compute_hess=self.compute_hess)
 
-        # print(J.mean(), G.abs().mean(), G.abs().max())
-
+        #print(J.mean(), G.abs().mean(), G.abs().max())
         if hessG is not None:
             hessG.detach_()
 
@@ -595,9 +595,9 @@ class AllegroValveTurning(AllegroValveProblem):
             T_range_plus = torch.arange(1, T, device=x.device)
 
             # Compute gradient w.r.t q
-            dcontact_v_dq = (dJ_dq[:, 1:] @ dq.reshape(N, T, 1, 8, 1)).squeeze(-1) - contact_jacobian[:, 1:]
-            tmp = torch.cross(d_contact_loc_dq[:, 1:], valve_omega.reshape(N, T, 3, 1), dim=2)  # N x T x 3 x 8
-            dg_dq = dcontact_v_dq - tmp
+            dcontact_v_dq = (dJ_dq[:, :-1] @ dq.reshape(N, T, 1, 8, 1)).squeeze(-1) - contact_jacobian[:, :-1]
+            tmp = torch.cross(d_contact_loc_dq[:, :-1], valve_omega_robot_frame.reshape(N, T, 3, 1), dim=2)  # N x T x 3 x 8
+            dg_dq = dcontact_v_dq + tmp
 
             # Compute gradient w.r.t valve angle
             d_omega_dtheta = torch.stack((torch.zeros_like(dtheta),
@@ -1066,6 +1066,15 @@ def do_trial(env, params, fpath):
     # start = torch.cat((state['q'].reshape(10), torch.zeros(1).to(state['q'].device))).to(device=params['device'])
     chain.to(device=params['device'])
 
+    # warm-starting using learned sampler
+    trajectory_sampler = None
+    model_path = params.get('model_path', None)
+
+    if model_path is not None:
+        trajectory_sampler = TrajectorySampler(T=16, dx=9, du=8, type='diffusion', timesteps=100, hidden_dim=128, context_dim=0)
+        trajectory_sampler.load_state_dict(torch.load(f'{CCAI_PATH}/{model_path}'))
+        trajectory_sampler.to(device=params['device'])
+
     if params['controller'] == 'csvgd':
         regrasp_problem = AllegroValveRegrasping(
             start=start[:8],
@@ -1102,8 +1111,16 @@ def do_trial(env, params, fpath):
         # reset planner
         state = env.get_state()
         state = state['q'].reshape(9).to(device=params['device'])
+
+        # generate initial samples with diffusion model
+        initial_samples = None
+        if trajectory_sampler is not None:
+            initial_samples = trajectory_sampler.sample(N=params['N'], start=state.reshape(1, -1), H=params['T']+1)
+            initial_x = initial_samples[:, 1:, :planner.problem.dx]
+            initial_u = initial_samples[:, :-1, -planner.problem.du:]
+            initial_samples = torch.cat((initial_x, initial_u), dim=-1)
         state = state[:planner.problem.dx]
-        planner.reset(state, T=params['T'], goal=goal)
+        planner.reset(state, T=params['T'], goal=goal, initial_x=initial_samples)
 
         planned_trajectories = []
         actual_trajectory = []
@@ -1130,7 +1147,10 @@ def do_trial(env, params, fpath):
 
             # execute the action
             action = best_traj[0, planner.problem.dx:planner.problem.dx + planner.problem.du]
+            state = env.get_state()
+            state = state['q'].reshape(9).to(device=params['device'])
             xu = torch.cat((state, action))
+            # record the actual trajectory
             actual_trajectory.append(xu)
             action = action + state.unsqueeze(0)[:, :8]
 
@@ -1234,7 +1254,7 @@ if __name__ == "__main__":
     # combined chain
     chain = pk.build_chain_from_urdf(open(asset).read())
 
-    for i in tqdm(range(config['num_trials'])):
+    for i in tqdm(range(0, config['num_trials'])):
         goal = torch.tensor([np.pi])
         # goal = goal + 0.025 * torch.randn(1) + 0.2
         for controller in config['controllers'].keys():
