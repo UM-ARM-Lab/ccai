@@ -252,11 +252,12 @@ class GaussianDiffusion(nn.Module):
 
     @torch.no_grad()
     def p_sample(self, x, t, context):
+        alpha = 0.5
         b, *_, device = *x.shape, x.device
         batched_times = torch.full((b,), t, device=x.device, dtype=torch.long)
         model_mean, _, model_log_variance, x_start = self.p_mean_variance(x=x, t=batched_times, context=context)
         noise = torch.randn_like(x) if t > 0 else 0.  # no noise if t == 0
-        pred_img = model_mean + (0.5 * model_log_variance).exp() * noise
+        pred_img = model_mean + alpha * (0.5 * model_log_variance).exp() * noise
         # pred_img[:, -1, 8] += 0.01
         return pred_img, x_start
 
@@ -308,8 +309,8 @@ class GaussianDiffusion(nn.Module):
 
         # first state of each subtrajectory should be the same as the final state of the previous
         # make noises the same
-        for i in range(1, N):
-            img[:, i, 0] = img[:, i - 1, -1]
+        # for i in range(1, N):
+        #    img[:, i, 0] = img[:, i - 1, -1]
 
         if start_timestep is None:
             start_timestep = self.num_timesteps
@@ -321,19 +322,22 @@ class GaussianDiffusion(nn.Module):
         for t in reversed(range(0, start_timestep)):
             img, x_start = self.p_sample(img.reshape(B * N, H, -1), t, context)
             img = img.reshape(B, N, H, -1)
-
+            w1, w2 = 0.5, 0.5
             # combine subtrajectory updates
             for i in range(1, N):
                 tmp = img[:, i, 0, :9].clone()
-                img[:, i, 0, :9] = (tmp + img[:, i - 1, -1, :9]) / 2
-                img[:, i - 1, -1, :9] = img[:, i, 0, :9]
-
+                tmp2 = img[:, i - 1, -1, :9].clone()
+                img[:, i, 0, :9] = w2 * tmp + w1 * tmp2
+                img[:, i - 1, -1, :9] = w2 * tmp + w1 * tmp2
             img[:, 0] = self._apply_conditioning(img[:, 0], condition)
-            img[:, -1, -1, 8] += 1.0e-3
+
+            #img[:, -1, -1, 8] += 0.02
             imgs.append(img)
-
+        #for i in img:
+        #    print('--')
+        #    print(i.reshape(-1, 17)[:, 8])
+        #exit(0)
         ret = img if not return_all_timesteps else torch.stack(imgs, dim=1)
-
         return ret
 
     @torch.no_grad()
@@ -388,12 +392,12 @@ class GaussianDiffusion(nn.Module):
         if H > self.horizon:
             # get closest multiple of horizon
             factor = math.ceil(H / self.horizon)
-            #H_total = factor * self.horizon
+            # H_total = factor * self.horizon
             sample = self.p_multi_sample_loop((B * N, factor, self.horizon, self.xu_dim),
                                               condition=condition, context=context,
                                               return_all_timesteps=return_all_timesteps)
             # combine samples
-            combined_samples = [sample[:, i, :-1] for i in range(0, factor-1)]
+            combined_samples = [sample[:, i, :-1] for i in range(0, factor - 1)]
             combined_samples.append(sample[:, -1])
             # get combined trajectory
             sample = torch.cat(combined_samples, dim=1)

@@ -36,8 +36,8 @@ def rbf_kernel(X, Xbar, Q=None):
 
     scaled_diff = (scaled_diff.reshape(-1, 1, d) @ diff.reshape(-1, d, 1)).reshape(n, n)
     h = median(torch.sqrt(scaled_diff)) ** 2
-    h = h / np.log(n) + EPS
-    # h = 0.1
+    #h = h / np.log(n) + EPS
+    #h = 2
     return torch.exp(-scaled_diff / h)
 
 

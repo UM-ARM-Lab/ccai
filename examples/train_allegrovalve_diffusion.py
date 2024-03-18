@@ -81,7 +81,7 @@ def visualize_trajectories(trajectories, scene, fpath, headless=False):
         # Visualize what happens if we execute the actions in the trajectory in the simulator
         pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/sim/img'), parents=True, exist_ok=True)
         pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/sim/gif'), parents=True, exist_ok=True)
-        visualize_trajectory_in_sim(trajectory, config['env'], f'{fpath}/trajectory_{n + 1}/sim')
+        # visualize_trajectory_in_sim(trajectory, config['env'], f'{fpath}/trajectory_{n + 1}/sim')
         # save the trajectory
         np.save(f'{fpath}/trajectory_{n + 1}/traj.npz', trajectory.cpu().numpy())
 
@@ -165,17 +165,17 @@ def train_model(trajectory_sampler, train_loader, config):
 
 
 def test_long_horizon(model, loader, config):
-    fpath = f'{CCAI_PATH}/data/training/allegro_valve/{config["model_name"]}_{config["model_type"]}/long_horizon3'
+    fpath = f'{CCAI_PATH}/data/training/allegro_valve/{config["model_name"]}_{config["model_type"]}/long_horizon'
     pathlib.Path.mkdir(pathlib.Path(fpath), parents=True, exist_ok=True)
     N = 16
 
-    start = torch.tensor([0.2, 0.5, 0.7, 0.7, 1.3, 0.1, -0.1, 1.0, 0], device=config['device'])
-    start[-1] = 2 * np.pi * (torch.rand(1, device=config['device']) - 0.5)
+    start = torch.tensor([0.2, 0.5, 0.7, 0.7, 1.3, 0, 0.1, 1.0, 0], device=config['device'])
+    start[-1] =  0 * 2 * np.pi * (torch.rand(1, device=config['device']) - 0.5)
     goal = 0.5 * torch.tensor([-np.pi / 2.0], device=config['device'])
 
     start = start[None, :].repeat(N, 1)
     # goal = (goal[None, :].repeat(N, 1) - model.x_mean[8]) / model.x_std[8]
-    # start=None
+    #start = None
     goal = None
     # goal = None
     # print(model.x_mean[:8])

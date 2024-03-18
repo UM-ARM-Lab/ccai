@@ -1,5 +1,5 @@
 ---
-model_name: 'allegro_new_dataset_augment_angle_masked'
+model_name: 'allegro_new_dataset_augment_angle_masked_2'
 T: 16
 dx: 9
 du: 8
