@@ -88,7 +88,7 @@ class PositionControlConstrainedSVGDMPC(Constrained_SVGD_MPC):
         super().__init__(problem, params)
         self.solver = PositionControlConstrainedSteinTrajOpt(problem, params)
     
-class AllegroValveProblem(ConstrainedSVGDProblem):
+class AllegroObjectProblem(ConstrainedSVGDProblem):
 
     def __init__(self, 
                  dx,
@@ -97,7 +97,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
                  goal, 
                  T, 
                  chain, 
-                 valve_location, 
+                 object_location, 
                  world_trans,
                  fingers=['index', 'middle', 'ring', 'thumb'],
                  obj_dof=1, 
@@ -118,7 +118,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         self.num_fingers = len(fingers)
         self.obj_dof = obj_dof
 
-        self.valve_location = valve_location
+        self.object_location = object_location
 
         self.chain = chain
         self.joint_index = {
@@ -284,7 +284,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
 
 
 
-class AllegroContactProblem(AllegroValveProblem):
+class AllegroContactProblem(AllegroObjectProblem):
     
     def get_constraint_dim(self, T):
         self.dg_per_t = 0
@@ -300,22 +300,25 @@ class AllegroContactProblem(AllegroValveProblem):
                  goal, 
                  T, 
                  chain, 
-                 valve_location, 
-                 valve_type,
+                 object_location, 
+                 object_type,
                  world_trans,
-                 valve_asset_pos,
+                 object_asset_pos,
                  fingers=['index', 'middle', 'ring', 'thumb'],
                  obj_dof=1,
                  device='cuda:0'):
-        super().__init__(dx=dx, du=du, start=start, goal=goal, T=T, chain=chain, valve_location=valve_location,
+        # object_location is different from object_asset_pos. object_asset_pos is 
+        # used for pytorch volumetric. The asset of valve might contain something else such as a wall, a table
+        # object_location is the location of the object joint, which is what we care for motion planning 
+        super().__init__(dx=dx, du=du, start=start, goal=goal, T=T, chain=chain, object_location=object_location,
                          world_trans=world_trans, fingers=fingers, obj_dof=obj_dof, device=device)
         self.get_constraint_dim(T)
 
         # update x_max with valve angle
-        valve_x_max = 10.0 * np.pi * torch.ones(self.obj_dof)
-        valve_x_min = -10.0 * np.pi * torch.ones(self.obj_dof)
-        self.x_max = torch.cat((self.x_max[:4 * self.num_fingers], valve_x_max, self.x_max[4 * self.num_fingers:]))
-        self.x_min = torch.cat((self.x_min[:4 * self.num_fingers], valve_x_min, self.x_min[4 * self.num_fingers:]))
+        obj_x_max = 10.0 * np.pi * torch.ones(self.obj_dof)
+        obj_x_min = -10.0 * np.pi * torch.ones(self.obj_dof)
+        self.x_max = torch.cat((self.x_max[:4 * self.num_fingers], obj_x_max, self.x_max[4 * self.num_fingers:]))
+        self.x_min = torch.cat((self.x_min[:4 * self.num_fingers], obj_x_min, self.x_min[4 * self.num_fingers:]))
         # add collision checking
         # collision check all of the non-finger tip links
         # collision_check_oya = ['allegro_hand_oya_finger_link_13',
@@ -325,29 +328,34 @@ class AllegroContactProblem(AllegroValveProblem):
         #     'allegro_hand_hitosashi_finger_finger_link_2',
         #     'allegro_hand_hitosashi_finger_finger_link_1'
         # ]
-        if valve_type == 'cuboid':
-            asset_valve = get_assets_dir() + '/valve/valve_cuboid.urdf'
-        elif valve_type == 'cylinder':
-            asset_valve = get_assets_dir() + '/valve/valve_cylinder.urdf'
+        if object_type == 'cuboid_valve':
+            asset_object = get_assets_dir() + '/valve/valve_cuboid.urdf'
+        elif object_type == 'cylinder_valve':
+            asset_object = get_assets_dir() + '/valve/valve_cylinder.urdf'
+        elif object_type == 'screwdriver':
+            asset_object = get_assets_dir() + '/screwdriver/screwdriver.urdf'
 
-        chain_valve = pk.build_chain_from_urdf(open(asset_valve).read())
-        chain_valve = chain_valve.to(device=device)
-        valve_sdf = pv.RobotSDF(chain_valve, path_prefix=get_assets_dir() + '/valve')
+        chain_object = pk.build_chain_from_urdf(open(asset_object).read())
+        chain_object = chain_object.to(device=device)
+        if 'valve' in object_type:
+            object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/valve')
+        elif 'screwdriver' in object_type:
+            object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver')
         robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models')
 
         scene_trans = world_trans.inverse().compose(
-            pk.Transform3d(device=device).translate(valve_asset_pos[0], valve_asset_pos[1], valve_asset_pos[2]))
+            pk.Transform3d(device=device).translate(object_asset_pos[0], object_asset_pos[1], object_asset_pos[2]))
 
-        # self.index_collision_scene = pv.RobotScene(robot_sdf, valve_sdf, scene_trans,
+        # self.index_collision_scene = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
         #                                            collision_check_links=collision_check_hitosashi,
         #                                            softmin_temp=100.0)
-        # self.thumb_collision_scene = pv.RobotScene(robot_sdf, valve_sdf, scene_trans,
+        # self.thumb_collision_scene = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
         #                                            collision_check_links=collision_check_oya,
         #                                            softmin_temp=100.0)
         # contact checking
         self.contact_scenes = {}
         for finger in self.fingers:
-            self.contact_scenes[finger] = pv.RobotScene(robot_sdf, valve_sdf, scene_trans,
+            self.contact_scenes[finger] = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
                                                           collision_check_links=[self.ee_names[finger]],
                                                           softmin_temp=1.0e3,
                                                           points_per_link=1000,
@@ -411,7 +419,7 @@ class AllegroContactProblem(AllegroValveProblem):
         # dJ_dq = dJ_dq.sum(dim=2)  # should be N x T x 3 x 8 x 8
         # dJ_dq = dJ_dq + contact_hessian
         dJ_dq = contact_hessian
-        ret_scene['dJ_dq'] = dJ_dq
+        ret_scene['dJ_dq'] = dJ_dq  # Jacobian of the contact point
 
         self.data[finger_name] = ret_scene
     
@@ -492,18 +500,18 @@ class AllegroValveTurning(AllegroContactProblem):
                  goal,
                  T,
                  chain,
-                 valve_location,
-                 valve_type,
+                 object_location,
+                 object_type,
                  world_trans,
-                 valve_asset_pos,
+                 object_asset_pos,
                  fingers=['index', 'middle', 'ring', 'thumb'],
                  friction_coefficient=0.95,
                  obj_dof=1,
                  device='cuda:0', **kwargs):
         self.num_fingers = len(fingers)
-        super().__init__(dx=4 * self.num_fingers + 1, du=4 * self.num_fingers, start=start, goal=goal, 
-                         T=T, chain=chain, valve_location=valve_location,
-                         valve_type=valve_type, world_trans=world_trans, valve_asset_pos=valve_asset_pos,
+        super().__init__(dx=4 * self.num_fingers + obj_dof, du=4 * self.num_fingers, start=start, goal=goal, 
+                         T=T, chain=chain, object_location=object_location,
+                         object_type=object_type, world_trans=world_trans, object_asset_pos=object_asset_pos,
                          fingers=fingers, obj_dof=obj_dof, device=device)
         
         self.friction_coefficient = friction_coefficient
@@ -584,7 +592,7 @@ class AllegroValveTurning(AllegroContactProblem):
         # NOTE: the constriant is defined in the robot frame
         # the contact jac an contact points are all in the robot frame
         # this will be vmapped, so takes in a 3 vector and a [num_finger x 3 x 8] jacobian and a dq vector
-        valve_robot_frame = self.world_trans.inverse().transform_points(self.valve_location.reshape(1, 3))
+        obj_robot_frame = self.world_trans.inverse().transform_points(self.object_location.reshape(1, 3))
         delta_q = q + u - next_q
         torque_list = []
         residual_list = []
@@ -605,7 +613,7 @@ class AllegroValveTurning(AllegroContactProblem):
             # print(torch.linalg.det(contact_jacobian @ contact_jacobian.T))
             # alt_force = torch.linalg.inv(contact_jacobian @ contact_jacobian.T) @ contact_jacobian @ delta_q
             # alt_residual = torch.linalg.norm(contact_jacobian.transpose(-1, -2) @ alt_force - delta_q)
-            contact_point_r_valve = contact_point_list[i] - valve_robot_frame[0]
+            contact_point_r_valve = contact_point_list[i] - obj_robot_frame[0]
             torque = torch.cross(contact_point_r_valve, force)
             torque_list.append(torque)
             # Force is in the robot frame instead of the world frame. 
@@ -672,7 +680,7 @@ class AllegroValveTurning(AllegroContactProblem):
             return g.reshape(N, -1), grad_g.reshape(N, -1, T * (self.dx + self.du)), None
     
     @combine_finger_constraints
-    def _valve_kinematics_constraints(self, xu, finger_name, compute_grads=True, compute_hess=False):
+    def _kinematics_constraints(self, xu, finger_name, compute_grads=True, compute_hess=False):
         """
             Computes on the kinematics of the valve and the finger being consistant
             Note that the constraint is defined in the robot frame
@@ -703,8 +711,8 @@ class AllegroValveTurning(AllegroContactProblem):
         contact_point_v = (contact_jacobian[:, :-1] @ dq.reshape(N, T, 4 * self.num_fingers, 1)).squeeze(-1)  # should be N x T x 3
 
         # compute valve contact point velocity
-        valve_robot_frame = self.world_trans.inverse().transform_points(self.valve_location.reshape(1, 3))
-        contact_point_r_valve = contact_loc.reshape(N, T + 1, 3) - valve_robot_frame.reshape(1, 1, 3)
+        obj_robot_frame = self.world_trans.inverse().transform_points(self.object_location.reshape(1, 3))
+        contact_point_r_valve = contact_loc.reshape(N, T + 1, 3) - obj_robot_frame.reshape(1, 1, 3)
         valve_omega_robot_frame = self.world_trans.inverse().transform_normals(valve_omega)
         object_contact_point_v = torch.cross(valve_omega_robot_frame, contact_point_r_valve[:, :-1])
 
@@ -798,7 +806,7 @@ class AllegroValveTurning(AllegroContactProblem):
         contact_jac = self.data[finger_name]['contact_jacobian'].reshape(N, T + 1, 3, 4 * self.num_fingers)[:, :-1]
         contact_normal = self.data[finger_name]['contact_normal'].reshape(N, T + 1, 3)[:, :-1]
         dnormal_dq = self.data[finger_name]['dnormal_dq'].reshape(N, T + 1, 3, 4 * self.num_fingers)[:, :-1]
-        dnormal_dtheta = self.data[finger_name]['dnormal_denv_q'].reshape(N, T + 1, 3, 1)[:, :-1]
+        dnormal_dtheta = self.data[finger_name]['dnormal_denv_q'].reshape(N, T + 1, 3, self.obj_dof)[:, :-1]
 
         g = self.dynamics_constr(q.reshape(-1, 4 * self.num_fingers), u.reshape(-1, 4 * self.num_fingers),
                                  next_q.reshape(-1, 4 * self.num_fingers),
@@ -824,7 +832,7 @@ class AllegroValveTurning(AllegroContactProblem):
 
             grad_g[:, :, T_plus, T_minus, :4 * self.num_fingers] = dg_dq[:, 1:].transpose(1, 2)  # first q is the start
             grad_g[:, :, T_range, T_range, self.dx:] = dg_du.reshape(N, T, -1, self.du).transpose(1, 2)
-            grad_g[:, :, T_plus, T_minus, 4 * self.num_fingers] = dg_dtheta[:, 1:].squeeze(-1).transpose(1, 2)
+            grad_g[:, :, T_plus, T_minus, 4 * self.num_fingers:4 * self.num_fingers+self.obj_dof] = dg_dtheta[:, 1:].transpose(1, 2)
             grad_g[:, :, T_range, T_range, :4 * self.num_fingers] = dg_dnext_q.reshape(N, T, -1, 4 * self.num_fingers).transpose(1, 2)
             grad_g = grad_g.transpose(1, 2)
         else:
@@ -898,7 +906,7 @@ class AllegroValveTurning(AllegroContactProblem):
             T_range_minus = torch.arange(T - 1, device=self.device)
             T_range_plus = torch.arange(1, T, device=self.device)
             grad_h[:, :, T_range_plus, T_range_minus, :4 * self.num_fingers] = dh_dq[:, 1:].transpose(1, 2)
-            grad_h[:, :, T_range_plus, T_range_minus, 4 * self.num_fingers] = dh_dtheta[:, 1:].squeeze(-1).transpose(1, 2)
+            grad_h[:, :, T_range_plus, T_range_minus, 4 * self.num_fingers: 4 * self.num_fingers + self.obj_dof] = dh_dtheta[:, 1:].transpose(1, 2)
             grad_h[:, :, T_range, T_range, self.dx:] = dh_du.reshape(N, T, dh, self.du).transpose(1, 2)
             grad_h = grad_h.transpose(1, 2).reshape(N, -1, T * d)
         else:
@@ -954,7 +962,7 @@ class AllegroValveTurning(AllegroContactProblem):
             compute_grads=compute_grads,
             compute_hess=compute_hess)
 
-        g_valve, grad_g_valve, hess_g_valve = self._valve_kinematics_constraints(
+        g_valve, grad_g_valve, hess_g_valve = self._kinematics_constraints(
             xu=xu.reshape(N, T, self.dx + self.du),
             compute_grads=compute_grads,
             compute_hess=compute_hess)
@@ -993,16 +1001,16 @@ class AllegroValveRegrasping(AllegroContactProblem):
                  goal,
                  T,
                  chain,
-                 valve_location,
-                 valve_type,
+                 object_location,
+                 object_type,
                  world_trans,
-                 valve_asset_pos,
+                 object_asset_pos,
                  fingers=['index', 'middle', 'ring', 'thumb'],
                  device='cuda:0'):
         dx = 8
         du = 8
-        super().__init__(dx=dx, du=du, start=start, goal=goal, T=T, chain=chain, valve_location=valve_location,
-                         valve_type=valve_type, world_trans=world_trans, valve_asset_pos=valve_asset_pos,
+        super().__init__(dx=dx, du=du, start=start, goal=goal, T=T, chain=chain, object_location=object_location,
+                         object_type=object_type, world_trans=world_trans, object_asset_pos=object_asset_pos,
                          fingers=fingers, device=device)
 
         
@@ -1144,9 +1152,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             T=4,
             chain=params['chain'],
             device=params['device'],
-            valve_asset_pos=env.valve_pose,
-            valve_location=params['valve_location'],
-            valve_type=params['valve_type'],
+            object_asset_pos=env.valve_pose,
+            object_location=params['object_location'],
+            object_type=params['object_type'],
             world_trans=env.world_trans,
             fingers=params['fingers']
         )
@@ -1159,9 +1167,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             T=params['T'],
             chain=params['chain'],
             device=params['device'],
-            valve_asset_pos=env.valve_pose,
-            valve_location=params['valve_location'],
-            valve_type=params['valve_type'],
+            object_asset_pos=env.valve_pose,
+            object_location=params['object_location'],
+            object_type=params['object_type'],
             friction_coefficient=params['friction_coefficient'],
             world_trans=env.world_trans,
             fingers=params['fingers'],
@@ -1282,7 +1290,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         
         # print(turn_problem.thumb_contact_scene.scene_collision_check(partial_to_full_state(x[:, :8]), x[:, 8],
         #                                                         compute_gradient=False, compute_hessian=False))
-        # distance2surface = torch.sqrt((best_traj_ee[:, 2] - valve_location[2].unsqueeze(0)) ** 2 + (best_traj_ee[:, 0] - valve_location[0].unsqueeze(0))**2)
+        # distance2surface = torch.sqrt((best_traj_ee[:, 2] - object_location[2].unsqueeze(0)) ** 2 + (best_traj_ee[:, 0] - object_location[0].unsqueeze(0))**2)
         distance2goal = (params['valve_goal'].cpu() - env.get_state()['q'][:, -1].cpu()).detach().cpu().item()
         print(f"distance to goal: {distance2goal}")
         info_list.append({
@@ -1407,6 +1415,10 @@ if __name__ == "__main__":
     # get config
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_valve.yaml').read_text())
     from tqdm import tqdm
+    if config['object_type'] == 'cuboid_valve':
+        valve_type = 'cuboid'
+    elif config['object_type'] == 'cylinder_valve':
+        valve_type = 'cylinder'
 
     if config['mode'] == 'hardware':
         env = RosAllegroValveTurningEnv(1, control_mode='joint_impedance',
@@ -1415,7 +1427,7 @@ if __name__ == "__main__":
                                  steps_per_action=60,
                                  friction_coefficient=1.0,
                                  device=config['sim_device'],
-                                 valve=config['valve_type'],
+                                 valve=valve_type,
                                  video_save_path=img_save_dir,
                                  joint_stiffness=config['kp'],
                                  fingers=config['fingers'],
@@ -1427,7 +1439,7 @@ if __name__ == "__main__":
                                     steps_per_action=60,
                                     friction_coefficient=1.0,
                                     device=config['sim_device'],
-                                    valve=config['valve_type'],
+                                    valve=valve_type,
                                     video_save_path=img_save_dir,
                                     joint_stiffness=config['kp'],
                                     fingers=config['fingers'],
@@ -1496,8 +1508,8 @@ if __name__ == "__main__":
             params['controller'] = controller
             params['valve_goal'] = goal.to(device=params['device'])
             params['chain'] = chain.to(device=params['device'])
-            valve_location = torch.tensor([0.85, 0.70, 1.405]).to(device) # the root of the valve
-            params['valve_location'] = valve_location
+            object_location = torch.tensor([0.85, 0.70, 1.405]).to(device) # the root of the valve
+            params['object_location'] = object_location
             final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node)
             # final_distance_to_goal = turn(env, params, fpath)
 
