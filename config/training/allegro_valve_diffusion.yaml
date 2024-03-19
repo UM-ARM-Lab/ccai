@@ -1,11 +1,11 @@
 ---
-model_name: 'allegro_new_dataset_augment_angle_masked'
+model_name: 'allegro_new_dataset_masked_angle_wrap_256_timesteps_model_long_train'
 T: 16
 dx: 9
 du: 8
 load_checkpoint: False
-epochs: 10000
-batch_size: 128
+epochs: 20000
+batch_size: 64
 lr: 1.0e-4
 model_type: 'diffusion'
 data_directory: 'allegro_valve_turning_new'
@@ -16,7 +16,7 @@ normalize_data: True
 constraint_embedding_dim: 64
 constrained: False
 guided: False
-timesteps: 100
+timesteps: 256
 hidden_dim: 128
 unconditional: True
 # Only applies to using EMA for training

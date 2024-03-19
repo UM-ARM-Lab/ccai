@@ -48,6 +48,7 @@ class AllegroValveDataset(Dataset):
                         traj[:, :, :-1, -8:] = traj[:, :, 1:, -8:]
                         traj[:, :, -1, -8:] = 0
                         turn_trajectories.append(traj)
+
             for p in path.rglob('*regrasp_data.p'):
                 with open(p, 'rb') as f:
                     data = pickle.load(f)
@@ -94,6 +95,7 @@ class AllegroValveDataset(Dataset):
         self.masks = self.masks.reshape(-1, self.masks.shape[-2])
         self.trajectories = torch.from_numpy(self.trajectories).float()
         self.masks = torch.from_numpy(self.masks).float()
+        self.masks = self.masks[:, :, None].repeat(1, 1, 17) # for states
         # self.trajectories[:, :, 8] += np.pi # add pi to the valve angle
         ## some wrap around issues here:
         # self.trajectories[:, :, 8] = torch.where(self.trajectories[:, :, 8] > np.pi,
@@ -112,8 +114,8 @@ class AllegroValveDataset(Dataset):
         self.mean = 0
         self.std = 1
 
-        self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.75)
-        self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.5)
+        self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.9)
+        self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.25)
 
     def __len__(self):
         return self.trajectories.shape[0]
@@ -122,32 +124,50 @@ class AllegroValveDataset(Dataset):
         traj = self.trajectories[idx]
         # randomly perturb the valve angles
         traj[:, 8] += 2 * np.pi * (np.random.rand() - 0.5)
+        # modulo to make sure between [-pi and pi]
+        # add pi to make [0, 2pi]
+        traj[:, 8] += np.pi
+        traj[:, 8] = traj[:, 8] % (2.0 * np.pi)
+        traj[:, 8] = traj[:, 8] - np.pi # subtract to make [-pi, pi]
+
         # traj[:, 8] += 0.01 * torch.randn(traj.shape[0])
-        # randomly mask out some of the trajectory -- how to do this?
-        mask = self.mask_dist.sample((traj.shape[0],)).to(device=traj.device)
-        mask = mask * self.masks[idx]
+        ## randomly mask out some of the trajectory -- how to do this?
+        #mask = self.mask_dist.sample((traj.shape[0],)).to(device=traj.device)
+        #mask = mask * self.masks[idx]
 
-        # higher prob of masking out initial state - since this will be very often conditioned on
-        mask[0] = self.initial_state_mask_dist.sample((1,)).to(device=traj.device)
+        # randomly mask the initial state and the final state
+        # need to find the final state - last part of mask that is 1
+        final_idx = self.masks[idx, :, 0].nonzero().max().item()
+        mask = self.masks[idx].clone()
 
-        # we can't mask out everything
+        # sample mask for initial state
+        mask[0, :9] = self.initial_state_mask_dist.sample((1,)).to(device=traj.device)
+
+        # sample mask for final state
+
+        mask[final_idx, :9] = self.initial_state_mask_dist.sample((1,)).to(device=traj.device)
+
+        # also mask out the rest with small probability
+        mask = mask * self.mask_dist.sample((mask.shape[0],)).to(device=traj.device).reshape(-1, 1)
+        ## we can't mask out everything
         if mask.sum() == 0:
             # randomly choose an index to un-mask
-            mask[np.random.randint(0, 8)] = 1
-        # mask = torch.ones(traj.shape[0]).to(device=traj.device)
-        # mask[0] = 0
-        # mask[0] = self.mask_dist.sample((1,)).to(device=traj.device)
-        return self.masks[idx, :, None] * (traj - self.mean) / self.std, mask
+            mask[np.random.randint(0, final_idx)] = 1
+        return self.masks[idx] * (traj - self.mean) / self.std, mask
 
     def compute_norm_constants(self):
         # compute norm constants not including the zero padding
         x = self.trajectories.clone()
-        x[:, :, 8] += 2 * np.pi * (torch.rand(x.shape[0], 1) - 0.5)
+        #x[:, :, 8] += 2 * np.pi * (torch.rand(x.shape[0], 1) - 0.5)
         x = x.reshape(-1, x.shape[-1])
 
-        mask = self.masks.reshape(-1)
+        mask = self.masks[:, :, 0].reshape(-1)
         mean = x.sum(dim=0) / mask.sum()
         std = np.sqrt(np.average((x - mean) ** 2, weights=mask, axis=0))
+
+        # for angle we force to be between [-1, 1]
+        mean[8] = 0
+        std[8] = np.pi
         self.mean = mean
         self.std = torch.from_numpy(std).float()
 

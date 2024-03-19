@@ -53,6 +53,7 @@ def visualize_trajectory(trajectory, scene, scene_fpath, headless=False):
             vis.add_geometry(mesh)
         ctr = vis.get_view_control()
         parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-02-14-13-45-19.json")
+        #parameters = o3d.io.read_pinhole_camera_parameters('ScreenCamera_2024-03-07-14-28-26.json')
         ctr.convert_from_pinhole_camera_parameters(parameters)
         vis.poll_events()
         vis.update_renderer()
@@ -81,7 +82,7 @@ def visualize_trajectories(trajectories, scene, fpath, headless=False):
         # Visualize what happens if we execute the actions in the trajectory in the simulator
         pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/sim/img'), parents=True, exist_ok=True)
         pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/sim/gif'), parents=True, exist_ok=True)
-        visualize_trajectory_in_sim(trajectory, config['env'], f'{fpath}/trajectory_{n + 1}/sim')
+        #visualize_trajectory_in_sim(trajectory, config['env'], f'{fpath}/trajectory_{n + 1}/sim')
         # save the trajectory
         np.save(f'{fpath}/trajectory_{n + 1}/traj.npz', trajectory.cpu().numpy())
 
@@ -146,11 +147,11 @@ def train_model(trajectory_sampler, train_loader, config):
             N = 8
             min_horizon = 16
             max_horizon = 32
-            start = torch.tensor([0.2, 0.5, 0.7, 0.7, 1.3, 0.1, -0.1, 1.0, 0], device=config['device'])
+            start = torch.tensor([0.2, 0.5, 0.7, 0.7, 1.3, 0, 0.1, 1.0, 0], device=config['device'])
             start[-1] = 2 * np.pi * (torch.rand(1, device=config['device']) - 0.5)
             start = start[None, :].repeat(N, 1)
 
-            for H in range(min_horizon, max_horizon + 1, 8):
+            for H in range(min_horizon, max_horizon + 1, 16):
                 plot_fpath = f'{fpath}/epoch_{epoch + 1}/horizon_{H}'
                 pathlib.Path.mkdir(pathlib.Path(plot_fpath), parents=True, exist_ok=True)
                 sampled_trajectories = test_model.sample(N, H=H, start=start)
@@ -165,11 +166,10 @@ def train_model(trajectory_sampler, train_loader, config):
 
 
 def test_long_horizon(model, loader, config):
-    fpath = f'{CCAI_PATH}/data/training/allegro_valve/{config["model_name"]}_{config["model_type"]}/long_horizon3'
+    fpath = f'{CCAI_PATH}/data/training/allegro_valve/{config["model_name"]}_{config["model_type"]}/long_horizon'
     pathlib.Path.mkdir(pathlib.Path(fpath), parents=True, exist_ok=True)
     N = 16
-
-    start = torch.tensor([0.2, 0.5, 0.7, 0.7, 1.3, 0.1, -0.1, 1.0, 0], device=config['device'])
+    start = torch.tensor([0.2, 0.5, 0.7, 0.7, 1.3, 0, 0.1, 1.0, 0], device=config['device'])
     start[-1] = 2 * np.pi * (torch.rand(1, device=config['device']) - 0.5)
     goal = 0.5 * torch.tensor([-np.pi / 2.0], device=config['device'])
 

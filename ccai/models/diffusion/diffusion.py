@@ -258,6 +258,10 @@ class GaussianDiffusion(nn.Module):
         noise = torch.randn_like(x) if t > 0 else 0.  # no noise if t == 0
         pred_img = model_mean + (0.5 * model_log_variance).exp() * noise
         # pred_img[:, -1, 8] += 0.01
+
+        # force angle to be between [-1, 1]
+        pred_img[..., 8] = ((pred_img[..., 8] + 1.0) % 2.0) - 1.0
+
         return pred_img, x_start
 
     def _apply_conditioning(self, x, condition=None):
@@ -286,7 +290,7 @@ class GaussianDiffusion(nn.Module):
         for t in reversed(range(0, start_timestep)):
             img, x_start = self.p_sample(img, t, context)
             img = self._apply_conditioning(img, condition)
-            img[:, -1, 8] += 1.0e-3
+            #img[:, -1, 8] = img[:, 0, 8] + np.pi / 4.0
             imgs.append(img)
 
         ret = img if not return_all_timesteps else torch.stack(imgs, dim=1)
@@ -329,7 +333,7 @@ class GaussianDiffusion(nn.Module):
                 img[:, i - 1, -1, :9] = img[:, i, 0, :9]
 
             img[:, 0] = self._apply_conditioning(img[:, 0], condition)
-            img[:, -1, -1, 8] += 1.0e-3
+            #img[:, -1, -1, 8] += 1.0e-3
             imgs.append(img)
 
         ret = img if not return_all_timesteps else torch.stack(imgs, dim=1)
@@ -395,8 +399,9 @@ class GaussianDiffusion(nn.Module):
             # combine samples
             combined_samples = [sample[:, i, :-1] for i in range(0, factor-1)]
             combined_samples.append(sample[:, -1])
+            sample = torch.cat([sample[:, i] for i in range(0, factor)], dim=1)
             # get combined trajectory
-            sample = torch.cat(combined_samples, dim=1)
+            #sample = torch.cat(combined_samples, dim=1)
             return sample
 
         return sample_fn((B * N, H, self.xu_dim), condition=condition, context=context,
@@ -420,21 +425,36 @@ class GaussianDiffusion(nn.Module):
             raise ValueError(f'invalid loss type {self.loss_type}')
 
     def p_losses(self, x_start, t, context, noise=None, mask=None):
+        B = x_start.shape[0]
         noise = default(noise, lambda: torch.randn_like(x_start))
         x = self.q_sample(x_start=x_start, t=t, noise=noise)
 
         # mask defines in-painting, model should receive un-noised copy of masked states
+        # note -- only mask states, not controls
         masked_idx = (mask == 0).nonzero()
-        x[masked_idx[:, 0], masked_idx[:, 1]] = x_start[masked_idx[:, 0], masked_idx[:, 1]]
+        x[masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]] = x_start[masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]]
+
+        # ensure angle between [-1, 1]
+        x[..., 8] = ((x[..., 8] + 1.0) % 2.0) - 1.0
+
         # predict and take gradient step
         model_out = self.model.compiled_conditional_train(t, x, context)
-
-        loss = self.loss_fn(model_out, noise, reduction='none')
+        # TODO need to figure out how to do loss that respects wrap-around
+        #loss = self.loss_fn(model_out, noise, reduction='none')
+        diff = model_out - noise
+        # diff is also an angle, so map between [-1, 1]
+        # TODO not sure what this does for gradients??
+        diff[..., 8] = ((diff[..., 8] + 1.0) % 2.0) - 1.0
+        # account for -1 and 1 having zero distance
+        #diff[..., 8] = torch.where(diff[..., 8].abs() > 1.0, 1.0 - diff[..., 8], diff[..., 8]
+        loss = diff ** 2
+        # diff for angle
+        #
 
         # apply mask
         if mask is not None:
-            loss = loss * mask[:, :, None]
-            loss = loss.sum(dim=1) / mask.sum(dim=1).reshape(-1, 1)
+            loss = loss * mask
+            loss = loss.reshape(B, -1).sum(dim=1) / mask.reshape(B, -1).sum(dim=1)
 
         # loss = reduce(loss, 'b ... -> b (...)', 'mean')
         # loss = loss * extract(self.loss_weight, t, loss.shape)
