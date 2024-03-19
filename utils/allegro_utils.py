@@ -44,7 +44,7 @@ def combine_finger_constraints(func):
         # Get values from dict
         xu = kwargs.pop('xu', None)
         if xu is None:
-            xu = args[1]
+            xu = args[0]
 
         compute_grads = kwargs.pop('compute_grads', True)
         compute_hess = kwargs.pop('compute_hess', False)
@@ -82,3 +82,5 @@ def state2ee_pos(state, finger_name, fingers, chain, frame_indices, world_trans)
     points_finger_frame = torch.tensor([0.00, 0.03, 0.00], device=m.device).unsqueeze(0)
     ee_p = m.transform_points(points_finger_frame).squeeze(-2)
     return ee_p
+
+
