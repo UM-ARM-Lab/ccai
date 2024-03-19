@@ -5,7 +5,7 @@ num_steps: 15
 num_trials: 20
 num_turns: 4
 visualize: True
-experiment_name: 'allegro_turning_data_collection_7'
+experiment_name: 'tmp'
 hardware: False
 valve_type: 'cylinder'
 sim_device: 'cuda:0'
@@ -19,8 +19,8 @@ controllers:
     step_size: 0.1
     momentum: 0.
     device: 'cuda:0'
-    online_iters: 100
-    warmup_iters: 500
+    online_iters: 20
+    warmup_iters: 100
     # warmup_iters: 10
     resample_steps: 1
     resample_sigma: 0.01
@@ -28,6 +28,7 @@ controllers:
     penalty: 10000
     collision_checking: False
     joint_friction: 0.0
+    #model_path: 'data/training/allegro_valve/allegro_new_dataset_augment_angle_masked_2_diffusion/allegro_valve_diffusion.pt'
 #  ipopt:
 #    device: 'cpu'
 #    online_iters: 10

@@ -44,6 +44,7 @@ class ToyProblem(ConstrainedSVGDProblem):
         self.dz = 1
         self.dg = 1
         self.dh = self.dz
+        self.squared_slack = True
 
         self.mog = MixtureOfGaussians(
             means=torch.tensor([[0.3, 0.8],
@@ -66,11 +67,14 @@ class ToyProblem(ConstrainedSVGDProblem):
         self.x_max = 2 * torch.ones(2)
         self.x_min = -self.x_max
 
+    def _preprocess(self, x):
+        pass
+
     def _objective(self, x):
         alpha = 2
         return alpha * -self.mog.log_prob(x), alpha * -self.grad_log_prob(x), None
 
-    def _con_eq(self, x, compute_grads=True):
+    def _con_eq(self, x, compute_grads=True, compute_hess=True):
         x = x.reshape(-1, self.dx)
         N = x.shape[0]
         g = x[:, 0] ** 2 + x[:, 1] ** 2 - 1.0
@@ -79,11 +83,15 @@ class ToyProblem(ConstrainedSVGDProblem):
             return g, None, None
 
         grad_g = 2 * x.reshape(N, 1, 2)
+
+        if not compute_hess:
+            return g, grad_g, None
+
         hess_g = 2 * torch.eye(2, device=self.device).repeat(N, 1, 1).reshape(N, 1, 2, 2)
 
         return g, grad_g, hess_g
 
-    def _con_ineq(self, x, compute_grads=True):
+    def _con_ineq(self, x, compute_grads=True, compute_hess=True):
         a = 1.5
         b = 0
         x = x.reshape(-1, self.dx)
@@ -103,6 +111,8 @@ class ToyProblem(ConstrainedSVGDProblem):
         grad_h[:, 0, 0] = 3 * a1 * x[:, 0] ** 2 + 2 * a2 * x[:, 0] + a1
         grad_h[:, 0, 1] = -1
 
+        if not compute_hess:
+            return h, grad_h, None
         hess_h = torch.zeros(N, 1, 2, 2, device=self.device)
         hess_h[:, 0, 0, 0] = 6 * a1 * x[:, 0] + 2 * a2
         return h, grad_h, hess_h
@@ -141,14 +151,14 @@ if __name__ == "__main__":
     toy_problem = ToyProblem(device=device)
 
     params = {
-        'N': 100,
-        'step_size': 0.1,
+        'N': 50,
+        'step_size': 0.25,
         'momentum': 0.0,
-        'iters': 200,
-        'alpha_J': 0.5,
+        'iters': 250,
+        'alpha_J': 0.1,
         'alpha_C': 1,
-        'resample_sigma': 0.01,
-        'resample_temperature': 1
+        'resample_sigma': 0.05,
+        'resample_temperature': 0.25
     }
 
     optimizer = ConstrainedSteinTrajOpt(toy_problem, params)
@@ -181,9 +191,11 @@ if __name__ == "__main__":
 
     plt.xlim([-2, 2])
     plt.ylim([-2, 2])
-    sc = plt.scatter(particle_path[0, :, 0], particle_path[0, :, 1])
     plt.contour(xx, yy, density, levels=50)
     plt.gca().add_patch(circle)
+
+    sc = plt.scatter(particle_path[0, :, 0], particle_path[0, :, 1])
+
     plt.axis('off')
     import pathlib
 
@@ -191,9 +203,9 @@ if __name__ == "__main__":
 
     fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/toy_problem')
     pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
-    plt.savefig(f'{fpath}/plot_000.png')
+    plt.savefig(f'{fpath}/plot_000.pdf', bbox_inches='tight')
     for i, particle in enumerate(particle_path[1:]):
         print(particle.shape)
         # if i % 100 == 0:
         sc.set_offsets(particle[:, :2])
-        plt.savefig(f'{fpath}/plot_{i + 1:03d}.png')
+        plt.savefig(f'{fpath}/plot_{i + 1:03d}.pdf', bbox_inches='tight')

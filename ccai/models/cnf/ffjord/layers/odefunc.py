@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from flow_mpc.flows.ffjord.layers import diffeq_layers
-from flow_mpc.flows.ffjord.layers.squeeze import squeeze, unsqueeze
+from ccai.models.cnf.ffjord.layers import diffeq_layers
+from ccai.models.cnf.ffjord.layers.squeeze import squeeze, unsqueeze
 from torch.func import jacrev, vmap
 
 __all__ = ["ODEnet", "ODEfunc", 'RegularizedODEfunc']
