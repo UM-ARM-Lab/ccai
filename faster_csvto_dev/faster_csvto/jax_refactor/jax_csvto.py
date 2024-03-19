@@ -7,7 +7,6 @@ import jax.numpy as jnp
 # worrying about making this an extensible framework for other optimizers right now. I'm also trying to make the
 # notation more consistent with the paper for clarity.
 
-
 class JaxCSVTOProblem:
     """Class storing the optimization problem formulation to be used by the JaxCSVTOpt optimizer.
     """
@@ -165,8 +164,8 @@ class JaxCSVTOpt:
             xuz = x0
 
         # Loop over the gradient step iterations.
-        # xuz, _ = self._solve_iteration(1, (xuz, xuz[0, :self.dx]))
-        xuz, _ = jax.lax.fori_loop(1, self.K+1, self._solve_iteration, (xuz, xuz[0, :self.dx]), unroll=True)
+        xuz, _ = self._solve_iteration(1, (xuz, xuz[0, :self.dx]))
+        # xuz, _ = jax.lax.fori_loop(1, self.K+1, self._solve_iteration, (xuz, xuz[0, :self.dx]), unroll=True)
 
         # Find the lowest cost trajectory in the optimized distribution, and return it without slack variables.
         min_cost_trajectory = xuz[:, :self._trajectory_dim()][self.c(xuz[:, :self._trajectory_dim()]).argmin()]
@@ -191,10 +190,17 @@ class JaxCSVTOpt:
         # Evaluate the gradient of the cost function at the current state (without slack variables).
         c_grad = jax.vmap(jax.jacrev(self.cost))(xuz[:, :self._trajectory_dim()])
 
-        # Evaluate the combined constraint function, its gradient, and its hessian at the current augmented state.
+        # Evaluate the combined constraint function and its gradient at the current augmented state.
         constraint = jax.vmap(self._combined_constraint)(xuz, jnp.tile(initial_state, (self.N, 1)))
         constraint_grad = jax.vmap(jax.jacrev(self._combined_constraint))(xuz, jnp.tile(initial_state, (self.N, 1)))
-        constraint_hess = jax.vmap(jax.jacfwd(jax.jacrev(self._combined_constraint)))(xuz, jnp.tile(initial_state, (self.N, 1)))
+
+        # Compute the constraint hessian via its components, then compile them all together.
+        h_hess = jax.vmap(jax.jacfwd(jax.jacrev(self.h)))(xuz)
+        slack_constraint_hess = jnp.zeros((self.N, self.dg, self._trajectory_dim(), self._slack_trajectory_dim()))
+        dynamics_constraint_hess = jax.vmap(jax.jacfwd(jax.jacrev(self._dynamics_constraint)))(xuz)
+        start_constraint_hess = jax.vmap(jax.jacfwd(jax.jacrev(self._start_constraint)))(xuz, jnp.tile(initial_state, (self.N, 1)))
+        constraint_hess = jnp.concatenate((h_hess, slack_constraint_hess, dynamics_constraint_hess,
+                                           start_constraint_hess), axis=1)
 
         # Evaluate the kernel function and its gradient at the current state (without slack variables).
         k = self.k(xuz[:, :self._trajectory_dim()].reshape(self.N, self.T, self.dx + self.du),

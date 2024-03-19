@@ -37,13 +37,13 @@ class GPSurfaceModel:
         # TODO: Fix these operations. Avoiding right now to avoid diag_embed, the mean() is not appropriate. Without,
         #  output shapes are (12, 100, 12, 2) and (12, 100, 12, 2, 12, 2). Should be (12, 100, 2) and (12, 100, 2, 2).
         #  May need to reimplement a non-batched version then vmap(grad()) to get the autodiff dimensionality right.
-        grad_K = jax.jacrev(self.kernel)(x, self.train_x).mean(axis=2)
-        hess_K = jax.jacfwd(jax.jacrev(self.kernel))(x, self.train_x).mean(axis=2).mean(axis=3)
+        # grad_K = jax.jacrev(self.kernel)(x, self.train_x).mean(axis=2)
+        # hess_K = jax.jacfwd(jax.jacrev(self.kernel))(x, self.train_x).mean(axis=2).mean(axis=3)
         eye = jnp.eye(len(self.train_x))
 
         # compute [K + sigma_sq I]^-1 y
         tmp = jnp.linalg.solve(train_K + self.sigma_sq_noise * eye, self.train_y.reshape(-1, 1))
         y = K @ tmp
-        grad_y = grad_K.transpose(0, 2, 1) @ tmp
-        hess_y = hess_K.transpose(0, 2, 3, 1) @ tmp
-        return y.squeeze(-1), grad_y.squeeze(-1), hess_y.squeeze(-1)
+        # grad_y = grad_K.transpose(0, 2, 1) @ tmp
+        # hess_y = hess_K.transpose(0, 2, 3, 1) @ tmp
+        return y.squeeze(-1)#, grad_y.squeeze(-1), hess_y.squeeze(-1)

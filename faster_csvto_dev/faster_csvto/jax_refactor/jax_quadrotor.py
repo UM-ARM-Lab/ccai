@@ -1,15 +1,21 @@
+import time
+from typing import Optional, Callable
+
 import numpy as np
-import os
 import jax
 import jax.numpy as jnp
+from matplotlib import pyplot as plt
 
+from ccai.quadrotor_env import QuadrotorEnv
 from jax_csvto import JaxCSVTOProblem, JaxCSVTOParams, JaxCSVTOpt
 from jax_gp import GPSurfaceModel
 from jax_rbf_kernels import structured_rbf_kernel
 
 # from jax import config
+# config.update("jax_enable_x64", True)
 # config.update("jax_debug_nans", True)
 
+# import os
 # os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 # os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = ".50"
 # os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
@@ -195,7 +201,7 @@ def height_constraint(trajectory: jnp.array, surface_gp: GPSurfaceModel) -> jnp.
     xy, z = trajectory[:, :2], trajectory[:, 2]
 
     # compute z of surface and gradient and hessian
-    surface_z, grad_surface_z, hess_surface_z = surface_gp.posterior_mean(xy)
+    surface_z = surface_gp.posterior_mean(xy)
 
     constr = surface_z - z
     return constr
@@ -222,13 +228,88 @@ class QuadrotorGPHeightConstraint:
         return height_constraint(trajectory, self.surface_gp)
 
 
+def update_plot_with_trajectories(ax, point_dim: int, best_trajectory: np.array,
+                                  other_trajectories: Optional[np.array] = None) -> None:
+    """
+
+    Args:
+        ax:
+        point_dim:
+        best_trajectory:
+        other_trajectories:
+    """
+    # Clear any of the previous lines.
+    for line in ax.get_lines():
+        line.remove()
+
+    if other_trajectories is None:
+        # Only plot the best trajectory.
+        ax.plot(best_trajectory[0::point_dim], best_trajectory[1::point_dim], best_trajectory[2::point_dim], color='g')
+
+    else:
+        # Plot all trajectories.
+        pass
+
+
+def plot_trajectory(env: QuadrotorEnv, ax, state_dim, trajectory, number):
+    """
+
+    """
+    env.render_update()
+    update_plot_with_trajectories(ax, state_dim, trajectory)
+    plt.savefig(f'output/mpc{number:02d}.png')
+    plt.gcf().canvas.flush_events()
+
+
+def get_initial_guess_from_start_state(start_state: np.array, N: int, T: int, dx: int, du: int,
+                                       dynamics_function: Callable) -> np.array:
+    """Get an initial guess by rolling out trajectories from a given start using randomly sampled inputs.
+
+    Args:
+        start_state:
+        N:
+        T:
+        du:
+        dynamics_function:
+
+    Returns:
+        A reasonable initial guess for the distribution of trajectories.
+    """
+    trajectories = np.tile(start_state, (N, 1))
+
+    # Sample and scale random inputs.
+    control_inputs = np.random.randn(T, N, du)
+    control_inputs[:, :, 1:] *= 0.25
+
+    # Roll out random inputs.
+    for t in range(T - 1):
+        trajectories = np.concatenate((trajectories,
+                                       control_inputs[t],
+                                       dynamics_function(trajectories[:, -dx:], control_inputs[t])), axis=1)
+    trajectories = np.concatenate((trajectories, control_inputs[-1]), axis=1)
+    return trajectories
+
+
+def profile():
+    """
+
+    """
+    # # Run the optimizer.
+    # start = time.time()
+    # for _ in range(100):
+    #     solution = solve_compiled(initial_guess)
+    # end = time.time()
+    # print('runtime', end - start)
+    # print(solution)
+
+
 def main() -> None:
     """Set up, compile, and solve a JaxCSVTOpt for the quadrotor problem with no obstacles.
     """
     # Set up the problem.
     goal_state = jnp.zeros(12, dtype=jnp.float32)
     cost_function = QuadrotorCost(goal_state)
-    equality_constraint_function = QuadrotorGPHeightConstraint('surface_data.npz')
+    equality_constraint_function = QuadrotorGPHeightConstraint('../surface_data.npz')
     inequality_constraint_function = None
     dynamics_function = QuadrotorDynamics()
     u_bounds = (jnp.array((-100.0000, -100.0000, -100.0000, -100.0000)),
@@ -246,7 +327,7 @@ def main() -> None:
 
     # Set up the parameters.
     k = structured_rbf_kernel
-    N = 8
+    N = 1
     T = 12
     K = 1
     anneal = True
@@ -256,12 +337,44 @@ def main() -> None:
     penalty_weight = 1e2
     quadrotor_parameters = JaxCSVTOParams(k, N, T, K, anneal, alpha_J, alpha_C, step_scale, penalty_weight)
 
-    # Set up and solve the optimization.
+    # Set up the optimization and compile its solve() routine.
     quadrotor_opt = JaxCSVTOpt(quadrotor_problem, quadrotor_parameters)
-    initial_guess = jnp.array(np.random.random([8, 16 * 12]), dtype=jnp.float32)
+    initial_guess = jnp.array(np.random.random([N, 16 * 12]), dtype=jnp.float32)
+    solve_compiled = jax.jit(quadrotor_opt.solve).lower(initial_guess).compile()
+    # solution = solve_compiled(initial_guess)
+    # print(solution)
 
-    solution = quadrotor_opt.solve(initial_guess)
-    print(solution)
+    # Initialize the environment.
+    env = QuadrotorEnv(False, '../surface_data.npz')
+    env.reset()
+    env.render_init()
+    ax = env.ax
+
+    # Get the start from the environment.
+    best_trajectory = get_initial_guess_from_start_state(env.state, N, T, dx, du, dynamics_function)[:1, :]
+
+    # Run the solver for warmup iterations.
+    for _ in range(1000):
+        best_trajectory = jnp.expand_dims(solve_compiled(best_trajectory), axis=0)
+
+    # Plot the best trajectory.
+    plot_trajectory(env, ax, dx + du, best_trajectory.squeeze(), 0)
+
+    # Loop over MPC updates.
+    for mpc_step in range(2):
+        # Loop over solver online iterations.
+        for _ in range(10):
+            best_trajectory = jnp.expand_dims(solve_compiled(best_trajectory), axis=0)
+
+        # Shift the trajectory forward one timestep by dropping the first point and adding a new point to the end.
+        best_trajectory = jnp.concatenate((best_trajectory[:, dx + du:],
+                                           dynamics_function(best_trajectory.reshape(N, T, dx + du)[:, -1, :dx],
+                                                             best_trajectory.reshape(N, T, dx + du)[:, -1, -du:]),
+                                           best_trajectory[:, -du:]), axis=1)
+
+        # Plot the best trajectory.
+        print(f'Ran MPC step {mpc_step}')
+        plot_trajectory(env, ax, dx + du, best_trajectory.squeeze(), mpc_step+1)
 
 
 if __name__ == '__main__':

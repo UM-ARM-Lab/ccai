@@ -1,5 +1,6 @@
 from typing import Tuple
 
+import jax
 import jax.numpy as jnp
 
 EPS = 1e-9
@@ -56,7 +57,10 @@ def rbf_kernel(X: jnp.array, X_bar: jnp.array) -> jnp.array:
                                elementwise_difference.reshape(-1, l, 1)).reshape(N, N)
 
     # Compute the kernel bandwidth via equation (48).
-    h = jnp.median(jnp.sqrt(difference_norm_squared)) ** 2 / jnp.log(N)
+    if N == 1:
+        h = jax.lax.stop_gradient(jnp.median(jnp.sqrt(difference_norm_squared)) ** 2 / jnp.log(2))
+    else:
+        h = jax.lax.stop_gradient(jnp.median(jnp.sqrt(difference_norm_squared)) ** 2 / jnp.log(N))
 
     # Compute the RBF kernel with an extra weight in the denominator for numerical stability.
     batched_rbf_kernel = jnp.exp(-difference_norm_squared / (h + EPS))
@@ -96,7 +100,10 @@ def structured_rbf_kernel(X: jnp.array, X_bar: jnp.array) -> jnp.array:
                                elementwise_difference.reshape(-1, l, 1)).reshape(M, N, N)
 
     # Compute the kernel bandwidth via equation (48).
-    h = jnp.median(jnp.sqrt(difference_norm_squared)) ** 2 / jnp.log(N)
+    if N == 1:
+        h = jax.lax.stop_gradient(jnp.median(jnp.sqrt(difference_norm_squared)) ** 2 / jnp.log(2))
+    else:
+        h = jax.lax.stop_gradient(jnp.median(jnp.sqrt(difference_norm_squared)) ** 2 / jnp.log(N))
 
     # Compute the kernel according to equation (47) with an extra weight in the denominator for numerical stability.
     structured_rbf_kernel_output = jnp.exp(-difference_norm_squared / (h + EPS)).mean(axis=0)
