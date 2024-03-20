@@ -11,8 +11,7 @@ class JaxCSVTOProblem:
     """Class storing the optimization problem formulation to be used by the JaxCSVTOpt optimizer.
     """
 
-    # TODO: It would be ideal to either deduce the dimensionality automatically, for now jax.experimental.checkify() is
-    #   used for runtime assertion in the jit compiled solve() function.
+    # TODO: It would be ideal to either deduce the dimensionality automatically.
     def __init__(self,
                  c: Callable[[jnp.array], jnp.array],
                  h: Callable[[jnp.array], jnp.array],
@@ -128,7 +127,7 @@ class JaxCSVTOpt:
         self.anneal: bool = params.anneal
         self.alpha_J: jnp.float32 = params.alpha_J
         self.alpha_C: jnp.float32 = params.alpha_C
-        self.step_scale: jnp.float32 = params.step_scale
+        self.step_scale: jnp.float32 = params.step_scale  # TODO: currently unused.
         self.penalty_weight: jnp.float32 = params.penalty_weight
 
         # Store configuration.
@@ -168,8 +167,9 @@ class JaxCSVTOpt:
         # xuz, _ = jax.lax.fori_loop(1, self.K+1, self._solve_iteration, (xuz, xuz[0, :self.dx]), unroll=True)
 
         # Find the lowest cost trajectory in the optimized distribution, and return it without slack variables.
-        min_cost_trajectory = xuz[:, :self._trajectory_dim()][self.c(xuz[:, :self._trajectory_dim()]).argmin()]
-        return min_cost_trajectory
+        min_cost_trajectory = xuz[:, :self._trajectory_dim()][self.c(xuz[:, :self._trajectory_dim()]).argmin(), :]
+        other_trajectories = xuz[:, :self._trajectory_dim()]
+        return min_cost_trajectory, other_trajectories
 
     def _solve_iteration(self, iteration: int, xuz_initial_state: Tuple[jnp.array, jnp.array]) -> jnp.array:
         """Compute a single retraction step for the optimizer and return the updated state.
@@ -422,73 +422,3 @@ class JaxCSVTOpt:
         """Get the length of a single trajectory with slack variables.
         """
         return (self.dx + self.du) * self.T + self.dg
-
-    # def _dynamics_constraint(self, xuz: jnp.array) -> jnp.array:
-    #     """Compute the dynamics constraint which enforces that the points in each trajectory spline are in fact related
-    #     by the supplied dynamics function. This function's output will be constrained to zero in the optimizer.
-    #
-    #     Args:
-    #         xuz: All N trajectories including slack variables stacked as rows, shape (N, (dx + du) * T + dg).
-    #
-    #     Returns:
-    #         The dynamics error on every point except the first one in every trajectory, shape (N, dx * (T - 1)).
-    #     """
-    #     assert xuz.shape == (self.N, self._slack_trajectory_dim())
-    #
-    #     # Index out the state-space points for each trajectory spline, to get inputs for batched dynamics function.
-    #     points = xuz[:, :self._trajectory_dim()].reshape(self.N * self.T, self.dx + self.du)
-    #     states = points[:, :self.dx]
-    #     control_inputs = points[:, -self.du:]
-    #
-    #     # Compute the error of the dynamics function in predicting the next state along each spline.
-    #     states_forward_one_without_last = self.f(states, control_inputs).reshape(self.N, self.T * self.dx)[:, :-self.dx]
-    #     states_without_first = states.reshape(self.N, self.T * self.dx)[:, self.dx:]
-    #     dynamics_error = states_forward_one_without_last - states_without_first
-    #     assert dynamics_error.shape == (self.N, self.dx * (self.T - 1))
-    #     return dynamics_error
-    #
-    # def _start_constraint(self, xuz: jnp.array, initial_state: jnp.array) -> jnp.array:
-    #     """Compute the start constraint function which enforces that the starting state in the trajectories is the same
-    #     as the supplied initial state. This function's output will be constrained to zero in the optimizer.
-    #
-    #     Args:
-    #         xuz: All N trajectories including slack variables stacked as rows, shape (N, (dx + du) * T + dg).
-    #         initial_state: The state of the initial condition for the trajectories, shape (dx,).
-    #
-    #     Returns:
-    #         The start error on every trajectory, shape (N, dx).
-    #     """
-    #     assert xuz.shape == (self.N, self._slack_trajectory_dim())
-    #
-    #     start_error = xuz[:, :self.dx] - initial_state
-    #     assert start_error.shape == (self.N, self.dx)
-    #     return start_error
-
-    # def _combined_constraint(self, xuz: jnp.array, initial_state: jnp.array) -> jnp.array:
-    #     """Compute the combined equality constraint function. This should be formed from composition of the specified
-    #     equality constraints, specified inequality constraints paired with slack variables, dynamics constraints, and an
-    #     additional constraint for keeping the initial state in place.
-    #
-    #     Args:
-    #         xuz: All N trajectories including slack variables stacked as rows, shape (N, (dx + du) * T + dg).
-    #         initial_state: The state of the initial condition for the trajectories, shape (dx,).
-    #
-    #     Returns:
-    #         The evaluated combined constraint, shape (N, dh + dg + dx * T).
-    #     """
-    #     # assert xuz.shape == (self.N, self._slack_trajectory_dim())
-    #     # assert initial_state.shape == (self.dx,)
-    #
-    #     if self.g is not None:
-    #         combined_constraint = jnp.concatenate((self.h(xuz[:, :self._trajectory_dim()]),
-    #                                                self._slack_constraint(xuz),
-    #                                                self._dynamics_constraint(xuz),
-    #                                                self._start_constraint(xuz, initial_state)), axis=1)
-    #     else:
-    #         equality_constraint = self.h(xuz[:, :self._trajectory_dim()])
-    #         dynamics_constraint = self._dynamics_constraint(xuz[:, :self._trajectory_dim()])
-    #         start_constraint = self._start_constraint(xuz[:, :self._trajectory_dim()], initial_state)
-    #         combined_constraint = jnp.concatenate((equality_constraint, dynamics_constraint, start_constraint),
-    #                                               axis=1)
-    #     assert combined_constraint.shape == (self.N, self.dh + self.dg + self.dx * self.T)
-    #     return combined_constraint

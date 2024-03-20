@@ -1,5 +1,3 @@
-from typing import Tuple
-
 import jax
 import jax.numpy as jnp
 
@@ -19,21 +17,6 @@ def get_window_splits(X: jnp.array, window_size: int=3) -> jnp.array:
     """
     splits = jnp.stack([X[:, i:i + window_size] for i in range(0, X.shape[1] - window_size + 1)], axis=0)
     return splits
-
-
-# def get_window_splits(X: jnp.array, window_size: int=4) -> jnp.array:
-#     """Break a trajectory into splits of size `window_size`, where windows are slid incrementally along each
-#     point in each trajectory spline (along axis 0) to generate individual splits.
-#
-#     Args:
-#         X: A trajectory, shape (T, d).
-#         window_size: The size of the sliding window.
-#
-#     Returns:
-#         The window splits for the trajectory, shape (T - window_size + 1, window_size, d).
-#     """
-#     splits = jnp.stack([X[i:i + window_size, :] for i in range(0, X.shape[0] - window_size + 1)], axis=0)
-#     return splits
 
 
 def rbf_kernel(X: jnp.array, X_bar: jnp.array) -> jnp.array:
