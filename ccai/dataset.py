@@ -7,9 +7,10 @@ from torch.utils.data import Dataset
 
 class AllegroValveDataset(Dataset):
 
-    def __init__(self, folders, turn=True, regrasp=True):
+    def __init__(self, folders, turn=True, regrasp=True, cosine_sine=True):
         super().__init__()
         assert (turn or regrasp)
+        self.cosine_sine = cosine_sine
         # TODO: only using trajectories for now, also includes closest points and their sdf values
         turn_trajectories = []
         turn_starts = []
@@ -95,7 +96,11 @@ class AllegroValveDataset(Dataset):
         self.masks = self.masks.reshape(-1, self.masks.shape[-2])
         self.trajectories = torch.from_numpy(self.trajectories).float()
         self.masks = torch.from_numpy(self.masks).float()
-        self.masks = self.masks[:, :, None].repeat(1, 1, 17) # for states
+        if self.cosine_sine:
+            dx = 18
+        else:
+            dx = 17
+        self.masks = self.masks[:, :, None].repeat(1, 1, dx) # for states
         # self.trajectories[:, :, 8] += np.pi # add pi to the valve angle
         ## some wrap around issues here:
         # self.trajectories[:, :, 8] = torch.where(self.trajectories[:, :, 8] > np.pi,
@@ -129,11 +134,13 @@ class AllegroValveDataset(Dataset):
         traj[:, 8] += np.pi
         traj[:, 8] = traj[:, 8] % (2.0 * np.pi)
         traj[:, 8] = traj[:, 8] - np.pi # subtract to make [-pi, pi]
-
-        # traj[:, 8] += 0.01 * torch.randn(traj.shape[0])
-        ## randomly mask out some of the trajectory -- how to do this?
-        #mask = self.mask_dist.sample((traj.shape[0],)).to(device=traj.device)
-        #mask = mask * self.masks[idx]
+        dx = 9
+        if self.cosine_sine:
+            traj_q = traj[:, :8]
+            traj_theta = traj[:, 8][:, None]
+            traj_u = traj[:, :8]
+            dx = 10
+            traj = torch.cat((traj_q, torch.cos(traj_theta), torch.sin(traj_theta), traj_u), dim=1)
 
         # randomly mask the initial state and the final state
         # need to find the final state - last part of mask that is 1
@@ -141,11 +148,11 @@ class AllegroValveDataset(Dataset):
         mask = self.masks[idx].clone()
 
         # sample mask for initial state
-        mask[0, :9] = self.initial_state_mask_dist.sample((1,)).to(device=traj.device)
+        mask[0, :dx] = self.initial_state_mask_dist.sample((1,)).to(device=traj.device)
 
         # sample mask for final state
 
-        mask[final_idx, :9] = self.initial_state_mask_dist.sample((1,)).to(device=traj.device)
+        mask[final_idx, :dx] = self.initial_state_mask_dist.sample((1,)).to(device=traj.device)
 
         # also mask out the rest with small probability
         mask = mask * self.mask_dist.sample((mask.shape[0],)).to(device=traj.device).reshape(-1, 1)
@@ -166,10 +173,19 @@ class AllegroValveDataset(Dataset):
         std = np.sqrt(np.average((x - mean) ** 2, weights=mask, axis=0))
 
         # for angle we force to be between [-1, 1]
-        mean[8] = 0
-        std[8] = np.pi
-        self.mean = mean
-        self.std = torch.from_numpy(std).float()
+        if self.cosine_sine:
+            self.mean = torch.zeros(18)
+            self.std = torch.ones(18)
+            self.mean[:8] = mean[:8]
+            self.std[:8] = torch.from_numpy(std[:8]).float()
+            self.mean[-8:] = mean[-8:]
+            self.std[-8:] = torch.from_numpy(std[-8:]).float()
+
+        else:
+            mean[8] = 0
+            std[8] = np.pi
+            self.mean = mean
+            self.std = torch.from_numpy(std).float()
 
     def set_norm_constants(self, mean, std):
         self.mean = mean
