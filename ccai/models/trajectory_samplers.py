@@ -133,7 +133,7 @@ class TrajectoryDiffusionModel(nn.Module):
                                                      sampling_timesteps=timesteps, hidden_dim=hidden_dim,
                                                      unconditional=unconditional)
 
-    def sample(self, N, H=None, start=None, goal=None, constraints=None):
+    def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None):
         # B, N, _ = constraints.shape
         if constraints is not None:
             B = constraints.shape[0]
@@ -143,8 +143,12 @@ class TrajectoryDiffusionModel(nn.Module):
         else:
             context = None
         condition = {}
+        time_index = 0
+        if past is not None:
+            condition[0] = [0, past]
+            time_index = past.shape[1]
         if start is not None:
-            condition[0] = [0, start]
+            condition[time_index] = [0, start]
         if goal is not None:
             condition[-1] = [8, goal]
         if condition == {}:
@@ -174,12 +178,28 @@ class TrajectoryDiffusionModel(nn.Module):
                              constraints), dim=-1)
         return self.diffusion_model.model_predictions(trajectories, t, context=context).pred_noise
 
-    def resample(self, start, goal, constraints, initial_trajectory, timestep):
-        B, N, _ = constraints.shape
-        context = torch.cat((start.unsqueeze(1).repeat(1, N, 1),
-                             goal.unsqueeze(1).repeat(1, N, 1),
-                             constraints), dim=-1)
-        condition = {0: start}
+    def resample(self, start, goal, constraints, initial_trajectory, past, timestep):
+        # B, N, _ = constraints.shape
+        N, H, _ = initial_trajectory.shape
+        if constraints is not None:
+            B = constraints.shape[0]
+            context = torch.cat((start.unsqueeze(1).repeat(1, N, 1),
+                                 goal.unsqueeze(1).repeat(1, N, 1),
+                                 constraints), dim=-1)
+        else:
+            context = None
+        condition = {}
+        time_index = 0
+        if past is not None:
+            condition[0] = [0, past]
+            time_index = past.shape[1]
+        if start is not None:
+            condition[time_index] = [0, start]
+        if goal is not None:
+            condition[-1] = [8, goal]
+        if condition == {}:
+            condition = None
+
         samples = self.diffusion_model.resample(x=initial_trajectory, context=context, condition=condition,
                                                 timestep=timestep).reshape(-1, self.T, self.dx + self.du)
         return samples
@@ -239,19 +259,29 @@ class TrajectorySampler(nn.Module):
     def send_norm_constants_to_submodels(self):
         self.model.set_norm_constants(self.x_mean, self.x_std)
 
-    def sample(self, N, H=10, start=None, goal=None, constraints=None):
+    def sample(self, N, H=10, start=None, goal=None, constraints=None, past=None):
         norm_start = None
+        norm_past = None
         if start is not None:
             norm_start = (start - self.x_mean[:self.dx]) / self.x_std[:self.dx]
+        if past is not None:
+            norm_past = (past - self.x_mean) / self.x_std
 
-        samples = self.model.sample(N, H, norm_start, goal, constraints)
+        samples = self.model.sample(N, H, norm_start, goal, constraints, norm_past)
         return samples * self.x_std + self.x_mean
 
-    def resample(self, start, goal, constraints, initial_trajectory, timestep):
-        norm_start = (start - self.x_mean[:self.dx]) / self.x_std[:self.dx]
-        norm_initial_trajectory = (initial_trajectory - self.x_mean) / self.x_std
+    def resample(self, start=None, goal=None, constraints=None, initial_trajectory=None, past=None, timestep=10):
+        norm_start = None
+        norm_initial_trajectory = None
+        norm_past = None
+        if start is not None:
+            norm_start = (start - self.x_mean[:self.dx]) / self.x_std[:self.dx]
+        if initial_trajectory is not None:
+            norm_initial_trajectory = (initial_trajectory - self.x_mean) / self.x_std
+        if past is not None:
+            norm_past = (past - self.x_mean) / self.x_std
 
-        return self.model.resample(norm_start, goal, constraints, norm_initial_trajectory,
+        return self.model.resample(norm_start, goal, constraints, norm_initial_trajectory, norm_past,
                                    timestep) * self.x_std + self.x_mean
 
     def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):

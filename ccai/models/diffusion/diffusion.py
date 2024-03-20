@@ -269,8 +269,9 @@ class GaussianDiffusion(nn.Module):
             return x
 
         for t, (start_idx, val) in condition.items():
-            n, d = val.shape
-            x[:, t, start_idx:start_idx + d] = val.clone()
+            val = val.reshape(val.shape[0], -1, val.shape[-1])
+            n, h, d = val.shape
+            x[:, t:t+h, start_idx:start_idx + d] = val.clone()
         return x
 
     @torch.no_grad()
@@ -473,9 +474,10 @@ class GaussianDiffusion(nn.Module):
         self.std = std
 
     def resample(self, x, condition, context, timestep):
-        B, num_constraints, dc = context.shape
-        N, _, _ = x.shape
-        assert (B == N)
+        B = x.shape[0]
+        if context is not None:
+            B, num_constraints, dc = context.shape
+            context = context.reshape(B, 1, num_constraints, dc).repeat(1, N, 1, 1).reshape(B * N, num_constraints, -1)
 
         ##context = context.reshape(B, 1, num_constraints, dc).repeat(1, N, 1, 1).reshape(B * N, num_constraints, -1)
 
@@ -483,12 +485,13 @@ class GaussianDiffusion(nn.Module):
         # takes a current data estimate x_0, samples from forward diffusion to noise to x_timestep < T
         # then runs reverse diffusion to get a new updated sample
         # what if we noise it a little less than we were supposed to
+        print(timestep)
         batched_times = torch.full((B,), timestep, device=x.device, dtype=torch.long)
 
-        x_noised = self.q_sample(x, batched_times)
+        x_noised = self.q_sample(x, batched_times-1)
         # x_noised = x
         # return resampled
-        return self.p_sample_loop(x.shape, condition, context,
+        return self.p_sample_loop(x.shape, condition=condition, context=context,
                                   return_all_timesteps=False,
                                   start_timestep=timestep,
                                   trajectory=x_noised)
