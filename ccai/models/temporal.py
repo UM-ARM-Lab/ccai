@@ -153,7 +153,7 @@ class TemporalUnet(nn.Module):
     def vmapped_fwd(self, t, x, context=None):
         return self(t.reshape(1), x.unsqueeze(0), context.unsqueeze(0)).squeeze(0)
 
-    # @torch.compile(mode='reduce-overhead')
+    @torch.compile(mode='max-autotune')
     def forward(self, t, x, context=None, dropout=False):
         '''
             x : [ batch x horizon x transition ]

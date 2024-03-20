@@ -260,7 +260,7 @@ class GaussianDiffusion(nn.Module):
         # pred_img[:, -1, 8] += 0.01
 
         # force angle to be between [-1, 1]
-        pred_img[..., 8] = ((pred_img[..., 8] + 1.0) % 2.0) - 1.0
+        #pred_img[..., 8] = ((pred_img[..., 8] + 1.0) % 2.0) - 1.0
 
         return pred_img, x_start
 
@@ -436,19 +436,19 @@ class GaussianDiffusion(nn.Module):
         x[masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]] = x_start[masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]]
 
         # ensure angle between [-1, 1]
-        x[..., 8] = ((x[..., 8] + 1.0) % 2.0) - 1.0
+        #x[..., 8] = ((x[..., 8] + 1.0) % 2.0) - 1.0
 
         # predict and take gradient step
         model_out = self.model.compiled_conditional_train(t, x, context)
         # TODO need to figure out how to do loss that respects wrap-around
-        #loss = self.loss_fn(model_out, noise, reduction='none')
-        diff = model_out - noise
-        # diff is also an angle, so map between [-1, 1]
-        # TODO not sure what this does for gradients??
-        diff[..., 8] = ((diff[..., 8] + 1.0) % 2.0) - 1.0
-        # account for -1 and 1 having zero distance
-        #diff[..., 8] = torch.where(diff[..., 8].abs() > 1.0, 1.0 - diff[..., 8], diff[..., 8]
-        loss = diff ** 2
+        loss = self.loss_fn(model_out, noise, reduction='none')
+        # diff = model_out - noise
+        # # diff is also an angle, so map between [-1, 1]
+        # # TODO not sure what this does for gradients??
+        # diff[..., 8] = ((diff[..., 8] + 1.0) % 2.0) - 1.0
+        # # account for -1 and 1 having zero distance
+        # #diff[..., 8] = torch.where(diff[..., 8].abs() > 1.0, 1.0 - diff[..., 8], diff[..., 8]
+        # loss = diff ** 2
         # diff for angle
         #
 

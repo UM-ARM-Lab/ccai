@@ -136,28 +136,47 @@ def train_model(trajectory_sampler, train_loader, config):
 
         # generate samples and plot them
         if (epoch + 1) % config['test_every'] == 0:
+            #
+            # count = 0
+            # if config['use_ema']:
+            #     test_model = ema_model
+            # else:
+            #     test_model = trajectory_sampler
+            #
+            # # we will plot for a variety of different horizons
+            # N = 8
+            # min_horizon = 16
+            # max_horizon = 32
+            # if config['sine_cosine']:
+            #     theta = 2 * np.pi * (torch.rand(1, device=config['device']) - 0.5)
+            #     start = torch.tensor([0.2, 0.5, 0.7, 0.7, 1.3, 0, 0.1, 1.0, torch.cos(theta), torch.sin(theta)], device=config['device'])
+            # else:
+            #     start = torch.tensor([0.2, 0.5, 0.7, 0.7, 1.3, 0, 0.1, 1.0, 0], device=config['device'])
+            #     start[-1] = 2 * np.pi * (torch.rand(1, device=config['device']) - 0.5)
+            # start = start[None, :].repeat(N, 1)
+            #
+            # for H in range(min_horizon, max_horizon + 1, 16):
+            #     plot_fpath = f'{fpath}/epoch_{epoch + 1}/horizon_{H}'
+            #     pathlib.Path.mkdir(pathlib.Path(plot_fpath), parents=True, exist_ok=True)
+            #     sampled_trajectories = test_model.sample(N, H=H, start=start)
+            #
+            #     if config['sine_cosine']:
+            #         eps = 1e-6
+            #         cos_theta = sampled_trajectories[:, :, 8].clamp(min=-1 + eps, max=1 - eps)
+            #         sin_theta = sampled_trajectories[:, :, 9].clamp(min=-1 + eps, max=1 - eps)
+            #         theta = torch.atan2(sin_theta, cos_theta)
+            #         sampled_trajectories = torch.cat((
+            #             sampled_trajectories[:, :, :8], theta[:, :, None], sampled_trajectories[:, :, -8:]
+            #         ), dim=-1)
+            #
+            #     # TODO: plot the sampled trajectories
+            #     visualize_trajectories(sampled_trajectories, config['scene'], plot_fpath, headless=False):
 
-            count = 0
             if config['use_ema']:
-                test_model = ema_model
+                torch.save(ema_model.state_dict(), f'{fpath}/allegro_valve_{config["model_type"]}.pt')
             else:
-                test_model = trajectory_sampler
-
-            # we will plot for a variety of different horizons
-            N = 8
-            min_horizon = 16
-            max_horizon = 32
-            start = torch.tensor([0.2, 0.5, 0.7, 0.7, 1.3, 0, 0.1, 1.0, 0], device=config['device'])
-            start[-1] = 2 * np.pi * (torch.rand(1, device=config['device']) - 0.5)
-            start = start[None, :].repeat(N, 1)
-
-            for H in range(min_horizon, max_horizon + 1, 16):
-                plot_fpath = f'{fpath}/epoch_{epoch + 1}/horizon_{H}'
-                pathlib.Path.mkdir(pathlib.Path(plot_fpath), parents=True, exist_ok=True)
-                sampled_trajectories = test_model.sample(N, H=H, start=start)
-                # TODO: plot the sampled trajectories
-                visualize_trajectories(sampled_trajectories, config['scene'], plot_fpath, headless=False)
-
+                torch.save(model.state_dict(),
+                           f'{fpath}/allegro_valve_{config["model_type"]}.pt')
     if config['use_ema']:
         torch.save(ema_model.state_dict(), f'{fpath}/allegro_valve_{config["model_type"]}.pt')
     else:
@@ -169,10 +188,15 @@ def test_long_horizon(model, loader, config):
     fpath = f'{CCAI_PATH}/data/training/allegro_valve/{config["model_name"]}_{config["model_type"]}/long_horizon'
     pathlib.Path.mkdir(pathlib.Path(fpath), parents=True, exist_ok=True)
     N = 16
-    start = torch.tensor([0.2, 0.5, 0.7, 0.7, 1.3, 0, 0.1, 1.0, 0], device=config['device'])
-    start[-1] = 2 * np.pi * (torch.rand(1, device=config['device']) - 0.5)
-    goal = 0.5 * torch.tensor([-np.pi / 2.0], device=config['device'])
+    if config['sine_cosine']:
+        theta = 2 * np.pi * (torch.rand(1, device=config['device']) - 0.5)
+        start = torch.tensor([0.2, 0.5, 0.7, 0.7, 1.3, 0, 0.1, 1.0, torch.cos(theta), torch.sin(theta)],
+                             device=config['device'])
+    else:
+        start = torch.tensor([0.2, 0.5, 0.7, 0.7, 1.3, 0, 0.1, 1.0, 0], device=config['device'])
+        start[-1] = 2 * np.pi * (torch.rand(1, device=config['device']) - 0.5)
 
+    goal = 0.5 * torch.tensor([-np.pi / 2.0], device=config['device'])
     start = start[None, :].repeat(N, 1)
     # goal = (goal[None, :].repeat(N, 1) - model.x_mean[8]) / model.x_std[8]
     # start=None
@@ -185,7 +209,15 @@ def test_long_horizon(model, loader, config):
     #    print(item[0, 0, :8].cuda() * model.x_std[:8] + model.x_mean[:8] - start[0, :8])
 
     # exit(0)
-    sampled_trajectories = model.sample(N=N, start=start, goal=goal, H=32)
+    sampled_trajectories = model.sample(N=N, start=start, goal=goal, H=32 * 4)
+    if config['sine_cosine']:
+        eps = 1e-6
+        cos_theta = sampled_trajectories[:, :, 8].clamp(min=-1 + eps, max=1 - eps)
+        sin_theta = sampled_trajectories[:, :, 9].clamp(min=-1 + eps, max=1 - eps)
+        theta = torch.atan2(sin_theta, cos_theta)
+        sampled_trajectories = torch.cat((
+            sampled_trajectories[:, :, :8], theta[:, :, None], sampled_trajectories[:, :, -8:]
+        ), dim=-1)
     visualize_trajectories(sampled_trajectories, config['scene'],
                            fpath, headless=False)
 
@@ -242,11 +274,16 @@ if __name__ == "__main__":
     config = yaml.safe_load(
         pathlib.Path(f'{CCAI_PATH}/config/training/allegro_valve_diffusion.yaml').read_text())
 
-    model = TrajectorySampler(T=config['T'], dx=config['dx'], du=config['du'], context_dim=0, type=config['model_type'],
+    if config['sine_cosine']:
+        dx = config['dx'] + 1
+    else:
+        dx = config['dx']
+
+    model = TrajectorySampler(T=config['T'], dx=dx, du=config['du'], context_dim=0, type=config['model_type'],
                               hidden_dim=config['hidden_dim'], timesteps=config['timesteps'])
 
     data_path = pathlib.Path(f'{CCAI_PATH}/data/training_data/{config["data_directory"]}')
-    train_dataset = AllegroValveDataset([p for p in data_path.glob('*train_data*')])
+    train_dataset = AllegroValveDataset([p for p in data_path.glob('*train_data*')], cosine_sine=config['sine_cosine'])
 
     if config['normalize_data']:
         # normalize data

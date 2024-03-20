@@ -1,5 +1,5 @@
 ---
-model_name: 'allegro_new_dataset_masked_angle_wrap_256_timesteps_model_long_train'
+model_name: 'allegro_new_dataset_sine_cosine_100_timesteps_model_long_train'
 T: 16
 dx: 9
 du: 8
@@ -9,16 +9,17 @@ batch_size: 64
 lr: 1.0e-4
 model_type: 'diffusion'
 data_directory: 'allegro_valve_turning_new'
-device: 'cuda:0'
-test_every: 1000
-save_every: 1000
+device: 'cuda:1'
+test_every: 2000
+save_every: 2000
 normalize_data: True
 constraint_embedding_dim: 64
 constrained: False
 guided: False
-timesteps: 256
+timesteps: 100
 hidden_dim: 128
 unconditional: True
+sine_cosine: True
 # Only applies to using EMA for training
 use_ema: True
 ema_decay: 0.995
