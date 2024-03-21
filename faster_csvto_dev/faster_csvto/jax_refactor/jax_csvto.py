@@ -11,7 +11,9 @@ class JaxCSVTOProblem:
     """Class storing the optimization problem formulation to be used by the JaxCSVTOpt optimizer.
     """
 
-    # TODO: It would be ideal to either deduce the dimensionality automatically.
+    # TODO: It would be ideal to either deduce the dimensionality automatically. Possibly subclassing jnp.array with a
+    #  'Trajectory' object with nice indexing methods is a route forward. There are also assertions in
+    #  jax.lax.experimental.
     def __init__(self,
                  c: Callable[[jnp.array], jnp.array],
                  h: Callable[[jnp.array], jnp.array],
@@ -127,7 +129,7 @@ class JaxCSVTOpt:
         self.anneal: bool = params.anneal
         self.alpha_J: jnp.float32 = params.alpha_J
         self.alpha_C: jnp.float32 = params.alpha_C
-        self.step_scale: jnp.float32 = params.step_scale  # TODO: currently unused.
+        self.step_scale: jnp.float32 = params.step_scale  # TODO: currently unused. Need a C_hat function for penalty.
         self.penalty_weight: jnp.float32 = params.penalty_weight
 
         # Store configuration.
@@ -144,43 +146,46 @@ class JaxCSVTOpt:
         """
         raise NotImplementedError
 
-    def solve(self, x0: jnp.array) -> jnp.array:
-        """Execute the CSVTO algorithm to solve for an optimal distribution of trajectories, given an initial guess.
+    def solve(self, initial_state: jnp.array, guess: jnp.array) -> jnp.array:
+        """Execute the CSVTO algorithm to solve for an optimal distribution of trajectories, given an initial state of
+        the system and a guess for the trajectory distribution.
 
         Args:
-            x0: The initialization for the trajectory distribution, shape (N, (dx + du) * T).
+            initial_state: The initial state which will be used as the start of all trajectories in the distribution,
+                shape (dx,).
+            guess: The initialization for the trajectory distribution, shape (N, (dx + du) * T).
 
         Returns:
             The optimal trajectory from the optimized distribution, shape ((dx + du) * T,).
         """
-        # TODO: Assert that the initial state for each trajectory is the same, or add initial state as a second
-        #  parameter.
 
         # Calculate slack variable values via equation (33) and append to the trajectory according to equation (35).
         if self.g is not None:
-            xuz: jnp.array = jnp.concatenate((x0, jnp.sqrt(-2*self.g(x0))), axis=1)
+            xuz: jnp.array = jnp.concatenate((guess, jnp.sqrt(-2 * self.g(guess))), axis=1)
         else:
-            xuz = x0
+            xuz = guess
 
         # Loop over the gradient step iterations.
-        xuz, _ = self._solve_iteration(1, (xuz, xuz[0, :self.dx]))
-        # xuz, _ = jax.lax.fori_loop(1, self.K+1, self._solve_iteration, (xuz, xuz[0, :self.dx]), unroll=True)
+        # xuz, _ = self._solve_iteration(1, (xuz, initial_state))
+        xuz, _ = jax.lax.fori_loop(1, self.K+1, self._solve_iteration, (xuz, initial_state), unroll=True)
 
         # Find the lowest cost trajectory in the optimized distribution, and return it without slack variables.
         min_cost_trajectory = xuz[:, :self._trajectory_dim()][self.c(xuz[:, :self._trajectory_dim()]).argmin(), :]
-        other_trajectories = xuz[:, :self._trajectory_dim()]
-        return min_cost_trajectory, other_trajectories
+        all_trajectories = xuz[:, :self._trajectory_dim()]
+        return min_cost_trajectory, all_trajectories
 
-    def _solve_iteration(self, iteration: int, xuz_initial_state: Tuple[jnp.array, jnp.array]) -> jnp.array:
+    def _solve_iteration(self, iteration: int, xuz_initial_state: Tuple[jnp.array, jnp.array]) -> (
+            Tuple)[jnp.array, jnp.array]:
         """Compute a single retraction step for the optimizer and return the updated state.
-        TODO: Fix Args.
+
         Args:
             iteration: The iteration number, in range [0, K).
-            xuz: All N trajectories including slack variables stacked as rows, shape (N, (dx + du) * T + dg).
-            initial_state: The state of the initial condition for the trajectories, shape (dx,).
+            xuz_initial_state: A Tuple of two variables. First xuz, N trajectories including slack variables stacked as
+                rows, shape (N, (dx + du) * T + dg). Second initial_state, the initial state of the system for the
+                trajectories, shape (dx,).
 
         Returns:
-            The value of xuz after taking the retraction step.
+            A Tuple of the value of xuz after taking the retraction step, and the unaltered initial state.
         """
         xuz, initial_state = xuz_initial_state
 
@@ -198,7 +203,8 @@ class JaxCSVTOpt:
         h_hess = jax.vmap(jax.jacfwd(jax.jacrev(self.h)))(xuz)
         slack_constraint_hess = jnp.zeros((self.N, self.dg, self._trajectory_dim(), self._slack_trajectory_dim()))
         dynamics_constraint_hess = jax.vmap(jax.jacfwd(jax.jacrev(self._dynamics_constraint)))(xuz)
-        start_constraint_hess = jax.vmap(jax.jacfwd(jax.jacrev(self._start_constraint)))(xuz, jnp.tile(initial_state, (self.N, 1)))
+        start_constraint_hess = jax.vmap(jax.jacfwd(jax.jacrev(self._start_constraint)))(xuz, jnp.tile(initial_state,
+                                                                                                       (self.N, 1)))
         constraint_hess = jnp.concatenate((h_hess, slack_constraint_hess, dynamics_constraint_hess,
                                            start_constraint_hess), axis=1)
 
@@ -228,13 +234,14 @@ class JaxCSVTOpt:
         Args:
             constraint: The combined constraint evaluated at the current state, shape (N, dh + dg + dx * T).
             constraint_grad: The gradient of the combined constraint evaluated at the current state, shape (N, dh + dg +
-             dx * T).
+             dx * T, (dx + du) * T + dg).
 
         Returns:
             The constraint step, shape (N, (dx + du) * T + dg).
         """
         # Get inv(dC * dCT) term to be used below, shape (N, dg + dh, dg + dh).
-        dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)))
+        dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)) +
+                                   jnp.expand_dims(jnp.eye(self.dh + self.dg + self.dx * self.T), axis=0) * 1e-8)
 
         # Get constraint step from equation (39), shape (N, d * T).
         constraint_step = (constraint_grad.transpose((0, 2, 1)) @ dCdCT_inv @
@@ -262,8 +269,9 @@ class JaxCSVTOpt:
         Returns:
             The tangent step for the current state, shape (N, (dx + du) * T + dg).
         """
-        # Get inv(dC * dCT), shape (N, dg + dh, dg + dh).
-        dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)))
+        # Get inv(dC * dCT) term to be used below, shape (N, dg + dh, dg + dh).
+        dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)) +
+                                   jnp.expand_dims(jnp.eye(self.dh + self.dg + self.dx * self.T), axis=0) * 1e-8)
 
         # Get projection tensor via equation (36), shape (N, d * T, d * T).
         projection = (jnp.expand_dims(jnp.eye((self.dx + self.du) * self.T + self.dg), axis=0) -
@@ -332,10 +340,9 @@ class JaxCSVTOpt:
                                                    self._dynamics_constraint(xuz),
                                                    self._start_constraint(xuz, initial_state)), axis=1)
         else:
-            equality_constraint = self.h(xuz[:self._trajectory_dim()])
-            dynamics_constraint = self._dynamics_constraint(xuz[:self._trajectory_dim()])
-            start_constraint = self._start_constraint(xuz[:self._trajectory_dim()], initial_state)
-            combined_constraint = jnp.concatenate((equality_constraint, dynamics_constraint, start_constraint),
+            combined_constraint = jnp.concatenate((self.h(xuz[:self._trajectory_dim()]),
+                                                   self._dynamics_constraint(xuz[:self._trajectory_dim()]),
+                                                   self._start_constraint(xuz[:self._trajectory_dim()], initial_state)),
                                                   axis=0)
         return combined_constraint
 
@@ -360,22 +367,22 @@ class JaxCSVTOpt:
             x: A trajectory, shape ((dx + du) * T).
 
         Returns:
-            The dynamics error on every point except the first one in every trajectory, shape (dx * (T - 1)).
+            The dynamics error on every point except the first one in the trajectory, shape (dx * (T - 1)).
         """
-        # Index out the state-space points for the trajectory spline, to get inputs for the dynamics function.
+        # Index out the state-space points for the trajectory spline to get inputs for the dynamics function.
         points = x.reshape(self.T, self.dx + self.du)
         states = points[:, :self.dx]
         control_inputs = points[:, -self.du:]
 
         # Compute the error of the dynamics function in predicting the next state along each spline.
-        states_forward_one_without_last = self.f(states, control_inputs).reshape(self.T * self.dx)[:-self.dx]
+        states_forward_one_without_last = self.f(states[:-1], control_inputs[1:]).reshape((self.T - 1) * self.dx)
         states_without_first = states.reshape(self.T * self.dx)[self.dx:]
         dynamics_error = states_forward_one_without_last - states_without_first
         return dynamics_error
 
     def _start_constraint(self, x: jnp.array, initial_state: jnp.array) -> jnp.array:
-        """Compute the start constraint function which enforces that the starting state a trajectory is the same
-        as the supplied initial state. This function's output will be constrained to zero in the optimizer.
+        """Compute the start constraint function which enforces that the initial condition is related to the beginning
+        of the trajectory by the dynamics function. This function's output will be constrained to zero in the optimizer.
 
         Args:
             x: A trajectory, shape ((dx + du) * T).
@@ -384,7 +391,9 @@ class JaxCSVTOpt:
         Returns:
             The start error on the trajectory, shape (dx,).
         """
-        start_error = x[:self.dx] - initial_state
+        initial_state_forward_one = self.f(initial_state, x[self.dx: self.dx + self.du])
+        second_state = x[:self.dx]
+        start_error = initial_state_forward_one - second_state
         return start_error
 
     def _bound_projection(self, xuz: jnp.array) -> jnp.array:

@@ -12,7 +12,7 @@ class QuadrotorEnv:
         assert obstacle_mode in [None, 'static', 'dynamic', 'gp']
         self.env_dims = [-10, 10]
         self.state_dim = 12
-        self.dt = 0.1
+        self.dt = 1e-4
         self.state = None
         self.surface_model = None
         if surface_constraint:
@@ -120,7 +120,8 @@ class QuadrotorEnv:
         start[6:] = 0.05 * np.random.randn(6)
 
         # start[9:] *= 5
-        self.state = start
+        # self.state = start
+        self.state = np.array([-5.0, -5.0, 0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 0.0, 0.0, 0.0, 0.0])
         self.goal = goal
         if self.obstacle_mode == 'dynamic':
             self.obstacle_pos = np.array([-2.25, 1.75])

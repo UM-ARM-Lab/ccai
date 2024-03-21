@@ -46,17 +46,27 @@ class QuadrotorCost:
             The cost of the trajectory, shape (1,).
         """
         # Set Q, P, and R according to equations (54), (55), and (56), respectively.
+        # Q = jnp.eye(self.dx) * 2.5
+        # Q = Q.at[:2, :2].set(jnp.eye(2) * 5)
+        # Q = Q.at[2, 2].set(0.5)
+        # Q = Q.at[5, 5].set(0.025)
+        # P = 2 * Q
+        # R = jnp.eye(self.du) * 16
+        # R = R.at[0, 0].set(1)
+
+        # Trying the setting currently used in quadrotor_example.py
         Q = jnp.eye(self.dx) * 2.5
-        Q = Q.at[:2, :2].set(jnp.eye(2) * 5)
-        Q = Q.at[2, 2].set(0.5)
-        Q = Q.at[5, 5].set(0.025)
-        P = 2 * Q
+        Q = Q.at[0, 0].set(5.0)
+        Q = Q.at[1, 1].set(5.0)
+        Q = Q.at[2, 2].set(5.0)
+        Q = Q.at[5, 5].set(0.01)
+        P = Q
         R = jnp.eye(self.du) * 16
         R = R.at[0, 0].set(1)
 
         # Index out intermediate terms with shape (T, -1).
         points = trajectory.reshape(self.T, self.dx + self.du)
-        x = points[:, self.dx]
+        x = points[:, :self.dx]
         u = points[:, -self.du:]
         goal_error = x - self.goal_state.reshape(1, self.dx)
 
@@ -74,7 +84,7 @@ class QuadrotorDynamics:
     """Dynamics function for the 12 DOF quadrotor example problem.
     """
 
-    def __init__(self, dt: jnp.float32 = 0.1) -> None:
+    def __init__(self, dt: jnp.float32 = 1e-4) -> None:
         """Initialize a QuadrotorDynamics object with a set time step.
 
         Args:
@@ -145,19 +155,18 @@ def height_constraint(trajectory: jnp.array, surface_gp: GPSurfaceModel) -> jnp.
     """
 
     Args:
-        trajectory: Single trajectory, shape (N, dx + du).
+        trajectory: Single trajectory, shape ((dx + du) * T).
         surface_gp:
     Returns:
+
     """
     trajectory = trajectory.reshape(12, 16)
-    T = trajectory.shape[0]
     xy, z = trajectory[:, :2], trajectory[:, 2]
 
     # compute z of surface and gradient and hessian
     surface_z = surface_gp.posterior_mean(xy)
-
-    constr = surface_z - z
-    return constr
+    constraint = surface_z - z
+    return constraint
 
 
 class QuadrotorGPHeightConstraint:
@@ -184,12 +193,6 @@ class QuadrotorGPHeightConstraint:
 def update_plot_with_trajectories(ax, point_dim: int, best_trajectory: np.array,
                                   other_trajectories: Optional[np.array] = None) -> None:
     """
-
-    Args:
-        ax:
-        point_dim:
-        best_trajectory:
-        other_trajectories:
     """
     # Clear any of the previous lines.
     for line in ax.get_lines():
@@ -207,7 +210,6 @@ def update_plot_with_trajectories(ax, point_dim: int, best_trajectory: np.array,
 
 def plot_trajectory(env: QuadrotorEnv, ax, state_dim, best_trajectory, other_trajectories, number):
     """
-
     """
     env.render_update()
     update_plot_with_trajectories(ax, state_dim, best_trajectory, other_trajectories)
@@ -219,42 +221,59 @@ def get_initial_guess_from_start_state(start_state: np.array, N: int, T: int, dx
                                        dynamics_function: Callable) -> np.array:
     """Get an initial guess by rolling out trajectories from a given start using randomly sampled inputs.
 
-    Args:
-        start_state:
-        N:
-        T:
-        du:
-        dynamics_function:
-
-    Returns:
-        A reasonable initial guess for the distribution of trajectories.
+    NOTE: New version for trajectories that start with the second state and have the previous control input.
     """
-    trajectories = np.tile(start_state, (N, 1))
-
     # Sample and scale random inputs.
-    control_inputs = np.random.randn(T, N, du)
+    control_inputs = np.random.randn(N, T, du)
     control_inputs[:, :, 1:] *= 0.25
 
-    # Roll out random inputs.
-    for t in range(T - 1):
+    # Get the first state for all the trajectories.
+    tall_start_state = np.tile(start_state, (N, 1))
+    trajectories = dynamics_function(tall_start_state, control_inputs[:, 0, :])
+    trajectories = np.concatenate((trajectories, control_inputs[:, 0, :]), axis=1)
+
+    # Use the random inputs to roll out T - 1 more new states.
+    for t in range(T-1):
+        # Get the new spline point x using the new spline point u and the last added x.
         trajectories = np.concatenate((trajectories,
-                                       control_inputs[t],
-                                       dynamics_function(trajectories[:, -dx:], control_inputs[t])), axis=1)
-    trajectories = np.concatenate((trajectories, control_inputs[-1]), axis=1)
+                                       dynamics_function(trajectories[:, -(dx+du): -du], control_inputs[:, t+1, :]),
+                                       control_inputs[:, t+1, :]), axis=1)
     return trajectories
 
 
-def profile():
-    """
+def step_trajectories(trajectories, state_dim):
+    """Drop the first point in each trajectory spline and add another copy of the last point to the back to maintain the
+    spline length.
 
+    TODO: It might be a good idea to copy over the last u, then roll out the last state for less constraint violation.
     """
-    # # Run the optimizer.
-    # start = time.time()
-    # for _ in range(100):
-    #     solution = solve_compiled(initial_guess)
-    # end = time.time()
-    # print('runtime', end - start)
-    # print(solution)
+    trajectories = trajectories[:, state_dim:]
+    trajectories = jnp.concatenate((trajectories, trajectories[:, -state_dim:]), axis=1)
+    return trajectories
+
+
+def roll_out_trajectories(start_state, trajectories, dynamics_function, N, T, dx, du):
+    """
+    """
+    state_dim = dx + du
+
+    trajectories = trajectories[:, state_dim:]
+    trajectories = jnp.concatenate((trajectories, trajectories[:, -state_dim:]), axis=1)
+
+    points = trajectories.reshape(N, T, state_dim)
+    control_inputs = points[:, :, -du:]
+
+    tall_start_state = np.tile(start_state, (N, 1))
+    trajectories = dynamics_function(tall_start_state, control_inputs[:, 0, :])
+    trajectories = np.concatenate((trajectories, control_inputs[:, 0, :]), axis=1)
+
+    # Use the random inputs to roll out T - 1 more new states.
+    for t in range(T-1):
+        # Get the new spline point x using the new spline point u and the last added x.
+        trajectories = np.concatenate((trajectories,
+                                       dynamics_function(trajectories[:, -(dx+du): -du], control_inputs[:, t+1, :]),
+                                       control_inputs[:, t+1, :]), axis=1)
+    return trajectories
 
 
 def main() -> None:
@@ -262,7 +281,7 @@ def main() -> None:
     """
     # Set up the problem.
     goal_state = jnp.zeros(12, dtype=jnp.float32)
-    goal_state = goal_state.at[0:1].set(4)
+    goal_state = goal_state.at[0:2].set(4)
     cost_function = QuadrotorCost(goal_state)
     equality_constraint_function = QuadrotorGPHeightConstraint('../surface_data.npz')
     inequality_constraint_function = None
@@ -294,10 +313,9 @@ def main() -> None:
 
     # Set up the optimization and compile its solve() routine.
     quadrotor_opt = JaxCSVTOpt(quadrotor_problem, quadrotor_parameters)
+    initial_state = jnp.zeros(dx)
     initial_guess = jnp.array(np.random.random([N, 16 * 12]), dtype=jnp.float32)
-    solve_compiled = jax.jit(quadrotor_opt.solve).lower(initial_guess).compile()
-    # solution = solve_compiled(initial_guess)
-    # print(solution)
+    solve_compiled = jax.jit(quadrotor_opt.solve).lower(initial_state, initial_guess).compile()
 
     # Initialize the environment.
     env = QuadrotorEnv(False, '../surface_data.npz')
@@ -306,33 +324,35 @@ def main() -> None:
     ax = env.ax
 
     # Get the start from the environment.
-    state = env.state
-    state[1] = 4
-    trajectories = get_initial_guess_from_start_state(env.state, N, T, dx, du, dynamics_function)
+    start = env.state
+    trajectories = get_initial_guess_from_start_state(start, N, T, dx, du, dynamics_function)
+    best_trajectory = None
 
-    # Run the solver for warmup iterations.
-    for warmup_step in range(50):
-        best_trajectory, trajectories = solve_compiled(trajectories)
-        plot_trajectory(env, ax, dx + du, best_trajectory.squeeze(), trajectories, warmup_step)
+    # Loop over MPC updates.
+    for mpc_step in range(100):
+        # Optimize the trajectory distribution.
+        if mpc_step == 0:
+            # Solve for the trajectory distribution to warm up.
+            for _ in range(100):
+                best_trajectory, trajectories = solve_compiled(start, trajectories)
+        else:
+            # Solve for the trajectory distribution online.
+            for _ in range(10):
+                best_trajectory, trajectories = solve_compiled(start, trajectories)
 
-    # # Plot the best trajectory.
-    # plot_trajectory(env, ax, dx + du, best_trajectory.squeeze(), 0)
-    #
-    # # Loop over MPC updates.
-    # for mpc_step in range(2):
-    #     # Loop over solver online iterations.
-    #     for _ in range(10):
-    #         best_trajectory = jnp.expand_dims(solve_compiled(best_trajectory), axis=0)
-    #
-    #     # Shift the trajectory forward one timestep by dropping the first point and adding a new point to the end.
-    #     best_trajectory = jnp.concatenate((best_trajectory[:, dx + du:],
-    #                                        dynamics_function(best_trajectory.reshape(N, T, dx + du)[:, -1, :dx],
-    #                                                          best_trajectory.reshape(N, T, dx + du)[:, -1, -du:]),
-    #                                        best_trajectory[:, -du:]), axis=1)
-    #
-    #     # Plot the best trajectory.
-    #     print(f'Ran MPC step {mpc_step}')
-    #     plot_trajectory(env, ax, dx + du, best_trajectory.squeeze(), mpc_step+1)
+        # Run the first input from the best trajectory on the simulated quadrotor.
+        print(best_trajectory[dx:dx + du])
+        start, _ = env.step(best_trajectory[dx:dx + du])
+
+        # Step the trajectories so that they can be used as the initial guess in the next iteration.
+        # trajectories = step_trajectories(trajectories, dx + du)
+        trajectories = roll_out_trajectories(start, trajectories, dynamics_function, N, T, dx, du)
+        best_trajectory = roll_out_trajectories(start, jnp.expand_dims(best_trajectory, axis=0), dynamics_function,
+                                                1, T, dx, du)
+
+        # Plot the best trajectories.
+        print(f'Ran MPC step {mpc_step}')
+        plot_trajectory(env, ax, dx + du, best_trajectory.squeeze(), trajectories, mpc_step)
 
 
 if __name__ == '__main__':

@@ -175,7 +175,9 @@ class ConstrainedSteinTrajOpt:
 
             xi_J = -phi
 
-        return (self.alpha_J * xi_J + self.alpha_C * xi_C).detach()
+        return (self.alpha_C * xi_C).detach()
+        # return (self.alpha_J * xi_J).detach()
+        # return (self.alpha_J * xi_J + self.alpha_C * xi_C).detach()
 
     def _clamp_in_bounds(self, xuz):
         N = xuz.shape[0]
