@@ -1,5 +1,11 @@
 import torch 
 from functools import wraps
+import open3d as o3d
+import numpy as np
+import matplotlib.pyplot as plt
+import pathlib
+import pytorch3d.transforms as tf
+
 
 full_finger_list = ['index', 'middle', 'ring', 'thumb']
 def partial_to_full_state(partial, fingers):
@@ -84,3 +90,59 @@ def state2ee_pos(state, finger_name, fingers, chain, frame_indices, world_trans)
     return ee_p
 
 
+def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headless=False):
+    num_fingers = len(fingers)
+    # for a single trajectory
+    T, dxu = trajectory.shape
+    # set up visualizer
+    vis = o3d.visualization.Visualizer()
+    vis.create_window(width=800, height=600, visible=not headless)
+    # update camera
+    vis.get_render_option().mesh_show_wireframe = True
+    for t in range(T):
+        vis.clear_geometries()
+        q = trajectory[t, : 4 * num_fingers]
+        theta = trajectory[t, 4 * num_fingers: 4 * num_fingers + obj_dof]
+        meshes = scene.get_visualization_meshes(partial_to_full_state(q.unsqueeze(0), fingers).to(device=scene.device),
+                                                theta.unsqueeze(0).to(device=scene.device))
+        for mesh in meshes:
+            vis.add_geometry(mesh)
+        ctr = vis.get_view_control()
+        parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-02-14-13-45-19.json")
+        #parameters = o3d.io.read_pinhole_camera_parameters('ScreenCamera_2024-03-07-14-28-26.json')
+        ctr.convert_from_pinhole_camera_parameters(parameters)
+        vis.poll_events()
+        vis.update_renderer()
+        img = vis.capture_screen_float_buffer(False)
+        plt.imsave(f'{scene_fpath}/img/im_{t:04d}.png',
+                   np.asarray(img),
+                   dpi=1)
+
+    vis.destroy_window()
+
+    # convert to GIF
+    import subprocess
+    output_dir = f'{scene_fpath}/gif/trajectory.gif'
+    cmd = f"ffmpeg -y -i {scene_fpath}/img/im_%4d.png -vf palettegen ~/palette.png"
+    subprocess.call(cmd, shell=True)
+    cmd = f"ffmpeg -y -framerate 2 -i {scene_fpath}/img/im_%4d.png -i ~/palette.png " \
+          f"-lavfi paletteuse {output_dir}"
+    subprocess.call(cmd, shell=True)
+
+
+def visualize_trajectories(trajectories, scene, fpath, headless=False):
+    for n, trajectory in enumerate(trajectories):
+        pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/kin/img'), parents=True, exist_ok=True)
+        pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/kin/gif'), parents=True, exist_ok=True)
+        visualize_trajectory(trajectory, scene, f'{fpath}/trajectory_{n + 1}/kin', headless=headless)
+        # Visualize what happens if we execute the actions in the trajectory in the simulator
+        pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/sim/img'), parents=True, exist_ok=True)
+        pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/sim/gif'), parents=True, exist_ok=True)
+        #visualize_trajectory_in_sim(trajectory, config['env'], f'{fpath}/trajectory_{n + 1}/sim')
+        # save the trajectory
+        np.save(f'{fpath}/trajectory_{n + 1}/traj.npz', trajectory.cpu().numpy())
+
+def axis_angle_to_euler(axis_angle):
+    matrix = tf.axis_angle_to_matrix(axis_angle)
+    euler = tf.matrix_to_euler_angles(matrix, convention='XYZ')
+    return euler
