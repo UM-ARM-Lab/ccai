@@ -25,7 +25,7 @@ class QuadrotorCost:
     """Cost function for the 12 DOF quadrotor example problem.
     """
 
-    def __init__(self, goal_state: jnp.array) -> None:
+    def __init__(self, goal_state: jnp.array, T: int) -> None:
         """Initialize a QuadrotorCost object with a set goal state.
 
         Args:
@@ -34,7 +34,7 @@ class QuadrotorCost:
         self.goal_state = goal_state
         self.dx = 12
         self.du = 4
-        self.T = 12
+        self.T = T
 
     def __call__(self, trajectory: jnp.array) -> jnp.array:
         """Compute the cost of a trajectory according to equation (53).
@@ -46,21 +46,11 @@ class QuadrotorCost:
             The cost of the trajectory, shape (1,).
         """
         # Set Q, P, and R according to equations (54), (55), and (56), respectively.
-        # Q = jnp.eye(self.dx) * 2.5
-        # Q = Q.at[:2, :2].set(jnp.eye(2) * 5)
-        # Q = Q.at[2, 2].set(0.5)
-        # Q = Q.at[5, 5].set(0.025)
-        # P = 2 * Q
-        # R = jnp.eye(self.du) * 16
-        # R = R.at[0, 0].set(1)
-
-        # Trying the setting currently used in quadrotor_example.py
         Q = jnp.eye(self.dx) * 2.5
-        Q = Q.at[0, 0].set(5.0)
-        Q = Q.at[1, 1].set(5.0)
-        Q = Q.at[2, 2].set(5.0)
-        Q = Q.at[5, 5].set(0.01)
-        P = Q
+        Q = Q.at[:2, :2].set(jnp.eye(2) * 5)
+        Q = Q.at[2, 2].set(0.5)
+        Q = Q.at[5, 5].set(0.025)
+        P = 30 * Q
         R = jnp.eye(self.du) * 16
         R = R.at[0, 0].set(1)
 
@@ -72,8 +62,22 @@ class QuadrotorCost:
 
         # Calculate cost according to equation (53).
         terminal_state_cost = (goal_error[-1, :] @ P @ goal_error[-1, :].reshape(self.dx, 1)).squeeze()
-        running_state_cost = (jnp.expand_dims(goal_error, axis=1) @ Q.reshape(1, self.dx, self.dx) @
-                              jnp.expand_dims(goal_error, axis=2)).squeeze().sum()
+        # running_state_cost = (jnp.expand_dims(goal_error, axis=1) @ Q.reshape(1, self.dx, self.dx) @
+        #                       jnp.expand_dims(goal_error, axis=2)).squeeze().sum()
+
+        # TODO: Figure out how to write this cost with T.
+        running_state_cost = jnp.sum(jnp.array(
+            ((goal_error[-2, :] @ Q * 10 @ goal_error[-2, :].reshape(self.dx, 1)).squeeze(),
+             (goal_error[-3, :] @ Q * 5 @ goal_error[-3, :].reshape(self.dx, 1)).squeeze(),
+             (goal_error[-4, :] @ Q * 2.5 @ goal_error[-4, :].reshape(self.dx, 1)).squeeze(),
+             (goal_error[-5, :] @ Q * 1.25 @ goal_error[-5, :].reshape(self.dx, 1)).squeeze(),
+             (goal_error[-6, :] @ Q * 0.5 @ goal_error[-6, :].reshape(self.dx, 1)).squeeze(),
+             (goal_error[-7, :] @ Q * 0.2 @ goal_error[-7, :].reshape(self.dx, 1)).squeeze(),
+             (goal_error[-8, :] @ Q * 0.1 @ goal_error[-8, :].reshape(self.dx, 1)).squeeze(),
+             (goal_error[-9, :] @ Q * 0.05 @ goal_error[-9, :].reshape(self.dx, 1)).squeeze(),
+             (goal_error[-10, :] @ Q * 0.025 @ goal_error[-10, :].reshape(self.dx, 1)).squeeze(),
+             (goal_error[-11, :] @ Q * 0.0125 @ goal_error[-11, :].reshape(self.dx, 1)).squeeze())))
+             # (goal_error[-12, :] @ Q * 0.5 @ goal_error[-12, :].reshape(self.dx, 1)).squeeze())))
         running_control_cost = (jnp.expand_dims(u, axis=1) @ R.reshape(1, self.du, self.du) @
                                 jnp.expand_dims(u, axis=2)).squeeze().sum()
         cost = terminal_state_cost + running_state_cost + running_control_cost
@@ -84,7 +88,7 @@ class QuadrotorDynamics:
     """Dynamics function for the 12 DOF quadrotor example problem.
     """
 
-    def __init__(self, dt: jnp.float32 = 1e-4) -> None:
+    def __init__(self, dt: jnp.float32 = 0.1) -> None:
         """Initialize a QuadrotorDynamics object with a set time step.
 
         Args:
@@ -144,14 +148,14 @@ class QuadrotorDynamics:
         new_theta = theta + theta_dot * self.dt
         new_psi = psi + psi_dot * self.dt
         new_x = x + new_xdot * self.dt
-        new_y = y + new_ydot + self.dt
-        new_z = z + new_zdot + self.dt
+        new_y = y + new_ydot * self.dt
+        new_z = z + new_zdot * self.dt
 
         return jnp.concatenate((new_x, new_y, new_z, new_phi, new_theta, new_psi, new_xdot, new_ydot, new_zdot, new_p,
                                 new_q, new_r), axis=-1)
 
 
-def height_constraint(trajectory: jnp.array, surface_gp: GPSurfaceModel) -> jnp.array:
+def height_constraint(trajectory: jnp.array, T: int, surface_gp: GPSurfaceModel) -> jnp.array:
     """
 
     Args:
@@ -160,7 +164,7 @@ def height_constraint(trajectory: jnp.array, surface_gp: GPSurfaceModel) -> jnp.
     Returns:
 
     """
-    trajectory = trajectory.reshape(12, 16)
+    trajectory = trajectory.reshape(T, 16)
     xy, z = trajectory[:, :2], trajectory[:, 2]
 
     # compute z of surface and gradient and hessian
@@ -175,7 +179,7 @@ class QuadrotorGPHeightConstraint:
     example problem.
     """
 
-    def __init__(self, surface_file_path: str) -> None:
+    def __init__(self, surface_file_path: str, T: int) -> None:
         """
 
         Args:
@@ -183,11 +187,12 @@ class QuadrotorGPHeightConstraint:
         data = np.load(surface_file_path)
         self.surface_gp = GPSurfaceModel(jnp.array(data['xy'], dtype=jnp.float32),
                                          jnp.array(data['z'], dtype=jnp.float32))
+        self.T = T
 
     def __call__(self, trajectory):
         """
         """
-        return height_constraint(trajectory, self.surface_gp)
+        return height_constraint(trajectory, self.T, self.surface_gp)
 
 
 def update_plot_with_trajectories(ax, point_dim: int, best_trajectory: np.array,
@@ -279,11 +284,23 @@ def roll_out_trajectories(start_state, trajectories, dynamics_function, N, T, dx
 def main() -> None:
     """Set up, compile, and solve a JaxCSVTOpt for the quadrotor problem with no obstacles.
     """
+    # Set up the parameters.
+    k = structured_rbf_kernel
+    N = 8
+    T = 11
+    K_warmup = 100
+    K_online = 10
+    anneal = True
+    alpha_J = 1
+    alpha_C = 1
+    step_scale = 1e-2
+    penalty_weight = 1e-2
+
     # Set up the problem.
     goal_state = jnp.zeros(12, dtype=jnp.float32)
     goal_state = goal_state.at[0:2].set(4)
-    cost_function = QuadrotorCost(goal_state)
-    equality_constraint_function = QuadrotorGPHeightConstraint('../surface_data.npz')
+    cost_function = QuadrotorCost(goal_state, T)
+    equality_constraint_function = QuadrotorGPHeightConstraint('../surface_data.npz', T)
     inequality_constraint_function = None
     dynamics_function = QuadrotorDynamics()
     u_bounds = (jnp.array((-100.0000, -100.0000, -100.0000, -100.0000)),
@@ -299,60 +316,91 @@ def main() -> None:
     quadrotor_problem = JaxCSVTOProblem(cost_function, equality_constraint_function, inequality_constraint_function,
                                         dynamics_function, u_bounds, x_bounds, dx, du, dh, dg)
 
-    # Set up the parameters.
-    k = structured_rbf_kernel
-    N = 8
-    T = 12
-    K = 1
-    anneal = True
-    alpha_J = 1
-    alpha_C = 1
-    step_scale = 1e-2
-    penalty_weight = 1e2
-    quadrotor_parameters = JaxCSVTOParams(k, N, T, K, anneal, alpha_J, alpha_C, step_scale, penalty_weight)
+    quadrotor_parameters_warmup = JaxCSVTOParams(k, N, T, K_warmup, anneal, alpha_J, alpha_C, step_scale, penalty_weight)
+    quadrotor_parameters_online = JaxCSVTOParams(k, N, T, K_online, anneal, alpha_J, alpha_C, step_scale, penalty_weight)
 
-    # Set up the optimization and compile its solve() routine.
-    quadrotor_opt = JaxCSVTOpt(quadrotor_problem, quadrotor_parameters)
+    # Set up one optimizer for the warmup solve and one optimizer for the online solve.
+    quadrotor_opt_warmup = JaxCSVTOpt(quadrotor_problem, quadrotor_parameters_warmup)
+    quadrotor_opt_online = JaxCSVTOpt(quadrotor_problem, quadrotor_parameters_online)
     initial_state = jnp.zeros(dx)
-    initial_guess = jnp.array(np.random.random([N, 16 * 12]), dtype=jnp.float32)
-    solve_compiled = jax.jit(quadrotor_opt.solve).lower(initial_state, initial_guess).compile()
+    initial_guess = jnp.array(np.random.random([N, (dx + du) * T]), dtype=jnp.float32)
 
-    # Initialize the environment.
-    env = QuadrotorEnv(False, '../surface_data.npz')
-    env.reset()
-    env.render_init()
-    ax = env.ax
+    # Compile the solve() routines ahead of time.
+    compile_start = time.time()
+    _, _ = quadrotor_opt_warmup.solve(initial_state, initial_guess)
+    compile_end = time.time()
+    print(f'Compiled warmup solve() in {compile_end - compile_start:02f} seconds')
+    compile_start = time.time()
+    _, _ = quadrotor_opt_online.solve(initial_state, initial_guess)
+    compile_end = time.time()
+    print(f'Compiled online solve() in {compile_end - compile_start:02f} seconds')
 
-    # Get the start from the environment.
-    start = env.state
-    trajectories = get_initial_guess_from_start_state(start, N, T, dx, du, dynamics_function)
-    best_trajectory = None
+    # Profile the solve() routines.
+    solve_start = time.time()
+    _, _ = quadrotor_opt_warmup.solve(initial_state, initial_guess)
+    solve_end = time.time()
+    print(f'Solve {K_warmup} iterations in {solve_end - solve_start:02f} seconds')
 
-    # Loop over MPC updates.
-    for mpc_step in range(100):
-        # Optimize the trajectory distribution.
-        if mpc_step == 0:
-            # Solve for the trajectory distribution to warm up.
-            for _ in range(100):
-                best_trajectory, trajectories = solve_compiled(start, trajectories)
-        else:
-            # Solve for the trajectory distribution online.
-            for _ in range(10):
-                best_trajectory, trajectories = solve_compiled(start, trajectories)
+    solve_start = time.time()
+    _, _ = quadrotor_opt_online.solve(initial_state, initial_guess)
+    solve_end = time.time()
+    print(f'Solved {K_online} iterations in {solve_end - solve_start:02f} seconds')
 
-        # Run the first input from the best trajectory on the simulated quadrotor.
-        print(best_trajectory[dx:dx + du])
-        start, _ = env.step(best_trajectory[dx:dx + du])
+    # # Compile the solve() routines.
+    # compile_start = time.time()
+    # solve_warmup = jax.jit(quadrotor_opt_warmup.solve).lower(initial_state, initial_guess).compile()
+    # compile_end = time.time()
+    # print(f'Compiled warmup solve() in {compile_end - compile_start:02f} seconds')
+    # compile_start = time.time()
+    # solve_online = jax.jit(quadrotor_opt_online.solve).lower(initial_state, initial_guess).compile()
+    # compile_end = time.time()
+    # print(f'Compiled online solve() in {compile_end - compile_start:02f} seconds')
 
-        # Step the trajectories so that they can be used as the initial guess in the next iteration.
-        # trajectories = step_trajectories(trajectories, dx + du)
-        trajectories = roll_out_trajectories(start, trajectories, dynamics_function, N, T, dx, du)
-        best_trajectory = roll_out_trajectories(start, jnp.expand_dims(best_trajectory, axis=0), dynamics_function,
-                                                1, T, dx, du)
+    # # Initialize the environment.
+    # env = QuadrotorEnv(False, '../surface_data.npz')
+    # env.reset()
+    # env.render_init()
+    # ax = env.ax
+    #
+    # # Get the start from the environment.
+    # start = env.state
+    # trajectories = get_initial_guess_from_start_state(start, N, T, dx, du, dynamics_function)
+    # best_trajectory = None
 
-        # Plot the best trajectories.
-        print(f'Ran MPC step {mpc_step}')
-        plot_trajectory(env, ax, dx + du, best_trajectory.squeeze(), trajectories, mpc_step)
+    # # Profile the solve() routines.
+    # solve_start = time.time()
+    # best_trajectory, trajectories = solve_warmup(start, trajectories)
+    # solve_end = time.time()
+    # print(f'Solve {K_warmup} iterations in {solve_end - solve_start:02f} seconds')
+    # solve_start = time.time()
+    # best_trajectory, trajectories = solve_warmup(start, trajectories)
+    # solve_end = time.time()
+    # print(f'Solved {K_online} iterations in {solve_end - solve_start:02f} seconds')
+
+    # # Loop over MPC updates.
+    # for mpc_step in range(100):
+    #     print(f'Running MPC step {mpc_step}')
+    #
+    #     # Optimize the trajectory distribution.
+    #     if mpc_step == 0:
+    #         # Solve for the trajectory distribution to warm up on the first iteration.
+    #         best_trajectory, trajectories = quadrotor_opt_warmup.solve(start, trajectories)
+    #     else:
+    #         # Solve for the trajectory distribution online for every iteration after the first one.
+    #         best_trajectory, trajectories = quadrotor_opt_online.solve(start, trajectories)
+    #
+    #     # Run the first input from the best trajectory on the simulated quadrotor.
+    #     print(f'Selected control input: {best_trajectory[dx:dx + du]}')
+    #     start, _ = env.step(best_trajectory[dx:dx + du])
+    #     print(f'Moved to (x, y, z): ({start[0]}, {start[1]}, {start[2]})')
+    #
+    #     # Step the trajectories so that they can be used as the initial guess in the next iteration.
+    #     trajectories = roll_out_trajectories(start, trajectories, dynamics_function, N, T, dx, du)
+    #     best_trajectory = roll_out_trajectories(start, jnp.expand_dims(best_trajectory, axis=0), dynamics_function,
+    #                                             1, T, dx, du)
+    #
+    #     # Plot the best trajectories.
+    #     plot_trajectory(env, ax, dx + du, best_trajectory.squeeze(), trajectories, mpc_step)
 
 
 if __name__ == '__main__':

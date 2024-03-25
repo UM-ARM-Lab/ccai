@@ -1,7 +1,11 @@
+from functools import partial
 from typing import Callable, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
+
+import numpy as np
+import torch
 
 # Using this file to sketch out the minimal interface for getting the quad rotor problem to work in Jax. I'm not
 # worrying about making this an extensible framework for other optimizers right now. I'm also trying to make the
@@ -107,8 +111,8 @@ class JaxCSVTOpt:
             config: An optional struct for storing visualization, profiling, and debugging output options.
         """
         # Store problem functions and bounds.
-        self.cost = problem.c
-        self.c: Callable[[jnp.array], jnp.array] = jax.vmap(problem.c)
+        self.c = problem.c
+        self.cost_batched: Callable[[jnp.array], jnp.array] = jax.vmap(problem.c)
         self.h: Callable[[jnp.array], jnp.array] = problem.h
         self.g: Optional[Callable[[jnp.array], jnp.array]] = problem.g
         self.f: Callable[[jnp.array, jnp.array], jnp.array] = problem.f
@@ -129,7 +133,7 @@ class JaxCSVTOpt:
         self.anneal: bool = params.anneal
         self.alpha_J: jnp.float32 = params.alpha_J
         self.alpha_C: jnp.float32 = params.alpha_C
-        self.step_scale: jnp.float32 = params.step_scale  # TODO: currently unused. Need a C_hat function for penalty.
+        self.step_scale: jnp.float32 = params.step_scale
         self.penalty_weight: jnp.float32 = params.penalty_weight
 
         # Store configuration.
@@ -146,6 +150,18 @@ class JaxCSVTOpt:
         """
         raise NotImplementedError
 
+    def __hash__(self):
+        """Hash function to distinguiash compiled solvers with different parameters.
+        TODO: Will need to use the PyTree method instead to flexibly incorporate user constraints.
+        """
+        return hash(self.K)
+
+    def __eq__(self, other):
+        """
+        """
+        return self.K == other.K
+
+    @partial(jax.jit, static_argnums=0)
     def solve(self, initial_state: jnp.array, guess: jnp.array) -> jnp.array:
         """Execute the CSVTO algorithm to solve for an optimal distribution of trajectories, given an initial state of
         the system and a guess for the trajectory distribution.
@@ -166,11 +182,10 @@ class JaxCSVTOpt:
             xuz = guess
 
         # Loop over the gradient step iterations.
-        # xuz, _ = self._solve_iteration(1, (xuz, initial_state))
-        xuz, _ = jax.lax.fori_loop(1, self.K+1, self._solve_iteration, (xuz, initial_state), unroll=True)
+        xuz, _ = jax.lax.fori_loop(1, self.K+1, self._solve_iteration, (xuz, initial_state))
 
         # Find the lowest cost trajectory in the optimized distribution, and return it without slack variables.
-        min_cost_trajectory = xuz[:, :self._trajectory_dim()][self.c(xuz[:, :self._trajectory_dim()]).argmin(), :]
+        min_cost_trajectory = xuz[:, :self._trajectory_dim()][self._penalty(xuz[:, :self._trajectory_dim()]).argmin(), :]
         all_trajectories = xuz[:, :self._trajectory_dim()]
         return min_cost_trajectory, all_trajectories
 
@@ -189,11 +204,19 @@ class JaxCSVTOpt:
         """
         xuz, initial_state = xuz_initial_state
 
+        # # TODO: Remove this test.
+        # thing, initial_state = xuz_initial_state
+        # xuz_np: np.array = np.array(thing)
+        # xuz_torch: torch.tensor = torch.from_numpy(xuz_np)
+        # xuz_torch *= 0.5
+        # xuz_np2 = xuz_torch.numpy()
+        # xuz = jnp.array(xuz_np2)
+
         # Set the annealing weight gamma if annealing is on.
         gamma: Optional[jnp.float32] = iteration / self.K if self.anneal else None
 
         # Evaluate the gradient of the cost function at the current state (without slack variables).
-        c_grad = jax.vmap(jax.jacrev(self.cost))(xuz[:, :self._trajectory_dim()])
+        c_grad = jax.vmap(jax.jacrev(self.c))(xuz[:, :self._trajectory_dim()])
 
         # Evaluate the combined constraint function and its gradient at the current augmented state.
         constraint = jax.vmap(self._combined_constraint)(xuz, jnp.tile(initial_state, (self.N, 1)))
@@ -223,6 +246,8 @@ class JaxCSVTOpt:
 
         # Combine the steps according to equation (26) and use them to update the current augmented state.
         xuz -= self.step_scale * (self.alpha_J * tangent_step + self.alpha_C * constraint_step)
+        # xuz -= self.step_scale * (self.alpha_J * tangent_step)
+        # xuz -= self.step_scale * (self.alpha_C * constraint_step)
 
         # Clamp the state in bounds and return.
         xuz = self._bound_projection(xuz)
@@ -241,7 +266,7 @@ class JaxCSVTOpt:
         """
         # Get inv(dC * dCT) term to be used below, shape (N, dg + dh, dg + dh).
         dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)) +
-                                   jnp.expand_dims(jnp.eye(self.dh + self.dg + self.dx * self.T), axis=0) * 1e-8)
+                                   jnp.expand_dims(jnp.eye(self.dh + self.dg + self.dx * self.T - 1), axis=0) * 1e-4)
 
         # Get constraint step from equation (39), shape (N, d * T).
         constraint_step = (constraint_grad.transpose((0, 2, 1)) @ dCdCT_inv @
@@ -271,7 +296,7 @@ class JaxCSVTOpt:
         """
         # Get inv(dC * dCT) term to be used below, shape (N, dg + dh, dg + dh).
         dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)) +
-                                   jnp.expand_dims(jnp.eye(self.dh + self.dg + self.dx * self.T), axis=0) * 1e-8)
+                                   jnp.expand_dims(jnp.eye(self.dh + self.dg + self.dx * self.T - 1), axis=0) * 1e-4)
 
         # Get projection tensor via equation (36), shape (N, d * T, d * T).
         projection = (jnp.expand_dims(jnp.eye((self.dx + self.du) * self.T + self.dg), axis=0) -
@@ -421,6 +446,18 @@ class JaxCSVTOpt:
         else:
             xuz_in_bounds = x_in_bounds
         return xuz_in_bounds
+
+    def _penalty(self, x: jnp.array) -> jnp.float32:
+        """Compute the penalty function used to select the best trajectory. Combines cost and 1-norm of constraint
+        violation according to equation (40).
+
+        Args:
+            x: All N trajectories without slack variables stacked as rows, shape (N, (dx + du) * T).
+
+        Returns:
+            The penalty function evaluated on each trajectory, shape (N,).
+        """
+        return self.cost_batched(x) + self.penalty_weight * jnp.abs(x).sum(axis=1)
 
     def _trajectory_dim(self) -> int:
         """Get the length of a single trajectory.
