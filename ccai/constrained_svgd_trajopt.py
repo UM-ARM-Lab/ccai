@@ -28,7 +28,7 @@ class ConstrainedSteinTrajOpt:
         self.matrix_kernel = False
         self.use_fisher = False
         self.use_hessian = False  # True
-        self.use_constraint_hessian = True
+        self.use_constraint_hessian = False
         self.normxiJ = None
         #self.dtype = torch.float32
         self.dtype = torch.float64
