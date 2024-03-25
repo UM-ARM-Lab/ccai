@@ -36,7 +36,7 @@ def axis_angle_to_euler(axis_angle):
 
 class AllegroIndexPlanner:
     "The index finger is desgie"
-    def __init__(self, chain_hand, chain_screwdriver, screwdriver_asset_pose) -> None:
+    def __init__(self, chain_hand, chain_screwdriver, world_trans, screwdriver_asset_pose) -> None:
         pass
 
 class AllegroScrewdriverContact(AllegroContactProblem):
@@ -102,7 +102,8 @@ class AllegroScrewdriver(AllegroValveTurning):
                  world_trans,
                  object_asset_pos,
                  fingers=['index', 'middle', 'ring', 'thumb'],
-                 friction_coefficient=0.95,
+                #  friction_coefficient=0.95,
+                 friction_coefficient=10.95, # DEBUG ONLY, set the priction very high
                  obj_ori_rep='axis_angle',
                  optimize_force=False,
                  device='cuda:0', **kwargs):
@@ -136,7 +137,7 @@ class AllegroScrewdriver(AllegroValveTurning):
     
                 
     @combine_finger_constraints
-    def _valve_kinematics_constraint(self, xu, finger_name, compute_grads=True, compute_hess=False):
+    def _kinematics_constraints(self, xu, finger_name, compute_grads=True, compute_hess=False):
         """
             Computes on the kinematics of the valve and the finger being consistant
         """
@@ -354,7 +355,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         # print(f'Inequality constraint violation: {torch.norm(inequality_constr)}')
 
         action = x[:, turn_problem.dx:turn_problem.dx+turn_problem.du].to(device=env.device)
-        print(action)
+        # print(action)
         action = action[:, :4 * num_fingers]
         action = action + start.unsqueeze(0)[:, :4 * num_fingers] # NOTE: this is required since we define action as delta action
         # action = best_traj[0, :8]
@@ -365,6 +366,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         elif params['mode'] == 'hardware_copy':
             ros_copy_node.apply_action(partial_to_full_state(action[0], params['fingers']))
         # action = x[:, :4 * num_fingers].to(device=env.device)
+        # DEBUG ONLY
+        action = best_traj[1, :4 * turn_problem.num_fingers].unsqueeze(0)
         env.step(action)
         # if params['hardware']:
         #     # ros_node.apply_action(action[0].detach().cpu().numpy())
@@ -507,7 +510,8 @@ if __name__ == "__main__":
                                     use_cartesian_controller=False,
                                     viewer=True,
                                     steps_per_action=60,
-                                    friction_coefficient=1.0,
+                                    # friction_coefficient=1.0,
+                                    friction_coefficient=10.0,  # DEBUG ONLY, set the friction very high
                                     device=config['sim_device'],
                                     video_save_path=img_save_dir,
                                     joint_stiffness=config['kp'],
