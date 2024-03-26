@@ -92,7 +92,11 @@ class AllegroValveDataset(Dataset):
         elif regrasp:
             self.trajectories = self.regrasp_trajectories
             self.masks = regrasp_masks
+
+        self.trajectory_type = torch.zeros(*self.trajectories.shape[:-2], dtype=torch.long)
+        self.trajectory_type[self.turn_trajectories.shape[0]:] = 1
         self.trajectories = self.trajectories.reshape(-1, self.trajectories.shape[-2], self.trajectories.shape[-1])
+        self.trajectory_type = self.trajectory_type.reshape(-1)
         self.masks = self.masks.reshape(-1, self.masks.shape[-2])
         self.trajectories = torch.from_numpy(self.trajectories).float()
         self.masks = torch.from_numpy(self.masks).float()
@@ -151,7 +155,6 @@ class AllegroValveDataset(Dataset):
         mask[0, :dx] = self.initial_state_mask_dist.sample((1,)).to(device=traj.device)
 
         # sample mask for final state
-
         mask[final_idx, :dx] = self.initial_state_mask_dist.sample((1,)).to(device=traj.device)
 
         # also mask out the rest with small probability
@@ -160,7 +163,7 @@ class AllegroValveDataset(Dataset):
         if mask.sum() == 0:
             # randomly choose an index to un-mask
             mask[np.random.randint(0, final_idx)] = 1
-        return self.masks[idx] * (traj - self.mean) / self.std, mask
+        return self.masks[idx] * (traj - self.mean) / self.std, self.trajectory_type[idx], mask
 
     def compute_norm_constants(self):
         # compute norm constants not including the zero padding

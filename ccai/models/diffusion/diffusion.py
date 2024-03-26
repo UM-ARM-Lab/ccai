@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import numpy as np
 
-from ccai.models.temporal import TemporalUnet
+from ccai.models.temporal import TemporalUnet, TemporalUNetContext
 
 from einops import reduce
 import math
@@ -253,15 +253,11 @@ class GaussianDiffusion(nn.Module):
     @torch.no_grad()
     def p_sample(self, x, t, context):
         b, *_, device = *x.shape, x.device
+        alpha = 0.5
         batched_times = torch.full((b,), t, device=x.device, dtype=torch.long)
         model_mean, _, model_log_variance, x_start = self.p_mean_variance(x=x, t=batched_times, context=context)
         noise = torch.randn_like(x) if t > 0 else 0.  # no noise if t == 0
-        pred_img = model_mean + (0.5 * model_log_variance).exp() * noise
-        # pred_img[:, -1, 8] += 0.01
-
-        # force angle to be between [-1, 1]
-        #pred_img[..., 8] = ((pred_img[..., 8] + 1.0) % 2.0) - 1.0
-
+        pred_img = model_mean + alpha * (0.5 * model_log_variance).exp() * noise
         return pred_img, x_start
 
     def _apply_conditioning(self, x, condition=None):
@@ -271,7 +267,7 @@ class GaussianDiffusion(nn.Module):
         for t, (start_idx, val) in condition.items():
             val = val.reshape(val.shape[0], -1, val.shape[-1])
             n, h, d = val.shape
-            x[:, t:t+h, start_idx:start_idx + d] = val.clone()
+            x[:, t:t + h, start_idx:start_idx + d] = val.clone()
         return x
 
     @torch.no_grad()
@@ -291,7 +287,7 @@ class GaussianDiffusion(nn.Module):
         for t in reversed(range(0, start_timestep)):
             img, x_start = self.p_sample(img, t, context)
             img = self._apply_conditioning(img, condition)
-            #img[:, -1, 8] = img[:, 0, 8] + np.pi / 4.0
+            # img[:, -1, 8] = img[:, 0, 8] + np.pi / 4.0
             imgs.append(img)
 
         ret = img if not return_all_timesteps else torch.stack(imgs, dim=1)
@@ -323,6 +319,8 @@ class GaussianDiffusion(nn.Module):
         #  need to think how to do this for all subtrajectories
         img[:, 0] = self._apply_conditioning(img[:, 0], condition)
         imgs = [img]
+        if context is not None:
+            context = context.reshape(B * N, 1, -1)
         for t in reversed(range(0, start_timestep)):
             img, x_start = self.p_sample(img.reshape(B * N, H, -1), t, context)
             img = img.reshape(B, N, H, -1)
@@ -334,7 +332,7 @@ class GaussianDiffusion(nn.Module):
                 img[:, i - 1, -1, :9] = img[:, i, 0, :9]
 
             img[:, 0] = self._apply_conditioning(img[:, 0], condition)
-            #img[:, -1, -1, 8] += 1.0e-3
+            # img[:, -1, -1, 8] += 1.0e-3
             imgs.append(img)
 
         ret = img if not return_all_timesteps else torch.stack(imgs, dim=1)
@@ -386,23 +384,24 @@ class GaussianDiffusion(nn.Module):
             H = self.horizon
 
         if context is not None:
-            B, num_constraints, dc = context.shape
-            context = context.reshape(B, 1, num_constraints, dc).repeat(1, N, 1, 1).reshape(B * N, num_constraints, -1)
+            N2, num_constraints, dc = context.shape
+            assert N2 == N
+            # context = context.reshape(B, 1, num_constraints, dc).repeat(1, N, 1, 1).reshape(B * N, num_constraints, -1)
 
         sample_fn = self.p_sample_loop if not self.is_ddim_sampling else self.ddim_sample
         if H > self.horizon:
             # get closest multiple of horizon
             factor = math.ceil(H / self.horizon)
-            #H_total = factor * self.horizon
+            # H_total = factor * self.horizon
             sample = self.p_multi_sample_loop((B * N, factor, self.horizon, self.xu_dim),
                                               condition=condition, context=context,
                                               return_all_timesteps=return_all_timesteps)
             # combine samples
-            combined_samples = [sample[:, i, :-1] for i in range(0, factor-1)]
+            combined_samples = [sample[:, i, :-1] for i in range(0, factor - 1)]
             combined_samples.append(sample[:, -1])
             sample = torch.cat([sample[:, i] for i in range(0, factor)], dim=1)
             # get combined trajectory
-            #sample = torch.cat(combined_samples, dim=1)
+            # sample = torch.cat(combined_samples, dim=1)
             return sample
 
         return sample_fn((B * N, H, self.xu_dim), condition=condition, context=context,
@@ -433,10 +432,11 @@ class GaussianDiffusion(nn.Module):
         # mask defines in-painting, model should receive un-noised copy of masked states
         # note -- only mask states, not controls
         masked_idx = (mask == 0).nonzero()
-        x[masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]] = x_start[masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]]
+        x[masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]] = x_start[
+            masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]]
 
         # ensure angle between [-1, 1]
-        #x[..., 8] = ((x[..., 8] + 1.0) % 2.0) - 1.0
+        # x[..., 8] = ((x[..., 8] + 1.0) % 2.0) - 1.0
 
         # predict and take gradient step
         model_out = self.model.compiled_conditional_train(t, x, context)
@@ -485,10 +485,9 @@ class GaussianDiffusion(nn.Module):
         # takes a current data estimate x_0, samples from forward diffusion to noise to x_timestep < T
         # then runs reverse diffusion to get a new updated sample
         # what if we noise it a little less than we were supposed to
-        print(timestep)
         batched_times = torch.full((B,), timestep, device=x.device, dtype=torch.long)
 
-        x_noised = self.q_sample(x, batched_times-1)
+        x_noised = self.q_sample(x, batched_times - 1)
         # x_noised = x
         # return resampled
         return self.p_sample_loop(x.shape, condition=condition, context=context,
@@ -497,8 +496,156 @@ class GaussianDiffusion(nn.Module):
                                   trajectory=x_noised)
 
 
-class ConstrainedDiffusion(GaussianDiffusion):
+class JointDiffusion(GaussianDiffusion):
+    """
 
+        Class for jointly diffusing p(\tau, c) using score function networks e(\tau|c) and e(c|\tau)
+        where \tau is the trajectory and c is the context.
+
+    """
+
+    def __init__(
+            self,
+            horizon,
+            xu_dim,
+            context_dim,
+            timesteps=1000,
+            sampling_timesteps=20,
+            loss_type='l2',
+            hidden_dim=32,
+            unconditional=True
+    ):
+        super().__init__(
+            horizon,
+            xu_dim,
+            context_dim,
+            timesteps=timesteps,
+            sampling_timesteps=sampling_timesteps,
+            loss_type=loss_type,
+            hidden_dim=hidden_dim,
+            unconditional=unconditional,
+        )
+        # model provides score fcn for both trajectory and context
+        self.model = TemporalUNetContext(horizon, xu_dim, context_dim, dim=hidden_dim)
+        self.register_buffer('context_dropout_p', torch.tensor([0.25]))
+
+    def model_predictions(self, x, t, context=None):
+        e_x, e_c = self.model(t, x, context)
+        x_start = self.predict_start_from_noise(x, t, e_x)
+        c_start = self.predict_start_from_noise(context, t, e_c)
+        return ModelPrediction(e_x, x_start), ModelPrediction(e_c, c_start)
+
+    def p_mean_variance(self, x, t, context):
+        pred_x, pred_c = self.model_predictions(x, t, context)
+        x_start = pred_x.pred_x_start
+        c_start = pred_c.pred_x_start
+        x_mean, x_var, x_log_var = self.q_posterior(x_start=x_start, x_t=x, t=t)
+        c_mean, c_var, c_log_var = self.q_posterior(x_start=c_start, x_t=context, t=t)
+
+        return {'x': {'mean': x_mean, 'var': x_var, 'log_var': x_log_var, 'start': x_start},
+                'c': {'mean': c_mean, 'var': c_var, 'log_var': c_log_var, 'start': c_start}}
+
+    @torch.no_grad()
+    def p_sample(self, x, t, context):
+        b, *_, device = *x.shape, x.device
+        alpha = 0.5
+        batched_times = torch.full((b,), t, device=x.device, dtype=torch.long)
+        mu_var = self.p_mean_variance(x=x, t=batched_times, context=context)
+        # model_mean, _, model_log_variance, x_start = self.p_mean_variance(x=x, t=batched_times, context=context)
+        noise_x = torch.randn_like(x) if t > 0 else 0.  # no noise if t == 0
+        noise_c = torch.randn_like(context) if t > 0 else 0.  # no noise if t == 0
+        pred_x = mu_var['x']['mean'] + alpha * (0.5 * mu_var['x']['logvar']).exp() * noise_x
+        pred_c = mu_var['c']['mean'] + alpha * (0.5 * mu_var['c']['logvar']).exp() * noise_c
+        return pred_x, mu_var['x']['start'], pred_c, mu_var['c']['start']
+
+    @torch.no_grad()
+    def p_sample_loop(self, shape, condition, context,
+                      return_all_timesteps=False,
+                      start_timestep=None,
+                      trajectory=None):
+        batch, device = shape[0], self.betas.device
+
+        if trajectory is None:
+            x = torch.randn(shape, device=device)
+        else:
+            x = trajectory
+        if context is None:
+            c = torch.randn((batch, self.context_dim), device=device)
+        else:
+            c = context
+
+        if start_timestep is None:
+            start_timestep = self.num_timesteps
+
+        x = self._apply_conditioning(x, condition)
+        all_x = [x]
+        all_c = [c]
+        for t in reversed(range(0, start_timestep)):
+            x, x_start, c, c_start = self.p_sample(x, t, c)
+
+            # apply conditioning
+            x = self._apply_conditioning(x, condition)
+            if context is not None:
+                c = context
+
+            all_x.append(x)
+            all_c.append(c)
+
+        ret_x = x if not return_all_timesteps else torch.stack(all_x, dim=1)
+        ret_c = c if not return_all_timesteps else torch.stack(all_c, dim=1)
+
+        return ret_x, ret_c
+
+    def p_losses(self, x_start, t, context, noise=None, mask=None):
+        B = x_start.shape[0]
+        noise_x = default(noise, lambda: torch.randn_like(x_start))
+        noise_c = default(noise, lambda: torch.randn_like(context))
+        x = self.q_sample(x_start=x_start, t=t, noise=noise_x)
+        c = self.q_sample(x_start=context, t=t, noise=noise_c)
+
+        # mask defines in-painting, model should receive un-noised copy of masked states
+        # note -- only mask states, not controls
+        masked_idx = (mask == 0).nonzero()
+        x[masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]] = x_start[
+            masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]]
+
+        # dropout for training to condition on context as well as diffuse context
+        context_mask_dist = torch.distributions.Bernoulli(probs=1 - self.context_dropout_p)
+        context_mask = context_mask_dist.sample((B,))  # .to(device=context.device)
+
+        # do masking
+        masked_idx = (context_mask == 0).nonzero()
+        c[masked_idx[:, 0], masked_idx[:, 1]] = context[masked_idx[:, 0], masked_idx[:, 1]]
+
+        # predict and take gradient step
+        e_x, e_c = self.model(t, x, context)
+        loss_x = self.loss_fn(e_x, noise_x, reduction='none')
+        loss_c = self.loss_fn(e_c, noise_c, reduction='none')
+
+        # apply mask
+        if mask is not None:
+            loss_x = loss_x * mask
+            loss_x = loss_x.reshape(B, -1).sum(dim=1) / mask.reshape(B, -1).sum(dim=1)
+
+            loss_c = loss_c * mask
+            loss_c = loss_c.reshape(B, -1).sum(dim=1) / mask.reshape(B, -1).sum(dim=1)
+
+            loss = loss_x + loss_c
+
+        # loss = reduce(loss, 'b ... -> b (...)', 'mean')
+        # loss = loss * extract(self.loss_weight, t, loss.shape)
+
+        return loss.mean()
+
+    def loss(self, x, context, mask=None):
+        b = x.shape[0]
+        x = x.reshape(b, -1, self.xu_dim)
+        device = x.device
+        t = torch.randint(0, self.num_timesteps, (b,), device=device).long()
+        return self.p_losses(x, t, context, mask=mask)
+
+
+class ConstrainedDiffusion(GaussianDiffusion):
     def __init__(
             self,
             horizon,

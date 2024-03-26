@@ -136,10 +136,11 @@ class TrajectoryDiffusionModel(nn.Module):
     def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None):
         # B, N, _ = constraints.shape
         if constraints is not None:
-            B = constraints.shape[0]
-            context = torch.cat((start.unsqueeze(1).repeat(1, N, 1),
-                                 goal.unsqueeze(1).repeat(1, N, 1),
-                                 constraints), dim=-1)
+            constraints = constraints.reshape(constraints.shape[0], -1, constraints.shape[-1])
+            context = constraints
+            #context = torch.cat((start.unsqueeze(1).repeat(1, N, 1),
+            #                     goal.unsqueeze(1).repeat(1, N, 1),
+            #                     constraints), dim=-1)
         else:
             context = None
         condition = {}
@@ -163,7 +164,7 @@ class TrajectoryDiffusionModel(nn.Module):
         if start is not None:
             context = torch.cat((start, goal, constraints), dim=1)
         else:
-            context = None
+            context = constraints
 
         # context=None
         return self.diffusion_model.loss(trajectories.reshape(B, -1), context=context, mask=mask).mean()

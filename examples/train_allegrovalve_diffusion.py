@@ -113,12 +113,15 @@ def train_model(trajectory_sampler, train_loader, config):
     for epoch in pbar:
         train_loss = 0.0
         trajectory_sampler.train()
-        for trajectories, masks in train_loader:
+        for trajectories, traj_class, masks in train_loader:
             trajectories = trajectories.to(device=config['device'])
             masks = masks.to(device=config['device'])
             B, T, dxu = trajectories.shape
-
-            sampler_loss = trajectory_sampler.loss(trajectories, mask=masks)
+            if config['use_class']:
+                traj_class = traj_class.to(device=config['device']).float()
+            else:
+                traj_class = None
+            sampler_loss = trajectory_sampler.loss(trajectories, mask=masks, constraints=traj_class)
             loss = sampler_loss
             loss.backward()
             # torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
@@ -195,11 +198,18 @@ def test_long_horizon(model, loader, config):
     else:
         start = torch.tensor([0.2, 0.5, 0.7, 0.7, 1.3, 0, 0.1, 1.0, 0], device=config['device'])
         start[-1] = 2 * np.pi * (torch.rand(1, device=config['device']) - 0.5)
+    num_turns = 1
+    if config['use_class']:
+        context = torch.tensor([1.0, 0.0], device=config['device']).repeat(num_turns)
+        context = context.reshape(1, -1, 1).repeat(N, 1, 1)
+    else:
+        context = None
 
     goal = 0.5 * torch.tensor([-np.pi / 2.0], device=config['device'])
     start = start[None, :].repeat(N, 1)
     # goal = (goal[None, :].repeat(N, 1) - model.x_mean[8]) / model.x_std[8]
     # start=None
+    context = None
     goal = None
     # goal = None
     # print(model.x_mean[:8])
@@ -209,7 +219,7 @@ def test_long_horizon(model, loader, config):
     #    print(item[0, 0, :8].cuda() * model.x_std[:8] + model.x_mean[:8] - start[0, :8])
 
     # exit(0)
-    sampled_trajectories = model.sample(N=N, start=start, goal=goal, H=32 * 4)
+    sampled_trajectories = model.sample(N=N, start=start, goal=goal, H=32 * num_turns, constraints=context)
     if config['sine_cosine']:
         eps = 1e-6
         cos_theta = sampled_trajectories[:, :, 8].clamp(min=-1 + eps, max=1 - eps)
@@ -279,7 +289,11 @@ if __name__ == "__main__":
     else:
         dx = config['dx']
 
-    model = TrajectorySampler(T=config['T'], dx=dx, du=config['du'], context_dim=0, type=config['model_type'],
+    if config['use_class']:
+        dcontext = 1
+    else:
+        dcontext = 0
+    model = TrajectorySampler(T=config['T'], dx=dx, du=config['du'], context_dim=dcontext, type=config['model_type'],
                               hidden_dim=config['hidden_dim'], timesteps=config['timesteps'])
 
     data_path = pathlib.Path(f'{CCAI_PATH}/data/training_data/{config["data_directory"]}')
@@ -340,7 +354,7 @@ if __name__ == "__main__":
     config['scene'] = scene
     config['env'] = env
 
-    # train_model(model, train_loader, config)
+    #train_model(model, train_loader, config)
     # vis_dataset(train_loader, config, N=64)
     model.load_state_dict(torch.load(
         f'{CCAI_PATH}/data/training/allegro_valve/{config["model_name"]}_{config["model_type"]}/allegro_valve_{config["model_type"]}.pt'
