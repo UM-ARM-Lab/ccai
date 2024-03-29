@@ -115,6 +115,7 @@ class JaxCSVTOpt:
         self.cost_batched: Callable[[jnp.array], jnp.array] = jax.vmap(problem.c)
         self.h: Callable[[jnp.array], jnp.array] = problem.h
         self.g: Optional[Callable[[jnp.array], jnp.array]] = problem.g
+        self.g_batched = jax.vmap(problem.g)
         self.f: Callable[[jnp.array, jnp.array], jnp.array] = problem.f
         self.k: Callable[[jnp.array, jnp.array], jnp.array] = params.k
         self.u_bounds: Tuple[jnp.array, jnp.array] = problem.u_bounds
@@ -177,7 +178,7 @@ class JaxCSVTOpt:
 
         # Calculate slack variable values via equation (33) and append to the trajectory according to equation (35).
         if self.g is not None:
-            xuz: jnp.array = jnp.concatenate((guess, jnp.sqrt(-2 * self.g(guess))), axis=1)
+            xuz: jnp.array = jnp.concatenate((guess, jnp.sqrt(-2 * self.g_batched(guess))), axis=1)
         else:
             xuz = guess
 
@@ -223,11 +224,30 @@ class JaxCSVTOpt:
         constraint_grad = jax.vmap(jax.jacrev(self._combined_constraint))(xuz, jnp.tile(initial_state, (self.N, 1)))
 
         # Compute the constraint hessian via its components, then compile them all together.
-        h_hess = jax.vmap(jax.jacfwd(jax.jacrev(self.h)))(xuz)
-        slack_constraint_hess = jnp.zeros((self.N, self.dg, self._trajectory_dim(), self._slack_trajectory_dim()))
-        dynamics_constraint_hess = jax.vmap(jax.jacfwd(jax.jacrev(self._dynamics_constraint)))(xuz)
-        start_constraint_hess = jax.vmap(jax.jacfwd(jax.jacrev(self._start_constraint)))(xuz, jnp.tile(initial_state,
+        h_hess = jax.vmap(jax.jacfwd(jax.jacrev(self.h)))(xuz[:, :self._trajectory_dim()])
+        if self.g is not None:
+            slack_constraint_hess = jax.vmap(jax.jacfwd(jax.jacrev(self._slack_constraint)))(xuz)
+        else:
+            slack_constraint_hess = jnp.zeros((self.N, self.dg, self._trajectory_dim(), self._trajectory_dim()))
+        dynamics_constraint_hess = jax.vmap(jax.jacfwd(jax.jacrev(self._dynamics_constraint)))(xuz[:, :self._trajectory_dim()])
+        start_constraint_hess = jax.vmap(jax.jacfwd(jax.jacrev(self._start_constraint)))(xuz[:, :self._trajectory_dim()], jnp.tile(initial_state,
                                                                                                        (self.N, 1)))
+        if self.g is not None:
+            # Add in zero blocks for h, dynamics, and start constraints, which do not depend on the slack variables.
+            h_padding_axis_3 = jnp.zeros((self.N, self.dh, self._trajectory_dim(), self.dg))
+            h_padding_axis_2 = jnp.zeros((self.N, self.dh, self.dg, self._slack_trajectory_dim()))
+            h_hess_padded_axis_3 = jnp.concatenate((h_hess, h_padding_axis_3), axis=3)
+            h_hess = jnp.concatenate((h_hess_padded_axis_3, h_padding_axis_2), axis=2)
+
+            dynamics_padding_axis_3 = jnp.zeros((self.N, self.dx * (self.T - 1), self._trajectory_dim(), self.dg))
+            dynamics_padding_axis_2 = jnp.zeros((self.N, self.dx * (self.T - 1), self.dg, self._slack_trajectory_dim()))
+            dynamics_constraint_hess_padded_axis_3 = jnp.concatenate((dynamics_constraint_hess, dynamics_padding_axis_3), axis=3)
+            dynamics_constraint_hess = jnp.concatenate((dynamics_constraint_hess_padded_axis_3, dynamics_padding_axis_2), axis=2)
+
+            start_padding_axis_3 = jnp.zeros((self.N, self.dx, self._trajectory_dim(), self.dg))
+            start_padding_axis_2 = jnp.zeros((self.N, self.dx, self.dg, self._slack_trajectory_dim()))
+            start_constraint_hess_padded_axis_3 = jnp.concatenate((start_constraint_hess, start_padding_axis_3), axis=3)
+            start_constraint_hess = jnp.concatenate((start_constraint_hess_padded_axis_3, start_padding_axis_2), axis=2)
         constraint_hess = jnp.concatenate((h_hess, slack_constraint_hess, dynamics_constraint_hess,
                                            start_constraint_hess), axis=1)
 
@@ -266,7 +286,7 @@ class JaxCSVTOpt:
         """
         # Get inv(dC * dCT) term to be used below, shape (N, dg + dh, dg + dh).
         dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)) +
-                                   jnp.expand_dims(jnp.eye(self.dh + self.dg + self.dx * self.T - 1), axis=0) * 1e-4)
+                                   jnp.expand_dims(jnp.eye(self.dh + self.dg + self.dx * self.T), axis=0) * 1e-4)
 
         # Get constraint step from equation (39), shape (N, d * T).
         constraint_step = (constraint_grad.transpose((0, 2, 1)) @ dCdCT_inv @
@@ -296,7 +316,7 @@ class JaxCSVTOpt:
         """
         # Get inv(dC * dCT) term to be used below, shape (N, dg + dh, dg + dh).
         dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)) +
-                                   jnp.expand_dims(jnp.eye(self.dh + self.dg + self.dx * self.T - 1), axis=0) * 1e-4)
+                                   jnp.expand_dims(jnp.eye(self.dh + self.dg + self.dx * self.T), axis=0) * 1e-4)
 
         # Get projection tensor via equation (36), shape (N, d * T, d * T).
         projection = (jnp.expand_dims(jnp.eye((self.dx + self.du) * self.T + self.dg), axis=0) -
@@ -360,10 +380,11 @@ class JaxCSVTOpt:
             The evaluated combined constraint, shape (N, dh + dg + dx * T).
         """
         if self.g is not None:
-            combined_constraint = jnp.concatenate((self.h(xuz[:, :self._trajectory_dim()]),
+            combined_constraint = jnp.concatenate((self.h(xuz[:self._trajectory_dim()]),
                                                    self._slack_constraint(xuz),
-                                                   self._dynamics_constraint(xuz),
-                                                   self._start_constraint(xuz, initial_state)), axis=1)
+                                                   self._dynamics_constraint(xuz[:self._trajectory_dim()]),
+                                                   self._start_constraint(xuz[:self._trajectory_dim()], initial_state)),
+                                                  axis=0)
         else:
             combined_constraint = jnp.concatenate((self.h(xuz[:self._trajectory_dim()]),
                                                    self._dynamics_constraint(xuz[:self._trajectory_dim()]),
@@ -376,12 +397,12 @@ class JaxCSVTOpt:
         variables according to equation (33). This function's output will be constrained to zero in the optimizer.
 
         Args:
-            xuz: All N trajectories including slack variables stacked as rows, shape (N, (dx + du) * T + dg).
+            xuz: All N trajectories including slack variables stacked as rows, shape ((dx + du) * T + dg). TODO: this is only a single trajectory
 
         Returns:
             The evaluated slack constraint, shape (N, dg).
         """
-        inequality_with_slack = self.g(xuz[:, :self._trajectory_dim()]) + 0.5 * xuz[:, self._trajectory_dim()+1:] ** 2
+        inequality_with_slack = self.g(xuz[:self._trajectory_dim()]) + 0.5 * xuz[-self.dg:] ** 2
         return inequality_with_slack
 
     def _dynamics_constraint(self, x: jnp.array) -> jnp.array:

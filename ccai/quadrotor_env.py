@@ -196,8 +196,8 @@ class QuadrotorEnv:
         new_theta = theta + theta_dot * self.dt
         new_psi = psi + psi_dot * self.dt
         new_x = x + new_xdot * self.dt
-        new_y = y + new_ydot + self.dt
-        new_z = z + new_zdot + self.dt
+        new_y = y + new_ydot * self.dt
+        new_z = z + new_zdot * self.dt
 
         # dstate = np.stack((x_dot, y_dot, z_dot, phi_dot, theta_dot, psi_dot,
         #                   x_ddot, y_ddot, z_ddot, p_dot, q_dot, r_dot), axis=-1)

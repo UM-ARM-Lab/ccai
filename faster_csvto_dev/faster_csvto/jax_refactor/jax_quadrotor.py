@@ -1,5 +1,5 @@
 import time
-from typing import Optional, Callable
+from typing import Optional, Callable, Tuple
 
 import numpy as np
 import jax
@@ -195,6 +195,38 @@ class QuadrotorGPHeightConstraint:
         return height_constraint(trajectory, self.T, self.surface_gp)
 
 
+def cylinder_sdf_constraint(trajectory, radius):
+    """Return the negative distance from the cylinder.
+
+    Args:
+        trajectory: Single trajectory, shape ((dx + du) * T).
+
+    Returns:
+        The negative distance from the cylinder for each point in the trajectory spline.
+    """
+    points = trajectory.reshape(11, 16)
+    x = points[:, 0]
+    y = points[:, 1]
+    distance_from_center = jnp.sqrt(x**2 + y**2)
+    negative_distance_from_cylinder = radius - distance_from_center
+    return negative_distance_from_cylinder
+
+
+class QuadrotorCylinderConstraint:
+    """Inequality constraint function to force each point state to be outside a cylinder.
+    """
+
+    def __init__(self, radius: jnp.float32) -> None:
+        """
+        """
+        self.radius = radius
+
+    def __call__(self, trajectory) -> jnp.array:
+        """
+        """
+        return cylinder_sdf_constraint(trajectory, self.radius)
+
+
 def update_plot_with_trajectories(ax, point_dim: int, best_trajectory: np.array,
                                   other_trajectories: Optional[np.array] = None) -> None:
     """
@@ -301,7 +333,7 @@ def main() -> None:
     goal_state = goal_state.at[0:2].set(4)
     cost_function = QuadrotorCost(goal_state, T)
     equality_constraint_function = QuadrotorGPHeightConstraint('../surface_data.npz', T)
-    inequality_constraint_function = None
+    inequality_constraint_function = QuadrotorCylinderConstraint(1)
     dynamics_function = QuadrotorDynamics()
     u_bounds = (jnp.array((-100.0000, -100.0000, -100.0000, -100.0000)),
                 jnp.array((100.0000, 100.0000, 100.0000, 100.0000)))
@@ -311,8 +343,8 @@ def main() -> None:
                           100.0000, 100.0000, 100.0000, 100.0000, 100.0000)))
     dx = 12
     du = 4
-    dh = 12
-    dg = 0
+    dh = 11
+    dg = 11
     quadrotor_problem = JaxCSVTOProblem(cost_function, equality_constraint_function, inequality_constraint_function,
                                         dynamics_function, u_bounds, x_bounds, dx, du, dh, dg)
 
@@ -346,61 +378,41 @@ def main() -> None:
     solve_end = time.time()
     print(f'Solved {K_online} iterations in {solve_end - solve_start:02f} seconds')
 
-    # # Compile the solve() routines.
-    # compile_start = time.time()
-    # solve_warmup = jax.jit(quadrotor_opt_warmup.solve).lower(initial_state, initial_guess).compile()
-    # compile_end = time.time()
-    # print(f'Compiled warmup solve() in {compile_end - compile_start:02f} seconds')
-    # compile_start = time.time()
-    # solve_online = jax.jit(quadrotor_opt_online.solve).lower(initial_state, initial_guess).compile()
-    # compile_end = time.time()
-    # print(f'Compiled online solve() in {compile_end - compile_start:02f} seconds')
+    # Initialize the environment.
+    env = QuadrotorEnv(False, '../surface_data.npz', obstacle_mode='static')
+    env.reset()
+    env.render_init()
+    ax = env.ax
 
-    # # Initialize the environment.
-    # env = QuadrotorEnv(False, '../surface_data.npz')
-    # env.reset()
-    # env.render_init()
-    # ax = env.ax
-    #
-    # # Get the start from the environment.
-    # start = env.state
-    # trajectories = get_initial_guess_from_start_state(start, N, T, dx, du, dynamics_function)
-    # best_trajectory = None
+    # Get the start from the environment.
+    start = env.state
+    trajectories = get_initial_guess_from_start_state(start, N, T, dx, du, dynamics_function)
+    best_trajectory = None
 
-    # # Profile the solve() routines.
-    # solve_start = time.time()
-    # best_trajectory, trajectories = solve_warmup(start, trajectories)
-    # solve_end = time.time()
-    # print(f'Solve {K_warmup} iterations in {solve_end - solve_start:02f} seconds')
-    # solve_start = time.time()
-    # best_trajectory, trajectories = solve_warmup(start, trajectories)
-    # solve_end = time.time()
-    # print(f'Solved {K_online} iterations in {solve_end - solve_start:02f} seconds')
+    # Loop over MPC updates.
+    for mpc_step in range(100):
+        print(f'Running MPC step {mpc_step}')
 
-    # # Loop over MPC updates.
-    # for mpc_step in range(100):
-    #     print(f'Running MPC step {mpc_step}')
-    #
-    #     # Optimize the trajectory distribution.
-    #     if mpc_step == 0:
-    #         # Solve for the trajectory distribution to warm up on the first iteration.
-    #         best_trajectory, trajectories = quadrotor_opt_warmup.solve(start, trajectories)
-    #     else:
-    #         # Solve for the trajectory distribution online for every iteration after the first one.
-    #         best_trajectory, trajectories = quadrotor_opt_online.solve(start, trajectories)
-    #
-    #     # Run the first input from the best trajectory on the simulated quadrotor.
-    #     print(f'Selected control input: {best_trajectory[dx:dx + du]}')
-    #     start, _ = env.step(best_trajectory[dx:dx + du])
-    #     print(f'Moved to (x, y, z): ({start[0]}, {start[1]}, {start[2]})')
-    #
-    #     # Step the trajectories so that they can be used as the initial guess in the next iteration.
-    #     trajectories = roll_out_trajectories(start, trajectories, dynamics_function, N, T, dx, du)
-    #     best_trajectory = roll_out_trajectories(start, jnp.expand_dims(best_trajectory, axis=0), dynamics_function,
-    #                                             1, T, dx, du)
-    #
-    #     # Plot the best trajectories.
-    #     plot_trajectory(env, ax, dx + du, best_trajectory.squeeze(), trajectories, mpc_step)
+        # Optimize the trajectory distribution.
+        if mpc_step == 0:
+            # Solve for the trajectory distribution to warm up on the first iteration.
+            best_trajectory, trajectories = quadrotor_opt_warmup.solve(start, trajectories)
+        else:
+            # Solve for the trajectory distribution online for every iteration after the first one.
+            best_trajectory, trajectories = quadrotor_opt_online.solve(start, trajectories)
+
+        # Run the first input from the best trajectory on the simulated quadrotor.
+        print(f'Selected control input: {best_trajectory[dx:dx + du]}')
+        start, _ = env.step(best_trajectory[dx:dx + du])
+        print(f'Moved to (x, y, z): ({start[0]}, {start[1]}, {start[2]})')
+
+        # Step the trajectories so that they can be used as the initial guess in the next iteration.
+        trajectories = roll_out_trajectories(start, trajectories, dynamics_function, N, T, dx, du)
+        best_trajectory = roll_out_trajectories(start, jnp.expand_dims(best_trajectory, axis=0), dynamics_function,
+                                                1, T, dx, du)
+
+        # Plot the best trajectories.
+        plot_trajectory(env, ax, dx + du, best_trajectory.squeeze(), trajectories, mpc_step)
 
 
 if __name__ == '__main__':

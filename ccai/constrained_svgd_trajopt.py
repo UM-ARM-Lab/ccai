@@ -172,12 +172,8 @@ class ConstrainedSteinTrajOpt:
             # compute kernelized score
             kernelized_score = torch.sum(matrix_K @ -grad_J.reshape(N, 1, -1, 1), dim=0)
             phi = self.gamma * kernelized_score.squeeze(-1) / N + grad_matrix_K / N  # maximize phi
-
             xi_J = -phi
-
-        return (self.alpha_C * xi_C).detach()
-        # return (self.alpha_J * xi_J).detach()
-        # return (self.alpha_J * xi_J + self.alpha_C * xi_C).detach()
+        return (self.alpha_J * xi_J + self.alpha_C * xi_C).detach()
 
     def _clamp_in_bounds(self, xuz):
         N = xuz.shape[0]
