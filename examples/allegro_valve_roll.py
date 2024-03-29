@@ -8,6 +8,7 @@ import pickle as pkl
 import torch
 import time
 import yaml
+import copy
 import pathlib
 from functools import partial
 from torch.func import vmap, jacrev, hessian, jacfwd
@@ -532,8 +533,9 @@ class AllegroValveTurning(AllegroContactProblem):
         if self.optimize_force:
             self.dg_per_t = self.num_fingers * (1 + 3 + 4) + 3
         else:
-            # self.dg_per_t = self.num_fingers * (1 + 3) + 3
-            self.dg_per_t = self.num_fingers * (1 + 3)
+            self.dg_per_t = self.num_fingers * (1 + 3) + 3
+            # self.dg_per_t = self.num_fingers * (1 + 3)
+            # self.dg_per_t = self.num_fingers * (1 + 3 + 2)
         self.dg_constant = 0
         self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
         self.dz = (self.friction_polytope_k) * self.num_fingers # one friction constraints per finger
@@ -569,8 +571,8 @@ class AllegroValveTurning(AllegroContactProblem):
                          obj_joint_dim=obj_joint_dim, device=device)
         
         self.friction_coefficient = friction_coefficient
-        # self.dynamics_constr = vmap(self._dynamics_constr)
-        # self.grad_dynamics_constr = vmap(jacrev(self._dynamics_constr, argnums=(0, 1, 2, 3, 4)))
+        self.dynamics_constr = vmap(self._dynamics_constr)
+        self.grad_dynamics_constr = vmap(jacrev(self._dynamics_constr, argnums=(0, 1, 2, 3, 4)))
         if not optimize_force:
             self.force_equlibrium_constr = vmap(self._force_equlibrium_constr)
             self.grad_force_equlibrium_constr = vmap(jacrev(self._force_equlibrium_constr, argnums=(0, 1, 2, 3, 4)))
@@ -645,6 +647,7 @@ class AllegroValveTurning(AllegroContactProblem):
         normal_vectors = []
         for i in range(self.friction_polytope_k):
             theta = 2 * np.pi * i / self.friction_polytope_k
+            # might be -cos(theta), -sin(theta), mu
             normal_vector = torch.tensor([np.cos(theta), np.sin(theta), self.friction_coefficient]).to(
                 device=self.device,
                 dtype=torch.float32)
@@ -746,6 +749,7 @@ class AllegroValveTurning(AllegroContactProblem):
     def _force_equlibrium_constr_w_force(self, q, u, next_q, force_list, contact_jac_list, contact_point_list):
         # NOTE: the constriant is defined in the robot frame
         # the contact jac an contact points are all in the robot frame
+        # NOTE: the force is also defined in the robot frame
         # this will be vmapped, so takes in a 3 vector and a [num_finger x 3 x 8] jacobian and a dq vector
         obj_robot_frame = self.world_trans.inverse().transform_points(self.object_location.reshape(1, 3))
         delta_q = q + u - next_q
@@ -1028,7 +1032,7 @@ class AllegroValveTurning(AllegroContactProblem):
         # if self.optimize_force:
         #     u = u[:, :, 4 * self.num_fingers: (4 + 3) * self.num_fingers].reshape(-1, 3 * self.num_fingers)
         # else:
-        # TODO: when optimize force, we should directly use the force
+        # TODO: when including force as a decision variable, we should directly use the force
         u = u[:, :, :4 * self.num_fingers].reshape(-1, 4 * self.num_fingers)
 
         # u is the delta q commanded
@@ -1184,20 +1188,20 @@ class AllegroValveTurning(AllegroContactProblem):
             return result_dict
         g_contact = torch.cat((g_contact, 
                             #    g_dynamics,
-                            #    g_equil,
+                               g_equil,
                                g_valve,
                                ), dim=1)
 
         if grad_g_contact is not None:
             grad_g_contact = torch.cat((grad_g_contact, 
                                         # grad_g_dynamics,
-                                        # grad_g_equil,
+                                        grad_g_equil,
                                         grad_g_valve,
                                         ), dim=1)
         if hess_g_contact is not None:
             hess_g_contact = torch.cat((hess_g_contact, 
                                         # hess_g_dynamics,
-                                        # hess_g_equil,
+                                        hess_g_equil,
                                         hess_g_valve,
                                         ), dim=1)
 
@@ -1414,18 +1418,17 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     actual_trajectory = []
     duration = 0
 
-    # debug: plot the thumb traj
     fig = plt.figure()
-    axes = [fig.add_subplot(int(f'1{num_fingers}{i+1}'), projection='3d') for i in range(num_fingers)]
-    for i, ax in enumerate(axes):
-        axes[i].set_title(params['fingers'][i])
-        axes[i].set_aspect('equal')
-        axes[i].set_xlabel('x', labelpad=20)
-        axes[i].set_ylabel('y', labelpad=20)
-        axes[i].set_zlabel('z', labelpad=20)
-        axes[i].set_xlim3d(0.8, 0.87)
-        axes[i].set_ylim3d(0.52, 0.58)
-        axes[i].set_zlim3d(1.36, 1.46)
+    axes = {params['fingers'][i]: fig.add_subplot(int(f'1{num_fingers}{i+1}'), projection='3d') for i in range(num_fingers)}
+    for finger in params['fingers']:
+        axes[finger].set_title(finger)
+        axes[finger].set_aspect('equal')
+        axes[finger].set_xlabel('x', labelpad=20)
+        axes[finger].set_ylabel('y', labelpad=20)
+        axes[finger].set_zlabel('z', labelpad=20)
+        axes[finger].set_xlim3d(0.8, 0.87)
+        axes[finger].set_ylim3d(0.52, 0.58)
+        axes[finger].set_zlim3d(1.36, 1.46)
     finger_traj_history = {}
     for finger in params['fingers']:
         finger_traj_history[finger] = []
@@ -1445,8 +1448,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         start_time = time.time()
         best_traj, trajectories = turn_planner.step(start)
 
-        # NOTE: DEBUG ONLY
-        thumb_jacobian = turn_problem.data['thumb']['contact_jacobian']
 
         print(f"solve time: {time.time() - start_time}")
         planned_theta_traj = best_traj[:, 4 * num_fingers].detach().cpu().numpy()
@@ -1454,9 +1455,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         print(f"planned theta: {planned_theta_traj}")
         # add trajectory lines to sim
         if params['mode'] == 'hardware':
-            add_trajectories_hardware(trajectories, best_traj, axes, env, config=params)
+            add_trajectories_hardware(trajectories, best_traj, axes, env, config=params, state2ee_pos_func=state2ee_pos)
         else:
-            add_trajectories(trajectories, best_traj, axes, env, gym, config=params)
+            add_trajectories(trajectories, best_traj, axes, env, sim=sim, gym=gym, viewer=viewer,
+                            config=params, state2ee_pos_func=state2ee_pos)
 
         if params['visualize_plan']:
             traj_for_viz = best_traj[:, :turn_problem.dx]
@@ -1525,7 +1527,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         # distance2surface = torch.sqrt((best_traj_ee[:, 2] - object_location[2].unsqueeze(0)) ** 2 + (best_traj_ee[:, 0] - object_location[0].unsqueeze(0))**2)
         distance2goal = (params['valve_goal'].cpu() - env.get_state()['q'][:, -1].cpu()).detach().cpu().item()
         print(f"distance to goal: {distance2goal}")
-        info = {**equality_constr_dict, **inequality_constr_dcit, **{'distance2goal': distance2goal}, **{'thumb_jacobian': thumb_jacobian}}
+        info = {**equality_constr_dict, **inequality_constr_dcit, **{'distance2goal': distance2goal}}
         info_list.append(info)
 
         gym.clear_lines(viewer)
@@ -1535,12 +1537,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         for finger in params['fingers']:
             ee = state2ee_pos(start[:4 * num_fingers], turn_problem.ee_names[finger])
             finger_traj_history[finger].append(ee.detach().cpu().numpy())
-        for i, ax in enumerate(axes):
-            finger = params['fingers'][i]
+        for finger in params['fingers']:
             traj_history = finger_traj_history[finger]
             temp_for_plot = np.stack(traj_history, axis=0)
             if k >= 2:
-                axes[i].plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray', label='actual')
+                axes[finger].plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray', label='actual')
     with open(f'{fpath.resolve()}/info.pkl', 'wb') as f:
         pkl.dump(info_list, f)
     handles, labels = plt.gca().get_legend_handles_labels()
@@ -1574,48 +1575,61 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     return torch.min(final_distance_to_goal).cpu().numpy()
 
 
-def add_trajectories(trajectories, best_traj, axes, env, gym, config):
+def add_trajectories(trajectories, best_traj, axes, env, sim, gym, viewer, config, state2ee_pos_func):
     M = len(trajectories)
-    fingers = config['fingers']
+    T = len(best_traj)
+    fingers = copy.copy(config['fingers'])
+    if config['exclude_index']:
+        fingers.remove('index')
     num_fingers = len(fingers)
     obj_dof = config['obj_dof']
     if M > 0:
         initial_state = env.get_state()['q']
         # num_fingers = initial_state.shape[1] // 4
-        initial_state = initial_state[:, :4 * num_fingers]
+        if config['exclude_index']:
+            initial_state = initial_state[:, 4: 4 * (num_fingers + 1)]
+        else:
+            initial_state = initial_state[:, :4 * num_fingers]
+        if config['optimize_force']:
+            force = best_traj[:, (4 + 4) * num_fingers + obj_dof:].reshape(T, num_fingers, 3)
         all_state = torch.cat((initial_state, best_traj[:-1, :4 * num_fingers]), dim=0)
         desired_state = all_state + best_traj[:, 4 * num_fingers + obj_dof: 4 * num_fingers + obj_dof + 4 * num_fingers]
         
-        desired_best_traj_ee = [state2ee_pos(desired_state, config['ee_names'][finger]) for finger in fingers]
-        best_traj_ee = [state2ee_pos(best_traj[:, :4 * num_fingers], config['ee_names'][finger]) for finger in fingers]
+        desired_best_traj_ee = [state2ee_pos_func(desired_state, config['ee_names'][finger], fingers=fingers) for finger in fingers]
+        best_traj_ee = [state2ee_pos_func(best_traj[:, :4 * num_fingers], config['ee_names'][finger], fingers=fingers) for finger in fingers]
 
         state_colors = np.array([0, 0, 1]).astype(np.float32)
-        force_colors = np.array([0, 1, 1]).astype(np.float32)
+        desired_state_colors = np.array([0, 1, 1]).astype(np.float32)
+        force_colors = np.array([1, 1, 1]).astype(np.float32)
         
         for e in env.envs:
             T = best_traj.shape[0]
             for t in range(T):
                 for i, finger in enumerate(fingers):
                     if t == 0:
-                        initial_ee = state2ee_pos(initial_state, config['ee_names'][finger])
+                        initial_ee = state2ee_pos_func(initial_state, config['ee_names'][finger], fingers=fingers)
                         state_traj = torch.stack((initial_ee, best_traj_ee[i][0]), dim=0).cpu().numpy()
                         action_traj = torch.stack((initial_ee, desired_best_traj_ee[i][0]), dim=0).cpu().numpy()
-                        axes[i].plot3D(state_traj[:, 0], state_traj[:, 1], state_traj[:, 2], 'blue', label='desired next state')
-                        axes[i].plot3D(action_traj[:, 0], action_traj[:, 1], action_traj[:, 2], 'green', label='raw commanded position')
+                        axes[finger].plot3D(state_traj[:, 0], state_traj[:, 1], state_traj[:, 2], 'blue', label='desired next state')
+                        axes[finger].plot3D(action_traj[:, 0], action_traj[:, 1], action_traj[:, 2], 'green', label='raw commanded position')
+                        if config['optimize_force']:
+                            force_traj = torch.stack((initial_ee, initial_ee + force[t, i]), dim=0).cpu().numpy()
+                            axes[finger].plot3D(force_traj[:, 0], force_traj[:, 1], force_traj[:, 2], 'red', label='force')
                     else:
                         state_traj = torch.stack((best_traj_ee[i][t - 1, :3], best_traj_ee[i][t, :3]), dim=0).cpu().numpy()
                         action_traj = torch.stack((best_traj_ee[i][t - 1, :3], desired_best_traj_ee[i][t, :3]), dim=0).cpu().numpy()
-                    
+                        force_traj = torch.stack((best_traj_ee[i][t - 1, :3], best_traj_ee[i][t - 1, :3] + force[t, i]), dim=0).cpu().numpy()
                     state_traj = state_traj.reshape(2, 3)
                     action_traj = action_traj.reshape(2, 3)
                 
                     gym.add_lines(viewer, e, 1, state_traj, state_colors)
-                    gym.add_lines(viewer, e, 1, action_traj, force_colors)
+                    gym.add_lines(viewer, e, 1, action_traj, desired_state_colors)
+                    gym.add_lines(viewer, e, 1, force_traj, force_colors)  
             gym.step_graphics(sim)
             gym.draw_viewer(viewer, sim, False)
             gym.sync_frame_time(sim)
 
-def add_trajectories_hardware(trajectories, best_traj, axes, env, config):
+def add_trajectories_hardware(trajectories, best_traj, axes, env, config, state2ee_pos_func):
     M = len(trajectories)
     fingers = config['fingers']
     if M > 0:
@@ -1625,14 +1639,14 @@ def add_trajectories_hardware(trajectories, best_traj, axes, env, config):
         all_state = torch.cat((initial_state, best_traj[:-1, :4 * num_fingers]), dim=0)
         desired_state = all_state + best_traj[:, 9:17]
 
-        desired_best_traj_ee = [state2ee_pos(desired_state, ee_names[finger]) for finger in fingers]
-        best_traj_ee = [state2ee_pos(best_traj[:, :4 * num_fingers], ee_names[finger]) for finger in fingers]
+        desired_best_traj_ee = [state2ee_pos_func(desired_state, ee_names[finger], fingers=fingers) for finger in fingers]
+        best_traj_ee = [state2ee_pos_func(best_traj[:, :4 * num_fingers], ee_names[finger], fingers=fingers) for finger in fingers]
 
         for i, finger in enumerate(fingers):
-            initial_ee = state2ee_pos(initial_state, ee_names[finger])
+            initial_ee = state2ee_pos_func(initial_state, ee_names[finger], fingers=fingers)
             state_traj = torch.stack((initial_ee, best_traj_ee[i][0]), dim=0).cpu().numpy()
             action_traj = torch.stack((initial_ee, desired_best_traj_ee[i][0]), dim=0).cpu().numpy()
-            axes[i].plot3D(action_traj[:, 0], action_traj[:, 1], action_traj[:, 2], 'green', label='raw commanded position')
+            axes[finger].plot3D(action_traj[:, 0], action_traj[:, 1], action_traj[:, 2], 'green', label='raw commanded position')
 
 if __name__ == "__main__":
     # get config
@@ -1642,6 +1656,7 @@ if __name__ == "__main__":
         valve_type = 'cuboid'
     elif config['object_type'] == 'cylinder_valve':
         valve_type = 'cylinder'
+    config['object_dof'] = 1
 
     if config['mode'] == 'hardware':
         env = RosAllegroValveTurningEnv(1, control_mode='joint_impedance',

@@ -21,7 +21,7 @@ import pytorch3d.transforms as tf
 
 import matplotlib.pyplot as plt
 from utils.allegro_utils import partial_to_full_state, full_to_partial_state, combine_finger_constraints, state2ee_pos, visualize_trajectory
-from allegro_valve_roll import AllegroValveTurning, AllegroContactProblem, PositionControlConstrainedSVGDMPC
+from allegro_valve_roll import AllegroValveTurning, AllegroContactProblem, PositionControlConstrainedSVGDMPC, add_trajectories, add_trajectories_hardware
 from scipy.spatial.transform import Rotation as R
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
@@ -33,11 +33,6 @@ img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 
 def vector_cos(a, b):
     return torch.dot(a.reshape(-1), b.reshape(-1)) / (torch.norm(a.reshape(-1)) * torch.norm(b.reshape(-1)))
-
-def axis_angle_to_euler(axis_angle):
-    matrix = tf.axis_angle_to_matrix(axis_angle)
-    euler = tf.matrix_to_euler_angles(matrix, convention='XYZ')
-    return euler
 
 def euler_to_quat(euler):
     matrix = tf.euler_angles_to_matrix(euler, convention='XYZ')
@@ -103,8 +98,7 @@ class AllegroScrewdriver(AllegroValveTurning):
                  world_trans,
                  object_asset_pos,
                  fingers=['index', 'middle', 'ring', 'thumb'],
-                #  friction_coefficient=0.95,
-                 friction_coefficient=10.95, # DEBUG ONLY, set the priction very high
+                 friction_coefficient=0.95,
                  obj_ori_rep='euler',
                  optimize_force=False,
                  device='cuda:0', **kwargs):
@@ -129,14 +123,17 @@ class AllegroScrewdriver(AllegroValveTurning):
         next_q = state[:-1, :-self.obj_dof] + action
         action_cost = torch.sum((state[1:, :-self.obj_dof] - next_q) ** 2)
 
-        smoothness_cost = 10 * torch.sum((state[1:] - state[:-1]) ** 2)
-        smoothness_cost += 50 * torch.sum((state[1:, -self.obj_dof:] - state[:-1, -self.obj_dof:]) ** 2)
-        smoothness_cost += 20000 * torch.sum((state[:, -self.obj_dof:-1]) ** 2) # the screwdriver should only rotate in z direction
+        smoothness_cost = 1 * torch.sum((state[1:] - state[:-1]) ** 2)
+        smoothness_cost += 5 * torch.sum((state[1:, -self.obj_dof:] - state[:-1, -self.obj_dof:]) ** 2)
+        upright_cost = 2000 * torch.sum((state[:, -self.obj_dof:-1]) ** 2) # the screwdriver should only rotate in z direction
 
         goal_cost = torch.sum((100 * (state[-1, -self.obj_dof:] - goal) ** 2)).reshape(-1)
         # goal_cost += torch.sum((10 * (state[:, -1] - goal) ** 2), dim=0)
-
-        return smoothness_cost + action_cost + goal_cost
+        if self.optimize_force:
+            force = xu[:, self.dx + 4 * self.num_fingers: self.dx + (4 + 3) * self.num_fingers]
+            force_cost = 10 * torch.sum(force ** 2)
+            action_cost += force_cost
+        return smoothness_cost + action_cost + goal_cost + upright_cost
     
     
     def _kinematics_constr(self, current_q, next_q, current_theta, next_theta, contact_jac, contact_loc):
@@ -366,18 +363,17 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     actual_trajectory = []
     duration = 0
 
-    # debug: plot the thumb traj
     fig = plt.figure()
-    axes = [fig.add_subplot(int(f'1{num_fingers}{i+1}'), projection='3d') for i in range(num_fingers)]
-    for i, ax in enumerate(axes):
-        axes[i].set_title(params['fingers'][i])
-        axes[i].set_aspect('equal')
-        axes[i].set_xlabel('x', labelpad=20)
-        axes[i].set_ylabel('y', labelpad=20)
-        axes[i].set_zlabel('z', labelpad=20)
-        # axes[i].set_xlim3d(0.8, 0.87)
-        # axes[i].set_ylim3d(0.52, 0.58)
-        # axes[i].set_zlim3d(1.36, 1.46)
+    axes = {params['fingers'][i]: fig.add_subplot(int(f'1{num_fingers}{i+1}'), projection='3d') for i in range(num_fingers)}
+    for finger in params['fingers']:
+        axes[finger].set_title(finger)
+        axes[finger].set_aspect('equal')
+        axes[finger].set_xlabel('x', labelpad=20)
+        axes[finger].set_ylabel('y', labelpad=20)
+        axes[finger].set_zlabel('z', labelpad=20)
+        axes[finger].set_xlim3d(-0.05, 0.1)
+        axes[finger].set_ylim3d(-0.06, 0.04)
+        axes[finger].set_zlim3d(1.32, 1.43)
     finger_traj_history = {}
     for finger in params['fingers']:
         finger_traj_history[finger] = []
@@ -409,14 +405,18 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         print(f"current theta: {state['q'][0, -1].detach().cpu().numpy()}")
         print(f"planned theta: {planned_theta_traj}")
         # add trajectory lines to sim
-        # if params['mode'] == 'hardware':
-        #     add_trajectories_hardware(trajectories, best_traj, axes, env, config=params)
-        # else:
-        #     add_trajectories(trajectories, best_traj, axes, env, gym, config=params)
+        if params['mode'] == 'hardware':
+            add_trajectories_hardware(trajectories, best_traj, axes, env, config=params, state2ee_pos_func=state2ee_pos)
+        else:
+            add_trajectories(trajectories, best_traj, axes, env, sim=sim, gym=gym, viewer=viewer,
+                            config=params, state2ee_pos_func=state2ee_pos)
 
         if params['visualize_plan']:
             traj_for_viz = best_traj[:, :turn_problem.dx]
-            traj_for_viz = torch.cat((start[:turn_problem.dx].unsqueeze(0), traj_for_viz), dim=0)
+            if params['exclude_index']:
+                traj_for_viz = torch.cat((start[4:4 + turn_problem.dx].unsqueeze(0), traj_for_viz), dim=0)
+            else:
+                traj_for_viz = torch.cat((start[:turn_problem.dx].unsqueeze(0), traj_for_viz), dim=0)
             tmp = torch.zeros((traj_for_viz.shape[0], 1), device=best_traj.device) # add the joint for the screwdriver cap
             traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
             # traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof] = axis_angle_to_euler(traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof])
@@ -454,9 +454,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             ros_copy_node.apply_action(partial_to_full_state(action[0], params['fingers']))
         # action = x[:, :4 * num_fingers].to(device=env.device)
         # NOTE: DEBUG ONLY
-        action = best_traj[1, :4 * turn_problem.num_fingers].unsqueeze(0)
-        if params['exclude_index'] == True:
-            action = torch.cat((start.unsqueeze(0)[:, :4], action), dim=1)
+        # action = best_traj[1, :4 * turn_problem.num_fingers].unsqueeze(0)
+        # if params['exclude_index'] == True:
+        #     action = torch.cat((start.unsqueeze(0)[:, :4], action), dim=1)
         env.step(action)
         # if params['hardware']:
         #     # ros_node.apply_action(action[0].detach().cpu().numpy())
@@ -474,18 +474,16 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                         })
 
         gym.clear_lines(viewer)
-        # for debugging
         state = env.get_state()
         start = state['q'][:,:4 * num_fingers + obj_dof].squeeze(0).to(device=params['device'])
         for finger in params['fingers']:
             ee = state2ee_pos(start[:4 * num_fingers], turn_problem.ee_names[finger])
             finger_traj_history[finger].append(ee.detach().cpu().numpy())
-        for i, ax in enumerate(axes):
-            finger = params['fingers'][i]
+        for finger in params['fingers']:
             traj_history = finger_traj_history[finger]
             temp_for_plot = np.stack(traj_history, axis=0)
             if k >= 2:
-                axes[i].plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray', label='actual')
+                axes[finger].plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray', label='actual')
     with open(f'{fpath.resolve()}/info.pkl', 'wb') as f:
         pkl.dump(info_list, f)
     handles, labels = plt.gca().get_legend_handles_labels()
@@ -504,9 +502,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
     env.reset()
     state = env.get_state()
-    state = state['q'].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
-    actual_trajectory.append(state.clone())
-    actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + 1)
+    state = state['q'].reshape(4 * num_fingers + obj_dof + 1).to(device=params['device'])
+    actual_trajectory.append(state.clone()[: 4 * num_fingers + obj_dof])
+    actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
     turn_problem.T = actual_trajectory.shape[0]
     # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
     final_distance_to_goal = (actual_trajectory[:, -obj_dof:] - params['valve_goal']).abs()
@@ -519,66 +517,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
              d2goal=final_distance_to_goal.cpu().numpy())
     return torch.min(final_distance_to_goal).cpu().numpy()
 
-
-def add_trajectories(trajectories, best_traj, axes, env, gym, config):
-    M = len(trajectories)
-    fingers = config['fingers']
-    num_fingers = len(fingers)
-    obj_dof = config['obj_dof']
-    if M > 0:
-        initial_state = env.get_state()['q']
-        # num_fingers = initial_state.shape[1] // 4
-        initial_state = initial_state[:, :4 * num_fingers]
-        all_state = torch.cat((initial_state, best_traj[:-1, :4 * num_fingers]), dim=0)
-        desired_state = all_state + best_traj[:, 4 * num_fingers + obj_dof: 4 * num_fingers + obj_dof + 4 * num_fingers]
-        
-        desired_best_traj_ee = [state2ee_pos(desired_state, config['ee_names'][finger]) for finger in fingers]
-        best_traj_ee = [state2ee_pos(best_traj[:, :4 * num_fingers], config['ee_names'][finger]) for finger in fingers]
-
-        state_colors = np.array([0, 0, 1]).astype(np.float32)
-        force_colors = np.array([0, 1, 1]).astype(np.float32)
-        
-        for e in env.envs:
-            T = best_traj.shape[0]
-            for t in range(T):
-                for i, finger in enumerate(fingers):
-                    if t == 0:
-                        initial_ee = state2ee_pos(initial_state, config['ee_names'][finger])
-                        state_traj = torch.stack((initial_ee, best_traj_ee[i][0]), dim=0).cpu().numpy()
-                        action_traj = torch.stack((initial_ee, desired_best_traj_ee[i][0]), dim=0).cpu().numpy()
-                        axes[i].plot3D(state_traj[:, 0], state_traj[:, 1], state_traj[:, 2], 'blue', label='desired next state')
-                        axes[i].plot3D(action_traj[:, 0], action_traj[:, 1], action_traj[:, 2], 'green', label='raw commanded position')
-                    else:
-                        state_traj = torch.stack((best_traj_ee[i][t - 1, :3], best_traj_ee[i][t, :3]), dim=0).cpu().numpy()
-                        action_traj = torch.stack((best_traj_ee[i][t - 1, :3], desired_best_traj_ee[i][t, :3]), dim=0).cpu().numpy()
-                    
-                    state_traj = state_traj.reshape(2, 3)
-                    action_traj = action_traj.reshape(2, 3)
-                
-                    gym.add_lines(viewer, e, 1, state_traj, state_colors)
-                    gym.add_lines(viewer, e, 1, action_traj, force_colors)
-            gym.step_graphics(sim)
-            gym.draw_viewer(viewer, sim, False)
-            gym.sync_frame_time(sim)
-
-def add_trajectories_hardware(trajectories, best_traj, axes, env, config):
-    M = len(trajectories)
-    fingers = config['fingers']
-    if M > 0:
-        initial_state = env.get_state()['q']
-        num_fingers = initial_state.shape[1] // 4
-        initial_state = initial_state[:, :4 * num_fingers]
-        all_state = torch.cat((initial_state, best_traj[:-1, :4 * num_fingers]), dim=0)
-        desired_state = all_state + best_traj[:, 9:17]
-
-        desired_best_traj_ee = [state2ee_pos(desired_state, ee_names[finger]) for finger in fingers]
-        best_traj_ee = [state2ee_pos(best_traj[:, :4 * num_fingers], ee_names[finger]) for finger in fingers]
-
-        for i, finger in enumerate(fingers):
-            initial_ee = state2ee_pos(initial_state, ee_names[finger])
-            state_traj = torch.stack((initial_ee, best_traj_ee[i][0]), dim=0).cpu().numpy()
-            action_traj = torch.stack((initial_ee, desired_best_traj_ee[i][0]), dim=0).cpu().numpy()
-            axes[i].plot3D(action_traj[:, 0], action_traj[:, 1], action_traj[:, 2], 'green', label='raw commanded position')
 if __name__ == "__main__":
     # get config
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver.yaml').read_text())
@@ -649,7 +587,7 @@ if __name__ == "__main__":
             'thumb': 'allegro_hand_oya_finger_3_aftc_base_link',
             }
     config['ee_names'] = ee_names
-    config['obj_dof'] = 1
+    config['obj_dof'] = 3
 
     screwdriver_asset = f'{get_assets_dir()}/screwdriver/screwdriver.urdf'
 
