@@ -218,6 +218,8 @@ class JaxCSVTOpt:
 
         # Evaluate the gradient of the cost function at the current state (without slack variables).
         c_grad = jax.vmap(jax.jacrev(self.c))(xuz[:, :self._trajectory_dim()])
+        if self.g is not None:
+            c_grad = jnp.concatenate((c_grad, jnp.zeros((self.N, self.dg))), axis=1)
 
         # Evaluate the combined constraint function and its gradient at the current augmented state.
         constraint = jax.vmap(self._combined_constraint)(xuz, jnp.tile(initial_state, (self.N, 1)))
@@ -257,17 +259,17 @@ class JaxCSVTOpt:
         k_grad = jax.jacrev(self.k)(xuz[:, :self._trajectory_dim()].reshape(self.N, self.T, self.dx + self.du),
                                     xuz[:, :self._trajectory_dim()].reshape(self.N, self.T, self.dx + self.du))
         k_grad = jnp.einsum('nmmi->nmi', k_grad.reshape(self.N, self.N, self.N, -1))
-        k_grad = jnp.concatenate((k_grad.reshape(self.N, self.N, self.T, self.dx + self.du),
-                                  jnp.zeros((self.N, self.N, self.T, self.dg))), axis=-1).reshape(self.N, self.N, -1)
+        k_grad = jnp.concatenate((k_grad.reshape(self.N, self.N, self._trajectory_dim()),
+                                  jnp.zeros((self.N, self.N, self.dg))), axis=-1).reshape(self.N, self.N, -1)
 
         # Compute the retraction steps.
         constraint_step = self._constraint_step(constraint, constraint_grad)
         tangent_step = self._tangent_step(c_grad, constraint_grad, constraint_hess, k, k_grad, gamma)
 
         # Combine the steps according to equation (26) and use them to update the current augmented state.
-        xuz -= self.step_scale * (self.alpha_J * tangent_step + self.alpha_C * constraint_step)
+        # xuz -= self.step_scale * (self.alpha_J * tangent_step + self.alpha_C * constraint_step)
         # xuz -= self.step_scale * (self.alpha_J * tangent_step)
-        # xuz -= self.step_scale * (self.alpha_C * constraint_step)
+        xuz -= self.step_scale * (self.alpha_C * constraint_step)
 
         # Clamp the state in bounds and return.
         xuz = self._bound_projection(xuz)
@@ -285,8 +287,8 @@ class JaxCSVTOpt:
             The constraint step, shape (N, (dx + du) * T + dg).
         """
         # Get inv(dC * dCT) term to be used below, shape (N, dg + dh, dg + dh).
-        dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)) +
-                                   jnp.expand_dims(jnp.eye(self.dh + self.dg + self.dx * self.T), axis=0) * 1e-4)
+        dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)))# +
+                                   # jnp.expand_dims(jnp.eye(self.dh + self.dg + self.dx * self.T), axis=0) * 1e-4)
 
         # Get constraint step from equation (39), shape (N, d * T).
         constraint_step = (constraint_grad.transpose((0, 2, 1)) @ dCdCT_inv @
@@ -315,8 +317,8 @@ class JaxCSVTOpt:
             The tangent step for the current state, shape (N, (dx + du) * T + dg).
         """
         # Get inv(dC * dCT) term to be used below, shape (N, dg + dh, dg + dh).
-        dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)) +
-                                   jnp.expand_dims(jnp.eye(self.dh + self.dg + self.dx * self.T), axis=0) * 1e-4)
+        dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)))# +
+                                   # jnp.expand_dims(jnp.eye(self.dh + self.dg + self.dx * self.T), axis=0) * 1e-4)
 
         # Get projection tensor via equation (36), shape (N, d * T, d * T).
         projection = (jnp.expand_dims(jnp.eye((self.dx + self.du) * self.T + self.dg), axis=0) -
@@ -463,7 +465,7 @@ class JaxCSVTOpt:
         # Project trajectories inside bounds and then append slack variables.
         x_in_bounds = jnp.clip(xuz[:, :self._trajectory_dim()], trajectory_min, trajectory_max)
         if self.dg > 0:
-            xuz_in_bounds = jnp.concatenate((x_in_bounds, xuz[:, self._trajectory_dim()+1:]), axis=1)
+            xuz_in_bounds = jnp.concatenate((x_in_bounds, xuz[:, self._trajectory_dim():]), axis=1)
         else:
             xuz_in_bounds = x_in_bounds
         return xuz_in_bounds

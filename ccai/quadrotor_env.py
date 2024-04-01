@@ -26,7 +26,7 @@ class QuadrotorEnv:
         self.surface_plotting_vars = self._get_plotting_vars(self.surface_model)
 
         self.obstacle_pos = np.array([0.0, 0.0])
-        self.obstacle_r = 1.
+        self.obstacle_r = 3.
         self.obstacle_mode = obstacle_mode
 
         if self.obstacle_mode == 'gp':
@@ -122,7 +122,7 @@ class QuadrotorEnv:
         # start[9:] *= 5
         # self.state = start
         # NOTE: This is from Joseph debugging Jax CSVTO.
-        self.state = np.array([-2.0, -4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        self.state = np.array([-4.0, -4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         self.goal = goal
         if self.obstacle_mode == 'dynamic':
             self.obstacle_pos = np.array([-2.25, 1.75])

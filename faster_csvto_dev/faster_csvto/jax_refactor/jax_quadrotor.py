@@ -333,7 +333,7 @@ def main() -> None:
     goal_state = goal_state.at[0:2].set(4)
     cost_function = QuadrotorCost(goal_state, T)
     equality_constraint_function = QuadrotorGPHeightConstraint('../surface_data.npz', T)
-    inequality_constraint_function = QuadrotorCylinderConstraint(1)
+    inequality_constraint_function = QuadrotorCylinderConstraint(3.)
     dynamics_function = QuadrotorDynamics()
     u_bounds = (jnp.array((-100.0000, -100.0000, -100.0000, -100.0000)),
                 jnp.array((100.0000, 100.0000, 100.0000, 100.0000)))
