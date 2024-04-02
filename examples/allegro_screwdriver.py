@@ -42,26 +42,26 @@ def euler_to_quat(euler):
 def euler_to_angular_velocity(current_euler, next_euler):
     # using matrix
     
-    current_mat = tf.euler_angles_to_matrix(current_euler, convention='XYZ')
-    next_mat = tf.euler_angles_to_matrix(next_euler, convention='XYZ')
-    dmat = next_mat - current_mat
-    omega_mat = dmat @ current_mat.transpose(-1, -2)
-    omega_x = (omega_mat[..., 2, 1] - omega_mat[..., 1, 2]) / 2
-    omega_y = (omega_mat[..., 0, 2] - omega_mat[..., 2, 0]) / 2
-    omega_z = (omega_mat[..., 1, 0] - omega_mat[..., 0, 1]) / 2
-    omega_mat = torch.stack((omega_x, omega_y, omega_z), dim=-1)
+    # current_mat = tf.euler_angles_to_matrix(current_euler, convention='XYZ')
+    # next_mat = tf.euler_angles_to_matrix(next_euler, convention='XYZ')
+    # dmat = next_mat - current_mat
+    # omega_mat = dmat @ current_mat.transpose(-1, -2)
+    # omega_x = (omega_mat[..., 2, 1] - omega_mat[..., 1, 2]) / 2
+    # omega_y = (omega_mat[..., 0, 2] - omega_mat[..., 2, 0]) / 2
+    # omega_z = (omega_mat[..., 1, 0] - omega_mat[..., 0, 1]) / 2
+    # omega = torch.stack((omega_x, omega_y, omega_z), dim=-1)
 
     # R.from_euler('XYZ', current_euler.cpu().detach().numpy().reshape(-1, 3)).as_quat().reshape(3, 12, 4)
 
     # quaternion 
-    # current_quat = euler_to_quat(current_euler)
-    # next_quat = euler_to_quat(next_euler)
-    # dquat = next_quat - current_quat
-    # con_quat = - current_quat # conjugate
-    # con_quat[..., 0] = current_quat[..., 0]
-    # omega = 2 * tf.quaternion_raw_multiply(dquat, con_quat)[..., 1:] 
+    current_quat = euler_to_quat(current_euler)
+    next_quat = euler_to_quat(next_euler)
+    dquat = next_quat - current_quat
+    con_quat = - current_quat # conjugate
+    con_quat[..., 0] = current_quat[..., 0]
+    omega = 2 * tf.quaternion_raw_multiply(dquat, con_quat)[..., 1:] 
     # TODO: quaternion and its negative are the same, but it is not true for angular velocity. Might have some bug here 
-    return omega_mat
+    return omega
 
 class AllegroIndexPlanner:
     "The index finger is desgie"
@@ -121,11 +121,14 @@ class AllegroScrewdriver(AllegroValveTurning):
         
         action = xu[:, self.dx:self.dx + 4 * self.num_fingers]  # action dim = 8
         next_q = state[:-1, :-self.obj_dof] + action
-        action_cost = torch.sum((state[1:, :-self.obj_dof] - next_q) ** 2)
+        if self.optimize_force:
+            action_cost = 0
+        else:
+            action_cost = torch.sum((state[1:, :-self.obj_dof] - next_q) ** 2)
 
         smoothness_cost = 1 * torch.sum((state[1:] - state[:-1]) ** 2)
         smoothness_cost += 5 * torch.sum((state[1:, -self.obj_dof:] - state[:-1, -self.obj_dof:]) ** 2)
-        upright_cost = 2000 * torch.sum((state[:, -self.obj_dof:-1]) ** 2) # the screwdriver should only rotate in z direction
+        upright_cost = 5000 * torch.sum((state[:, -self.obj_dof:-1]) ** 2) # the screwdriver should only rotate in z direction
 
         goal_cost = torch.sum((100 * (state[-1, -self.obj_dof:] - goal) ** 2)).reshape(-1)
         # goal_cost += torch.sum((10 * (state[:, -1] - goal) ** 2), dim=0)
@@ -319,29 +322,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
         pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
 
-        if params['exclude_index']:
-            turn_problem_fingers = copy.copy(params['fingers'])
-            turn_problem_fingers.remove('index')
-            turn_problem_start = start[4:4 * num_fingers + obj_dof]
-        else:
-            turn_problem_fingers = params['fingers']
-            turn_problem_start = start[:4 * num_fingers + obj_dof]
-        turn_problem = AllegroScrewdriver(
-            start=turn_problem_start,
-            goal=params['valve_goal'],
-            T=params['T'],
-            chain=params['chain'],
-            device=params['device'],
-            object_asset_pos=env.table_pose,
-            object_location=params['object_location'],
-            object_type=params['object_type'],
-            friction_coefficient=params['friction_coefficient'],
-            world_trans=env.world_trans,
-            fingers=turn_problem_fingers,
-            obj_dof=obj_dof,
-            optimize_force=params['optimize_force']
-        )
-
     else:
         raise ValueError('Invalid controller')
     
@@ -358,6 +338,30 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         if params['mode'] == 'hardware_copy':
             ros_copy_node.apply_action(partial_to_full_state(x.reshape(-1, 4 * num_fingers)[0], params['fingers']))
 
+    state = env.get_state()
+    start = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
+    if params['exclude_index']:
+            turn_problem_fingers = copy.copy(params['fingers'])
+            turn_problem_fingers.remove('index')
+            turn_problem_start = start[4:4 * num_fingers + obj_dof]
+    else:
+        turn_problem_fingers = params['fingers']
+        turn_problem_start = start[:4 * num_fingers + obj_dof]
+    turn_problem = AllegroScrewdriver(
+        start=turn_problem_start,
+        goal=params['valve_goal'],
+        T=params['T'],
+        chain=params['chain'],
+        device=params['device'],
+        object_asset_pos=env.table_pose,
+        object_location=params['object_location'],
+        object_type=params['object_type'],
+        friction_coefficient=params['friction_coefficient'],
+        world_trans=env.world_trans,
+        fingers=turn_problem_fingers,
+        obj_dof=obj_dof,
+        optimize_force=params['optimize_force']
+    )
     turn_planner = PositionControlConstrainedSVGDMPC(turn_problem, params)
 
     actual_trajectory = []
@@ -377,8 +381,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     finger_traj_history = {}
     for finger in params['fingers']:
         finger_traj_history[finger] = []
-    state = env.get_state()
-    start = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
+
+
     for finger in params['fingers']:
         ee = state2ee_pos(start[:4 * num_fingers], turn_problem.ee_names[finger])
         finger_traj_history[finger].append(ee.detach().cpu().numpy())
@@ -402,7 +406,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
         print(f"solve time: {time.time() - start_time}")
         planned_theta_traj = best_traj[:, 4 * num_fingers_to_plan: 4 * num_fingers_to_plan + obj_dof].detach().cpu().numpy()
-        print(f"current theta: {state['q'][0, -1].detach().cpu().numpy()}")
+        print(f"current theta: {state['q'][0, -(obj_dof+1): -1].detach().cpu().numpy()}")
         print(f"planned theta: {planned_theta_traj}")
         # add trajectory lines to sim
         if params['mode'] == 'hardware':
@@ -438,6 +442,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         # print(f'Inequality constraint violation: {torch.norm(inequality_constr)}')
 
         action = x[:, turn_problem.dx:turn_problem.dx+turn_problem.du].to(device=env.device)
+        if params['optimize_force']:
+            print(action[:, 4 * num_fingers_to_plan:]) # print out the action for debugging
         # print(action)
         action = action[:, :4 * num_fingers_to_plan]
         if params['exclude_index']:
@@ -454,9 +460,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             ros_copy_node.apply_action(partial_to_full_state(action[0], params['fingers']))
         # action = x[:, :4 * num_fingers].to(device=env.device)
         # NOTE: DEBUG ONLY
-        # action = best_traj[1, :4 * turn_problem.num_fingers].unsqueeze(0)
-        # if params['exclude_index'] == True:
-        #     action = torch.cat((start.unsqueeze(0)[:, :4], action), dim=1)
+        action = best_traj[1, :4 * turn_problem.num_fingers].unsqueeze(0)
+        if params['exclude_index'] == True:
+            action = torch.cat((start.unsqueeze(0)[:, :4], action), dim=1)
         env.step(action)
         # if params['hardware']:
         #     # ros_node.apply_action(action[0].detach().cpu().numpy())
