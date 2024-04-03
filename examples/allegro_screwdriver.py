@@ -65,26 +65,33 @@ def euler_to_angular_velocity(current_euler, next_euler):
 
 class AllegroIndexPlanner:
     "The index finger is desgie"
-    def __init__(self, chain_hand, chain_screwdriver, world_trans, screwdriver_asset_pose) -> None:
+    def __init__(self, chain_hand, chain_screwdriver, world_trans, screwdriver_asset_pose, fingers, ee_names, frame_indices) -> None:
         self.chain_hand = chain_hand
         self.chain_screwdriver = chain_screwdriver
         self.world_trans = world_trans
         self.screwdriver_asset_pose = screwdriver_asset_pose
+        self.fingers = fingers
+        self.finger_target_location
+        self.ee_names = ee_names
+        self.frame_indices = frame_indices
+    def step(self):
+        forward_kinematics(partial_to_full_state(state['q'][:,:12], fingers=params['fingers']))[ee_names['index']]
 
-    def inverse_kinematics(self):
-        pass
-        # for _ in range(10):
-        #     J = chain.jacobian(partial_to_full_state(q), link_indices=torch.tensor([thumb_ee_link],
-        #                                                                         device=params['device']))[:, :3, -4:]
+    # def inverse_kinematics(self, q):
+    #     eps = 1e-3
+    #     for _ in range(10):
+    #         J = chain.jacobian(partial_to_full_state(q), link_indices=torch.tensor([self.frame_indices['index']],
+    #                                                                             device=params['device']))[:, :3, -4:]
 
-        #     # get update in robot frame
-        #     dx = world_trans.inverse().transform_normals(torch.tensor([[-1.0, 0.0, 0.0]],
-        #                                                             device=params['device']).reshape(1, 3)).reshape(1, 3,
-        #                                                                                                             1)
-        #     # joint update
-        #     dq = J.permute(0, 2, 1) @ torch.linalg.inv(J @ J.permute(0, 2, 1) + 1e-5 * eye) @ dx
-        #     q[:, 4:] += eps * dq.reshape(1, 4)
-        # return q
+    #         # get update in robot frame
+    #         dx = self.world_trans.inverse().transform_normals(torch.tensor([[-1.0, 0.0, 0.0]],
+    #                                                                 device=params['device']).reshape(1, 3)).reshape(1, 3,
+    #                                                                                                                 1)
+    #         # joint update
+    #         dq = J.permute(0, 2, 1) @ torch.linalg.inv(J @ J.permute(0, 2, 1) + 1e-5 * eye) @ dx
+    #         q[:, 4:] += eps * dq.reshape(1, 4)
+
+    #     return q
             
 
 class AllegroScrewdriver(AllegroValveTurning):
@@ -126,11 +133,11 @@ class AllegroScrewdriver(AllegroValveTurning):
         else:
             action_cost = torch.sum((state[1:, :-self.obj_dof] - next_q) ** 2)
 
-        smoothness_cost = 1 * torch.sum((state[1:] - state[:-1]) ** 2)
-        smoothness_cost += 5 * torch.sum((state[1:, -self.obj_dof:] - state[:-1, -self.obj_dof:]) ** 2)
-        upright_cost = 5000 * torch.sum((state[:, -self.obj_dof:-1]) ** 2) # the screwdriver should only rotate in z direction
+        smoothness_cost = 10 * torch.sum((state[1:] - state[:-1]) ** 2)
+        smoothness_cost += 50 * torch.sum((state[1:, -self.obj_dof:] - state[:-1, -self.obj_dof:]) ** 2)
+        upright_cost = 50000 * torch.sum((state[:, -self.obj_dof:-1]) ** 2) # the screwdriver should only rotate in z direction
 
-        goal_cost = torch.sum((100 * (state[-1, -self.obj_dof:] - goal) ** 2)).reshape(-1)
+        goal_cost = torch.sum((500 * (state[-1, -self.obj_dof:] - goal) ** 2)).reshape(-1)
         # goal_cost += torch.sum((10 * (state[:, -1] - goal) ** 2), dim=0)
         if self.optimize_force:
             force = xu[:, self.dx + 4 * self.num_fingers: self.dx + (4 + 3) * self.num_fingers]
@@ -460,9 +467,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             ros_copy_node.apply_action(partial_to_full_state(action[0], params['fingers']))
         # action = x[:, :4 * num_fingers].to(device=env.device)
         # NOTE: DEBUG ONLY
-        action = best_traj[1, :4 * turn_problem.num_fingers].unsqueeze(0)
-        if params['exclude_index'] == True:
-            action = torch.cat((start.unsqueeze(0)[:, :4], action), dim=1)
+        # action = best_traj[1, :4 * turn_problem.num_fingers].unsqueeze(0)
+        # if params['exclude_index'] == True:
+        #     action = torch.cat((start.unsqueeze(0)[:, :4], action), dim=1)
+        #     action[:, 2] += 0.003
+        #     action[:, 3] += 0.008
         env.step(action)
         # if params['hardware']:
         #     # ros_node.apply_action(action[0].detach().cpu().numpy())
@@ -500,9 +509,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         newHandles.append(handle)
     fig.tight_layout()
     fig.legend(newHandles, newLabels, loc='lower center', ncol=3)
-    # plt.savefig(f'{fpath.resolve()}/traj.png')
-    # plt.close()
-    plt.show()
+    plt.savefig(f'{fpath.resolve()}/traj.png')
+    plt.close()
+    # plt.show()
 
 
 
@@ -602,7 +611,8 @@ if __name__ == "__main__":
     frame_indices = [chain.frame_to_idx[ee_names[finger]] for finger in config['fingers']]    # combined chain
     frame_indices = torch.tensor(frame_indices)
     state2ee_pos = partial(state2ee_pos, fingers=config['fingers'], chain=chain, frame_indices=frame_indices, world_trans=env.world_trans)
-    # full_to_partial_state = partial(full_to_partial_state, fingers=config['fingers'])
+    
+    forward_kinematics = partial(chain.forward_kinematics, frame_indices=frame_indices) # full_to= _partial_state = partial(full_to_partial_state, fingers=config['fingers'])
     # partial_to_full_state = partial(partial_to_full_state, fingers=config['fingers'])
 
 

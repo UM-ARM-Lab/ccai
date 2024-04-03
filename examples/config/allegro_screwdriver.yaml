@@ -4,17 +4,17 @@ receding_horizon: False
 num_steps: 11
 num_trials: 5
 visualize: True
-experiment_name: 'allegro_valve'
+experiment_name: 'allegro_screwdriver'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
-fingers: ['index', 'thumb']
-# fingers: ['index', 'middle', 'thumb']
-object_type: 'cylinder_valve'
+# fingers: ['index', 'thumb']
+fingers: ['index', 'middle', 'thumb']
+object_type: 'screwdriver'
 sim_device: 'cuda:0'
-friction_coefficient: 0.9
+friction_coefficient: 10.0
 kp: 3.0
-visualize_plan: False
-random_robot_pose: False
-optimize_force: True
+visualize_plan: True
+optimize_force: False
+exclude_index: False
 controllers:
   csvgd:
     # N: 16
@@ -24,8 +24,8 @@ controllers:
     step_size: 0.1
     momentum: 0.
     device: 'cuda:0'
-    online_iters: 30
-    warmup_iters: 100
+    online_iters: 3
+    warmup_iters: 10
     resample_steps: 1
     resample_sigma: 0.01
     resample_temperature: 0.1
