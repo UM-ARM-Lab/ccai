@@ -178,20 +178,22 @@ class JaxCSVTOpt:
 
         # Calculate slack variable values via equation (33) and append to the trajectory according to equation (35).
         if self.g is not None:
-            xuz: jnp.array = jnp.concatenate((guess, jnp.sqrt(-2 * self.g_batched(guess))), axis=1)
+            xuz: jnp.array = jnp.concatenate((guess, jnp.sqrt(2 * jnp.abs(self.g_batched(guess)))), axis=1)
         else:
             xuz = guess
 
         # Loop over the gradient step iterations.
-        xuz, _ = jax.lax.fori_loop(1, self.K+1, self._solve_iteration, (xuz, initial_state))
+        constraints_start = jnp.zeros((self.K, self.N, self.dh + self.dg + self.T * self.dx))
+        xuz, _, constraints = jax.lax.fori_loop(1, self.K+1, self._solve_iteration, (xuz, initial_state,
+                                                                                     constraints_start))
 
         # Find the lowest cost trajectory in the optimized distribution, and return it without slack variables.
         min_cost_trajectory = xuz[:, :self._trajectory_dim()][self._penalty(xuz[:, :self._trajectory_dim()]).argmin(), :]
         all_trajectories = xuz[:, :self._trajectory_dim()]
-        return min_cost_trajectory, all_trajectories
+        return min_cost_trajectory, all_trajectories, constraints
 
-    def _solve_iteration(self, iteration: int, xuz_initial_state: Tuple[jnp.array, jnp.array]) -> (
-            Tuple)[jnp.array, jnp.array]:
+    def _solve_iteration(self, iteration: int, xuz_initial_state: Tuple[jnp.array, jnp.array, jnp.array]) -> (
+            Tuple)[jnp.array, jnp.array, jnp.array]:
         """Compute a single retraction step for the optimizer and return the updated state.
 
         Args:
@@ -203,7 +205,7 @@ class JaxCSVTOpt:
         Returns:
             A Tuple of the value of xuz after taking the retraction step, and the unaltered initial state.
         """
-        xuz, initial_state = xuz_initial_state
+        xuz, initial_state, constraints = xuz_initial_state
 
         # # TODO: Remove this test.
         # thing, initial_state = xuz_initial_state
@@ -267,13 +269,16 @@ class JaxCSVTOpt:
         tangent_step = self._tangent_step(c_grad, constraint_grad, constraint_hess, k, k_grad, gamma)
 
         # Combine the steps according to equation (26) and use them to update the current augmented state.
-        # xuz -= self.step_scale * (self.alpha_J * tangent_step + self.alpha_C * constraint_step)
+        xuz -= self.step_scale * (self.alpha_J * tangent_step + self.alpha_C * constraint_step)
         # xuz -= self.step_scale * (self.alpha_J * tangent_step)
-        xuz -= self.step_scale * (self.alpha_C * constraint_step)
+        # xuz -= self.step_scale * (self.alpha_C * constraint_step)
 
         # Clamp the state in bounds and return.
         xuz = self._bound_projection(xuz)
-        return xuz, initial_state
+
+        # TODO: Remove this or integrate as debug configuration.
+        constraints = constraints.at[iteration, :, :].set(constraint)
+        return xuz, initial_state, constraints
 
     def _constraint_step(self, constraint: jnp.array, constraint_grad: jnp.array) -> jnp.array:
         """Compute the constraint step according to equation (39).

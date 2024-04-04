@@ -532,7 +532,7 @@ def do_trial(env, params, fpath):
 import argparse
 def parse_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='quadrotor_dynamic_obs.yaml')
+    parser.add_argument('--config', type=str, default='quadrotor_no_obs.yaml')
     parser.add_argument('--load-starts', action='store_true')
     args = parser.parse_args()
     return args
