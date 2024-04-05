@@ -208,7 +208,7 @@ def cylinder_sdf_constraint(trajectory, radius):
     x = points[:, 0]
     y = points[:, 1]
     distance_from_center = jnp.sqrt(x**2 + y**2)
-    negative_distance_from_cylinder = distance_from_center - radius
+    negative_distance_from_cylinder = radius - distance_from_center
     return negative_distance_from_cylinder
 
 
@@ -348,11 +348,11 @@ def main() -> None:
     k = structured_rbf_kernel
     N = 8
     T = 11
-    K_warmup = 1000
-    K_online = 100
+    K_warmup = 100
+    K_online = 10
     anneal = True
     alpha_J = 1
-    alpha_C = 1
+    alpha_C = 50
     step_scale = 1e-2
     penalty_weight = 1e-2
 

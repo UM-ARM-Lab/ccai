@@ -269,9 +269,11 @@ class JaxCSVTOpt:
         tangent_step = self._tangent_step(c_grad, constraint_grad, constraint_hess, k, k_grad, gamma)
 
         # Combine the steps according to equation (26) and use them to update the current augmented state.
-        xuz -= self.step_scale * (self.alpha_J * tangent_step + self.alpha_C * constraint_step)
-        # xuz -= self.step_scale * (self.alpha_J * tangent_step)
-        # xuz -= self.step_scale * (self.alpha_C * constraint_step)
+        step = self.step_scale * (self.alpha_J * tangent_step + self.alpha_C * constraint_step)
+        max_norm = 10
+        step_norm = jnp.linalg.norm(step, axis=1)
+        step = jnp.where(step > max_norm, max_norm * step / jnp.expand_dims(step_norm, axis=-1), step)
+        xuz -= step
 
         # Clamp the state in bounds and return.
         xuz = self._bound_projection(xuz)

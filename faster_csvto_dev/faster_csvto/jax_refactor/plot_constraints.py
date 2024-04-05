@@ -38,5 +38,8 @@ if __name__ == "__main__":
 
     with open('output/all_online_constraints.npy', 'rb') as f:
         all_online_constraints = np.load(f)
-    for i in range(all_online_constraints.shape[0]):
-        plot_constraint_metrics(all_online_constraints[i], 11, 11, 12, i)
+    print(np.max(all_online_constraints))
+
+    #
+    # for i in range(all_online_constraints.shape[0]):
+    #     plot_constraint_metrics(all_online_constraints[i], 11, 11, 12, i)
