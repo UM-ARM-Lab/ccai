@@ -270,9 +270,9 @@ class JaxCSVTOpt:
 
         # Combine the steps according to equation (26) and use them to update the current augmented state.
         step = self.step_scale * (self.alpha_J * tangent_step + self.alpha_C * constraint_step)
-        max_norm = 10
-        step_norm = jnp.linalg.norm(step, axis=1)
-        step = jnp.where(step > max_norm, max_norm * step / jnp.expand_dims(step_norm, axis=-1), step)
+        # max_norm = 10
+        # step_norm = jnp.linalg.norm(step, axis=1)
+        # step = jnp.where(step > max_norm, max_norm * step / jnp.expand_dims(step_norm, axis=-1), step)
         xuz -= step
 
         # Clamp the state in bounds and return.

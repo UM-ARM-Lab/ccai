@@ -15,7 +15,7 @@ def plot_constraint_metrics(constraints, dh, dg, dx, number):
     K, N, _ = constraints.shape
     iteration_number = np.arange(0, K)
 
-    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(10, 20))
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(5, 10))
     ax1.plot(iteration_number, average_equality_violation[:, :], linewidth=2.0)
     ax1.set_xlabel('average equality violation')
 
@@ -32,13 +32,13 @@ def plot_constraint_metrics(constraints, dh, dg, dx, number):
 
 
 if __name__ == "__main__":
-    # with open('output/warmup_constraints.npy', 'rb') as f:
-    #     warmup_constraints = np.load(f)
-    # plot_constraint_metrics(warmup_constraints, 11, 11, 12, 1001)
+    with open('output/warmup_constraints.npy', 'rb') as f:
+        warmup_constraints = np.load(f)
+    plot_constraint_metrics(warmup_constraints, 11, 11, 12, 1001)
 
-    with open('output/all_online_constraints.npy', 'rb') as f:
-        all_online_constraints = np.load(f)
-    print(np.max(all_online_constraints))
+    # with open('output/all_online_constraints.npy', 'rb') as f:
+    #     all_online_constraints = np.load(f)
+    # print(np.max(all_online_constraints))
 
     #
     # for i in range(all_online_constraints.shape[0]):
