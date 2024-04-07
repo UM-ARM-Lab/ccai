@@ -294,8 +294,8 @@ class JaxCSVTOpt:
             The constraint step, shape (N, (dx + du) * T + dg).
         """
         # Get inv(dC * dCT) term to be used below, shape (N, dg + dh, dg + dh).
-        dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)))# +
-                                   # jnp.expand_dims(jnp.eye(self.dh + self.dg + self.dx * self.T), axis=0) * 1e-4)
+        dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)) +
+                                   jnp.expand_dims(jnp.eye(self.dh + self.dg + self.dx * self.T), axis=0) * 1e-3)
 
         # Get constraint step from equation (39), shape (N, d * T).
         constraint_step = (constraint_grad.transpose((0, 2, 1)) @ dCdCT_inv @
@@ -324,8 +324,8 @@ class JaxCSVTOpt:
             The tangent step for the current state, shape (N, (dx + du) * T + dg).
         """
         # Get inv(dC * dCT) term to be used below, shape (N, dg + dh, dg + dh).
-        dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)))# +
-                                   # jnp.expand_dims(jnp.eye(self.dh + self.dg + self.dx * self.T), axis=0) * 1e-4)
+        dCdCT_inv = jnp.linalg.inv(constraint_grad @ constraint_grad.transpose((0, 2, 1)) +
+                                   jnp.expand_dims(jnp.eye(self.dh + self.dg + self.dx * self.T), axis=0) * 1e-3)
 
         # Get projection tensor via equation (36), shape (N, d * T, d * T).
         projection = (jnp.expand_dims(jnp.eye((self.dx + self.du) * self.T + self.dg), axis=0) -
