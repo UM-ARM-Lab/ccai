@@ -59,7 +59,7 @@ def solve_dual_batched(dJ, dG, dH, iters=100, eps=1e-3, tol=1e-4):
 
 @jax.jit
 def solve(Q, c, A, l, u):
-    qp = BoxOSQP()
+    qp = BoxOSQP(maxiter=1000, tol=1e-6)
     return qp.run(params_obj=(Q, c), params_eq=A, params_ineq=(l, u)).params
 
 
@@ -74,7 +74,7 @@ if __name__ == "__main__":
     xdim = 180
     nineq = 400
     neq = 200
-    B = 16
+    B = 1
     dG = torch.randn(B, neq, xdim, device=device, dtype=dtype)
     dH = torch.randn(B, nineq, xdim, device=device, dtype=dtype)
     dJ = torch.rand(B, xdim, 1, device=device, dtype=dtype)
@@ -99,29 +99,75 @@ if __name__ == "__main__":
 
     half_Q = jnp.concatenate((dJ, dG, dH), axis=1)
     Q = half_Q.T @ half_Q
-    c = None
-    A = None
-
+    c = jnp.zeros((1 + neq + nineq))
+    A = jnp.eye(1 + neq + nineq)
     bound = jnp.ones(1 + neq + nineq)
     l = bound.at[1:].set(-jnp.inf)
     u = bound.at[1:].set(jnp.inf)
 
-    # Q = 2 * jnp.array([[2.0, 0.5], [0.5, 1]])
-    # c = jnp.array([1.0, 1.0])
-    # A = jnp.array([[1.0, 1.0], [-1.0, 0.0], [0.0, -1.0]])
-    # l = jnp.array([1.0, -jnp.inf, -jnp.inf])
-    # u = jnp.array([1.0, 0.0, 0.0])
+    # Q = {'p1': Q,
+    #      'p2': Q,
+    #      'p3': Q,
+    #      'p4': Q,
+    #      'p5': Q,
+    #      'p6': Q,
+    #      'p7': Q,
+    #      'p8': Q}
+    # c = {'p1': c,
+    #      'p2': c,
+    #      'p3': c,
+    #      'p4': c,
+    #      'p5': c,
+    #      'p6': c,
+    #      'p7': c,
+    #      'p8': c}
+    # A = {'p1': A,
+    #      'p2': A,
+    #      'p3': A,
+    #      'p4': A,
+    #      'p5': A,
+    #      'p6': A,
+    #      'p7': A,
+    #      'p8': A}
+    # l = {'p1': l,
+    #      'p2': l,
+    #      'p3': l,
+    #      'p4': l,
+    #      'p5': l,
+    #      'p6': l,
+    #      'p7': l,
+    #      'p8': l}
+    # u = {'p1': u,
+    #      'p2': u,
+    #      'p3': u,
+    #      'p4': u,
+    #      'p5': u,
+    #      'p6': u,
+    #      'p7': u,
+    #      'p8': u}
+
+    qp = BoxOSQP(jit=True)
 
     compile_start = time.time()
-    sol = solve(Q = Q, l = l, u = u)
+    # sol = qp.run(params_obj=(Q, c), params_eq=A, params_ineq=(l, u)).params
+    sol = solve(Q, c, A, l, u)
     compile_end = time.time()
 
     solve_start = time.time()
+    # sol = qp.run(params_obj=(Q, c), params_eq=A, params_ineq=(l, u)).params
     sol = solve(Q, c, A, l, u)
     solve_end = time.time()
 
-    print(sol.primal)
-    print(sol.dual_eq)
-    print(sol.dual_ineq)
+    solve_start2 = time.time()
+    # sol2 = qp.run(params_obj=(Q, c), params_eq=A, params_ineq=(l, u)).params
+    sol = solve(Q, c, A, l, u)
+    solve_end2 = time.time()
+
+    # print('primal solution', sol.primal)
+    # print(sol.dual_eq)
+    # print(sol.dual_ineq)
+
+    # print(sol.primal)
     print(compile_end - compile_start)
     print(solve_end - solve_start)
+    print(solve_end2 - solve_start2)
