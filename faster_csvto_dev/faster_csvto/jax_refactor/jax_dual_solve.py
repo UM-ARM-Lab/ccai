@@ -104,8 +104,6 @@ class JaxDualSolve:
         Returns:
             The optimal value of the decision variable.
         """
-        objective_grad = jax.grad(self.objective)
-
         # Initialize decision variable with zero vector of appropriate dimension.
         equality_multiplier = jnp.zeros(self._equality_grad.shape[0])
         inequality_multiplier = jnp.zeros(self._inequality_grad.shape[0])
@@ -114,17 +112,20 @@ class JaxDualSolve:
         # Set carry variables
         iteration = 0
         old_decision_variable = decision_variable
-        _, decision_variable, _ = jax.lax.while_loop(self.not_within_tolerance_or_at_iteration_limit, self.solver_step,
-                                                     (iteration, decision_variable, old_decision_variable))
-        return decision_variable
+        step = self._step_scale * self.objective_grad(decision_variable)
+        decision_variable = jnp.clip(decision_variable - step, self._min_decision_variable, self._max_decision_variable)
+        iteration, decision_variable, _ = jax.lax.while_loop(self.not_within_tolerance_or_at_iteration_limit,
+                                                             self.solver_step, (iteration, decision_variable,
+                                                                                old_decision_variable))
+        return decision_variable, iteration
 
     def not_within_tolerance_or_at_iteration_limit(self, variables) -> bool:
         """
         """
         iteration, decision_variable, old_decision_variable = variables
 
-        distance = jnp.linalg.norm(self.objective(decision_variable) - self.objective(old_decision_variable))
-        return (iteration < self._max_iterations) & (self._tolerance < distance)
+        distance = jnp.abs(self.objective(decision_variable) - self.objective(old_decision_variable))
+        return (self._tolerance < distance) & (iteration < self._max_iterations)
 
     def solver_step(self, variables) -> jnp.array:
         """
@@ -137,8 +138,9 @@ class JaxDualSolve:
         decision_variable = jnp.clip(decision_variable - step, self._min_decision_variable, self._max_decision_variable)
 
         # Perform backtracking to avoid overstepping.
-        backtracking_variables = (self._step_scale, decision_variable, old_decision_variable)
-        step_scale, decision_variable, old_decision_variable = jax.lax.while_loop(self.new_worse_than_old,
+        back_iteration = 0
+        backtracking_variables = (back_iteration, self._step_scale, decision_variable, old_decision_variable)
+        back_iteration, step_scale, decision_variable, old_decision_variable = jax.lax.while_loop(self.new_worse_than_old,
                                                                                   self.backtracking_step,
                                                                                   backtracking_variables)
 
@@ -149,17 +151,18 @@ class JaxDualSolve:
     def new_worse_than_old(self, backtracking_variables) -> bool:
         """
         """
-        step_scale, decision_variable, old_decision_variable = backtracking_variables
+        back_iteration, step_scale, decision_variable, old_decision_variable = backtracking_variables
 
-        return self.objective(decision_variable) > self.objective(old_decision_variable)
+        return (self.objective(decision_variable) > self.objective(old_decision_variable)) & (back_iteration < 3)
 
     def backtracking_step(self, backtracking_variables):
         """
         """
-        step_scale, decision_variable, old_decision_variable = backtracking_variables
+        back_iteration, step_scale, decision_variable, old_decision_variable = backtracking_variables
+        back_iteration += 1
 
         decision_variable = old_decision_variable - step_scale * 0.1 * self.objective_grad(old_decision_variable)
-        return step_scale, decision_variable, old_decision_variable
+        return back_iteration, step_scale, decision_variable, old_decision_variable
 
     def objective(self, decision_variable: jnp.array) -> jnp.float32:
         """
@@ -217,13 +220,19 @@ if __name__ == "__main__":
     dH = jnp.array(np.random.randn(nineq, xdim))
     dJ = jnp.array(np.random.randn(xdim))
 
-    # jax_solver = JaxDualSolve(dJ, dG, dH, max_iter, eps, tol)
-    # lambda_mu = jax_solver.solve()
-    # print(lambda_mu)
+    jax_solver = JaxDualSolve(dJ, dG, dH, max_iter, eps, tol)
+    lambda_mu, iteration = jax_solver.solve()
+
+    start = time.time()
+    lambda_mu, iteration = jax_solver.solve()
+    end = time.time()
+    print('time', end - start)
+    print('output shape: ', lambda_mu.shape)
+    print('solving iterations', iteration)
 
     # a: jnp.float32 = 64
     # b: jnp.float32 = 10
     # print(loop_test(a))
-    a = loop_test()
-    b = loop_test()
-    print(b)
+    # a = loop_test()
+    # b = loop_test()
+    # print(b)
