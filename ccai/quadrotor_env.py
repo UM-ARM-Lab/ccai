@@ -122,7 +122,7 @@ class QuadrotorEnv:
         # start[9:] *= 5
         # self.state = start
         # NOTE: This is from Joseph debugging Jax CSVTO.
-        self.state = np.array([-4.0, -4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        self.state = np.array([3.0, -4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         self.goal = goal
         if self.obstacle_mode == 'dynamic':
             self.obstacle_pos = np.array([-2.25, 1.75])
