@@ -175,8 +175,6 @@ class ConstrainedSVGDProblem(Problem):
         self._preprocess(x)
         N = x.shape[0]
         h, _, _ = self._con_ineq(x, compute_grads=False, compute_hess=False)
-        # self.slack_weight = 1 / torch.mean(torch.linalg.norm(h.reshape(N, -1), dim=1)) ** 2
-        # print(self.slack_weight)
         if h is not None:
             if self.squared_slack:
                 # z = torch.where(h < 0, torch.sqrt(-2 * h), 0)

@@ -3,29 +3,38 @@ import numpy as np
 import rospy
 import tf2_ros
 from sensor_msgs.msg import JointState
+from std_msgs.msg import String
 import torch
 from copy import deepcopy
 
-class Ros_Node(object):
+LIB_CMD_TOPIC = '/allegroHand/lib_cmd'
+
+class RosNode(object):
     '''
     Ros Node for communication with the hardware
     '''
-    def __init__(self, node_name='run_policy', freq=2):
+    def __init__(self, node_name='run_policy', num_repeat=1, kp=4, use_grav_comp=False):
         try:
             rospy.init_node('allegro_hand_node')
         except:
             pass
         self.node_name = node_name
-        self.freq = freq
+        self.num_repeat = num_repeat
         self.get_allegro_bounds()
         # rospy.init_node(self.node_name)
         self.tfBuffer = tf2_ros.Buffer()
         # self.listener = tf2_ros.TransformListener(self.tfBuffer)
         self.set_allegro_states_subscriber()
         self.set_allegro_cmd_publisher()
+        self.set_allegro_grav_comp_subscriber()
+        self.lib_cmd_publisher = rospy.Publisher(LIB_CMD_TOPIC, String, queue_size=-1)
+        self.lib_cmd_publisher.publish('gravcomp')
         rospy.sleep(2)
         print('ros listner initialized.')
         self.current_joint_pose = None
+        self.kp = kp
+        self.use_grav_comp = use_grav_comp
+
         
     
     def get_allegro_bounds(self, allegro_lb=None, allegro_ub=None):
@@ -64,7 +73,22 @@ class Ros_Node(object):
             1. topic_name: str of rostopic to subscribe
         '''
         self.subscriber = rospy.Subscriber(topic_name, JointState, self.allegro_joint_callback)
+    def set_allegro_grav_comp_subscriber(self, topic_name='/allegroHand/grav_comp_torques'):
+        '''
+        Subscribe to a rostopic and update the corresponding values
+        Args:
+            1. topic_name: str of rostopic to subscribe
+        '''
+        self.grav_comp_subscriber = rospy.Subscriber(topic_name, JointState, self.allegro_grav_comp_callback)
 
+    def allegro_grav_comp_callback(self, data):
+        '''
+        Function called each time we recieve a joint_state
+        Save the latest Joint State in current_joint_pose for use at the moment of publish 
+        Transform the Joint State positions into a torch tensor to be used when needed
+        '''
+        self.grav_comp_data = data
+        self.grav_comp_torque = torch.tensor(data.effort)
     def set_allegro_cmd_publisher(self, topic_name='/allegroHand/joint_cmd'):
         '''
         Publish to a rostopic and update the corresponding values
@@ -75,14 +99,32 @@ class Ros_Node(object):
         print('joint command publisher initialized.')
         
     def apply_action(self, action, weight=0.5):
-        action = list(action.detach().numpy())
-        desired_js = deepcopy(self.current_joint_pose) # We copy the message type from the last current joint pose recieved to have the format
-        desired_js.position = action # We change the position to have the commanded joint angles
-        desired_js.effort = list([]) # We set the effort command to zero because we are doing position control and not torque control
-        self.joint_comm_publisher.publish(desired_js) # Publish the desired command
+        "the action has to be full action (16 dimensional)"
+
+        action_sequence = np.linspace(torch.tensor(self.current_joint_pose.position), action.cpu(), self.num_repeat + 1)[1:]
+        if len(action.shape) == 2:
+            action = action.squeeze(0)
+        # if self.num_repeat == 1:
+        for i in range(self.num_repeat):
+            desired_js = deepcopy(self.current_joint_pose) # We copy the message type from the last current joint pose recieved to have the format
+            if self.use_grav_comp:
+                desired_js.position = action + self.grav_comp_torque.to(action.device) / self.kp
+            else:
+                desired_js.position = action
+            desired_js.effort = list([]) # We set the effort command to zero because we are doing position control and not torque control
+            self.joint_comm_publisher.publish(desired_js) # Publish the desired command
+            rospy.sleep(0.1)
+        # for i in range(self.num_repeat):
+        #     # action = list(action.detach().cpu().numpy())
+        #     action = list(action_sequence[i])
+        #     desired_js = deepcopy(self.current_joint_pose) # We copy the message type from the last current joint pose recieved to have the format
+        #     desired_js.position = action # We change the position to have the commanded joint angles
+        #     desired_js.effort = list([]) # We set the effort command to zero because we are doing position control and not torque control
+        #     self.joint_comm_publisher.publish(desired_js) # Publish the desired command
+        #     rospy.sleep(0.1)
 
 def main():
-    ros_node = Ros_Node()
+    ros_node = RosNode()
     while not rospy.is_shutdown():
         # The rospy sleep set the seconds before running another iteration. During this time, we will recieve multiple joint state, but we will used the last one
         # recieved for the ros_node.step(obs) and ros_node.apply_action. If we want to compute the action after each joint state update, we can put the apply_action inside 
@@ -92,7 +134,7 @@ def main():
         # ros_node.get_object_pose()
         # obs = ros_node.get_observation()
         action = torch.randn(16) / 3
-        print(action)
+        print(ros_node.allegro_joint_pos)
         ros_node.apply_action(action, weight=1)
         
         

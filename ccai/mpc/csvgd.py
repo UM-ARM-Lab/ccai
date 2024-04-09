@@ -44,6 +44,7 @@ class Constrained_SVGD_MPC:
         best_trajectory = self.x[0].clone()
         all_trajectories = self.x.clone()
         self.shift()
+        # self.x = self.problem.get_initial_xu(self.N)
         return best_trajectory, all_trajectories
 
     def shift(self):

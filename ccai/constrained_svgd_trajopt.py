@@ -28,7 +28,7 @@ class ConstrainedSteinTrajOpt:
         self.matrix_kernel = False
         self.use_fisher = False
         self.use_hessian = False  # True
-        self.use_constraint_hessian = True
+        self.use_constraint_hessian = False
         self.normxiJ = None
         #self.dtype = torch.float32
         self.dtype = torch.float64
@@ -53,11 +53,12 @@ class ConstrainedSteinTrajOpt:
             dCdCT = dC @ dC.permute(0, 2, 1)
             dCdCT = dCdCT.to(dtype=self.dtype)
             A_bmm = lambda x: dCdCT @ x
-            print(torch.linalg.matrix_rank(dCdCT))
             #
             # damping_factor = 1e-1
             try:
-                dCdCT_inv = torch.linalg.solve(dCdCT, eye)
+                damping_factor = 1e-6
+                dCdCT_inv = torch.linalg.solve(dCdCT + damping_factor * eye, eye)
+                # dCdCT_inv = torch.linalg.solve(dCdCT, eye)
                 if torch.any(torch.isnan(dCdCT_inv)):
                     raise ValueError('nan in inverse')
             except Exception as e:
@@ -254,7 +255,7 @@ class ConstrainedSteinTrajOpt:
         path = [xuz.data.clone()]
         self.gamma = self.max_gamma
         for iter in range(T):
-            print(iter)
+            # print(iter)
             # reset slack variables
             # if self.problem.dz > 0:
             #    xu = xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du]
