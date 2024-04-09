@@ -255,10 +255,10 @@ class TemporalUNetContext(nn.Module):
             nn.Mish(),
             nn.Linear(128, 128),
             nn.Mish(),
-            nn.Linear(128, cond_dim),
-            nn.Mish()
+            nn.Linear(128, cond_dim)
         )
 
+    #@torch.compile(mode='max-autotune')
     def forward(self, t, x, context):
         '''
             x : [ batch x horizon x transition ]
@@ -267,9 +267,9 @@ class TemporalUNetContext(nn.Module):
         t = t.reshape(-1)
         if t.shape[0] == 1:
             t = t.repeat(B)
-        t = self.time_embedding(t)
         e_x, h = self.temporal_unet(t, x, context, dropout=False)
         h = self.pooling(h).reshape(B, -1)
+        t = self.time_embedding(t)
         h = torch.cat((context, h, t), dim=-1)
         e_c = self.context_net(h)
         return e_x, e_c

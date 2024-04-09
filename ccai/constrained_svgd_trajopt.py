@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from torch.profiler import profile, record_function, ProfilerActivity
 
-from torch_cg import cg_batch
+# from torch_cg import cg_batch
 
 
 class ConstrainedSteinTrajOpt:
@@ -65,9 +65,10 @@ class ConstrainedSteinTrajOpt:
                     raise ValueError('nan in inverse')
             except Exception as e:
                 print(e)
+                exit(0)
                 # dCdCT_inv = torch.linalg.lstsq(dC @ dC.permute(0, 2, 1), eye).solution
                 # dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1))
-                dCdCT_inv, _ = cg_batch(A_bmm, eye, verbose=False)
+                #dCdCT_inv, _ = cg_batch(A_bmm, eye, verbose=False)
             dCdCT_inv = dCdCT_inv.to(dtype=torch.float32)
             # what if we convert everything to float64 - will slow down some
             #dC = dC.to(dtype=self.dtype)
@@ -226,14 +227,15 @@ class ConstrainedSteinTrajOpt:
         A_bmm = lambda x: dCdCT @ x
         eye = torch.eye(self.dg + self.dh).repeat(N, 1, 1).to(device=C.device)
         try:
-            dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1), eye)
+            dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1) + eye * 1e-6, eye)
             if torch.any(torch.isnan(dCdCT_inv)):
                 raise ValueError('nan in inverse')
         except Exception as e:
             print(e)
+            exit(0)
             # dCdCT_inv = torch.linalg.lstsq(dC @ dC.permute(0, 2, 1), eye).solution
             # dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1))
-            dCdCT_inv, _ = cg_batch(A_bmm, eye, verbose=False)
+            #dCdCT_inv, _ = cg_batch(A_bmm, eye, verbose=False)
         projection = dCdCT_inv @ dC
         eye = torch.eye((self.dx + self.du) * self.T + self.dh, device=xuz.device, dtype=xuz.dtype).unsqueeze(0)
         projection = eye - dC.permute(0, 2, 1) @ projection

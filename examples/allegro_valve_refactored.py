@@ -187,6 +187,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
 
         self.world_trans = world_trans.to(device=device)
         self.alpha = 10
+        self.sdf_offset = 0.01 * (np.random.rand(1).item() - 0.5)
 
         # add collision checking
         # collision check all of the non-finger tip links
@@ -211,7 +212,7 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         chain_valve = pk.build_chain_from_urdf(open(asset_valve).read())
         chain_valve = chain_valve.to(device=device)
         valve_sdf = pv.RobotSDF(chain_valve, path_prefix=get_assets_dir() + '/valve')
-        robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models')
+        robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models', use_collision_geometry=True)
 
         scene_trans = world_trans.inverse().compose(
             pk.Transform3d(device=device).translate(valve_asset_pos[0], valve_asset_pos[1], valve_asset_pos[2]))
@@ -342,6 +343,9 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         # Retrieve pre-processed data
         ret_scene = self.data[finger_name]
         g = ret_scene.get('sdf').reshape(N, T + 1, 1)  # - 0.0025
+
+        # offset to account for weird isaac collisions
+        g = g - 0*self.sdf_offset
         grad_g_q = ret_scene.get('grad_sdf', None)
         hess_g_q = ret_scene.get('hess_sdf', None)
         grad_g_theta = ret_scene.get('grad_env_sdf', None)
@@ -449,6 +453,9 @@ class AllegroValveProblem(ConstrainedSVGDProblem):
         self.cost = vmap(partial(self._cost, start=self.start, goal=self.goal))
         self.grad_cost = vmap(jacrev(partial(self._cost, start=self.start, goal=self.goal)))
         self.hess_cost = vmap(hessian(partial(self._cost, start=self.start, goal=self.goal)))
+
+        # reset offset
+        self.sdf_offset = 0.01 * (np.random.rand(1).item() - 0.5)
 
         if T is not None:
             self.T = T
@@ -1071,11 +1078,11 @@ def do_trial(env, params, fpath):
     model_path = params.get('model_path', None)
 
     if model_path is not None:
-        trajectory_sampler = TrajectorySampler(T=16, dx=9, du=8, type='diffusion', timesteps=100, hidden_dim=128, context_dim=0)
+        trajectory_sampler = TrajectorySampler(T=16, dx=10, du=8, type='diffusion', timesteps=256, hidden_dim=128, context_dim=1, generate_context=True)
         trajectory_sampler.load_state_dict(torch.load(f'{CCAI_PATH}/{model_path}'))
         trajectory_sampler.to(device=params['device'])
 
-    if params['controller'] == 'csvgd':
+    if 'csvgd' in params['controller']:
         regrasp_problem = AllegroValveRegrasping(
             start=start[:8],
             goal=desired_contact_loc,
@@ -1114,14 +1121,45 @@ def do_trial(env, params, fpath):
 
         # generate initial samples with diffusion model
         initial_samples = None
+        import time
+        sample_time = time.time()
         if trajectory_sampler is not None:
-            initial_samples = trajectory_sampler.sample(N=params['N'], start=state.reshape(1, -1), H=params['T']+1)
-            initial_x = initial_samples[:, 1:, :planner.problem.dx]
-            initial_u = initial_samples[:, :-1, -planner.problem.du:]
-            initial_samples = torch.cat((initial_x, initial_u), dim=-1)
-        state = state[:planner.problem.dx]
-        planner.reset(state, T=params['T'], goal=goal, initial_x=initial_samples)
+            start = state.reshape(1, -1)
+            state = torch.cat((start[:, :8], torch.cos(start[:, 8])[:, None], torch.sin(start[:, 8])[:, None]), dim=1)
+            with torch.no_grad():
+                context = torch.ones(params['T'] + 1, 1, device=params['device'])
+                if planner.problem.dx == 9:
+                    context *= -1
+                context = None
+                initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=state.reshape(1, -1),
+                                                                  H=params['T']+1,
+                                                                  constraints=context)
+            eps = 1e-6
+            cos_theta = initial_samples[:, :, 8].clamp(min=-1 + eps, max=1 - eps)
+            sin_theta = initial_samples[:, :, 9].clamp(min=-1 + eps, max=1 - eps)
+            theta = torch.atan2(sin_theta, cos_theta)
+            initial_samples = torch.cat((
+                initial_samples[:, :, :8], theta[:, :, None], initial_samples[:, :, 9:]
+            ), dim=-1)
 
+            initial_x = initial_samples[:, 1:, :planner.problem.dx]
+            #initial_u = initial_samples[:, 1:, :8] - initial_samples[:, :-1, :8]
+            initial_u = initial_samples[:, :-1, -planner.problem.du:]
+            #initial_u = initial_samples[:, 1:, planner.problem.dx]
+            #print(initial_u)
+            #print(initial_samples[0, :, -planner.problem.du:])
+            #print(initial_samples[0, :, :9])
+            #exit(0)
+
+            initial_samples = torch.cat((initial_x, initial_u), dim=-1)
+        print(time.time() - sample_time)
+
+
+        state = env.get_state()
+        state = state['q'].reshape(9).to(device=params['device'])
+        state = state[:planner.problem.dx]
+        # print(params['T'], state.shape, initial_samples)
+        planner.reset(state, T=params['T'], goal=goal, initial_x=initial_samples)
         planned_trajectories = []
         actual_trajectory = []
         contact_points = {
@@ -1135,7 +1173,9 @@ def do_trial(env, params, fpath):
             print('Step:', k, 'Valve angle: ', state[-1] * 180 / np.pi)
 
             state = state[:planner.problem.dx]
+            start_time = time.time()
             best_traj, plans = planner.step(state)
+            print(start_time - time.time())
             planned_trajectories.append(plans)
             N, T, _ = plans.shape
 
@@ -1171,29 +1211,74 @@ def do_trial(env, params, fpath):
         regrasp_data[t] = {'plans': [], 'starts': [], 'contact_points': [], 'contact_distance': []}
         turn_data[t] = {'plans': [], 'starts': [], 'contact_points': [], 'contact_distance': []}
 
-    for turn in range(params['num_turns']):
-        regrasp_traj, regrasp_plans, regrasp_contact_points, regrasp_contact_distance = execute_traj(regrasp_planner)
-        time.sleep(1)
+
+    # sample initial trajectory with diffusion model to get contact sequence
+    state = env.get_state()
+    state = state['q'].reshape(9).to(device=params['device'])
+
+    # generate initial samples with diffusion model
+    initial_samples = None
+    if trajectory_sampler is not None:
+        for turn in range(2*params['num_turns']):
+            state = env.get_state()
+            state = state['q'].reshape(9).to(device=params['device'])
+            start = state.reshape(1, -1)
+            state = torch.cat((start[:, :8], torch.cos(start[:, 8])[:, None], torch.sin(start[:, 8])[:, None]), dim=1)
+            turns_left = 2 * params['num_turns'] - turn
+            with torch.no_grad():
+                trajectory, contact, likelihoods = trajectory_sampler.sample(N=256, start=state.reshape(1, -1), H=turns_left * 16)
+            # choose highest likelihood trajectory
+            contact_sequence = contact[torch.argmax(likelihoods)]
+            contact_sequence = torch.round(contact_sequence)
+            print('selected contact sequence')
+            print(contact_sequence)
+
+            if contact_sequence[0] == 1:
+                regrasp_traj, regrasp_plans, regrasp_contact_points, regrasp_contact_distance = execute_traj(regrasp_planner)
+                for i, plan in enumerate(regrasp_plans):
+                    t = plan.shape[1]
+                    regrasp_data[t]['plans'].append(plan)
+                    regrasp_data[t]['starts'].append(regrasp_traj[i].reshape(1, -1).repeat(plan.shape[0], 1))
+                    regrasp_data[t]['contact_points'].append(regrasp_contact_points[t])
+                    regrasp_data[t]['contact_distance'].append(regrasp_contact_distance[t])
+            else:
+                state = env.get_state()
+                state = state['q'].reshape(9).to(device=params['device'])
+                valve_goal = state[-1].reshape(-1) + 0.5 * np.pi
+                turn_traj, turn_plans, turn_contact_points, turn_contact_distance = execute_traj(turn_planner, goal=valve_goal)
+                # add trajectories and starts to dataset
+                for i, plan in enumerate(turn_plans):
+                    t = plan.shape[1]
+                    turn_data[t]['plans'].append(plan)
+                    turn_data[t]['starts'].append(turn_traj[i].reshape(1, -1).repeat(plan.shape[0], 1))
+                    turn_data[t]['contact_points'].append(turn_contact_points[t])
+                    turn_data[t]['contact_distance'].append(turn_contact_distance[t])
+
+    else:
         state = env.get_state()
-        state = state['q'].reshape(9).to(device=params['device'])
-        valve_goal = state[-1].reshape(-1) + 0.5 * np.pi
-        turn_traj, turn_plans, turn_contact_points, turn_contact_distance = execute_traj(turn_planner, goal=valve_goal)
-        time.sleep(1)
+        for turn in range(params['num_turns']):
+            regrasp_traj, regrasp_plans, regrasp_contact_points, regrasp_contact_distance = execute_traj(regrasp_planner)
+            time.sleep(1)
+            state = env.get_state()
+            state = state['q'].reshape(9).to(device=params['device'])
+            valve_goal = state[-1].reshape(-1) + 0.5 * np.pi
+            turn_traj, turn_plans, turn_contact_points, turn_contact_distance = execute_traj(turn_planner, goal=valve_goal)
+            time.sleep(1)
 
-        # add trajectories and starts to dataset
-        for i, plan in enumerate(turn_plans):
-            t = plan.shape[1]
-            turn_data[t]['plans'].append(plan)
-            turn_data[t]['starts'].append(turn_traj[i].reshape(1, -1).repeat(plan.shape[0], 1))
-            turn_data[t]['contact_points'].append(turn_contact_points[t])
-            turn_data[t]['contact_distance'].append(turn_contact_distance[t])
+            # add trajectories and starts to dataset
+            for i, plan in enumerate(turn_plans):
+                t = plan.shape[1]
+                turn_data[t]['plans'].append(plan)
+                turn_data[t]['starts'].append(turn_traj[i].reshape(1, -1).repeat(plan.shape[0], 1))
+                turn_data[t]['contact_points'].append(turn_contact_points[t])
+                turn_data[t]['contact_distance'].append(turn_contact_distance[t])
 
-        for i, plan in enumerate(regrasp_plans):
-            t = plan.shape[1]
-            regrasp_data[t]['plans'].append(plan)
-            regrasp_data[t]['starts'].append(regrasp_traj[i].reshape(1, -1).repeat(plan.shape[0], 1))
-            regrasp_data[t]['contact_points'].append(regrasp_contact_points[t])
-            regrasp_data[t]['contact_distance'].append(regrasp_contact_distance[t])
+            for i, plan in enumerate(regrasp_plans):
+                t = plan.shape[1]
+                regrasp_data[t]['plans'].append(plan)
+                regrasp_data[t]['starts'].append(regrasp_traj[i].reshape(1, -1).repeat(plan.shape[0], 1))
+                regrasp_data[t]['contact_points'].append(regrasp_contact_points[t])
+                regrasp_data[t]['contact_distance'].append(regrasp_contact_distance[t])
 
     # change to numpy and save data
     for t in range(1, 1 + params['T']):
@@ -1254,7 +1339,7 @@ if __name__ == "__main__":
     # combined chain
     chain = pk.build_chain_from_urdf(open(asset).read())
 
-    for i in tqdm(range(0, config['num_trials'])):
+    for i in tqdm(range(1, config['num_trials'])):
         goal = torch.tensor([np.pi])
         # goal = goal + 0.025 * torch.randn(1) + 0.2
         for controller in config['controllers'].keys():

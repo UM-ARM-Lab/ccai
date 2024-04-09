@@ -2,25 +2,60 @@
 T: 15
 receding_horizon: False
 num_steps: 15
-num_trials: 20
+num_trials: 10
 num_turns: 4
 visualize: True
-experiment_name: 'tmp'
+experiment_name: 'test_diffusion_contact_sequence2'
 hardware: False
 valve_type: 'cylinder'
-sim_device: 'cuda:0'
+sim_device: 'cuda:1'
 friction_coefficient: 0.95
 controllers:
-  csvgd:
+#  csvgd:
+#    # N: 16
+#    N: 16
+#    alpha_J: 5.0e-3
+#    alpha_C: 1.0
+#    step_size: 0.1
+#    momentum: 0.
+#    device: 'cuda:1'
+#    online_iters: 10
+#    warmup_iters: 50
+#    # warmup_iters: 10
+#    resample_steps: 1
+#    resample_sigma: 0.01
+#    resample_temperature: 1
+#    penalty: 10000
+#    collision_checking: False
+#    joint_friction: 0.0
+#    model_path: 'data/training/allegro_valve/allegro_random_sdf_dataset_sine_cosine_256_timesteps_diffuse_class_model_long_train_batch_dropout_p_0.1_diffusion/allegro_valve_diffusion.pt'
+#  csvgd_small_opt:
+#    # N: 16
+#    N: 16
+#    alpha_J: 5.0e-3
+#    alpha_C: 1.0
+#    step_size: 0.1
+#    momentum: 0.
+#    device: 'cuda:1'
+#    online_iters: 10
+#    warmup_iters: 100
+#    # warmup_iters: 10
+#    resample_steps: 1
+#    resample_sigma: 0.01
+#    resample_temperature: 1
+#    penalty: 10000
+#    collision_checking: False
+#    joint_friction: 0.0
+  csvgd_mid_opt:
     # N: 16
     N: 16
     alpha_J: 5.0e-3
     alpha_C: 1.0
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:0'
-    online_iters: 20
-    warmup_iters: 100
+    device: 'cuda:1'
+    online_iters: 100
+    warmup_iters: 500
     # warmup_iters: 10
     resample_steps: 1
     resample_sigma: 0.01
@@ -28,7 +63,7 @@ controllers:
     penalty: 10000
     collision_checking: False
     joint_friction: 0.0
-    #model_path: 'data/training/allegro_valve/allegro_new_dataset_augment_angle_masked_2_diffusion/allegro_valve_diffusion.pt'
+    #model_path: 'data/training/allegro_valve/allegro_random_sdf_dataset_sine_cosine_256_timesteps_diffuse_class_model_long_train_batch_dropout_p_0.1_diffusion/allegro
 #  ipopt:
 #    device: 'cpu'
 #    online_iters: 10

@@ -11,7 +11,7 @@ from nflows.nn.nets import ResidualNet
 from nflows.utils import torchutils
 
 # Diffusion
-from ccai.models.diffusion.diffusion import GaussianDiffusion, ConstrainedDiffusion
+from ccai.models.diffusion.diffusion import GaussianDiffusion, ConstrainedDiffusion, JointDiffusion
 from ccai.models.cnf.cnf import TrajectoryCNF
 
 from ccai.models.helpers import MLP
@@ -114,7 +114,7 @@ class TrajectoryFlowModel(nn.Module):
 class TrajectoryDiffusionModel(nn.Module):
 
     def __init__(self, T, dx, du, context_dim, problem=None, timesteps=20, hidden_dim=64, constrained=False,
-                 unconditional=False):
+                 unconditional=False, generate_context=False):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -129,9 +129,14 @@ class TrajectoryDiffusionModel(nn.Module):
                                                         hidden_dim=hidden_dim,
                                                         unconditional=unconditional)
         else:
-            self.diffusion_model = GaussianDiffusion(T, (dx + du), context_dim, timesteps=timesteps,
-                                                     sampling_timesteps=timesteps, hidden_dim=hidden_dim,
-                                                     unconditional=unconditional)
+            if generate_context:
+                self.diffusion_model = JointDiffusion(T, (dx + du), context_dim, timesteps=timesteps,
+                                                      sampling_timesteps=timesteps,
+                                                      hidden_dim=hidden_dim)
+            else:
+                self.diffusion_model = GaussianDiffusion(T, (dx + du), context_dim, timesteps=timesteps,
+                                                         sampling_timesteps=timesteps, hidden_dim=hidden_dim,
+                                                         unconditional=unconditional)
 
     def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None):
         # B, N, _ = constraints.shape
@@ -205,6 +210,8 @@ class TrajectoryDiffusionModel(nn.Module):
                                                 timestep=timestep).reshape(-1, self.T, self.dx + self.du)
         return samples
 
+    def likelihood(self, trajectories, context):
+        return self.diffusion_model.approximate_likelihood(trajectories, context)
 
 class TrajectoryCNFModel(TrajectoryCNF):
 
@@ -234,7 +241,7 @@ class TrajectoryCNFModel(TrajectoryCNF):
 class TrajectorySampler(nn.Module):
 
     def __init__(self, T, dx, du, context_dim, type='nf', dynamics=None, problem=None, timesteps=50, hidden_dim=64,
-                 constrain=False, unconditional=False):
+                 constrain=False, unconditional=False, generate_context=False):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -248,7 +255,7 @@ class TrajectorySampler(nn.Module):
             self.model = TrajectoryCNFModel(T, dx, du, context_dim, hidden_dim=hidden_dim)
         else:
             self.model = TrajectoryDiffusionModel(T, dx, du, context_dim, problem, timesteps, hidden_dim, constrain,
-                                                  unconditional)
+                                                  unconditional, generate_context=generate_context)
 
         self.register_buffer('x_mean', torch.zeros(dx + du))
         self.register_buffer('x_std', torch.ones(dx + du))
@@ -269,7 +276,8 @@ class TrajectorySampler(nn.Module):
             norm_past = (past - self.x_mean) / self.x_std
 
         samples = self.model.sample(N, H, norm_start, goal, constraints, norm_past)
-        return samples * self.x_std + self.x_mean
+        x, c, likelihood = samples
+        return x * self.x_std + self.x_mean, c, likelihood
 
     def resample(self, start=None, goal=None, constraints=None, initial_trajectory=None, past=None, timestep=10):
         norm_start = None
@@ -290,3 +298,7 @@ class TrajectorySampler(nn.Module):
 
     def grad(self, trajectories, t, start, goal, constraints=None):
         return self.model.grad(trajectories, t, start, goal, constraints)
+
+    def likelihood(self, trajectories, mask=None, start=None, goal=None, context=None):
+        norm_traj = (trajectories - self.x_mean) / self.x_std
+        return self.model.likelihood(norm_traj, context)

@@ -7,7 +7,7 @@ from torch.utils.data import Dataset
 
 class AllegroValveDataset(Dataset):
 
-    def __init__(self, folders, turn=True, regrasp=True, cosine_sine=True):
+    def __init__(self, folders, turn=True, regrasp=True, cosine_sine=True, states_only=False):
         super().__init__()
         assert (turn or regrasp)
         self.cosine_sine = cosine_sine
@@ -18,10 +18,10 @@ class AllegroValveDataset(Dataset):
         regrasp_starts = []
         regrasp_masks = []
         turn_masks = []
-        min_t = 7
+        min_t = 1
         max_T = 15
 
-        use_actual_traj = False
+        use_actual_traj = True
         for fpath in folders:
             path = pathlib.Path(fpath)
 
@@ -55,7 +55,7 @@ class AllegroValveDataset(Dataset):
                     data = pickle.load(f)
                     actual_traj = []
                     for t in range(max_T, min_t - 1, -1):
-                        actual_traj.append(data[t]['starts'][:, :, None, :])
+                        actual_traj.append(data[t]['starts'][:, :, None, :16])
                         traj = data[t]['plans']
                         # combine traj and starts
                         if use_actual_traj:
@@ -79,6 +79,8 @@ class AllegroValveDataset(Dataset):
                         if not use_actual_traj:
                             traj[:, :, t + 1:, 8] = 0
                         regrasp_trajectories.append(traj)
+        print([turn_traj.shape for turn_traj in turn_trajectories])
+
         self.turn_trajectories = np.concatenate(turn_trajectories, axis=0)
         self.regrasp_trajectories = np.concatenate(regrasp_trajectories, axis=0)
         turn_masks = np.concatenate(turn_masks, axis=0)
@@ -93,17 +95,21 @@ class AllegroValveDataset(Dataset):
             self.trajectories = self.regrasp_trajectories
             self.masks = regrasp_masks
 
-        self.trajectory_type = torch.zeros(*self.trajectories.shape[:-2], dtype=torch.long)
+        self.trajectory_type = torch.zeros(*self.trajectories.shape[:-2], 1, dtype=torch.long)
         self.trajectory_type[self.turn_trajectories.shape[0]:] = 1
+        self.trajectory_type[:self.turn_trajectories.shape[0]] = -1
+
         self.trajectories = self.trajectories.reshape(-1, self.trajectories.shape[-2], self.trajectories.shape[-1])
         self.trajectory_type = self.trajectory_type.reshape(-1)
         self.masks = self.masks.reshape(-1, self.masks.shape[-2])
         self.trajectories = torch.from_numpy(self.trajectories).float()
         self.masks = torch.from_numpy(self.masks).float()
+        if states_only:
+            self.trajectories = self.trajectories[:, :, :9]
         if self.cosine_sine:
-            dx = 18
+            dx = self.trajectories.shape[-1] + 1
         else:
-            dx = 17
+            dx = self.trajectories.shapes[-1]
         self.masks = self.masks[:, :, None].repeat(1, 1, dx) # for states
         # self.trajectories[:, :, 8] += np.pi # add pi to the valve angle
         ## some wrap around issues here:
@@ -115,16 +121,16 @@ class AllegroValveDataset(Dataset):
         #                                         self.trajectories[:, :, 8])
 
         print(self.trajectories.shape)
-        print(self.trajectories[:, :, 8].min(), self.trajectories[:, :, 8].max(), self.trajectories[:, :, 8].mean())
-
         # self.trajectories = self.trajectories[:, :, :9]
         # self.masks = torch.from_numpy(self.masks).float()
         # self.masks = torch.ones(self.trajectories.shape[0], self.trajectories.shape[1])
         self.mean = 0
         self.std = 1
 
-        self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.9)
-        self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.25)
+
+        self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.75)
+        self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.75)
+        self.states_only = states_only
 
     def __len__(self):
         return self.trajectories.shape[0]
@@ -142,7 +148,7 @@ class AllegroValveDataset(Dataset):
         if self.cosine_sine:
             traj_q = traj[:, :8]
             traj_theta = traj[:, 8][:, None]
-            traj_u = traj[:, :8]
+            traj_u = traj[:, 9:]
             dx = 10
             traj = torch.cat((traj_q, torch.cos(traj_theta), torch.sin(traj_theta), traj_u), dim=1)
 
@@ -163,7 +169,9 @@ class AllegroValveDataset(Dataset):
         if mask.sum() == 0:
             # randomly choose an index to un-mask
             mask[np.random.randint(0, final_idx)] = 1
-        return self.masks[idx] * (traj - self.mean) / self.std, self.trajectory_type[idx], mask
+        print(traj)
+        exit(0)
+        return self.masks[idx] * (traj - self.mean) / self.std, self.trajectory_type[idx, None], mask
 
     def compute_norm_constants(self):
         # compute norm constants not including the zero padding
@@ -175,15 +183,18 @@ class AllegroValveDataset(Dataset):
         mean = x.sum(dim=0) / mask.sum()
         std = np.sqrt(np.average((x - mean) ** 2, weights=mask, axis=0))
 
+        if self.states_only:
+            dim = 9
+        else:
+            dim = 17
         # for angle we force to be between [-1, 1]
         if self.cosine_sine:
-            self.mean = torch.zeros(18)
-            self.std = torch.ones(18)
+            self.mean = torch.zeros(dim+1)
+            self.std = torch.ones(dim+1)
             self.mean[:8] = mean[:8]
             self.std[:8] = torch.from_numpy(std[:8]).float()
-            self.mean[-8:] = mean[-8:]
-            self.std[-8:] = torch.from_numpy(std[-8:]).float()
-
+            self.mean[10:] = mean[9:]
+            self.std[10:] = torch.from_numpy(std[9:]).float()
         else:
             mean[8] = 0
             std[8] = np.pi
