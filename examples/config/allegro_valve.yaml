@@ -12,9 +12,9 @@ object_type: 'cylinder_valve'
 sim_device: 'cuda:0'
 friction_coefficient: 0.9
 kp: 3.0
-visualize_plan: False
+visualize_plan: True
 random_robot_pose: False
-optimize_force: True
+optimize_force: False
 controllers:
   csvgd:
     # N: 16
@@ -25,7 +25,7 @@ controllers:
     momentum: 0.
     device: 'cuda:0'
     online_iters: 30
-    warmup_iters: 100
+    warmup_iters: 50
     resample_steps: 1
     resample_sigma: 0.01
     resample_temperature: 0.1

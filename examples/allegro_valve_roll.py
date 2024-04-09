@@ -34,6 +34,34 @@ device = 'cuda:0'
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 
+def euler_to_quat(euler):
+    matrix = tf.euler_angles_to_matrix(euler, convention='XYZ')
+    quat = tf.matrix_to_quaternion(matrix)
+    return quat
+
+def euler_to_angular_velocity(current_euler, next_euler):
+    # using matrix
+    
+    # current_mat = tf.euler_angles_to_matrix(current_euler, convention='XYZ')
+    # next_mat = tf.euler_angles_to_matrix(next_euler, convention='XYZ')
+    # dmat = next_mat - current_mat
+    # omega_mat = dmat @ current_mat.transpose(-1, -2)
+    # omega_x = (omega_mat[..., 2, 1] - omega_mat[..., 1, 2]) / 2
+    # omega_y = (omega_mat[..., 0, 2] - omega_mat[..., 2, 0]) / 2
+    # omega_z = (omega_mat[..., 1, 0] - omega_mat[..., 0, 1]) / 2
+    # omega = torch.stack((omega_x, omega_y, omega_z), dim=-1)
+
+    # R.from_euler('XYZ', current_euler.cpu().detach().numpy().reshape(-1, 3)).as_quat().reshape(3, 12, 4)
+
+    # quaternion 
+    current_quat = euler_to_quat(current_euler)
+    next_quat = euler_to_quat(next_euler)
+    dquat = next_quat - current_quat
+    con_quat = - current_quat # conjugate
+    con_quat[..., 0] = current_quat[..., 0]
+    omega = 2 * tf.quaternion_raw_multiply(dquat, con_quat)[..., 1:] 
+    # TODO: quaternion and its negative are the same, but it is not true for angular velocity. Might have some bug here 
+    return omega
 
 class PositionControlConstrainedSteinTrajOpt(ConstrainedSteinTrajOpt):
     def __init__(self, problem, params):
@@ -181,6 +209,10 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
         self.singularity_constr = vmap(self._singularity_constr)
         self.grad_singularity_constr = vmap(jacrev(self._singularity_constr))
+
+        # DEBUG ONLY
+        # self.grad_euler_to_angular_velocity = jacrev(euler_to_angular_velocity, argnums=(0,1))
+
 
 
     def _preprocess(self, xu):
@@ -651,6 +683,7 @@ class AllegroValveTurning(AllegroContactProblem):
             theta = np.linspace(self.start[-self.obj_dof:].cpu().numpy(), self.goal.cpu().numpy(), self.T + 1)[:-1]
             theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
             theta = theta.unsqueeze(0).repeat((N,1,1))
+            # DEBUG ONLY
             # theta = self.start[-self.obj_dof:].unsqueeze(0).repeat((N, self.T, 1))
             # theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
             x = torch.cat((x, theta), dim=-1)
@@ -676,9 +709,10 @@ class AllegroValveTurning(AllegroContactProblem):
         # smoothness_cost += 50 * torch.sum((state[1:, -1] - state[:-1, -1]) ** 2)
         smoothness_cost += 10 * torch.sum((state[1:, -1] - state[:-1, -1]) ** 2)
 
-        goal_cost = (50 * (state[-1, -1] - goal) ** 2).reshape(-1)
-        # TODO: might need to tune the weights of the cost function
-        # goal_cost += torch.sum((10 * (state[:, -1] - goal) ** 2), dim=0)
+        goal_cost = (10 * (state[-1, -1] - goal) ** 2).reshape(-1)
+        # add a running cost
+        goal_cost += torch.sum((3 * (state[:, -1] - goal) ** 2), dim=0)
+
     
         return smoothness_cost + action_cost + goal_cost
 
@@ -1258,6 +1292,7 @@ class AllegroValveTurning(AllegroContactProblem):
             print(f"max force equilibrium constraint: {torch.max(torch.abs(g_equil))}")
             result_dict = {}
             result_dict['contact'] = torch.max(torch.abs(g_contact)).item()
+            result_dict['dynamics'] = torch.max(torch.abs(g_dynamics)).item()
             result_dict['valve_kine'] = torch.max(torch.abs(g_valve)).item()
             result_dict['force'] = torch.max(torch.abs(g_equil)).item()
             return result_dict
