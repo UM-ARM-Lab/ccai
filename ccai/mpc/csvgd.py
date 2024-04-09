@@ -58,7 +58,9 @@ class Constrained_SVGD_MPC:
         self.problem.update(start, **kwargs)
         self.warmed_up = False
         self.iter = 0
-        self.x = self.problem.get_initial_xu(self.N)
+        #elf.warmup_iters = self.online_iters
+
         if initial_x is not None:
             self.x = initial_x
-            self.warmup_iters = self.online_iters
+        else:
+            self.x = self.problem.get_initial_xu(self.N)
