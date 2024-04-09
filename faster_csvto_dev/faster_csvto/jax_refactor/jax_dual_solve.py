@@ -31,7 +31,12 @@ def solve_dual_batched(dJ, dG, dH, iters=100, eps=1e-3, tol=1e-4):
     obj = objective(dJ, dG, dH, _lambda, _mu)
     x = torch.cat((_lambda, _mu), dim=1)
 
+    history = torch.zeros(iters)
+
+    iteration = 0
     for iter in range(iters):
+        iteration = iter
+
         # Do update
         _step = Ab + AtA @ x
         new_x = x - eps * _step
@@ -53,9 +58,10 @@ def solve_dual_batched(dJ, dG, dH, iters=100, eps=1e-3, tol=1e-4):
         # for next time
         obj = new_obj
         x = new_x
-        print(iter)
+
+        history[iter] = obj[0]
     _lambda, _mu = x[:, :_lambda.shape[1]], x[:, _lambda.shape[1]:]
-    return _lambda, _mu
+    return _lambda, _mu, iteration, history
 
 
 class JaxDualSolve:
@@ -106,8 +112,6 @@ class JaxDualSolve:
         Returns:
             The optimal value of the decision variable.
         """
-        objectives = jnp.zeros(self._max_iterations)
-
         # Initialize decision variable with zero vector of appropriate dimension.
         equality_multiplier = jnp.zeros(self._equality_grad.shape[0])
         inequality_multiplier = jnp.zeros(self._inequality_grad.shape[0])
@@ -118,15 +122,21 @@ class JaxDualSolve:
         old_decision_variable = decision_variable
         step = self._step_scale * self.objective_grad(decision_variable)
         decision_variable = jnp.clip(decision_variable - step, self._min_decision_variable, self._max_decision_variable)
-        iteration, decision_variable, _ = jax.lax.while_loop(self.not_within_tolerance_or_at_iteration_limit,
-                                                             self.solver_step, (iteration, decision_variable,
-                                                                                old_decision_variable))
-        return decision_variable, iteration
+
+        # Update history for analysis.
+        history = jnp.zeros((self._max_iterations, decision_variable.shape[0]))
+        history = history.at[0, :].set(decision_variable)
+
+        iteration, decision_variable, _, history = jax.lax.while_loop(self.not_within_tolerance_or_at_iteration_limit,
+                                                                      self.solver_step,
+                                                                      (iteration, decision_variable,
+                                                                       old_decision_variable, history))
+        return decision_variable, iteration, history
 
     def not_within_tolerance_or_at_iteration_limit(self, variables) -> bool:
         """
         """
-        iteration, decision_variable, old_decision_variable = variables
+        iteration, decision_variable, old_decision_variable, history = variables
 
         distance = jnp.abs(self.objective(decision_variable) - self.objective(old_decision_variable))
         return (self._tolerance < distance) & (iteration < self._max_iterations)
@@ -134,7 +144,7 @@ class JaxDualSolve:
     def solver_step(self, variables) -> jnp.array:
         """
         """
-        iteration, decision_variable, old_decision_variable = variables
+        iteration, decision_variable, old_decision_variable, history = variables
 
         # Update via projected gradient descent.
         old_decision_variable = decision_variable
@@ -148,16 +158,19 @@ class JaxDualSolve:
                                                                                   self.backtracking_step,
                                                                                   backtracking_variables)
 
+        # Update history for analysis.
+        history = history.at[iteration, :].set(decision_variable)
+
         # Update iteration and return carry variables.
         iteration += 1
-        return iteration, decision_variable, old_decision_variable
+        return iteration, decision_variable, old_decision_variable, history
 
     def new_worse_than_old(self, backtracking_variables) -> bool:
         """
         """
         back_iteration, step_scale, decision_variable, old_decision_variable = backtracking_variables
 
-        return (self.objective(decision_variable) > self.objective(old_decision_variable)) & (back_iteration < 5)
+        return (self.objective(decision_variable) > self.objective(old_decision_variable)) #& (back_iteration < 100000)
 
     def backtracking_step(self, backtracking_variables):
         """
@@ -187,10 +200,10 @@ if __name__ == "__main__":
     device = 'cuda:0'
     dtype = torch.float32
 
-    # Test the batched version
+    # Test the batched PyTorch implementation (Tom).
     eps = 1e-3
     tol = 1e-6
-    max_iter = 1000
+    max_iter = 100
     xdim = 180
     nineq = 400
     neq = 200
@@ -201,38 +214,55 @@ if __name__ == "__main__":
 
     num_trials = 10
 
+    iteration = 0
+    history = None
     torch.cuda.synchronize()
     start = time.time()
     for _ in range(num_trials):
-        lambda_, mu = solve_dual_batched(dJ, dG, dH, iters=max_iter, eps=eps, tol=tol)
+        lambda_, mu, iteration, history = solve_dual_batched(dJ, dG, dH, iters=max_iter, eps=eps, tol=tol)
     torch.cuda.synchronize()
     end = time.time()
     print('time', (end - start) / num_trials)
-    print('objective', torch.linalg.norm(dJ + dG.transpose(1, 2) @ lambda_ +
-                                         dH.transpose(1, 2) @ mu, dim=1))
-    print(torch.min(mu))
+    print('solving iterations', iteration)
+    print('objective (first item)', torch.linalg.norm(dJ + dG.transpose(1, 2) @ lambda_ +
+                                         dH.transpose(1, 2) @ mu, dim=1)[0])
 
+    history = history[:iteration].cpu().numpy()
+    with open('output/dual_solve_torch_objective_history.npy', 'wb') as f:
+        np.save(f, history)
+
+    # Test the Jax implementation.
     dG_jnp = jnp.array(dG[0].cpu().numpy())
     dH_jnp = jnp.array(dH[0].cpu().numpy())
     dJ_jnp = jnp.array(dJ[0].cpu().numpy())
-
     dGs = [dG_jnp for _ in range(B)]
     dHs = [dH_jnp for _ in range(B)]
     dJs = [dJ_jnp for _ in range(B)]
 
     jax_solver = JaxDualSolve(dG_jnp, dH_jnp, dJ_jnp, max_iter, eps, tol)
-    lambda_mu, iteration = jax_solver.solve()
-
+    lambda_mu, iteration, history = jax_solver.solve()
     start = time.time()
     for _ in range(num_trials):
-        lambda_mu, iteration = jax_solver.solve()
+        lambda_mu, iteration, history = jax_solver.solve()
     end = time.time()
     print('time', (end - start) / num_trials)
     print('solving iterations', iteration)
     print('objective', jax_solver.objective(lambda_mu))
-    print(jnp.min(lambda_mu[neq:]))
-    print(jnp.max(lambda_mu[neq:]))
-    print(jnp.min(lambda_mu))
-    print(jnp.max(lambda_mu))
-    # print(lambda_mu)
-    print(torch.max(dJ))
+
+    history = history[:iteration, :]
+    batched_objective = jax.vmap(jax_solver.objective)
+    objective_history = batched_objective(history)
+
+    history_np = np.array(history)
+    objective_history_np = np.array(objective_history)
+    with open('output/dual_solve_jax_objective_history.npy', 'wb') as f:
+        np.save(f, objective_history_np)
+
+    # Determining which constraints were active.
+    mu = mu[0, :].cpu().numpy()
+    number_active = np.where(mu > 1e-8, 1, 0).sum()
+    print('number active torch', number_active)
+
+    mu_jax = np.array(lambda_mu[neq:])
+    number_active = np.where(mu_jax > 1e-8, 1, 0).sum()
+    print('number active jax', number_active)
