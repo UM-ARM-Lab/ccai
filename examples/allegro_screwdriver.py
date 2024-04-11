@@ -117,9 +117,6 @@ class AllegroScrewdriver(AllegroValveTurning):
                                                  fingers=fingers, friction_coefficient=friction_coefficient, obj_dof=obj_dof, 
                                                  obj_ori_rep=obj_ori_rep, obj_joint_dim=1, optimize_force=optimize_force, device=device)
         self.friction_coefficient = friction_coefficient
-        # self.grad_euler_to_angular_velocity = jacrev(euler_to_angular_velocity, argnums=(0,1))
-        # self.grad_kinematics_constr = jacrev(self._kinematics_constr, argnums=(0, 1, 2, 3, 4, 5, 6))
-        # self.grad_axis_angle_to_euler = jacrev(axis_angle_to_euler)
 
     def _cost(self, xu, start, goal):
         # TODO: check if the addtional term of the smoothness cost and running goal cost is necessary
@@ -139,7 +136,7 @@ class AllegroScrewdriver(AllegroValveTurning):
 
         goal_cost = torch.sum((500 * (state[-1, -self.obj_dof:] - goal) ** 2)).reshape(-1)
         # add a running cost
-        goal_cost += torch.sum((5 * (state[:, -self.obj_dof:] - goal.unsqueeze(0)) ** 2))
+        goal_cost += torch.sum((2 * (state[:, -self.obj_dof:] - goal.unsqueeze(0)) ** 2))
 
         if self.optimize_force:
             force = xu[:, self.dx + 4 * self.num_fingers: self.dx + (4 + 3) * self.num_fingers]
@@ -186,7 +183,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         )
 
         pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
-        pregrasp_planner.warmup_iters = 40
+        pregrasp_planner.warmup_iters = 50
     else:
         raise ValueError('Invalid controller')
     
@@ -301,11 +298,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         x = best_traj[0, :turn_problem.dx+turn_problem.du]
         x = x.reshape(1, turn_problem.dx+turn_problem.du)
         turn_problem._preprocess(best_traj.unsqueeze(0))
-        equality_constr = turn_problem._con_eq(best_traj.unsqueeze(0), compute_grads=False, compute_hess=False, verbose=True)
-        inequality_constr = turn_problem._con_ineq(best_traj.unsqueeze(0), compute_grads=False, compute_hess=False, verbose=True)
+        equality_constr_dict = turn_problem._con_eq(best_traj.unsqueeze(0), compute_grads=False, compute_hess=False, verbose=True)
+        inequality_constr_dict = turn_problem._con_ineq(best_traj.unsqueeze(0), compute_grads=False, compute_hess=False, verbose=True)
         print("--------------------------------------")
-        # print(f'Equality constraint violation: {torch.norm(equality_constr)}')
-        # print(f'Inequality constraint violation: {torch.norm(inequality_constr)}')
 
         action = x[:, turn_problem.dx:turn_problem.dx+turn_problem.du].to(device=env.device)
         if params['optimize_force']:
@@ -317,8 +312,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             action = torch.cat((start.unsqueeze(0)[:, :4], action), dim=1) # add the index finger back
         else:
             action = action + start.unsqueeze(0)[:, :4 * num_fingers] # NOTE: this is required since we define action as delta action
-        # action = best_traj[0, :8]
-        # action[:, 4:] = 0
         if params['mode'] == 'hardware':
             sim_viz_env.set_pose(env.get_state()['all_state'].to(device=env.device))
             sim_viz_env.step(action)
@@ -326,11 +319,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             ros_copy_node.apply_action(partial_to_full_state(action[0], params['fingers']))
         # action = x[:, :4 * num_fingers].to(device=env.device)
         # NOTE: DEBUG ONLY
-        action = best_traj[1, :4 * turn_problem.num_fingers].unsqueeze(0)
-        if params['exclude_index'] == True:
-            action = torch.cat((start.unsqueeze(0)[:, :4], action), dim=1)
-            action[:, 2] += 0.003
-            action[:, 3] += 0.008
+        # action = best_traj[1, :4 * turn_problem.num_fingers].unsqueeze(0)
+        # if params['exclude_index'] == True:
+        #     action = torch.cat((start.unsqueeze(0)[:, :4], action), dim=1)
+        #     action[:, 2] += 0.003
+        #     action[:, 3] += 0.008
         env.step(action)
         action_list.append(action)
         # if params['hardware']:
@@ -343,10 +336,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         # distance2surface = torch.sqrt((best_traj_ee[:, 2] - object_location[2].unsqueeze(0)) ** 2 + (best_traj_ee[:, 0] - object_location[0].unsqueeze(0))**2)
         distance2goal = (params['valve_goal'].cpu() - env.get_state()['q'][:, -obj_dof-1: -1].cpu()).detach().cpu()
         print(distance2goal)
-        info_list.append({
-                        #   'distance': distance, 
-                          'distance2goal': distance2goal, 
-                        })
+        info = {**equality_constr_dict, **inequality_constr_dict, **{'distance2goal': distance2goal}}
+        info_list.append(info)
 
         gym.clear_lines(viewer)
         state = env.get_state()
@@ -417,8 +408,8 @@ if __name__ == "__main__":
                                     use_cartesian_controller=False,
                                     viewer=True,
                                     steps_per_action=60,
-                                    # friction_coefficient=1.0,
-                                    friction_coefficient=10.0,  # DEBUG ONLY, set the friction very high
+                                    friction_coefficient=1.0,
+                                    # friction_coefficient=10.0,  # DEBUG ONLY, set the friction very high
                                     device=config['sim_device'],
                                     video_save_path=img_save_dir,
                                     joint_stiffness=config['kp'],
