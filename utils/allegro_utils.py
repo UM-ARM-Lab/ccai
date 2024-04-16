@@ -108,8 +108,8 @@ def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headl
         for mesh in meshes:
             vis.add_geometry(mesh)
         ctr = vis.get_view_control()
-        parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-04-03-13-14-26.json")
-        #parameters = o3d.io.read_pinhole_camera_parameters('ScreenCamera_2024-03-07-14-28-26.json')
+        # parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-04-03-13-14-26.json")
+        parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-04-05-13-17-03.json")
         ctr.convert_from_pinhole_camera_parameters(parameters)
         vis.poll_events()
         vis.update_renderer()

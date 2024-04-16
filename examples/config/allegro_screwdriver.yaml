@@ -2,7 +2,7 @@
 T: 12
 receding_horizon: False
 num_steps: 11
-num_trials: 5
+num_trials: 1
 visualize: True
 experiment_name: 'allegro_screwdriver'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
@@ -10,10 +10,10 @@ mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 fingers: ['index', 'middle', 'thumb']
 object_type: 'screwdriver'
 sim_device: 'cuda:0'
-friction_coefficient: 10.0
+friction_coefficient: 1.0
 kp: 3.0
 visualize_plan: True
-optimize_force: False
+optimize_force: True
 exclude_index: False
 controllers:
   csvgd:
@@ -24,75 +24,11 @@ controllers:
     step_size: 0.1
     momentum: 0.
     device: 'cuda:0'
-    online_iters: 3
-    warmup_iters: 10
+    online_iters: 100
+    warmup_iters: 200
     resample_steps: 1
     resample_sigma: 0.01
     resample_temperature: 0.1
     penalty: 1000000
     collision_checking: False
     joint_friction: 0.0
-#  ipopt:
-#    device: 'cpu'
-#    online_iters: 10
-#    warmup_iters: 100
-#  mppi_1000:
-#    N: 1000
-#    lambda: 1.0e-4
-#    sigma: 0.2
-#    device: 'cuda:0'
-#    penalty: 1000
-#    online_iters: 25
-#    warmup_iters: 250
-##  svgd_1000:
-##    M: 8
-##    N: 128
-##    step_size: 0.05
-##    sigma: 0.25
-##    lambda: 1.0e-4
-##    use_grad: False
-##    penalty: 1000
-##    online_iters: 25
-##    warmup_iters: 250
-##    device: 'cuda:0'
-#  mppi_100:
-#    N: 1000
-#    lambda: 1.0e-4
-#    sigma: 0.2
-#    device: 'cuda:0'
-#    penalty: 100
-#    online_iters: 25
-#    warmup_iters: 250
-#  svgd_100:
-#    M: 8
-#    N: 128
-#    step_size: 0.1
-#    sigma: 0.25
-#    lambda: 1.0e-4
-#    use_grad: False
-#    penalty: 100
-#    online_iters: 25
-#    warmup_iters: 250
-#    device: 'cuda:0'
-#  svgd_grad_100:
-#    M: 8
-#    N: 128
-#    step_size: 0.025
-#    sigma: 0.25
-#    lambda: 100
-#    use_grad: True
-#    penalty: 100
-#    online_iters: 10
-#    warmup_iters: 100
-#    device: 'cuda:0'
-#  svgd_grad_1000:
-#    M: 8
-#    N: 128
-#    step_size: 0.025
-#    sigma: 0.25
-#    lambda: 100
-#    use_grad: True
-#    penalty: 1000
-#    online_iters: 10
-#    warmup_iters: 100
-#    device: 'cuda:0'

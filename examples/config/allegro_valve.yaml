@@ -7,12 +7,12 @@ visualize: True
 experiment_name: 'allegro_valve'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 fingers: ['index', 'thumb']
-# fingers: ['index', 'middle', 'thumb']
+# fingers: ['index', 'middle', 'thumb', 'ring']
 object_type: 'cylinder_valve'
 sim_device: 'cuda:0'
 friction_coefficient: 0.9
 kp: 3.0
-visualize_plan: False
+visualize_plan: True
 random_robot_pose: False
 optimize_force: True
 controllers:
