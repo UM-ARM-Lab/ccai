@@ -7,7 +7,7 @@ visualize: True
 experiment_name: 'allegro_valve'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 fingers: ['index', 'thumb']
-# fingers: ['index', 'middle', 'thumb']
+# fingers: ['index', 'middle', 'thumb', 'ring']
 object_type: 'cylinder_valve'
 sim_device: 'cuda:0'
 friction_coefficient: 0.9

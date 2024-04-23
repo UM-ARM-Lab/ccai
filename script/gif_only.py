@@ -5,7 +5,7 @@ import cv2
 import matplotlib.pyplot as plt
 import torch
 
-directory = '/home/fanyang/github/ccai/data/experiments/allegro_test/csvgd/trial_1'
+directory = '/home/fanyang/github/ccai/data/experiments/allegro_screwdriver_6d/csvgd/trial_1'
 
 if __name__ == '__main__':
 
@@ -18,4 +18,4 @@ if __name__ == '__main__':
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img_list.append(img)
     # imageio.mimsave(directory + '/result.gif', img_list, duration=20)
-    imageio.mimsave(directory + '/result.gif', img_list, format='GIF', duration=500)
+    imageio.mimsave(directory + '/result.gif', img_list, format='GIF', duration=500, loop=0)
