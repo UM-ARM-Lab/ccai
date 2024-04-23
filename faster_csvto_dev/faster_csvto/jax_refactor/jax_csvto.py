@@ -4,8 +4,7 @@ from typing import Callable, Optional, Tuple
 import jax
 import jax.numpy as jnp
 
-import numpy as np
-import torch
+from jax_dual_solve import JaxDualSolve
 
 # Using this file to sketch out the minimal interface for getting the quad rotor problem to work in Jax. I'm not
 # worrying about making this an extensible framework for other optimizers right now. I'm also trying to make the
@@ -207,21 +206,31 @@ class JaxCSVTOpt:
         """
         xuz, initial_state, constraints = xuz_initial_state
 
-        # # TODO: Remove this test.
-        # thing, initial_state = xuz_initial_state
-        # xuz_np: np.array = np.array(thing)
-        # xuz_torch: torch.tensor = torch.from_numpy(xuz_np)
-        # xuz_torch *= 0.5
-        # xuz_np2 = xuz_torch.numpy()
-        # xuz = jnp.array(xuz_np2)
-
         # Set the annealing weight gamma if annealing is on.
         gamma: Optional[jnp.float32] = iteration / self.K if self.anneal else None
 
-        # Evaluate the gradient of the cost function at the current state (without slack variables).
-        c_grad = jax.vmap(jax.jacrev(self.c))(xuz[:, :self._trajectory_dim()])
-        if self.g is not None:
-            c_grad = jnp.concatenate((c_grad, jnp.zeros((self.N, self.dg))), axis=1)
+        # Evaluate the gradient of the cost function at the current state.
+        c_grad = jax.vmap(jax.jacrev(self.c))(xuz)
+
+        # Evaluate the gradient of the equality constraint at the current state.
+        equality_grad = jax.vmap(jax.jacrev(self._equality_constraint))(xuz)
+
+        # Evaluate the gradient of the inequality constraint at the current state.
+        inequality_grad = jax.vmap(jax.jacrev(self.g))(xuz)
+
+        # Solve the dual problem to determine which inequality constraints are active.
+        initial_guess = jnp.zeros((self.dh + (self.dx + self.du) * self.T + self.dg,))
+        solver = JaxDualSolve(max_iterations=100, step_scale=1e-3, tolerance=1e-6)
+        lambda_mu, _, _ = solver.solve(initial_guess, c_grad, equality_grad, inequality_grad)
+        active_mask =
+
+        # Get the combined constraint gradient from previously computed gradients, but zero out inactive dimensions.
+
+        # Evaluate the combined constraint and its hessian at the current state.
+
+        # Zero out parts of the combined constraint and its hessian that correspond to inactive inequality constraints.
+
+        # Evaluate the kernel function and its gradient at the current state.
 
         # Evaluate the combined constraint function and its gradient at the current augmented state.
         constraint = jax.vmap(self._combined_constraint)(xuz, jnp.tile(initial_state, (self.N, 1)))
@@ -270,9 +279,6 @@ class JaxCSVTOpt:
 
         # Combine the steps according to equation (26) and use them to update the current augmented state.
         step = self.step_scale * (self.alpha_J * tangent_step + self.alpha_C * constraint_step)
-        # max_norm = 10
-        # step_norm = jnp.linalg.norm(step, axis=1)
-        # step = jnp.where(step > max_norm, max_norm * step / jnp.expand_dims(step_norm, axis=-1), step)
         xuz -= step
 
         # Clamp the state in bounds and return.
@@ -399,6 +405,15 @@ class JaxCSVTOpt:
                                                    self._dynamics_constraint(xuz[:self._trajectory_dim()]),
                                                    self._start_constraint(xuz[:self._trajectory_dim()], initial_state)),
                                                   axis=0)
+        return combined_constraint
+
+    def _equality_constraint(self, xuz: jnp.array, initial_state: jnp.array) -> jnp.array:
+        """
+        """
+        combined_constraint = jnp.concatenate((self.h(xuz),
+                                              self._dynamics_constraint(xuz),
+                                              self._start_constraint(xuz, initial_state)),
+                                              axis=0)
         return combined_constraint
 
     def _slack_constraint(self, xuz: jnp.array) -> jnp.array:

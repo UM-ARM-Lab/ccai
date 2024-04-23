@@ -16,7 +16,6 @@ def solve_dual_batched(dJ, dG, dH, iters=100, eps=1e-3, tol=1e-4):
         For batched inputs
 
         Uses projected gradient descent with line search
-
     """
     B = dJ.shape[0]
     dC = torch.cat((dG, dH), dim=1)
@@ -68,93 +67,96 @@ class JaxDualSolve:
     """
     """
 
-    def __init__(self, cost_grad: jnp.array, equality_grad: jnp.array, inequality_grad: jnp.array,
-                 max_iterations: int = 100, step_scale: jnp.float32 = 1e-3, tolerance: jnp.float32 = 1e-4):
+    def __init__(self, max_iterations: int = 100, step_scale: jnp.float32 = 1e-3, tolerance: jnp.float32 = 1e-4):
         """
         """
-        self._cost_grad = cost_grad
-        self._equality_grad = equality_grad
-        self._inequality_grad = inequality_grad
         self._max_iterations = max_iterations
         self._step_scale = step_scale
         self._tolerance = tolerance
 
-        min_equality_multiplier = -jnp.inf * jnp.ones(self._equality_grad.shape[0])
-        min_inequality_multiplier = jnp.zeros(self._inequality_grad.shape[0])
-        max_equality_multiplier = jnp.inf * jnp.ones(self._equality_grad.shape[0])
-        max_inequality_multiplier = jnp.inf * jnp.ones(self._inequality_grad.shape[0])
-        self._min_decision_variable = jnp.concatenate((min_equality_multiplier, min_inequality_multiplier))
-        self._max_decision_variable = jnp.concatenate((max_equality_multiplier, max_inequality_multiplier))
-
-        # dC = jnp.concatenate((equality_grad, inequality_grad))
-
     def __hash__(self):
         """
         """
-        # return hash((self._cost_grad, self._equality_grad, self._inequality_grad, self._max_iterations,
-        #              self._step_scale, self._tolerance))
         return hash((self._max_iterations, self._step_scale, self._tolerance))
 
     def __eq__(self, other):
         """
         """
-        return (self._cost_grad == other._cost_grad and
-                self._equality_grad == other._equality_grad and
-                self._inequality_grad == other._inequality_grad and
-                self._max_iterations == other._max_iterations and
+        return (self._max_iterations == other._max_iterations and
                 self._step_scale == other._step_scale and
                 self._tolerance == other._tolerance)
 
     @partial(jax.jit, static_argnums=0)
-    def solve(self) -> jnp.array:
+    def solve(self, initial_guess: jnp.array, cost_grad: jnp.array, equality_grad: jnp.array,
+              inequality_grad: jnp.array) -> jnp.array:
         """
 
         Returns:
             The optimal value of the decision variable.
         """
-        # Initialize decision variable with zero vector of appropriate dimension.
-        equality_multiplier = jnp.zeros(self._equality_grad.shape[0])
-        inequality_multiplier = jnp.zeros(self._inequality_grad.shape[0])
-        decision_variable = jnp.concatenate((equality_multiplier, inequality_multiplier))
+        # Initialize decision variable.
+        decision_variable = initial_guess
 
-        # Set carry variables
+        # Get variables for clamping the decision variable.
+        min_equality_multiplier = -jnp.inf * jnp.ones(equality_grad.shape[0])
+        min_inequality_multiplier = jnp.zeros(inequality_grad.shape[0])
+        max_equality_multiplier = jnp.inf * jnp.ones(equality_grad.shape[0])
+        max_inequality_multiplier = jnp.inf * jnp.ones(inequality_grad.shape[0])
+        min_decision_variable = jnp.concatenate((min_equality_multiplier, min_inequality_multiplier))
+        max_decision_variable = jnp.concatenate((max_equality_multiplier, max_inequality_multiplier))
+
+        # Set carry variables.
         iteration = 0
         old_decision_variable = decision_variable
-        step = self._step_scale * self.objective_grad(decision_variable)
-        decision_variable = jnp.clip(decision_variable - step, self._min_decision_variable, self._max_decision_variable)
+        step = self._step_scale * self.objective_grad(decision_variable, cost_grad, equality_grad, inequality_grad)
+        decision_variable = jnp.clip(decision_variable - step, min_decision_variable, max_decision_variable)
 
         # Update history for analysis.
         history = jnp.zeros((self._max_iterations, decision_variable.shape[0]))
         history = history.at[0, :].set(decision_variable)
 
-        iteration, decision_variable, _, history = jax.lax.while_loop(self.not_within_tolerance_or_at_iteration_limit,
-                                                                      self.solver_step,
-                                                                      (iteration, decision_variable,
-                                                                       old_decision_variable, history))
+        iteration, decision_variable, _, history, _, _, _ = jax.lax.while_loop(self.not_within_tolerance_or_at_iteration_limit,
+                                                                               self.solver_step,
+                                                                               (iteration,
+                                                                                decision_variable,
+                                                                                old_decision_variable,
+                                                                                history,
+                                                                                cost_grad,
+                                                                                equality_grad,
+                                                                                inequality_grad))
         return decision_variable, iteration, history
 
     def not_within_tolerance_or_at_iteration_limit(self, variables) -> bool:
         """
         """
-        iteration, decision_variable, old_decision_variable, history = variables
+        iteration, decision_variable, old_decision_variable, history, cost_grad, equality_grad, inequality_grad = variables
 
-        distance = jnp.abs(self.objective(decision_variable) - self.objective(old_decision_variable))
+        distance = jnp.abs(self.objective(decision_variable, cost_grad, equality_grad, inequality_grad) -
+                           self.objective(old_decision_variable, cost_grad, equality_grad, inequality_grad))
         return (self._tolerance < distance) & (iteration < self._max_iterations)
 
     def solver_step(self, variables) -> jnp.array:
         """
         """
-        iteration, decision_variable, old_decision_variable, history = variables
+        iteration, decision_variable, old_decision_variable, history, cost_grad, equality_grad, inequality_grad = variables
+
+        # Get variables for clamping the decision variable.
+        min_equality_multiplier = -jnp.inf * jnp.ones(equality_grad.shape[0])
+        min_inequality_multiplier = jnp.zeros(inequality_grad.shape[0])
+        max_equality_multiplier = jnp.inf * jnp.ones(equality_grad.shape[0])
+        max_inequality_multiplier = jnp.inf * jnp.ones(inequality_grad.shape[0])
+        min_decision_variable = jnp.concatenate((min_equality_multiplier, min_inequality_multiplier))
+        max_decision_variable = jnp.concatenate((max_equality_multiplier, max_inequality_multiplier))
 
         # Update via projected gradient descent.
         old_decision_variable = decision_variable
-        step = self._step_scale * self.objective_grad(decision_variable)
-        decision_variable = jnp.clip(decision_variable - step, self._min_decision_variable, self._max_decision_variable)
+        step = self._step_scale * self.objective_grad(decision_variable, cost_grad, equality_grad, inequality_grad)
+        decision_variable = jnp.clip(decision_variable - step, min_decision_variable, max_decision_variable)
 
         # Perform backtracking to avoid overstepping.
-        back_iteration = 0
-        backtracking_variables = (back_iteration, self._step_scale, decision_variable, old_decision_variable)
-        back_iteration, step_scale, decision_variable, old_decision_variable = jax.lax.while_loop(self.new_worse_than_old,
+        backtracking_variables = (self._step_scale, decision_variable, old_decision_variable, cost_grad, equality_grad,
+                                  inequality_grad)
+        step_scale, decision_variable, old_decision_variable, _, _, _ = jax.lax.while_loop(self.new_worse_than_old,
                                                                                   self.backtracking_step,
                                                                                   backtracking_variables)
 
@@ -163,36 +165,50 @@ class JaxDualSolve:
 
         # Update iteration and return carry variables.
         iteration += 1
-        return iteration, decision_variable, old_decision_variable, history
+        return iteration, decision_variable, old_decision_variable, history, cost_grad, equality_grad, inequality_grad
 
     def new_worse_than_old(self, backtracking_variables) -> bool:
         """
         """
-        back_iteration, step_scale, decision_variable, old_decision_variable = backtracking_variables
+        step_scale, decision_variable, old_decision_variable, cost_grad, equality_grad, inequality_grad = backtracking_variables
 
-        return (self.objective(decision_variable) > self.objective(old_decision_variable)) #& (back_iteration < 100000)
+        return (self.objective(decision_variable, cost_grad, equality_grad, inequality_grad) >
+                self.objective(old_decision_variable, cost_grad, equality_grad, inequality_grad))
 
     def backtracking_step(self, backtracking_variables):
         """
         """
-        back_iteration, step_scale, decision_variable, old_decision_variable = backtracking_variables
-        back_iteration += 1
+        step_scale, decision_variable, old_decision_variable, cost_grad, equality_grad, inequality_grad = backtracking_variables
 
-        decision_variable = old_decision_variable - step_scale * 0.1 * self.objective_grad(old_decision_variable)
-        decision_variable = jnp.clip(decision_variable, self._min_decision_variable, self._max_decision_variable)
-        return back_iteration, step_scale, decision_variable, old_decision_variable
+        # Get variables for clamping the decision variable.
+        min_equality_multiplier = -jnp.inf * jnp.ones(equality_grad.shape[0])
+        min_inequality_multiplier = jnp.zeros(inequality_grad.shape[0])
+        max_equality_multiplier = jnp.inf * jnp.ones(equality_grad.shape[0])
+        max_inequality_multiplier = jnp.inf * jnp.ones(inequality_grad.shape[0])
+        min_decision_variable = jnp.concatenate((min_equality_multiplier, min_inequality_multiplier))
+        max_decision_variable = jnp.concatenate((max_equality_multiplier, max_inequality_multiplier))
 
-    def objective(self, decision_variable: jnp.array) -> jnp.float32:
-        """
-        """
-        return jnp.linalg.norm(self._cost_grad +
-                               self._equality_grad.T @ decision_variable[:self._equality_grad.shape[0]] +
-                               self._inequality_grad.T @ decision_variable[self._equality_grad.shape[0]:])
+        decision_variable = old_decision_variable - step_scale * 0.1 * self.objective_grad(old_decision_variable,
+                                                                                           cost_grad,
+                                                                                           equality_grad,
+                                                                                           inequality_grad)
+        decision_variable = jnp.clip(decision_variable, min_decision_variable, max_decision_variable)
+        return step_scale, decision_variable, old_decision_variable, cost_grad, equality_grad, inequality_grad
 
-    def objective_grad(self, decision_variable: jnp.array) -> jnp.array:
+    @staticmethod
+    def objective(decision_variable: jnp.array, cost_grad: jnp.array, equality_grad: jnp.array,
+                  inequality_grad: jnp.array) -> jnp.float32:
         """
         """
-        gradient = jax.grad(self.objective)(decision_variable)
+        return jnp.linalg.norm(cost_grad +
+                               equality_grad.T @ decision_variable[:equality_grad.shape[0]] +
+                               inequality_grad.T @ decision_variable[equality_grad.shape[0]:])
+
+    def objective_grad(self, decision_variable: jnp.array, cost_grad: jnp.array, equality_grad: jnp.array,
+                       inequality_grad: jnp.array) -> jnp.array:
+        """
+        """
+        gradient = jax.grad(self.objective)(decision_variable, cost_grad, equality_grad, inequality_grad)
         return gradient
 
 
@@ -239,19 +255,22 @@ if __name__ == "__main__":
     dHs = [dH_jnp for _ in range(B)]
     dJs = [dJ_jnp for _ in range(B)]
 
-    jax_solver = JaxDualSolve(dG_jnp, dH_jnp, dJ_jnp, max_iter, eps, tol)
-    lambda_mu, iteration, history = jax_solver.solve()
+    # Set the initial guess.
+    initial_guess = jnp.zeros((nineq + neq,))
+
+    jax_solver = JaxDualSolve(max_iter, eps, tol)
+    lambda_mu, iteration, history = jax_solver.solve(initial_guess, dJ_jnp, dG_jnp, dH_jnp)
     start = time.time()
     for _ in range(num_trials):
-        lambda_mu, iteration, history = jax_solver.solve()
+        lambda_mu, iteration, history = jax_solver.solve(initial_guess, dJ_jnp, dG_jnp, dH_jnp)
     end = time.time()
     print('time', (end - start) / num_trials)
     print('solving iterations', iteration)
-    print('objective', jax_solver.objective(lambda_mu))
+    print('objective', jax_solver.objective(lambda_mu, dJ_jnp, dG_jnp, dH_jnp))
 
     history = history[:iteration, :]
-    batched_objective = jax.vmap(jax_solver.objective)
-    objective_history = batched_objective(history)
+    batched_objective = jax.vmap(jax_solver.objective, (0, None, None, None), 0)
+    objective_history = batched_objective(history, dJ_jnp, dG_jnp, dH_jnp)
 
     history_np = np.array(history)
     objective_history_np = np.array(objective_history)
