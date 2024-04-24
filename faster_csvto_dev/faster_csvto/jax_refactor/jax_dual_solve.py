@@ -124,7 +124,9 @@ class JaxDualSolve:
                                                                                 cost_grad,
                                                                                 equality_grad,
                                                                                 inequality_grad))
-        return decision_variable, iteration, history
+        equality_multiplier = decision_variable[:equality_grad.shape[0]]
+        inequality_multiplier = decision_variable[equality_grad.shape[0]:]
+        return equality_multiplier, inequality_multiplier, iteration, history
 
     def not_within_tolerance_or_at_iteration_limit(self, variables) -> bool:
         """
@@ -259,11 +261,14 @@ if __name__ == "__main__":
     initial_guess = jnp.zeros((nineq + neq,))
 
     jax_solver = JaxDualSolve(max_iter, eps, tol)
-    lambda_mu, iteration, history = jax_solver.solve(initial_guess, dJ_jnp, dG_jnp, dH_jnp)
+    equality_multiplier, inequality_multiplier, iteration, history = jax_solver.solve(initial_guess, dJ_jnp, dG_jnp, dH_jnp)
     start = time.time()
     for _ in range(num_trials):
-        lambda_mu, iteration, history = jax_solver.solve(initial_guess, dJ_jnp, dG_jnp, dH_jnp)
+        equality_multiplier, inequality_multiplier, iteration, history = jax_solver.solve(initial_guess, dJ_jnp, dG_jnp, dH_jnp)
     end = time.time()
+
+    lambda_mu = jnp.concatenate((equality_multiplier, inequality_multiplier))
+
     print('time', (end - start) / num_trials)
     print('solving iterations', iteration)
     print('objective', jax_solver.objective(lambda_mu, dJ_jnp, dG_jnp, dH_jnp))

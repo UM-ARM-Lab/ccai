@@ -221,10 +221,15 @@ class JaxCSVTOpt:
         # Solve the dual problem to determine which inequality constraints are active.
         initial_guess = jnp.zeros((self.dh + (self.dx + self.du) * self.T + self.dg,))
         solver = JaxDualSolve(max_iterations=100, step_scale=1e-3, tolerance=1e-6)
-        lambda_mu, _, _ = solver.solve(initial_guess, c_grad, equality_grad, inequality_grad)
-        active_mask =
+        _, inequality_multiplier, _, _ = jax.vmap(solver.solve)(initial_guess,
+                                                                c_grad.transpose(0, 2, 1),
+                                                                equality_grad,
+                                                                inequality_grad)
+        active_mask = jnp.where(inequality_multiplier > 1e-8, 1, 0)
+        active_mask = active_mask
 
         # Get the combined constraint gradient from previously computed gradients, but zero out inactive dimensions.
+
 
         # Evaluate the combined constraint and its hessian at the current state.
 
