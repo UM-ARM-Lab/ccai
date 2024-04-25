@@ -745,7 +745,8 @@ class AllegroValveTurning(AllegroContactProblem):
         the actual dynamics model is not used
         """
 
-        u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
+        # u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
+        u = 0.1 * torch.randn(N, self.T, self.du, device=self.device)
 
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
         for t in range(self.T):

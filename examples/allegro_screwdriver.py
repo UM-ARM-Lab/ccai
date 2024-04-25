@@ -98,6 +98,7 @@ class AllegroScrewdriver(AllegroValveTurning):
             action_cost = 0
         else:
             action_cost = torch.sum((state[1:, :-self.obj_dof] - next_q) ** 2)
+        # action_cost = torch.sum((state[1:, :-self.obj_dof] - next_q) ** 2)
 
         smoothness_cost = 10 * torch.sum((state[1:] - state[:-1]) ** 2)
         smoothness_cost += 50 * torch.sum((state[1:, -self.obj_dof:] - state[:-1, -self.obj_dof:]) ** 2)
@@ -111,8 +112,8 @@ class AllegroScrewdriver(AllegroValveTurning):
             force = xu[:, self.dx + 4 * self.num_fingers: self.dx + (4 + 3) * self.num_fingers]
             force = force.reshape(force.shape[0], self.num_fingers, 3)
             force_norm = torch.norm(force, dim=-1)
-            force_norm = force_norm - 5.0 # desired maginitute
-            force_cost = 200 * torch.sum(force_norm ** 2)
+            force_norm = force_norm - 5 # desired maginitute
+            force_cost = 1 * torch.sum(force_norm ** 2)
             action_cost += force_cost
         return smoothness_cost + action_cost + goal_cost + upright_cost    
     
@@ -387,6 +388,7 @@ if __name__ == "__main__":
     from tqdm import tqdm
 
     if config['mode'] == 'hardware':
+        # pass
         env = RosAllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
                                  use_cartesian_controller=False,
                                  viewer=True,
