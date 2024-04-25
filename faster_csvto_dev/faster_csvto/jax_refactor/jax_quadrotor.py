@@ -15,10 +15,10 @@ from jax_rbf_kernels import structured_rbf_kernel
 # config.update("jax_enable_x64", True)
 # config.update("jax_debug_nans", True)
 
-# import os
-# os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-# os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = ".50"
-# os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
+import os
+os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = ".50"
+os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 
 
 class QuadrotorCost:
@@ -348,8 +348,8 @@ def main() -> None:
     k = structured_rbf_kernel
     N = 8
     T = 11
-    K_warmup = 100
-    K_online = 10
+    K_warmup = 1
+    K_online = 1
     anneal = True
     alpha_J = 1
     alpha_C = 50
@@ -386,6 +386,7 @@ def main() -> None:
     initial_guess = jnp.array(np.random.random([N, (dx + du) * T]), dtype=jnp.float32)
 
     # Compile the solve() routines ahead of time.
+    print('Starting initial compile')
     compile_start = time.time()
     _, _, _ = quadrotor_opt_warmup.solve(initial_state, initial_guess)
     compile_end = time.time()
@@ -399,7 +400,7 @@ def main() -> None:
     solve_start = time.time()
     _, _, _ = quadrotor_opt_warmup.solve(initial_state, initial_guess)
     solve_end = time.time()
-    print(f'Solve {K_warmup} iterations in {solve_end - solve_start:02f} seconds')
+    print(f'Solved {K_warmup} iterations in {solve_end - solve_start:02f} seconds')
 
     solve_start = time.time()
     _, _, _ = quadrotor_opt_online.solve(initial_state, initial_guess)

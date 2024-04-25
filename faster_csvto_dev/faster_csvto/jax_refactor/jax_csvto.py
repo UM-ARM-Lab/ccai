@@ -210,64 +210,73 @@ class JaxCSVTOpt:
         gamma: Optional[jnp.float32] = iteration / self.K if self.anneal else None
 
         # Evaluate the gradient of the cost function at the current state.
-        c_grad = jax.vmap(jax.jacrev(self.c))(xuz)
+        c_grad = jax.vmap(jax.jacrev(self.c))(xuz[:, :self._trajectory_dim()])
 
         # Evaluate the gradient of the equality constraint at the current state.
-        equality_grad = jax.vmap(jax.jacrev(self._equality_constraint))(xuz)
+        equality_grad = jax.vmap(jax.jacrev(self._equality_constraint), (0, None), 0)(xuz[:, :self._trajectory_dim()], initial_state)
 
         # Evaluate the gradient of the inequality constraint at the current state.
-        inequality_grad = jax.vmap(jax.jacrev(self.g))(xuz)
+        inequality_grad = jax.vmap(jax.jacrev(self.g))(xuz[:, :self._trajectory_dim()])
 
         # Solve the dual problem to determine which inequality constraints are active.
-        initial_guess = jnp.zeros((self.dh + (self.dx + self.du) * self.T + self.dg,))
+        initial_guess = jnp.zeros((self.N, self.dh + self.dx * self.T + self.dg,))
         solver = JaxDualSolve(max_iterations=100, step_scale=1e-3, tolerance=1e-6)
         _, inequality_multiplier, _, _ = jax.vmap(solver.solve)(initial_guess,
-                                                                c_grad.transpose(0, 2, 1),
+                                                                jnp.expand_dims(c_grad, axis=-1),
                                                                 equality_grad,
                                                                 inequality_grad)
         active_mask = jnp.where(inequality_multiplier > 1e-8, 1, 0)
-        active_mask = active_mask
 
         # Get the combined constraint gradient from previously computed gradients, but zero out inactive dimensions.
+        active_mask = jnp.concatenate((jnp.ones((self.N, self.dh + self.dx * self.T)), active_mask), axis=1)
+        constraint_grad = jnp.concatenate((equality_grad, inequality_grad), axis=1)
+        constraint_grad = constraint_grad * jnp.expand_dims(active_mask, axis=-1)
 
-
-        # Evaluate the combined constraint and its hessian at the current state.
-
-        # Zero out parts of the combined constraint and its hessian that correspond to inactive inequality constraints.
-
-        # Evaluate the kernel function and its gradient at the current state.
-
-        # Evaluate the combined constraint function and its gradient at the current augmented state.
+        # Evaluate the combined constraint at the current state.
         constraint = jax.vmap(self._combined_constraint)(xuz, jnp.tile(initial_state, (self.N, 1)))
-        constraint_grad = jax.vmap(jax.jacrev(self._combined_constraint))(xuz, jnp.tile(initial_state, (self.N, 1)))
 
-        # Compute the constraint hessian via its components, then compile them all together.
+        # Evaluate the combined constraint hessian and zero out parts that correspond to inactive inequality constraints.
         h_hess = jax.vmap(jax.jacfwd(jax.jacrev(self.h)))(xuz[:, :self._trajectory_dim()])
-        if self.g is not None:
-            slack_constraint_hess = jax.vmap(jax.jacfwd(jax.jacrev(self._slack_constraint)))(xuz)
-        else:
-            slack_constraint_hess = jnp.zeros((self.N, self.dg, self._trajectory_dim(), self._trajectory_dim()))
-        dynamics_constraint_hess = jax.vmap(jax.jacfwd(jax.jacrev(self._dynamics_constraint)))(xuz[:, :self._trajectory_dim()])
-        start_constraint_hess = jax.vmap(jax.jacfwd(jax.jacrev(self._start_constraint)))(xuz[:, :self._trajectory_dim()], jnp.tile(initial_state,
-                                                                                                       (self.N, 1)))
-        if self.g is not None:
-            # Add in zero blocks for h, dynamics, and start constraints, which do not depend on the slack variables.
-            h_padding_axis_3 = jnp.zeros((self.N, self.dh, self._trajectory_dim(), self.dg))
-            h_padding_axis_2 = jnp.zeros((self.N, self.dh, self.dg, self._slack_trajectory_dim()))
-            h_hess_padded_axis_3 = jnp.concatenate((h_hess, h_padding_axis_3), axis=3)
-            h_hess = jnp.concatenate((h_hess_padded_axis_3, h_padding_axis_2), axis=2)
+        dynamics_constraint_hess = jax.vmap(jax.jacfwd(jax.jacrev(self._dynamics_constraint)))(
+            xuz[:, :self._trajectory_dim()])
+        start_constraint_hess = jax.vmap(jax.jacfwd(jax.jacrev(self._start_constraint)))(
+            xuz[:, :self._trajectory_dim()], jnp.tile(initial_state,
+                                                      (self.N, 1)))
+        inequality_constraint_hess = jax.vmap(jax.jacfwd(jax.jacrev(self.g)))(xuz[:, :self._trajectory_dim()])
+        constraint_hess = jnp.concatenate((h_hess, dynamics_constraint_hess, start_constraint_hess,
+                                           inequality_constraint_hess), axis=1)
+        constraint_hess = constraint_hess * jnp.expand_dims(jnp.expand_dims(active_mask, axis=-1), axis=-1)
 
-            dynamics_padding_axis_3 = jnp.zeros((self.N, self.dx * (self.T - 1), self._trajectory_dim(), self.dg))
-            dynamics_padding_axis_2 = jnp.zeros((self.N, self.dx * (self.T - 1), self.dg, self._slack_trajectory_dim()))
-            dynamics_constraint_hess_padded_axis_3 = jnp.concatenate((dynamics_constraint_hess, dynamics_padding_axis_3), axis=3)
-            dynamics_constraint_hess = jnp.concatenate((dynamics_constraint_hess_padded_axis_3, dynamics_padding_axis_2), axis=2)
-
-            start_padding_axis_3 = jnp.zeros((self.N, self.dx, self._trajectory_dim(), self.dg))
-            start_padding_axis_2 = jnp.zeros((self.N, self.dx, self.dg, self._slack_trajectory_dim()))
-            start_constraint_hess_padded_axis_3 = jnp.concatenate((start_constraint_hess, start_padding_axis_3), axis=3)
-            start_constraint_hess = jnp.concatenate((start_constraint_hess_padded_axis_3, start_padding_axis_2), axis=2)
-        constraint_hess = jnp.concatenate((h_hess, slack_constraint_hess, dynamics_constraint_hess,
-                                           start_constraint_hess), axis=1)
+        # # Evaluate the combined constraint function and its gradient at the current augmented state.
+        # constraint = jax.vmap(self._combined_constraint)(xuz, jnp.tile(initial_state, (self.N, 1)))
+        # constraint_grad = jax.vmap(jax.jacrev(self._combined_constraint))(xuz, jnp.tile(initial_state, (self.N, 1)))
+        #
+        # # Compute the constraint hessian via its components, then compile them all together.
+        # h_hess = jax.vmap(jax.jacfwd(jax.jacrev(self.h)))(xuz[:, :self._trajectory_dim()])
+        # if self.g is not None:
+        #     slack_constraint_hess = jax.vmap(jax.jacfwd(jax.jacrev(self._slack_constraint)))(xuz)
+        # else:
+        #     slack_constraint_hess = jnp.zeros((self.N, self.dg, self._trajectory_dim(), self._trajectory_dim()))
+        # dynamics_constraint_hess = jax.vmap(jax.jacfwd(jax.jacrev(self._dynamics_constraint)))(xuz[:, :self._trajectory_dim()])
+        #
+        # if self.g is not None:
+        #     # Add in zero blocks for h, dynamics, and start constraints, which do not depend on the slack variables.
+        #     h_padding_axis_3 = jnp.zeros((self.N, self.dh, self._trajectory_dim(), self.dg))
+        #     h_padding_axis_2 = jnp.zeros((self.N, self.dh, self.dg, self._slack_trajectory_dim()))
+        #     h_hess_padded_axis_3 = jnp.concatenate((h_hess, h_padding_axis_3), axis=3)
+        #     h_hess = jnp.concatenate((h_hess_padded_axis_3, h_padding_axis_2), axis=2)
+        #
+        #     dynamics_padding_axis_3 = jnp.zeros((self.N, self.dx * (self.T - 1), self._trajectory_dim(), self.dg))
+        #     dynamics_padding_axis_2 = jnp.zeros((self.N, self.dx * (self.T - 1), self.dg, self._slack_trajectory_dim()))
+        #     dynamics_constraint_hess_padded_axis_3 = jnp.concatenate((dynamics_constraint_hess, dynamics_padding_axis_3), axis=3)
+        #     dynamics_constraint_hess = jnp.concatenate((dynamics_constraint_hess_padded_axis_3, dynamics_padding_axis_2), axis=2)
+        #
+        #     start_padding_axis_3 = jnp.zeros((self.N, self.dx, self._trajectory_dim(), self.dg))
+        #     start_padding_axis_2 = jnp.zeros((self.N, self.dx, self.dg, self._slack_trajectory_dim()))
+        #     start_constraint_hess_padded_axis_3 = jnp.concatenate((start_constraint_hess, start_padding_axis_3), axis=3)
+        #     start_constraint_hess = jnp.concatenate((start_constraint_hess_padded_axis_3, start_padding_axis_2), axis=2)
+        # constraint_hess = jnp.concatenate((h_hess, slack_constraint_hess, dynamics_constraint_hess,
+        #                                    start_constraint_hess), axis=1)
 
         # Evaluate the kernel function and its gradient at the current state (without slack variables).
         k = self.k(xuz[:, :self._trajectory_dim()].reshape(self.N, self.T, self.dx + self.du),
@@ -275,8 +284,8 @@ class JaxCSVTOpt:
         k_grad = jax.jacrev(self.k)(xuz[:, :self._trajectory_dim()].reshape(self.N, self.T, self.dx + self.du),
                                     xuz[:, :self._trajectory_dim()].reshape(self.N, self.T, self.dx + self.du))
         k_grad = jnp.einsum('nmmi->nmi', k_grad.reshape(self.N, self.N, self.N, -1))
-        k_grad = jnp.concatenate((k_grad.reshape(self.N, self.N, self._trajectory_dim()),
-                                  jnp.zeros((self.N, self.N, self.dg))), axis=-1).reshape(self.N, self.N, -1)
+        # k_grad = jnp.concatenate((k_grad.reshape(self.N, self.N, self._trajectory_dim()),
+        #                           jnp.zeros((self.N, self.N, self.dg))), axis=-1).reshape(self.N, self.N, -1)
 
         # Compute the retraction steps.
         constraint_step = self._constraint_step(constraint, constraint_grad)
@@ -284,7 +293,8 @@ class JaxCSVTOpt:
 
         # Combine the steps according to equation (26) and use them to update the current augmented state.
         step = self.step_scale * (self.alpha_J * tangent_step + self.alpha_C * constraint_step)
-        xuz -= step
+        xuz = xuz.at[:, :self._trajectory_dim()].set(xuz[:, :self._trajectory_dim()] - step)
+        # xuz -= step
 
         # Clamp the state in bounds and return.
         xuz = self._bound_projection(xuz)
@@ -339,7 +349,7 @@ class JaxCSVTOpt:
                                    jnp.expand_dims(jnp.eye(self.dh + self.dg + self.dx * self.T), axis=0) * 1e-3)
 
         # Get projection tensor via equation (36), shape (N, d * T, d * T).
-        projection = (jnp.expand_dims(jnp.eye((self.dx + self.du) * self.T + self.dg), axis=0) -
+        projection = (jnp.expand_dims(jnp.eye((self.dx + self.du) * self.T), axis=0) -
                       constraint_grad.transpose((0, 2, 1)) @ dCdCT_inv @ constraint_grad)
 
         # Get the tangent space kernel from equation (29), shape (N, N, d * T, d * T).
@@ -399,17 +409,18 @@ class JaxCSVTOpt:
         Returns:
             The evaluated combined constraint, shape (N, dh + dg + dx * T).
         """
-        if self.g is not None:
-            combined_constraint = jnp.concatenate((self.h(xuz[:self._trajectory_dim()]),
-                                                   self._slack_constraint(xuz),
-                                                   self._dynamics_constraint(xuz[:self._trajectory_dim()]),
-                                                   self._start_constraint(xuz[:self._trajectory_dim()], initial_state)),
-                                                  axis=0)
-        else:
-            combined_constraint = jnp.concatenate((self.h(xuz[:self._trajectory_dim()]),
-                                                   self._dynamics_constraint(xuz[:self._trajectory_dim()]),
-                                                   self._start_constraint(xuz[:self._trajectory_dim()], initial_state)),
-                                                  axis=0)
+        # if self.g is not None:
+        #     combined_constraint = jnp.concatenate((self.h(xuz[:self._trajectory_dim()]),
+        #                                            self._slack_constraint(xuz),
+        #                                            self._dynamics_constraint(xuz[:self._trajectory_dim()]),
+        #                                            self._start_constraint(xuz[:self._trajectory_dim()], initial_state)),
+        #                                           axis=0)
+        # else:
+        combined_constraint = jnp.concatenate((self.h(xuz[:self._trajectory_dim()]),
+                                               self._dynamics_constraint(xuz[:self._trajectory_dim()]),
+                                               self._start_constraint(xuz[:self._trajectory_dim()], initial_state),
+                                               self.g(xuz[:self._trajectory_dim()])),
+                                              axis=0)
         return combined_constraint
 
     def _equality_constraint(self, xuz: jnp.array, initial_state: jnp.array) -> jnp.array:
