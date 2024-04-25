@@ -85,14 +85,19 @@ class ObjectPoseReader:
     def get_screwdriver_state(self):
         center_coors = []
         screwdriver_ori_eulers = []
-        ret, frame = self.__cap.read()
+        ctr = 0
+        while True:
+            ret, frame = self.__cap.read()
+            ctr += 1
+            if ctr >= 7 and ret:
+                break
         markerCorners, markerIds, rejectedCandidates = self.__detector.detectMarkers(frame)
         if len(markerCorners) > 0 and markerIds.max() < 4:
-            cv2.aruco.drawDetectedMarkers(frame, markerCorners, markerIds)
+            # cv2.aruco.drawDetectedMarkers(frame, markerCorners, markerIds)
             for i in range(len(markerCorners)):
 
                 ret, rvecs, tvecs = cv2.solvePnP(self.__objp, markerCorners[i], self.__intrinsic, self.__dist) 
-                cv2.drawFrameAxes(frame, self.__intrinsic, self.__dist, rvecs, tvecs, 35 / 2) # debug
+                # cv2.drawFrameAxes(frame, self.__intrinsic, self.__dist, rvecs, tvecs, 35 / 2) # debug
                 rotation = R.from_rotvec(rvecs[:,0])
                 rotation_mat = rotation.as_matrix()
                 translation = tvecs
@@ -112,12 +117,11 @@ class ObjectPoseReader:
                 screwdriver_ori_eulers.append(screwdriver_ori_euler)
             center_coor = np.mean(center_coors, axis=0)
             screwdriver_ori_euler = np.mean(screwdriver_ori_eulers, axis=0)
-            if np.isnan(center_coor).any() or np.isnan(screwdriver_ori_euler).any():
-                breakpoint()
-            print(center_coor, screwdriver_ori_euler)
-            cv2.imshow('frame', frame) # debug
+            screwdriver_ori_euler = screwdriver_ori_euler / 180 * np.pi # change to radian
+            # cv2.imshow('frame', frame) # debug
             return center_coor, screwdriver_ori_euler
         else:
+            print("No readings from camera.")
             return None, None
     def get_state(self):
         if self.obj == 'valve':
@@ -125,6 +129,7 @@ class ObjectPoseReader:
         elif self.obj == 'screwdriver':
             while True:
                 center_coor, screwdriver_ori_euler = self.get_screwdriver_state()
+                # print(center_coor, screwdriver_ori_euler)
                 if center_coor is not None:
                     break
             return center_coor, screwdriver_ori_euler
@@ -132,16 +137,18 @@ class ObjectPoseReader:
 class HardwareEnv:
     def __init__(self, default_pos, finger_list=['index', 'middle', 'ring', 'thumb'], kp=4, obj='valve', ori_only=True, device='cuda:0'):
         self.__all_finger_list = ['index', 'middle', 'ring', 'thumb']
+        self.obj = obj
         self.__finger_list = finger_list
         self.__ros_node = RosNode(kp=kp)
 
         self.obj_reader = ObjectPoseReader(obj=obj)
 
         self.device = device
-        self.default_pos = default_pos
+        self.default_pos = default_pos.clone()
         self.ori_only = ori_only
     
     def get_state(self):
+        rospy.sleep(0.5)
         robot_state = self.__ros_node.allegro_joint_pos.float()
         robot_state = robot_state.to(self.device)
         index, mid, ring, thumb = torch.chunk(robot_state, chunks=4, dim=-1)
@@ -161,8 +168,10 @@ class HardwareEnv:
             pos, ori = self.obj_reader.get_state()
             pos = torch.tensor(pos).float().to(self.device)
             ori = torch.tensor(ori).float().to(self.device)
+            # ori = ori * 0 # debug
             if self.ori_only:
                 q.append(ori)
+                q.append(torch.zeros(1).float().to(self.device)) # add the screwdriver cap angle
             else:
                 raise NotImplementedError
         all_state = torch.cat((robot_state, ori), dim=-1)

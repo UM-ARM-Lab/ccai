@@ -1,6 +1,6 @@
 from isaac_victor_envs.utils import get_assets_dir
 from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
-# from isaac_victor_envs.tasks.allegro_ros import RosAllegroValveTurningEnv
+from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
 
 import numpy as np
 import pickle as pkl
@@ -89,7 +89,6 @@ class AllegroScrewdriver(AllegroValveTurning):
         self.friction_coefficient = friction_coefficient
 
     def _cost(self, xu, start, goal):
-        # TODO: check if the addtional term of the smoothness cost and running goal cost is necessary
         state = xu[:, :self.dx]  # state dim = 9
         state = torch.cat((start.reshape(1, self.dx), state), dim=0)  # combine the first time step into it
         
@@ -112,8 +111,8 @@ class AllegroScrewdriver(AllegroValveTurning):
             force = xu[:, self.dx + 4 * self.num_fingers: self.dx + (4 + 3) * self.num_fingers]
             force = force.reshape(force.shape[0], self.num_fingers, 3)
             force_norm = torch.norm(force, dim=-1)
-            force_norm = force_norm - 0.5 # desired maginitute
-            force_cost = 20 * torch.sum(force_norm ** 2)
+            force_norm = force_norm - 5.0 # desired maginitute
+            force_cost = 200 * torch.sum(force_norm ** 2)
             action_cost += force_cost
         return smoothness_cost + action_cost + goal_cost + upright_cost    
     
@@ -165,10 +164,24 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
     best_traj, _ = pregrasp_planner.step(start[:4 * num_fingers])
 
+    if params['visualize_plan']:
+        traj_for_viz = best_traj[:, :pregrasp_problem.dx]
+        tmp = start[4 * num_fingers:].unsqueeze(0).repeat(traj_for_viz.shape[0], 1)
+        traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)    
+        viz_fpath = pathlib.PurePath.joinpath(fpath, "pregrasp")
+        img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
+        gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
+        pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
+        pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
+        visualize_trajectory(traj_for_viz, pregrasp_problem.contact_scenes['thumb'], viz_fpath, pregrasp_problem.fingers, pregrasp_problem.obj_dof+1)
+
+
     for x in best_traj[:, :4 * num_fingers]:
         action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
         if params['mode'] == 'hardware':
-            sim_viz_env.set_pose(env.get_state()['all_state'].to(device=env.device))
+            set_state = env.get_state()['all_state'].to(device=env.device)
+            set_state = torch.cat((set_state, torch.zeros(1).float().to(env.device)), dim=0)
+            sim_viz_env.set_pose(set_state)
             sim_viz_env.step(action)
         env.step(action)
         action_list.append(action)
@@ -249,7 +262,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         print(f"planned theta: {planned_theta_traj}")
         # add trajectory lines to sim
         if params['mode'] == 'hardware':
-            add_trajectories_hardware(trajectories, best_traj, axes, env, config=params, state2ee_pos_func=state2ee_pos)
+            pass # debug TODO: fix it
+            # add_trajectories_hardware(trajectories, best_traj, axes, env, config=params, state2ee_pos_func=state2ee_pos)
         else:
             add_trajectories(trajectories, best_traj, axes, env, sim=sim, gym=gym, viewer=viewer,
                             config=params, state2ee_pos_func=state2ee_pos)
@@ -282,6 +296,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         if params['optimize_force']:
             print("planned force")
             print(action[:, 4 * num_fingers_to_plan:].reshape(num_fingers_to_plan, 3)) # print out the action for debugging
+            print("delta action")
+            print(action[:, :4 * num_fingers_to_plan].reshape(num_fingers_to_plan, 4))
         # print(action)
         action = action[:, :4 * num_fingers_to_plan]
         if params['exclude_index']:
@@ -290,7 +306,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         else:
             action = action + start.unsqueeze(0)[:, :4 * num_fingers] # NOTE: this is required since we define action as delta action
         if params['mode'] == 'hardware':
-            sim_viz_env.set_pose(env.get_state()['all_state'].to(device=env.device))
+            set_state = env.get_state()['all_state'].to(device=env.device)
+            set_state = torch.cat((set_state, torch.zeros(1).float().to(env.device)), dim=0)
+            sim_viz_env.set_pose(set_state)
             sim_viz_env.step(action)
         elif params['mode'] == 'hardware_copy':
             ros_copy_node.apply_action(partial_to_full_state(action[0], params['fingers']))
@@ -369,7 +387,7 @@ if __name__ == "__main__":
     from tqdm import tqdm
 
     if config['mode'] == 'hardware':
-        env = RosAllegroValveTurningEnv(1, control_mode='joint_impedance',
+        env = RosAllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
                                  use_cartesian_controller=False,
                                  viewer=True,
                                  steps_per_action=60,
@@ -410,11 +428,11 @@ if __name__ == "__main__":
     if config['mode'] == 'hardware':
         sim_env = env
         from hardware.hardware_env import HardwareEnv
-        env = HardwareEnv(sim_env.default_dof_pos[:, :16], finger_list=['index', 'thumb'], kp=config['kp'])
+        env = HardwareEnv(sim_env.default_dof_pos[:, :16], finger_list=config['fingers'], kp=config['kp'], obj='screwdriver')
         env.world_trans = sim_env.world_trans
         env.joint_stiffness = sim_env.joint_stiffness
         env.device = sim_env.device
-        env.valve_pose = sim_env.valve_pose
+        env.table_pose = sim_env.table_pose
     elif config['mode'] == 'hardware_copy':
         from hardware.hardware_env import RosNode
         ros_copy_node = RosNode()

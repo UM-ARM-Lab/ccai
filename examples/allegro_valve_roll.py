@@ -1754,7 +1754,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         print(f"planned theta: {planned_theta_traj}")
         # add trajectory lines to sim
         if params['mode'] == 'hardware':
-            add_trajectories_hardware(trajectories, best_traj, axes, env, config=params, state2ee_pos_func=state2ee_pos)
+            pass # debug only TODO: fix it
+            # add_trajectories_hardware(trajectories, best_traj, axes, env, config=params, state2ee_pos_func=state2ee_pos)
         else:
             add_trajectories(trajectories, best_traj, axes, env, sim=sim, gym=gym, viewer=viewer,
                             config=params, state2ee_pos_func=state2ee_pos)
