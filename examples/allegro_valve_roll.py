@@ -328,7 +328,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         # manipulability = torch.sqrt(torch.prod(eig, dim=-1))
         # return 0.0001 - manipulability
 
-    @combine_finger_constraints
+    @all_finger_constraints
     def _singularity_constraint(self, xu, finger_name, compute_grads=True, compute_hess=False):
 
         # assume access to class member variables which have already done some of the computation
@@ -533,7 +533,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                                                           )
         # self.contact_scenes['index'].visualize_robot(partial_to_full_state(self.start[:4*self.num_fingers], fingers=fingers), torch.zeros(obj_dof + obj_joint_dim).to(self.device))
     
-    @combine_finger_constraints
+    @all_finger_constraints
     def _contact_constraints(self, xu, finger_name, compute_grads=True, compute_hess=False, terminal=False):
         """
             Computes contact constraints
@@ -951,7 +951,7 @@ class AllegroValveTurning(AllegroContactProblem):
 
         return g
     
-    @combine_finger_constraints
+    @all_finger_constraints
     def _kinematics_constraints(self, xu, finger_name, compute_grads=True, compute_hess=False):
         """
             Computes on the kinematics of the valve and the finger being consistant
@@ -1058,7 +1058,7 @@ class AllegroValveTurning(AllegroContactProblem):
         # TODO: this constraint value is super small
         return (R @ (contact_v_tan - contact_v_u_tan).unsqueeze(-1)).squeeze(-1)
     
-    @combine_finger_constraints
+    @all_finger_constraints
     def _dynamics_constraints(self, xu, finger_name, compute_grads=True, compute_hess=False):
         """ Computes dynamics constraints
             constraint that sdf value is zero
@@ -1144,7 +1144,7 @@ class AllegroValveTurning(AllegroContactProblem):
         # force is defined as the force of robot pushing the object
         return B @ contact_v_contact_frame
 
-    @combine_finger_constraints
+    @all_finger_constraints
     def _friction_constraint(self, xu, finger_name, compute_grads=True, compute_hess=False):
 
         # assume access to class member variables which have already done some of the computation
@@ -1414,7 +1414,7 @@ class AllegroValveTurning(AllegroContactProblem):
 #             return g, grad_g, hess_g
 #         return g, grad_g, None
 
-#     @combine_finger_constraints
+#     @all_finger_constraints
 #     def _contact_target_constraints(self, xu, finger_name, compute_grads=True, compute_hess=False):
 #         """
 #         Constraint that contact point is equal to target value

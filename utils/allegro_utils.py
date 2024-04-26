@@ -1,4 +1,4 @@
-import torch 
+import torch
 from functools import wraps
 import open3d as o3d
 import numpy as np
@@ -6,8 +6,9 @@ import matplotlib.pyplot as plt
 import pathlib
 import pytorch3d.transforms as tf
 
-
 full_finger_list = ['index', 'middle', 'ring', 'thumb']
+
+
 def partial_to_full_state(partial, fingers):
     """
     fingers: which fingers are in the partial state
@@ -28,6 +29,7 @@ def partial_to_full_state(partial, fingers):
     full = torch.cat(full, dim=-1)
     return full
 
+
 def full_to_partial_state(full, fingers):
     """
     :params partial: B x 8 joint configurations for index and thumb
@@ -43,39 +45,67 @@ def full_to_partial_state(full, fingers):
     partial = torch.cat(partial, dim=-1)
     return partial
 
-def combine_finger_constraints(func):
+
+def finger_constraint_wrapper(self, *args, **kwargs):
+    #xu = kwargs.pop('xu', None)
+    #if xu is None:
+    #    xu = args[0]
+    fingers = kwargs.pop('fingers', None)
+    if fingers is None:
+        raise ValueError("fingers must be specified")
+    func = kwargs.pop('func', None)
+    if func is None:
+        raise ValueError("func must be specified")
+
+    compute_grads = kwargs.pop('compute_grads', True)
+    compute_hess = kwargs.pop('compute_hess', False)
+    # compute contact constraints for index finger
+    g_list, grad_g_list, hess_g_list = [], [], []
+    for finger in fingers:
+        g, grad_g, hess_g = func(self, finger_name=finger,
+                                 compute_grads=compute_grads, compute_hess=compute_hess, **kwargs)
+        g_list.append(g)
+        grad_g_list.append(grad_g)
+        hess_g_list.append(hess_g)
+    g = torch.cat(g_list, dim=1)
+    if compute_grads:
+        grad_g = torch.cat(grad_g_list, dim=1)
+    else:
+        return g, None, None
+
+    if compute_hess:
+        hess_g = torch.cat(hess_g_list, dim=1)
+        return g, grad_g, hess_g
+
+    return g, grad_g, None
+
+
+def all_finger_constraints(func):
     @wraps(func)
     def wrapper(self, *args, **kwargs):
         fingers = self.fingers
-        # Get values from dict
-        xu = kwargs.pop('xu', None)
-        if xu is None:
-            xu = args[0]
-
-        compute_grads = kwargs.pop('compute_grads', True)
-        compute_hess = kwargs.pop('compute_hess', False)
-
-        # compute contact constraints for index finger
-        g_list, grad_g_list, hess_g_list = [], [], []
-        for finger in fingers:
-            g, grad_g, hess_g = func(self, xu, finger_name=finger,
-                                    compute_grads=compute_grads, compute_hess=compute_hess, **kwargs)
-            g_list.append(g)
-            grad_g_list.append(grad_g)
-            hess_g_list.append(hess_g)
-        g = torch.cat(g_list, dim=1)
-        if compute_grads:
-            grad_g = torch.cat(grad_g_list, dim=1)
-        else:
-            return g, None, None
-
-        if compute_hess:
-            hess_g = torch.cat(hess_g_list, dim=1)
-            return g, grad_g, hess_g
-
-        return g, grad_g, None
+        return finger_constraint_wrapper(self, fingers=fingers, func=func, *args, **kwargs)
 
     return wrapper
+
+
+def regrasp_finger_constraints(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        fingers = self.regrasp_fingers
+        return finger_constraint_wrapper(self, fingers=fingers, func=func, *args, **kwargs)
+
+    return wrapper
+
+
+def contact_finger_constraints(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        fingers = self.contact_fingers
+        return finger_constraint_wrapper(self, fingers=fingers, func=func, *args, **kwargs)
+
+    return wrapper
+
 
 def state2ee_pos(state, finger_name, fingers, chain, frame_indices, world_trans):
     """
@@ -138,9 +168,10 @@ def visualize_trajectories(trajectories, scene, fpath, headless=False):
         # Visualize what happens if we execute the actions in the trajectory in the simulator
         pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/sim/img'), parents=True, exist_ok=True)
         pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/sim/gif'), parents=True, exist_ok=True)
-        #visualize_trajectory_in_sim(trajectory, config['env'], f'{fpath}/trajectory_{n + 1}/sim')
+        # visualize_trajectory_in_sim(trajectory, config['env'], f'{fpath}/trajectory_{n + 1}/sim')
         # save the trajectory
         np.save(f'{fpath}/trajectory_{n + 1}/traj.npz', trajectory.cpu().numpy())
+
 
 def axis_angle_to_euler(axis_angle):
     matrix = tf.axis_angle_to_matrix(axis_angle)
