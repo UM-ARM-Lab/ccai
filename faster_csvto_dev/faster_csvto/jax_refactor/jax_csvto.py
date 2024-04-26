@@ -220,7 +220,7 @@ class JaxCSVTOpt:
 
         # Solve the dual problem to determine which inequality constraints are active.
         initial_guess = jnp.zeros((self.N, self.dh + self.dx * self.T + self.dg,))
-        solver = JaxDualSolve(max_iterations=100, step_scale=1e-3, tolerance=1e-6)
+        solver = JaxDualSolve(max_iterations=1, step_scale=1e-3, tolerance=1e-6)
         _, inequality_multiplier, _, _ = jax.vmap(solver.solve)(initial_guess,
                                                                 jnp.expand_dims(c_grad, axis=-1),
                                                                 equality_grad,

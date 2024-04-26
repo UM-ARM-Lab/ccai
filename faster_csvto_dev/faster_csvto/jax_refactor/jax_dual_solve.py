@@ -135,6 +135,7 @@ class JaxDualSolve:
 
         distance = jnp.abs(self.objective(decision_variable, cost_grad, equality_grad, inequality_grad) -
                            self.objective(old_decision_variable, cost_grad, equality_grad, inequality_grad))
+        # return False
         return (self._tolerance < distance) & (iteration < self._max_iterations)
 
     def solver_step(self, variables) -> jnp.array:
@@ -156,9 +157,10 @@ class JaxDualSolve:
         decision_variable = jnp.clip(decision_variable - step, min_decision_variable, max_decision_variable)
 
         # Perform backtracking to avoid overstepping.
+        back_iter = 0
         backtracking_variables = (self._step_scale, decision_variable, old_decision_variable, cost_grad, equality_grad,
-                                  inequality_grad)
-        step_scale, decision_variable, old_decision_variable, _, _, _ = jax.lax.while_loop(self.new_worse_than_old,
+                                  inequality_grad, back_iter)
+        step_scale, decision_variable, old_decision_variable, _, _, _, _ = jax.lax.while_loop(self.new_worse_than_old,
                                                                                   self.backtracking_step,
                                                                                   backtracking_variables)
 
@@ -172,15 +174,17 @@ class JaxDualSolve:
     def new_worse_than_old(self, backtracking_variables) -> bool:
         """
         """
-        step_scale, decision_variable, old_decision_variable, cost_grad, equality_grad, inequality_grad = backtracking_variables
+        step_scale, decision_variable, old_decision_variable, cost_grad, equality_grad, inequality_grad, back_iter = backtracking_variables
 
-        return (self.objective(decision_variable, cost_grad, equality_grad, inequality_grad) >
-                self.objective(old_decision_variable, cost_grad, equality_grad, inequality_grad))
+        # return False
+        return ((self.objective(decision_variable, cost_grad, equality_grad, inequality_grad) >
+                self.objective(old_decision_variable, cost_grad, equality_grad, inequality_grad)) & (back_iter < 1))
 
     def backtracking_step(self, backtracking_variables):
         """
         """
-        step_scale, decision_variable, old_decision_variable, cost_grad, equality_grad, inequality_grad = backtracking_variables
+        step_scale, decision_variable, old_decision_variable, cost_grad, equality_grad, inequality_grad, back_iter = backtracking_variables
+        back_iter += 1
 
         # Get variables for clamping the decision variable.
         min_equality_multiplier = -jnp.inf * jnp.ones(equality_grad.shape[0])
@@ -195,7 +199,7 @@ class JaxDualSolve:
                                                                                            equality_grad,
                                                                                            inequality_grad)
         decision_variable = jnp.clip(decision_variable, min_decision_variable, max_decision_variable)
-        return step_scale, decision_variable, old_decision_variable, cost_grad, equality_grad, inequality_grad
+        return step_scale, decision_variable, old_decision_variable, cost_grad, equality_grad, inequality_grad, back_iter
 
     @staticmethod
     def objective(decision_variable: jnp.array, cost_grad: jnp.array, equality_grad: jnp.array,
