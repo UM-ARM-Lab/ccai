@@ -4,13 +4,13 @@ receding_horizon: False
 num_steps: 11
 num_trials: 1
 visualize: True
-experiment_name: 'allegro_screwdriver'
+experiment_name: 'allegro_screwdriver_6d'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
-object_type: 'screwdriver'
+object_type: 'screwdriver_6d'
 sim_device: 'cuda:0'
-friction_coefficient: 0.95
+friction_coefficient: 1.9
 kp: 3.0
 visualize_plan: True
 optimize_force: True
@@ -19,8 +19,7 @@ controllers:
   csvgd:
     # N: 16
     N: 4
-    # alpha_J: 5.0e-3
-    alpha_J: 5.0e-4 # DEBUG ONLY
+    alpha_J: 5.0e-3
     alpha_C: 1
     step_size: 0.1
     momentum: 0.

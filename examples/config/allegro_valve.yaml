@@ -12,7 +12,7 @@ object_type: 'cylinder_valve'
 sim_device: 'cuda:0'
 friction_coefficient: 0.9
 kp: 3.0
-visualize_plan: True
+visualize_plan: False
 random_robot_pose: False
 optimize_force: True
 controllers:
