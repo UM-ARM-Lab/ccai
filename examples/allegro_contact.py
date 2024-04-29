@@ -445,9 +445,9 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         d = self.d
         # Retrieve pre-processed data
         ret_scene = self.data[finger_name]
-        g = ret_scene.get('sdf').reshape(N, T + 1, 1)# - 1.0e-3
+        g = ret_scene.get('sdf').reshape(N, T + 1, 1)  # - 1.0e-3
         # for some reason the thumb penetrates the object
-        #if finger_name == 'thumb':
+        # if finger_name == 'thumb':
         #    g = g - 1.0e-3
         grad_g_q = ret_scene.get('grad_sdf', None)
         hess_g_q = ret_scene.get('hess_sdf', None)
@@ -527,7 +527,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
         if hessG is not None:
             hessG.detach_()
-        #print(J.mean(), G.abs().mean(), G.abs().max())
+        # print(J.mean(), G.abs().mean(), G.abs().max())
         return grad_J.detach(), hess_J, K.detach(), grad_K.detach(), G.detach(), dG.detach(), hessG
 
     def update(self, start, goal=None, T=None):
@@ -590,6 +590,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                  device='cuda:0',
                  moveable_object=False,
                  optimize_force=False,
+                 default_dof_pos=None,
                  *args, **kwargs):
         print('Calling Regrasp Constructor')
 
@@ -616,7 +617,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                          object_type=object_type,
                          moveable_object=moveable_object, optimize_force=optimize_force,
                          contact_fingers=contact_fingers,
-                         regrasp_fingers=regrasp_fingers, default_dof_pos=None, *args, **kwargs)
+                         regrasp_fingers=regrasp_fingers, default_dof_pos=default_dof_pos, *args, **kwargs)
 
         self.regrasp_fingers = regrasp_fingers
         self.num_regrasps = len(regrasp_fingers)
@@ -628,15 +629,21 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         self._regrasp_dz = self.num_regrasps  # one contact constraints per finger
         self._regrasp_dh = self._regrasp_dz * T  # inequality
 
-        self.default_dof_pos = torch.cat((torch.tensor([[0.1, 0.5, 0.5, 0.5]]).float().to(device=self.device),
-                                          torch.tensor([[-0.1, 0.5, 0.65, 0.65]]).float().to(device=self.device),
-                                          torch.tensor([[0., 0.5, 0.65, 0.65]]).float().to(device=self.device),
-                                          torch.tensor([[1.2, 0.3, 0.2, 1.]]).float().to(device=self.device)),
-                                         dim=1).to(self.device).reshape(-1)
+        if default_dof_pos is None:
+            self.default_dof_pos = torch.cat((torch.tensor([[0.1, 0.5, 0.5, 0.5]]).float().to(device=self.device),
+                                              torch.tensor([[-0.1, 0.5, 0.65, 0.65]]).float().to(device=self.device),
+                                              torch.tensor([[0., 0.5, 0.65, 0.65]]).float().to(device=self.device),
+                                              torch.tensor([[1.2, 0.3, 0.2, 1.]]).float().to(device=self.device)),
+                                             dim=1).to(self.device).reshape(-1)
+        else:
+            self.default_dof_pos = default_dof_pos
 
         if self.num_regrasps > 0:
             self.default_ee_locs = self._ee_locations_in_screwdriver(self.default_dof_pos,
                                                                      torch.zeros(3, device=self.device))
+
+            # add a small amount of noise to ee loc default
+            self.default_ee_locs = self.default_ee_locs + 0.01 * torch.randn_like(self.default_ee_locs)
         else:
             self.default_ee_locs = None
 
@@ -880,11 +887,11 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         # if valve angle in state
         if self.dx == (4 * self.num_fingers + self.obj_dof):
-            # theta = np.linspace(self.start[-self.obj_dof:].cpu().numpy(), self.goal.cpu().numpy(), self.T + 1)[:-1]
-            # theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
-            # theta = theta.unsqueeze(0).repeat((N, 1, 1))
-            theta = self.start[-self.obj_dof:].unsqueeze(0).repeat((N, self.T, 1))
-            theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
+            theta = np.linspace(self.start[-self.obj_dof:].cpu().numpy(), self.goal.cpu().numpy(), self.T + 1)[:-1]
+            theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
+            theta = theta.unsqueeze(0).repeat((N, 1, 1))
+            # theta = self.start[-self.obj_dof:].unsqueeze(0).repeat((N, self.T, 1))
+            # theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
             x = torch.cat((x, theta), dim=-1)
 
         xu = torch.cat((x, u), dim=2)
@@ -1491,25 +1498,26 @@ class AllegroContactProblem(AllegroObjectProblem):
         if force is None:
             # compute constraint value
             h = self.friction_constr(u,
-                                 contact_normal.reshape(-1, 3),
-                                 contact_jac.reshape(-1, 3, 4 * self.num_contacts)).reshape(N, -1)
+                                     contact_normal.reshape(-1, 3),
+                                     contact_jac.reshape(-1, 3, 4 * self.num_contacts)).reshape(N, -1)
         else:
             # compute constraint value
             h = self.friction_constr_force(u,
-                                     contact_normal.reshape(-1, 3),
-                                     contact_jac.reshape(-1, 3, 4 * self.num_contacts)).reshape(N, -1)
+                                           contact_normal.reshape(-1, 3),
+                                           contact_jac.reshape(-1, 3, 4 * self.num_contacts)).reshape(N, -1)
 
         # compute the gradient
         if compute_grads:
             if force is None:
                 dh_du, dh_dnormal, dh_djac = self.grad_friction_constr(u,
-                                                                   contact_normal.reshape(-1, 3),
-                                                                   contact_jac.reshape(-1, 3, 4 * self.num_contacts))
-            else:
-                dh_du, dh_dnormal, dh_djac = self.grad_friction_constr_force(u,
                                                                        contact_normal.reshape(-1, 3),
                                                                        contact_jac.reshape(-1, 3,
                                                                                            4 * self.num_contacts))
+            else:
+                dh_du, dh_dnormal, dh_djac = self.grad_friction_constr_force(u,
+                                                                             contact_normal.reshape(-1, 3),
+                                                                             contact_jac.reshape(-1, 3,
+                                                                                                 4 * self.num_contacts))
 
             djac_dq = self.data[finger_name]['dJ_dq'].reshape(N, T + 1, 3, 16, 16)[
                       :, :-1, :, self.contact_state_indices][:, :, :, :, self.contact_state_indices]

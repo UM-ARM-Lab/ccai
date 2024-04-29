@@ -290,4 +290,4 @@ class ConstrainedSteinTrajOpt:
         idx = torch.argsort(penalty, descending=False)
         path = torch.stack(path, dim=0).reshape(len(path), N, self.T, -1)[:, :, :, :self.dx + self.du]
         path = path[:, idx]
-        return path
+        return path.detach()
