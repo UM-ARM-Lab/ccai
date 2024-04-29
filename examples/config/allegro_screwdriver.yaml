@@ -18,15 +18,15 @@ exclude_index: False
 controllers:
   csvgd:
     # N: 16
-    N: 4
+    N: 2
     # alpha_J: 5.0e-3
     alpha_J: 5.0e-4 # DEBUG ONLY
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
     device: 'cuda:0'
-    online_iters: 100
-    warmup_iters: 200
+    online_iters: 50
+    warmup_iters: 500
     resample_steps: 1
     resample_sigma: 0.01
     resample_temperature: 0.1

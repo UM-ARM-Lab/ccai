@@ -1,6 +1,6 @@
 from isaac_victor_envs.utils import get_assets_dir
 from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
-from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
+# from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
 
 import numpy as np
 import pickle as pkl
@@ -15,12 +15,12 @@ from functools import partial
 import time
 import pytorch_volumetric as pv
 import pytorch_kinematics as pk
-# import pytorch_kinematics.transforms as tf
+import pytorch_kinematics.transforms as tf
 from torch.func import vmap, jacrev, hessian, jacfwd
-import pytorch3d.transforms as tf
 
 import matplotlib.pyplot as plt
-from utils.allegro_utils import partial_to_full_state, full_to_partial_state, combine_finger_constraints, state2ee_pos, visualize_trajectory
+from utils.allegro_utils import partial_to_full_state, full_to_partial_state, state2ee_pos, visualize_trajectory, all_finger_constraints
+# from utils.allegro_utils import partial_to_full_state, full_to_partial_state, combine_finger_constraints, state2ee_pos, visualize_trajectory, all_finger_constraints
 from allegro_valve_roll import AllegroValveTurning, AllegroContactProblem, PositionControlConstrainedSVGDMPC, add_trajectories, add_trajectories_hardware
 from scipy.spatial.transform import Rotation as R
 
@@ -102,7 +102,7 @@ class AllegroScrewdriver(AllegroValveTurning):
 
         smoothness_cost = 10 * torch.sum((state[1:] - state[:-1]) ** 2)
         smoothness_cost += 50 * torch.sum((state[1:, -self.obj_dof:] - state[:-1, -self.obj_dof:]) ** 2)
-        upright_cost = 500 * torch.sum((state[:, -self.obj_dof:-1]) ** 2) # the screwdriver should only rotate in z direction
+        upright_cost = 10000 * torch.sum((state[:, -self.obj_dof:-1]) ** 2) # the screwdriver should only rotate in z direction
 
         goal_cost = torch.sum((500 * (state[-1, -self.obj_dof:] - goal) ** 2)).reshape(-1)
         # add a running cost
@@ -112,8 +112,8 @@ class AllegroScrewdriver(AllegroValveTurning):
             force = xu[:, self.dx + 4 * self.num_fingers: self.dx + (4 + 3) * self.num_fingers]
             force = force.reshape(force.shape[0], self.num_fingers, 3)
             force_norm = torch.norm(force, dim=-1)
-            force_norm = force_norm - 5 # desired maginitute
-            force_cost = 1 * torch.sum(force_norm ** 2)
+            force_norm = force_norm - 2 # desired maginitute
+            force_cost = 1 * torch.sum(((force_norm < 0) * force_norm) ** 2)
             action_cost += force_cost
         return smoothness_cost + action_cost + goal_cost + upright_cost    
     
@@ -388,18 +388,18 @@ if __name__ == "__main__":
     from tqdm import tqdm
 
     if config['mode'] == 'hardware':
-        # pass
-        env = RosAllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
-                                 use_cartesian_controller=False,
-                                 viewer=True,
-                                 steps_per_action=60,
-                                 friction_coefficient=1.0,
-                                 device=config['sim_device'],
-                                 valve=config['object_type'],
-                                 video_save_path=img_save_dir,
-                                 joint_stiffness=config['kp'],
-                                 fingers=config['fingers'],
-                                 )
+        pass
+        # env = RosAllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
+        #                          use_cartesian_controller=False,
+        #                          viewer=True,
+        #                          steps_per_action=60,
+        #                          friction_coefficient=1.0,
+        #                          device=config['sim_device'],
+        #                          valve=config['object_type'],
+        #                          video_save_path=img_save_dir,
+        #                          joint_stiffness=config['kp'],
+        #                          fingers=config['fingers'],
+        #                          )
     else:
         env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
                                     use_cartesian_controller=False,

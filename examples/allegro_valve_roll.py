@@ -25,7 +25,6 @@ import time
 import pytorch_volumetric as pv
 import pytorch_kinematics as pk
 import pytorch_kinematics.transforms as tf
-# import pytorch3d.transforms as tf
 
 import matplotlib.pyplot as plt
 from utils.allegro_utils import *
@@ -44,24 +43,24 @@ def euler_to_quat(euler):
 def euler_to_angular_velocity(current_euler, next_euler):
     # using matrix
     
-    # current_mat = tf.euler_angles_to_matrix(current_euler, convention='XYZ')
-    # next_mat = tf.euler_angles_to_matrix(next_euler, convention='XYZ')
-    # dmat = next_mat - current_mat
-    # omega_mat = dmat @ current_mat.transpose(-1, -2)
-    # omega_x = (omega_mat[..., 2, 1] - omega_mat[..., 1, 2]) / 2
-    # omega_y = (omega_mat[..., 0, 2] - omega_mat[..., 2, 0]) / 2
-    # omega_z = (omega_mat[..., 1, 0] - omega_mat[..., 0, 1]) / 2
-    # omega = torch.stack((omega_x, omega_y, omega_z), dim=-1)
+    current_mat = tf.euler_angles_to_matrix(current_euler, convention='XYZ')
+    next_mat = tf.euler_angles_to_matrix(next_euler, convention='XYZ')
+    dmat = next_mat - current_mat
+    omega_mat = dmat @ current_mat.transpose(-1, -2)
+    omega_x = (omega_mat[..., 2, 1] - omega_mat[..., 1, 2]) / 2
+    omega_y = (omega_mat[..., 0, 2] - omega_mat[..., 2, 0]) / 2
+    omega_z = (omega_mat[..., 1, 0] - omega_mat[..., 0, 1]) / 2
+    omega = torch.stack((omega_x, omega_y, omega_z), dim=-1)
 
     # R.from_euler('XYZ', current_euler.cpu().detach().numpy().reshape(-1, 3)).as_quat().reshape(3, 12, 4)
 
     # quaternion 
-    current_quat = euler_to_quat(current_euler)
-    next_quat = euler_to_quat(next_euler)
-    dquat = next_quat - current_quat
-    con_quat = - current_quat # conjugate
-    con_quat[..., 0] = current_quat[..., 0]
-    omega = 2 * tf.quaternion_raw_multiply(dquat, con_quat)[..., 1:] 
+    # current_quat = euler_to_quat(current_euler)
+    # next_quat = euler_to_quat(next_euler)
+    # dquat = next_quat - current_quat
+    # con_quat = - current_quat # conjugate
+    # con_quat[..., 0] = current_quat[..., 0]
+    # omega = 2 * tf.quaternion_raw_multiply(dquat, con_quat)[..., 1:] 
     # TODO: quaternion and its negative are the same, but it is not true for angular velocity. Might have some bug here 
     return omega
 
@@ -735,7 +734,10 @@ class AllegroValveTurning(AllegroContactProblem):
             self.x_min = torch.cat((self.x_min, min_f))
         self.friction_constr = vmap(self._friction_constr, randomness='same')
         self.grad_friction_constr = vmap(jacrev(self._friction_constr, argnums=(0, 1, 2)))
-        self.grad_kinematics_constr = jacrev(self._kinematics_constr, argnums=(0, 1, 2, 3, 4, 5, 6))
+        # self.grad_kinematics_constr = jacrev(self._kinematics_constr, argnums=(0, 1, 2, 3, 4, 5, 6))
+
+        self.kinematics_constr = vmap(vmap(self._kinematics_constr))
+        self.grad_kinematics_constr = vmap(vmap(jacrev(self._kinematics_constr, argnums=(0, 1, 2, 3, 4, 5, 6))))
     
     def get_initial_xu(self, N):
         # TODO: fix the initialization, for 6D movement, the angle is not supposed to be the linear interpolation of the euler angle. 
@@ -746,7 +748,12 @@ class AllegroValveTurning(AllegroContactProblem):
         """
 
         # u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
-        u = 0.1 * torch.randn(N, self.T, self.du, device=self.device)
+        if self.optimize_force:
+            u = 0.025 * torch.randn(N, self.T, 4 * self.num_fingers, device=self.device)
+            force = 1.5 * torch.randn(N, self.T, 3 * self.num_fingers, device=self.device)
+            u = torch.cat((u, force), dim=-1)
+        else:
+            u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
 
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
         for t in range(self.T):
@@ -1034,58 +1041,56 @@ class AllegroValveTurning(AllegroContactProblem):
         else:
             return g.reshape(N, -1), grad_g.reshape(N, -1, T * (self.dx + self.du)), None
     
-    
     def _kinematics_constr(self, current_q, next_q, current_theta, next_theta, contact_jac, contact_loc, contact_normal):
-        N, _, _ = current_q.shape
-        T = self.T
         # approximate q dot and theta dot
         dq = next_q - current_q
         if np.sum(self.obj_rotational_code) == 3:
-            obj_omega = euler_to_angular_velocity(current_theta[:, :, self.obj_translational_dim:],\
-                                                   next_theta[:, :, self.obj_translational_dim:] )
+            obj_omega = euler_to_angular_velocity(current_theta[self.obj_translational_dim:],\
+                                                   next_theta[self.obj_translational_dim:] )
         elif np.sum(self.obj_rotational_code) == 1:
-            dtheta = next_theta[:, :, self.obj_translational_dim:] - current_theta[:, :, self.obj_translational_dim:]
+            dtheta = next_theta[self.obj_translational_dim:] - current_theta[self.obj_translational_dim:]
             idx = torch.where(torch.tensor(self.obj_rotational_code) == 1)[0]
             obj_omega = torch.concat((torch.zeros_like(dtheta),
                                    torch.zeros_like(dtheta),
                                    torch.zeros_like(dtheta)), -1)  
-            obj_omega[:, :, idx] = dtheta  
-        contact_point_v = (contact_jac[:, :-1] @ dq.reshape(N, T, 4 * self.num_fingers, 1)).squeeze(-1)  # should be N x T x 3
+            obj_omega[idx] = dtheta  
+        contact_point_v = (contact_jac @ dq.reshape(4 * self.num_fingers, 1)).squeeze(-1)  # should be N x T x 3
         # compute valve contact point velocity
         object_contact_point_v = 0 # in the robot frame
         if self.obj_rotational_dim > 0:
             if self.obj_translational_dim > 0:
                 with torch.no_grad(): # the change of object location should not affect the contact velocity
-                    obj_location = torch.zeros(N, T, 3).to(self.device)
+                    obj_location = torch.zeros(3).to(self.device)
                     idx = torch.where(torch.tensor(self.obj_translational_code) == 1)[0]
-                    obj_location[:, :, idx] = current_theta[:, :, :self.obj_translational_dim]
+                    obj_location[idx] = current_theta[:self.obj_translational_dim]
                     obj_robot_frame = self.world_trans.inverse().transform_points(obj_location)
-                contact_point_r_valve = contact_loc.reshape(N, T + 1, 3)[:, :-1] - obj_robot_frame
+                contact_point_r_valve = contact_loc.reshape(3) - obj_robot_frame
             else: # assuming the object location is fixed
                 obj_robot_frame = self.world_trans.inverse().transform_points(self.object_location.reshape(1, 3))
-                contact_point_r_valve = contact_loc.reshape(N, T + 1, 3)[:, :-1] - obj_robot_frame.reshape(1, 1, 3)
-            obj_omega_robot_frame = self.world_trans.inverse().transform_normals(obj_omega)
+                contact_point_r_valve = contact_loc.reshape(3) - obj_robot_frame.reshape(3)
+            obj_omega_robot_frame = self.world_trans.inverse().transform_normals(obj_omega.unsqueeze(0)).squeeze(0)
             object_contact_point_v = object_contact_point_v + torch.cross(obj_omega_robot_frame, contact_point_r_valve, dim=-1)
         if self.obj_translational_dim > 0:
-            obj_translational_v = torch.zeros(N, T, 3).to(self.device)
+            obj_translational_v = torch.zeros(3).to(self.device)
             idx = torch.where(torch.tensor(self.obj_translational_code) == 1)[0]
-            obj_translational_v[:, :, idx] = next_theta[:, :, :self.obj_translational_dim] - current_theta[:, :, :self.obj_translational_dim]
+            obj_translational_v[idx] = next_theta[:self.obj_translational_dim] - current_theta[:self.obj_translational_dim]
             obj_translational_v = self.world_trans.inverse().transform_normals(obj_translational_v)
             object_contact_point_v = object_contact_point_v + obj_translational_v
         # project the constraint into the tangential plane
         normal_projection = contact_normal.unsqueeze(-1) @ contact_normal.unsqueeze(-2)
-        R = self.get_rotation_from_normal(contact_normal.reshape(-1, 3)).reshape(N, T, 3, 3).detach().permute(0, 1, 3, 2)
-        R = R[:, :, :2]
+        R = self.get_rotation_from_normal(contact_normal.reshape(-1, 3)).reshape(3, 3).detach().transpose(1,0)
+        R = R[:2]
         # compute contact v tangential to surface
         contact_point_v_tan = contact_point_v - (normal_projection @ contact_point_v.unsqueeze(-1)).squeeze(-1)
         object_contact_point_v_tan = object_contact_point_v - (normal_projection @ object_contact_point_v.unsqueeze(-1)).squeeze(-1)
 
         # we actually ended up computing T+1 contact constraints, but start state is fixed so we throw that away
         # g = (contact_point_v - object_contact_point_v).reshape(N, -1) # DEBUG ONLY
-        g = (R @ (contact_point_v_tan - object_contact_point_v_tan).unsqueeze(-1)).reshape(N, -1)
+        g = (R @ (contact_point_v_tan - object_contact_point_v_tan).unsqueeze(-1)).squeeze(-1)
 
         return g
-    
+
+
     @all_finger_constraints
     def _kinematics_constraints(self, xu, finger_name, compute_grads=True, compute_hess=False):
         """
@@ -1111,8 +1116,9 @@ class AllegroValveTurning(AllegroContactProblem):
         next_q = x[:, 1:, :4 * self.num_fingers]
         current_theta = x[:, :-1, 4 * self.num_fingers: 4 * self.num_fingers + self.obj_dof]
         next_theta = x[:, 1:, 4 * self.num_fingers: 4 * self.num_fingers + self.obj_dof]
-        g = self._kinematics_constr(current_q, next_q, current_theta, next_theta, contact_jacobian, contact_loc, contact_normal=contact_normal)
+        g = self.kinematics_constr(current_q, next_q, current_theta, next_theta, contact_jacobian[:, :-1], contact_loc[:, :-1], contact_normal)
         g_dim = g.reshape(N, T, -1).shape[-1]
+        g = g.reshape(N, -1)
         # print(finger_name, g.abs().max(), g.abs().mean())
 
         if compute_grads:
@@ -1121,27 +1127,8 @@ class AllegroValveTurning(AllegroContactProblem):
             T_range_plus = torch.arange(1, T, device=x.device)
 
             dg_d_current_q, dg_d_next_q, dg_d_current_theta, dg_d_next_theta, dg_d_contact_jac, dg_d_contact_loc, dg_d_normal \
-                = self.grad_kinematics_constr(current_q, next_q, current_theta, next_theta, contact_jacobian, contact_loc, contact_normal)
+                = self.grad_kinematics_constr(current_q, next_q, current_theta, next_theta, contact_jacobian[:, :-1], contact_loc[:, :-1], contact_normal)
             with torch.no_grad():
-                # compress the N dimension
-                dg_d_current_q = torch.stack([dg_d_current_q[i, :, i] for i in range(N)], dim=0)
-                dg_d_next_q = torch.stack([dg_d_next_q[i, :, i] for i in range(N)], dim=0)
-                dg_d_current_theta = torch.stack([dg_d_current_theta[i, :, i] for i in range(N)], dim=0)
-                dg_d_next_theta = torch.stack([dg_d_next_theta[i, :, i] for i in range(N)], dim=0)
-                dg_d_contact_jac = torch.stack([dg_d_contact_jac[i, :, i] for i in range(N)], dim=0)
-                dg_d_contact_jac = dg_d_contact_jac[:, :, :-1] # throw awaw the last dim, which is not used
-                dg_d_contact_loc = torch.stack([dg_d_contact_loc[i, :, i] for i in range(N)], dim=0)
-                dg_d_contact_loc = dg_d_contact_loc[:, :, :-1] # throw awat the last dim, which is not used
-                dg_d_normal = torch.stack([dg_d_normal[i, :, i] for i in range(N)], dim=0)
-
-                # compress the T dimension
-                dg_d_current_q = torch.stack([dg_d_current_q.reshape(N, T, g_dim, T, 4 * self.num_fingers)[:, i, :, i] for i in range(T)], dim=1)
-                dg_d_next_q = torch.stack([dg_d_next_q.reshape(N, T, g_dim, T, 4 * self.num_fingers)[:, i, :, i] for i in range(T)], dim=1)
-                dg_d_current_theta = torch.stack([dg_d_current_theta.reshape(N, T, g_dim, T, self.obj_dof)[:, i, :, i] for i in range(T)], dim=1)
-                dg_d_next_theta = torch.stack([dg_d_next_theta.reshape(N, T, g_dim, T, self.obj_dof)[:, i, :, i] for i in range(T)], dim=1)
-                dg_d_contact_jac = torch.stack([dg_d_contact_jac.reshape(N, T, g_dim, T, 3, 4 * self.num_fingers)[:, i, :, i] for i in range(T)], dim=1)
-                dg_d_contact_loc = torch.stack([dg_d_contact_loc.reshape(N, T, g_dim, T, 3)[:, i, :, i] for i in range(T)], dim=1)
-                dg_d_normal = torch.stack([dg_d_normal.reshape(N, T, g_dim, T, 3)[:, i, :, i] for i in range(T)], dim=1)
 
                 dg_d_current_q = dg_d_current_q + dg_d_contact_jac.reshape(N, T, g_dim, -1) @ dJ_dq[:, :-1].reshape(N, T, -1, 4 * self.num_fingers)
                 dg_d_current_q = dg_d_current_q + dg_d_contact_loc @ d_contact_loc_dq[:, :-1]
@@ -1164,6 +1151,135 @@ class AllegroValveTurning(AllegroContactProblem):
             return g, grad_g, hess
 
         return g, grad_g, None
+    # def _kinematics_constr(self, current_q, next_q, current_theta, next_theta, contact_jac, contact_loc, contact_normal):
+    #     N, _, _ = current_q.shape
+    #     T = self.T
+    #     # approximate q dot and theta dot
+    #     dq = next_q - current_q
+    #     if np.sum(self.obj_rotational_code) == 3:
+    #         obj_omega = euler_to_angular_velocity(current_theta[:, :, self.obj_translational_dim:],\
+    #                                                next_theta[:, :, self.obj_translational_dim:] )
+    #     elif np.sum(self.obj_rotational_code) == 1:
+    #         dtheta = next_theta[:, :, self.obj_translational_dim:] - current_theta[:, :, self.obj_translational_dim:]
+    #         idx = torch.where(torch.tensor(self.obj_rotational_code) == 1)[0]
+    #         obj_omega = torch.concat((torch.zeros_like(dtheta),
+    #                                torch.zeros_like(dtheta),
+    #                                torch.zeros_like(dtheta)), -1)  
+    #         obj_omega[:, :, idx] = dtheta  
+    #     contact_point_v = (contact_jac[:, :-1] @ dq.reshape(N, T, 4 * self.num_fingers, 1)).squeeze(-1)  # should be N x T x 3
+    #     # compute valve contact point velocity
+    #     object_contact_point_v = 0 # in the robot frame
+    #     if self.obj_rotational_dim > 0:
+    #         if self.obj_translational_dim > 0:
+    #             with torch.no_grad(): # the change of object location should not affect the contact velocity
+    #                 obj_location = torch.zeros(N, T, 3).to(self.device)
+    #                 idx = torch.where(torch.tensor(self.obj_translational_code) == 1)[0]
+    #                 obj_location[:, :, idx] = current_theta[:, :, :self.obj_translational_dim]
+    #                 obj_robot_frame = self.world_trans.inverse().transform_points(obj_location)
+    #             contact_point_r_valve = contact_loc.reshape(N, T + 1, 3)[:, :-1] - obj_robot_frame
+    #         else: # assuming the object location is fixed
+    #             obj_robot_frame = self.world_trans.inverse().transform_points(self.object_location.reshape(1, 3))
+    #             contact_point_r_valve = contact_loc.reshape(N, T + 1, 3)[:, :-1] - obj_robot_frame.reshape(1, 1, 3)
+    #         obj_omega_robot_frame = self.world_trans.inverse().transform_normals(obj_omega)
+    #         object_contact_point_v = object_contact_point_v + torch.cross(obj_omega_robot_frame, contact_point_r_valve, dim=-1)
+    #     if self.obj_translational_dim > 0:
+    #         obj_translational_v = torch.zeros(N, T, 3).to(self.device)
+    #         idx = torch.where(torch.tensor(self.obj_translational_code) == 1)[0]
+    #         obj_translational_v[:, :, idx] = next_theta[:, :, :self.obj_translational_dim] - current_theta[:, :, :self.obj_translational_dim]
+    #         obj_translational_v = self.world_trans.inverse().transform_normals(obj_translational_v)
+    #         object_contact_point_v = object_contact_point_v + obj_translational_v
+    #     # project the constraint into the tangential plane
+    #     normal_projection = contact_normal.unsqueeze(-1) @ contact_normal.unsqueeze(-2)
+    #     R = self.get_rotation_from_normal(contact_normal.reshape(-1, 3)).reshape(N, T, 3, 3).detach().permute(0, 1, 3, 2)
+    #     R = R[:, :, :2]
+    #     # compute contact v tangential to surface
+    #     contact_point_v_tan = contact_point_v - (normal_projection @ contact_point_v.unsqueeze(-1)).squeeze(-1)
+    #     object_contact_point_v_tan = object_contact_point_v - (normal_projection @ object_contact_point_v.unsqueeze(-1)).squeeze(-1)
+
+    #     # we actually ended up computing T+1 contact constraints, but start state is fixed so we throw that away
+    #     # g = (contact_point_v - object_contact_point_v).reshape(N, -1) # DEBUG ONLY
+    #     g = (R @ (contact_point_v_tan - object_contact_point_v_tan).unsqueeze(-1)).reshape(N, -1)
+
+    #     return g
+    
+    # @all_finger_constraints
+    # def _kinematics_constraints(self, xu, finger_name, compute_grads=True, compute_hess=False):
+    #     """
+    #         Computes on the kinematics of the valve and the finger being consistant
+    #     """
+    #     x = xu[:, :, :self.dx]
+    #     N, T, _ = x.shape
+
+    #     # we want to add the start state to x, this x is now T + 1
+    #     x = torch.cat((self.start.reshape(1, 1, -1).repeat(N, 1, 1), x), dim=1)
+
+    #     # Retrieve pre-processed data
+    #     ret_scene = self.data[finger_name]
+    #     contact_jacobian = ret_scene.get('contact_jacobian', None)
+    #     contact_loc = ret_scene.get('closest_pt_world', None).reshape(N, T + 1, 3)
+    #     d_contact_loc_dq = ret_scene.get('closest_pt_q_grad', None)
+    #     dJ_dq = ret_scene.get('dJ_dq', None)
+    #     contact_normal = ret_scene.get('contact_normal', None).reshape(N, T + 1, 3)[:, :-1]
+    #     dnormal_dq = self.data[finger_name]['dnormal_dq'].reshape(N, T + 1, 3, 4 * self.num_fingers)[:, :-1]
+    #     dnormal_dtheta = self.data[finger_name]['dnormal_denv_q'].reshape(N, T + 1, 3, self.obj_dof)[:, :-1]
+
+    #     current_q = x[:, :-1, :4 * self.num_fingers]
+    #     next_q = x[:, 1:, :4 * self.num_fingers]
+    #     current_theta = x[:, :-1, 4 * self.num_fingers: 4 * self.num_fingers + self.obj_dof]
+    #     next_theta = x[:, 1:, 4 * self.num_fingers: 4 * self.num_fingers + self.obj_dof]
+    #     g = self._kinematics_constr(current_q, next_q, current_theta, next_theta, contact_jacobian, contact_loc, contact_normal=contact_normal)
+    #     g_dim = g.reshape(N, T, -1).shape[-1]
+    #     # print(finger_name, g.abs().max(), g.abs().mean())
+
+    #     if compute_grads:
+    #         T_range = torch.arange(T, device=x.device)
+    #         T_range_minus = torch.arange(T - 1, device=x.device)
+    #         T_range_plus = torch.arange(1, T, device=x.device)
+
+    #         dg_d_current_q, dg_d_next_q, dg_d_current_theta, dg_d_next_theta, dg_d_contact_jac, dg_d_contact_loc, dg_d_normal \
+    #             = self.grad_kinematics_constr(current_q, next_q, current_theta, next_theta, contact_jacobian, contact_loc, contact_normal)
+    #         with torch.no_grad():
+    #             # compress the N dimension
+    #             dg_d_current_q = torch.stack([dg_d_current_q[i, :, i] for i in range(N)], dim=0)
+    #             dg_d_next_q = torch.stack([dg_d_next_q[i, :, i] for i in range(N)], dim=0)
+    #             dg_d_current_theta = torch.stack([dg_d_current_theta[i, :, i] for i in range(N)], dim=0)
+    #             dg_d_next_theta = torch.stack([dg_d_next_theta[i, :, i] for i in range(N)], dim=0)
+    #             dg_d_contact_jac = torch.stack([dg_d_contact_jac[i, :, i] for i in range(N)], dim=0)
+    #             dg_d_contact_jac = dg_d_contact_jac[:, :, :-1] # throw awaw the last dim, which is not used
+    #             dg_d_contact_loc = torch.stack([dg_d_contact_loc[i, :, i] for i in range(N)], dim=0)
+    #             dg_d_contact_loc = dg_d_contact_loc[:, :, :-1] # throw awat the last dim, which is not used
+    #             dg_d_normal = torch.stack([dg_d_normal[i, :, i] for i in range(N)], dim=0)
+
+    #             # compress the T dimension
+    #             dg_d_current_q = torch.stack([dg_d_current_q.reshape(N, T, g_dim, T, 4 * self.num_fingers)[:, i, :, i] for i in range(T)], dim=1)
+    #             dg_d_next_q = torch.stack([dg_d_next_q.reshape(N, T, g_dim, T, 4 * self.num_fingers)[:, i, :, i] for i in range(T)], dim=1)
+    #             dg_d_current_theta = torch.stack([dg_d_current_theta.reshape(N, T, g_dim, T, self.obj_dof)[:, i, :, i] for i in range(T)], dim=1)
+    #             dg_d_next_theta = torch.stack([dg_d_next_theta.reshape(N, T, g_dim, T, self.obj_dof)[:, i, :, i] for i in range(T)], dim=1)
+    #             dg_d_contact_jac = torch.stack([dg_d_contact_jac.reshape(N, T, g_dim, T, 3, 4 * self.num_fingers)[:, i, :, i] for i in range(T)], dim=1)
+    #             dg_d_contact_loc = torch.stack([dg_d_contact_loc.reshape(N, T, g_dim, T, 3)[:, i, :, i] for i in range(T)], dim=1)
+    #             dg_d_normal = torch.stack([dg_d_normal.reshape(N, T, g_dim, T, 3)[:, i, :, i] for i in range(T)], dim=1)
+
+    #             dg_d_current_q = dg_d_current_q + dg_d_contact_jac.reshape(N, T, g_dim, -1) @ dJ_dq[:, :-1].reshape(N, T, -1, 4 * self.num_fingers)
+    #             dg_d_current_q = dg_d_current_q + dg_d_contact_loc @ d_contact_loc_dq[:, :-1]
+    #             # add constraints related to normal 
+    #             dg_d_current_q = dg_d_current_q + dg_d_normal @ dnormal_dq
+    #             dg_d_current_theta = dg_d_current_theta + dg_d_normal @ dnormal_dtheta
+
+    #             grad_g = torch.zeros((N, T, T, g_dim, self.dx + self.du), device=x.device)
+    #             grad_g[:, T_range_plus, T_range_minus, :, :4 * self.num_fingers] = dg_d_current_q[:, 1:]
+    #             grad_g[:, T_range_plus, T_range_minus, :, 4 * self.num_fingers: 4 * self.num_fingers + self.obj_dof] = dg_d_current_theta[:, 1:]
+    #             grad_g[:, T_range, T_range, :, :4 * self.num_fingers] = dg_d_next_q
+    #             grad_g[:, T_range, T_range, :, 4 * self.num_fingers: 4 * self.num_fingers + self.obj_dof] = dg_d_next_theta
+    #             grad_g = grad_g.permute(0, 1, 3, 2, 4).reshape(N, -1, T * (self.dx + self.du))
+        
+    #     else:
+    #         return g, None, None
+
+    #     if compute_hess:
+    #         hess = torch.zeros(N, g.shape[1], T * (self.dx + self.du), T * (self.dx + self.du), device=self.device)
+    #         return g, grad_g, hess
+
+    #     return g, grad_g, None
     
     def _dynamics_constr(self, q, u, next_q, contact_jacobian, contact_normal):
         # this will be vmapped, so takes in a 3 vector and a 3 x 8 jacobian and a dq vector
