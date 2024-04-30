@@ -30,6 +30,7 @@ from scipy.spatial.transform import Rotation as R
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
+device = 'cuda:0'
 obj_dof = 3
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
@@ -361,7 +362,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             import time
             s = time.time()
             best_traj, plans = planner.step(state)
-            #print('Planning time: ', time.time() - s)
             planned_trajectories.append(plans)
             N, T, _ = plans.shape
 
@@ -378,16 +378,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             action = best_traj[0, planner.problem.dx:planner.problem.dx + planner.problem.du]
             state = env.get_state()
             state = state['q'].reshape(-1).to(device=params['device'])
-            xu = torch.cat((state, action))
+            xu = torch.cat((state[:-1], action))
 
             # record the actual trajectory
             actual_trajectory.append(xu)
-            #print('--')
             x = best_traj[0, :planner.problem.dx + planner.problem.du]
             x = x.reshape(1, planner.problem.dx + planner.problem.du)
             action = x[:, planner.problem.dx:planner.problem.dx + planner.problem.du].to(device=env.device)
-            #if params['optimize_force']:
-            #    print(action[:, 4 * num_fingers_to_plan:])  # print out the action for debugging
             # print(action)
             action = action[:, :4 * num_fingers_to_plan]
             if params['exclude_index']:
@@ -438,22 +435,26 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             # print(distance2goal)
             # info = {**equality_constr_dict, **inequality_constr_dict, **{'distance2goal': distance2goal}}
             # info_list.append(info)
+            if params['visualize']:
+                gym.clear_lines(viewer)
+                state = env.get_state()
+                start = state['q'][:, :4 * num_fingers + obj_dof].squeeze(0).to(device=params['device'])
+                for finger in params['fingers']:
+                    ee = state2ee_pos(start[:4 * num_fingers], turn_problem.ee_names[finger])
+                    finger_traj_history[finger].append(ee.detach().cpu().numpy())
+                for finger in params['fingers']:
+                    traj_history = finger_traj_history[finger]
+                    temp_for_plot = np.stack(traj_history, axis=0)
+                    if k >= 2:
+                        axes[finger].plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray',
+                                            label='actual')
 
-            gym.clear_lines(viewer)
-            state = env.get_state()
-            start = state['q'][:, :4 * num_fingers + obj_dof].squeeze(0).to(device=params['device'])
-            for finger in params['fingers']:
-                ee = state2ee_pos(start[:4 * num_fingers], turn_problem.ee_names[finger])
-                finger_traj_history[finger].append(ee.detach().cpu().numpy())
-            for finger in params['fingers']:
-                traj_history = finger_traj_history[finger]
-                temp_for_plot = np.stack(traj_history, axis=0)
-                if k >= 2:
-                    axes[finger].plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray',
-                                        label='actual')
         # actual_trajectory.append(env.get_state()['q'].reshape(9).to(device=params['device']))
-        actual_trajectory = torch.stack(actual_trajectory, dim=0).cpu()
+        actual_trajectory = torch.stack(actual_trajectory, dim=0)
         # can't stack plans as each is of a different length
+
+        # for memory reasons we clear the data
+        planner.problem.data = {}
         return actual_trajectory, planned_trajectories, contact_points, contact_distance
 
     data = {}
@@ -472,7 +473,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         for i, plan in enumerate(plans):
             t = plan.shape[1]
             data[t]['plans'].append(plan)
-            data[t]['starts'].append(traj[i, :15].reshape(1, -1).repeat(plan.shape[0], 1))
+            data[t]['starts'].append(traj[i].reshape(1, -1).repeat(plan.shape[0], 1))
             data[t]['contact_points'].append(contact_points[t])
             data[t]['contact_distance'].append(contact_distance[t])
             data[t]['contact_state'].append(contact_state)
@@ -486,25 +487,25 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         if turn == 0:
             traj, plans, contact_points, contact_distance = execute_traj(
                 pregrasp_planner, fname=f'pregrasp_{turn}')
-            #p#rint(plans[0].shape)
 
             # include zero for the contact forces
             plans = [torch.cat((plan,
                                 torch.zeros(*plan.shape[:-1], 9).to(device=params['device'])),
                                dim=-1) for plan in plans]
-
+            traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 9).to(device=params['device'])), dim=-1)
             _add_to_dataset(traj, plans, contact_points, contact_distance, contact_state=torch.zeros(3))
 
         else:
 
             traj, plans, contact_points, contact_distance = execute_traj(
                 index_regrasp_planner, goal=valve_goal, fname=f'index_regrasp_{turn}')
-            #print(plans[0].shape)
 
             plans = [torch.cat((plan[..., :-6],
                                 torch.zeros(*plan.shape[:-1], 3).to(device=params['device']),
                                 plan[..., -6:]),
                                dim=-1) for plan in plans]
+            traj = torch.cat((traj[..., :-6], torch.zeros(*traj.shape[:-1], 3).to(device=params['device']),
+                              traj[..., -6:]), dim=-1)
 
             _add_to_dataset(traj, plans, contact_points, contact_distance, contact_state=torch.tensor([0.0, 1.0, 1.0]))
 
@@ -513,6 +514,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             plans = [torch.cat((plan,
                                 torch.zeros(*plan.shape[:-1], 6).to(device=params['device'])),
                                dim=-1) for plan in plans]
+            traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 6).to(device=params['device'])), dim=-1)
+
             _add_to_dataset(traj, plans, contact_points, contact_distance, contact_state=torch.tensor([1.0, 0.0, 0.0]))
 
         time.sleep(1)
@@ -574,6 +577,9 @@ if __name__ == "__main__":
                                         fingers=config['fingers'],
                                         )
     else:
+        if not config['visualize']:
+            img_save_dir = None
+
         env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
                                            use_cartesian_controller=False,
                                            viewer=config['visualize'],
@@ -581,7 +587,7 @@ if __name__ == "__main__":
                                            friction_coefficient=config['friction_coefficient'] * 1.05,
                                            # friction_coefficient=1.0,  # DEBUG ONLY, set the friction very high
                                            device=config['sim_device'],
-                                           video_save_path=img_save_dir if config['visualize'] else None,
+                                           video_save_path=img_save_dir,
                                            joint_stiffness=config['kp'],
                                            fingers=config['fingers'],
                                            )
