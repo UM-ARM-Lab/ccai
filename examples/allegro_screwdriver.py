@@ -1,6 +1,6 @@
 from isaac_victor_envs.utils import get_assets_dir
 from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
-# from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
+from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
 
 import numpy as np
 import pickle as pkl
@@ -106,7 +106,23 @@ class AllegroScrewdriver(AllegroValveTurning):
 
         goal_cost = torch.sum((500 * (state[-1, -self.obj_dof:] - goal) ** 2)).reshape(-1)
         # add a running cost
-        goal_cost += torch.sum((2 * (state[:, -self.obj_dof:] - goal.unsqueeze(0)) ** 2))
+        goal_cost += torch.sum((1 * (state[:, -self.obj_dof:] - goal.unsqueeze(0)) ** 2))
+
+        # obj_orientation = state[:, -self.obj_dof+self.obj_translational_dim:]
+        # obj_orientation = tf.euler_angles_to_matrix(obj_orientation, convention='XYZ')
+        # # obj_orientation = tf.matrix_to_rotation_6d(obj_orientation)
+        # goal_orientation = tf.euler_angles_to_matrix(goal[-self.obj_rotational_dim:], convention='XYZ')
+        # # goal_orientation = tf.matrix_to_rotation_6d(goal_orientation) # convert to 6d representation  
+        # cos_angle = tf.so3_relative_angle(obj_orientation, goal_orientation.unsqueeze(0), cos_angle=True)
+        # # terminal cost
+        # goal_cost = torch.sum((1000 * (1 - cos_angle[-1]) ** 2))
+        # # running cost 
+        # goal_cost = goal_cost + 10*torch.sum((1 * (1 - cos_angle) ** 2))
+
+        # # terminal cost
+        # goal_cost = torch.sum((100 * (obj_orientation[-1] - goal_orientation) ** 2))
+        # # running cost 
+        # goal_cost = goal_cost + torch.sum((3 * (obj_orientation - goal_orientation) ** 2))
 
         if self.optimize_force:
             force = xu[:, self.dx + 4 * self.num_fingers: self.dx + (4 + 3) * self.num_fingers]
@@ -388,18 +404,18 @@ if __name__ == "__main__":
     from tqdm import tqdm
 
     if config['mode'] == 'hardware':
-        pass
-        # env = RosAllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
-        #                          use_cartesian_controller=False,
-        #                          viewer=True,
-        #                          steps_per_action=60,
-        #                          friction_coefficient=1.0,
-        #                          device=config['sim_device'],
-        #                          valve=config['object_type'],
-        #                          video_save_path=img_save_dir,
-        #                          joint_stiffness=config['kp'],
-        #                          fingers=config['fingers'],
-        #                          )
+        # pass
+        env = RosAllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
+                                 use_cartesian_controller=False,
+                                 viewer=True,
+                                 steps_per_action=60,
+                                 friction_coefficient=1.0,
+                                 device=config['sim_device'],
+                                 valve=config['object_type'],
+                                 video_save_path=img_save_dir,
+                                 joint_stiffness=config['kp'],
+                                 fingers=config['fingers'],
+                                 )
     else:
         env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
                                     use_cartesian_controller=False,
@@ -430,7 +446,11 @@ if __name__ == "__main__":
     if config['mode'] == 'hardware':
         sim_env = env
         from hardware.hardware_env import HardwareEnv
-        env = HardwareEnv(sim_env.default_dof_pos[:, :16], finger_list=config['fingers'], kp=config['kp'], obj='screwdriver')
+        env = HardwareEnv(sim_env.default_dof_pos[:, :16], 
+                          finger_list=config['fingers'], 
+                          kp=config['kp'], 
+                          obj='screwdriver',
+                          mode='relative')
         env.world_trans = sim_env.world_trans
         env.joint_stiffness = sim_env.joint_stiffness
         env.device = sim_env.device

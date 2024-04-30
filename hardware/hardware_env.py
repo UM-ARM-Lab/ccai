@@ -6,7 +6,8 @@ import torch
 import rospy
 
 class ObjectPoseReader:
-    def __init__(self, obj='valve') -> None:
+    def __init__(self, obj='valve', mode='relative') -> None:
+        self.mode = mode
         self.obj = obj
         self.__intrinsic = np.array([[621.80984333,   0.,         651.09118583],
         [  0.,         621.66658768, 352.88384525],
@@ -28,25 +29,60 @@ class ObjectPoseReader:
                 if self.__initial_pose is not None:
                     break
         elif self.obj == 'screwdriver':
+            if mode == 'absolute':
+                global_rvecs = np.load('rvecs.npy')
+                global_tvecs = np.load('tvecs.npy')
+                rotation = R.from_rotvec(global_rvecs[:,0])
+                rotation_mat = rotation.as_matrix()
+                translation = global_tvecs
+                world2cam = np.concatenate((rotation_mat, translation), axis=1) # transform from world coordinate to camera coordinate
+                world2cam = np.concatenate((world2cam, np.array([[0, 0, 0, 1]])), axis=0)
+                global_trans = np.array([[0, 1, 0], 
+                                        [1, 0, 0],
+                                        [0, 0, -1]]).T
+                global_trans = np.concatenate((global_trans, np.array([[0, 0, 0]]).T), axis=1)
+                global_trans = np.concatenate((global_trans, np.array([[0, 0, 0, 1]])), axis=0)
+                cam2world = np.linalg.inv(world2cam)
+                self.__cam2world = global_trans @ cam2world
+            elif mode == 'relative':
+                objp_palm = np.array([[-0.5, 0, -0.5],
+                                        [0.5, 0, -0.5],
+                                        [0.5, 0, 0.5],
+                                        [-0.5, 0, 0.5]]) * 35
+                while True:
+                    ret, frame = self.__cap.read()
+                    markerCorners, markerIds, rejectedCandidates = self.__detector.detectMarkers(frame)
+                    # print(markerCorners)
+                    if len(markerCorners) > 0:
+                        cv2.aruco.drawDetectedMarkers(frame, markerCorners, markerIds)
+                        palm_marker_flag = False
+                        for marker_id, marker_corner in zip(markerIds, markerCorners):
+                            if marker_id.item() == 4:
+                                ret, rvecs, tvecs = cv2.solvePnP(objp_palm, marker_corner, self.__intrinsic, self.__dist) 
+                                # cv2.drawFrameAxes(frame, intrinsic, dist, rvecs, tvecs, 35 / 2)
+                                rotation = R.from_rotvec(rvecs[:,0])
+                                rotation_mat = rotation.as_matrix()
+                                translation = tvecs
+                                palm_marker2cam = np.concatenate((rotation_mat, translation), axis=1)
+                                palm_marker2cam = np.concatenate((palm_marker2cam, np.array([[0, 0, 0, 1]])), axis=0)
+                                palm_marker_flag = True
+                        if palm_marker_flag:
+                            break
+                    # cv2.imshow('frame', frame)
+                    # if cv2.waitKey(1) & 0xFF == ord('q'):
+                    #     break
+                world2palm_marker = np.array([[1, 0, 0, 0],
+                                            [0, 1, 0, 0],
+                                            [0, 0, 1, 0],
+                                            [0, 0, 0, 1]])
+                self.__cam2world = np.linalg.inv(world2palm_marker) @ np.linalg.inv(palm_marker2cam) 
+            else:
+                raise NotImplementedError
+
             self.__objp = np.array([[-0.5, -0.5, 0.],
                     [-0.5, 0.5, 0.],
                     [0.5, 0.5, 0.],
                     [0.5, -0.5, 0.]]) * 35
-            global_rvecs = np.load('rvecs.npy')
-            global_tvecs = np.load('tvecs.npy')
-            rotation = R.from_rotvec(global_rvecs[:,0])
-            rotation_mat = rotation.as_matrix()
-            translation = global_tvecs
-            world2cam = np.concatenate((rotation_mat, translation), axis=1) # transform from world coordinate to camera coordinate
-            world2cam = np.concatenate((world2cam, np.array([[0, 0, 0, 1]])), axis=0)
-            global_trans = np.array([[0, 1, 0], 
-                                    [1, 0, 0],
-                                    [0, 0, -1]]).T
-            global_trans = np.concatenate((global_trans, np.array([[0, 0, 0]]).T), axis=1)
-            global_trans = np.concatenate((global_trans, np.array([[0, 0, 0, 1]])), axis=0)
-            cam2world = np.linalg.inv(world2cam)
-            self.__cam2world = global_trans @ cam2world
-
             self.__screwdriver2marker = []
             rotate_90_trans = np.array([[1, 0, 0],
                                         [0, 0, 1],
@@ -92,11 +128,13 @@ class ObjectPoseReader:
             if ctr >= 7 and ret:
                 break
         markerCorners, markerIds, rejectedCandidates = self.__detector.detectMarkers(frame)
-        if len(markerCorners) > 0 and markerIds.max() < 4:
+        if len(markerCorners) > 0 and markerIds.max() <= 4:
             # cv2.aruco.drawDetectedMarkers(frame, markerCorners, markerIds)
-            for i in range(len(markerCorners)):
+            for marker_corner, marker_id in zip(markerCorners, markerIds):
+                if marker_id.item() >= 4:
+                    continue
 
-                ret, rvecs, tvecs = cv2.solvePnP(self.__objp, markerCorners[i], self.__intrinsic, self.__dist) 
+                ret, rvecs, tvecs = cv2.solvePnP(self.__objp, marker_corner, self.__intrinsic, self.__dist) 
                 # cv2.drawFrameAxes(frame, self.__intrinsic, self.__dist, rvecs, tvecs, 35 / 2) # debug
                 rotation = R.from_rotvec(rvecs[:,0])
                 rotation_mat = rotation.as_matrix()
@@ -108,7 +146,7 @@ class ObjectPoseReader:
                 centroid_direction = marker2world[:3, 2]
                 center_coor = world_coor - centroid_direction * 21
                 # print(markerIds[i], center_coor)
-                trans_mat = self.__screwdriver2marker[markerIds[i].item()]
+                trans_mat = self.__screwdriver2marker[marker_id.item()]
                 trans_mat = marker2world @ trans_mat
                 scrwedriver_ori_mat = trans_mat[:3, :3]
                 screwdriver_ori_euler = R.from_matrix(scrwedriver_ori_mat).as_euler('XYZ', degrees=True)
@@ -135,13 +173,13 @@ class ObjectPoseReader:
             return center_coor, screwdriver_ori_euler
 
 class HardwareEnv:
-    def __init__(self, default_pos, finger_list=['index', 'middle', 'ring', 'thumb'], kp=4, obj='valve', ori_only=True, device='cuda:0'):
+    def __init__(self, default_pos, finger_list=['index', 'middle', 'ring', 'thumb'], kp=4, obj='valve', ori_only=True, mode='relative', device='cuda:0'):
         self.__all_finger_list = ['index', 'middle', 'ring', 'thumb']
         self.obj = obj
         self.__finger_list = finger_list
         self.__ros_node = RosNode(kp=kp)
 
-        self.obj_reader = ObjectPoseReader(obj=obj)
+        self.obj_reader = ObjectPoseReader(obj=obj, mode=mode)
 
         self.device = device
         self.default_pos = default_pos.clone()
