@@ -234,7 +234,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
             pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
             pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-            visualize_trajectory(traj_for_viz, turn_problem.contact_scenes['thumb'], viz_fpath, turn_problem.fingers, turn_problem.obj_dof+1)
+            visualize_trajectory(traj_for_viz, turn_problem.contact_scenes, viz_fpath, turn_problem.fingers, turn_problem.obj_dof+1)
         
         x = best_traj[0, :turn_problem.dx+turn_problem.du]
         x = x.reshape(1, turn_problem.dx+turn_problem.du)

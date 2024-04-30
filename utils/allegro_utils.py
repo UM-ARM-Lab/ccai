@@ -4,6 +4,7 @@ import open3d as o3d
 import numpy as np
 import matplotlib.pyplot as plt
 import pathlib
+import pytorch_kinematics.transforms as tf
 # import pytorch3d.transforms as tf
 
 full_finger_list = ['index', 'middle', 'ring', 'thumb']
@@ -173,7 +174,7 @@ def visualize_trajectories(trajectories, scene, fpath, headless=False):
         np.save(f'{fpath}/trajectory_{n + 1}/traj.npz', trajectory.cpu().numpy())
 
 
-# def axis_angle_to_euler(axis_angle):
-#     matrix = tf.axis_angle_to_matrix(axis_angle)
-#     euler = tf.matrix_to_euler_angles(matrix, convention='XYZ')
-#     return euler
+def axis_angle_to_euler(axis_angle):
+    matrix = tf.axis_angle_to_matrix(axis_angle)
+    euler = tf.matrix_to_euler_angles(matrix, convention='XYZ')
+    return euler

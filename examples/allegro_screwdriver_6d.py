@@ -17,7 +17,7 @@ import pytorch_volumetric as pv
 import pytorch_kinematics as pk
 # import pytorch_kinematics.transforms as tf
 from torch.func import vmap, jacrev, hessian, jacfwd
-import pytorch3d.transforms as tf
+# import pytorch3d.transforms as tf
 
 import matplotlib.pyplot as plt
 from utils.allegro_utils import partial_to_full_state, full_to_partial_state, combine_finger_constraints, state2ee_pos, visualize_trajectory
@@ -255,7 +255,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
             pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
             pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-            visualize_trajectory(traj_for_viz, turn_problem.contact_scenes['thumb'], viz_fpath, turn_problem.fingers, turn_problem.obj_dof+1)
+            visualize_trajectory(traj_for_viz, turn_problem.contact_scenes, viz_fpath, turn_problem.fingers, turn_problem.obj_dof+1)
         
         x = best_traj[0, :turn_problem.dx+turn_problem.du]
         x = x.reshape(1, turn_problem.dx+turn_problem.du)
@@ -436,8 +436,8 @@ if __name__ == "__main__":
 
     for i in tqdm(range(config['num_trials'])):
         # goal = torch.tensor([0, 0, 0, 0, 0, 0])
-        # goal = torch.tensor([0, 0, 0, 0, -0.75, 0])
-        goal = torch.tensor([0, 0, 0.04, 0, -1.57, 0]) # debug
+        goal = torch.tensor([0, 0, 0, 0, -0.75, 0])
+        # goal = torch.tensor([0, 0, 0.04, 0, -1.57, 0]) # debug
         for controller in config['controllers'].keys():
             env.reset()
             fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_{i + 1}')
