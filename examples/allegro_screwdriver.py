@@ -30,7 +30,6 @@ from scipy.spatial.transform import Rotation as R
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
-device = 'cuda:0'
 obj_dof = 3
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
@@ -260,8 +259,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         # middle_regrasp_planner = PositionControlConstrainedSVGDMPC(middle_regrasp_problem, params)
         # thumb_regrasp_planner = PositionControlConstrainedSVGDMPC(thumb_regrasp_problem, params)
         thumb_and_middle_regrasp_planner = PositionControlConstrainedSVGDMPC(thumb_and_middle_regrasp_problem, params)
-        pregrasp_planner.warmup_iters = 50
-        pregrasp_planner.online_iters = 10
+        #pregrasp_planner.warmup_iters = 50
+        #pregrasp_planner.online_iters = 10
 
 
     else:
@@ -362,7 +361,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             import time
             s = time.time()
             best_traj, plans = planner.step(state)
-            print('Planning time: ', time.time() - s)
+            #print('Planning time: ', time.time() - s)
             planned_trajectories.append(plans)
             N, T, _ = plans.shape
 
@@ -383,27 +382,27 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
             # record the actual trajectory
             actual_trajectory.append(xu)
-            print('--')
+            #print('--')
             x = best_traj[0, :planner.problem.dx + planner.problem.du]
             x = x.reshape(1, planner.problem.dx + planner.problem.du)
             action = x[:, planner.problem.dx:planner.problem.dx + planner.problem.du].to(device=env.device)
-            if params['optimize_force']:
-                print(action[:, 4 * num_fingers_to_plan:])  # print out the action for debugging
+            #if params['optimize_force']:
+            #    print(action[:, 4 * num_fingers_to_plan:])  # print out the action for debugging
             # print(action)
             action = action[:, :4 * num_fingers_to_plan]
             if params['exclude_index']:
                 action = state.unsqueeze(0)[:, 4:4 * num_fingers] + action
                 action = torch.cat((state.unsqueeze(0)[:, :4], action), dim=1)  # add the index finger back
             else:
-                action = action + state.unsqueeze(0)[:,
-                                  :4 * num_fingers]  # NOTE: this is required since we define action as delta action
+                action = action + state.unsqueeze(0)[:,:4 * num_fingers].to(device=env.device)
+
             if params['mode'] == 'hardware':
                 sim_viz_env.set_pose(env.get_state()['all_state'].to(device=env.device))
                 sim_viz_env.step(action)
             elif params['mode'] == 'hardware_copy':
                 ros_copy_node.apply_action(partial_to_full_state(action[0], params['fingers']))
 
-            if best_traj.shape[0] > 1:
+            if params['visualize'] and best_traj.shape[0] > 1:
                 add_trajectories(plans, best_traj, axes, env, sim=sim, gym=gym, viewer=viewer,
                                  config=params, state2ee_pos_func=state2ee_pos,
                                  show_force=(planner == turn_planner and params['optimize_force']))
@@ -487,7 +486,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         if turn == 0:
             traj, plans, contact_points, contact_distance = execute_traj(
                 pregrasp_planner, fname=f'pregrasp_{turn}')
-            print(plans[0].shape)
+            #p#rint(plans[0].shape)
 
             # include zero for the contact forces
             plans = [torch.cat((plan,
@@ -500,7 +499,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
             traj, plans, contact_points, contact_distance = execute_traj(
                 index_regrasp_planner, goal=valve_goal, fname=f'index_regrasp_{turn}')
-            print(plans[0].shape)
+            #print(plans[0].shape)
 
             plans = [torch.cat((plan[..., :-6],
                                 torch.zeros(*plan.shape[:-1], 3).to(device=params['device']),
@@ -577,12 +576,12 @@ if __name__ == "__main__":
     else:
         env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
                                            use_cartesian_controller=False,
-                                           viewer=True,
+                                           viewer=config['visualize'],
                                            steps_per_action=60,
                                            friction_coefficient=config['friction_coefficient'] * 1.05,
                                            # friction_coefficient=1.0,  # DEBUG ONLY, set the friction very high
                                            device=config['sim_device'],
-                                           video_save_path=img_save_dir,
+                                           video_save_path=img_save_dir if config['visualize'] else None,
                                            joint_stiffness=config['kp'],
                                            fingers=config['fingers'],
                                            )
@@ -655,7 +654,7 @@ if __name__ == "__main__":
             params['controller'] = controller
             params['valve_goal'] = goal.to(device=params['device'])
             params['chain'] = chain.to(device=params['device'])
-            object_location = torch.tensor([0, 0, 1.205]).to(device)  # TODO: confirm if this is the correct location
+            object_location = torch.tensor([0, 0, 1.205]).to(params['device'])  # TODO: confirm if this is the correct location
             params['object_location'] = object_location
             final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node)
             # final_distance_to_goal = turn(env, params, fpath)

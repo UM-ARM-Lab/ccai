@@ -4,7 +4,7 @@ import open3d as o3d
 import numpy as np
 import matplotlib.pyplot as plt
 import pathlib
-import pytorch3d.transforms as tf
+import pytorch_kinematics.transforms as tf
 
 full_finger_list = ['index', 'middle', 'ring', 'thumb']
 
@@ -114,7 +114,7 @@ def state2ee_pos(state, finger_name, fingers, chain, frame_indices, world_trans)
 
     """
     fk_dict = chain.forward_kinematics(partial_to_full_state(state, fingers), frame_indices=frame_indices)
-    m = world_trans.compose(fk_dict[finger_name])
+    m = world_trans.compose(fk_dict[finger_name].to(world_trans.device))
     points_finger_frame = torch.tensor([0.00, 0.03, 0.00], device=m.device).unsqueeze(0)
     ee_p = m.transform_points(points_finger_frame).squeeze(-2)
     return ee_p

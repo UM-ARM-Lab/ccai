@@ -1,6 +1,5 @@
 from isaac_victor_envs.utils import get_assets_dir
 from isaac_victor_envs.tasks.allegro import AllegroValveTurningEnv
-# from isaac_victor_envs.tasks.allegro_ros import RosAllegroValveTurningEnv
 
 import numpy as np
 import pickle as pkl
@@ -23,15 +22,14 @@ from ccai.mpc.csvgd import Constrained_SVGD_MPC
 import time
 import pytorch_volumetric as pv
 import pytorch_kinematics as pk
-import pytorch_kinematics.transforms as tf
 # import pytorch3d.transforms as tf
 
 import matplotlib.pyplot as plt
 from utils.allegro_utils import *
+import pytorch_kinematics.transforms as tf
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
-device = 'cuda:0'
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 
@@ -1052,6 +1050,7 @@ class AllegroContactProblem(AllegroObjectProblem):
 
     def _force_equlibrium_constr_w_force(self, q, u, next_q, force_list, contact_jac_list, contact_point_list):
         # NOTE: the constriant is defined in the robot frame
+        # NOTE: the constriant is defined in the robot frame
         # the contact jac an contact points are all in the robot frame
         # this will be vmapped, so takes in a 3 vector and a [num_finger x 3 x 8] jacobian and a dq vector
         obj_robot_frame = self.world_trans.inverse().transform_points(self.object_location.reshape(1, 3))
@@ -1528,9 +1527,9 @@ class AllegroContactProblem(AllegroObjectProblem):
             dh_dtheta = dh_dnormal.reshape(N, T, dh, -1) @ dnormal_dtheta
             grad_h = torch.zeros(N, dh, T, T, d, device=self.device)
 
-            T_range = torch.arange(T, device=device)
-            T_range_minus = torch.arange(T - 1, device=device)
-            T_range_plus = torch.arange(1, T, device=device)
+            T_range = torch.arange(T, device=self.device)
+            T_range_minus = torch.arange(T - 1, device=self.device)
+            T_range_plus = torch.arange(1, T, device=self.device)
 
             # create masks
             mask_t = torch.zeros_like(grad_h).bool()
