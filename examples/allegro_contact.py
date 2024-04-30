@@ -230,12 +230,12 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
         # contact checking
         self.contact_scenes = {}
-        for finger in self.fingers:
-            self.contact_scenes[finger] = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
-                                                        collision_check_links=[self.ee_names[finger]],
-                                                        softmin_temp=1.0e3,
-                                                        points_per_link=1000,
-                                                        )
+        collision_check_links = [self.ee_names[finger] for finger in self.fingers]
+        self.contact_scenes = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
+                                            collision_check_links=collision_check_links,
+                                            softmin_temp=1.0e3,
+                                            points_per_link=1000,
+                                            )
 
         ###### Joint limits ########
         # NOTE: DEBUG only, set the joint limit to be very large for now.
@@ -296,10 +296,9 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             pass
         else:
             raise NotImplementedError
-        for finger in self.fingers:
-            self._preprocess_finger(q, theta, self.contact_scenes[finger], self.ee_link_idx[finger], finger)
+        self._preprocess_fingers(q, theta, self.contact_scenes)
 
-    def _preprocess_finger(self, q, theta, finger_scene, finger_ee_link, finger_name):
+    def _preprocess_fingers(self, q, theta, finger_ee_link):
         N, _, _ = q.shape
 
         # reshape to batch across time
@@ -311,40 +310,41 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             # the cap does not matter for the task, but needs to be included in the state for the model
             theta_b = torch.cat((theta_b, theta_obj_joint), dim=1)
         full_q = partial_to_full_state(q_b, fingers=self.fingers)
-        ret_scene = finger_scene.scene_collision_check(full_q, theta_b,
-                                                       compute_gradient=True,
-                                                       compute_hessian=False)
+        ret_scene = self.contact_scenes.scene_collision_check(full_q, theta_b,
+                                                              compute_gradient=True,
+                                                              compute_hessian=False)
+        for i, finger in enumerate(self.fingers):
+            self.data[finger] = {}
+            self.data[finger]['sdf'] = ret_scene['sdf'][:, i].reshape(N, self.T + 1)
+            # reshape and throw away data for unused fingers
+            grad_g_q = ret_scene.get('grad_sdf', None)
+            self.data[finger]['grad_sdf'] = grad_g_q[:, i].reshape(N, self.T + 1, 16)
 
-        # reshape and throw away data for unused fingers
-        grad_g_q = ret_scene.get('grad_sdf', None)
-        ret_scene['grad_sdf'] = grad_g_q.reshape(N, self.T + 1, 16)
+            # contact jacobian
+            contact_jacobian = ret_scene.get('contact_jacobian', None)
+            self.data[finger]['contact_jacobian'] = contact_jacobian[:, i].reshape(N, self.T + 1, 3, 16)
 
-        # contact jacobian
-        contact_jacobian = ret_scene.get('contact_jacobian', None)
-        contact_jacobian = contact_jacobian.reshape(N, self.T + 1, 3, 16)  # [:, :, :, self.all_joint_index]
-        ret_scene['contact_jacobian'] = contact_jacobian
+            # contact hessian
+            contact_hessian = ret_scene.get('contact_hessian', None)
+            contact_hessian = contact_hessian[:, i].reshape(N, self.T + 1, 3, 16, 16)  # [:, :, :, self.all_joint_index]
+            # contact_hessian = contact_hessian[:, :, :, :, self.all_joint_index]  # shape (N, T+1, 3, 8, 8)
 
-        # contact hessian
-        contact_hessian = ret_scene.get('contact_hessian', None)
-        contact_hessian = contact_hessian.reshape(N, self.T + 1, 3, 16, 16)  # [:, :, :, self.all_joint_index]
-        # contact_hessian = contact_hessian[:, :, :, :, self.all_joint_index]  # shape (N, T+1, 3, 8, 8)
+            # gradient of contact point
+            d_contact_loc_dq = ret_scene.get('closest_pt_q_grad', None)
+            d_contact_loc_dq = d_contact_loc_dq[:, i].reshape(N, self.T + 1, 3, 16)  # [:, :, :, self.all_joint_index]
+            self.data[finger]['closest_pt_q_grad'] = d_contact_loc_dq
+            self.data[finger]['contact_hessian'] = contact_hessian
+            self.data[finger]['closest_pt_world'] = ret_scene['closest_pt_world'][:, i]
+            self.data[finger]['contact_normal'] = ret_scene['contact_normal'][:, i]
 
-        # gradient of contact point
-        d_contact_loc_dq = ret_scene.get('closest_pt_q_grad', None)
-        d_contact_loc_dq = d_contact_loc_dq.reshape(N, self.T + 1, 3, 16)  # [:, :, :, self.all_joint_index]
-        ret_scene['closest_pt_q_grad'] = d_contact_loc_dq
-        ret_scene['contact_hessian'] = contact_hessian
+            # gradient of contact normal
+            self.data[finger]['dnormal_dq'] = ret_scene['dnormal_dq'][:, i].reshape(N, self.T + 1, 3, 16)  # [:, :, :,
+            # self.all_joint_index]
 
-        # gradient of contact normal
-        ret_scene['dnormal_dq'] = ret_scene['dnormal_dq'].reshape(N, self.T + 1, 3, 16)  # [:, :, :,
-        # self.all_joint_index]
-
-        ret_scene['dnormal_denv_q'] = ret_scene['dnormal_denv_q'][:, :, :self.obj_dof]
-        ret_scene['grad_env_sdf'] = ret_scene['grad_env_sdf'][:, :self.obj_dof]
-        dJ_dq = contact_hessian
-        ret_scene['dJ_dq'] = dJ_dq  # Jacobian of the contact point
-
-        self.data[finger_name] = ret_scene
+            self.data[finger]['dnormal_denv_q'] = ret_scene['dnormal_denv_q'][:, i, :, :self.obj_dof]
+            self.data[finger]['grad_env_sdf'] = ret_scene['grad_env_sdf'][:, i, :self.obj_dof]
+            dJ_dq = contact_hessian
+            self.data[finger]['dJ_dq'] = dJ_dq  # Jacobian of the contact point
 
     def _cost(self, xu, start, goal):
         start_q = partial_to_full_state(start[None, :self.num_fingers * 4], self.fingers)[:, self.all_joint_index]
@@ -359,12 +359,13 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
     def _objective(self, x):
         x = x[:, :, :self.dx + self.du]
         N = x.shape[0]
-        J, grad_J, hess_J = self.cost(x), self.grad_cost(x), self.hess_cost(x)
+        J, grad_J = self.cost(x), self.grad_cost(x)
 
         N = x.shape[0]
         return (self.alpha * J.reshape(N),
                 self.alpha * grad_J.reshape(N, -1),
-                self.alpha * hess_J.reshape(N, self.T * (self.dx + self.du), self.T * (self.dx + self.du)))
+                None)
+        # self.alpha * hess_J.reshape(N, self.T * (self.dx + self.du), self.T * (self.dx + self.du)))
 
     def _step_size_limit(self, xu):
         N, T, _ = xu.shape
@@ -592,7 +593,6 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                  optimize_force=False,
                  default_dof_pos=None,
                  *args, **kwargs):
-        print('Calling Regrasp Constructor')
 
         # object_location is different from object_asset_pos. object_asset_pos is 
         # used for pytorch volumetric. The asset of valve might contain something else such as a wall, a table
@@ -656,7 +656,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         if self.obj_dof == 3:
             _q_env = torch.cat((q_env, torch.zeros_like(q_env[..., :1])), dim=-1)
 
-        robot_trans = self.contact_scenes[self.fingers[0]].robot_sdf.chain.forward_kinematics(q_rob.reshape(-1, 16))
+        robot_trans = self.contact_scenes.robot_sdf.chain.forward_kinematics(q_rob.reshape(-1, 16))
         ee_locs = []
 
         for finger in self.regrasp_fingers:
@@ -665,10 +665,10 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         ee_locs = torch.stack(ee_locs, dim=1)
 
         # convert to scene base frame
-        ee_locs = self.contact_scenes[self.fingers[0]].scene_transform.inverse().transform_points(ee_locs)
+        ee_locs = self.contact_scenes.scene_transform.inverse().transform_points(ee_locs)
 
         # convert to scene ee frame
-        object_trans = self.contact_scenes[self.fingers[0]].scene_sdf.chain.forward_kinematics(
+        object_trans = self.contact_scenes.scene_sdf.chain.forward_kinematics(
             _q_env.reshape(-1, _q_env.shape[-1]))
         ee_locs = object_trans['screwdriver_body'].inverse().transform_points(ee_locs)
 
@@ -1967,7 +1967,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
             pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
             pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-            visualize_trajectory(traj_for_viz, turn_problem.contact_scenes['index'], viz_fpath, turn_problem.fingers,
+            visualize_trajectory(traj_for_viz, turn_problem.contact_scenes, viz_fpath, turn_problem.fingers,
                                  turn_problem.obj_dof + 1)
 
         # process the action
@@ -2109,7 +2109,6 @@ def add_trajectories(trajectories, best_traj, axes, env, sim, gym, viewer, confi
 
         for e in env.envs:
             T = best_traj.shape[0]
-            print(best_traj.shape)
             for t in range(T):
                 for i, finger in enumerate(fingers):
                     if t == 0:
