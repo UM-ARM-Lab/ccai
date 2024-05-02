@@ -260,8 +260,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         # middle_regrasp_planner = PositionControlConstrainedSVGDMPC(middle_regrasp_problem, params)
         # thumb_regrasp_planner = PositionControlConstrainedSVGDMPC(thumb_regrasp_problem, params)
         thumb_and_middle_regrasp_planner = PositionControlConstrainedSVGDMPC(thumb_and_middle_regrasp_problem, params)
-        #pregrasp_planner.warmup_iters = 100
-        #pregrasp_planner.online_iters = 20
+        #pregrasp_planner.warmup_iters = 50
+        #pregrasp_planner.online_iters = 10
 
 
     else:
@@ -391,8 +391,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                 action = state.unsqueeze(0)[:, 4:4 * num_fingers] + action
                 action = torch.cat((state.unsqueeze(0)[:, :4], action), dim=1)  # add the index finger back
             else:
-                action = action + state.unsqueeze(0)[:,
-                                  :4 * num_fingers]  # NOTE: this is required since we define action as delta action
+                action = action + state.unsqueeze(0)[:,:4 * num_fingers].to(device=env.device)
+
             if params['mode'] == 'hardware':
                 sim_viz_env.set_pose(env.get_state()['all_state'].to(device=env.device))
                 sim_viz_env.step(action)
@@ -660,7 +660,7 @@ if __name__ == "__main__":
             params['controller'] = controller
             params['valve_goal'] = goal.to(device=params['device'])
             params['chain'] = chain.to(device=params['device'])
-            object_location = torch.tensor([0, 0, 1.205]).to(device)  # TODO: confirm if this is the correct location
+            object_location = torch.tensor([0, 0, 1.205]).to(params['device'])  # TODO: confirm if this is the correct location
             params['object_location'] = object_location
             final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node)
             # final_distance_to_goal = turn(env, params, fpath)
