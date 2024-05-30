@@ -173,11 +173,11 @@ class ObjectPoseReader:
             return center_coor, screwdriver_ori_euler
 
 class HardwareEnv:
-    def __init__(self, default_pos, finger_list=['index', 'middle', 'ring', 'thumb'], kp=4, obj='valve', ori_only=True, mode='relative', device='cuda:0'):
+    def __init__(self, default_pos, num_repeat=1, gradual_control=False, finger_list=['index', 'middle', 'ring', 'thumb'], kp=4, obj='valve', ori_only=True, mode='relative', device='cuda:0'):
         self.__all_finger_list = ['index', 'middle', 'ring', 'thumb']
         self.obj = obj
         self.__finger_list = finger_list
-        self.__ros_node = RosNode(kp=kp)
+        self.__ros_node = RosNode(kp=kp, num_repeat=num_repeat, gradual_control=gradual_control)
 
         self.obj_reader = ObjectPoseReader(obj=obj, mode=mode)
 

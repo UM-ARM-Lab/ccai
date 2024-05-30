@@ -1,6 +1,6 @@
 from isaac_victor_envs.utils import get_assets_dir
 from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
-from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
+# from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
 
 import numpy as np
 import pickle as pkl
@@ -26,7 +26,8 @@ from scipy.spatial.transform import Rotation as R
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
-device = 'cuda:0'
+# device = 'cuda:0'
+torch.cuda.set_device(1)
 obj_dof = 3
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
@@ -375,9 +376,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         newHandles.append(handle)
     fig.tight_layout()
     fig.legend(newHandles, newLabels, loc='lower center', ncol=3)
-    # plt.savefig(f'{fpath.resolve()}/traj.png')
-    # plt.close()
-    plt.show()
+    plt.savefig(f'{fpath.resolve()}/traj.png')
+    plt.close()
+    # plt.show()
 
 
 
@@ -404,18 +405,18 @@ if __name__ == "__main__":
     from tqdm import tqdm
 
     if config['mode'] == 'hardware':
-        # pass
-        env = RosAllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
-                                 use_cartesian_controller=False,
-                                 viewer=True,
-                                 steps_per_action=60,
-                                 friction_coefficient=1.0,
-                                 device=config['sim_device'],
-                                 valve=config['object_type'],
-                                 video_save_path=img_save_dir,
-                                 joint_stiffness=config['kp'],
-                                 fingers=config['fingers'],
-                                 )
+        pass
+        # env = RosAllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
+        #                          use_cartesian_controller=False,
+        #                          viewer=True,
+        #                          steps_per_action=60,
+        #                          friction_coefficient=1.0,
+        #                          device=config['sim_device'],
+        #                          valve=config['object_type'],
+        #                          video_save_path=img_save_dir,
+        #                          joint_stiffness=config['kp'],
+        #                          fingers=config['fingers'],
+        #                          )
     else:
         env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
                                     use_cartesian_controller=False,
@@ -426,6 +427,7 @@ if __name__ == "__main__":
                                     video_save_path=img_save_dir,
                                     joint_stiffness=config['kp'],
                                     fingers=config['fingers'],
+                                    gradual_control=True,
                                     )
 
     sim, gym, viewer = env.get_sim()
@@ -501,7 +503,7 @@ if __name__ == "__main__":
             params['controller'] = controller
             params['valve_goal'] = goal.to(device=params['device'])
             params['chain'] = chain.to(device=params['device'])
-            object_location = torch.tensor(env.table_pose).to(device).float() # TODO: confirm if this is the correct location
+            object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
             params['object_location'] = object_location
             final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node)
             # final_distance_to_goal = turn(env, params, fpath)

@@ -116,7 +116,7 @@ def state2ee_pos(state, finger_name, fingers, chain, frame_indices, world_trans)
     """
     fk_dict = chain.forward_kinematics(partial_to_full_state(state, fingers), frame_indices=frame_indices)
     m = world_trans.compose(fk_dict[finger_name])
-    points_finger_frame = torch.tensor([0.00, 0.03, 0.00], device=m.device).unsqueeze(0)
+    points_finger_frame = torch.tensor([0.00, 0.03, 0.00], device=state.device).unsqueeze(0)
     ee_p = m.transform_points(points_finger_frame).squeeze(-2)
     return ee_p
 
