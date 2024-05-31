@@ -29,7 +29,7 @@ class ObjectPoseReader:
                 if self.__initial_pose is not None:
                     break
         elif self.obj == 'screwdriver':
-            if mode == 'absolute':
+            if mode == 'absolute': # not working any more, since the obj_p has been changed 
                 global_rvecs = np.load('rvecs.npy')
                 global_tvecs = np.load('tvecs.npy')
                 rotation = R.from_rotvec(global_rvecs[:,0])
@@ -45,57 +45,60 @@ class ObjectPoseReader:
                 cam2world = np.linalg.inv(world2cam)
                 self.__cam2world = global_trans @ cam2world
             elif mode == 'relative':
-                objp_palm = np.array([[-0.5, 0, -0.5],
-                                        [0.5, 0, -0.5],
-                                        [0.5, 0, 0.5],
-                                        [-0.5, 0, 0.5]]) * 35
-                while True:
-                    ret, frame = self.__cap.read()
-                    markerCorners, markerIds, rejectedCandidates = self.__detector.detectMarkers(frame)
-                    # print(markerCorners)
-                    if len(markerCorners) > 0:
-                        cv2.aruco.drawDetectedMarkers(frame, markerCorners, markerIds)
-                        palm_marker_flag = False
-                        for marker_id, marker_corner in zip(markerIds, markerCorners):
-                            if marker_id.item() == 4:
-                                ret, rvecs, tvecs = cv2.solvePnP(objp_palm, marker_corner, self.__intrinsic, self.__dist) 
-                                # cv2.drawFrameAxes(frame, intrinsic, dist, rvecs, tvecs, 35 / 2)
-                                rotation = R.from_rotvec(rvecs[:,0])
-                                rotation_mat = rotation.as_matrix()
-                                translation = tvecs
-                                palm_marker2cam = np.concatenate((rotation_mat, translation), axis=1)
-                                palm_marker2cam = np.concatenate((palm_marker2cam, np.array([[0, 0, 0, 1]])), axis=0)
-                                palm_marker_flag = True
-                        if palm_marker_flag:
-                            break
-                    # cv2.imshow('frame', frame)
-                    # if cv2.waitKey(1) & 0xFF == ord('q'):
-                    #     break
-                world2palm_marker = np.array([[1, 0, 0, 0],
-                                            [0, 1, 0, 0],
-                                            [0, 0, 1, 0],
+                self.__objp_palm = np.array([[-0.5, 0, -0.5],
+                                            [0.5, 0, -0.5],
+                                            [0.5, 0, 0.5],
+                                            [-0.5, 0, 0.5]]) * 35
+                # self.__world2palm_marker = np.array([[1, 0, 0, 20],
+                #                                     [0, 1, 0, 50],
+                #                                     [0, 0, 1, -110],
+                #                                     [0, 0, 0, 1]])
+                hand_center2palm_marker= np.array([[1, 0, 0, 18],
+                                            [0, 1, 0, 45],
+                                            [0, 0, 1, -120],
                                             [0, 0, 0, 1]])
-                self.__cam2world = np.linalg.inv(world2palm_marker) @ np.linalg.inv(palm_marker2cam) 
+                world2hand_center = np.array([[0.7071068, 0, 0.7071068, 0],
+                                            [0, 1, 0, 0],
+                                            [-0.7071068, 0, 0.7071068, 0],
+                                            [0, 0, 0, 1]])
+                self.__world2palm_marker =  hand_center2palm_marker @ world2hand_center
+                # self.__world2palm_marker = np.array([[0.7071068, 0, -0.7071068, -25],
+                #                                     [0, 1, 0, -50],
+                #                                     [0.7071068, 0, 0.7071068, 110],
+                #                                     [0, 0, 0, 1]])
+                # self.__world2palm_marker = np.linalg.inv(self.__world2palm_marker)
+                # self.__world2palm_marker = np.array([[0.7071068, 0, 0.7071068, 63.63960861],
+                #                                     [0, 1, 0, 50],
+                #                                     [-0.7071068, 0, 0.7071068, -91.92387911],
+                #                                     [0, 0, 0, 1]])
+                while True:
+                    flag = self.get_robot_frame()
+                    if flag:
+                        break
             else:
                 raise NotImplementedError
 
-            self.__objp = np.array([[-0.5, -0.5, 0.],
-                    [-0.5, 0.5, 0.],
-                    [0.5, 0.5, 0.],
-                    [0.5, -0.5, 0.]]) * 35
-            self.__screwdriver2marker = []
-            rotate_90_trans = np.array([[1, 0, 0],
-                                        [0, 0, 1],
-                                        [0, -1, 0]])
+            self.__objp = np.array([[0.5, 0.0, -0.5],
+                    [-0.5, 0.0, -0.5],
+                    [-0.5, 0.0, 0.5],
+                    [0.5, 0.0, 0.5]]) * 35
+            self.__root2marker = np.array([[1, 0, 0, 0], # the root of the screwdriver to the screwdriver marker
+                                    [0, 1, 0, 21.5],
+                                    [0, 0, 1, -80],
+                                    [0, 0, 0, 1]])
+            self.__nominal_root2root = []
+            rotate_90_trans = np.array([[0, 1, 0, 0],
+                                        [-1, 0, 0, 0],
+                                        [0, 0, 1, 0],
+                                        [0, 0, 0, 1]])
             for i in range(4):
-                trans = np.array([[0, 0, 1],
-                                [-1, 0, 0],
-                                [0, -1, 0]])
-                for j in range(i):
+                trans = np.array([[1, 0, 0, 0],
+                                [0, 1, 0, 0],
+                                [0, 0, 1, 0],
+                                [0, 0, 0, 1]])
+                for _ in range(i):
                     trans = rotate_90_trans @ trans
-                trans = np.concatenate((trans, np.array([[0, 0, 0]]).T), axis=1)
-                trans = np.concatenate((trans, np.array([[0, 0, 0, 1]])), axis=0)
-                self.__screwdriver2marker.append(trans)
+                self.__nominal_root2root.append(trans)
 
     def _get_valve_rot_vec(self):
         ret, frame = self.__cap.read()
@@ -119,7 +122,7 @@ class ObjectPoseReader:
         angle = np.linalg.norm(diff_vec) * np.sign(diff_vec[2])
         return angle
     def get_screwdriver_state(self):
-        center_coors = []
+        root_coors = []
         screwdriver_ori_eulers = []
         ctr = 0
         while True:
@@ -142,25 +145,50 @@ class ObjectPoseReader:
                 marker2cam = np.concatenate((rotation_mat, translation), axis=1)
                 marker2cam = np.concatenate((marker2cam, np.array([[0, 0, 0, 1]])), axis=0)
                 marker2world = self.__cam2world @ marker2cam
-                world_coor = marker2world[:3, 3]
-                centroid_direction = marker2world[:3, 2]
-                center_coor = world_coor - centroid_direction * 21
-                # print(markerIds[i], center_coor)
-                trans_mat = self.__screwdriver2marker[marker_id.item()]
-                trans_mat = marker2world @ trans_mat
-                scrwedriver_ori_mat = trans_mat[:3, :3]
+                root2world = marker2world @ self.__root2marker
+                trans_mat = self.__nominal_root2root[marker_id.item()]
+                root2world = root2world @ trans_mat 
+                root_coor = root2world[:3, 3]
+                scrwedriver_ori_mat = root2world[:3, :3]
                 screwdriver_ori_euler = R.from_matrix(scrwedriver_ori_mat).as_euler('XYZ', degrees=True)
                 # print(markerIds[i].item(), screwdriver_ori_euler)
-                center_coors.append(center_coor)
+                root_coors.append(root_coor)
                 screwdriver_ori_eulers.append(screwdriver_ori_euler)
-            center_coor = np.mean(center_coors, axis=0)
+            root_coor = np.mean(root_coors, axis=0)
             screwdriver_ori_euler = np.mean(screwdriver_ori_eulers, axis=0)
             screwdriver_ori_euler = screwdriver_ori_euler / 180 * np.pi # change to radian
             # cv2.imshow('frame', frame) # debug
-            return center_coor, screwdriver_ori_euler
+            return root_coor, screwdriver_ori_euler
         else:
             print("No readings from camera.")
             return None, None
+    def get_robot_frame(self):
+        
+        ctr = 0
+        while True:
+            ret, frame = self.__cap.read()
+            ctr += 1
+            if ctr >= 7 and ret:
+                break
+        palm_marker_flag = False
+        markerCorners, markerIds, rejectedCandidates = self.__detector.detectMarkers(frame)
+        if len(markerCorners) > 0 and markerIds.max() <= 4:
+            # cv2.aruco.drawDetectedMarkers(frame, markerCorners, markerIds)
+            for marker_corner, marker_id in zip(markerCorners, markerIds):
+                if marker_id.item() == 4:
+                    ret, rvecs, tvecs = cv2.solvePnP(self.__objp_palm, marker_corner, self.__intrinsic, self.__dist) 
+                    cv2.drawFrameAxes(frame, self.__intrinsic, self.__dist, rvecs, tvecs, 35 / 2)
+                    rotation = R.from_rotvec(rvecs[:,0])
+                    rotation_mat = rotation.as_matrix()
+                    translation = tvecs
+                    palm_marker2cam = np.concatenate((rotation_mat, translation), axis=1)
+                    palm_marker2cam = np.concatenate((palm_marker2cam, np.array([[0, 0, 0, 1]])), axis=0)
+                    # the origin of the world frame is defined as the root of the robot hand
+                    world2cam = palm_marker2cam @ self.__world2palm_marker 
+                    self.__cam2world = np.linalg.inv(world2cam)
+                    palm_marker_flag = True
+        return palm_marker_flag
+
     def get_state(self):
         if self.obj == 'valve':
             return self.get_valve_angle()

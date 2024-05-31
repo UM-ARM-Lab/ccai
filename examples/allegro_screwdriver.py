@@ -403,9 +403,33 @@ if __name__ == "__main__":
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver.yaml').read_text())
     from tqdm import tqdm
 
+    sim_env = None
+    ros_copy_node = None
+
     if config['mode'] == 'hardware':
-        # pass
-        env = RosAllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
+        from hardware.hardware_env import HardwareEnv
+        # TODO, think about how to read that in simulator
+        # default_dof_pos = torch.cat((torch.tensor([[0., 0.5, 0.7, 0.7]]).float(),
+        #                             torch.tensor([[0., 0.5, 0.7, 0.7]]).float(),
+        #                             torch.tensor([[0., 0.5, 0.0, 0.7]]).float(),
+        #                             torch.tensor([[1.3, 0.3, 0.2, 1.1]]).float()),
+        #                             dim=1)
+        default_dof_pos = torch.cat((torch.tensor([[0.2, 0.5, 0.6, 0.6]]).float(),
+                                    torch.tensor([[-0.1, 0.5, 0.65, 0.7]]).float(),
+                                    torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
+                                    torch.tensor([[1.2, 0.3, 0.2, 1.06]]).float()),
+                                    dim=1)
+        env = HardwareEnv(default_dof_pos[:, :16], 
+                          finger_list=config['fingers'], 
+                          kp=config['kp'], 
+                          obj='screwdriver',
+                          mode='relative')
+        root_coor, root_ori = env.obj_reader.get_state()
+        root_coor = root_coor / 1000 # convert to meters
+        # robot_p = np.array([-0.025, -0.1, 1.33])
+        robot_p = np.array([0, -0.1, 1.33])
+        root_coor = root_coor + robot_p
+        sim_env = RosAllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
                                  use_cartesian_controller=False,
                                  viewer=True,
                                  steps_per_action=60,
@@ -415,7 +439,15 @@ if __name__ == "__main__":
                                  video_save_path=img_save_dir,
                                  joint_stiffness=config['kp'],
                                  fingers=config['fingers'],
+                                 table_pose=root_coor,
                                  )
+        sim, gym, viewer = sim_env.get_sim()
+        assert (np.array(sim_env.robot_p) == robot_p).all()
+        assert (sim_env.default_dof_pos[:, :16] == default_dof_pos.to(device)).all()
+        env.world_trans = sim_env.world_trans
+        env.joint_stiffness = sim_env.joint_stiffness
+        env.device = sim_env.device
+        env.table_pose = sim_env.table_pose
     else:
         env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
                                     use_cartesian_controller=False,
@@ -427,8 +459,15 @@ if __name__ == "__main__":
                                     joint_stiffness=config['kp'],
                                     fingers=config['fingers'],
                                     )
+        sim, gym, viewer = env.get_sim()
+    if config['mode'] == 'hardware_copy':
+        from hardware.hardware_env import RosNode
+        ros_copy_node = RosNode()
+        
 
-    sim, gym, viewer = env.get_sim()
+    
+
+    
 
 
     state = env.get_state()
@@ -440,26 +479,6 @@ if __name__ == "__main__":
     #         time.sleep(0.1)
     # except KeyboardInterrupt:
     #     pass
-
-    sim_env = None
-    ros_copy_node = None
-    if config['mode'] == 'hardware':
-        sim_env = env
-        from hardware.hardware_env import HardwareEnv
-        env = HardwareEnv(sim_env.default_dof_pos[:, :16], 
-                          finger_list=config['fingers'], 
-                          kp=config['kp'], 
-                          obj='screwdriver',
-                          mode='relative')
-        env.world_trans = sim_env.world_trans
-        env.joint_stiffness = sim_env.joint_stiffness
-        env.device = sim_env.device
-        env.table_pose = sim_env.table_pose
-    elif config['mode'] == 'hardware_copy':
-        from hardware.hardware_env import RosNode
-        ros_copy_node = RosNode()
-
-
 
     results = {}
 
