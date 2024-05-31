@@ -13,7 +13,7 @@ class RosNode(object):
     '''
     Ros Node for communication with the hardware
     '''
-    def __init__(self, node_name='run_policy', num_repeat=1, kp=4, use_grav_comp=False):
+    def __init__(self, node_name='run_policy', num_repeat=1, gradual_control=False, kp=4, use_grav_comp=False):
         try:
             rospy.init_node('allegro_hand_node')
         except:
@@ -34,6 +34,7 @@ class RosNode(object):
         self.current_joint_pose = None
         self.kp = kp
         self.use_grav_comp = use_grav_comp
+        self.gradual_control = gradual_control
 
         
     
@@ -101,27 +102,28 @@ class RosNode(object):
     def apply_action(self, action, weight=0.5):
         "the action has to be full action (16 dimensional)"
 
-        action_sequence = np.linspace(torch.tensor(self.current_joint_pose.position), action.cpu(), self.num_repeat + 1)[1:]
+        action_sequence = np.linspace(torch.tensor(self.current_joint_pose.position), action.cpu(), int(self.num_repeat * 0.75) + 1)[1:]
+        action_sequence = np.concatenate([action_sequence, np.tile(action.cpu().numpy(), (self.num_repeat - len(action_sequence), 1))])
         if len(action.shape) == 2:
             action = action.squeeze(0)
         # if self.num_repeat == 1:
-        for i in range(self.num_repeat):
-            desired_js = deepcopy(self.current_joint_pose) # We copy the message type from the last current joint pose recieved to have the format
-            if self.use_grav_comp:
-                desired_js.position = action + self.grav_comp_torque.to(action.device) / self.kp
-            else:
-                desired_js.position = action
-            desired_js.effort = list([]) # We set the effort command to zero because we are doing position control and not torque control
-            self.joint_comm_publisher.publish(desired_js) # Publish the desired command
-            rospy.sleep(0.1)
         # for i in range(self.num_repeat):
-        #     # action = list(action.detach().cpu().numpy())
-        #     action = list(action_sequence[i])
         #     desired_js = deepcopy(self.current_joint_pose) # We copy the message type from the last current joint pose recieved to have the format
-        #     desired_js.position = action # We change the position to have the commanded joint angles
+        #     if self.use_grav_comp:
+        #         desired_js.position = action + self.grav_comp_torque.to(action.device) / self.kp
+        #     else:
+        #         desired_js.position = action
         #     desired_js.effort = list([]) # We set the effort command to zero because we are doing position control and not torque control
         #     self.joint_comm_publisher.publish(desired_js) # Publish the desired command
         #     rospy.sleep(0.1)
+        for i in range(self.num_repeat):
+            # action = list(action.detach().cpu().numpy())
+            action = list(action_sequence[i])
+            desired_js = deepcopy(self.current_joint_pose) # We copy the message type from the last current joint pose recieved to have the format
+            desired_js.position = action # We change the position to have the commanded joint angles
+            desired_js.effort = list([]) # We set the effort command to zero because we are doing position control and not torque control
+            self.joint_comm_publisher.publish(desired_js) # Publish the desired command
+            rospy.sleep(0.05)
 
 def main():
     ros_node = RosNode()

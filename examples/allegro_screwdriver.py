@@ -26,7 +26,8 @@ from scipy.spatial.transform import Rotation as R
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
-device = 'cuda:0'
+# device = 'cuda:0'
+torch.cuda.set_device(1)
 obj_dof = 3
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
@@ -375,9 +376,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         newHandles.append(handle)
     fig.tight_layout()
     fig.legend(newHandles, newLabels, loc='lower center', ncol=3)
-    # plt.savefig(f'{fpath.resolve()}/traj.png')
-    # plt.close()
-    plt.show()
+    plt.savefig(f'{fpath.resolve()}/traj.png')
+    plt.close()
+    # plt.show()
 
 
 
@@ -443,7 +444,7 @@ if __name__ == "__main__":
                                  )
         sim, gym, viewer = sim_env.get_sim()
         assert (np.array(sim_env.robot_p) == robot_p).all()
-        assert (sim_env.default_dof_pos[:, :16] == default_dof_pos.to(device)).all()
+        assert (sim_env.default_dof_pos[:, :16] == default_dof_pos.to(config['sim_device'])).all()
         env.world_trans = sim_env.world_trans
         env.joint_stiffness = sim_env.joint_stiffness
         env.device = sim_env.device
@@ -458,6 +459,7 @@ if __name__ == "__main__":
                                     video_save_path=img_save_dir,
                                     joint_stiffness=config['kp'],
                                     fingers=config['fingers'],
+                                    gradual_control=True,
                                     )
         sim, gym, viewer = env.get_sim()
     if config['mode'] == 'hardware_copy':
@@ -520,7 +522,7 @@ if __name__ == "__main__":
             params['controller'] = controller
             params['valve_goal'] = goal.to(device=params['device'])
             params['chain'] = chain.to(device=params['device'])
-            object_location = torch.tensor(env.table_pose).to(device).float() # TODO: confirm if this is the correct location
+            object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
             params['object_location'] = object_location
             final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node)
             # final_distance_to_goal = turn(env, params, fpath)
