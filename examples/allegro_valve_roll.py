@@ -192,11 +192,10 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         # index_x_min = torch.tensor([-0.47, -0.195999999999, -0.174000000, -0.227]) + 0.05
         # thumb_x_max = torch.tensor([1.396, 1.1629999999999, 1.644, 1.71899999]) - 0.05
         # thumb_x_min = torch.tensor([0.26, -0.1049999999, -0.1889999999, -0.162]) + 0.05
-        # NOTE: DEBUG only, set the joint limit to be very large for now. 
-        index_x_max = torch.tensor([0.47, 1.6099999999, 1.7089999, 1.61799999]) + 10.05
-        index_x_min = torch.tensor([-0.47, -0.195999999999, -0.174000000, -0.227]) - 10.05
-        thumb_x_max = torch.tensor([1.396, 1.1629999999999, 1.644, 1.71899999]) + 10.05
-        thumb_x_min = torch.tensor([0.26, -0.1049999999, -0.1889999999, -0.162]) - 10.05
+        index_x_max = torch.tensor([0.47, 1.6099999999, 1.7089999, 1.61799999]) + 0.05
+        index_x_min = torch.tensor([-0.47, -0.195999999999, -0.174000000, -0.227]) - 0.05
+        thumb_x_max = torch.tensor([1.396, 1.1629999999999, 1.644, 1.71899999]) + 0.05
+        thumb_x_min = torch.tensor([0.26, -0.1049999999, -0.1889999999, -0.162]) - 0.05
         joint_min = {'index': index_x_min, 'middle': index_x_min, 'ring': index_x_min, 'thumb': thumb_x_min}
         joint_max = {'index': index_x_max, 'middle': index_x_max, 'ring': index_x_max, 'thumb': thumb_x_max}
         self.x_max = torch.cat([joint_max[finger] for finger in self.fingers])

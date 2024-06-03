@@ -53,10 +53,10 @@ class ObjectPoseReader:
                 #                                     [0, 1, 0, 50],
                 #                                     [0, 0, 1, -110],
                 #                                     [0, 0, 0, 1]])
-                hand_center2palm_marker= np.array([[1, 0, 0, 18],
-                                            [0, 1, 0, 45],
-                                            [0, 0, 1, -120],
-                                            [0, 0, 0, 1]])
+                hand_center2palm_marker= np.array([[1, 0, 0, 15],
+                                                    [0, 1, 0, 55],
+                                                    [0, 0, 1, -120],
+                                                    [0, 0, 0, 1]])
                 world2hand_center = np.array([[0.7071068, 0, 0.7071068, 0],
                                             [0, 1, 0, 0],
                                             [-0.7071068, 0, 0.7071068, 0],
@@ -83,7 +83,7 @@ class ObjectPoseReader:
                     [-0.5, 0.0, 0.5],
                     [0.5, 0.0, 0.5]]) * 35
             self.__root2marker = np.array([[1, 0, 0, 0], # the root of the screwdriver to the screwdriver marker
-                                    [0, 1, 0, 21.5],
+                                    [0, 1, 0, 20.5],
                                     [0, 0, 1, -80],
                                     [0, 0, 0, 1]])
             self.__nominal_root2root = []

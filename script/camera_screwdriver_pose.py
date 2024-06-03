@@ -59,7 +59,7 @@ if __name__ == "__main__":
         if len(markerCorners) > 0:
             cv2.aruco.drawDetectedMarkers(frame, markerCorners, markerIds)
             for i in range(len(markerCorners)):
-                if markerIds[i].item() > 4:
+                if markerIds[i].item() >= 4:
                     continue
 
                 ret, rvecs, tvecs = cv2.solvePnP(objp, markerCorners[i], intrinsic, dist) 

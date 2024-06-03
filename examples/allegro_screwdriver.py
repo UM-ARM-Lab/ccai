@@ -27,7 +27,7 @@ from scipy.spatial.transform import Rotation as R
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
 # device = 'cuda:0'
-torch.cuda.set_device(1)
+# torch.cuda.set_device(1)
 obj_dof = 3
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
@@ -424,7 +424,9 @@ if __name__ == "__main__":
                           finger_list=config['fingers'], 
                           kp=config['kp'], 
                           obj='screwdriver',
-                          mode='relative')
+                          mode='relative',
+                          gradual_control=True,
+                          num_repeat=10)
         root_coor, root_ori = env.obj_reader.get_state()
         root_coor = root_coor / 1000 # convert to meters
         # robot_p = np.array([-0.025, -0.1, 1.33])
