@@ -79,6 +79,7 @@ class AllegroScrewdriver(AllegroValveTurning):
                  fingers=['index', 'middle', 'ring', 'thumb'],
                  friction_coefficient=0.95,
                  optimize_force=False,
+                 force_balance=False,
                  device='cuda:0', **kwargs):
         self.num_fingers = len(fingers)
         self.obj_dof_code = [0, 0, 0, 1, 1, 1]
@@ -86,7 +87,8 @@ class AllegroScrewdriver(AllegroValveTurning):
         super(AllegroScrewdriver, self).__init__(start=start, goal=goal, T=T, chain=chain, object_location=object_location,
                                                  object_type=object_type, world_trans=world_trans, object_asset_pos=object_asset_pos,
                                                  fingers=fingers, friction_coefficient=friction_coefficient, obj_dof_code=self.obj_dof_code, 
-                                                 obj_joint_dim=1, optimize_force=optimize_force, device=device)
+                                                 obj_joint_dim=1, optimize_force=optimize_force, 
+                                                 screwdriver_force_balance=force_balance, device=device)
         self.friction_coefficient = friction_coefficient
 
     def _cost(self, xu, start, goal):
@@ -227,7 +229,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         friction_coefficient=params['friction_coefficient'],
         world_trans=env.world_trans,
         fingers=turn_problem_fingers,
-        optimize_force=params['optimize_force']
+        optimize_force=params['optimize_force'],
+        force_balance=params['force_balance'],
     )
     turn_planner = PositionControlConstrainedSVGDMPC(turn_problem, params)
 

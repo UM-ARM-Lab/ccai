@@ -665,6 +665,8 @@ class AllegroValveTurning(AllegroContactProblem):
             wrench_dim += 3
         if self.obj_rotational_dim > 0:
             wrench_dim += 3
+        if self.screwdriver_force_balance:
+            wrench_dim += 2
 
         if self.optimize_force:
             self.dg_per_t = self.num_fingers * (1 + 2 + 4) + wrench_dim
@@ -694,7 +696,9 @@ class AllegroValveTurning(AllegroContactProblem):
                  obj_dof_code=[0, 0, 0, 0, 0, 0], 
                  obj_joint_dim=0,
                  optimize_force=False,
+                 screwdriver_force_balance=False,
                  device='cuda:0', **kwargs):
+        self.screwdriver_force_balance = screwdriver_force_balance
         self.optimize_force = optimize_force
         self.num_fingers = len(fingers)
         obj_dof = np.sum(obj_dof_code)
@@ -957,6 +961,9 @@ class AllegroValveTurning(AllegroContactProblem):
         g = []
         if self.obj_translational_dim > 0:
             g.append(sum_force_list)
+        elif self.screwdriver_force_balance:
+            # balance the force with the torque
+            g.append(torch.sum(force_list, dim=0)[:2])
         if self.obj_rotational_dim > 0:
             g.append(sum_torque_list)
         g = torch.cat(g)
