@@ -215,6 +215,7 @@ class AllegroScrewDriverDataset(Dataset):
     def __init__(self, folders, cosine_sine=False, states_only=False):
         super().__init__()
         self.cosine_sine = cosine_sine
+        assert not cosine_sine
         # TODO: only using trajectories for now, also includes closest points and their sdf values
         starts = []
         trajectories = []
@@ -290,6 +291,10 @@ class AllegroScrewDriverDataset(Dataset):
         # TODO: figure out how to do data augmentation on screwdriver angle
         # a little more complex due to rotation representation
         dx = 15
+
+        # randomly perturb angle of screwdriver
+        traj[:, dx-1] += 2 * np.pi * (np.random.rand() - 0.5)
+
         if self.cosine_sine:
             raise NotImplementedError
 
@@ -312,6 +317,7 @@ class AllegroScrewDriverDataset(Dataset):
             # randomly choose an index to un-mask
             mask[np.random.randint(0, final_idx)] = 1
 
+        #print(mask)
         return self.masks[idx] * (traj - self.mean) / self.std, self.trajectory_type[idx], mask
 
     def compute_norm_constants(self):
@@ -338,8 +344,10 @@ class AllegroScrewDriverDataset(Dataset):
             self.mean[10:] = mean[9:]
             self.std[10:] = torch.from_numpy(std[9:]).float()
         else:
-            mean[12:15] = 0
-            std[12:15] = np.pi
+            #mean[12:15] = 0
+            #std[12:15] = np.pi
+            mean[14] = 0
+            std[14] = np.pi
             self.mean = mean
             self.std = torch.from_numpy(std).float()
 

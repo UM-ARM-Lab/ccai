@@ -137,7 +137,6 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         obj_dof: DoF of the object, The max number is 6, It's the DoF for the rigid body, not including any joints within the object. 
         obj_joint_dim: It's the DoF of the joints within the object, excluding those are rigid body DoF.
         """
-        print('Calling Object Constructor')
 
         super().__init__(start, goal, T, device)
         self.dx, self.du = dx, du
@@ -641,7 +640,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                                                                      torch.zeros(3, device=self.device))
 
             # add a small amount of noise to ee loc default
-            self.default_ee_locs = self.default_ee_locs + 0.01 * torch.randn_like(self.default_ee_locs)
+            #self.default_ee_locs = self.default_ee_locs #+ 0.01 * torch.randn_like(self.default_ee_locs)
         else:
             self.default_ee_locs = None
 
@@ -818,8 +817,6 @@ class AllegroContactProblem(AllegroObjectProblem):
             du = (4 + 3) * num_fingers
         else:
             du = 4 * num_fingers
-        print('Calling Contact Constructor')
-        print(super().__init__)
         super().__init__(dx=dx, du=du, start=start, goal=goal,
                          T=T, chain=chain, object_location=object_location,
                          object_type=object_type, world_trans=world_trans, object_asset_pos=object_asset_pos,
@@ -1697,7 +1694,6 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
         #                                                  friction_coefficient=friction_coefficient, obj_dof=obj_dof,
         #                                                  obj_ori_rep=obj_ori_rep, obj_joint_dim=obj_joint_dim,
         #                                                  optimize_force=optimize_force, device=device, **kwargs)
-        print('Calling AllegroManipulationProblem constructor')
         moveable_object = True if len(contact_fingers) > 0 else False
         AllegroContactProblem.__init__(self, start=start, goal=goal, T=T, chain=chain,
                                        object_location=object_location, object_type=object_type,

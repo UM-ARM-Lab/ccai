@@ -1,16 +1,16 @@
 ---
-model_name: 'allegro_test'
+model_name: 'allegro_test_new_data_augment_angle'
 T: 16
 dx: 15
 du: 21
 load_checkpoint: False
-epochs: 10000
-batch_size: 128
+epochs: 5000
+batch_size: 256
 lr: 1.0e-4
 model_type: 'diffusion'
-data_directory: 'allegro_screwdriver_turning'
-device: 'cuda:0'
-test_every: 500
+data_directory: 'allegro_screwdriver_new'
+device: 'cuda:1'
+test_every: 5001
 save_every: 500
 normalize_data: True
 constraint_embedding_dim: 64
