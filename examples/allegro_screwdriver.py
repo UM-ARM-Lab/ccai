@@ -334,8 +334,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     else:
         raise ValueError('Invalid controller')
 
-    pregrasp_planner.warmup_iters = 100
-    pregrasp_planner.online_iters = 0
     # start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
     # best_traj, _ = pregrasp_planner.step(start[:4 * num_fingers + obj_dof])
     #
@@ -445,7 +443,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                 action = state.unsqueeze(0)[:, 4:4 * num_fingers] + action
                 action = torch.cat((state.unsqueeze(0)[:, :4], action), dim=1)  # add the index finger back
             else:
-                action = action + state.unsqueeze(0)[:,:4 * num_fingers].to(device=env.device)
+                action = action + state.unsqueeze(0)[:, :4 * num_fingers].to(device=env.device)
 
             if params['mode'] == 'hardware':
                 sim_viz_env.set_pose(env.get_state()['all_state'].to(device=env.device))
@@ -552,26 +550,53 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
         else:
 
-            traj, plans, contact_points, contact_distance = execute_traj(
-                index_regrasp_planner, goal=valve_goal, fname=f'index_regrasp_{turn}')
+            # randomly choose index or thumb/middle first
+            index_first = np.random.choice([0, 1])
 
-            plans = [torch.cat((plan[..., :-6],
-                                torch.zeros(*plan.shape[:-1], 3).to(device=params['device']),
-                                plan[..., -6:]),
-                               dim=-1) for plan in plans]
-            traj = torch.cat((traj[..., :-6], torch.zeros(*traj.shape[:-1], 3).to(device=params['device']),
-                              traj[..., -6:]), dim=-1)
+            if index_first:
+                traj, plans, contact_points, contact_distance = execute_traj(
+                    index_regrasp_planner, goal=valve_goal, fname=f'index_regrasp_{turn}')
 
-            _add_to_dataset(traj, plans, contact_points, contact_distance, contact_state=torch.tensor([0.0, 1.0, 1.0]))
+                plans = [torch.cat((plan[..., :-6],
+                                    torch.zeros(*plan.shape[:-1], 3).to(device=params['device']),
+                                    plan[..., -6:]),
+                                   dim=-1) for plan in plans]
+                traj = torch.cat((traj[..., :-6], torch.zeros(*traj.shape[:-1], 3).to(device=params['device']),
+                                  traj[..., -6:]), dim=-1)
 
-            traj, plans, contact_points, contact_distance = execute_traj(
-                thumb_and_middle_regrasp_planner, goal=valve_goal, fname=f'thumb_middle_regrasp_{turn}')
-            plans = [torch.cat((plan,
-                                torch.zeros(*plan.shape[:-1], 6).to(device=params['device'])),
-                               dim=-1) for plan in plans]
-            traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 6).to(device=params['device'])), dim=-1)
+                _add_to_dataset(traj, plans, contact_points, contact_distance,
+                                contact_state=torch.tensor([0.0, 1.0, 1.0]))
 
-            _add_to_dataset(traj, plans, contact_points, contact_distance, contact_state=torch.tensor([1.0, 0.0, 0.0]))
+                traj, plans, contact_points, contact_distance = execute_traj(
+                    thumb_and_middle_regrasp_planner, goal=valve_goal, fname=f'thumb_middle_regrasp_{turn}')
+                plans = [torch.cat((plan,
+                                    torch.zeros(*plan.shape[:-1], 6).to(device=params['device'])),
+                                   dim=-1) for plan in plans]
+                traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 6).to(device=params['device'])), dim=-1)
+
+                _add_to_dataset(traj, plans, contact_points, contact_distance,
+                                contact_state=torch.tensor([1.0, 0.0, 0.0]))
+            else:
+                traj, plans, contact_points, contact_distance = execute_traj(
+                    thumb_and_middle_regrasp_planner, goal=valve_goal, fname=f'thumb_middle_regrasp_{turn}')
+                plans = [torch.cat((plan,
+                                    torch.zeros(*plan.shape[:-1], 6).to(device=params['device'])),
+                                   dim=-1) for plan in plans]
+                traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 6).to(device=params['device'])), dim=-1)
+
+                _add_to_dataset(traj, plans, contact_points, contact_distance,
+                                contact_state=torch.tensor([1.0, 0.0, 0.0]))
+                # index
+                traj, plans, contact_points, contact_distance = execute_traj(
+                    index_regrasp_planner, goal=valve_goal, fname=f'index_regrasp_{turn}')
+                plans = [torch.cat((plan[..., :-6],
+                                    torch.zeros(*plan.shape[:-1], 3).to(device=params['device']),
+                                    plan[..., -6:]),
+                                   dim=-1) for plan in plans]
+                traj = torch.cat((traj[..., :-6], torch.zeros(*traj.shape[:-1], 3).to(device=params['device']),
+                                  traj[..., -6:]), dim=-1)
+                _add_to_dataset(traj, plans, contact_points, contact_distance,
+                                contact_state=torch.tensor([0.0, 1.0, 1.0]))
 
         time.sleep(1)
         state = env.get_state()
@@ -650,14 +675,14 @@ if __name__ == "__main__":
     sim, gym, viewer = env.get_sim()
 
     state = env.get_state()
-    try:
-        while True:
-            start = env.get_state()['q'][:, :-1]
-            env.step(start)
-            print('waiting for you to finish camera adjustment, ctrl-c when done')
-            time.sleep(0.1)
-    except KeyboardInterrupt:
-        pass
+    # try:
+    #     while True:
+    #         start = env.get_state()['q'][:, :-1]
+    #         env.step(start)
+    #         print('waiting for you to finish camera adjustment, ctrl-c when done')
+    #         time.sleep(0.1)
+    # except KeyboardInterrupt:
+    #     pass
 
     sim_env = None
     ros_copy_node = None
@@ -715,15 +740,19 @@ if __name__ == "__main__":
             params['controller'] = controller
             params['valve_goal'] = goal.to(device=params['device'])
             params['chain'] = chain.to(device=params['device'])
-            object_location = torch.tensor([0, 0, 1.205]).to(params['device'])  # TODO: confirm if this is the correct location
+            object_location = torch.tensor([0, 0, 1.205]).to(
+                params['device'])  # TODO: confirm if this is the correct location
             params['object_location'] = object_location
-            final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node)
-            # final_distance_to_goal = turn(env, params, fpath)
+            try:
+                final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node)
+                # final_distance_to_goal = turn(env, params, fpath)
 
-            if controller not in results.keys():
-                results[controller] = [final_distance_to_goal]
-            else:
-                results[controller].append(final_distance_to_goal)
+                if controller not in results.keys():
+                    results[controller] = [final_distance_to_goal]
+                else:
+                    results[controller].append(final_distance_to_goal)
+            except:
+                continue
         print(results)
 
     gym.destroy_viewer(viewer)

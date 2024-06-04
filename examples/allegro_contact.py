@@ -138,7 +138,6 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         obj_dof: DoF of the object, The max number is 6, It's the DoF for the rigid body, not including any joints within the object. 
         obj_joint_dim: It's the DoF of the joints within the object, excluding those are rigid body DoF.
         """
-        print('Calling Object Constructor')
 
         super().__init__(start, goal, T, device)
         self.dx, self.du = dx, du
@@ -640,7 +639,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                                                                      torch.zeros(self.obj_dof, device=self.device))
 
             # add a small amount of noise to ee loc default
-            self.default_ee_locs = self.default_ee_locs + 0.01 * torch.randn_like(self.default_ee_locs)
+            #self.default_ee_locs = self.default_ee_locs #+ 0.01 * torch.randn_like(self.default_ee_locs)
         else:
             self.default_ee_locs = None
 

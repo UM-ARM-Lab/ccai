@@ -174,7 +174,6 @@ class GaussianDiffusion(nn.Module):
         snr = alphas_cumprod / (1 - alphas_cumprod)
 
         # https://arxiv.org/abs/2303.09556
-
         maybe_clipped_snr = snr.clone()
         if min_snr_loss_weight:
             maybe_clipped_snr.clamp_(max=min_snr_gamma)
@@ -336,6 +335,12 @@ class GaussianDiffusion(nn.Module):
                 img[:, i - 1, -1, :self.dx] = img[:, i, 0, :self.dx]
 
             img[:, 0] = self._apply_conditioning(img[:, 0], condition)
+
+            # add some guidance using gradient - maximise turn angle, keep upright
+            eta = 0.01
+            img[:, -1, -1, self.dx-3:self.dx-1] -= 2 * eta * img[:, -1, -1, self.dx-3:self.dx-1]
+            img[:, -1, -1, self.dx] -= eta
+
             # img[:, -1, -1, 8] += 1.0e-3
             imgs.append(img)
 
@@ -774,13 +779,6 @@ class JointDiffusion(GaussianDiffusion):
             x, x_start, c, c_start = self.p_sample(x.reshape(B, N, H, -1), t, c.reshape(B, N, -1))
             x = x.reshape(B, N, H, -1)
             c = c.reshape(B, N, -1)
-            # combine subtrajectory updates
-            #for i in range(1, N):
-            #    tmp = x[:, i, 0, :10].clone()
-            ##    x[:, i, 0, :10] = x[:, i - 1, -1, :10]
-            ##    #x[:, i, 0, :10] = (tmp + x[:, i - 1, -1, :10]) / 2
-            #    #[:, i - 1, -1, :10] = x[:, i, 0, :10]
-
             # apply conditioning
             x[:, 0] = self._apply_conditioning(x[:, 0], condition)
             if context is not None:

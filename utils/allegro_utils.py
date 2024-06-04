@@ -133,13 +133,15 @@ def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headl
         vis.clear_geometries()
         q = trajectory[t, : 4 * num_fingers]
         theta = trajectory[t, 4 * num_fingers: 4 * num_fingers + obj_dof]
+        #scene.visualize_robot(partial_to_full_state(q.unsqueeze(0), fingers).to(device=scene.device),
+        #                      theta.unsqueeze(0).to(device=scene.device))
         meshes = scene.get_visualization_meshes(partial_to_full_state(q.unsqueeze(0), fingers).to(device=scene.device),
                                                 theta.unsqueeze(0).to(device=scene.device))
         for mesh in meshes:
             vis.add_geometry(mesh)
         ctr = vis.get_view_control()
-        # parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-04-03-13-14-26.json")
-        parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-04-05-13-17-03.json")
+        parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-05-03-11-09-44.json")
+        #parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-04-05-13-17-03.json")
         ctr.convert_from_pinhole_camera_parameters(parameters)
         vis.poll_events()
         vis.update_renderer()
