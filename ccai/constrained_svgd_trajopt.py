@@ -44,7 +44,7 @@ class ConstrainedSteinTrajOpt:
         xuz = xuz.to(dtype=torch.float32)
         grad_J, hess_J, K, grad_K, C, dC, hess_C = self.problem.eval(xuz.to(dtype=torch.float32))
 
-        if hess_C is None:
+        if hess_C is None and self.use_constraint_hessian:
             hess_C = torch.zeros(N, self.dh + self.dg, self.T * d + self.dh, self.T * d + self.dh, device=xuz.device)
 
         with torch.no_grad():

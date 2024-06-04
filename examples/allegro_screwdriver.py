@@ -28,6 +28,9 @@ from allegro_contact import AllegroManipulationProblem, PositionControlConstrain
     add_trajectories_hardware
 from scipy.spatial.transform import Rotation as R
 
+from ccai.mpc.ipopt import IpoptMPC
+from ccai.problem import IpoptProblem
+
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
 device = 'cuda:0'
@@ -145,6 +148,14 @@ class AllegroScrewdriver(AllegroManipulationProblem):
             (state[:, -self.obj_dof:-1]) ** 2)  # the screwdriver should only rotate in z direction
         return smoothness_cost + upright_cost + super()._cost(xu, start, goal)
 
+class IpoptScrewdriver(AllegroScrewdriver, IpoptProblem):
+
+    def __init__(self, *args, **kwargs):
+        device = kwargs.get('device', None)
+        if device is not None:
+            kwargs.pop('device')
+        super().__init__(*args, **kwargs, N=1, device='cpu')
+
 
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     "only turn the valve once"
@@ -202,41 +213,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             optimize_force=params['optimize_force'],
             default_dof_pos=env.default_dof_pos[:, :16]
         )
-
-        # middle_regrasp_problem = AllegroScrewdriver(
-        #     start=start[:4 * num_fingers + obj_dof],
-        #     goal=params['valve_goal'] * 0,
-        #     T=params['T'],
-        #     chain=params['chain'],
-        #     device=params['device'],
-        #     object_asset_pos=env.table_pose,
-        #     object_location=params['object_location'],
-        #     object_type=params['object_type'],
-        #     world_trans=env.world_trans,
-        #     contact_fingers=['index', 'thumb'],
-        #     regrasp_fingers=['middle'],
-        #     obj_dof=obj_dof,
-        #     obj_joint_dim=1,
-        #     optimize_force=params['optimize_force']
-        # )
-        #
-        # thumb_regrasp_problem = AllegroScrewdriver(
-        #     start=start[:4 * num_fingers + obj_dof],
-        #     goal=params['valve_goal'] * 0,
-        #     T=params['T'],
-        #     chain=params['chain'],
-        #     device=params['device'],
-        #     object_asset_pos=env.table_pose,
-        #     object_location=params['object_location'],
-        #     object_type=params['object_type'],
-        #     world_trans=env.world_trans,
-        #     contact_fingers=['index', 'middle'],
-        #     regrasp_fingers=['thumb'],
-        #     obj_dof=obj_dof,
-        #     obj_joint_dim=1,
-        #     optimize_force=params['optimize_force']
-        # )
-
         thumb_and_middle_regrasp_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
             goal=params['valve_goal'] * 0,
@@ -254,19 +230,112 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             optimize_force=params['optimize_force'],
             default_dof_pos=env.default_dof_pos[:, :16]
         )
-
+        turn_problem = AllegroScrewdriver(
+            start=start[:4 * num_fingers + obj_dof],
+            goal=params['valve_goal'] * 0,
+            T=params['T'],
+            chain=params['chain'],
+            device=params['device'],
+            object_asset_pos=env.table_pose,
+            object_location=params['object_location'],
+            object_type=params['object_type'],
+            world_trans=env.world_trans,
+            contact_fingers=['index', 'middle', 'thumb'],
+            obj_dof=obj_dof,
+            obj_joint_dim=1,
+            optimize_force=params['optimize_force'],
+            default_dof_pos=env.default_dof_pos[:, :16]
+        )
         pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
         index_regrasp_planner = PositionControlConstrainedSVGDMPC(index_regrasp_problem, params)
-        # middle_regrasp_planner = PositionControlConstrainedSVGDMPC(middle_regrasp_problem, params)
-        # thumb_regrasp_planner = PositionControlConstrainedSVGDMPC(thumb_regrasp_problem, params)
         thumb_and_middle_regrasp_planner = PositionControlConstrainedSVGDMPC(thumb_and_middle_regrasp_problem, params)
-        #pregrasp_planner.warmup_iters = 50
-        #pregrasp_planner.online_iters = 10
+        turn_planner = PositionControlConstrainedSVGDMPC(turn_problem, params)
 
 
+    elif params['controller'] == 'ipopt':
+        # index finger is used for stability
+        if 'index' in params['fingers']:
+            fingers = params['fingers']
+        else:
+            fingers = ['index'] + params['fingers']
+
+        # initial grasp
+        pregrasp_problem = IpoptScrewdriver(
+            start=start[:4 * num_fingers + obj_dof],
+            goal=params['valve_goal'] * 0,
+            T=params['T'],
+            chain=params['chain'],
+            device=params['device'],
+            object_asset_pos=env.table_pose,
+            object_location=params['object_location'],
+            object_type=params['object_type'],
+            world_trans=env.world_trans,
+            regrasp_fingers=fingers,
+            contact_fingers=[],
+            obj_dof=obj_dof,
+            obj_joint_dim=1,
+            optimize_force=params['optimize_force'],
+        )
+        # finger gate index
+        index_regrasp_problem = IpoptScrewdriver(
+            start=start[:4 * num_fingers + obj_dof],
+            goal=params['valve_goal'] * 0,
+            T=params['T'],
+            chain=params['chain'],
+            device=params['device'],
+            object_asset_pos=env.table_pose,
+            object_location=params['object_location'],
+            object_type=params['object_type'],
+            world_trans=env.world_trans,
+            regrasp_fingers=['index'],
+            contact_fingers=['middle', 'thumb'],
+            obj_dof=obj_dof,
+            obj_joint_dim=1,
+            optimize_force=params['optimize_force'],
+            default_dof_pos=env.default_dof_pos[:, :16]
+        )
+        thumb_and_middle_regrasp_problem = IpoptScrewdriver(
+            start=start[:4 * num_fingers + obj_dof],
+            goal=params['valve_goal'] * 0,
+            T=params['T'],
+            chain=params['chain'],
+            device=params['device'],
+            object_asset_pos=env.table_pose,
+            object_location=params['object_location'],
+            object_type=params['object_type'],
+            world_trans=env.world_trans,
+            contact_fingers=['index'],
+            regrasp_fingers=['middle', 'thumb'],
+            obj_dof=obj_dof,
+            obj_joint_dim=1,
+            optimize_force=params['optimize_force'],
+            default_dof_pos=env.default_dof_pos[:, :16]
+        )
+        turn_problem = IpoptScrewdriver(
+            start=start[:4 * num_fingers + obj_dof],
+            goal=params['valve_goal'] * 0,
+            T=params['T'],
+            chain=params['chain'],
+            device=params['device'],
+            object_asset_pos=env.table_pose,
+            object_location=params['object_location'],
+            object_type=params['object_type'],
+            world_trans=env.world_trans,
+            contact_fingers=['index', 'middle', 'thumb'],
+            obj_dof=obj_dof,
+            obj_joint_dim=1,
+            optimize_force=params['optimize_force'],
+            default_dof_pos=env.default_dof_pos[:, :16]
+        )
+        pregrasp_planner = IpoptMPC(pregrasp_problem, params)
+        index_regrasp_planner = IpoptMPC(index_regrasp_problem, params)
+        thumb_and_middle_regrasp_planner = IpoptMPC(thumb_and_middle_regrasp_problem, params)
+        turn_planner = IpoptMPC(turn_problem, params)
     else:
         raise ValueError('Invalid controller')
 
+    pregrasp_planner.warmup_iters = 100
+    pregrasp_planner.online_iters = 0
     # start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
     # best_traj, _ = pregrasp_planner.step(start[:4 * num_fingers + obj_dof])
     #
@@ -290,23 +359,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         turn_problem_fingers = params['fingers']
         turn_problem_start = start[:4 * num_fingers + obj_dof]
 
-    turn_problem = AllegroScrewdriver(
-        start=start[:4 * num_fingers + obj_dof],
-        goal=params['valve_goal'] * 0,
-        T=params['T'],
-        chain=params['chain'],
-        device=params['device'],
-        object_asset_pos=env.table_pose,
-        object_location=params['object_location'],
-        object_type=params['object_type'],
-        world_trans=env.world_trans,
-        contact_fingers=['index', 'middle', 'thumb'],
-        obj_dof=obj_dof,
-        obj_joint_dim=1,
-        optimize_force=params['optimize_force'],
-        default_dof_pos=env.default_dof_pos[:, :16]
-    )
-    turn_planner = PositionControlConstrainedSVGDMPC(turn_problem, params)
+
 
     actual_trajectory = []
     duration = 0
@@ -362,6 +415,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             import time
             s = time.time()
             best_traj, plans = planner.step(state)
+            print('Solve time for step', time.time() - s)
             planned_trajectories.append(plans)
             N, T, _ = plans.shape
 
@@ -399,8 +453,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             elif params['mode'] == 'hardware_copy':
                 ros_copy_node.apply_action(partial_to_full_state(action[0], params['fingers']))
 
-            if params['visualize'] and best_traj.shape[0] > 1:
-                add_trajectories(plans, best_traj, axes, env, sim=sim, gym=gym, viewer=viewer,
+            if params['visualize'] and best_traj.shape[0] > 1 and False:
+                add_trajectories(plans.to(device=env.device), best_traj.to(device=env.device),
+                                 axes, env, sim=sim, gym=gym, viewer=viewer,
                                  config=params, state2ee_pos_func=state2ee_pos,
                                  show_force=(planner == turn_planner and params['optimize_force']))
             if params['visualize_plan']:
@@ -435,7 +490,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             # print(distance2goal)
             # info = {**equality_constr_dict, **inequality_constr_dict, **{'distance2goal': distance2goal}}
             # info_list.append(info)
-            if params['visualize']:
+            if params['visualize'] and False:
                 gym.clear_lines(viewer)
                 state = env.get_state()
                 start = state['q'][:, :4 * num_fingers + obj_dof].squeeze(0).to(device=params['device'])
@@ -595,14 +650,14 @@ if __name__ == "__main__":
     sim, gym, viewer = env.get_sim()
 
     state = env.get_state()
-    # try:
-    #     while True:
-    #         start = env.get_state()['q'][:, :-1]
-    #         env.step(start)
-    #         print('waiting for you to finish camera adjustment, ctrl-c when done')
-    #         time.sleep(0.1)
-    # except KeyboardInterrupt:
-    #     pass
+    try:
+        while True:
+            start = env.get_state()['q'][:, :-1]
+            env.step(start)
+            print('waiting for you to finish camera adjustment, ctrl-c when done')
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        pass
 
     sim_env = None
     ros_copy_node = None

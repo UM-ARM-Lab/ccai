@@ -191,11 +191,13 @@ class IpoptProblem(Problem):
 
     def objective(self, x):
         tensor_x = torch.from_numpy(x).reshape(1, self.T, -1).to(torch.float32)
+        self._preprocess(tensor_x)
         J, _, _ = self._objective(tensor_x)
         return J.detach().reshape(-1).item()
 
     def objective_grad(self, x):
         tensor_x = torch.from_numpy(x).reshape(1, self.T, -1).to(torch.float32)
+        self._preprocess(tensor_x)
         _, grad_J, _ = self._objective(tensor_x)
         return grad_J.detach().numpy().reshape(-1)
 
@@ -212,13 +214,16 @@ class IpoptProblem(Problem):
 
     def con_eq(self, x):
         tensor_x = torch.from_numpy(x).reshape(1, self.T, -1).to(torch.float32)
+        self._preprocess(tensor_x)
         g, _, _ = self._con_eq(tensor_x, compute_grads=False)
+
         if g is None:
             return None
         return g.reshape(-1).detach().numpy()
 
     def con_eq_grad(self, x):
         tensor_x = torch.from_numpy(x).reshape(1, self.T, -1).to(torch.float32)
+        self._preprocess(tensor_x)
         _, grad_g, _ = self._con_eq(tensor_x, compute_grads=True, compute_hess=False)
         if grad_g is None:
             return None
@@ -240,11 +245,12 @@ class IpoptProblem(Problem):
     def get_bounds(self):
         prob_dim = self.T * (self.dx + self.du)
         ub = self.x_max.reshape(1, self.dx + self.du).repeat(self.T, 1).reshape(-1)
-        lb = - ub
+        lb = self.x_min.reshape(1, self.dx + self.du).repeat(self.T, 1).reshape(-1)
         return lb, ub
 
     def con_ineq(self, x):
         tensor_x = torch.from_numpy(x).reshape(1, self.T, -1).to(torch.float32)
+        self._preprocess(tensor_x)
         h, _, _ = self._con_ineq(tensor_x)
         if h is None:
             return None
@@ -252,6 +258,8 @@ class IpoptProblem(Problem):
 
     def con_ineq_grad(self, x):
         tensor_x = torch.from_numpy(x).reshape(1, self.T, -1).to(torch.float32)
+        self._preprocess(tensor_x)
+
         _, grad_h, _ = self._con_ineq(tensor_x, compute_grads=True, compute_hess=False)
         if grad_h is None:
             return None

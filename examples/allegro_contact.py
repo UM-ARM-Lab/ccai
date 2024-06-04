@@ -16,8 +16,9 @@ from torch.func import vmap, jacrev, hessian, jacfwd
 from ccai.constrained_svgd_trajopt import ConstrainedSteinTrajOpt
 from ccai.kernels import rbf_kernel, structured_rbf_kernel
 
-from ccai.problem import ConstrainedSVGDProblem
+from ccai.problem import ConstrainedSVGDProblem, IpoptProblem
 from ccai.mpc.csvgd import Constrained_SVGD_MPC
+from ccai.mpc.ipopt import IpoptMPC
 
 import time
 import pytorch_volumetric as pv
@@ -252,12 +253,11 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             obj_x_max = 10.0 * np.pi * torch.ones(self.obj_dof)
             obj_x_min = -10.0 * np.pi * torch.ones(self.obj_dof)
         else:
-            obj_x_max = start[-self.obj_dof:].cpu()
-            obj_x_min = start[-self.obj_dof:].cpu()
+            obj_x_max = start[-self.obj_dof:].cpu() + 1e-3
+            obj_x_min = start[-self.obj_dof:].cpu() - 1e-3
 
         self.x_max = torch.cat((self.x_max, obj_x_max))
         self.x_min = torch.cat((self.x_min, obj_x_min))
-
         if self.du > 0:
             self.u_max = torch.ones(4 * self.num_fingers) * np.pi / 5
             self.u_min = - torch.ones(4 * self.num_fingers) * np.pi / 5
@@ -526,7 +526,6 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
         if hessG is not None:
             hessG.detach_()
-        # print(J.mean(), G.abs().mean(), G.abs().max())
         return grad_J.detach(), hess_J, K.detach(), grad_K.detach(), G.detach(), dG.detach(), hessG
 
     def update(self, start, goal=None, T=None):
@@ -552,7 +551,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         initialize with object not moving at all
         """
 
-        u = 0.0025 * torch.randn(N, self.T, self.du, device=self.device)
+        u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
 
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
         for t in range(self.T):
@@ -638,7 +637,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
 
         if self.num_regrasps > 0:
             self.default_ee_locs = self._ee_locations_in_screwdriver(self.default_dof_pos,
-                                                                     torch.zeros(3, device=self.device))
+                                                                     torch.zeros(self.obj_dof, device=self.device))
 
             # add a small amount of noise to ee loc default
             self.default_ee_locs = self.default_ee_locs + 0.01 * torch.randn_like(self.default_ee_locs)
@@ -668,7 +667,12 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         # convert to scene ee frame
         object_trans = self.contact_scenes.scene_sdf.chain.forward_kinematics(
             _q_env.reshape(-1, _q_env.shape[-1]))
-        ee_locs = object_trans['screwdriver_body'].inverse().transform_points(ee_locs)
+        if self.obj_dof == 3:
+            object_link_name = 'screwdriver_body'
+        else:
+            object_link_name = 'valve'
+
+        ee_locs = object_trans[object_link_name].inverse().transform_points(ee_locs)
 
         return ee_locs.reshape(q_rob.shape[:-1] + (self.num_regrasps, 3))
 
@@ -679,8 +683,11 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         theta = xu[:, self.num_fingers * 4:self.num_fingers * 4 + self.obj_dof]
 
         # ignore the rotation of the screwdriver
-        mask = torch.tensor([1.0, 1.0, 0.0], device=xu.device)
-        theta = theta * mask.reshape(1, 3)
+        if self.obj_dof == 3:
+            mask = torch.tensor([1.0, 1.0, 0.0], device=xu.device)
+            theta = theta * mask.reshape(1, 3)
+        else:
+            theta = theta * 0
         # print('--')
         # print(self._ee_locations_in_screwdriver(q, theta))
         # print(self.default_ee_locs)
@@ -818,8 +825,6 @@ class AllegroContactProblem(AllegroObjectProblem):
             du = (4 + 3) * num_fingers
         else:
             du = 4 * num_fingers
-        print('Calling Contact Constructor')
-        print(super().__init__)
         super().__init__(dx=dx, du=du, start=start, goal=goal,
                          T=T, chain=chain, object_location=object_location,
                          object_type=object_type, world_trans=world_trans, object_asset_pos=object_asset_pos,
@@ -852,7 +857,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         self.contact_state_indices = [self.joint_index[finger] for finger in contact_fingers]
         self.contact_state_indices = list(itertools.chain.from_iterable(self.contact_state_indices))
         self.contact_control_indices = [16 + self.obj_dof + idx for idx in self.contact_state_indices]
-        self.friction_polytope_k = 4
+        self.friction_polytope_k = 8
 
         if self.optimize_force:
             self._contact_dg_per_t = self.num_contacts * (1 + 2 + 4) + 3
@@ -874,7 +879,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         the actual dynamics model is not used
         """
 
-        u = 0.0025 * torch.randn(N, self.T, self.du, device=self.device)
+        u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
 
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
         for t in range(self.T):
@@ -889,7 +894,7 @@ class AllegroContactProblem(AllegroObjectProblem):
             theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
             theta = theta.unsqueeze(0).repeat((N, 1, 1))
             # theta = self.start[-self.obj_dof:].unsqueeze(0).repeat((N, self.T, 1))
-            # theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
+            theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
             x = torch.cat((x, theta), dim=-1)
 
         xu = torch.cat((x, u), dim=2)
@@ -1697,7 +1702,6 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
         #                                                  friction_coefficient=friction_coefficient, obj_dof=obj_dof,
         #                                                  obj_ori_rep=obj_ori_rep, obj_joint_dim=obj_joint_dim,
         #                                                  optimize_force=optimize_force, device=device, **kwargs)
-        print('Calling AllegroManipulationProblem constructor')
         moveable_object = True if len(contact_fingers) > 0 else False
         AllegroContactProblem.__init__(self, start=start, goal=goal, T=T, chain=chain,
                                        object_location=object_location, object_type=object_type,
@@ -1828,6 +1832,15 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
         return h, grad_h, hess_h
 
 
+class IpoptManipulationProblem(AllegroManipulationProblem, IpoptProblem):
+
+    def __init__(self, *args, **kwargs):
+        device = kwargs.get('device', None)
+        if device is not None:
+            kwargs.pop('device')
+        super().__init__(*args, **kwargs, N=1, device='cpu')
+
+
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     "only turn the valve once"
     num_contacts = len(params['fingers'])
@@ -1875,6 +1888,22 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         # )
 
         # turn_planner = PositionControlConstrainedSVGDMPC(turn_problem, params)
+    elif params['controller'] == 'ipopt':
+        pregrasp_problem = IpoptManipulationProblem(
+            start=start[:4 * num_contacts + 1],
+            goal=params['valve_goal'] * 0,
+            T=4,
+            chain=params['chain'],
+            device=params['device'],
+            object_asset_pos=env.valve_pose,
+            object_location=params['object_location'],
+            object_type=params['object_type'],
+            world_trans=env.world_trans,
+            regrasp_fingers=params['fingers'],
+            contact_fingers=[],
+        )
+        pregrasp_planner = IpoptMPC(pregrasp_problem, params)
+        pregrasp_planner.warmup_iters = 40
     else:
         raise ValueError('Invalid controller')
 
@@ -1912,23 +1941,44 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         finger_traj_history[finger] = []
     state = env.get_state()
     start = state['q'].reshape(4 * num_contacts + 1).to(device=params['device'])
-    turn_problem = AllegroManipulationProblem(
-        start=start,
-        goal=params['valve_goal'],
-        T=params['T'],
-        chain=params['chain'],
-        device=params['device'],
-        object_asset_pos=env.valve_pose,
-        object_location=params['object_location'],
-        object_type=params['object_type'],
-        friction_coefficient=params['friction_coefficient'],
-        world_trans=env.world_trans,
-        contact_fingers=params['fingers'],
-        regrasp_fingers=[],
-        optimize_force=params['optimize_force']
-    )
+    if 'csvgd' in params['controller']:
+        turn_problem = AllegroManipulationProblem(
+            start=start,
+            goal=params['valve_goal'],
+            T=params['T'],
+            chain=params['chain'],
+            device=params['device'],
+            object_asset_pos=env.valve_pose,
+            object_location=params['object_location'],
+            object_type=params['object_type'],
+            friction_coefficient=params['friction_coefficient'],
+            world_trans=env.world_trans,
+            contact_fingers=params['fingers'],
+            regrasp_fingers=[],
+            optimize_force=params['optimize_force']
+        )
+        turn_planner = PositionControlConstrainedSVGDMPC(turn_problem, params)
+    elif 'ipopt' in params['controller']:
+        turn_problem = IpoptManipulationProblem(
+            start=start,
+            goal=params['valve_goal'],
+            T=params['T'],
+            chain=params['chain'],
+            device=params['device'],
+            object_asset_pos=env.valve_pose,
+            object_location=params['object_location'],
+            object_type=params['object_type'],
+            friction_coefficient=params['friction_coefficient'],
+            world_trans=env.world_trans,
+            contact_fingers=params['fingers'],
+            regrasp_fingers=[],
+            optimize_force=params['optimize_force']
+        )
+        turn_planner = IpoptMPC(turn_problem, params)
 
-    turn_planner = PositionControlConstrainedSVGDMPC(turn_problem, params)
+    else:
+        raise ValueError('Invalid controller')
+
     for finger in params['fingers']:
         ee = state2ee_pos(start[:4 * num_contacts], turn_problem.ee_names[finger])
         finger_traj_history[finger].append(ee.detach().cpu().numpy())
@@ -1951,8 +2001,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         if params['mode'] == 'hardware':
             add_trajectories_hardware(trajectories, best_traj, axes, env, config=params, state2ee_pos_func=state2ee_pos)
         else:
-            add_trajectories(trajectories, best_traj, axes, env, sim=sim, gym=gym, viewer=viewer,
-                             config=params, state2ee_pos_func=state2ee_pos)
+            if best_traj.shape[0] > 1 and False:
+                add_trajectories(trajectories.to(device=env.device),
+                                 best_traj.to(device=env.device), axes, env, sim=sim, gym=gym, viewer=viewer,
+                                 config=params, state2ee_pos_func=state2ee_pos)
 
         if params['visualize_plan']:
             traj_for_viz = best_traj[:, :turn_problem.dx]
@@ -1975,11 +2027,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         print("--------------------------------------")
 
         action = x[:, turn_problem.dx:turn_problem.dx + 4 * turn_problem.num_contacts].to(device=env.device)
-        if params['optimize_force']:
-            print(
-                f"delta action: {action + start.unsqueeze(0)[:, :4 * num_contacts] - best_traj[1, : 4 * num_contacts]}")
-            print(
-                f"force: {x[:, turn_problem.dx + 4 * turn_problem.num_contacts:].reshape(turn_problem.num_contacts, 3)}")
+        start = start.to(device=env.device)
+        #if params['optimize_force']:
+        #    print(
+        #        f"delta action: {action + start.unsqueeze(0)[:, :4 * num_contacts] - best_traj[1, : 4 * num_contacts].to(device=env.device)}")
+        #    print(
+        #        f"force: {x[:, turn_problem.dx + 4 * turn_problem.num_contacts:].reshape(turn_problem.num_contacts, 3)}")
         # print(action)
         action = action + start.unsqueeze(0)[:,
                           :4 * num_contacts]  # NOTE: this is required since we define action as delta action
@@ -2046,23 +2099,23 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                                     label='actual')
     # with open(f'{fpath.resolve()}/info.pkl', 'wb') as f:
     #    pkl.dump(info_list, f)
-    handles, labels = plt.gca().get_legend_handles_labels()
-    newLabels, newHandles = [], []
-    for handle, label in zip(handles, labels):
-        if label not in newLabels:
-            newLabels.append(label)
-            newHandles.append(handle)
-    fig.tight_layout()
-    fig.legend(newHandles, newLabels, loc='lower center', ncol=3)
-    # plt.savefig(f'{fpath.resolve()}/traj.png')
-    # plt.close()
-    plt.show()
+    # handles, labels = plt.gca().get_legend_handles_labels()
+    # newLabels, newHandles = [], []
+    # for handle, label in zip(handles, labels):
+    #     if label not in newLabels:
+    #         newLabels.append(label)
+    #         newHandles.append(handle)
+    # fig.tight_layout()
+    # fig.legend(newHandles, newLabels, loc='lower center', ncol=3)
+    # # plt.savefig(f'{fpath.resolve()}/traj.png')
+    # # plt.close()
+    # plt.show()
 
     env.reset()
     state = env.get_state()
     state = state['q'].reshape(4 * num_contacts + 1).to(device=params['device'])
     actual_trajectory.append(state.clone())
-    actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_contacts + 1)
+    actual_trajectory = torch.stack([a.to(device=params['device']) for a in actual_trajectory], dim=0).reshape(-1, 4 * num_contacts + 1)
     turn_problem.T = actual_trajectory.shape[0]
     # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
     final_distance_to_goal = (actual_trajectory[:, -1] - params['valve_goal']).abs()
@@ -2078,6 +2131,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 def add_trajectories(trajectories, best_traj, axes, env, sim, gym, viewer, config, state2ee_pos_func, show_force=False):
     M = len(trajectories)
     T = len(best_traj)
+    print(trajectories.shape, best_traj.shape)
     fingers = copy.copy(config['fingers'])
     if 'exclude_index' in config.keys() and config['exclude_index']:
         fingers.remove('index')
@@ -2267,7 +2321,7 @@ if __name__ == "__main__":
             params['controller'] = controller
             params['valve_goal'] = goal.to(device=params['device'])
             params['chain'] = chain.to(device=params['device'])
-            object_location = torch.tensor([0.85, 0.70, 1.405]).to(device)  # the root of the valve
+            object_location = torch.tensor([0.85, 0.70, 1.405]).to(params['device'])  # the root of the valve
             params['object_location'] = object_location
             final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node)
             # final_distance_to_goal = turn(env, params, fpath)

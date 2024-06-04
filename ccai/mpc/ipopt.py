@@ -14,6 +14,7 @@ class IpoptMPC:
 
         # initialize randomly
         self.x = self.problem.get_initial_xu(1).squeeze(0)
+        self.problem._preprocess(self.x.unsqueeze(0))
         g = self.problem.con_eq(self.x.numpy())
         h = self.problem.con_ineq(self.x.numpy())
         # store if problem has equality and inequality constraints
@@ -58,7 +59,7 @@ class IpoptMPC:
         res = cyipopt.minimize_ipopt(self.problem.objective, jac=self.problem.objective_grad,
                                      hess=self.problem.objective_hess, x0=x,
                                      bounds=bnds,
-                                     constraints=cons, options={'disp': 0,
+                                     constraints=cons, options={'disp': 1,
                                                                 'max_iter': iters,
                                                                 'tol': 1e-4,
                                                                 'acceptable_tol': 1e-4,
@@ -71,13 +72,15 @@ class IpoptMPC:
         return ret_x, ret_x.unsqueeze(0)
 
     def shift(self):
-        # if self.fix_T:
-        #    self.x = torch.roll(self.x, shifts=-1, dims=0)
-        #    self.x[-1] = self.x[-2]
-        # else:
-        #    self.x = self.x[1:]
-        self.x = self.problem.shift(self.x.unsqueeze(0)).squeeze(0)
+        if self.fix_T:
+           self.x = torch.roll(self.x, shifts=-1, dims=0)
+           self.x[-1] = self.x[-2]
+        else:
+           self.x = self.x[1:]
+        #self.x = self.problem.shift(self.x.unsqueeze(0)).squeeze(0)
 
-    def reset(self, start, **kwargs):
+    def reset(self, start, initial_x=None, **kwargs):
+        if initial_x is not None:
+            self.x = initial_x
         self.problem.update(start, **kwargs)
         self.warmed_up = False

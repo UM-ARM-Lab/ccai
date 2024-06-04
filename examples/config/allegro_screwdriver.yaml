@@ -2,10 +2,10 @@
 T: 15
 receding_horizon: False
 num_steps: 15
-num_turns: 2
-num_trials: 1
+num_turns: 1
+num_trials: 10
 visualize: True
-experiment_name: 'allegro_screwdriver_long_thumb_middle4'
+experiment_name: 'allegro_screwdriver_test_ipopt_2'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -20,16 +20,22 @@ controllers:
   csvgd:
     # N: 16
     N: 8
-    alpha_J: 1.0e-3
+    alpha_J: 5.0e-3
     alpha_C: 1
     step_size: 0.1
-    momentum: 0.
+    momentum: 0.0
     device: 'cuda:0'
-    online_iters: 10
-    warmup_iters: 50
+    online_iters: 0
+    warmup_iters: 1000
     resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1
     penalty: 1000000
+    collision_checking: False
+    joint_friction: 0.0
+  ipopt:
+    device: 'cpu'
+    online_iters: 0
+    warmup_iters: 1000
     collision_checking: False
     joint_friction: 0.0

@@ -256,7 +256,7 @@ if __name__ == "__main__":
 
     train_sampler = RandomSampler(train_dataset)
     train_loader = DataLoader(train_dataset, batch_size=config['batch_size'],
-                              sampler=train_sampler, num_workers=0)
+                                  sampler=train_sampler, num_workers=4, pin_memory=True)
 
     model = model.to(device=config['device'])
 
