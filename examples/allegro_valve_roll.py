@@ -402,6 +402,34 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         R = torch.stack((x_axis, y_axis, z_axis), dim=2)
         return R
     
+    def _ee_locations_in_screwdriver(self, q_rob, q_env, queried_fingers, object_frame_name='screwdriver_body'):
+
+        assert q_rob.shape[-1] == 16
+        assert q_env.shape[-1] == self.obj_dof
+
+        _q_env = q_env.clone()
+        if self.obj_dof == 3:
+            _q_env = torch.cat((q_env, torch.zeros_like(q_env[..., :1])), dim=-1)
+
+        robot_trans = self.contact_scenes.robot_sdf.chain.forward_kinematics(q_rob.reshape(-1, 16))
+        ee_locs = []
+
+        for finger in queried_fingers:
+            ee_locs.append(robot_trans[self.ee_names[finger]].get_matrix()[:, :3, -1])
+
+        ee_locs = torch.stack(ee_locs, dim=1)
+
+        # convert to scene base frame
+        ee_locs = self.contact_scenes.scene_transform.inverse().transform_points(ee_locs)
+
+        # convert to scene ee frame
+        # Note, the FK here does not consider the change of the link center, specifically, it's the position of the joint connecting this link
+        object_trans = self.contact_scenes.scene_sdf.chain.forward_kinematics(
+            _q_env.reshape(-1, _q_env.shape[-1]))
+        ee_locs = object_trans[object_frame_name].inverse().transform_points(ee_locs)
+
+        return ee_locs
+    
     def eval(self, augmented_trajectory):
         N = augmented_trajectory.shape[0]
         augmented_trajectory = augmented_trajectory.clone().reshape(N, self.T, -1)
@@ -528,6 +556,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                  obj_dof_code=[0, 0, 0, 0, 0, 0], 
                  obj_joint_dim=0,
                  fixed_obj=False,
+                #  default_index_ee_pos=None, 
                  device='cuda:0'):
         # object_location is different from object_asset_pos. object_asset_pos is 
         # used for pytorch volumetric. The asset of valve might contain something else such as a wall, a table
@@ -592,8 +621,9 @@ class AllegroContactProblem(AllegroObjectProblem):
                                             collision_check_links=collision_check_links,
                                             softmin_temp=1.0e3,
                                             points_per_link=1000,
+                                            partial_patch=True,
                                             )
-        # self.contact_scenes['index'].visualize_robot(partial_to_full_state(self.start[:4*self.num_fingers], fingers=fingers), torch.zeros(self.obj_dof + obj_joint_dim).to(self.device))
+        # self.contact_scenes.visualize_robot(partial_to_full_state(self.start[:4*self.num_fingers], fingers=fingers), torch.zeros(self.obj_dof + obj_joint_dim).to(self.device))
     
     @all_finger_constraints
     def _contact_constraints(self, xu, finger_name, compute_grads=True, compute_hess=False, terminal=False):

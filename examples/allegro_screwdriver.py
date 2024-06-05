@@ -1,6 +1,6 @@
 from isaac_victor_envs.utils import get_assets_dir
 from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
-from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
+# from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
 
 import numpy as np
 import pickle as pkl
@@ -90,6 +90,7 @@ class AllegroScrewdriver(AllegroValveTurning):
                                                  obj_joint_dim=1, optimize_force=optimize_force, 
                                                  screwdriver_force_balance=force_balance, device=device)
         self.friction_coefficient = friction_coefficient
+        self.default_index_ee_loc_in_screwdriver = torch.tensor([0.0087, -0.016, 0.1293], device=device).unsqueeze(0)
 
     def _cost(self, xu, start, goal):
         state = xu[:, :self.dx]  # state dim = 9
@@ -134,11 +135,21 @@ class AllegroScrewdriver(AllegroValveTurning):
             force_norm = force_norm - 2 # desired maginitute
             force_cost = 1 * torch.sum(((force_norm < 0) * force_norm) ** 2)
             action_cost += force_cost
-        return smoothness_cost + action_cost + goal_cost + upright_cost    
+
+        # index_ee_locs = self._ee_locations_in_screwdriver(partial_to_full_state(state[:, :4*self.num_fingers], fingers=self.fingers),
+        #                                             state[:, 4*self.num_fingers: 4*self.num_fingers + self.obj_dof],
+        #                                             queried_fingers=['index'])
+        # index_pos_loss = 1000 * torch.sum((index_ee_locs[:,0] - self.default_index_ee_loc_in_screwdriver.unsqueeze(0)) ** 2)
+        # return smoothness_cost + action_cost + goal_cost + upright_cost + index_pos_loss
+        return smoothness_cost + action_cost + goal_cost + upright_cost
+    
+  
     
     
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
-    "only turn the valve once"
+    "only turn the screwdriver once"
+    screwdriver_goal = params['screwdriver_goal'].cpu()
+    screwdriver_goal_mat = R.from_euler('xyz', screwdriver_goal).as_matrix()
     num_fingers = len(params['fingers'])
     state = env.get_state()
     action_list = []
@@ -219,7 +230,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         turn_problem_start = start[:4 * num_fingers + obj_dof]
     turn_problem = AllegroScrewdriver(
         start=turn_problem_start,
-        goal=params['valve_goal'],
+        goal=params['screwdriver_goal'],
         T=params['T'],
         chain=params['chain'],
         device=params['device'],
@@ -340,6 +351,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         #     action = torch.cat((start.unsqueeze(0)[:, :4], action), dim=1)
         #     action[:, 2] += 0.003
         #     action[:, 3] += 0.008
+        # action = action + torch.randn(action.shape).to(action.device) * 0.1
         env.step(action)
         action_list.append(action)
         # if params['hardware']:
@@ -350,7 +362,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         # print(turn_problem.thumb_contact_scene.scene_collision_check(partial_to_full_state(x[:, :8]), x[:, 8],
         #                                                         compute_gradient=False, compute_hessian=False))
         # distance2surface = torch.sqrt((best_traj_ee[:, 2] - object_location[2].unsqueeze(0)) ** 2 + (best_traj_ee[:, 0] - object_location[0].unsqueeze(0))**2)
-        distance2goal = (params['valve_goal'].cpu() - env.get_state()['q'][:, -obj_dof-1: -1].cpu()).detach().cpu()
+        screwdriver_state = env.get_state()['q'][:, -obj_dof-1: -1].cpu()
+        screwdriver_mat = R.from_euler('xyz', screwdriver_state).as_matrix()
+        distance2goal = tf.so3_relative_angle(torch.tensor(screwdriver_mat), \
+            torch.tensor(screwdriver_goal_mat).unsqueeze(0), cos_angle=False).detach().cpu().abs()
+
+        # distance2goal = (screwdriver_goal - screwdriver_state)).detach().cpu()
         print(distance2goal)
         info = {**equality_constr_dict, **inequality_constr_dict, **{'distance2goal': distance2goal}}
         info_list.append(info)
@@ -368,9 +385,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                 axes[finger].plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray', label='actual')
     with open(f'{fpath.resolve()}/info.pkl', 'wb') as f:
         pkl.dump(info_list, f)
-    action_list = torch.concat(action_list, dim=0)
-    with open(f'{fpath.resolve()}/action.pkl', 'wb') as f:
-        pkl.dump(action_list, f)
+    # action_list = torch.concat(action_list, dim=0)
+    # with open(f'{fpath.resolve()}/action.pkl', 'wb') as f:
+    #     pkl.dump(action_list, f)
     handles, labels = plt.gca().get_legend_handles_labels()
     newLabels, newHandles = [], []
     for handle, label in zip(handles, labels):
@@ -385,22 +402,27 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
 
 
-    env.reset()
     state = env.get_state()
     state = state['q'].reshape(4 * num_fingers + obj_dof + 1).to(device=params['device'])
-    actual_trajectory.append(state.clone()[: 4 * num_fingers + obj_dof])
+    actual_trajectory.append(state.clone()[:4 * num_fingers + obj_dof])
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
     turn_problem.T = actual_trajectory.shape[0]
     # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
-    final_distance_to_goal = (actual_trajectory[:, -obj_dof:] - params['valve_goal']).abs()
+    screwdriver_state = actual_trajectory[:, -obj_dof:].cpu()
+    screwdriver_mat = R.from_euler('xyz', screwdriver_state).as_matrix()
+    distance2goal = tf.so3_relative_angle(torch.tensor(screwdriver_mat), \
+        torch.tensor(screwdriver_goal_mat).unsqueeze(0).repeat(screwdriver_mat.shape[0],1,1), cos_angle=False).detach().cpu()
 
-    print(f'Controller: {params["controller"]} Final distance to goal: {torch.min(final_distance_to_goal)}')
+    final_distance_to_goal = torch.min(distance2goal.abs())
+
+    print(f'Controller: {params["controller"]} Final distance to goal: {final_distance_to_goal}')
     print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
 
     np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
             #  constr=constraint_val.cpu().numpy(),
              d2goal=final_distance_to_goal.cpu().numpy())
-    return torch.min(final_distance_to_goal).cpu().numpy()
+    env.reset()
+    return final_distance_to_goal.cpu().detach().item()
 
 if __name__ == "__main__":
     # get config
@@ -488,6 +510,7 @@ if __name__ == "__main__":
     #     pass
 
     results = {}
+    succ_rate = {}
 
     # set up the kinematic chain
     asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
@@ -514,9 +537,10 @@ if __name__ == "__main__":
 
 
     for i in tqdm(range(config['num_trials'])):
-        goal = - 0.5 * torch.tensor([0, 0, np.pi])
+        goal = - 90 / 180 * torch.tensor([0, 0, np.pi])
         # goal = goal + 0.025 * torch.randn(1) + 0.2
         for controller in config['controllers'].keys():
+            succ = False
             env.reset()
             fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_{i + 1}')
             pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
@@ -525,19 +549,28 @@ if __name__ == "__main__":
             params.pop('controllers')
             params.update(config['controllers'][controller])
             params['controller'] = controller
-            params['valve_goal'] = goal.to(device=params['device'])
+            params['screwdriver_goal'] = goal.to(device=params['device'])
             params['chain'] = chain.to(device=params['device'])
             object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
             params['object_location'] = object_location
             final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node)
+            if final_distance_to_goal < 30 / 180 * np.pi:
+                succ = True
             # final_distance_to_goal = turn(env, params, fpath)
 
             if controller not in results.keys():
                 results[controller] = [final_distance_to_goal]
+                succ_rate[controller] = [succ]
             else:
                 results[controller].append(final_distance_to_goal)
+                succ_rate[controller].append(succ)
         print(results)
+        print(succ_rate)
+
+    print(f"Average final distance to goal: {torch.mean(torch.tensor(results['csvgd']))}, std: {torch.std(torch.tensor(results['csvgd']))}")
+    print(f"Success rate: {torch.mean(torch.tensor(succ_rate['csvgd']).float())}")
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)
+
 
