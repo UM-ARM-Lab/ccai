@@ -143,7 +143,7 @@ class TrajectoryDiffusionModel(nn.Module):
         if constraints is not None:
             constraints = constraints.reshape(constraints.shape[0], -1, constraints.shape[-1])
             context = constraints
-            #context = torch.cat((start.unsqueeze(1).repeat(1, N, 1),
+            # context = torch.cat((start.unsqueeze(1).repeat(1, N, 1),
             #                     goal.unsqueeze(1).repeat(1, N, 1),
             #                     constraints), dim=-1)
         else:
@@ -160,8 +160,8 @@ class TrajectoryDiffusionModel(nn.Module):
         if condition == {}:
             condition = None
 
-        samples = self.diffusion_model.sample(N=N, H=H, context=context, condition=condition)#.reshape(-1, H#,
-                                                                                             #         self.dx + self.du)
+        samples = self.diffusion_model.sample(N=N, H=H, context=context, condition=condition)  # .reshape(-1, H#,
+        #         self.dx + self.du)
         return samples
 
     def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
@@ -187,13 +187,10 @@ class TrajectoryDiffusionModel(nn.Module):
     def resample(self, start, goal, constraints, initial_trajectory, past, timestep):
         # B, N, _ = constraints.shape
         N, H, _ = initial_trajectory.shape
+        context = None
         if constraints is not None:
-            B = constraints.shape[0]
-            context = torch.cat((start.unsqueeze(1).repeat(1, N, 1),
-                                 goal.unsqueeze(1).repeat(1, N, 1),
-                                 constraints), dim=-1)
-        else:
-            context = None
+            constraints = constraints.reshape(constraints.shape[0], -1, constraints.shape[-1])
+            context = constraints
         condition = {}
         time_index = 0
         if past is not None:
@@ -206,12 +203,14 @@ class TrajectoryDiffusionModel(nn.Module):
         if condition == {}:
             condition = None
 
-        samples = self.diffusion_model.resample(x=initial_trajectory, context=context, condition=condition,
-                                                timestep=timestep).reshape(-1, self.T, self.dx + self.du)
-        return samples
+        samples, c = self.diffusion_model.resample(x=initial_trajectory, context=context,
+                                                   condition=condition,
+                                                   timestep=timestep)
+        return samples.reshape(-1, self.T, self.dx + self.du), c.reshape(c.shape[0], -1, self.context_dim)
 
     def likelihood(self, trajectories, context):
         return self.diffusion_model.approximate_likelihood(trajectories, context)
+
 
 class TrajectoryCNFModel(TrajectoryCNF):
 
@@ -259,6 +258,7 @@ class TrajectorySampler(nn.Module):
 
         self.register_buffer('x_mean', torch.zeros(dx + du))
         self.register_buffer('x_std', torch.ones(dx + du))
+        self.send_norm_constants_to_submodels()
 
     def set_norm_constants(self, x_mean, x_std):
         self.x_mean.data = x_mean.to(device=self.x_mean.device, dtype=self.x_mean.dtype)
@@ -290,8 +290,9 @@ class TrajectorySampler(nn.Module):
         if past is not None:
             norm_past = (past - self.x_mean) / self.x_std
 
-        return self.model.resample(norm_start, goal, constraints, norm_initial_trajectory, norm_past,
-                                   timestep) * self.x_std + self.x_mean
+        x, c = self.model.resample(norm_start, goal, constraints, norm_initial_trajectory, norm_past,
+                                   timestep)
+        return x * self.x_std + self.x_mean, c
 
     def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
         return self.model.loss(trajectories, mask=mask, start=start, goal=goal, constraints=constraints)

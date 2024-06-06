@@ -337,9 +337,10 @@ class GaussianDiffusion(nn.Module):
             img[:, 0] = self._apply_conditioning(img[:, 0], condition)
 
             # add some guidance using gradient - maximise turn angle, keep upright
-            eta = 0.01
-            img[:, -1, -1, self.dx-3:self.dx-1] -= 2 * eta * img[:, -1, -1, self.dx-3:self.dx-1]
-            img[:, -1, -1, self.dx] -= eta
+            eta = 0.1
+            img[:, :, :, self.dx - 3:self.dx - 1] -= 0.1 * 2 * eta * img[:, :, :, self.dx - 3:self.dx - 1]
+            # img[:, -1, -1, self.dx - 1] -= 10 * eta
+            img[:, :, :, self.dx - 1] -= eta
 
             # img[:, -1, -1, 8] += 1.0e-3
             imgs.append(img)
@@ -487,7 +488,7 @@ class GaussianDiffusion(nn.Module):
         B = x.shape[0]
         if context is not None:
             B, num_constraints, dc = context.shape
-            context = context.reshape(B, 1, num_constraints, dc).repeat(1, N, 1, 1).reshape(B * N, num_constraints, -1)
+            context = context.reshape(B, 1, num_constraints, dc)
 
         ##context = context.reshape(B, 1, num_constraints, dc).repeat(1, N, 1, 1).reshape(B * N, num_constraints, -1)
 
@@ -583,35 +584,35 @@ class JointDiffusion(GaussianDiffusion):
         B, N = x.shape[:2]
 
         if context is not None:
-            context = context.reshape(B*N, -1)
+            context = context.reshape(B * N, -1)
 
-        e_x, e_c = self.model(t.reshape(B*N), x.reshape(B*N, -1, self.xu_dim), context)
+        e_x, e_c = self.model(t.reshape(B * N), x.reshape(B * N, -1, self.xu_dim), context)
         e_x = e_x.reshape(B, N, -1, self.xu_dim)
         e_c = e_c.reshape(B, N, -1)
 
         # combine score for knot points
-        #print(N)
-        #print('--')
-        #print(e_x[0, 0, -1])
-        #print(e_x[0, 1, 0])
+        # print(N)
+        # print('--')
+        # print(e_x[0, 0, -1])
+        # print(e_x[0, 1, 0])
         for i in range(1, N):
-            tmp = e_x[:, i, 0, :self.dx].clone()# = e_x[:, i]
-            e_x[:, i, 0, :self.dx] = (tmp + e_x[:, i-1, -1, :self.dx]) / 2.0
-            e_x[:, i-1, -1, :self.dx] = e_x[:, i, 0, :self.dx].clone()
-            #e_x[:, i, 0, :10] = e_x[:, i-1, -1, :10]
-            #e_x[:, i-1, -1, :10] = (tmp + e_x[:, i-1, -1, :10]) / 2
-            #e_x[:, i, 0, :10] = e_x[:, i-1, -1, :10]
+            tmp = e_x[:, i, 0, :self.dx].clone()  # = e_x[:, i]
+            e_x[:, i, 0, :self.dx] = (tmp + e_x[:, i - 1, -1, :self.dx]) / 2.0
+            e_x[:, i - 1, -1, :self.dx] = e_x[:, i, 0, :self.dx].clone()
+            # e_x[:, i, 0, :10] = e_x[:, i-1, -1, :10]
+            # e_x[:, i-1, -1, :10] = (tmp + e_x[:, i-1, -1, :10]) / 2
+            # e_x[:, i, 0, :10] = e_x[:, i-1, -1, :10]
 
         if N == 1:
             e_x.squeeze_(1)
             e_c.squeeze_(1)
 
-        x_start = self.predict_start_from_noise(x.reshape(B*N, -1, self.xu_dim),
-                                                t.reshape(B*N),
-                                                e_x.reshape(B*N, -1, self.xu_dim))#.reshape(B, N, -1, self.xu_dim)
-        c_start = self.predict_start_from_noise(context.reshape(B*N, -1),
-                                                t.reshape(B*N),
-                                                e_c.reshape(B*N, -1))#.reshape(B, N, -1)
+        x_start = self.predict_start_from_noise(x.reshape(B * N, -1, self.xu_dim),
+                                                t.reshape(B * N),
+                                                e_x.reshape(B * N, -1, self.xu_dim))  # .reshape(B, N, -1, self.xu_dim)
+        c_start = self.predict_start_from_noise(context.reshape(B * N, -1),
+                                                t.reshape(B * N),
+                                                e_c.reshape(B * N, -1))  # .reshape(B, N, -1)
         return ModelPrediction(e_x, x_start), ModelPrediction(e_c, c_start)
 
     def p_mean_variance(self, x, t, context):
@@ -622,24 +623,24 @@ class JointDiffusion(GaussianDiffusion):
 
         x_start = pred_x.pred_x_start
         c_start = pred_c.pred_x_start
-        x_mean, x_var, x_log_var = self.q_posterior(x_start=x_start, x_t=x.reshape(B*N, h, d), t=t.reshape(B*N))
-        c_mean, c_var, c_log_var = self.q_posterior(x_start=c_start, x_t=context.reshape(B*N, -1), t=t.reshape(B*N))
+        x_mean, x_var, x_log_var = self.q_posterior(x_start=x_start, x_t=x.reshape(B * N, h, d), t=t.reshape(B * N))
+        c_mean, c_var, c_log_var = self.q_posterior(x_start=c_start, x_t=context.reshape(B * N, -1), t=t.reshape(B * N))
         return {'x': {'mean': x_mean.reshape(B, N, h, d), 'var': x_var.reshape(B, N, 1, 1),
                       'logvar': x_log_var.reshape(B, N, 1, 1), 'start': x_start.reshape(B, N, h, d)},
                 'c': {'mean': c_mean.reshape(B, N, -1), 'var': c_var.reshape(B, N, 1),
                       'logvar': c_log_var.reshape(B, N, 1), 'start': c_start.reshape(B, N, -1)}}
 
     def _cost(self, x):
-        return torch.sum((x[1:] - x[:-1])**2)
-        #ctheta = x[:, 8]
-        #stheta = x[:, 9]
-        #theta = torch.atan2(stheta, ctheta)
-        #return torch.sum((theta[0] - theta[1]) ** 2) + torch.sum((theta[-1] - theta[-1]) ** 2)# - 0.01*(theta[-1]-theta[0]) ** 2
+        return torch.sum((x[1:] - x[:-1]) ** 2)
+        # ctheta = x[:, 8]
+        # stheta = x[:, 9]
+        # theta = torch.atan2(stheta, ctheta)
+        # return torch.sum((theta[0] - theta[1]) ** 2) + torch.sum((theta[-1] - theta[-1]) ** 2)# - 0.01*(theta[-1]-theta[0]) ** 2
 
     @torch.no_grad()
     def p_sample(self, x, t, context):
         b, *_, device = *x.shape, x.device
-        alpha = 1
+        alpha = 1.0
         batched_times = torch.full((b,), t, device=x.device, dtype=torch.long)
         mu_var = self.p_mean_variance(x=x, t=batched_times, context=context)
         # model_mean, _, model_log_variance, x_start = self.p_mean_variance(x=x, t=batched_times, context=context)
@@ -652,11 +653,18 @@ class JointDiffusion(GaussianDiffusion):
                 noise_x[:, i, 0, :self.dx] = noise_x[:, i - 1, -1, :self.dx]
 
         # use same noise vector
-        #print(self.cost(x).mean())#, self.cost(x).max())
-        pred_x = mu_var['x']['mean'] + alpha * (0.5 * mu_var['x']['logvar']).exp() * noise_x
-        #pred_x = pred_x - 0.01 * self.grad_cost(mu_var['x']['mean'].reshape(b*N, -1, self.xu_dim)).reshape(b, N, -1, self.xu_dim)
+        grad = torch.zeros_like(mu_var['x']['mean'])
+        # add some guidance using gradient - maximise turn angle, keep upright
+        eta = 0.25
+        grad[:, :, :, self.dx - 3:self.dx - 1] = -2 * (mu_var['x']['mean'][:, :, :, self.dx - 3:self.dx - 1] +
+                                                                   self.mu[self.dx-3:self.dx-1].to(device=x.device))
+        #grad[:, -1, -1, self.dx - 1] = -eta
+        grad[:, :, :, self.dx - 1] = -1
+        #print(mu_var['x']['logvar'].exp())
+        pred_x = mu_var['x']['mean'] + alpha * (0.5 * mu_var['x']['logvar']).exp() * (noise_x + eta * grad)
+        # pred_x = pred_x - 0.01 * self.grad_cost(mu_var['x']['mean'].reshape(b*N, -1, self.xu_dim)).reshape(b, N, -1, self.xu_dim)
         pred_c = mu_var['c']['mean'].squeeze(1) + alpha * (0.5 * mu_var['c']['logvar']).exp().squeeze(1) * noise_c
-        #print(self.cost(pred_x).mean())#, self.cost(pred_x).max())
+        # print(self.cost(pred_x).mean())#, self.cost(pred_x).max())
         return pred_x, mu_var['x']['start'], pred_c, mu_var['c']['start']
 
     @torch.no_grad()
@@ -767,7 +775,7 @@ class JointDiffusion(GaussianDiffusion):
         # first state of each subtrajectory should be the same as the final state of the previous
         # make noises the same
         for i in range(1, N):
-            x[:, i, 0] = x[:, i - 1, -1]
+            x[:, i, 0, :self.dx] = x[:, i - 1, -1, :self.dx]
 
         if start_timestep is None:
             start_timestep = self.num_timesteps
@@ -781,6 +789,7 @@ class JointDiffusion(GaussianDiffusion):
             c = c.reshape(B, N, -1)
             # apply conditioning
             x[:, 0] = self._apply_conditioning(x[:, 0], condition)
+
             if context is not None:
                 c = context
 
@@ -821,7 +830,7 @@ class JointDiffusion(GaussianDiffusion):
             combined_samples = [sample_x[:, i, :-1] for i in range(0, factor - 1)]
             combined_samples.append(sample_x[:, -1])
             sample_x = torch.cat([sample_x[:, i] for i in range(0, factor)], dim=1)
-            sample_c = torch.cat([sample_c[:, i] for i in range(0, factor)], dim=1)
+            sample_c = torch.stack([sample_c[:, i] for i in range(0, factor)], dim=1)
             return sample_x, sample_c, likelihood
 
         sample_x, sample_c = sample_fn((B * N, H, self.xu_dim), condition=condition, context=context,
@@ -855,12 +864,14 @@ class JointDiffusion(GaussianDiffusion):
         p_next = self.p_mean_variance(x=x_t, t=t, context=c_t)
 
         if forward_kl:
-            kl_x = self._gaussian_kl(p_next['x']['mean'].squeeze(1), p_next['x']['var'].squeeze(1), q_next_x[0], q_next_x[1])
+            kl_x = self._gaussian_kl(p_next['x']['mean'].squeeze(1), p_next['x']['var'].squeeze(1), q_next_x[0],
+                                     q_next_x[1])
             kl_c = self._gaussian_kl(p_next['c']['mean'], p_next['c']['var'], q_next_c[0], q_next_c[1])
         else:
             kl_x = self._gaussian_kl(q_next_x[0], q_next_x[1], p_next['x']['mean'].squeeze(1),
                                      p_next['x']['var'].squeeze(1))
-            kl_c = self._gaussian_kl(q_next_c[0], q_next_c[1], p_next['c']['mean'].squeeze(1), p_next['c']['var'].squeeze(1))
+            kl_c = self._gaussian_kl(q_next_c[0], q_next_c[1], p_next['c']['mean'].squeeze(1),
+                                     p_next['c']['var'].squeeze(1))
 
         overall_kl = (kl_c + kl_x).reshape(B, N).mean(dim=1)
 

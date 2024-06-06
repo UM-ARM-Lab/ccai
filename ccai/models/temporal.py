@@ -259,7 +259,7 @@ class TemporalUNetContext(nn.Module):
             nn.Linear(128, cond_dim)
         )
 
-    @torch.compile(mode='max-autotune')
+    #@torch.compile(mode='max-autotune')
     def forward(self, t, x, context):
         '''
             x : [ batch x horizon x transition ]
