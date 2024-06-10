@@ -159,6 +159,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         self.obj_translational_dim = np.sum(self.obj_translational_code)
         self.obj_rotational_dim = np.sum(self.obj_rotational_code)
         self.obj_joint_dim = obj_joint_dim
+        self.collision_checking = False
         if self.fixed_obj:
             self.start_obj_pose = self.start[-self.obj_dof:]
             self.start = self.start[:4 * self.num_fingers]
@@ -309,16 +310,17 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.data[finger]['grad_env_sdf'] = ret_scene['grad_env_sdf'][:, i, :self.obj_dof]
             dJ_dq = contact_hessian
             self.data[finger]['dJ_dq'] = dJ_dq  # Jacobian of the contact point
-        self.data['allegro_hand_hitosashi_finger_finger_link_2'] = {}
-        self.data['allegro_hand_hitosashi_finger_finger_link_2']['sdf'] = ret_scene['sdf'][:, -2].reshape(N, self.T + 1)
-        grad_g_q = ret_scene.get('grad_sdf', None)
-        self.data['allegro_hand_hitosashi_finger_finger_link_2']['grad_sdf'] = grad_g_q[:, -2].reshape(N, self.T + 1, 16)[:, :, self.all_joint_index]
-        self.data['allegro_hand_hitosashi_finger_finger_link_2']['grad_env_sdf'] = ret_scene['grad_env_sdf'][:, -2, :self.obj_dof]
+        if self.collision_checking:
+            self.data['allegro_hand_hitosashi_finger_finger_link_2'] = {}
+            self.data['allegro_hand_hitosashi_finger_finger_link_2']['sdf'] = ret_scene['sdf'][:, -2].reshape(N, self.T + 1)
+            grad_g_q = ret_scene.get('grad_sdf', None)
+            self.data['allegro_hand_hitosashi_finger_finger_link_2']['grad_sdf'] = grad_g_q[:, -2].reshape(N, self.T + 1, 16)[:, :, self.all_joint_index]
+            self.data['allegro_hand_hitosashi_finger_finger_link_2']['grad_env_sdf'] = ret_scene['grad_env_sdf'][:, -2, :self.obj_dof]
 
-        self.data['allegro_hand_hitosashi_finger_finger_link_3'] = {}
-        self.data['allegro_hand_hitosashi_finger_finger_link_3']['sdf'] = ret_scene['sdf'][:, -1].reshape(N, self.T + 1)
-        self.data['allegro_hand_hitosashi_finger_finger_link_3']['grad_sdf'] = grad_g_q[:, -1].reshape(N, self.T + 1, 16)[:, :, self.all_joint_index]
-        self.data['allegro_hand_hitosashi_finger_finger_link_3']['grad_env_sdf'] = ret_scene['grad_env_sdf'][:, -1, :self.obj_dof]
+            self.data['allegro_hand_hitosashi_finger_finger_link_3'] = {}
+            self.data['allegro_hand_hitosashi_finger_finger_link_3']['sdf'] = ret_scene['sdf'][:, -1].reshape(N, self.T + 1)
+            self.data['allegro_hand_hitosashi_finger_finger_link_3']['grad_sdf'] = grad_g_q[:, -1].reshape(N, self.T + 1, 16)[:, :, self.all_joint_index]
+            self.data['allegro_hand_hitosashi_finger_finger_link_3']['grad_env_sdf'] = ret_scene['grad_env_sdf'][:, -1, :self.obj_dof]
 
     
     def _cost(self, x, start, goal):
@@ -566,6 +568,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                  obj_dof_code=[0, 0, 0, 0, 0, 0], 
                  obj_joint_dim=0,
                  fixed_obj=False,
+                 collision_checking=False,
                  device='cuda:0'):
         # object_location is different from object_asset_pos. object_asset_pos is 
         # used for pytorch volumetric. The asset of valve might contain something else such as a wall, a table
@@ -573,6 +576,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         super().__init__(dx=dx, du=du, start=start, goal=goal, T=T, chain=chain, object_location=object_location,
                          world_trans=world_trans, fingers=fingers, obj_dof_code=obj_dof_code, 
                          obj_joint_dim=obj_joint_dim, fixed_obj=fixed_obj, device=device)
+        self.collision_checking = collision_checking
         self.get_constraint_dim(T)
 
         # update x_max with valve angle
@@ -626,8 +630,9 @@ class AllegroContactProblem(AllegroObjectProblem):
         #                                            softmin_temp=100.0)
         # contact checking
         collision_check_links = [self.ee_names[finger] for finger in self.fingers]
-        collision_check_links.append('allegro_hand_hitosashi_finger_finger_link_2')
-        collision_check_links.append('allegro_hand_hitosashi_finger_finger_link_3')
+        if collision_checking:
+            collision_check_links.append('allegro_hand_hitosashi_finger_finger_link_2')
+            collision_check_links.append('allegro_hand_hitosashi_finger_finger_link_3')
         self.contact_scenes = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
                                             collision_check_links=collision_check_links,
                                             softmin_temp=1.0e3,
@@ -719,8 +724,9 @@ class AllegroValveTurning(AllegroContactProblem):
             # self.dg_per_t = self.num_fingers * (1 + 3 + 2)
         self.dg_constant = 0
         self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
-        # self.dz = (self.friction_polytope_k) * self.num_fingers # one friction constraints per finger
-        self.dz = (self.friction_polytope_k) * self.num_fingers + 2 # one additional repulsive constrants of the index finger
+        self.dz = (self.friction_polytope_k) * self.num_fingers # one friction constraints per finger
+        if self.collision_checking:
+            self.dz += 2
         # self.dz = 0 # DEBUG ONLY
         self.dh = self.dz * T  # inequality
     
@@ -739,6 +745,7 @@ class AllegroValveTurning(AllegroContactProblem):
                  obj_joint_dim=0,
                  optimize_force=False,
                  screwdriver_force_balance=False,
+                 collision_checking=False,
                  device='cuda:0', **kwargs):
         self.screwdriver_force_balance = screwdriver_force_balance
         self.optimize_force = optimize_force
@@ -753,8 +760,8 @@ class AllegroValveTurning(AllegroContactProblem):
                          T=T, chain=chain, object_location=object_location,
                          object_type=object_type, world_trans=world_trans, object_asset_pos=object_asset_pos,
                          fingers=fingers, obj_dof_code=obj_dof_code, 
-                         obj_joint_dim=obj_joint_dim, fixed_obj=False, device=device)
-        
+                         obj_joint_dim=obj_joint_dim, fixed_obj=False, 
+                         collision_checking=collision_checking, device=device)
         self.friction_coefficient = friction_coefficient
         self.dynamics_constr = vmap(self._dynamics_constr)
         self.grad_dynamics_constr = vmap(jacrev(self._dynamics_constr, argnums=(0, 1, 2, 3, 4)))

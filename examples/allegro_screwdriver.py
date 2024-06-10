@@ -82,12 +82,13 @@ class ALlegroScrewdriverContact(AllegroContactProblem):
                  obj_dof_code=[0, 0, 0, 0, 0, 0], 
                  obj_joint_dim=0,
                  fixed_obj=False,
+                 collision_checking=False,
                 #  default_index_ee_pos=None, 
                  device='cuda:0'):
         super(ALlegroScrewdriverContact, self).__init__(dx, du, start, goal, T, 
                                                         chain, object_location, object_type, world_trans,
                                                         object_asset_pos, fingers, obj_dof_code, obj_joint_dim,
-                                                        fixed_obj, device)
+                                                        fixed_obj, collision_checking, device)
         self.default_index_ee_loc_in_screwdriver = torch.tensor([0.0087, -0.02, 0.1293], device=device).unsqueeze(0)
     # def _cost(self, xu, start, goal):
     #     loss = super(ALlegroScrewdriverContact, self)._cost(xu, start, goal)
@@ -113,6 +114,7 @@ class AllegroScrewdriver(AllegroValveTurning):
                  friction_coefficient=0.95,
                  optimize_force=False,
                  force_balance=False,
+                 collision_checking=False,
                  device='cuda:0', **kwargs):
         self.num_fingers = len(fingers)
         self.obj_dof_code = [0, 0, 0, 1, 1, 1]
@@ -121,7 +123,8 @@ class AllegroScrewdriver(AllegroValveTurning):
                                                  object_type=object_type, world_trans=world_trans, object_asset_pos=object_asset_pos,
                                                  fingers=fingers, friction_coefficient=friction_coefficient, obj_dof_code=self.obj_dof_code, 
                                                  obj_joint_dim=1, optimize_force=optimize_force, 
-                                                 screwdriver_force_balance=force_balance, device=device)
+                                                 screwdriver_force_balance=force_balance,
+                                                 collision_checking=collision_checking, device=device)
         self.friction_coefficient = friction_coefficient
         self.default_index_ee_loc_in_screwdriver = torch.tensor([0.0087, -0.016, 0.1293], device=device).unsqueeze(0)
         self.friction_vel_constr = vmap(self._friction_vel_constr, randomness='same')
@@ -171,12 +174,12 @@ class AllegroScrewdriver(AllegroValveTurning):
             force_cost = 1 * torch.sum(((force_norm < 0) * force_norm) ** 2)
             action_cost += force_cost
 
-        index_ee_locs = self._ee_locations_in_screwdriver(partial_to_full_state(state[:, :4*self.num_fingers], fingers=self.fingers),
-                                                    state[:, 4*self.num_fingers: 4*self.num_fingers + self.obj_dof],
-                                                    queried_fingers=['index'])
-        index_pos_loss = 1000 * torch.sum((index_ee_locs[:,0] - self.default_index_ee_loc_in_screwdriver.unsqueeze(0)) ** 2)
-        return smoothness_cost + action_cost + goal_cost + upright_cost + index_pos_loss
-        # return smoothness_cost + action_cost + goal_cost + upright_cost
+        # index_ee_locs = self._ee_locations_in_screwdriver(partial_to_full_state(state[:, :4*self.num_fingers], fingers=self.fingers),
+        #                                             state[:, 4*self.num_fingers: 4*self.num_fingers + self.obj_dof],
+        #                                             queried_fingers=['index'])
+        # index_pos_loss = 1000 * torch.sum((index_ee_locs[:,0] - self.default_index_ee_loc_in_screwdriver.unsqueeze(0)) ** 2)
+        # return smoothness_cost + action_cost + goal_cost + upright_cost + index_pos_loss
+        return smoothness_cost + action_cost + goal_cost + upright_cost
     def _index_repulsive(self, xu, link_name, compute_grads=True, compute_hess=False):
         """
         None teriminal link of the finger tip should have >= 0 sdf value
@@ -298,46 +301,50 @@ class AllegroScrewdriver(AllegroValveTurning):
         #     xu=xu.reshape(-1, T, self.dx + self.du),
         #     compute_grads=compute_grads,
         #     compute_hess=compute_hess)
+        if self.collision_checking:
+            h_rep_1, grad_h_rep_1, hess_h_rep_1 = self._index_repulsive(
+                xu=xu.reshape(-1, T, self.dx + self.du),
+                link_name='allegro_hand_hitosashi_finger_finger_link_2',
+                compute_grads=compute_grads,
+                compute_hess=compute_hess)
+            
+            h_rep_2, grad_h_rep_2, hess_h_rep_2 = self._index_repulsive(
+                xu=xu.reshape(-1, T, self.dx + self.du),
+                link_name='allegro_hand_hitosashi_finger_finger_link_3',
+                compute_grads=compute_grads,
+                compute_hess=compute_hess)
         
-        h_rep_1, grad_h_rep_1, hess_h_rep_1 = self._index_repulsive(
-            xu=xu.reshape(-1, T, self.dx + self.du),
-            link_name='allegro_hand_hitosashi_finger_finger_link_2',
-            compute_grads=compute_grads,
-            compute_hess=compute_hess)
-        
-        h_rep_2, grad_h_rep_2, hess_h_rep_2 = self._index_repulsive(
-            xu=xu.reshape(-1, T, self.dx + self.du),
-            link_name='allegro_hand_hitosashi_finger_finger_link_3',
-            compute_grads=compute_grads,
-            compute_hess=compute_hess)
-        
-        # h = torch.cat((h, h_vel), dim=1)
-        h_rep = torch.cat((h_rep_1, h_rep_2), dim=1)
+            # h = torch.cat((h, h_vel), dim=1)
+            h_rep = torch.cat((h_rep_1, h_rep_2), dim=1)
         if verbose:
             print(f"max friction constraint: {torch.max(h)}")
-            print(f"max index repulsive constraint: {torch.max(h_rep)}")
+            if self.collision_checking:
+                print(f"max index repulsive constraint: {torch.max(h_rep)}")
             # print(f"max step size constraint: {torch.max(h_step_size)}")
             # print(f"max singularity constraint: {torch.max(h_sin)}")
             result_dict = {}
             result_dict['friction'] = torch.max(h).item()
             result_dict['friction_mean'] = torch.mean(h).item()
-            result_dict['index_rep'] = torch.max(h_rep).item()
-            result_dict['index_rep_mean'] = torch.mean(h_rep).item()
+            if self.collision_checking:
+                result_dict['index_rep'] = torch.max(h_rep).item()
+                result_dict['index_rep_mean'] = torch.mean(h_rep).item()
             # result_dict['singularity'] = torch.max(h_sin).item()
             return result_dict
 
         # h = torch.cat((h,
         #             #    h_step_size,
         #                h_sin), dim=1)
-        h = torch.cat((h, h_rep), dim=1)  
+        if self.collision_checking:
+            h = torch.cat((h, h_rep), dim=1)  
         if compute_grads:
             grad_h = grad_h.reshape(N, -1, self.T * (self.dx + self.du))
             # grad_h = torch.cat((grad_h, 
             #                     # grad_h_step_size,
             #                     grad_h_sin), dim=1)
             # grad_h = torch.cat((grad_h, grad_h_vel), dim=1)
-            grad_h_rep = torch.cat((grad_h_rep_1, grad_h_rep_2), dim=1)
-            grad_h = torch.cat((grad_h, grad_h_rep), dim=1)
+            if self.collision_checking:
+                grad_h_rep = torch.cat((grad_h_rep_1, grad_h_rep_2), dim=1)
+                grad_h = torch.cat((grad_h, grad_h_rep), dim=1)
         else:
             return h, None, None
         if compute_hess:
@@ -445,6 +452,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         fingers=turn_problem_fingers,
         optimize_force=params['optimize_force'],
         force_balance=params['force_balance'],
+        collision_checking=params['collision_checking'],
     )
     turn_planner = PositionControlConstrainedSVGDMPC(turn_problem, params)
 
