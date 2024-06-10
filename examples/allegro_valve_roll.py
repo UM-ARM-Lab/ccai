@@ -255,7 +255,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
         q = x_expanded[:, :, :4 * self.num_fingers]
         if self.fixed_obj:
-            theta =self.start_obj_pose.unsqueeze(0).repeat((N, self.T + 1, 1))
+            theta = self.start_obj_pose.unsqueeze(0).repeat((N, self.T + 1, 1))
         else:
             theta = x_expanded[:, :, 4 * self.num_fingers: 4 * self.num_fingers + self.obj_dof]
         # theta = x_expanded[:, :, 4 * self.num_fingers: 4 * self.num_fingers + self.obj_dof]
@@ -309,6 +309,16 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.data[finger]['grad_env_sdf'] = ret_scene['grad_env_sdf'][:, i, :self.obj_dof]
             dJ_dq = contact_hessian
             self.data[finger]['dJ_dq'] = dJ_dq  # Jacobian of the contact point
+        self.data['allegro_hand_hitosashi_finger_finger_link_2'] = {}
+        self.data['allegro_hand_hitosashi_finger_finger_link_2']['sdf'] = ret_scene['sdf'][:, -2].reshape(N, self.T + 1)
+        grad_g_q = ret_scene.get('grad_sdf', None)
+        self.data['allegro_hand_hitosashi_finger_finger_link_2']['grad_sdf'] = grad_g_q[:, -2].reshape(N, self.T + 1, 16)[:, :, self.all_joint_index]
+        self.data['allegro_hand_hitosashi_finger_finger_link_2']['grad_env_sdf'] = ret_scene['grad_env_sdf'][:, -2, :self.obj_dof]
+
+        self.data['allegro_hand_hitosashi_finger_finger_link_3'] = {}
+        self.data['allegro_hand_hitosashi_finger_finger_link_3']['sdf'] = ret_scene['sdf'][:, -1].reshape(N, self.T + 1)
+        self.data['allegro_hand_hitosashi_finger_finger_link_3']['grad_sdf'] = grad_g_q[:, -1].reshape(N, self.T + 1, 16)[:, :, self.all_joint_index]
+        self.data['allegro_hand_hitosashi_finger_finger_link_3']['grad_env_sdf'] = ret_scene['grad_env_sdf'][:, -1, :self.obj_dof]
 
     
     def _cost(self, x, start, goal):
@@ -556,7 +566,6 @@ class AllegroContactProblem(AllegroObjectProblem):
                  obj_dof_code=[0, 0, 0, 0, 0, 0], 
                  obj_joint_dim=0,
                  fixed_obj=False,
-                #  default_index_ee_pos=None, 
                  device='cuda:0'):
         # object_location is different from object_asset_pos. object_asset_pos is 
         # used for pytorch volumetric. The asset of valve might contain something else such as a wall, a table
@@ -617,11 +626,13 @@ class AllegroContactProblem(AllegroObjectProblem):
         #                                            softmin_temp=100.0)
         # contact checking
         collision_check_links = [self.ee_names[finger] for finger in self.fingers]
+        collision_check_links.append('allegro_hand_hitosashi_finger_finger_link_2')
+        collision_check_links.append('allegro_hand_hitosashi_finger_finger_link_3')
         self.contact_scenes = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
                                             collision_check_links=collision_check_links,
                                             softmin_temp=1.0e3,
                                             points_per_link=1000,
-                                            partial_patch=True,
+                                            partial_patch=False,
                                             )
         # self.contact_scenes.visualize_robot(partial_to_full_state(self.start[:4*self.num_fingers], fingers=fingers), torch.zeros(self.obj_dof + obj_joint_dim).to(self.device))
     
@@ -708,7 +719,8 @@ class AllegroValveTurning(AllegroContactProblem):
             # self.dg_per_t = self.num_fingers * (1 + 3 + 2)
         self.dg_constant = 0
         self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
-        self.dz = (self.friction_polytope_k) * self.num_fingers # one friction constraints per finger
+        # self.dz = (self.friction_polytope_k) * self.num_fingers # one friction constraints per finger
+        self.dz = (self.friction_polytope_k) * self.num_fingers + 2 # one additional repulsive constrants of the index finger
         # self.dz = 0 # DEBUG ONLY
         self.dh = self.dz * T  # inequality
     
@@ -777,6 +789,8 @@ class AllegroValveTurning(AllegroContactProblem):
         if self.optimize_force:
             u = 0.025 * torch.randn(N, self.T, 4 * self.num_fingers, device=self.device)
             force = 1.5 * torch.randn(N, self.T, 3 * self.num_fingers, device=self.device)
+            # force[:, :, :3] = force[:, :, :3] * 0.01 # NOTE: scale down the index finger force, might not apply to situations other than screwdriver
+            # force = 0.025 * torch.randn(N, self.T, 3 * self.num_fingers, device=self.device)
             u = torch.cat((u, force), dim=-1)
         else:
             u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
