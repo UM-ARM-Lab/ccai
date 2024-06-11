@@ -2,19 +2,20 @@
 T: 12
 receding_horizon: False
 num_steps: 11
-num_trials: 1
+num_trials: 10
 visualize: True
-experiment_name: 'allegro_screwdriver'
-mode: 'hardware'  # choose from 'simulation', 'hardware', 'hardware_copy'
+experiment_name: 'allegro_screwdriver
+mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
 object_type: 'screwdriver'
 sim_device: 'cuda:0'
 friction_coefficient: 0.95
 kp: 3.0
-visualize_plan: True
+visualize_plan: False
 optimize_force: True
 exclude_index: False
+force_balance: False  # in addition to the torque balance, do we also need force balance, just for the screwdriver turning experiment w\o slot. 
 controllers:
   csvgd:
     # N: 16
@@ -31,5 +32,5 @@ controllers:
     resample_sigma: 0.01
     resample_temperature: 0.1
     penalty: 1000000
-    collision_checking: False
+    collision_checking: True
     joint_friction: 0.0
