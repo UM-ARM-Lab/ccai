@@ -130,6 +130,58 @@ class AllegroScrewdriver(AllegroValveTurning):
         self.friction_vel_constr = vmap(self._friction_vel_constr, randomness='same')
         self.grad_friction_vel_constr = vmap(jacrev(self._friction_vel_constr, argnums=(0, 1, 2)))
 
+    def get_initial_xu(self, N):
+        # TODO: fix the initialization, for 6D movement, the angle is not supposed to be the linear interpolation of the euler angle. 
+        """
+        use delta joint movement to get the initial trajectory
+        the action (force at the finger tip) is not used. it is randomly intiailized
+        the actual dynamics model is not used
+        """
+
+        # u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
+        if self.optimize_force:
+            u = 0.025 * torch.randn(N, self.T, 4 * self.num_fingers, device=self.device)
+            force = 1.5 * torch.randn(N, self.T, 3 * self.num_fingers, device=self.device)
+            force[:, :, :3] = force[:, :, :3] * 0.01 # NOTE: scale down the index finger force, might not apply to situations other than screwdriver
+            u = torch.cat((u, force), dim=-1)
+        else:
+            u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
+
+        x = [self.start.reshape(1, self.dx).repeat(N, 1)]
+        for t in range(self.T):
+            next_q = x[-1][:, :4 * self.num_fingers] + u[:, t, :4 * self.num_fingers]
+            x.append(next_q)
+
+        x = torch.stack(x[1:], dim=1)
+
+        # if valve angle in state
+        if self.dx == (4 * self.num_fingers + self.obj_dof):
+            if self.obj_dof == 6:
+                current_obj_position = self.start[4 * self.num_fingers: 4 * self.num_fingers + self.obj_translational_dim]
+                current_obj_orientation = self.start[4 * self.num_fingers + self.obj_translational_dim:4 * self.num_fingers + self.obj_dof]
+                current_obj_R = R.from_euler('XYZ', current_obj_orientation.cpu().numpy())
+                goal_obj_R = R.from_euler('XYZ', self.goal[self.obj_translational_dim:self.obj_translational_dim + self.obj_rotational_dim].cpu().numpy())
+                key_times = [0, self.T]
+                times = np.linspace(0, self.T, self.T + 1)
+                slerp = Slerp(key_times, R.concatenate([current_obj_R, goal_obj_R]))
+                interp_rots = slerp(times)
+                interp_rots = interp_rots.as_euler('XYZ')[1:]
+                # current_obj_orientation = tf.euler_angles_to_matrix(current_obj_orientation, convention='XYZ')
+                # current_obj_orientation = tf.matrix_to_rotation_6d(current_obj_orientation)
+
+                theta_position = np.linspace(current_obj_position.cpu().numpy(), self.goal[:self.obj_translational_dim].cpu().numpy(), self.T + 1)[1:]
+                theta = np.concatenate((theta_position, interp_rots), axis=-1)
+                theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
+            else:
+                theta = np.linspace(self.start[-self.obj_dof:].cpu().numpy(), self.goal.cpu().numpy(), self.T + 1)[1:]
+                theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
+            theta = theta.unsqueeze(0).repeat((N,1,1))
+
+            x = torch.cat((x, theta), dim=-1)
+
+        xu = torch.cat((x, u), dim=2)
+        return xu
+
     def _cost(self, xu, start, goal):
         state = xu[:, :self.dx]  # state dim = 9
         state = torch.cat((start.reshape(1, self.dx), state), dim=0)  # combine the first time step into it
@@ -166,13 +218,13 @@ class AllegroScrewdriver(AllegroValveTurning):
         # # running cost 
         # goal_cost = goal_cost + torch.sum((3 * (obj_orientation - goal_orientation) ** 2))
 
-        if self.optimize_force:
-            force = xu[:, self.dx + 4 * self.num_fingers: self.dx + (4 + 3) * self.num_fingers]
-            force = force.reshape(force.shape[0], self.num_fingers, 3)
-            force_norm = torch.norm(force, dim=-1)
-            force_norm = force_norm - 2 # desired maginitute
-            force_cost = 1 * torch.sum(((force_norm < 0) * force_norm) ** 2)
-            action_cost += force_cost
+        # if self.optimize_force:
+        #     force = xu[:, self.dx + 4 * self.num_fingers: self.dx + (4 + 3) * self.num_fingers]
+        #     force = force.reshape(force.shape[0], self.num_fingers, 3)
+        #     force_norm = torch.norm(force, dim=-1)
+        #     force_norm = force_norm - 2 # desired maginitute
+        #     force_cost = 1 * torch.sum(((force_norm < 0) * force_norm) ** 2)
+        #     action_cost += force_cost
 
         # index_ee_locs = self._ee_locations_in_screwdriver(partial_to_full_state(state[:, :4*self.num_fingers], fingers=self.fingers),
         #                                             state[:, 4*self.num_fingers: 4*self.num_fingers + self.obj_dof],
