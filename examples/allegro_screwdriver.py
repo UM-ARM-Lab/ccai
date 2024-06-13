@@ -1,6 +1,6 @@
 from isaac_victor_envs.utils import get_assets_dir
 from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
-# from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
+from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
 
 import numpy as np
 import pickle as pkl
@@ -703,10 +703,10 @@ if __name__ == "__main__":
         #                             torch.tensor([[0., 0.5, 0.0, 0.7]]).float(),
         #                             torch.tensor([[1.3, 0.3, 0.2, 1.1]]).float()),
         #                             dim=1)
-        default_dof_pos = torch.cat((torch.tensor([[0.2, 0.5, 0.6, 0.6]]).float(),
-                                    torch.tensor([[-0.1, 0.5, 0.65, 0.7]]).float(),
+        default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
+                                    torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float(),
                                     torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
-                                    torch.tensor([[1.2, 0.3, 0.2, 1.06]]).float()),
+                                    torch.tensor([[1.2, 0.3, 0.3, 1.2]]).float()),
                                     dim=1)
         env = HardwareEnv(default_dof_pos[:, :16], 
                           finger_list=config['fingers'], 
@@ -718,7 +718,7 @@ if __name__ == "__main__":
         root_coor, root_ori = env.obj_reader.get_state()
         root_coor = root_coor / 1000 # convert to meters
         # robot_p = np.array([-0.025, -0.1, 1.33])
-        robot_p = np.array([0, -0.1, 1.33])
+        robot_p = np.array([0, -0.095, 1.33])
         root_coor = root_coor + robot_p
         sim_env = RosAllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
                                  use_cartesian_controller=False,
