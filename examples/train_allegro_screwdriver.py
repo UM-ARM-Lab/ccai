@@ -1,4 +1,5 @@
 # from isaac_victor_envs.tasks.allegro import AllegroValveTurningEnv
+from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
 
 import yaml
 import copy
@@ -18,22 +19,23 @@ from torch.utils.data import DataLoader, RandomSampler
 from ccai.models.trajectory_samplers import TrajectorySampler
 from utils.allegro_utils import partial_to_full_state, visualize_trajectory
 
+
 fingers = ['index', 'middle', 'thumb']
 
 
 def visualize_trajectories(trajectories, scene, fpath, headless=False):
     for n, trajectory in enumerate(trajectories):
 
-        trajectory = trajectory[:, :16]
-        trajectory[:, 15] *= 0
+        state_trajectory = trajectory[:, :16]
+        state_trajectory[:, 15] *= 0
         pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/kin/img'), parents=True, exist_ok=True)
         pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/kin/gif'), parents=True, exist_ok=True)
-        visualize_trajectory(trajectory, scene, f'{fpath}/trajectory_{n + 1}/kin', headless=headless,
+        visualize_trajectory(state_trajectory, scene, f'{fpath}/trajectory_{n + 1}/kin', headless=headless,
                              fingers=fingers, obj_dof=4)
         # Visualize what happens if we execute the actions in the trajectory in the simulator
         pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/sim/img'), parents=True, exist_ok=True)
         pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/sim/gif'), parents=True, exist_ok=True)
-        # visualize_trajectory_in_sim(trajectory, config['env'], f'{fpath}/trajectory_{n + 1}/sim')
+        visualize_trajectory_in_sim(trajectory, config['env'], f'{fpath}/trajectory_{n + 1}/sim')
         # save the trajectory
         np.save(f'{fpath}/trajectory_{n + 1}/traj.npz', trajectory.cpu().numpy())
 
@@ -128,13 +130,13 @@ def train_model(trajectory_sampler, train_loader, config):
 
 
 def test_long_horizon(test_model, loader, config):
-    fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/eta_001'
+    fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/eta_0'
     pathlib.Path.mkdir(pathlib.Path(fpath), parents=True, exist_ok=True)
     N = 16
 
     # we will plot for a variety of different horizons
-    N = 64
-    min_horizon = 16
+    N = 32
+    min_horizon = 32
     max_horizon = 64
 
     trajectories, traj_class, masks = next(iter(train_loader))
@@ -177,14 +179,18 @@ def visualize_trajectory_in_sim(trajectory, env, fpath):
     # reset environment
     env.frame_fpath = f'{fpath}/img'
     env.frame_id = 0
-    x0 = trajectory[0, :9].to(device=env.device)
+    x0 = trajectory[0, :15].to(device=env.device)
+    #q = partial_to_full_state(x0[:12], fingers)
+    #x0 = torch.cat((q, x0[12:]))
+    #print(x0.shape)
     env.reset(x0.unsqueeze(0))
-
+    print(trajectory.shape)
     # rollout actions
-    u = trajectory[:-1, -8:].to(device=env.device)  # controls
+    u = trajectory[:-1, 15:15+12].to(device=env.device)  # controls
+    print(u.shape)
     for i in range(u.shape[0]):
-        x = env.get_state()['q'].reshape(1, 9)[:, :8]
-        des_x = x + u[i].reshape(1, 8)
+        x = env.get_state()['q'].reshape(1, -1)[:, :12]
+        des_x = x + u[i].reshape(1, 12)
         env.step(des_x)
 
     import subprocess
@@ -212,6 +218,27 @@ if __name__ == "__main__":
         dcontext = 3
     else:
         dcontext = 0
+
+    env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
+                                       use_cartesian_controller=False,
+                                       viewer=True,
+                                       steps_per_action=60,
+                                       friction_coefficient=1.05,
+                                       # friction_coefficient=1.0,  # DEBUG ONLY, set the friction very high
+                                       device=config['device'],
+                                       video_save_path=f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}',
+                                       joint_stiffness=3,
+                                       fingers=['index', 'middle', 'thumb'],
+                                       )
+    import time
+    try:
+        while True:
+            start = env.get_state()['q'][:, :-1]
+            env.step(start)
+            print('waiting for you to finish camera adjustment, ctrl-c when done')
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        pass
 
     model = TrajectorySampler(T=config['T'], dx=dx, du=config['du'], context_dim=dcontext, type=config['model_type'],
                               hidden_dim=config['hidden_dim'], timesteps=config['timesteps'],
@@ -270,6 +297,7 @@ if __name__ == "__main__":
     # visualize_trajectory(train_dataset[i] * train_dataset.std + train_dataset.mean,
     #                     scene, scene_fpath=f'{CCAI_PATH}/examples', headless=False)
     config['scene'] = scene
+    config['env'] = env
     # train_model(model, train_loader, config)
     # vis_dataset(train_loader, config, N=64)
 
