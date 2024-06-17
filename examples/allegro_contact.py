@@ -2007,11 +2007,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
         if params['visualize_plan']:
             traj_for_viz = best_traj[:, :turn_problem.dx]
-            # traj_for_viz = torch.cat((start[:turn_problem.dx].unsqueeze(0), traj_for_viz), dim=0)
-            # tmp = torch.zeros((traj_for_viz.shape[0], 1), device=best_traj.device) # add the joint for the screwdriver cap
-            # traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
-            # traj_for_viz[:, 4 * num_contacts: 4 * num_contacts + turn_problem.obj_dof] = axis_angle_to_euler(traj_for_viz[:, 4 * num_contacts: 4 * num_contacts + turn_problem.obj_dof])
-
             viz_fpath = pathlib.PurePath.joinpath(fpath, f"timestep_{k}")
             img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
             gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
@@ -2027,12 +2022,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
         action = x[:, turn_problem.dx:turn_problem.dx + 4 * turn_problem.num_contacts].to(device=env.device)
         start = start.to(device=env.device)
-        #if params['optimize_force']:
-        #    print(
-        #        f"delta action: {action + start.unsqueeze(0)[:, :4 * num_contacts] - best_traj[1, : 4 * num_contacts].to(device=env.device)}")
-        #    print(
-        #        f"force: {x[:, turn_problem.dx + 4 * turn_problem.num_contacts:].reshape(turn_problem.num_contacts, 3)}")
-        # print(action)
         action = action + start.unsqueeze(0)[:,
                           :4 * num_contacts]  # NOTE: this is required since we define action as delta action
         if params['mode'] == 'hardware':
