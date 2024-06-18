@@ -127,8 +127,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                  goal, 
                  T, 
                  chain, 
-                 object_location, # location of the center of the object, might be different from the object asset location
-                 world_trans,
+                 world_trans, # transformation from the world to robot frame
                  fingers=['index', 'middle', 'ring', 'thumb'],
                  obj_dof_code=[0, 0, 0, 0, 0, 0], 
                  obj_joint_dim=0,
@@ -160,11 +159,11 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         self.obj_rotational_dim = np.sum(self.obj_rotational_code)
         self.obj_joint_dim = obj_joint_dim
         self.collision_checking = False
+        self.chain = chain
         if self.fixed_obj:
             self.start_obj_pose = self.start[-self.obj_dof:]
             self.start = self.start[:4 * self.num_fingers]
 
-        self.object_location = object_location
 
         self.chain = chain
         self.joint_index = {
@@ -260,9 +259,9 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         else:
             theta = x_expanded[:, :, 4 * self.num_fingers: 4 * self.num_fingers + self.obj_dof]
         # theta = x_expanded[:, :, 4 * self.num_fingers: 4 * self.num_fingers + self.obj_dof]
-        self._preprocess_fingers(q, theta, self.contact_scenes)
+        self._preprocess_fingers(q, theta)
 
-    def _preprocess_fingers(self, q, theta, finger_ee_link):
+    def _preprocess_fingers(self, q, theta):
         N, _, _ = q.shape
 
         # reshape to batch across time
@@ -560,7 +559,6 @@ class AllegroContactProblem(AllegroObjectProblem):
                  goal, 
                  T, 
                  chain, 
-                 object_location, 
                  object_type,
                  world_trans,
                  object_asset_pos,
@@ -573,7 +571,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         # object_location is different from object_asset_pos. object_asset_pos is 
         # used for pytorch volumetric. The asset of valve might contain something else such as a wall, a table
         # object_location is the location of the object joint, which is what we care for motion planning 
-        super().__init__(dx=dx, du=du, start=start, goal=goal, T=T, chain=chain, object_location=object_location,
+        super().__init__(dx=dx, du=du, start=start, goal=goal, T=T, chain=chain, 
                          world_trans=world_trans, fingers=fingers, obj_dof_code=obj_dof_code, 
                          obj_joint_dim=obj_joint_dim, fixed_obj=fixed_obj, device=device)
         self.collision_checking = collision_checking
@@ -604,23 +602,21 @@ class AllegroContactProblem(AllegroObjectProblem):
             asset_object = get_assets_dir() + '/screwdriver/screwdriver_6d.urdf'
         elif object_type == 'screwdriver_translation':
             asset_object = get_assets_dir() + '/screwdriver/screwdriver_translation.urdf'
-        self.object_asset_pos = object_asset_pos
+        elif object_type == 'peg':
+            asset_object = get_assets_dir() + '/peg_insertion/peg.urdf'
+        self.object_asset_pos = torch.tensor(object_asset_pos).to(self.device).float()
 
-        chain_object = pk.build_chain_from_urdf(open(asset_object).read())
-        chain_object = chain_object.to(device=device)
-        object_sdf = pv.RobotSDF(chain_object, path_prefix=None, use_collision_geometry=True) # since we are using primitive shapes for the object, there's no need to define path for stl
-        # if 'valve' in object_type:
-        #     object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/valve')
-        # elif 'screwdriver' == object_type:
-        #     object_sdf = pv.RobotSDF(chain_object, path_prefix=None)
-        # elif 'screwdriver_6d' == object_type:
-        #     object_sdf = pv.RobotSDF(chain_object, path_prefix=None)
-        # elif 'screwdriver_translation' == object_type:
-        #     object_sdf = pv.RobotSDF(chain_object, path_prefix=None)
-        robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models', use_collision_geometry=True)
+        self._init_contact_scenes(asset_object, collision_checking)
 
-        scene_trans = world_trans.inverse().compose(
-            pk.Transform3d(device=device).translate(object_asset_pos[0], object_asset_pos[1], object_asset_pos[2]))
+    
+    def _init_contact_scenes(self, asset_object, collision_checking):
+        object_chain = pk.build_chain_from_urdf(open(asset_object).read())
+        object_chain = object_chain.to(device=device)
+        object_sdf = pv.RobotSDF(object_chain, path_prefix=None, use_collision_geometry=True) # since we are using primitive shapes for the object, there's no need to define path for stl
+        robot_sdf = pv.RobotSDF(self.chain, path_prefix=get_assets_dir() + '/xela_models', use_collision_geometry=True)
+
+        scene_trans = self.world_trans.inverse().compose(
+            pk.Transform3d(device=device).translate(self.object_asset_pos[0], self.object_asset_pos[1], self.object_asset_pos[2]))
 
         # self.index_collision_scene = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
         #                                            collision_check_links=collision_check_hitosashi,
@@ -639,8 +635,9 @@ class AllegroContactProblem(AllegroObjectProblem):
                                             points_per_link=1000,
                                             partial_patch=False,
                                             )
-        # self.contact_scenes.visualize_robot(partial_to_full_state(self.start[:4*self.num_fingers], fingers=fingers), torch.zeros(self.obj_dof + obj_joint_dim).to(self.device))
-    
+        # self.contact_scenes.visualize_robot(partial_to_full_state(self.start[:4*self.num_fingers], fingers=self.fingers), self.start[4*self.num_fingers:].to(self.device))
+
+
     @all_finger_constraints
     def _contact_constraints(self, xu, finger_name, compute_grads=True, compute_hess=False, terminal=False):
         """
@@ -703,6 +700,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         return g_contact, grad_g_contact, hess_g_contact   
     def _con_ineq(self, x, compute_grads=True, compute_hess=False):
         return None, None, None
+
 class AllegroValveTurning(AllegroContactProblem):
     def get_constraint_dim(self, T):
         self.friction_polytope_k = 4
@@ -750,6 +748,7 @@ class AllegroValveTurning(AllegroContactProblem):
         self.screwdriver_force_balance = screwdriver_force_balance
         self.optimize_force = optimize_force
         self.num_fingers = len(fingers)
+        self.object_location = object_location
         obj_dof = np.sum(obj_dof_code)
         dx = 4 * self.num_fingers + obj_dof
         if optimize_force:
@@ -757,8 +756,8 @@ class AllegroValveTurning(AllegroContactProblem):
         else:
             du = 4 * self.num_fingers
         super().__init__(dx=dx, du=du, start=start, goal=goal, 
-                         T=T, chain=chain, object_location=object_location,
-                         object_type=object_type, world_trans=world_trans, object_asset_pos=object_asset_pos,
+                         T=T, chain=chain, object_type=object_type, world_trans=world_trans,
+                        object_asset_pos=object_asset_pos,
                          fingers=fingers, obj_dof_code=obj_dof_code, 
                          obj_joint_dim=obj_joint_dim, fixed_obj=False, 
                          collision_checking=collision_checking, device=device)
@@ -1009,6 +1008,7 @@ class AllegroValveTurning(AllegroContactProblem):
         torque_list = torch.stack(torque_list, dim=0)
         sum_torque_list = torch.sum(torque_list, dim=0)
         sum_force_list = torch.sum(force_list, dim=0)
+
         g = []
         if self.obj_translational_dim > 0:
             g.append(sum_force_list)
@@ -1110,21 +1110,22 @@ class AllegroValveTurning(AllegroContactProblem):
         if self.obj_rotational_dim > 0:
             if self.obj_translational_dim > 0:
                 with torch.no_grad(): # the change of object location should not affect the contact velocity
-                    obj_location = torch.zeros(3).to(self.device)
+                    obj_location = torch.zeros_like(current_q)[:3] # assume q has at least 3 dim
                     idx = torch.where(torch.tensor(self.obj_translational_code) == 1)[0]
                     obj_location[idx] = current_theta[:self.obj_translational_dim]
-                    obj_robot_frame = self.world_trans.inverse().transform_points(obj_location)
+                    obj_location = obj_location + self.object_asset_pos
+                    obj_robot_frame = self.world_trans.inverse().transform_points(obj_location.reshape(1, 3)).squeeze(0)
                 contact_point_r_valve = contact_loc.reshape(3) - obj_robot_frame
             else: # assuming the object location is fixed
-                obj_robot_frame = self.world_trans.inverse().transform_points(self.object_location.reshape(1, 3))
+                obj_robot_frame = self.world_trans.inverse().transform_points(self.object_location.reshape(1, 3)).squeeze(0)
                 contact_point_r_valve = contact_loc.reshape(3) - obj_robot_frame.reshape(3)
             obj_omega_robot_frame = self.world_trans.inverse().transform_normals(obj_omega.unsqueeze(0)).squeeze(0)
             object_contact_point_v = object_contact_point_v + torch.cross(obj_omega_robot_frame, contact_point_r_valve, dim=-1)
         if self.obj_translational_dim > 0:
-            obj_translational_v = torch.zeros(3).to(self.device)
+            obj_translational_v =  torch.zeros_like(current_q)[:3] 
             idx = torch.where(torch.tensor(self.obj_translational_code) == 1)[0]
             obj_translational_v[idx] = next_theta[:self.obj_translational_dim] - current_theta[:self.obj_translational_dim]
-            obj_translational_v = self.world_trans.inverse().transform_normals(obj_translational_v)
+            obj_translational_v = self.world_trans.inverse().transform_normals(obj_translational_v.reshape(1, 3)).squeeze(0)
             object_contact_point_v = object_contact_point_v + obj_translational_v
         # project the constraint into the tangential plane
         normal_projection = contact_normal.unsqueeze(-1) @ contact_normal.unsqueeze(-2)
@@ -1836,7 +1837,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             chain=params['chain'],
             device=params['device'],
             object_asset_pos=env.valve_pose,
-            object_location=params['object_location'],
             object_type=params['object_type'],
             world_trans=env.world_trans,
             fingers=params['fingers'],

@@ -13,6 +13,7 @@ class Constrained_SVGD_MPC:
         self.resample_steps = params.get('resample_steps', 1)
         self.problem = problem
         self.solver = ConstrainedSteinTrajOpt(problem, params)
+        self.random_init_every_iter = params.get('random_init_every_iter', False)
 
         # initialize randomly
         self.x = self.problem.get_initial_xu(self.N)
@@ -37,14 +38,14 @@ class Constrained_SVGD_MPC:
             self.solver.iters = self.warmup_iters
             self.warmed_up = True
             resample = False
-
+        if self.random_init_every_iter:
+            self.x = self.problem.get_initial_xu(self.N)
         path = self.solver.solve(self.x, resample)
         self.x = path[-1]
         self.iter += 1
         best_trajectory = self.x[0].clone()
         all_trajectories = self.x.clone()
         self.shift()
-        # self.x = self.problem.get_initial_xu(self.N)
         return best_trajectory, all_trajectories
 
     def shift(self):

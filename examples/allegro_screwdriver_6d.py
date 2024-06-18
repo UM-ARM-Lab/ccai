@@ -15,12 +15,12 @@ from functools import partial
 import time
 import pytorch_volumetric as pv
 import pytorch_kinematics as pk
-# import pytorch_kinematics.transforms as tf
+import pytorch_kinematics.transforms as tf
 from torch.func import vmap, jacrev, hessian, jacfwd
 # import pytorch3d.transforms as tf
 
 import matplotlib.pyplot as plt
-from utils.allegro_utils import partial_to_full_state, full_to_partial_state, combine_finger_constraints, state2ee_pos, visualize_trajectory
+from utils.allegro_utils import partial_to_full_state, full_to_partial_state, all_finger_constraints, state2ee_pos, visualize_trajectory
 from allegro_valve_roll import AllegroValveTurning, AllegroContactProblem, PositionControlConstrainedSVGDMPC, add_trajectories, add_trajectories_hardware
 from scipy.spatial.transform import Rotation as R
 
@@ -136,7 +136,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             chain=params['chain'],
             device=params['device'],
             object_asset_pos=env.table_pose,
-            object_location=params['object_location'],
             object_type=params['object_type'],
             world_trans=env.world_trans,
             fingers=contact_fingers,

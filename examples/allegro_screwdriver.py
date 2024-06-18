@@ -556,12 +556,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         print(f"current theta: {state['q'][0, -(obj_dof+1): -1].detach().cpu().numpy()}")
         print(f"planned theta: {planned_theta_traj}")
         # add trajectory lines to sim
-        if params['mode'] == 'hardware':
-            pass # debug TODO: fix it
-            # add_trajectories_hardware(trajectories, best_traj, axes, env, config=params, state2ee_pos_func=state2ee_pos)
-        else:
-            add_trajectories(trajectories, best_traj, axes, env, sim=sim, gym=gym, viewer=viewer,
-                            config=params, state2ee_pos_func=state2ee_pos)
+        if k < params['num_steps'] - 1:
+            if params['mode'] == 'hardware':
+                pass # debug TODO: fix it
+                # add_trajectories_hardware(trajectories, best_traj, axes, env, config=params, state2ee_pos_func=state2ee_pos)
+            else:
+                add_trajectories(trajectories, best_traj, axes, env, sim=sim, gym=gym, viewer=viewer,
+                                config=params, state2ee_pos_func=state2ee_pos)
 
         if params['visualize_plan']:
             traj_for_viz = best_traj[:, :turn_problem.dx]

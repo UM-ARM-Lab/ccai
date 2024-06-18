@@ -160,6 +160,42 @@ def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headl
           f"-lavfi paletteuse {output_dir}"
     subprocess.call(cmd, shell=True)
 
+def visualize_obj_trajectory(trajectory, scene, scene_fpath, headless=False):
+    # for a single trajectory
+    T, dxu = trajectory.shape
+    # set up visualizer
+    vis = o3d.visualization.Visualizer()
+    vis.create_window(width=int(800), height=int(600), visible=not headless)
+    # update camera
+    vis.get_render_option().mesh_show_wireframe = True
+    for t in range(T):
+        vis.clear_geometries()
+        theta = trajectory[t]
+        meshes = scene.get_visualization_meshes(theta.unsqueeze(0).to(device=scene.device), None)
+        for mesh in meshes:
+            vis.add_geometry(mesh)
+        ctr = vis.get_view_control()
+        # parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-04-03-13-14-26.json")
+        parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_screwdriver_translation.json")
+        ctr.convert_from_pinhole_camera_parameters(parameters)
+        vis.poll_events()
+        vis.update_renderer()
+        img = vis.capture_screen_float_buffer(False)
+        plt.imsave(f'{scene_fpath}/img_obj/im_{t:04d}.png',
+                   np.asarray(img),
+                   dpi=1)
+
+    vis.destroy_window()
+
+    # convert to GIF
+    import subprocess
+    output_dir = f'{scene_fpath}/gif_obj/trajectory.gif'
+    cmd = f"ffmpeg -y -i {scene_fpath}/img_obj/im_%4d.png -vf palettegen ~/palette.png"
+    subprocess.call(cmd, shell=True)
+    cmd = f"ffmpeg -y -framerate 2 -i {scene_fpath}/img_obj/im_%4d.png -i ~/palette.png " \
+          f"-lavfi paletteuse {output_dir}"
+    subprocess.call(cmd, shell=True)
+
 
 def visualize_trajectories(trajectories, scene, fpath, headless=False):
     for n, trajectory in enumerate(trajectories):
