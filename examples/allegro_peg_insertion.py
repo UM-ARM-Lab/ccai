@@ -109,7 +109,7 @@ class AllegroPegInsertion(AllegroValveTurning):
             # terminal cost
             goal_cost = goal_cost + torch.sum((20 * (obj_orientation[-1] - goal_orientation) ** 2))
             # running cost 
-            goal_cost = goal_cost + torch.sum((5 * (obj_orientation - goal_orientation) ** 2))
+            goal_cost = goal_cost + torch.sum((10 * (obj_orientation - goal_orientation) ** 2))
             smoothness_cost = smoothness_cost + 50 * torch.sum((obj_orientation[1:] - obj_orientation[:-1]) ** 2)
         # goal_cost = torch.sum((1000 * (state[-1, -self.obj_dof:] - goal) ** 2)).reshape(-1)
         # goal_cost += torch.sum((10 * (state[:, -self.obj_dof:] - goal.unsqueeze(0)) ** 2))
@@ -440,19 +440,22 @@ class AllegroPegInsertion(AllegroValveTurning):
     
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     # step multiple times untile it's stable
-    for i in range(1):
-        action = torch.cat((env.default_dof_pos[:,:8], env.default_dof_pos[:, 12:16]), dim=-1)
-        state = env.step(action)
-
-    num_fingers = len(params['fingers'])
-    state = env.get_state()
-    action_list = []
     if params['visualize']:
         env.frame_fpath = fpath
         env.frame_id = 0
     else:
         env.frame_fpath = None
         env.frame_id = None
+    for i in range(1):
+        if len(params['fingers']) == 3:
+            action = torch.cat((env.default_dof_pos[:,:8], env.default_dof_pos[:, 12:16]), dim=-1)
+        elif len(params['fingers']) == 4:
+            action = env.default_dof_pos[:, :16]
+        state = env.step(action)
+
+    num_fingers = len(params['fingers'])
+    state = env.get_state()
+    action_list = []
 
     start = state['q'].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
 
