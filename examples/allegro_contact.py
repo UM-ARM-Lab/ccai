@@ -286,7 +286,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             # expand to include start
             x_expanded = torch.cat((self.start.reshape(1, 1, -1).repeat(N, 1, 1), x), dim=1)
         else:
-            x = xu[:, :, :self.dx]
+            x_expanded = xu[:, :, :self.dx]
         q = x_expanded[:, :, :4 * self.num_fingers]
         theta = x_expanded[:, :, 4 * self.num_fingers: 4 * self.num_fingers + self.obj_dof]
         if self.obj_ori_rep == 'axis_angle':
@@ -442,6 +442,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             constraint that sdf value is zero
         """
         N, T, _ = q.shape
+        T_offset = 0 if projected_diffusion else 1
         d = self.d
         # Retrieve pre-processed data
         ret_scene = self.data[finger_name]
@@ -454,8 +455,8 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         grad_g_theta = ret_scene.get('grad_env_sdf', None)
         hess_g_theta = ret_scene.get('hess_env_sdf', None)
 
-        # Ignore first value, as it is the start state
-        g = g[:, 1:].reshape(N, -1)
+        # Ignore first value (if not doing projected diffusion), as it is the start state
+        g = g[:, T_offset:].reshape(N, -1)
 
         # If terminal, only consider last state
         if terminal:
@@ -469,7 +470,6 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             T_range = torch.arange(T, device=q.device)
             # compute gradient of sdf
             grad_g = torch.zeros(N, T, T, d, device=q.device)
-            T_offset = 0 if projected_diffusion else 1
             grad_g[:, T_range, T_range, :16] = grad_g_q[:, T_offset:]
             grad_g[:, T_range, T_range, 16: 16 + self.obj_dof] = grad_g_theta.reshape(N, T + T_offset, self.obj_dof)[:, T_offset:]
             grad_g = grad_g.reshape(N, -1, T, d)
@@ -699,8 +699,8 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         # return 10 * torch.sum((q - dof_pos) ** 2)
 
     @regrasp_finger_constraints
-    def _contact_avoidance(self, xu, finger_name, compute_grads=True, compute_hess=False):
-        h, grad_h, hess_h = self._contact_constraints(xu, finger_name, compute_grads, compute_hess, terminal=False)
+    def _contact_avoidance(self, xu, finger_name, compute_grads=True, compute_hess=False, projected_diffusion=False):
+        h, grad_h, hess_h = self._contact_constraints(xu, finger_name, compute_grads, compute_hess, terminal=False, projected_diffusion=projected_diffusion)
         eps = torch.zeros_like(h)
         eps[:, :-1] = 5e-3
         h = -h + eps
@@ -791,11 +791,12 @@ class AllegroRegraspProblem(AllegroObjectProblem):
 
         return g, grad_g, hess_g
 
-    def _con_ineq(self, xu, compute_grads=True, compute_hess=False):
+    def _con_ineq(self, xu, compute_grads=True, compute_hess=False, projected_diffusion=False):
         N, T = xu.shape[:2]
-        h_contact, grad_h_contact, hess_h_contact = self._contact_avoidance(xu=xu.reshape(N, T, self.dx + self.du),
+        h_contact, grad_h_contact, hess_h_contact = self._contact_avoidance(xu=xu.reshape(N, T, -1)[:, :, :self.dx + self.du],
                                                                             compute_grads=compute_grads,
-                                                                            compute_hess=compute_hess)
+                                                                            compute_hess=compute_hess,
+                                                                            projected_diffusion=projected_diffusion)
 
         return h_contact, grad_h_contact, hess_h_contact
 
@@ -1476,9 +1477,10 @@ class AllegroContactProblem(AllegroObjectProblem):
         return B @ contact_v_contact_frame
 
     @contact_finger_constraints
-    def _friction_constraint(self, q, delta_q, finger_name, force=None, compute_grads=True, compute_hess=False):
+    def _friction_constraint(self, q, delta_q, finger_name, force=None, compute_grads=True, compute_hess=False, projected_diffusion=False):
         # assume access to class member variables which have already done some of the computation
         N, T, _ = q.shape
+        T_offset = 1 if not projected_diffusion else 0
         d = self.d
         u = delta_q[:, :, self.contact_state_indices]
 
@@ -1494,13 +1496,13 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         # u is the delta q commanded
         # retrieved cached values
-        contact_jac = self.data[finger_name]['contact_jacobian'].reshape(N, T + 1, 3, 16)[
+        contact_jac = self.data[finger_name]['contact_jacobian'].reshape(N, T + T_offset, 3, 16)[
                       :, :-1, :, self.contact_state_indices]
-        contact_normal = self.data[finger_name]['contact_normal'].reshape(N, T + 1, 3)[:,
+        contact_normal = self.data[finger_name]['contact_normal'].reshape(N, T + T_offset, 3)[:,
                          :-1]  # contact normal is pointing out
-        dnormal_dq = self.data[finger_name]['dnormal_dq'].reshape(N, T + 1, 3, 16)[
+        dnormal_dq = self.data[finger_name]['dnormal_dq'].reshape(N, T + T_offset, 3, 16)[
                      :, :-1, :, self.contact_state_indices]
-        dnormal_dtheta = self.data[finger_name]['dnormal_denv_q'].reshape(N, T + 1, 3, self.obj_dof)[:, :-1]
+        dnormal_dtheta = self.data[finger_name]['dnormal_denv_q'].reshape(N, T + T_offset, 3, self.obj_dof)[:, :-1]
 
         if force is None:
             # compute constraint value
@@ -1526,7 +1528,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                                                                              contact_jac.reshape(-1, 3,
                                                                                                  4 * self.num_contacts))
 
-            djac_dq = self.data[finger_name]['dJ_dq'].reshape(N, T + 1, 3, 16, 16)[
+            djac_dq = self.data[finger_name]['dJ_dq'].reshape(N, T + T_offset, 3, 16, 16)[
                       :, :-1, :, self.contact_state_indices][:, :, :, :, self.contact_state_indices]
 
             dh = dh_dnormal.shape[1]
@@ -1566,12 +1568,12 @@ class AllegroContactProblem(AllegroObjectProblem):
             return h, None, None
 
         if compute_hess:
-            hess_h = torch.zeros(N, h.shape[1], T * d, T * d, device=device)
+            hess_h = torch.zeros(N, h.shape[1], T * d, T * d, device=q.device)
             return h, grad_h, hess_h
 
         return h, grad_h, None
 
-    def _con_ineq(self, xu, compute_grads=True, compute_hess=False, verbose=False):
+    def _con_ineq(self, xu, compute_grads=True, compute_hess=False, verbose=False, projected_diffusion=False):
         N = xu.shape[0]
         T = xu.shape[1]
         q = xu[:, :, :self.num_fingers * 4]
@@ -1582,7 +1584,8 @@ class AllegroContactProblem(AllegroObjectProblem):
         h, grad_h, hess_h = self._friction_constraint(
             q=q, delta_q=delta_q, force=None,
             compute_grads=compute_grads,
-            compute_hess=compute_hess)
+            compute_hess=compute_hess,
+            projected_diffusion=projected_diffusion)
 
         if self.optimize_force:
             force = torch.zeros(N, T, 12, device=self.device)
@@ -1590,7 +1593,8 @@ class AllegroContactProblem(AllegroObjectProblem):
             h2, grad_h2, hess_h2 = self._friction_constraint(
                 q=q, delta_q=delta_q,
                 compute_grads=compute_grads,
-                compute_hess=compute_hess)
+                compute_hess=compute_hess,
+                projected_diffusion=projected_diffusion)
             h = torch.cat((h, h2), dim=1)
             if grad_h is not None:
                 grad_h = torch.cat((grad_h, grad_h2), dim=1)
@@ -1782,7 +1786,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
 
         return g, grad_g, hess_g
 
-    def _con_ineq(self, xu, compute_grads=True, compute_hess=False, verbose=False):
+    def _con_ineq(self, xu, compute_grads=True, compute_hess=False, verbose=False, projected_diffusion=False):
         N, T = xu.shape[:2]
         h, grad_h, hess_h = None, None, None
         # h, grad_h, hess_h = AllegroObjectProblem._con_ineq(self, xu, compute_grads, compute_hess)
@@ -1795,7 +1799,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
 
         if self.num_regrasps > 0:
             h_regrasp, grad_h_regrasp, hess_h_regrasp = AllegroRegraspProblem._con_ineq(self, xu, compute_grads,
-                                                                                        compute_hess)
+                                                                                        compute_hess, projected_diffusion=projected_diffusion)
 
             if h is not None:
                 h = torch.cat((h_regrasp, h), dim=1)
@@ -1808,7 +1812,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
 
         if self.num_contacts > 0:
             h_contact, grad_h_contact, hess_h_contact = AllegroContactProblem._con_ineq(self, xu, compute_grads,
-                                                                                        compute_hess)
+                                                                                        compute_hess, projected_diffusion=projected_diffusion)
 
             if h is not None:
                 h = torch.cat((h, h_contact), dim=1)

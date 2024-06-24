@@ -14,10 +14,11 @@ object_type: 'screwdriver'
 sim_device: 'cuda:0'
 friction_coefficient: 1.0
 kp: 3.0
-visualize_plan: False
+visualize_plan: True
 optimize_force: True
 exclude_index: False
 projected: True
+rollout_in_sim: False
 model_path: 'data/training/allegro_screwdriver/allegro_test_new_data_augment_angle_diffusion/allegro_screwdriver_diffusion.pt'
 controllers:
   csvgd:
