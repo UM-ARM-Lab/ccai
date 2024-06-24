@@ -18,7 +18,7 @@ from isaac_victor_envs.utils import get_assets_dir
 from torch.utils.data import DataLoader, RandomSampler
 from ccai.models.trajectory_samplers import TrajectorySampler
 from utils.allegro_utils import partial_to_full_state, visualize_trajectory
-
+import pickle
 
 fingers = ['index', 'middle', 'thumb']
 
@@ -38,95 +38,6 @@ def visualize_trajectories(trajectories, scene, fpath, headless=False):
         visualize_trajectory_in_sim(trajectory, config['env'], f'{fpath}/trajectory_{n + 1}/sim')
         # save the trajectory
         np.save(f'{fpath}/trajectory_{n + 1}/traj.npz', trajectory.cpu().numpy())
-
-
-def train_model(trajectory_sampler, train_loader, config):
-    fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}'
-    pathlib.Path.mkdir(pathlib.Path(fpath), parents=True, exist_ok=True)
-
-    if config['use_ema']:
-        ema = EMA(beta=config['ema_decay'])
-        ema_model = copy.deepcopy(trajectory_sampler)
-
-    def reset_parameters():
-        ema_model.load_state_dict(trajectory_sampler.state_dict())
-
-    def update_ema(model):
-        if step < config['ema_warmup_steps']:
-            reset_parameters()
-        else:
-            ema.update_model_average(ema_model, model)
-
-    optimizer = torch.optim.Adam(trajectory_sampler.parameters(), lr=config['lr'])
-
-    step = 0
-
-    epochs = config['epochs']
-    pbar = tqdm.tqdm(range(epochs))
-    for epoch in pbar:
-        train_loss = 0.0
-        trajectory_sampler.train()
-        for trajectories, traj_class, masks in train_loader:
-            trajectories = trajectories.to(device=config['device'])
-            masks = masks.to(device=config['device'])
-            B, T, dxu = trajectories.shape
-            if config['use_class']:
-                traj_class = traj_class.to(device=config['device']).float()
-            else:
-                traj_class = None
-            sampler_loss = trajectory_sampler.loss(trajectories, mask=masks, constraints=traj_class)
-            loss = sampler_loss
-            loss.backward()
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
-            # for param in trajectory_sampler.parameters():
-            #    print(param.grad)
-            optimizer.step()
-            optimizer.zero_grad()
-            train_loss += loss.item()
-            step += 1
-            if config['use_ema']:
-                if step % 10 == 0:
-                    update_ema(trajectory_sampler)
-
-        train_loss /= len(train_loader)
-        pbar.set_description(
-            f'Train loss {train_loss:.3f}')
-
-        # generate samples and plot them
-        if (epoch + 1) % config['test_every'] == 0:
-
-            count = 0
-            if config['use_ema']:
-                test_model = ema_model
-            else:
-                test_model = trajectory_sampler
-
-            # we will plot for a variety of different horizons
-            N = 8
-            min_horizon = 16
-            max_horizon = 32
-
-            start = (trajectories[0, 0, :15] * train_dataset.std[:15].to(device=trajectories.device) +
-                     train_dataset.mean[:15].to(device=trajectories.device))
-            start = start[None, :].repeat(N, 1)
-
-            for H in range(min_horizon, max_horizon + 1, 16):
-                plot_fpath = f'{fpath}/epoch_{epoch + 1}/horizon_{H}'
-                pathlib.Path.mkdir(pathlib.Path(plot_fpath), parents=True, exist_ok=True)
-                sampled_trajectories, sampled_contexts, likelihoods = test_model.sample(N, H=H, start=start)
-                visualize_trajectories(sampled_trajectories, config['scene'], plot_fpath, headless=False)
-
-        if (epoch + 1) % config['save_every'] == 0:
-            if config['use_ema']:
-                torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
-            else:
-                torch.save(model.state_dict(),
-                           f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
-    if config['use_ema']:
-        torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
-    else:
-        torch.save(model.state_dict(),
-                   f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
 
 
 def test_long_horizon(test_model, loader, config):
@@ -155,25 +66,6 @@ def test_long_horizon(test_model, loader, config):
         visualize_trajectories(sampled_trajectories, config['scene'], plot_fpath, headless=False)
 
 
-def vis_dataset(loader, config, N=100):
-    fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/dataset_vis'
-    n = 0
-    for trajectories, _, masks in loader:
-        trajectories = trajectories * train_dataset.std + train_dataset.mean
-
-        for trajectory, mask in zip(trajectories, masks):
-            trajectory = trajectory[mask[:, 0].nonzero().reshape(-1)]
-            trajectory[:, 15] *= 0
-            # visualize the trajectory kinematically
-            pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/kin/img'), parents=True, exist_ok=True)
-            pathlib.Path.mkdir(pathlib.Path(f'{fpath}/trajectory_{n + 1}/kin/gif'), parents=True, exist_ok=True)
-            visualize_trajectory(trajectory, config["scene"], f'{fpath}/trajectory_{n + 1}/kin', headless=False,
-                                 fingers=fingers, obj_dof=4)
-
-            n += 1
-        if n > N:
-            break
-
 def rollout_trajectory_in_sim(trajectory, env):
     env.frame_id = 0
     x0 = trajectory[0, :15].to(device=env.device)
@@ -181,10 +73,8 @@ def rollout_trajectory_in_sim(trajectory, env):
     #x0 = torch.cat((q, x0[12:]))
     #print(x0.shape)
     env.reset(x0.unsqueeze(0))
-    print(trajectory.shape)
     # rollout actions
     u = trajectory[:-1, 15:15+12].to(device=env.device)  # controls
-    print(u.shape)
     actual_trajectory = torch.zeros_like(trajectory)
     for i in range(u.shape[0]):
         x = env.get_state()['q'].reshape(1, -1)[:, :12]
@@ -195,7 +85,6 @@ def rollout_trajectory_in_sim(trajectory, env):
     actual_trajectory[-1, :15] = env.get_state()['q'].reshape(1, -1)[:, :12]
     return actual_trajectory
         
-
 
 def visualize_trajectory_in_sim(trajectory, env, fpath):
     # reset environment
@@ -229,7 +118,7 @@ if __name__ == "__main__":
 
     torch.set_float32_matmul_precision('high')
     config = yaml.safe_load(
-        pathlib.Path(f'{CCAI_PATH}/config/training/allegro_screwdriver_diffusion.yaml').read_text())
+        pathlib.Path(f'{CCAI_PATH}/config/training/allegro_screwdriver_sim_eval.yaml').read_text())
 
     if config['sine_cosine']:
         raise NotImplementedError
@@ -243,7 +132,7 @@ if __name__ == "__main__":
 
     env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
                                        use_cartesian_controller=False,
-                                       viewer=True,
+                                       viewer=config['visualize'],
                                        steps_per_action=60,
                                        friction_coefficient=1.05,
                                        # friction_coefficient=1.0,  # DEBUG ONLY, set the friction very high
@@ -262,25 +151,8 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         pass
 
-    model = TrajectorySampler(T=config['T'], dx=dx, du=config['du'], context_dim=dcontext, type=config['model_type'],
-                              hidden_dim=config['hidden_dim'], timesteps=config['timesteps'],
-                              generate_context=config['diffuse_class'])
+    data_path = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["data_directory"]}/csvgd')
 
-    data_path = pathlib.Path(f'{CCAI_PATH}/data/training_data/{config["data_directory"]}')
-    train_dataset = AllegroScrewDriverDataset([p for p in data_path.glob('*train_data*')],
-                                              cosine_sine=config['sine_cosine'],
-                                              states_only=config['du'] == 0)
-
-    if config['normalize_data']:
-        # normalize data
-        train_dataset.compute_norm_constants()
-        model.set_norm_constants(*train_dataset.get_norm_constants())
-
-    train_sampler = RandomSampler(train_dataset)
-    train_loader = DataLoader(train_dataset, batch_size=config['batch_size'],
-                              sampler=train_sampler, num_workers=4, pin_memory=True)
-
-    model = model.to(device=config['device'])
 
     # set up pytorch volumetric for rendering
     asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
@@ -315,15 +187,25 @@ if __name__ == "__main__":
                           collision_check_links=contact_links,
                           softmin_temp=100.0)
 
-    i = np.random.randint(low=0, high=len(train_dataset))
-    # visualize_trajectory(train_dataset[i] * train_dataset.std + train_dataset.mean,
-    #                     scene, scene_fpath=f'{CCAI_PATH}/examples', headless=False)
     config['scene'] = scene
     config['env'] = env
+
+    for trial in tqdm.tqdm(range(1, 11)):
+        for t in range(1, 2):
+            # Load traj_data.p from {data_path}/csvgd/trial_{trial} with pickle
+            with open(data_path / f'trial_{trial}/traj_data.p', 'rb') as f:
+                data = pickle.load(f)
+            data[t]['init_sim_rollouts'] = []
+            inits = data[t]['inits']
+            # inits = torch.stack(inits).to(device=config['device'])
+            for i in tqdm.tqdm(range(len(inits))):
+                sim_rollout = rollout_trajectory_in_sim(inits[i], env)
+                data[t]['init_sim_rollouts'].append(sim_rollout)
+            # data[t]['init_sim_rollouts'] = torch.stack(data[t]['init_sim_rollouts'])
+        torch.save(data, data_path / f'trial_{trial}/traj_data_with_init_sim_rollouts.p')
+
+
     # train_model(model, train_loader, config)
     # vis_dataset(train_loader, config, N=64)
 
-    model.load_state_dict(torch.load(
-        f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/allegro_screwdriver_{config["model_type"]}.pt'
-    ))
-    test_long_horizon(model, train_loader, config)
+

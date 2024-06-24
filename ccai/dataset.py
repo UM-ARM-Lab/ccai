@@ -358,6 +358,63 @@ class AllegroScrewDriverDataset(Dataset):
     def get_norm_constants(self):
         return self.mean, self.std
 
+class AllegroScrewDriverTransitionDataset(AllegroScrewDriverDataset):
+
+    def __init__(self, folders, cosine_sine=False, states_only=False):
+        super().__init__(folders, cosine_sine, states_only)
+
+    def __len__(self):
+        return self.trajectories.shape[0] * 15
+
+    def __getitem__(self, idx):
+        traj_idx = idx // 15
+        traj = self.trajectories[traj_idx]
+        idx = idx % 15
+        
+        # print(traj.shape)
+        x_t = traj[idx, :15]
+        u_t = traj[idx, 15:]
+        x_t_1 = traj[idx+1, :15]
+
+        return x_t, u_t, x_t_1
+
+    def compute_norm_constants(self):
+        # compute norm constants not including the zero padding
+        x = self.trajectories.clone()
+        #x[:, :, 8] += 2 * np.pi * (torch.rand(x.shape[0], 1) - 0.5)
+        x = x.reshape(-1, x.shape[-1])
+
+        mask = self.masks[:, :, 0].reshape(-1)
+        mean = x.sum(dim=0) / mask.sum()
+        std = np.sqrt(np.average((x - mean) ** 2, weights=mask, axis=0))
+
+        if self.states_only:
+            dim = 15
+        else:
+            dim = 15 + 12 + 9
+
+        # for angle we force to be between [-1, 1]
+        if self.cosine_sine:
+            self.mean = torch.zeros(dim+1)
+            self.std = torch.ones(dim+1)
+            self.mean[:8] = mean[:8]
+            self.std[:8] = torch.from_numpy(std[:8]).float()
+            self.mean[10:] = mean[9:]
+            self.std[10:] = torch.from_numpy(std[9:]).float()
+        else:
+            #mean[12:15] = 0
+            #std[12:15] = np.pi
+            mean[14] = 0
+            std[14] = np.pi
+            self.mean = mean
+            self.std = torch.from_numpy(std).float()
+
+    def set_norm_constants(self, mean, std):
+        self.mean = mean
+        self.std = std
+
+    def get_norm_constants(self):
+        return self.mean, self.std
 
 if __name__ == "__main__":
     #d = AllegroValveDataset('../data/experiments/allegro_turning_data_collection')

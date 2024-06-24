@@ -2,16 +2,16 @@ import torch
 from torch import nn
 
 # Normalizing flow stuff
-from nflows.flows.base import Flow
-from nflows.distributions.normal import ConditionalDiagonalNormal
-from nflows.transforms.base import CompositeTransform
-from nflows.transforms.coupling import PiecewiseRationalQuadraticCouplingTransform, AffineCouplingTransform
-from nflows.transforms.lu import LULinear
-from nflows.nn.nets import ResidualNet
-from nflows.utils import torchutils
+# from nflows.flows.base import Flow
+# from nflows.distributions.normal import ConditionalDiagonalNormal
+# from nflows.transforms.base import CompositeTransform
+# from nflows.transforms.coupling import PiecewiseRationalQuadraticCouplingTransform, AffineCouplingTransform
+# from nflows.transforms.lu import LULinear
+# from nflows.nn.nets import ResidualNet
+# from nflows.utils import torchutils
 
 # Diffusion
-from ccai.models.diffusion.diffusion import GaussianDiffusion, ConstrainedDiffusion, JointDiffusion
+from ccai.models.diffusion.diffusion import GaussianDiffusion, ConstrainedDiffusion, JointDiffusion, LatentDiffusion
 from ccai.models.cnf.cnf import TrajectoryCNF
 
 from ccai.models.helpers import MLP
@@ -114,31 +114,36 @@ class TrajectoryFlowModel(nn.Module):
 class TrajectoryDiffusionModel(nn.Module):
 
     def __init__(self, T, dx, du, context_dim, problem=None, timesteps=20, hidden_dim=64, constrained=False,
-                 unconditional=False, generate_context=False, score_model='conv_unet'):
+                 unconditional=False, generate_context=False, score_model='conv_unet', latent_diffusion=False,
+                 vae=None):
         super().__init__()
         self.T = T
         self.dx = dx
         self.du = du
         self.context_dim = context_dim
-        if problem is not None:
-            self.diffusion_model = ConstrainedDiffusion(T, (dx + du), context_dim,
-                                                        timesteps=timesteps, sampling_timesteps=timesteps,
-                                                        z_dim=problem.dz,
-                                                        opt_problem=problem,
-                                                        constrain=constrained,
-                                                        hidden_dim=hidden_dim,
-                                                        unconditional=unconditional)
+        if latent_diffusion:
+            self.diffusion_model = LatentDiffusion(vae, T, dx, du, context_dim,
+                                                            timesteps=timesteps, sampling_timesteps=timesteps,
+                                                            hidden_dim=hidden_dim,
+                                                            unconditional=unconditional)
         else:
-            if generate_context:
-                self.diffusion_model = JointDiffusion(T, dx, du, context_dim, timesteps=timesteps,
-                                                      sampling_timesteps=timesteps,
-                                                      hidden_dim=hidden_dim,
-                                                      model_type=score_model)
+            if problem is not None:
+                self.diffusion_model = ConstrainedDiffusion(T, dx, du, context_dim, problem,
+                                                            timesteps=timesteps, sampling_timesteps=timesteps,
+                                                            constrain=constrained,
+                                                            hidden_dim=hidden_dim,
+                                                            unconditional=unconditional)
             else:
-                self.diffusion_model = GaussianDiffusion(T, dx, du, context_dim, timesteps=timesteps,
-                                                         sampling_timesteps=timesteps, hidden_dim=hidden_dim,
-                                                         unconditional=unconditional,
-                                                         model_type=score_model)
+                if generate_context:
+                    self.diffusion_model = JointDiffusion(T, dx, du, context_dim, timesteps=timesteps,
+                                                        sampling_timesteps=timesteps,
+                                                        hidden_dim=hidden_dim,
+                                                        model_type=score_model)
+                else:
+                    self.diffusion_model = GaussianDiffusion(T, dx, du, context_dim, timesteps=timesteps,
+                                                            sampling_timesteps=timesteps, hidden_dim=hidden_dim,
+                                                            unconditional=unconditional,
+                                                            model_type=score_model)
 
     def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None):
         # B, N, _ = constraints.shape
@@ -161,7 +166,6 @@ class TrajectoryDiffusionModel(nn.Module):
             condition[-1] = [8, goal]
         if condition == {}:
             condition = None
-
         samples = self.diffusion_model.sample(N=N, H=H, context=context, condition=condition)  # .reshape(-1, H#,
         #         self.dx + self.du)
         return samples
@@ -242,18 +246,23 @@ class TrajectoryCNFModel(TrajectoryCNF):
 class TrajectorySampler(nn.Module):
 
     def __init__(self, T, dx, du, context_dim, type='nf', dynamics=None, problem=None, timesteps=50, hidden_dim=64,
-                 constrain=False, unconditional=False, generate_context=False, score_model='conv_unet'):
+                 constrain=False, unconditional=False, generate_context=False, score_model='conv_unet',
+                 latent_diffusion=False, vae=None):
         super().__init__()
         self.T = T
         self.dx = dx
         self.du = du
         self.context_dim = context_dim
         self.type = type
-        assert type in ['nf', 'diffusion', 'cnf']
+        assert type in ['nf', 'latent_diffusion', 'diffusion', 'cnf']
         if type == 'nf':
             self.model = TrajectoryFlowModel(T, dx, du, context_dim, dynamics)
         elif type == 'cnf':
             self.model = TrajectoryCNFModel(T, dx, du, context_dim, hidden_dim=hidden_dim)
+        elif type == 'latent_diffusion':
+            self.model = TrajectoryDiffusionModel(T, dx, du, context_dim, problem, timesteps, hidden_dim, constrain,
+                                                  unconditional, generate_context=generate_context, score_model=score_model,
+                                                  latent_diffusion=True, vae=vae)
         else:
             self.model = TrajectoryDiffusionModel(T, dx, du, context_dim, problem, timesteps, hidden_dim, constrain,
                                                   unconditional, generate_context=generate_context, score_model=score_model)

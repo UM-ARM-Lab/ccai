@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from torch.profiler import profile, record_function, ProfilerActivity
 
-#from torch_cg import cg_batch
+from torch_cg import cg_batch
 
 
 class ConstrainedSteinTrajOpt:

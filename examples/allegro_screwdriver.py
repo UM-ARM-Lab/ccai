@@ -26,13 +26,16 @@ from utils.allegro_utils import *
 
 from allegro_contact import AllegroManipulationProblem, PositionControlConstrainedSVGDMPC, add_trajectories, \
     add_trajectories_hardware
+from train_allegro_screwdriver import rollout_trajectory_in_sim
 from scipy.spatial.transform import Rotation as R
 
-from ccai.mpc.ipopt import IpoptMPC
-from ccai.problem import IpoptProblem
+# from ccai.mpc.ipopt import IpoptMPC
+# from ccai.problem import IpoptProblem
 from ccai.models.trajectory_samplers import TrajectorySampler
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
+
+print("CCAI_PATH", CCAI_PATH)
 
 device = 'cuda:0'
 obj_dof = 3
@@ -150,13 +153,13 @@ class AllegroScrewdriver(AllegroManipulationProblem):
         return smoothness_cost + upright_cost + super()._cost(xu, start, goal)
 
 
-class IpoptScrewdriver(AllegroScrewdriver, IpoptProblem):
+# class IpoptScrewdriver(AllegroScrewdriver, IpoptProblem):
 
-    def __init__(self, *args, **kwargs):
-        device = kwargs.get('device', None)
-        if device is not None:
-            kwargs.pop('device')
-        super().__init__(*args, **kwargs, N=1, device='cpu')
+#     def __init__(self, *args, **kwargs):
+#         device = kwargs.get('device', None)
+#         if device is not None:
+#             kwargs.pop('device')
+#         super().__init__(*args, **kwargs, N=1, device='cpu')
 
 
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
@@ -170,16 +173,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     else:
         env.frame_fpath = None
         env.frame_id = None
-    # warm-starting using learned sampler
-    trajectory_sampler = None
-    model_path = params.get('model_path', None)
-
-    if model_path is not None:
-        trajectory_sampler = TrajectorySampler(T=16, dx=15, du=21, type='diffusion',
-                                               timesteps=256, hidden_dim=128,
-                                               context_dim=3, generate_context=True)
-        trajectory_sampler.load_state_dict(torch.load(f'{CCAI_PATH}/{model_path}'))
-        trajectory_sampler.to(device=params['device'])
 
     start = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
     # start = torch.cat((state['q'].reshape(10), torch.zeros(1).to(state['q'].device))).to(device=params['device'])
@@ -346,6 +339,29 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     else:
         raise ValueError('Invalid controller')
 
+    # warm-starting using learned sampler
+    trajectory_sampler = None
+    model_path = params.get('model_path', None)
+
+    if model_path is not None:
+        problem_for_sampler = None
+        if params['projected']:
+            problem_for_sampler = {
+                (-1, -1, -1): pregrasp_problem,
+                (-1, 1, 1): index_regrasp_problem,
+                (1, -1, -1): thumb_and_middle_regrasp_problem,
+                (1, 1, 1): turn_problem
+            }
+        trajectory_sampler = TrajectorySampler(T=16, dx=15, du=21, type='diffusion',
+                                               timesteps=256, hidden_dim=128,
+                                               context_dim=3, generate_context=True,
+                                               constrain=params['projected'],
+                                               problem=problem_for_sampler)
+        trajectory_sampler.load_state_dict(torch.load(f'{CCAI_PATH}/{model_path}'))
+        trajectory_sampler.to(device=params['device'])
+        trajectory_sampler.send_norm_constants_to_submodels()
+        print('Loaded trajectory sampler')
+
     # start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
     # best_traj, _ = pregrasp_planner.step(start[:4 * num_fingers + obj_dof])
     #
@@ -434,6 +450,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
         # generate initial samples with diffusion model
         initial_samples = None
+        sim_rollouts = None
         if trajectory_sampler is not None:
             with torch.no_grad():
                 start = state.clone()
@@ -445,6 +462,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                                                                   constraints=contact)
                 if state[-1] < -1.0:
                     initial_samples[:, :, -1] -= 0.75
+            
+            sim_rollouts = torch.zeros_like(initial_samples)
+            # for i in range(params['N']):
+            #     sim_rollout = rollout_trajectory_in_sim(env_sim_rollout, initial_samples[i])
+            #     sim_rollouts[i] = sim_rollout
 
             initial_samples = _full_to_partial(initial_samples, mode)
             initial_x = initial_samples[:, 1:, :planner.problem.dx]
@@ -457,8 +479,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         state = state[:planner.problem.dx]
         # print(params['T'], state.shape, initial_samples)
         planner.reset(state, T=params['T'], goal=goal, initial_x=initial_samples)
+        if trajectory_sampler is None:
+            initial_samples = planner.x.detach().clone()
+            sim_rollouts = torch.zeros_like(initial_samples)
         planned_trajectories = []
         actual_trajectory = []
+        optimizer_paths = []
         contact_points = {
         }
         contact_distance = {
@@ -507,6 +533,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             best_traj, plans = planner.step(state)
             print('Solve time for step', time.time() - s)
             planned_trajectories.append(plans)
+            optimizer_paths.append(copy.deepcopy(planner.path))
             N, T, _ = plans.shape
 
             contact_distance[T] = torch.stack((planner.problem.data['index']['sdf'].reshape(N, T + 1),
@@ -600,12 +627,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
         # for memory reasons we clear the data
         planner.problem.data = {}
-        return actual_trajectory, planned_trajectories, contact_points, contact_distance
+        return actual_trajectory, planned_trajectories, initial_samples, sim_rollouts, optimizer_paths, contact_points, contact_distance
 
     data = {}
-
     for t in range(1, 1 + params['T']):
-        data[t] = {'plans': [], 'starts': [], 'contact_points': [], 'contact_distance': [], 'contact_state': []}
+        data[t] = {'plans': [], 'starts': [], 'inits': [], 'init_sim_rollouts': [], 'optimizer_paths': [], 'contact_points': [], 'contact_distance': [], 'contact_state': []}
 
         # sample initial trajectory with diffusion model to get contact sequence
     state = env.get_state()
@@ -623,10 +649,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         mask = 2 ** torch.arange(bits - 1, -1, -1).to(b.device, b.dtype)
         return torch.sum(mask * b, -1)
 
-    def _add_to_dataset(traj, plans, contact_points, contact_distance, contact_state):
+    def _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, contact_state):
         for i, plan in enumerate(plans):
             t = plan.shape[1]
             data[t]['plans'].append(plan)
+            data[t]['inits'].append(inits)
+            data[t]['init_sim_rollouts'].append(init_sim_rollouts)
+            data[t]['optimizer_paths'].append(optimizer_paths)
             data[t]['starts'].append(traj[i].reshape(1, -1).repeat(plan.shape[0], 1))
             data[t]['contact_points'].append(contact_points[t])
             data[t]['contact_distance'].append(contact_distance[t])
@@ -678,7 +707,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             contact = contact_sequence[stage]
         print(stage, contact)
         if contact == 'pregrasp':
-            traj, plans, contact_points, contact_distance = execute_traj(
+            traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
                 pregrasp_planner, mode='pregrasp', fname=f'pregrasp_{stage}')
 
             # include zero for the contact forces
@@ -686,9 +715,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                                 torch.zeros(*plan.shape[:-1], 9).to(device=params['device'])),
                                dim=-1) for plan in plans]
             traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 9).to(device=params['device'])), dim=-1)
-            _add_to_dataset(traj, plans, contact_points, contact_distance, contact_state=torch.zeros(3))
+            _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, contact_state=torch.zeros(3))
         elif contact == 'index':
-            traj, plans, contact_points, contact_distance = execute_traj(
+            traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
                 index_regrasp_planner, mode='index', goal=valve_goal, fname=f'index_regrasp_{stage}')
 
             plans = [torch.cat((plan[..., :-6],
@@ -697,10 +726,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                                dim=-1) for plan in plans]
             traj = torch.cat((traj[..., :-6], torch.zeros(*traj.shape[:-1], 3).to(device=params['device']),
                               traj[..., -6:]), dim=-1)
-            _add_to_dataset(traj, plans, contact_points, contact_distance,
+            _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance,
                             contact_state=torch.tensor([0.0, 1.0, 1.0]))
         elif contact == 'thumb_middle':
-            traj, plans, contact_points, contact_distance = execute_traj(
+            traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
                 thumb_and_middle_regrasp_planner, mode='thumb_middle',
                 goal=valve_goal, fname=f'thumb_middle_regrasp_{stage}')
             plans = [torch.cat((plan,
@@ -708,14 +737,14 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                                dim=-1) for plan in plans]
             traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 6).to(device=params['device'])), dim=-1)
 
-            _add_to_dataset(traj, plans, contact_points, contact_distance,
+            _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance,
                             contact_state=torch.tensor([1.0, 0.0, 0.0]))
         elif contact == 'turn':
             valve_goal = torch.tensor([0, 0, state[-2] - np.pi / 3.0]).to(device=params['device'])
-            traj, plans, contact_points, contact_distance = execute_traj(
+            traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
                 turn_planner, mode='turn', goal=valve_goal, fname=f'turn_{stage}')
 
-            _add_to_dataset(traj, plans, contact_points, contact_distance, contact_state=torch.ones(3))
+            _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, contact_state=torch.ones(3))
 
     # change to numpy and save data
     for t in range(1, 1 + params['T']):
@@ -831,7 +860,174 @@ if __name__ == "__main__":
 
     forward_kinematics = partial(chain.forward_kinematics,
                                  frame_indices=frame_indices)  # full_to= _partial_state = partial(full_to_partial_state, fingers=config['fingers'])
-    # partial_to_full_state = partial(partial_to_full_state, fingers=config['fingers'])
+    partial_to_full_state = partial(partial_to_full_state, fingers=config['fingers'])
+    
+    # controller = 'csvgd'
+    # goal = - 0.5 * torch.tensor([0, 0, np.pi])
+    # # set up params
+    # params = config.copy()
+    # params.pop('controllers')
+    # params.update(config['controllers'][controller])
+    # params['controller'] = controller
+    # params['valve_goal'] = goal.to(device=params['device'])
+    # params['chain'] = chain.to(device=params['device'])
+    # object_location = torch.tensor([0, 0, 1.205]).to(
+    #     params['device'])  # TODO: confirm if this is the correct location
+    # params['object_location'] = object_location
+
+    # num_fingers = len(params['fingers'])
+    # state = env.get_state()
+    # start = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
+    # if 'csvgd' in params['controller']:
+    #     # index finger is used for stability
+    #     if 'index' in params['fingers']:
+    #         fingers = params['fingers']
+    #     else:
+    #         fingers = ['index'] + params['fingers']
+
+    # pregrasp_problem = AllegroScrewdriver(
+    #     start=start[:4 * num_fingers + obj_dof],
+    #     goal=params['valve_goal'] * 0,
+    #     T=params['T'],
+    #     chain=params['chain'],
+    #     device=params['device'],
+    #     object_asset_pos=env.table_pose,
+    #     object_location=params['object_location'],
+    #     object_type=params['object_type'],
+    #     world_trans=env.world_trans,
+    #     regrasp_fingers=fingers,
+    #     contact_fingers=[],
+    #     obj_dof=obj_dof,
+    #     obj_joint_dim=1,
+    #     optimize_force=params['optimize_force'],
+    # )
+    # # finger gate index
+    # index_regrasp_problem = AllegroScrewdriver(
+    #     start=start[:4 * num_fingers + obj_dof],
+    #     goal=params['valve_goal'] * 0,
+    #     T=params['T'],
+    #     chain=params['chain'],
+    #     device=params['device'],
+    #     object_asset_pos=env.table_pose,
+    #     object_location=params['object_location'],
+    #     object_type=params['object_type'],
+    #     world_trans=env.world_trans,
+    #     regrasp_fingers=['index'],
+    #     contact_fingers=['middle', 'thumb'],
+    #     obj_dof=obj_dof,
+    #     obj_joint_dim=1,
+    #     optimize_force=params['optimize_force'],
+    #     default_dof_pos=env.default_dof_pos[:, :16]
+    # )
+    # thumb_and_middle_regrasp_problem = AllegroScrewdriver(
+    #     start=start[:4 * num_fingers + obj_dof],
+    #     goal=params['valve_goal'] * 0,
+    #     T=params['T'],
+    #     chain=params['chain'],
+    #     device=params['device'],
+    #     object_asset_pos=env.table_pose,
+    #     object_location=params['object_location'],
+    #     object_type=params['object_type'],
+    #     world_trans=env.world_trans,
+    #     contact_fingers=['index'],
+    #     regrasp_fingers=['middle', 'thumb'],
+    #     obj_dof=obj_dof,
+    #     obj_joint_dim=1,
+    #     optimize_force=params['optimize_force'],
+    #     default_dof_pos=env.default_dof_pos[:, :16]
+    # )
+    # turn_problem = AllegroScrewdriver(
+    #     start=start[:4 * num_fingers + obj_dof],
+    #     goal=params['valve_goal'] * 0,
+    #     T=params['T'],
+    #     chain=params['chain'],
+    #     device=params['device'],
+    #     object_asset_pos=env.table_pose,
+    #     object_location=params['object_location'],
+    #     object_type=params['object_type'],
+    #     world_trans=env.world_trans,
+    #     contact_fingers=['index', 'middle', 'thumb'],
+    #     obj_dof=obj_dof,
+    #     obj_joint_dim=1,
+    #     optimize_force=params['optimize_force'],
+    #     default_dof_pos=env.default_dof_pos[:, :16]
+    # )
+    # contact_mode_dict = {0: 'pregrasp', 2: 'index', 1: 'thumb_middle', 3: 'turn'}
+    # data_path = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/csvgd')
+    # t = 15
+    # def calc_info(c_state, to_eval, info_list, pregrasp_problem, index_regrasp_problem, thumb_and_middle_regrasp_problem, turn_problem):
+    #     if c_state == 'pregrasp':
+    #         # Call _con_eq and _con_ineq to get constraint violation
+    #         pregrasp_problem._preprocess(to_eval)
+    #         g, _, _ = pregrasp_problem._con_eq(to_eval[..., :27], compute_grads=False, compute_hess=False, verbose=True)
+    #         h, _, _ = pregrasp_problem._con_ineq(to_eval[..., :27], compute_grads=False, compute_hess=False, verbose=True)
+
+    #         info = {'g': g, 'h': h, 'c_state': 'pregrasp'}
+    #         info_list.append(info)
+    #     elif c_state == 'index':
+    #         index_regrasp_problem._preprocess(to_eval)
+    #         # Need to rearrange (index, middle, thumb)
+    #         if plans_or_inits == 'plans':
+    #             inds = torch.cat((torch.arange(27), torch.arange(30, 36)))
+    #         else:
+    #             inds = torch.arange(33)
+    #         g, _, _ = index_regrasp_problem._con_eq(to_eval[..., inds], compute_grads=False, compute_hess=False, verbose=True)
+    #         h, _, _ = index_regrasp_problem._con_ineq(to_eval[..., inds], compute_grads=False, compute_hess=False, verbose=True)
+
+    #         info = {'g': g, 'h': h, 'c_state': 'index'}
+    #         info_list.append(info)
+    #     elif c_state == 'thumb_middle':
+    #         thumb_and_middle_regrasp_problem._preprocess(to_eval)
+    #         g, _, _ = thumb_and_middle_regrasp_problem._con_eq(to_eval[..., :30], compute_grads=False, compute_hess=False, verbose=True)
+    #         h, _, _ = thumb_and_middle_regrasp_problem._con_ineq(to_eval[..., :30], compute_grads=False, compute_hess=False, verbose=True)
+
+    #         info = {'g': g, 'h': h, 'c_state': 'thumb_middle'}
+    #         info_list.append(info)
+    #     elif c_state == 'turn':
+    #         turn_problem._preprocess(to_eval)
+    #         g, _, _ = turn_problem._con_eq(to_eval[..., :], compute_grads=False, compute_hess=False, verbose=True)
+    #         h, _, _ = turn_problem._con_ineq(to_eval[..., :], compute_grads=False, compute_hess=False, verbose=True)
+
+    #         info = {'g': g, 'h': h, 'c_state': 'turn'}
+    #         info_list.append(info)
+    #     return info_list
+
+    # def gen_constraint_data(plans_or_inits, constraint_violations):
+    #     for trial in tqdm(range(1, 11)):
+    #         info_list = []
+    #         with open(data_path / f'trial_{trial}/traj_data.p', 'rb') as f:
+    #             data = pkl.load(f)
+    #         if plans_or_inits == 'plans':
+    #             data[t]['plans'] = torch.tensor(data[t]['plans']).to(device=params['device'])
+    #             loop_range = data[t]['plans'].shape[0]
+    #         elif plans_or_inits == 'optimizer_paths':
+    #             loop_range = len(data[t]['optimizer_paths'])
+    #         else:
+    #             loop_range = len(data[t]['inits'])
+    #         print('lr', loop_range)
+    #         for i in tqdm(range(loop_range)):
+    #             c_state = contact_mode_dict[data[t]['contact_state'][i].sum().item()]
+
+    #             to_eval = data[t][plans_or_inits][i]
+    #             if plans_or_inits in {'plans', 'inits'}:
+    #                 info_list = calc_info(c_state, to_eval, info_list, pregrasp_problem, index_regrasp_problem, thumb_and_middle_regrasp_problem, turn_problem)
+    #             else:
+    #                 all_infos = []
+    #                 for csvto_tstep in tqdm(range(len(data[t]['optimizer_paths'][i]))):
+    #                     all_infos = calc_info(c_state, to_eval[csvto_tstep], all_infos, pregrasp_problem, index_regrasp_problem, thumb_and_middle_regrasp_problem, turn_problem)
+    #                 info_list.append(all_infos)
+    #         constraint_violations.append(info_list)
+    # constraint_violations_all = {
+    #     'optimizer_paths': [],
+    #     'plans': [],
+    #     'inits': [],
+    # }
+    # for plans_or_inits in constraint_violations_all.keys():
+    #     print(plans_or_inits)
+    #     gen_constraint_data(plans_or_inits, constraint_violations_all[plans_or_inits])
+    # with open(data_path / f'constraint_violations.p', 'wb') as f:
+    #     pkl.dump(constraint_violations_all, f)
+
 
     for i in tqdm(range(0, config['num_trials'])):
         goal = - 0.5 * torch.tensor([0, 0, np.pi])

@@ -160,7 +160,10 @@ class TemporalUnet(nn.Module):
         '''
             x : [ batch x horizon x transition ]
         '''
-
+        t = t.to(torch.float32)
+        x = x.to(torch.float32)
+        if context is not None:
+            context = context.to(torch.float32)
         # ensure t is a batched tensor
         B, H, d = x.shape
         t = t.reshape(-1)

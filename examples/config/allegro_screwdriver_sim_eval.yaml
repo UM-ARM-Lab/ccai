@@ -4,8 +4,8 @@ receding_horizon: False
 num_steps: 15
 num_turns: 4
 num_trials: 10
-visualize: False
-experiment_name: 'allegro_screwdriver_projected_diffusion_init'
+visualize: True
+experiment_name: 'allegro_screwdriver_diffusion_init_lower_random_init_noise_all_inits_saved'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
@@ -17,7 +17,7 @@ kp: 3.0
 visualize_plan: False
 optimize_force: True
 exclude_index: False
-projected: True
+projected: False
 model_path: 'data/training/allegro_screwdriver/allegro_test_new_data_augment_angle_diffusion/allegro_screwdriver_diffusion.pt'
 controllers:
   csvgd:
