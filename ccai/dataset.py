@@ -376,7 +376,7 @@ class AllegroScrewDriverTransitionDataset(AllegroScrewDriverDataset):
         u_t = traj[idx, 15:]
         x_t_1 = traj[idx+1, :15]
 
-        return x_t, u_t, x_t_1
+        return x_t, u_t, x_t_1, self.trajectory_type[traj_idx]
 
     def compute_norm_constants(self):
         # compute norm constants not including the zero padding
