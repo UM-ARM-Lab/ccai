@@ -20,12 +20,13 @@ from torch.func import vmap, jacrev, hessian, jacfwd
 # import pytorch3d.transforms as tf
 
 import matplotlib.pyplot as plt
-from utils.allegro_utils import *
+from ccai.utils.allegro_utils import *
 # from allegro_valve_roll import AllegroValveTurning, AllegroContactProblem, PositionControlConstrainedSVGDMPC, \
 #    add_trajectories, add_trajectories_hardware
 
-from allegro_contact import AllegroManipulationProblem, PositionControlConstrainedSVGDMPC, add_trajectories, \
+from ccai.allegro_contact import AllegroManipulationProblem, PositionControlConstrainedSVGDMPC, add_trajectories, \
     add_trajectories_hardware
+from ccai.allegro_screwdriver_problem_diffusion import AllegroScrewdriverDiff
 from train_allegro_screwdriver import rollout_trajectory_in_sim
 from scipy.spatial.transform import Rotation as R
 
@@ -153,6 +154,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
         return smoothness_cost + upright_cost + super()._cost(xu, start, goal)
 
 
+
 # class IpoptScrewdriver(AllegroScrewdriver, IpoptProblem):
 
 #     def __init__(self, *args, **kwargs):
@@ -160,7 +162,6 @@ class AllegroScrewdriver(AllegroManipulationProblem):
 #         if device is not None:
 #             kwargs.pop('device')
 #         super().__init__(*args, **kwargs, N=1, device='cpu')
-
 
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     "only turn the valve once"
@@ -346,11 +347,79 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     if model_path is not None:
         problem_for_sampler = None
         if params['projected']:
+            pregrasp_problem_diff = AllegroScrewdriverDiff(
+                start=start[:4 * num_fingers + obj_dof],
+                goal=params['valve_goal'] * 0,
+                T=params['T'],
+                chain=params['chain'],
+                device=params['device'],
+                object_asset_pos=env.table_pose,
+                object_location=params['object_location'],
+                object_type=params['object_type'],
+                world_trans=env.world_trans,
+                regrasp_fingers=fingers,
+                contact_fingers=[],
+                obj_dof=obj_dof,
+                obj_joint_dim=1,
+                optimize_force=params['optimize_force'],
+            )
+            # finger gate index
+            index_regrasp_problem_diff = AllegroScrewdriverDiff(
+                start=start[:4 * num_fingers + obj_dof],
+                goal=params['valve_goal'] * 0,
+                T=params['T'],
+                chain=params['chain'],
+                device=params['device'],
+                object_asset_pos=env.table_pose,
+                object_location=params['object_location'],
+                object_type=params['object_type'],
+                world_trans=env.world_trans,
+                regrasp_fingers=['index'],
+                contact_fingers=['middle', 'thumb'],
+                obj_dof=obj_dof,
+                obj_joint_dim=1,
+                optimize_force=params['optimize_force'],
+                default_dof_pos=env.default_dof_pos[:, :16]
+            )
+            thumb_and_middle_regrasp_problem_diff = AllegroScrewdriverDiff(
+                start=start[:4 * num_fingers + obj_dof],
+                goal=params['valve_goal'] * 0,
+                T=params['T'],
+                chain=params['chain'],
+                device=params['device'],
+                object_asset_pos=env.table_pose,
+                object_location=params['object_location'],
+                object_type=params['object_type'],
+                world_trans=env.world_trans,
+                contact_fingers=['index'],
+                regrasp_fingers=['middle', 'thumb'],
+                obj_dof=obj_dof,
+                obj_joint_dim=1,
+                optimize_force=params['optimize_force'],
+                default_dof_pos=env.default_dof_pos[:, :16]
+            )
+            turn_problem_diff = AllegroScrewdriverDiff(
+                start=start[:4 * num_fingers + obj_dof],
+                goal=params['valve_goal'] * 0,
+                T=params['T'],
+                chain=params['chain'],
+                device=params['device'],
+                object_asset_pos=env.table_pose,
+                object_location=params['object_location'],
+                object_type=params['object_type'],
+                world_trans=env.world_trans,
+                contact_fingers=['index', 'middle', 'thumb'],
+                obj_dof=obj_dof,
+                obj_joint_dim=1,
+                optimize_force=params['optimize_force'],
+                default_dof_pos=env.default_dof_pos[:, :16]
+            )
+
             problem_for_sampler = {
-                (-1, -1, -1): pregrasp_problem,
-                (-1, 1, 1): index_regrasp_problem,
-                (1, -1, -1): thumb_and_middle_regrasp_problem,
-                (1, 1, 1): turn_problem
+                (-1, -1, -1): pregrasp_problem_diff,
+                (-1, 1, 1): index_regrasp_problem_diff,
+                (1, -1, -1): thumb_and_middle_regrasp_problem_diff,
+                (1, 1, 1): turn_problem_diff
             }
         trajectory_sampler = TrajectorySampler(T=16, dx=15, du=21, type='diffusion',
                                                timesteps=256, hidden_dim=128,
@@ -591,7 +660,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                 gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
                 pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
                 pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-                visualize_trajectory(traj_for_viz, turn_problem.contact_scenes['thumb'], viz_fpath,
+                visualize_trajectory(traj_for_viz, turn_problem.contact_scenes, viz_fpath,
                                      turn_problem.fingers, turn_problem.obj_dof + 1)
 
             env.step(action.to(device=env.device))
@@ -777,7 +846,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
 if __name__ == "__main__":
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_sim_eval.yaml').read_text())
     from tqdm import tqdm
 
     if config['mode'] == 'hardware':

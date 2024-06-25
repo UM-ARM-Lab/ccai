@@ -17,7 +17,7 @@ from ccai.dataset import AllegroScrewDriverDataset
 from isaac_victor_envs.utils import get_assets_dir
 from torch.utils.data import DataLoader, RandomSampler
 from ccai.models.trajectory_samplers import TrajectorySampler
-from utils.allegro_utils import partial_to_full_state, visualize_trajectory
+from ccai.utils.allegro_utils import partial_to_full_state, visualize_trajectory
 
 
 fingers = ['index', 'middle', 'thumb']

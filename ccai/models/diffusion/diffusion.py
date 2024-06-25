@@ -684,7 +684,7 @@ class JointDiffusion(GaussianDiffusion):
         # use same noise vector
         grad = torch.zeros_like(mu_var['x']['mean'])
         # add some guidance using gradient - maximise turn angle, keep upright
-        eta = 0.05
+        eta = 0.0
         grad[:, :, :, self.dx - 3:self.dx - 1] = -2 * 0.1 * (mu_var['x']['mean'][:, :, :, self.dx - 3:self.dx - 1] +
                                                              self.mu[self.dx - 3:self.dx - 1].to(device=x.device))
         # grad[:, -1, -1, self.dx - 1] = -eta
@@ -1041,7 +1041,7 @@ class ConstrainedDiffusion(GaussianDiffusion):
 
         # for b_ind in (range(context.shape[0])):
         c_state, mask, mask_no_z = self.c_state_mask(context, x)
-        num_dim = (mask.long().sum().item())
+        num_dim = mask.long().sum().item()
         problem = self.problem_dict[c_state]
 
         update = torch.cat((update, torch.zeros(b, H, problem.dz, device=device)), dim=2)
@@ -1052,14 +1052,14 @@ class ConstrainedDiffusion(GaussianDiffusion):
         dJ = dJ.reshape(b, H, -1)
         z_dim = problem.dz
 
-        # C, dC, _ = problem.combined_constraints(x_norm[:, :, mask], compute_hess=False, projected_diffusion=True)
-        C, dC, _ = problem._con_eq(x_norm[:, :, mask_no_z], compute_hess=False, projected_diffusion=True)
+        C, dC, _ = problem.combined_constraints(x_norm[:, :, mask], compute_hess=False, projected_diffusion=True)
+        # C, dC, _ = problem._con_eq(x_norm[:, :, mask_no_z], compute_hess=False, projected_diffusion=True)
         # compute unconstrained update with cost guide
 
         # make update be unnormalized
         # Fix the indexing here
-        unnormalized_update = update[:, :, mask_no_z] * self.std[mask_no_z] - self.alpha_J * dJ
-        update_this_b_ind = torch.cat((unnormalized_update, torch.zeros(b, H, z_dim, device=device)[:, : mask[36:]]), dim=2)
+        unnormalized_update = update[:, :, mask_no_z] * self.std[mask_no_z[:-problem.dz]] - self.alpha_J * dJ
+        update_this_b_ind = torch.cat((unnormalized_update, torch.zeros(b, H, z_dim, device=device)[:, :, mask[36:]]), dim=2)
 
         dC = dC.reshape(b, -1, (H) * num_dim)
 
@@ -1124,7 +1124,7 @@ class ConstrainedDiffusion(GaussianDiffusion):
 
         # normalize update
         update_this_b_ind = update_this_b_ind.reshape(b, H, -1)
-        update_this_b_ind = update_this_b_ind / self.std[mask]
+        update_this_b_ind[:, :, :-problem.dz] = update_this_b_ind[:, :, :-problem.dz] / self.std[mask[:36]]
 
         update[:, :, mask] = update_this_b_ind
 
@@ -1166,7 +1166,7 @@ class ConstrainedDiffusion(GaussianDiffusion):
             augmented_trajectory, x_start = self.p_sample(augmented_trajectory, t, context, anneal)
             augmented_trajectory = self._apply_conditioning(augmented_trajectory, condition)
             # also clamp between bounds
-            self._clamp_in_bounds(augmented_trajectory[:, :, :self.xu_dim], self.problem[c_state], mask[:self.xu_dim])
+            self._clamp_in_bounds(augmented_trajectory[:, :, :self.xu_dim], self.problem_dict[c_state], mask[:self.xu_dim])
 
             trajectories.append(augmented_trajectory)
 
@@ -1212,8 +1212,8 @@ class ConstrainedDiffusion(GaussianDiffusion):
     def _clamp_in_bounds(self, xuz, problem, mask):
         min_x = problem.x_min.reshape(1, 1, -1).expand(-1, self.horizon, -1)
         max_x = problem.x_max.reshape(1, 1, -1).expand(-1, self.horizon, -1)
-        torch.clamp_(xuz[:, :, mask], min=min_x.to(device=xuz.device) / self.std,
-                     max=max_x.to(device=xuz.device) / self.std)
+        torch.clamp_(xuz[:, :, mask], min=min_x.to(device=xuz.device) / self.std[mask],
+                     max=max_x.to(device=xuz.device) / self.std[mask])
 
     def resample(self, x, condition, context, timestep):
         B, num_constraints, dc = context.shape

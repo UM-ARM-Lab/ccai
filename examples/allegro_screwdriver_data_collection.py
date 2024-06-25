@@ -24,7 +24,7 @@ from utils.allegro_utils import *
 # from allegro_valve_roll import AllegroValveTurning, AllegroContactProblem, PositionControlConstrainedSVGDMPC, \
 #    add_trajectories, add_trajectories_hardware
 
-from allegro_contact import AllegroManipulationProblem, PositionControlConstrainedSVGDMPC, add_trajectories, \
+from ccai.allegro_contact import AllegroManipulationProblem, PositionControlConstrainedSVGDMPC, add_trajectories, \
     add_trajectories_hardware
 from scipy.spatial.transform import Rotation as R
 

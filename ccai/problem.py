@@ -81,7 +81,7 @@ class ConstrainedSVGDProblem(Problem):
     def eval(self, x):
         pass
 
-    def combined_constraints(self, augmented_x, compute_grads=True, compute_hess=True, projected_diffusion=False):
+    def combined_constraints(self, augmented_x, compute_grads=True, compute_hess=True, projected_diffusion=False, include_slack=True):
         N = augmented_x.shape[0]
         T_offset = 1 if projected_diffusion else 0
         augmented_x = augmented_x.reshape(N, self.T + T_offset, self.dx + self.du + self.dz)
@@ -96,10 +96,13 @@ class ConstrainedSVGDProblem(Problem):
         if h is None:
             return g, grad_g, hess_g
 
-        if self.squared_slack:
-            h_aug = h + 0.5 * z.reshape(-1, self.dz * (self.T + T_offset)) ** 2
+        if include_slack:
+            if self.squared_slack:
+                h_aug = h + 0.5 * z.reshape(-1, self.dz * (self.T + T_offset)) ** 2
+            else:
+                h_aug = h + self.slack_weight * z.reshape(-1, self.dz * (self.T + T_offset))
         else:
-            h_aug = h + self.slack_weight * z.reshape(-1, self.dz * (self.T + T_offset))
+            h_aug = h
 
         if not compute_grads:
             if g is None:
@@ -107,17 +110,20 @@ class ConstrainedSVGDProblem(Problem):
             return torch.cat((g, h_aug), dim=1), None, None
 
             # Gradients - gradient wrt z should be z
-        if self.squared_slack:
-            z_extended = torch.diag_embed(torch.diag_embed(z).permute(0, 2, 3, 1)
-                                          ).permute(0, 3, 1, 4, 2)  # (N, T, dz, T dz)
-        else:
-            z_extended = self.slack_weight * torch.diag_embed(torch.diag_embed(torch.ones_like(z)).permute(0, 2, 3, 1)
-                                                              ).permute(0, 3, 1, 4, 2)  # (N, T, dz, T dz)
+        if include_slack:
+            if self.squared_slack:
+                z_extended = torch.diag_embed(torch.diag_embed(z).permute(0, 2, 3, 1)
+                                            ).permute(0, 3, 1, 4, 2)  # (N, T, dz, T dz)
+            else:
+                z_extended = self.slack_weight * torch.diag_embed(torch.diag_embed(torch.ones_like(z)).permute(0, 2, 3, 1)
+                                                                ).permute(0, 3, 1, 4, 2)  # (N, T, dz, T dz)
 
-        grad_h_aug = torch.cat((
-            grad_h.reshape(N, (self.T + T_offset), self.dz, (self.T + T_offset), -1),
-            z_extended), dim=-1)
-        grad_h_aug = grad_h_aug.reshape(N, self.dh, (self.T + T_offset) * (self.dx + self.du + self.dz))
+            grad_h_aug = torch.cat((
+                grad_h.reshape(N, (self.T + T_offset), self.dz, (self.T + T_offset), -1),
+                z_extended), dim=-1)
+            grad_h_aug = grad_h_aug.reshape(N, self.dh +self.dz * T_offset, (self.T + T_offset) * (self.dx + self.du + self.dz))
+        else:
+            grad_h_aug = grad_h.reshape(N, self.dh, (self.T + T_offset) * (self.dx + self.du))
 
         if compute_hess:
             # Hessians - second derivative wrt z should be identity
@@ -143,12 +149,14 @@ class ConstrainedSVGDProblem(Problem):
 
         if g is None:
             return h_aug, grad_h_aug, hess_h_aug
-        grad_g_aug = torch.cat((
-            grad_g.reshape(N, self.dg, (self.T + T_offset), -1),
-            torch.zeros(N, self.dg, (self.T + T_offset), self.dz, device=self.device)),
-            dim=-1
-        ).reshape(N, self.dg, (self.T + T_offset) * (self.dx + self.du + self.dz))
-
+        if include_slack:
+            grad_g_aug = torch.cat((
+                grad_g.reshape(N, self.dg + self.dg_per_t * T_offset, (self.T + T_offset), -1),
+                torch.zeros(N, self.dg + self.dg_per_t * T_offset, (self.T + T_offset), self.dz, device=self.device)),
+                dim=-1
+            ).reshape(N, self.dg + self.dg_per_t * T_offset, (self.T + T_offset) * (self.dx + self.du + self.dz))
+        else:
+            grad_g_aug = grad_g.reshape(N, self.dg + self.dg_per_t * T_offset, (self.T + T_offset) * (self.dx + self.du))
         if compute_hess:
             hess_g_aug = torch.zeros(N, self.dg,
                                      (self.T + T_offset), (self.dx + self.du + self.dz),
