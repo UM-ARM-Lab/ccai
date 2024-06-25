@@ -31,7 +31,7 @@ from utils.allegro_utils import *
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
-device = 'cuda:0'
+# device = 'cuda:0'
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 
@@ -611,12 +611,12 @@ class AllegroContactProblem(AllegroObjectProblem):
     
     def _init_contact_scenes(self, asset_object, collision_checking):
         object_chain = pk.build_chain_from_urdf(open(asset_object).read())
-        object_chain = object_chain.to(device=device)
+        object_chain = object_chain.to(device=self.device)
         object_sdf = pv.RobotSDF(object_chain, path_prefix=None, use_collision_geometry=True) # since we are using primitive shapes for the object, there's no need to define path for stl
         robot_sdf = pv.RobotSDF(self.chain, path_prefix=get_assets_dir() + '/xela_models', use_collision_geometry=True)
 
         scene_trans = self.world_trans.inverse().compose(
-            pk.Transform3d(device=device).translate(self.object_asset_pos[0], self.object_asset_pos[1], self.object_asset_pos[2]))
+            pk.Transform3d(device=self.device).translate(self.object_asset_pos[0], self.object_asset_pos[1], self.object_asset_pos[2]))
 
         # self.index_collision_scene = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
         #                                            collision_check_links=collision_check_hitosashi,
@@ -744,17 +744,21 @@ class AllegroValveTurning(AllegroContactProblem):
                  optimize_force=False,
                  screwdriver_force_balance=False,
                  collision_checking=False,
+                 dx=None,
+                 du=None,
                  device='cuda:0', **kwargs):
         self.screwdriver_force_balance = screwdriver_force_balance
         self.optimize_force = optimize_force
         self.num_fingers = len(fingers)
         self.object_location = object_location
         obj_dof = np.sum(obj_dof_code)
-        dx = 4 * self.num_fingers + obj_dof
-        if optimize_force:
-            du = (4 + 3) * self.num_fingers
-        else:
-            du = 4 * self.num_fingers
+        if dx is None:
+            dx = 4 * self.num_fingers + obj_dof
+        if du is None:
+            if optimize_force:
+                du = (4 + 3) * self.num_fingers
+            else:
+                du = 4 * self.num_fingers
         super().__init__(dx=dx, du=du, start=start, goal=goal, 
                          T=T, chain=chain, object_type=object_type, world_trans=world_trans,
                         object_asset_pos=object_asset_pos,
@@ -2221,7 +2225,7 @@ if __name__ == "__main__":
             params['controller'] = controller
             params['valve_goal'] = goal.to(device=params['device'])
             params['chain'] = chain.to(device=params['device'])
-            object_location = torch.tensor([0.85, 0.70, 1.405]).to(device) # the root of the valve
+            object_location = torch.tensor([0.85, 0.70, 1.405]).to(params['device']) # the root of the valve
             params['object_location'] = object_location
             final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node)
             # final_distance_to_goal = turn(env, params, fpath)
