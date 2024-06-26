@@ -1678,10 +1678,10 @@ class AllegroManipulationProblemDiff(AllegroContactProblemDiff, AllegroRegraspPr
         # if h is None:
         #    h = torch.cat((h_regrasp, h_contact), dim=1)
 
-        if compute_grads:
+        if compute_grads and grad_h is not None:
             grad_h = grad_h.reshape(grad_h.shape[0], grad_h.shape[1], T, -1)[:, :, :, self.all_var_index]
             grad_h = grad_h.reshape(N, -1, T * (self.dx + self.du))
-        if compute_hess:
+        if compute_hess and hess_h is not None:
             hess_h = hess_h.reshape(hess_h.shape[0], hess_h.shape[1], T, self.d, T, self.d)[:, :, :,
                      self.all_var_index]
             hess_h = hess_h[:, :, :, :, self.all_var_index].reshape(N, -1,

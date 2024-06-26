@@ -1008,7 +1008,8 @@ class ConstrainedDiffusion(GaussianDiffusion):
         # Concat False to mask to match the size of x
         mask = torch.cat((mask, torch.zeros(self.xu_dim + z_dim -x.shape[-1], device=x.device).bool()))
         mask_no_z = mask.clone()
-        mask_no_z[-z_dim:] = False
+        if z_dim > 0:
+            mask_no_z[-z_dim:] = False
         return c_state, mask, mask_no_z
     
     def p_sample(self, x, t, context, anneal=True):
@@ -1058,7 +1059,10 @@ class ConstrainedDiffusion(GaussianDiffusion):
 
         # make update be unnormalized
         # Fix the indexing here
-        unnormalized_update = update[:, :, mask_no_z] * self.std[mask_no_z[:-problem.dz]] - self.alpha_J * dJ
+        if problem.dz > 0:
+            unnormalized_update = update[:, :, mask_no_z] * self.std[mask_no_z[:-problem.dz]] - self.alpha_J * dJ
+        else:
+            unnormalized_update = update[:, :, mask_no_z] * self.std[mask_no_z] - self.alpha_J * dJ
         update_this_b_ind = torch.cat((unnormalized_update, torch.zeros(b, H, z_dim, device=device)[:, :, mask[36:]]), dim=2)
 
         dC = dC.reshape(b, -1, (H) * num_dim)
@@ -1124,7 +1128,10 @@ class ConstrainedDiffusion(GaussianDiffusion):
 
         # normalize update
         update_this_b_ind = update_this_b_ind.reshape(b, H, -1)
-        update_this_b_ind[:, :, :-problem.dz] = update_this_b_ind[:, :, :-problem.dz] / self.std[mask[:36]]
+        if problem.dz > 0:
+            update_this_b_ind[:, :, :-problem.dz] = update_this_b_ind[:, :, :-problem.dz] / self.std[mask[:36]]
+        else:
+            update_this_b_ind[:, :, :] = update_this_b_ind[:, :, :] / self.std[mask[:36]]
 
         update[:, :, mask] = update_this_b_ind
 
@@ -1157,7 +1164,10 @@ class ConstrainedDiffusion(GaussianDiffusion):
         if start_timestep is None:
             start_timestep = self.num_timesteps
 
-        augmented_trajectory = torch.cat((trajectory, z), dim=-1)
+        if z is not None:
+            augmented_trajectory = torch.cat((trajectory, z), dim=-1)
+        else:
+            augmented_trajectory = trajectory
         augmented_trajectory = self._apply_conditioning(augmented_trajectory, condition)
         trajectories = [augmented_trajectory]
 

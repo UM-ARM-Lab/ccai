@@ -1619,7 +1619,7 @@ class AllegroContactProblem(AllegroObjectProblem):
             return result_dict
 
         if compute_grads:
-            grad_h = grad_h.reshape(N, -1, self.T * self.d)
+            grad_h = grad_h.reshape(N, -1, (self.T + 1 if projected_diffusion else 0) * self.d)
         else:
             return h, None, None
         if compute_hess:
@@ -1814,7 +1814,6 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
         if self.num_regrasps > 0:
             h_regrasp, grad_h_regrasp, hess_h_regrasp = AllegroRegraspProblem._con_ineq(self, xu, compute_grads,
                                                                                         compute_hess, projected_diffusion=projected_diffusion)
-            print('reg', grad_h_regrasp.shape)
             if h is not None:
                 h = torch.cat((h_regrasp, h), dim=1)
                 if grad_h is not None:
@@ -1827,7 +1826,6 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
         if self.num_contacts > 0:
             h_contact, grad_h_contact, hess_h_contact = AllegroContactProblem._con_ineq(self, xu, compute_grads,
                                                                                         compute_hess, projected_diffusion=projected_diffusion)
-            print('grads', grad_h.shape, grad_h_contact.shape)
             if h is not None:
                 h = torch.cat((h, h_contact), dim=1)
                 if grad_h is not None:

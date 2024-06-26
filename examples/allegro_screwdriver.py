@@ -11,6 +11,7 @@ import copy
 import yaml
 import pathlib
 from functools import partial
+import sys
 
 import time
 import pytorch_volumetric as pv
@@ -846,7 +847,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
 if __name__ == "__main__":
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_sim_eval.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_proj_diff_init.yaml').read_text())
     from tqdm import tqdm
 
     if config['mode'] == 'hardware':
