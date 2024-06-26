@@ -146,6 +146,8 @@ class TrajectoryCNF(nn.Module):
 
         self.register_buffer('prior_mu', torch.zeros(horizon, self.xu_dim))
         self.register_buffer('prior_sigma', torch.ones(horizon, self.xu_dim))
+        self.register_buffer('x_mean', torch.zeros(self.xu_dim))
+        self.register_buffer('x_std', torch.ones(self.xu_dim))
 
         self.inflation_noise = inflation_noise
         self.sigma_min = 1e-4
@@ -167,25 +169,39 @@ class TrajectoryCNF(nn.Module):
 
         set_cnf_options(solver, self.flow)
 
-        start_mask = torch.ones(self.horizon, self.xu_dim)
-        start_mask[0, self.dx:] = 0
-        self.register_buffer('start_mask', start_mask)
+        mask = torch.ones(1, self.horizon, self.xu_dim)
+        #self.register_buffer('_grad_mask', mask)
+        self.register_buffer('start_mask', mask[0])
+        self._grad_mask = mask
 
     def masked_grad(self, t, x, context):
-        dx = self.model(t, x, context)
-        return dx * self.start_mask[None]
+        dx, _ = self.model(t, x, context)
 
-    def flow_matching_loss(self, xu, context):
+        if len(self._grad_mask.shape) == 4:
+            num_samples, num_sub_trajs = self._grad_mask.shape[:2]
+
+            dx = dx.reshape(num_samples, num_sub_trajs, self.horizon, self.xu_dim)
+            for i in range(num_sub_trajs - 1):
+                tmp = dx[:, i, -1, :self.dx].clone()
+                dx[:, i, -1, :self.dx] = (tmp + dx[:, i + 1, 0, :self.dx]) / 2
+                dx[:, i + 1, 0, :self.dx] = dx[:, i, -1, :self.dx]
+
+            dx = dx.reshape(-1, self.horizon, self.xu_dim)
+
+        return dx * self._grad_mask.reshape(-1, self.horizon, self.xu_dim)
+
+    def flow_matching_loss(self, xu, context, mask=None):
         if self.loss_type == 'diffusion':
-            return self.flow_matching_loss_diffusion(xu, context)
+            return self.flow_matching_loss_diffusion(xu, context, mask)
         elif self.loss_type == 'ot':
-            return self.flow_matching_loss_ot(xu, context)
+            return self.flow_matching_loss_ot(xu, context, mask)
         elif self.loss_type == 'conditional_ot':
-            return self.conditional_flow_matching_loss_ot(xu, context)
+            return self.conditional_flow_matching_loss_ot(xu, context, mask)
         elif self.loss_type == 'conditional_sb':
-            return self.conditional_flow_matching_loss_sb(xu, context)
+            return self.conditional_flow_matching_loss_sb(xu, context, mask)
 
-    def flow_matching_loss_ot(self, xu, context):
+    def flow_matching_loss_ot(self, xu, context, mask=None):
+
         # Using OT flow matching from https://arxiv.org/pdf/2210.02747.pdf
         B, T, _ = xu.shape
 
@@ -206,10 +222,21 @@ class TrajectoryCNF(nn.Module):
 
         # get GT velocity
         ut = (xu - (1 - self.sigma_min) * x0)
+
+        # include masking to allow inpainting
+        # when in-painting, gradient should be zero of in-painted values, and model recieve non-noisy input
+        if mask is not None:
+            masked_idx = (mask == 0).nonzero()
+            xut[masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]] = xu[
+                masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]]
+
+            ut[masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]] = torch.zeros_like(
+                xu[masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]])
+
         # ut = (xu - (1 - self.sigma_min) * xut) / (1 - t * (1 - self.sigma_min))
 
         # faster for training
-        vt = self.model.compiled_conditional_train(t.reshape(-1), xut, context)
+        vt, _ = self.model.compiled_conditional_train(t.reshape(-1), xut, context)
 
         # compute loss
         return mse_loss(ut, vt)
@@ -305,17 +332,52 @@ class TrajectoryCNF(nn.Module):
         # compute loss
         return mse_loss(ut, vt)
 
-    def _sample(self, context=None, start=None):
+    def _sample(self, context=None, condition=None, mask=None, H=None):
         N = context.shape[0]
-        prior = torch.distributions.Normal(self.prior_mu, self.prior_sigma)
-        noise = prior.sample(sample_shape=torch.Size([N])).to(context)
-        # manually set the start
-        if start is not None:
-            noise[:, 0, :self.dx] = start
+        if H is None:
+            H = self.horizon
 
-        log_prob = torch.zeros(N, device=noise.device)
-        out = self.flow(noise, logpx=log_prob, context=context, reverse=False)
-        return out[0]
+        num_sub_trajectories = H // self.horizon
+        sample_shape = torch.Size([N, num_sub_trajectories])
+        assert context.shape[1] == num_sub_trajectories
+
+        prior = torch.distributions.Normal(self.prior_mu, self.prior_sigma)
+        noise = prior.sample(sample_shape=sample_shape).to(context)
+
+        # if longer horizon, set noise of starts / ends to be same value
+        for i in range(num_sub_trajectories - 1):
+            noise[:, i, -1] = noise[:, i + 1, 0]
+
+        # manually set the conditions
+        if condition is not None:
+            noise[:, 0] = self._apply_conditioning(noise[:, 0], condition)
+            self._grad_mask = mask
+            if num_sub_trajectories > 1:
+                self._grad_mask = torch.cat((self._grad_mask[:, None],
+                                             torch.ones(N, num_sub_trajectories - 1,
+                                                        self.horizon, self.xu_dim, device=mask.device)), dim=1)
+        else:
+            self._grad_mask = torch.ones_like(noise)
+        self._grad_mask = self._grad_mask.to(device=noise.device)
+        log_prob = torch.zeros(N * num_sub_trajectories, device=noise.device)
+        out = self.flow(noise.reshape(-1, self.horizon, self.xu_dim),
+                        logpx=log_prob,
+                        context=context.reshape(-1, context.shape[-1]),
+                        reverse=False)
+
+        trajectories, log_prob = out[:2]
+
+        return trajectories.reshape(N, -1, self.xu_dim), log_prob.reshape(N, -1).sum(dim=1)
+
+    def _apply_conditioning(self, x, condition=None):
+        if condition is None:
+            return x
+
+        for t, (start_idx, val) in condition.items():
+            val = val.reshape(val.shape[0], -1, val.shape[-1])
+            n, h, d = val.shape
+            x[:, t:t + h, start_idx:start_idx + d] = val.clone()
+        return x
 
     def log_prob(self, xu, context):
         # inflate with noise

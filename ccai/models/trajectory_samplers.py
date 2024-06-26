@@ -114,7 +114,7 @@ class TrajectoryFlowModel(nn.Module):
 class TrajectoryDiffusionModel(nn.Module):
 
     def __init__(self, T, dx, du, context_dim, problem=None, timesteps=20, hidden_dim=64, constrained=False,
-                 unconditional=False, generate_context=False):
+                 unconditional=False, generate_context=False, discriminator_guidance=False):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -136,7 +136,8 @@ class TrajectoryDiffusionModel(nn.Module):
             else:
                 self.diffusion_model = GaussianDiffusion(T, dx, du, context_dim, timesteps=timesteps,
                                                          sampling_timesteps=timesteps, hidden_dim=hidden_dim,
-                                                         unconditional=unconditional)
+                                                         unconditional=unconditional,
+                                                         discriminator_guidance=discriminator_guidance)
 
     def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None):
         # B, N, _ = constraints.shape
@@ -170,9 +171,12 @@ class TrajectoryDiffusionModel(nn.Module):
             context = torch.cat((start, goal, constraints), dim=1)
         else:
             context = constraints
-
         # context=None
-        return self.diffusion_model.loss(trajectories.reshape(B, -1), context=context, mask=mask).mean()
+        return self.diffusion_model.loss(trajectories, context=context, mask=mask).mean()
+
+    def classifier_loss(self, trajectories, mask=None, context=None, label=None):
+        return self.diffusion_model.classifier_loss(trajectories, context=context, mask=mask, label=label).mean()
+
 
     def set_norm_constants(self, x_mu, x_std):
         self.diffusion_model.set_norm_constants(x_mu, x_std)
@@ -217,30 +221,52 @@ class TrajectoryCNFModel(TrajectoryCNF):
     def __init__(self, horizon, dx, du, context_dim, hidden_dim=32):
         super().__init__(horizon, dx, du, context_dim, hidden_dim=hidden_dim)
 
-    def sample(self, start=None, goal=None, constraints=None):
-        context = None
+    def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None):
+        # B, N, _ = constraints.shape
         if constraints is not None:
-            B, N, _ = constraints.shape
-            context = torch.cat((start, goal, constraints.reshape(B, -1)), dim=1)
+            constraints = constraints.reshape(constraints.shape[0], -1, constraints.shape[-1])
+            context = constraints
+        else:
+            context = None
+        condition = {}
+        time_index = 0
+        mask = torch.ones(N, self.horizon, self.dx + self.du, device=self._grad_mask.device)
+        if past is not None:
+            condition[0] = [0, past]
+            time_index = past.shape[1]
+            mask[:, :time_index] = torch.zeros_like(past)
+        if start is not None:
+            condition[time_index] = [0, start]
+            mask[:, time_index, :start.shape[1]] = torch.zeros_like(start)
+        if goal is not None:
+            condition[-1] = [8, goal]
+        if condition == {}:
+            condition = None
 
-            # context = torch.cat((start.unsqueeze(1).repeat(1, N, 1),
-            #                     goal.unsqueeze(1).repeat(1, N, 1),
-            #                     constraints), dim=-1)
-            if N > 1:
-                raise NotImplementedError('composability TODO')
-        return self._sample(context=context, start=start)
+        # TODO: in-painting for sample generation with CNF
+        # I guess just a case of intervening on the required gradient?
+        # initialize trajectory to right amount, set gradient of components to be zero
+        trajectories, likelihood = self._sample(context=context, condition=condition, mask=mask, H=H)
+        return trajectories, context, likelihood
 
-    def loss(self, x, start=None, goal=None, constraints=None, mask=None):
-        context = None
+
+    def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
+        B = trajectories.shape[0]
         if start is not None:
             context = torch.cat((start, goal, constraints), dim=1)
-        return self.flow_matching_loss(x, context, mask)
+        else:
+            context = constraints
+        return self.flow_matching_loss(trajectories, context=context, mask=mask)
+
+    def set_norm_constants(self, x_mu, x_std):
+        self.x_mean.data = x_mu.to(device=self.x_mean.device, dtype=self.x_mean.dtype)
+        self.x_std.data = x_std.to(device=self.x_std.device, dtype=self.x_std.dtype)
 
 
 class TrajectorySampler(nn.Module):
 
     def __init__(self, T, dx, du, context_dim, type='nf', dynamics=None, problem=None, timesteps=50, hidden_dim=64,
-                 constrain=False, unconditional=False, generate_context=False):
+                 constrain=False, unconditional=False, generate_context=False, discriminator_guidance=False):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -254,7 +280,8 @@ class TrajectorySampler(nn.Module):
             self.model = TrajectoryCNFModel(T, dx, du, context_dim, hidden_dim=hidden_dim)
         else:
             self.model = TrajectoryDiffusionModel(T, dx, du, context_dim, problem, timesteps, hidden_dim, constrain,
-                                                  unconditional, generate_context=generate_context)
+                                                  unconditional, generate_context=generate_context,
+                                                  discriminator_guidance=discriminator_guidance)
 
         self.register_buffer('x_mean', torch.zeros(dx + du))
         self.register_buffer('x_std', torch.ones(dx + du))
@@ -276,7 +303,14 @@ class TrajectorySampler(nn.Module):
             norm_past = (past - self.x_mean) / self.x_std
 
         samples = self.model.sample(N, H, norm_start, goal, constraints, norm_past)
-        x, c, likelihood = samples
+
+        if len(samples) == N:
+            x = samples
+            c = None,
+            likelihood = None
+        else:
+            x, c, likelihood = samples
+
         return x * self.x_std + self.x_mean, c, likelihood
 
     def resample(self, start=None, goal=None, constraints=None, initial_trajectory=None, past=None, timestep=10):
@@ -303,3 +337,6 @@ class TrajectorySampler(nn.Module):
     def likelihood(self, trajectories, mask=None, start=None, goal=None, context=None):
         norm_traj = (trajectories - self.x_mean) / self.x_std
         return self.model.likelihood(norm_traj, context)
+
+    def classifier_loss(self, trajectories, mask=None, context=None, label=None):
+        return self.model.classifier_loss(trajectories, context=context, mask=mask, label=label).mean()

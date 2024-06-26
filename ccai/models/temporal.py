@@ -47,7 +47,7 @@ class ResidualTemporalBlock(nn.Module):
 
         embed = self.time_mlp(t)
         out = self.blocks[0](x)
-        #print(x.shape, out.shape)
+        # print(x.shape, out.shape)
         out = out + embed
         out = self.blocks[1](out)
         out = out + self.residual_conv(x)
@@ -74,10 +74,10 @@ class TemporalUnet(nn.Module):
 
         self.time_embedding = SinusoidalPosEmb(32)
         self.constraint_type_embed = nn.Sequential(
-             nn.Linear(cond_dim, 32),
-             nn.Mish()
+            nn.Linear(cond_dim, 32),
+            nn.Mish()
         )
-        #self.constraint_type_embed = SinusoidalPosEmb(32)
+        # self.constraint_type_embed = SinusoidalPosEmb(32)
         self.time_mlp = nn.Sequential(
             nn.Linear(32 + 32, 256),
             nn.Mish()
@@ -149,13 +149,13 @@ class TemporalUnet(nn.Module):
             nn.Conv1d(dim, transition_dim, 1),
         )
 
-        #self.context_dropout_p = context_dropout_p
+        # self.context_dropout_p = context_dropout_p
         self.cond_dim = cond_dim
 
     def vmapped_fwd(self, t, x, context=None):
         return self(t.reshape(1), x.unsqueeze(0), context.unsqueeze(0)).squeeze(0)
 
-    #@torch.compile(mode='max-autotune')
+    # @torch.compile(mode='max-autotune')
     def forward(self, t, x, context=None, dropout=False):
         '''
             x : [ batch x horizon x transition ]
@@ -167,22 +167,21 @@ class TemporalUnet(nn.Module):
         if t.shape[0] == 1:
             t = t.repeat(B)
         t = self.time_embedding(t)
-        #x = einops.rearrange(x, 'b h t -> b t h')
+        # x = einops.rearrange(x, 'b h t -> b t h')
         x = x.permute(0, 2, 1)
         x = pad_to_multiple(x, m=2 ** len(self.downs))
 
         if context is not None:
-            #constraint_type = context[:, -2:]
-            #context = context[:, :-2]
+            # constraint_type = context[:, -2:]
+            # context = context[:, :-2]
             context = context.reshape(B, -1)
             c = self.constraint_type_embed(context)
             # c = context
-            #c = torch.cat((context, ctype_embed), dim=-1)
+            # c = torch.cat((context, ctype_embed), dim=-1)
             # need to do dropout on context embedding to train unconditional model alongside conditional
             if dropout:
                 mask_dist = Bernoulli(probs=1 - self.context_dropout_p)
-
-                mask = mask_dist.sample((B,))#.to(device=context.device)
+                mask = mask_dist.sample((B,))  # .to(device=context.device)
                 c = mask * c
                 t = torch.cat((t, c), dim=-1)
             else:
@@ -212,25 +211,28 @@ class TemporalUnet(nn.Module):
             x = upsample(x)
         x = self.final_conv(x)
 
-        #x = einops.rearrange(x, 'b t h -> b h t')
+        # x = einops.rearrange(x, 'b t h -> b h t')
         x = x.permute(0, 2, 1)
         # get rid of padding
         x = x[:, :H]
         return x, latent
 
-    #@torch.compile(mode='max-autotune')
+    # @torch.compile(mode='max-autotune')
     def compiled_conditional_test(self, t, x, context):
         return self(t, x, context, dropout=False)
-    #@torch.compile(mode='max-autotune')
+
+    # @torch.compile(mode='max-autotune')
     def compiled_unconditional_test(self, t, x):
         return self(t, x, context=None, dropout=False)
-    @torch.compile(mode='max-autotune')
+
+    # @torch.compile(mode='max-autotune')
     def compiled_conditional_train(self, t, x, context):
         return self(t, x, context, dropout=True)
 
 
 class TemporalUNetContext(nn.Module):
     """ does a temporal unet for a score function and also a score function for the context"""
+
     def __init__(
             self,
             horizon,
@@ -242,9 +244,8 @@ class TemporalUNetContext(nn.Module):
             dropout_p=0.25,
             trajectory_embed_dim=4
     ):
-
         super().__init__()
-
+        self.register_buffer('traj_dropout_p', torch.tensor([dropout_p]))
         self.temporal_unet = TemporalUnet(horizon, transition_dim, cond_dim, dim, dim_mults, attention, dropout_p)
         self.time_embedding = SinusoidalPosEmb(32)
         self.pooling = nn.AdaptiveAvgPool1d(trajectory_embed_dim)
@@ -259,8 +260,8 @@ class TemporalUNetContext(nn.Module):
             nn.Linear(128, cond_dim)
         )
 
-    #@torch.compile(mode='max-autotune')
-    def forward(self, t, x, context):
+    # @torch.compile(mode='max-autotune')
+    def forward(self, t, x, context, dropout=False):
         '''
             x : [ batch x horizon x transition ]
         '''
@@ -269,9 +270,35 @@ class TemporalUNetContext(nn.Module):
         t = t.reshape(-1)
         if t.shape[0] == 1:
             t = t.repeat(B)
-        e_x, h = self.temporal_unet(t, x, context, dropout=False)
+        e_x, h = self.temporal_unet(t, x, context, dropout=dropout)
         h = self.pooling(h).reshape(B, -1)
+
         t = self.time_embedding(t)
+        # with some probability, dropout trajectory from context diffusion
+        # if dropout:
+        #    mask_dist = Bernoulli(probs=1 - self.traj_dropout_p)
+        #    mask = mask_dist.sample((B,))  # .to(device=context.device)
+        #    h = mask * h
         h = torch.cat((context, h, t), dim=-1)
+
         e_c = self.context_net(h)
         return e_x, e_c
+
+
+class BinaryClassifier(nn.Module):
+    def __init__(self, input_dim=1, hidden_size=64):
+        super().__init__()
+        self.pooling = nn.AdaptiveAvgPool1d(input_dim)
+        self.fc1 = nn.Linear(512, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.fc3 = nn.Linear(hidden_size, 1)
+        self.act = nn.ReLU()
+        self.output_act = nn.Sigmoid()
+
+    def forward(self, x):
+        B = x.shape[0]
+        x = self.pooling(x).reshape(B, -1)
+        x = self.act(self.fc1(x))
+        x = self.act(self.fc2(x))
+        x = self.fc3(x)
+        return self.output_act(x)

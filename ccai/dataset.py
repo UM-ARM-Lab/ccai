@@ -110,7 +110,7 @@ class AllegroValveDataset(Dataset):
             dx = self.trajectories.shape[-1] + 1
         else:
             dx = self.trajectories.shapes[-1]
-        self.masks = self.masks[:, :, None].repeat(1, 1, dx) # for states
+        self.masks = self.masks[:, :, None].repeat(1, 1, dx)  # for states
         # self.trajectories[:, :, 8] += np.pi # add pi to the valve angle
         ## some wrap around issues here:
         # self.trajectories[:, :, 8] = torch.where(self.trajectories[:, :, 8] > np.pi,
@@ -127,7 +127,6 @@ class AllegroValveDataset(Dataset):
         self.mean = 0
         self.std = 1
 
-
         self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.75)
         self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.75)
         self.states_only = states_only
@@ -143,7 +142,7 @@ class AllegroValveDataset(Dataset):
         # add pi to make [0, 2pi]
         traj[:, 8] += np.pi
         traj[:, 8] = traj[:, 8] % (2.0 * np.pi)
-        traj[:, 8] = traj[:, 8] - np.pi # subtract to make [-pi, pi]
+        traj[:, 8] = traj[:, 8] - np.pi  # subtract to make [-pi, pi]
         dx = 9
         if self.cosine_sine:
             traj_q = traj[:, :8]
@@ -176,7 +175,7 @@ class AllegroValveDataset(Dataset):
     def compute_norm_constants(self):
         # compute norm constants not including the zero padding
         x = self.trajectories.clone()
-        #x[:, :, 8] += 2 * np.pi * (torch.rand(x.shape[0], 1) - 0.5)
+        # x[:, :, 8] += 2 * np.pi * (torch.rand(x.shape[0], 1) - 0.5)
         x = x.reshape(-1, x.shape[-1])
 
         mask = self.masks[:, :, 0].reshape(-1)
@@ -189,8 +188,8 @@ class AllegroValveDataset(Dataset):
             dim = 17
         # for angle we force to be between [-1, 1]
         if self.cosine_sine:
-            self.mean = torch.zeros(dim+1)
-            self.std = torch.ones(dim+1)
+            self.mean = torch.zeros(dim + 1)
+            self.std = torch.ones(dim + 1)
             self.mean[:8] = mean[:8]
             self.std[:8] = torch.from_numpy(std[:8]).float()
             self.mean[10:] = mean[9:]
@@ -207,7 +206,6 @@ class AllegroValveDataset(Dataset):
 
     def get_norm_constants(self):
         return self.mean, self.std
-
 
 
 class AllegroScrewDriverDataset(Dataset):
@@ -265,7 +263,7 @@ class AllegroScrewDriverDataset(Dataset):
         if states_only:
             self.trajectories = self.trajectories[:, :, :15]
         self.trajectory_type = torch.from_numpy(self.trajectory_type)
-        self.trajectory_type = 2 * (self.trajectory_type - 0.5) # scale to be [-1, 1]
+        self.trajectory_type = 2 * (self.trajectory_type - 0.5)  # scale to be [-1, 1]
 
         print(self.trajectories.shape)
         # TODO consider alternative SO3 representation that is better for learning
@@ -282,6 +280,10 @@ class AllegroScrewDriverDataset(Dataset):
         self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.75)
         self.states_only = states_only
 
+    def update_masks(self, p):
+        self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=p)
+        self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=p)
+
     def __len__(self):
         return self.trajectories.shape[0]
 
@@ -292,8 +294,8 @@ class AllegroScrewDriverDataset(Dataset):
         # a little more complex due to rotation representation
         dx = 15
 
-        # randomly perturb angle of screwdriver
-        traj[:, dx-1] += 2 * np.pi * (np.random.rand() - 0.5)
+        ## randomly perturb angle of screwdriver
+        ##traj[:, dx-1] += 2 * np.pi * (np.random.rand() - 0.5)
 
         if self.cosine_sine:
             raise NotImplementedError
@@ -317,13 +319,13 @@ class AllegroScrewDriverDataset(Dataset):
             # randomly choose an index to un-mask
             mask[np.random.randint(0, final_idx)] = 1
 
-        #print(mask)
+        # print(mask)
         return self.masks[idx] * (traj - self.mean) / self.std, self.trajectory_type[idx], mask
 
     def compute_norm_constants(self):
         # compute norm constants not including the zero padding
         x = self.trajectories.clone()
-        #x[:, :, 8] += 2 * np.pi * (torch.rand(x.shape[0], 1) - 0.5)
+        # x[:, :, 8] += 2 * np.pi * (torch.rand(x.shape[0], 1) - 0.5)
         x = x.reshape(-1, x.shape[-1])
 
         mask = self.masks[:, :, 0].reshape(-1)
@@ -337,17 +339,17 @@ class AllegroScrewDriverDataset(Dataset):
 
         # for angle we force to be between [-1, 1]
         if self.cosine_sine:
-            self.mean = torch.zeros(dim+1)
-            self.std = torch.ones(dim+1)
+            self.mean = torch.zeros(dim + 1)
+            self.std = torch.ones(dim + 1)
             self.mean[:8] = mean[:8]
             self.std[:8] = torch.from_numpy(std[:8]).float()
             self.mean[10:] = mean[9:]
             self.std[10:] = torch.from_numpy(std[9:]).float()
         else:
-            #mean[12:15] = 0
-            #std[12:15] = np.pi
-            mean[14] = 0
-            std[14] = np.pi
+            # mean[12:15] = 0
+            # std[12:15] = np.pi
+            # mean[14] = 0
+            # std[14] = np.pi
             self.mean = mean
             self.std = torch.from_numpy(std).float()
 
@@ -359,8 +361,76 @@ class AllegroScrewDriverDataset(Dataset):
         return self.mean, self.std
 
 
+class FakeDataset(Dataset):
+
+    def __init__(self, fpath):
+        data = dict(np.load(fpath))
+        self.trajectories = torch.from_numpy(data['trajectories'])
+        self.contact = torch.from_numpy(data['contact'])
+
+        self.N = len(self.trajectories)
+        self.mean = 0
+        self.std = 1
+
+        self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.75)
+        self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.75)
+
+    def update_masks(self, p):
+        self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=p)
+        self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=p)
+
+    def set_norm_constants(self, mean, std):
+        self.mean = mean
+        self.std = std
+
+    def __len__(self):
+        return self.N
+
+    def __getitem__(self, idx):
+        traj = self.trajectories[idx]
+
+        # TODO: figure out how to do data augmentation on screwdriver angle
+        # a little more complex due to rotation representation
+        dx = 15
+        mask = torch.ones_like(traj)
+        # sample mask for initial state
+        mask[0, :dx] = self.initial_state_mask_dist.sample((1,)).to(device=traj.device)
+
+        # sample mask for final state
+        mask[-1, :dx] = self.initial_state_mask_dist.sample((1,)).to(device=traj.device)
+
+        # also mask out the rest with small probability
+        mask = mask * self.mask_dist.sample((mask.shape[0],)).to(device=traj.device).reshape(-1, 1)
+
+        ## we can't mask out everything
+        if mask.sum() == 0:
+            # randomly choose an index to un-mask
+            mask[np.random.randint(0, mask.shape[0])] = 1
+
+        # print(mask)
+        return (traj - self.mean) / self.std, self.contact[idx], mask
+
+
+class RealAndFakeDataset(Dataset):
+
+    def __init__(self, real_dataset, fake_dataset):
+        self.real_dataset = real_dataset
+        self.fake_dataset = fake_dataset
+
+        self.fake_dataset.set_norm_constants(self.real_dataset.mean, self.real_dataset.std)
+
+    def __len__(self):
+        return len(self.real_dataset)
+
+    def __getitem__(self, idx):
+        real_traj, real_contact, real_mask = self.real_dataset[idx]
+        fake_traj, fake_contact, fake_mask = self.fake_dataset[idx]
+
+        return real_traj, real_contact, real_mask, fake_traj, fake_contact, fake_mask
+
+
 if __name__ == "__main__":
-    #d = AllegroValveDataset('../data/experiments/allegro_turning_data_collection')
+    # d = AllegroValveDataset('../data/experiments/allegro_turning_data_collection')
 
     d = AllegroScrewDriverDataset(['../data/experiments/allegro_screwdriver_data_collection_2_fixed'])
 
@@ -369,4 +439,3 @@ if __name__ == "__main__":
     print(traj.shape)
     print(contact.shape)
     print(mask.shape)
-

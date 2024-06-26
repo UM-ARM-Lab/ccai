@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import numpy as np
 
-from ccai.models.temporal import TemporalUnet, TemporalUNetContext
+from ccai.models.temporal import TemporalUnet, TemporalUNetContext, BinaryClassifier
 
 from einops import reduce
 import math
@@ -109,7 +109,8 @@ class GaussianDiffusion(nn.Module):
             min_snr_loss_weight=False,  # https://arxiv.org/abs/2303.09556
             min_snr_gamma=5,
             hidden_dim=32,
-            unconditional=True
+            unconditional=True,
+            discriminator_guidance=False
     ):
         super().__init__()
         self.horizon = horizon
@@ -117,6 +118,11 @@ class GaussianDiffusion(nn.Module):
         self.dx = dx
         self.du = du
         self.model = TemporalUnet(self.horizon, self.xu_dim, cond_dim=context_dim, dim=hidden_dim)
+
+        self.classifier = None
+        if discriminator_guidance:
+            self.classifier = BinaryClassifier()
+
         self.objective = objective
         self.unconditional = unconditional
         self.context_dim = context_dim
@@ -184,6 +190,9 @@ class GaussianDiffusion(nn.Module):
         elif objective == 'pred_v':
             register_buffer('loss_weight', maybe_clipped_snr / (snr + 1))
 
+    def add_classifier(self):
+        self.classifier = BinaryClassifier()
+
     def predict_start_from_noise(self, x_t, t, noise):
         return (
                 extract(self.sqrt_recip_alphas_cumprod, t, x_t.shape) * x_t -
@@ -219,15 +228,16 @@ class GaussianDiffusion(nn.Module):
 
     def model_predictions(self, x, t, context=None):
         if context is not None:
+            context = context.reshape(context.shape[0], -1, context.shape[-1])
             B, N, _ = context.shape
         guidance_weights = torch.tensor([0.5, 0.5], device=x.device)
         w_total = 1.0
-        unconditional = self.model.compiled_unconditional_test(t, x)
+        unconditional, _ = self.model.compiled_unconditional_test(t, x)
         # print(context.shape)
         if not (context is None or self.unconditional):
             num_constraints = context.shape[1]
 
-            conditional = self.model.compiled_conditional_test(t.unsqueeze(1).expand(-1, N).reshape(-1),
+            conditional, _ = self.model.compiled_conditional_test(t.unsqueeze(1).expand(-1, N).reshape(-1),
                                                                x.unsqueeze(1).expand(-1, N, -1, -1).reshape(B * N,
                                                                                                             self.horizon,
                                                                                                             -1),
@@ -266,7 +276,6 @@ class GaussianDiffusion(nn.Module):
     def _apply_conditioning(self, x, condition=None):
         if condition is None:
             return x
-
         for t, (start_idx, val) in condition.items():
             val = val.reshape(val.shape[0], -1, val.shape[-1])
             n, h, d = val.shape
@@ -337,7 +346,7 @@ class GaussianDiffusion(nn.Module):
             img[:, 0] = self._apply_conditioning(img[:, 0], condition)
 
             # add some guidance using gradient - maximise turn angle, keep upright
-            eta = 0.1
+            eta = 0.0
             img[:, :, :, self.dx - 3:self.dx - 1] -= 0.1 * 2 * eta * img[:, :, :, self.dx - 3:self.dx - 1]
             # img[:, -1, -1, self.dx - 1] -= 10 * eta
             img[:, :, :, self.dx - 1] -= eta
@@ -450,7 +459,7 @@ class GaussianDiffusion(nn.Module):
         # x[..., 8] = ((x[..., 8] + 1.0) % 2.0) - 1.0
 
         # predict and take gradient step
-        model_out = self.model.compiled_conditional_train(t, x, context)
+        model_out, _ = self.model.compiled_conditional_train(t, x, context)
         # TODO need to figure out how to do loss that respects wrap-around
         loss = self.loss_fn(model_out, noise, reduction='none')
         # diff = model_out - noise
@@ -542,6 +551,31 @@ class GaussianDiffusion(nn.Module):
         second_term = (var_1 + (mu_1 - mu_2) ** 2) / (2 * var_2)
         kl = first_term + second_term - 0.5
         return kl.reshape(kl.shape[0], -1).sum(dim=1)
+
+    def classifier_loss(self, x_start, context, label, mask, noise=None):
+        loss_fn = nn.BCELoss(reduction='none')
+        if self.classifier is None:
+            raise ValueError('Classifier must be set before calling classifier_loss')
+        # fist sample t
+        b = x_start.shape[0]
+        x = x_start.reshape(b, -1, self.xu_dim)
+        device = x.device
+        t = torch.randint(0, self.num_timesteps, (b,), device=device).long()
+        noise = default(noise, lambda: torch.randn_like(x_start))
+
+        x = self.q_sample(x_start=x_start, t=t, noise=noise)
+        # mask defines in-painting, model should receive un-noised copy of masked states
+        # note -- only mask states, not controls
+        masked_idx = (mask == 0).nonzero()
+        x[masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]] = x_start[
+            masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]]
+
+        # get weights
+        eps, h = self.model(t, x, context, dropout=False)
+        pred_label = self.classifier(h)
+        loss = loss_fn(pred_label, label)
+        loss = torch.mean(extract(torch.sqrt(self.betas), t, loss.shape) * loss)
+        return loss
 
 
 class JointDiffusion(GaussianDiffusion):
@@ -655,12 +689,18 @@ class JointDiffusion(GaussianDiffusion):
         # use same noise vector
         grad = torch.zeros_like(mu_var['x']['mean'])
         # add some guidance using gradient - maximise turn angle, keep upright
-        eta = 0.25
-        grad[:, :, :, self.dx - 3:self.dx - 1] = -2 * (mu_var['x']['mean'][:, :, :, self.dx - 3:self.dx - 1] +
-                                                                   self.mu[self.dx-3:self.dx-1].to(device=x.device))
-        #grad[:, -1, -1, self.dx - 1] = -eta
-        grad[:, :, :, self.dx - 1] = -1
-        #print(mu_var['x']['logvar'].exp())
+        eta = 0.05
+        grad[:, :, :, self.dx - 3:self.dx - 1] = -2 * 0.1 * (mu_var['x']['mean'][:, :, :, self.dx - 3:self.dx - 1] +
+                                                             self.mu[self.dx - 3:self.dx - 1].to(device=x.device))
+        # grad[:, -1, -1, self.dx - 1] = -eta
+
+        diff_theta = 0.05 * mu_var['x']['mean'][:, :, 1:, self.dx - 1] - mu_var['x']['mean'][:, :, :-1, self.dx - 1]
+        # also add cost on smoothness
+        # grad[:, :, :-1, self.dx - 1] = 2 * diff_theta
+        # grad[:, :, 1:, self.dx - 1] -= 2 * diff_theta
+        grad[:, :, :, self.dx - 1] -= 1
+
+        # print(mu_var['x']['logvar'].exp())
         pred_x = mu_var['x']['mean'] + alpha * (0.5 * mu_var['x']['logvar']).exp() * (noise_x + eta * grad)
         # pred_x = pred_x - 0.01 * self.grad_cost(mu_var['x']['mean'].reshape(b*N, -1, self.xu_dim)).reshape(b, N, -1, self.xu_dim)
         pred_c = mu_var['c']['mean'].squeeze(1) + alpha * (0.5 * mu_var['c']['logvar']).exp().squeeze(1) * noise_c
