@@ -1,5 +1,5 @@
 from isaac_victor_envs.utils import get_assets_dir
-from isaac_victor_envs.tasks.allegro import AllegroValveTurningEnv
+# from isaac_victor_envs.tasks.allegro import AllegroValveTurningEnv
 
 import numpy as np
 import pickle as pkl
@@ -972,8 +972,10 @@ class AllegroContactProblem(AllegroObjectProblem):
         # g = torch.cat((torque_list, residual_list), dim=-1)
         return g
 
-    def _force_equlibrium_constraints(self, q, delta_q, compute_grads=True, compute_hess=False):
+    def _force_equlibrium_constraints(self, q, delta_q, compute_grads=True, compute_hess=False,
+                                      projected_diffusion=False):
         N, T = q.shape[:2]
+        T_offset = 1 if not projected_diffusion else 0
         device = q.device
         d = 32 + self.obj_dof
         # we want to add the start state to x, this x is now T + 1
@@ -987,9 +989,9 @@ class AllegroContactProblem(AllegroObjectProblem):
         contact_jac_list = []
         contact_point_list = []
         for finger in self.contact_fingers:
-            jac = self.data[finger]['contact_jacobian'].reshape(N, T + 1, 3, -1)[:, 1:, :, self.contact_state_indices]
-            contact_points = self.data[finger]['closest_pt_world'].reshape(N, T + 1, 3)[:, 1:].reshape(-1, 3)
-            contact_jac_list.append(jac.reshape(N * (T + 1), 3, -1))
+            jac = self.data[finger]['contact_jacobian'].reshape(N, T + T_offset, 3, -1)[:, T_offset:, :, self.contact_state_indices]
+            contact_points = self.data[finger]['closest_pt_world'].reshape(N, T + T_offset, 3)[:, T_offset:].reshape(-1, 3)
+            contact_jac_list.append(jac.reshape(N * (T + T_offset), 3, -1))
             contact_point_list.append(contact_points)
 
         contact_jac_list = torch.stack(contact_jac_list, dim=1).to(device=device)
@@ -1019,14 +1021,14 @@ class AllegroContactProblem(AllegroObjectProblem):
             for i, finger_name in enumerate(self.fingers):
                 # NOTE: assume fingers have joints independent of each other
                 # TODO: check if we should use the jacobian of the current time steps or the jacobian of the next time steps.
-                djac_dnext_q = self.data[finger_name]['dJ_dq'].reshape(N, T + 1, 3, 16, 16)[:, 1:, :,
+                djac_dnext_q = self.data[finger_name]['dJ_dq'].reshape(N, T + T_offset, 3, 16, 16)[:, T_offset:, :,
                                self.contact_state_indices][:, :, :, :, self.contact_state_indices]
 
                 dg_dnext_q = dg_dnext_q + dg_djac[:, :, i].reshape(N, T, g.shape[2], -1) @ \
                              djac_dnext_q.reshape(N, T, -1, 4 * self.num_contacts)
 
                 d_contact_loc_dq = self.data[finger_name]['closest_pt_q_grad']
-                d_contact_loc_dq = d_contact_loc_dq.reshape(N, T + 1, 3, 16)[:, :-1, :, self.contact_state_indices]
+                d_contact_loc_dq = d_contact_loc_dq.reshape(N, T + T_offset, 3, 16)[:, :-1, :, self.contact_state_indices]
                 dg_dq = dg_dq + dg_dcontact[:, :, i].reshape(N, T, g.shape[2], 3) @ d_contact_loc_dq
             mask_t = torch.zeros_like(grad_g).bool()
             mask_t[:, :, T_range, T_range] = True
@@ -1089,8 +1091,10 @@ class AllegroContactProblem(AllegroObjectProblem):
         # g = torch.cat((torque_list, residual_list), dim=-1)
         return g
 
-    def _force_equlibrium_constraints_w_force(self, q, delta_q, force, compute_grads=True, compute_hess=False):
+    def _force_equlibrium_constraints_w_force(self, q, delta_q, force, compute_grads=True, compute_hess=False,
+                                              projected_diffusion=False):
         N, T = q.shape[:2]
+        T_offset = 1 if not projected_diffusion else 0
         device = q.device
         d = self.d
 
@@ -1101,13 +1105,14 @@ class AllegroContactProblem(AllegroObjectProblem):
         u = delta_q[:, :, self.contact_state_indices]
         force_list = force[:, :, self._contact_force_indices].reshape(force.shape[0], force.shape[1], self.num_contacts,
                                                                       3)
-
+# torch.Size([118, 8]) torch.Size([118, 8]) torch.Size([118, 8]) torch.Size([118, 2, 3, 4]) torch.Size([59, 2, 3])
+# torch.Size([118, 8]) torch.Size([118, 8]) torch.Size([118, 8]) torch.Size([118, 2, 3, 4]) torch.Size([59, 2, 3])
         # retrieve contact jacobians and points
         contact_jac_list = []
         contact_point_list = []
         for finger in self.contact_fingers:
-            jac = self.data[finger]['contact_jacobian'].reshape(N, T + 1, 3, -1)[:, 1:, :, self.contact_state_indices]
-            contact_points = self.data[finger]['closest_pt_world'].reshape(N, T + 1, 3)[:, 1:].reshape(-1, 3)
+            jac = self.data[finger]['contact_jacobian'].reshape(N, T + T_offset, 3, -1)[:, T_offset:, :, self.contact_state_indices]
+            contact_points = self.data[finger]['closest_pt_world'].reshape(N, T + T_offset , 3)[:, T_offset:].reshape(-1, 3)
             contact_jac_list.append(jac.reshape(N * T, 3, -1))
             contact_point_list.append(contact_points)
 
@@ -1142,14 +1147,14 @@ class AllegroContactProblem(AllegroObjectProblem):
             for i, finger_name in enumerate(self.contact_fingers):
                 # NOTE: assume fingers have joints independent of each other
                 # TODO: check if we should use the jacobian of the current time steps or the jacobian of the next time steps.
-                djac_dnext_q = self.data[finger_name]['dJ_dq'].reshape(N, T + 1, 3, 16, 16)[:, 1:, :,
+                djac_dnext_q = self.data[finger_name]['dJ_dq'].reshape(N, T + T_offset, 3, 16, 16)[:, T_offset:, :,
                                self.contact_state_indices][:, :, :, :, self.contact_state_indices]
 
                 dg_dnext_q = dg_dnext_q + dg_djac[:, :, i].reshape(N, T, g.shape[2], -1) @ \
                              djac_dnext_q.reshape(N, T, -1, 4 * self.num_contacts)
 
                 d_contact_loc_dq = self.data[finger_name]['closest_pt_q_grad']
-                d_contact_loc_dq = d_contact_loc_dq.reshape(N, T + 1, 3, 16)[:, :-1, :, self.contact_state_indices]
+                d_contact_loc_dq = d_contact_loc_dq.reshape(N, T + T_offset, 3, 16)[:, :-1, :, self.contact_state_indices]
                 dg_dq = dg_dq + dg_dcontact[:, :, i].reshape(N, T, g.shape[2], 3) @ d_contact_loc_dq
 
             mask_t = torch.zeros_like(grad_g).bool()
@@ -1232,11 +1237,13 @@ class AllegroContactProblem(AllegroObjectProblem):
         return g
 
     @contact_finger_constraints
-    def _kinematics_constraints(self, q, delta_q, theta, finger_name, compute_grads=True, compute_hess=False):
+    def _kinematics_constraints(self, q, delta_q, theta, finger_name, compute_grads=True, compute_hess=False,
+                                projected_diffusion=False):
         """
             Computes on the kinematics of the valve and the finger being consistant
         """
         N, T, _ = q.shape
+        T_offset = 1 if not projected_diffusion else 0
         d = self.d
         device = q.device
         full_start = partial_to_full_state(self.start[None, :self.num_fingers * 4], self.fingers)
@@ -1246,20 +1253,21 @@ class AllegroContactProblem(AllegroObjectProblem):
         # Retrieve pre-processed data
         ret_scene = self.data[finger_name]
         contact_jacobian = ret_scene.get('contact_jacobian', None).reshape(
-            N, T + 1, 3, 16)[:, :-1, :, self.contact_state_indices]
-        contact_loc = ret_scene.get('closest_pt_world', None).reshape(N, T + 1, 3)[:, :-1]
-        d_contact_loc_dq = ret_scene.get('closest_pt_q_grad', None)[:, :-1, :, self.contact_state_indices]
-        dJ_dq = ret_scene.get('dJ_dq', None)[:, :-1, :, self.contact_state_indices]
+            N, T + T_offset, 3, 16)[:, :T, :, self.contact_state_indices]
+        contact_loc = ret_scene.get('closest_pt_world', None).reshape(N, T + T_offset, 3)[:, :T]
+        d_contact_loc_dq = ret_scene.get('closest_pt_q_grad', None)[:, :T, :, self.contact_state_indices]
+        dJ_dq = ret_scene.get('dJ_dq', None)[:, :T, :, self.contact_state_indices]
         dJ_dq = dJ_dq[:, :, :, :, self.contact_state_indices]
-        contact_normal = ret_scene.get('contact_normal', None).reshape(N, T + 1, 3)[:, :-1]
-        dnormal_dq = self.data[finger_name]['dnormal_dq'].reshape(N, T + 1, 3, 16)[:, :-1, :,
+        contact_normal = ret_scene.get('contact_normal', None).reshape(N, T + T_offset, 3)[:, :T]
+        dnormal_dq = self.data[finger_name]['dnormal_dq'].reshape(N, T + T_offset, 3, 16)[:, :T, :,
                      self.contact_state_indices]
-        dnormal_dtheta = self.data[finger_name]['dnormal_denv_q'].reshape(N, T + 1, 3, self.obj_dof)[:, :-1]
+        dnormal_dtheta = self.data[finger_name]['dnormal_denv_q'].reshape(N, T + T_offset, 3, self.obj_dof)[:, :T]
 
         current_q = q[:, :-1, self.contact_state_indices]
         next_q = q[:, 1:, self.contact_state_indices]
         current_theta = theta[:, :-1]
         next_theta = theta[:, 1:]
+
 
         g = self.kinematics_constr(current_q,
                                    next_q,
@@ -1497,12 +1505,12 @@ class AllegroContactProblem(AllegroObjectProblem):
         # u is the delta q commanded
         # retrieved cached values
         contact_jac = self.data[finger_name]['contact_jacobian'].reshape(N, T + T_offset, 3, 16)[
-                      :, :-1, :, self.contact_state_indices]
+                      :, :T, :, self.contact_state_indices]
         contact_normal = self.data[finger_name]['contact_normal'].reshape(N, T + T_offset, 3)[:,
-                         :-1]  # contact normal is pointing out
+                         :T]  # contact normal is pointing out
         dnormal_dq = self.data[finger_name]['dnormal_dq'].reshape(N, T + T_offset, 3, 16)[
-                     :, :-1, :, self.contact_state_indices]
-        dnormal_dtheta = self.data[finger_name]['dnormal_denv_q'].reshape(N, T + T_offset, 3, self.obj_dof)[:, :-1]
+                     :, :T, :, self.contact_state_indices]
+        dnormal_dtheta = self.data[finger_name]['dnormal_denv_q'].reshape(N, T + T_offset, 3, self.obj_dof)[:, :T]
 
         if force is None:
             # compute constraint value
@@ -1529,7 +1537,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                                                                                                  4 * self.num_contacts))
 
             djac_dq = self.data[finger_name]['dJ_dq'].reshape(N, T + T_offset, 3, 16, 16)[
-                      :, :-1, :, self.contact_state_indices][:, :, :, :, self.contact_state_indices]
+                      :, :T, :, self.contact_state_indices][:, :, :, :, self.contact_state_indices]
 
             dh = dh_dnormal.shape[1]
             dh_dq = dh_dnormal.reshape(N, T, dh, -1) @ dnormal_dq
@@ -1621,9 +1629,11 @@ class AllegroContactProblem(AllegroObjectProblem):
         return h, grad_h, None
 
     @contact_finger_constraints
-    def _running_contact_constraints(self, q, finger_name, compute_grads=True, compute_hess=False):
+    def _running_contact_constraints(self, q, finger_name, compute_grads=True, compute_hess=False, 
+                                                                        projected_diffusion=False):
         return self._contact_constraints(q=q, finger_name=finger_name, compute_grads=compute_grads,
-                                         compute_hess=compute_hess)
+                                         compute_hess=compute_hess, 
+                                         projected_diffusion=projected_diffusion)
 
     def _con_eq(self, xu, compute_grads=True, compute_hess=False, verbose=False, projected_diffusion=False):
         N = xu.shape[0]
@@ -1635,7 +1645,8 @@ class AllegroContactProblem(AllegroObjectProblem):
         theta = xu[:, :, self.num_fingers * 4:self.num_fingers * 4 + self.obj_dof]
         g_contact, grad_g_contact, hess_g_contact = self._running_contact_constraints(q=q,
                                                                                       compute_grads=compute_grads,
-                                                                                      compute_hess=compute_hess)
+                                                                                      compute_hess=compute_hess, 
+                                                                                      projected_diffusion=projected_diffusion)
         force = None
         if self.optimize_force:
             force = torch.zeros(N, T, 12, device=self.device)
@@ -1646,17 +1657,20 @@ class AllegroContactProblem(AllegroObjectProblem):
                 delta_q=delta_q,
                 force=force,
                 compute_grads=compute_grads,
-                compute_hess=compute_hess)
+                compute_hess=compute_hess,
+                projected_diffusion=projected_diffusion)
         else:
             g_equil, grad_g_equil, hess_g_equil = self._force_equlibrium_constraints(
                 q=q, delta_q=delta_q,
                 compute_grads=compute_grads,
-                compute_hess=compute_hess)
+                compute_hess=compute_hess,
+                projected_diffusion=projected_diffusion)
 
         g_valve, grad_g_valve, hess_g_valve = self._kinematics_constraints(
             q=q, delta_q=delta_q, theta=theta,
             compute_grads=compute_grads,
-            compute_hess=compute_hess)
+            compute_hess=compute_hess,
+            projected_diffusion=projected_diffusion)
 
         g_contact = torch.cat((g_contact,
                                #    g_dynamics,
@@ -1800,7 +1814,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
         if self.num_regrasps > 0:
             h_regrasp, grad_h_regrasp, hess_h_regrasp = AllegroRegraspProblem._con_ineq(self, xu, compute_grads,
                                                                                         compute_hess, projected_diffusion=projected_diffusion)
-
+            print('reg', grad_h_regrasp.shape)
             if h is not None:
                 h = torch.cat((h_regrasp, h), dim=1)
                 if grad_h is not None:
@@ -1813,7 +1827,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
         if self.num_contacts > 0:
             h_contact, grad_h_contact, hess_h_contact = AllegroContactProblem._con_ineq(self, xu, compute_grads,
                                                                                         compute_hess, projected_diffusion=projected_diffusion)
-
+            print('grads', grad_h.shape, grad_h_contact.shape)
             if h is not None:
                 h = torch.cat((h, h_contact), dim=1)
                 if grad_h is not None:

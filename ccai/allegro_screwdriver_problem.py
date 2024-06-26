@@ -1,4 +1,4 @@
-from allegro_contact import AllegroManipulationProblem, PositionControlConstrainedSVGDMPC, add_trajectories, \
+from ccai.allegro_contact import AllegroManipulationProblem, PositionControlConstrainedSVGDMPC, add_trajectories, \
     add_trajectories_hardware
 import torch
 class AllegroScrewdriver(AllegroManipulationProblem):

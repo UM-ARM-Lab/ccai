@@ -11,6 +11,8 @@ setup(
     install_requires=[
         'torch',
         'numpy',
+        'better-abc',
+        'colorednoise'
     ],
     tests_require=[
         'pytest'
