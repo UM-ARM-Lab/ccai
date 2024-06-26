@@ -86,7 +86,7 @@ class ALlegroScrewdriverContact(AllegroContactProblem):
                 #  default_index_ee_pos=None, 
                  device='cuda:0'):
         super(ALlegroScrewdriverContact, self).__init__(dx, du, start, goal, T, 
-                                                        chain, object_location, object_type, world_trans,
+                                                        chain, object_type, world_trans,
                                                         object_asset_pos, fingers, obj_dof_code, obj_joint_dim,
                                                         fixed_obj, collision_checking, device)
         self.default_index_ee_loc_in_screwdriver = torch.tensor([0.0087, -0.02, 0.1293], device=device).unsqueeze(0)
@@ -175,6 +175,9 @@ class AllegroScrewdriver(AllegroValveTurning):
             else:
                 theta = np.linspace(self.start[-self.obj_dof:].cpu().numpy(), self.goal.cpu().numpy(), self.T + 1)[1:]
                 theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
+
+                # repeat the current state
+                # theta = self.start[-self.obj_dof:].unsqueeze(0).repeat((self.T, 1))
             theta = theta.unsqueeze(0).repeat((N,1,1))
 
             x = torch.cat((x, theta), dim=-1)
