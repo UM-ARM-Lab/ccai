@@ -251,7 +251,8 @@ class TemporalUNetContext(nn.Module):
         self.pooling = nn.AdaptiveAvgPool1d(trajectory_embed_dim)
 
         traj_hidden_dim = dim_mults[-1] * dim * trajectory_embed_dim
-
+        print(traj_hidden_dim)
+        print(dim_mults[-1], dim, trajectory_embed_dim)
         self.context_net = nn.Sequential(
             nn.Linear(cond_dim + 32 + traj_hidden_dim, 128),
             nn.Mish(),

@@ -3,6 +3,7 @@ from torch import nn
 import numpy as np
 
 from ccai.models.temporal import TemporalUnet, TemporalUNetContext, BinaryClassifier
+from ccai.models.transformer import TransformerContext, TransformerForDiffusion
 
 from einops import reduce
 import math
@@ -110,9 +111,20 @@ class GaussianDiffusion(nn.Module):
             min_snr_gamma=5,
             hidden_dim=32,
             unconditional=True,
+            model_type='conv_unet',
             discriminator_guidance=False
     ):
         super().__init__()
+
+        if model_type not in ['conv_unet', 'transformer']:
+            raise ValueError('Invalid model type')
+
+        # model provides score fcn for both trajectory and context
+        if model_type == 'conv_unet':
+            self.model = TemporalUnet(horizon, dx + du, context_dim, dim=hidden_dim)
+        else:
+            self.model = TransformerForDiffusion(dx + du, dx + du, horizon, 1, cond_dim=context_dim, n_emb=hidden_dim)
+
         self.horizon = horizon
         self.xu_dim = dx + du
         self.dx = dx
@@ -276,6 +288,7 @@ class GaussianDiffusion(nn.Module):
     def _apply_conditioning(self, x, condition=None):
         if condition is None:
             return x
+
         for t, (start_idx, val) in condition.items():
             val = val.reshape(val.shape[0], -1, val.shape[-1])
             n, h, d = val.shape
@@ -595,6 +608,7 @@ class JointDiffusion(GaussianDiffusion):
             sampling_timesteps=20,
             loss_type='l2',
             hidden_dim=32,
+            model_type='conv_unet',
             unconditional=True
     ):
         super().__init__(
@@ -607,9 +621,16 @@ class JointDiffusion(GaussianDiffusion):
             loss_type=loss_type,
             hidden_dim=hidden_dim,
             unconditional=unconditional,
+            model_type=model_type
         )
+        if model_type not in ['conv_unet', 'transformer']:
+            raise ValueError('Invalid model type')
         # model provides score fcn for both trajectory and context
-        self.model = TemporalUNetContext(horizon, dx + du, context_dim, dim=hidden_dim)
+        if model_type == 'conv_unet':
+            self.model = TemporalUNetContext(horizon, dx + du, context_dim, dim=hidden_dim)
+        else:
+            self.model = TransformerContext(dx + du, dx + du, horizon, 1, cond_dim=context_dim, n_emb=hidden_dim)
+
         self.register_buffer('context_dropout_p', torch.tensor([0.25]))
         self.grad_cost = torch.func.vmap(torch.func.jacrev(self._cost))
         self.cost = torch.func.vmap(self._cost)
@@ -693,13 +714,7 @@ class JointDiffusion(GaussianDiffusion):
         grad[:, :, :, self.dx - 3:self.dx - 1] = -2 * 0.1 * (mu_var['x']['mean'][:, :, :, self.dx - 3:self.dx - 1] +
                                                              self.mu[self.dx - 3:self.dx - 1].to(device=x.device))
         # grad[:, -1, -1, self.dx - 1] = -eta
-
-        diff_theta = 0.05 * mu_var['x']['mean'][:, :, 1:, self.dx - 1] - mu_var['x']['mean'][:, :, :-1, self.dx - 1]
-        # also add cost on smoothness
-        # grad[:, :, :-1, self.dx - 1] = 2 * diff_theta
-        # grad[:, :, 1:, self.dx - 1] -= 2 * diff_theta
-        grad[:, :, :, self.dx - 1] -= 1
-
+        grad[:, :, :, self.dx - 1] = -1
         # print(mu_var['x']['logvar'].exp())
         pred_x = mu_var['x']['mean'] + alpha * (0.5 * mu_var['x']['logvar']).exp() * (noise_x + eta * grad)
         # pred_x = pred_x - 0.01 * self.grad_cost(mu_var['x']['mean'].reshape(b*N, -1, self.xu_dim)).reshape(b, N, -1, self.xu_dim)
