@@ -1,18 +1,18 @@
 ---
-T: 12
+T: 11
 receding_horizon: False
-num_steps: 12
-num_trials: 1
+num_steps: 11
+num_trials: 10
 visualize: True
-experiment_name: 'allegro_peg_insertion'
+experiment_name: 'allegro_peg_insertion_env_force_3'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
 object_type: 'peg'
-sim_device: 'cuda:0'
-friction_coefficient: 0.9
+sim_device: 'cpu'
+friction_coefficient: 0.95
 kp: 3.0
-visualize_plan: True
+visualize_plan: False
 optimize_force: True
 exclude_index: False
 controllers:
@@ -23,8 +23,8 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:0'
-    online_iters: 50
+    device: 'cpu'
+    online_iters: 40
     warmup_iters: 300
     resample_steps: 1
     resample_sigma: 0.01

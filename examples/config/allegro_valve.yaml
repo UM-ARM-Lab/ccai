@@ -32,6 +32,7 @@ controllers:
     penalty: 1000000
     collision_checking: False
     joint_friction: 0.0
+    random_init_every_iter: False
 #  ipopt:
 #    device: 'cpu'
 #    online_iters: 10
