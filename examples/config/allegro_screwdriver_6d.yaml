@@ -12,7 +12,7 @@ object_type: 'screwdriver_6d'
 sim_device: 'cuda:0'
 friction_coefficient: 1.9
 kp: 3.0
-visualize_plan: True
+visualize_plan: False
 optimize_force: True
 exclude_index: False
 controllers:

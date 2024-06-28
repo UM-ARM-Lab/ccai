@@ -14,7 +14,7 @@ random_or_diffusion = config['experiment_name'].split('_')[2]
 with open(data_path / f'constraint_violations.p', 'rb') as f:
     constraint_violations_all = pkl.load(f)
 
-def gen_plot(key):
+def gen_plot(constraint_violations_all, key):
     plan_cv = constraint_violations_all[key]
 
     keys = ['pregrasp', 'index', 'thumb_middle', 'turn']

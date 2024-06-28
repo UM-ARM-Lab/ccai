@@ -13,7 +13,6 @@ import pathlib
 from functools import partial
 import sys
 
-import time
 import pytorch_volumetric as pv
 import pytorch_kinematics as pk
 import pytorch_kinematics.transforms as tf
@@ -422,7 +421,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                 (1, -1, -1): thumb_and_middle_regrasp_problem_diff,
                 (1, 1, 1): turn_problem_diff
             }
-        trajectory_sampler = TrajectorySampler(T=16, dx=15, du=21, type='diffusion',
+        if 'type' not in params:
+            params['type'] = 'diffusion'
+        trajectory_sampler = TrajectorySampler(T=16, dx=15, du=21, type=params['type'],
                                                timesteps=256, hidden_dim=128,
                                                context_dim=3, generate_context=True,
                                                constrain=params['projected'],
@@ -526,10 +527,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                 start = state.clone()
                 if state[-1] < -1.0:
                     start[-1] += 0.75
-
+                a = time.perf_counter()
                 initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start.reshape(1, -1),
                                                                   H=params['T'] + 1,
                                                                   constraints=contact)
+                print('Sampling time', time.perf_counter() - a)
                 if state[-1] < -1.0:
                     initial_samples[:, :, -1] -= 0.75
             
@@ -543,7 +545,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             initial_u = initial_samples[:, :-1, -planner.problem.du:]
             initial_samples = torch.cat((initial_x, initial_u), dim=-1)
 
-        import time
         state = env.get_state()
         state = state['q'].reshape(-1).to(device=params['device'])
         state = state[:planner.problem.dx]
@@ -598,7 +599,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                     # update the initial samples
                     planner.x = initial_samples[:, k:]
 
-            import time
             s = time.time()
             best_traj, plans = planner.step(state)
             print('Solve time for step', time.time() - s)
@@ -815,7 +815,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                 turn_planner, mode='turn', goal=valve_goal, fname=f'turn_{stage}')
 
             _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, contact_state=torch.ones(3))
-
+        actual_trajectory.append(traj)
     # change to numpy and save data
     for t in range(1, 1 + params['T']):
         data[t]['plans'] = torch.stack(data[t]['plans']).cpu().numpy()
@@ -826,29 +826,30 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
     import pickle
     pickle.dump(data, open(f"{fpath}/traj_data.p", "wb"))
-
-    env.reset()
     state = env.get_state()
     state = state['q'].reshape(4 * num_fingers + obj_dof + 1).to(device=params['device'])
     actual_trajectory.append(state.clone()[: 4 * num_fingers + obj_dof])
-    actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
-    turn_problem.T = actual_trajectory.shape[0]
+    # actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
+    # turn_problem.T = actual_trajectory.shape[0]
     # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
-    final_distance_to_goal = (actual_trajectory[:, -obj_dof:] - params['valve_goal']).abs()
+    # final_distance_to_goal = (state.clone()[:, -obj_dof:] - params['valve_goal']).abs()
 
-    print(f'Controller: {params["controller"]} Final distance to goal: {torch.min(final_distance_to_goal)}')
+    # print(f'Controller: {params["controller"]} Final distance to goal: {torch.min(final_distance_to_goal)}')
     print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
 
-    np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
+    with open(f'{fpath.resolve()}/trajectory.pkl', 'wb') as f:
+        pickle.dump([i.cpu().numpy() for i in actual_trajectory], f)
+    # np.savez(f'{fpath.resolve()}/trajectory.npz', x=[i.cpu().numpy() for i in actual_trajectory],)
              #  constr=constraint_val.cpu().numpy(),
-             d2goal=final_distance_to_goal.cpu().numpy())
-    return torch.min(final_distance_to_goal).cpu().numpy()
+            #  d2goal=final_distance_to_goal.cpu().numpy())
+    env.reset()
+    return -1#torch.min(final_distance_to_goal).cpu().numpy()
 
 
 if __name__ == "__main__":
     # get config
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_proj_diff_init.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_proj_diff_init_csvto.yaml').read_text())
     from tqdm import tqdm
 
     if config['mode'] == 'hardware':

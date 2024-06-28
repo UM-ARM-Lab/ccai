@@ -1048,9 +1048,9 @@ class ConstrainedDiffusion(GaussianDiffusion):
         update = torch.cat((update, torch.zeros(b, H, problem.dz, device=device)), dim=2)
 
         problem._preprocess(x_norm[:, :, mask_no_z], projected_diffusion=True)
-        J, dJ, _ = problem._objective(x_norm[:, :, mask])
+        # J, dJ, _ = problem._objective(x_norm[:, :, mask])
         # Fix the indexing here
-        dJ = dJ.reshape(b, H, -1)
+        # dJ = dJ.reshape(b, H, -1)
         z_dim = problem.dz
 
         C, dC, _ = problem.combined_constraints(x_norm[:, :, mask], compute_hess=False, projected_diffusion=True)
@@ -1060,9 +1060,9 @@ class ConstrainedDiffusion(GaussianDiffusion):
         # make update be unnormalized
         # Fix the indexing here
         if problem.dz > 0:
-            unnormalized_update = update[:, :, mask_no_z] * self.std[mask_no_z[:-problem.dz]] - self.alpha_J * dJ
+            unnormalized_update = update[:, :, mask_no_z] * self.std[mask_no_z[:-problem.dz]]# - self.alpha_J * dJ
         else:
-            unnormalized_update = update[:, :, mask_no_z] * self.std[mask_no_z] - self.alpha_J * dJ
+            unnormalized_update = update[:, :, mask_no_z] * self.std[mask_no_z]# - self.alpha_J * dJ
         update_this_b_ind = torch.cat((unnormalized_update, torch.zeros(b, H, z_dim, device=device)[:, :, mask[36:]]), dim=2)
 
         dC = dC.reshape(b, -1, (H) * num_dim)
@@ -1279,6 +1279,11 @@ class LatentDiffusion(GaussianDiffusion):
             timesteps=timesteps,
             sampling_timesteps=sampling_timesteps,
             loss_type=loss_type,
+            objective=objective,
+            schedule_fn_kwargs=schedule_fn_kwargs,
+            ddim_sampling_eta=ddim_sampling_eta,
+            min_snr_loss_weight=min_snr_loss_weight,
+            min_snr_gamma=min_snr_gamma,
             hidden_dim=hidden_dim,
             unconditional=unconditional,
             model_type=model_type
@@ -1298,3 +1303,40 @@ class LatentDiffusion(GaussianDiffusion):
             x_decode[:, t:t + h, start_idx:start_idx + d] = val.clone()
             _, x, _ = self.vae.vae_t.encode(x_decode)
         return x
+    
+    def sample(self, N, H=None, condition=None, context=None, return_all_timesteps=False):
+        B = 1
+        if H is None:
+            H = self.horizon
+
+        if context is not None:
+            N2, num_constraints, dc = context.shape
+            assert N2 == N
+
+            # context = context.reshape(B, 1, num_constraints, dc).repeat(1, N, 1, 1).reshape(B * N, num_constraints, -1)
+
+        sample_fn = self.p_sample_loop if not self.is_ddim_sampling else self.ddim_sample
+        if H > self.horizon:
+            # get closest multiple of horizon
+            factor = math.ceil(H / self.horizon)
+            # H_total = factor * self.horizon
+            sample = self.p_multi_sample_loop((B * N, factor, self.horizon, self.xu_dim),
+                                              condition=condition, context=context,
+                                              return_all_timesteps=return_all_timesteps)
+            # combine samples
+            combined_samples = [sample[:, i, :-1] for i in range(0, factor - 1)]
+            combined_samples.append(sample[:, -1])
+            sample = torch.cat([sample[:, i] for i in range(0, factor)], dim=1)
+            # get combined trajectory
+            # sample = torch.cat(combined_samples, dim=1)
+            return sample
+
+        latent_samples = sample_fn((B * N, H, self.xu_dim), condition=condition, context=context.squeeze(1),
+                         return_all_timesteps=return_all_timesteps)
+        
+        decoded_samples = self.vae.vae_t.decode(latent_samples)
+
+        decoded_samples_x = self.vae.vae_x.decode(decoded_samples[..., :8])
+        decoded_samples_u = self.vae.vae_u.decode(decoded_samples[..., 8:24])
+
+        return torch.cat((decoded_samples_x, decoded_samples_u), dim=-1)

@@ -1147,11 +1147,14 @@ class AllegroContactProblemDiff(AllegroObjectProblemDiff):
         return g
 
     @contact_finger_constraints
-    def _kinematics_constraints(self, q, delta_q, theta, finger_name, compute_grads=True, compute_hess=False):
+    def _kinematics_constraints(self, q, delta_q, theta, finger_name, compute_grads=True, compute_hess=False,
+                                projected_diffusion=False):
+
         """
             Computes on the kinematics of the valve and the finger being consistant
         """
         N, T, _ = q.shape
+        T_offset = 1 if not projected_diffusion else 0
         d = self.d
         device = q.device
         full_start = partial_to_full_state(self.start[None, :self.num_fingers * 4], self.fingers)
@@ -1161,20 +1164,21 @@ class AllegroContactProblemDiff(AllegroObjectProblemDiff):
         # Retrieve pre-processed data
         ret_scene = self.data[finger_name]
         contact_jacobian = ret_scene.get('contact_jacobian', None).reshape(
-            N, T + 1, 3, 16)[:, :-1, :, self.contact_state_indices]
-        contact_loc = ret_scene.get('closest_pt_world', None).reshape(N, T + 1, 3)[:, :-1]
-        d_contact_loc_dq = ret_scene.get('closest_pt_q_grad', None)[:, :-1, :, self.contact_state_indices]
-        dJ_dq = ret_scene.get('dJ_dq', None)[:, :-1, :, self.contact_state_indices]
+            N, T + T_offset, 3, 16)[:, :T, :, self.contact_state_indices]
+        contact_loc = ret_scene.get('closest_pt_world', None).reshape(N, T + T_offset, 3)[:, :T]
+        d_contact_loc_dq = ret_scene.get('closest_pt_q_grad', None)[:, :T, :, self.contact_state_indices]
+        dJ_dq = ret_scene.get('dJ_dq', None)[:, :T, :, self.contact_state_indices]
         dJ_dq = dJ_dq[:, :, :, :, self.contact_state_indices]
-        contact_normal = ret_scene.get('contact_normal', None).reshape(N, T + 1, 3)[:, :-1]
-        dnormal_dq = self.data[finger_name]['dnormal_dq'].reshape(N, T + 1, 3, 16)[:, :-1, :,
+        contact_normal = ret_scene.get('contact_normal', None).reshape(N, T + T_offset, 3)[:, :T]
+        dnormal_dq = self.data[finger_name]['dnormal_dq'].reshape(N, T + T_offset, 3, 16)[:, :T, :,
                      self.contact_state_indices]
-        dnormal_dtheta = self.data[finger_name]['dnormal_denv_q'].reshape(N, T + 1, 3, self.obj_dof)[:, :-1]
+        dnormal_dtheta = self.data[finger_name]['dnormal_denv_q'].reshape(N, T + T_offset, 3, self.obj_dof)[:, :T]
 
         current_q = q[:, :-1, self.contact_state_indices]
         next_q = q[:, 1:, self.contact_state_indices]
         current_theta = theta[:, :-1]
         next_theta = theta[:, 1:]
+
 
         g = self.kinematics_constr(current_q,
                                    next_q,
@@ -1492,9 +1496,11 @@ class AllegroContactProblemDiff(AllegroObjectProblemDiff):
         return None, None, None
 
     @contact_finger_constraints
-    def _running_contact_constraints(self, q, finger_name, compute_grads=True, compute_hess=False):
+    def _running_contact_constraints(self, q, finger_name, compute_grads=True, compute_hess=False,
+                                     projected_diffusion=False):
         return self._contact_constraints(q=q, finger_name=finger_name, compute_grads=compute_grads,
-                                         compute_hess=compute_hess)
+                                         compute_hess=compute_hess,
+                                         projected_diffusion=projected_diffusion)
 
     def _con_eq(self, xu, compute_grads=True, compute_hess=False, verbose=False, projected_diffusion=False):
         N = xu.shape[0]
@@ -1506,12 +1512,14 @@ class AllegroContactProblemDiff(AllegroObjectProblemDiff):
         theta = xu[:, :, self.num_fingers * 4:self.num_fingers * 4 + self.obj_dof]
         g_contact, grad_g_contact, hess_g_contact = self._running_contact_constraints(q=q,
                                                                                       compute_grads=compute_grads,
-                                                                                      compute_hess=compute_hess)
+                                                                                      compute_hess=compute_hess,
+                                                                                      projected_diffusion=projected_diffusion)
 
         g_valve, grad_g_valve, hess_g_valve = self._kinematics_constraints(
             q=q, delta_q=delta_q, theta=theta,
             compute_grads=compute_grads,
-            compute_hess=compute_hess)
+            compute_hess=compute_hess,
+            projected_diffusion=projected_diffusion)
 
         g_contact = torch.cat((g_contact,
                                #    g_dynamics,

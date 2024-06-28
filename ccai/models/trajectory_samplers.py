@@ -121,6 +121,7 @@ class TrajectoryDiffusionModel(nn.Module):
         self.dx = dx
         self.du = du
         self.context_dim = context_dim
+        print('problem:', problem)
         if latent_diffusion:
             self.diffusion_model = LatentDiffusion(vae, T, dx, du, context_dim,
                                                             timesteps=timesteps, sampling_timesteps=timesteps,
