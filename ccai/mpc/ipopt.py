@@ -77,12 +77,12 @@ class IpoptMPC:
         return ret_x, ret_x.unsqueeze(0)
 
     def shift(self):
-        if self.fix_T:
-           self.x = torch.roll(self.x, shifts=-1, dims=0)
-           self.x[-1] = self.x[-2]
-        else:
-           self.x = self.x[1:]
-        #self.x = self.problem.shift(self.x.unsqueeze(0)).squeeze(0)
+        #if self.fix_T:
+        #   self.x = torch.roll(self.x, shifts=-1, dims=0)
+        #   self.x[-1] = self.x[-2]
+        #else:
+        #   self.x = self.x[1:]
+        self.x = self.problem.shift(self.x.unsqueeze(0)).squeeze(0)
 
     def reset(self, start, **kwargs):
         self.problem.update(start, **kwargs)

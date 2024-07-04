@@ -12,7 +12,7 @@ class Quadrotor12DDynamics(torch.nn.Module):
         g = -9.81
         m = 1
         Ix, Iy, Iz = 0.5, 0.1, 0.3
-        K = 1
+        K = 5
         x, y, z, phi, theta, psi, x_dot, y_dot, z_dot, p, q, r = torch.chunk(state, chunks=12, dim=-1)
 
         u1, u2, u3, u4 = torch.chunk(control, chunks=4, dim=-1)
@@ -27,7 +27,7 @@ class Quadrotor12DDynamics(torch.nn.Module):
         ttheta = torch.tan(theta)
 
         x_ddot = -(sphi * spsi + cpsi * cphi * stheta) * K * u1 / m
-        y_ddot = - (cpsi * sphi - cphi * spsi * stheta) * K * u1 / m
+        y_ddot = - (cphi * spsi * stheta - cpsi * sphi) * K * u1 / m
         z_ddot = g - (cphi * ctheta) * K * u1 / m
 
         p_dot = ((Iy - Iz) * q * r + K * u2) / Ix
@@ -51,8 +51,8 @@ class Quadrotor12DDynamics(torch.nn.Module):
         new_theta = theta + theta_dot * self.dt
         new_psi = psi + psi_dot * self.dt
         new_x = x + new_xdot * self.dt
-        new_y = y + new_ydot + self.dt
-        new_z = z + new_zdot + self.dt
+        new_y = y + new_ydot * self.dt
+        new_z = z + new_zdot * self.dt
 
         # dstate = np.stack((x_dot, y_dot, z_dot, phi_dot, theta_dot, psi_dot,
         #                   x_ddot, y_ddot, z_ddot, p_dot, q_dot, r_dot), axis=-1)

@@ -26,16 +26,26 @@ def cost(trajectory, goal):
     u = trajectory[:, 12:]
     T = x.shape[0]
     Q = torch.eye(12, device=trajectory.device)
-    Q[5, 5] = 1e-2
     Q[2, 2] = 0.1
+    #Q[9, 9] = 1e-3
+    Q[5, 5] = 1e-2
     Q[3:, 3:] *= 0.5
-    #Q[6:9] *= 2.0
+    # Q[2, 2] = 1e-2
+    # Q[2:, 2:] *= 0.1
+    # Q[6:8, 6:8] = 0.0
+    # Q[-1, -1] = 0.0
+    # Q[8, 8] = 1e-5
+    Q[6:9] = 0.25
+    #Q[8] = 0.05 # z velocity we don't care about too much
+    #Q[9:] = 0.5
     Q *= 5
-    P = Q
-    R = 16 * torch.eye(4, device=trajectory.device)
-    R[0, 0] = 1
-
-    P[5, 5] = 1e-2
+    P = 1 * Q
+    #P[6:9] *= 0
+    #P[6:9, 6:9] = 1.0
+    R = 16 ** 2 * torch.eye(4, device=trajectory.device)
+    R[0, 0] = 1.0#0.25
+    R /= 2
+    #P[5, 5] = 1e-2
     d2goal = x - goal.reshape(-1, 12)
 
     running_state_cost = d2goal.reshape(-1, 1, 12) @ Q.reshape(1, 12, 12) @ d2goal.reshape(-1, 12, 1)
@@ -58,6 +68,8 @@ def cost(trajectory, goal):
     running_state_hess = Q.reshape(1, 12, 12).repeat(T, 1, 1)
     running_control_hess = R.reshape(1, 4, 4).repeat(T, 1, 1)
     terminal_hess = torch.cat((torch.zeros(T - 1, 12, 12, device=trajectory.device), P.unsqueeze(0)), dim=0)
+
+#    print(running_state_cost, terminal_state_cost, running_control_cost)
 
     state_hess = running_state_hess + terminal_hess
     hess_cost = torch.cat((
@@ -87,7 +99,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         self.dh = self.dz * T
         self.dg = 12 * T + T - 1
         self.alpha = alpha
-        self.alpha = 0.1
+        self.alpha = 1.0
         self.include_obstacle = include_obstacle
         # self.dg = 2 * T - 1
         data = np.load('surface_data.npz')
@@ -143,6 +155,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
 
     def _objective(self, x):
         J, dJ, HJ = cost(x, self.goal)
+        print(self.alpha)
         return J * self.alpha, dJ * self.alpha, HJ * self.alpha
 
     def dynamics(self, x, u):
@@ -239,8 +252,8 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
 
         # compute z of surface and gradient and hessian
         sdf, grad_sdf, hess_sdf = self.obs_gp.posterior_mean(xy)
-        m = 1
-        constr = m*sdf + 0.05
+        m = 10
+        constr = m*(sdf + 0.05)
         grad_constr = torch.cat((m*grad_sdf,
                                  torch.zeros(T, 14, device=trajectory.device)), dim=1)
         hess_constr = torch.cat((
@@ -320,7 +333,7 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
 
         cost, grad_cost, hess_cost = self._objective(trajectory)
 
-        grad_cost = torch.cat((grad_cost.reshape(N, self.T, -1),
+        grad_cost = self.alpha * torch.cat((grad_cost.reshape(N, self.T, -1),
                                torch.zeros(N, self.T, self.dz, device=trajectory.device)
                                ), dim=2).reshape(N, -1)
 
@@ -361,7 +374,8 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
     def get_initial_xu(self, N):
         x = [self.start.repeat(N, 1)]
         u = torch.randn(N, self.T, self.du, device=self.device)
-        u[:, :, 1:] *= 0.25
+        u[:, :, 1:] /= 16
+        #u[:, :, 0] *= 2.0
         for t in range(self.T - 1):
             x.append(self.dynamics(x[-1], u[:, t]))
 
@@ -373,8 +387,8 @@ class QuadrotorProblem(ConstrainedSVGDProblem):
         """
         N, T, _ = xu.shape
         u = torch.randn(N, self.du, device=self.device)
-        u[:, 1:] *= 0.25
-        #u[:, 0] *= 0.5
+        u[:, 1:] /= 16
+        #u[:, 0] *= 2.0
         next_x = self.dynamics(xu[:, -1, :self.dx], u)
         xu = torch.roll(xu, -1, dims=1)
         xu[:, -2, self.dx:] = u
@@ -550,7 +564,7 @@ if __name__ == "__main__":
     results = {}
     for i in tqdm(range(config['num_trials'])):
         env = QuadrotorEnv(False, 'surface_data.npz', obstacle_mode=config['obstacle_mode'],
-                           obstacle_data_fname='obstacle_data_20.npz')
+                           obstacle_data_fname='_obstacle_data_20.npz')
         env.reset()
 
         if args.load_starts:
@@ -574,6 +588,7 @@ if __name__ == "__main__":
             params.update(config['controllers'][controller])
             params['controller'] = controller
             final_distance_to_goal = do_trial(env, params, fpath)
+            print(controller, final_distance_to_goal)
 
             if controller not in results.keys():
                 results[controller] = [final_distance_to_goal]

@@ -85,9 +85,17 @@ class ConstrainedSteinTrajOpt:
             dCdCT = dC @ dC.permute(0, 2, 1)
             A_bmm = lambda x: dCdCT @ x
             #
-            # damping_factor = 1e-1
+            damping_factor = 1.0e-6
+            #print('--')
+            #print(torch.linalg.cond(dCdCT))
+            #print(torch.linalg.cond(dCdCT + damping_factor * eye))
+
             try:
-                dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1), eye)
+                #dCdCT_inv, _ = cg_batch(A_bmm, eye, verbose=False)
+
+                dCdCT_inv = torch.linalg.solve((dC @ dC.permute(0, 2, 1)).double() + damping_factor * eye.double(),
+                                               eye.double()).float()
+                #dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1), atol=1e-6)
                 if torch.any(torch.isnan(dCdCT_inv)):
                     raise ValueError('nan in inverse')
             except Exception as e:
@@ -167,9 +175,9 @@ class ConstrainedSteinTrajOpt:
 
             # compute kernelized score
             kernelized_score = torch.sum(matrix_K @ -grad_J.reshape(N, 1, -1, 1), dim=0)
-            phi = self.gamma * kernelized_score.squeeze(-1) / N + grad_matrix_K / N  # maximize phi
-
+            phi = self.gamma * kernelized_score.squeeze(-1) / N + grad_matrix_K / N# maximize phi
             xi_J = -phi
+
             if False:
                 # Normalize gradient
                 normxiC = torch.clamp(torch.linalg.norm(xi_C, dim=1, keepdim=True, ord=np.inf), min=1e-9)
@@ -248,6 +256,8 @@ class ConstrainedSteinTrajOpt:
         projection = eye - dC.permute(0, 2, 1) @ projection
 
         noise = self.resample_sigma * torch.randn_like(xuz)
+
+        print(idx)
         eps = projection[idx] @ noise.unsqueeze(-1)
         # print(penalty, weights)
         # we need to add a very small amount of noise just so that the particles are distinct - otherwise
@@ -286,10 +296,11 @@ class ConstrainedSteinTrajOpt:
         T = self.iters
         C = T // resample_period
         p = 1
-        self.max_gamma = 1
+        self.max_gamma = 1.0
+
         import time
         def driving_force(t):
-            return ((t % (T / C)) / (T / C)) ** p
+            return max(((t % (T / C)) / (T / C)) ** p, 1 / T)
 
         if resample:
             xuz.data = self.resample(xuz.data)
@@ -329,7 +340,7 @@ class ConstrainedSteinTrajOpt:
 
             # xuz.data = #new_xuz
             grad_norm = torch.linalg.norm(grad, dim=1, keepdim=True)
-            max_norm = 10
+            max_norm = 100
             grad = torch.where(grad > max_norm, max_norm * grad / grad_norm, grad)
             xuz.data = xuz.data - self.dt * grad
             self.delta_x = self.dt * grad
