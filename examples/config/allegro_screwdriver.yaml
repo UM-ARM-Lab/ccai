@@ -1,18 +1,18 @@
 ---
 T: 12
 receding_horizon: False
-num_steps: 11
-num_trials: 10
+num_steps: 12
+num_trials: 20
 visualize: True
-experiment_name: 'allegro_screwdriver_collision_checking_small_force'
+experiment_name: 'allegro_screwdriver_paper'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
 object_type: 'screwdriver'
-sim_device: 'cuda:0'
+sim_device: 'cpu'
 friction_coefficient: 0.95
 kp: 3.0
-visualize_plan: True
+visualize_plan: False
 optimize_force: True
 exclude_index: False
 force_balance: False  # in addition to the torque balance, do we also need force balance, just for the screwdriver turning experiment w\o slot. 
@@ -25,13 +25,15 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:0'
+    device: 'cpu'
     online_iters: 50
     warmup_iters: 300
     resample_steps: 1
     resample_sigma: 0.01
     resample_temperature: 0.1
     penalty: 1000000
-    collision_checking: True
+    collision_checking: False
     joint_friction: 0.0
     random_init_every_iter: False
+    obj_gravity: True # whether to conside the object gravity in our optimization
+    contact_region: True # whether to consider the contact region of the index finegr in our optimization

@@ -1,6 +1,6 @@
 from isaac_victor_envs.utils import get_assets_dir
 from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
-from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
+# from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
 
 import numpy as np
 import pickle as pkl
@@ -115,20 +115,29 @@ class AllegroScrewdriver(AllegroValveTurning):
                  optimize_force=False,
                  force_balance=False,
                  collision_checking=False,
-                 device='cuda:0', **kwargs):
+                 device='cuda:0', 
+                 obj_gravity=False,
+                 contact_region=False,
+                 **kwargs):
         self.num_fingers = len(fingers)
         self.obj_dof_code = [0, 0, 0, 1, 1, 1]
         self.optimize_force = optimize_force
+        self.obj_mass = 0.1
+        self.contact_region = contact_region
         super(AllegroScrewdriver, self).__init__(start=start, goal=goal, T=T, chain=chain, object_location=object_location,
                                                  object_type=object_type, world_trans=world_trans, object_asset_pos=object_asset_pos,
                                                  fingers=fingers, friction_coefficient=friction_coefficient, obj_dof_code=self.obj_dof_code, 
                                                  obj_joint_dim=1, optimize_force=optimize_force, 
                                                  screwdriver_force_balance=force_balance,
-                                                 collision_checking=collision_checking, device=device)
+                                                 collision_checking=collision_checking, obj_gravity=obj_gravity,
+                                                 contact_region=contact_region, device=device)
         self.friction_coefficient = friction_coefficient
         self.default_index_ee_loc_in_screwdriver = torch.tensor([0.0087, -0.016, 0.1293], device=device).unsqueeze(0)
         self.friction_vel_constr = vmap(self._friction_vel_constr, randomness='same')
         self.grad_friction_vel_constr = vmap(jacrev(self._friction_vel_constr, argnums=(0, 1, 2)))
+        if contact_region:
+            self.index_contact_region_constr = vmap(self._index_contact_region_constr, randomness='same')
+            self.grad_index_contact_region_constr = vmap(jacrev(self._index_contact_region_constr, argnums=(0, 1)))
 
     def get_initial_xu(self, N):
         # TODO: fix the initialization, for 6D movement, the angle is not supposed to be the linear interpolation of the euler angle. 
@@ -269,6 +278,45 @@ class AllegroScrewdriver(AllegroValveTurning):
             return g, grad_g, hess
 
         return g, grad_g, None
+    def _index_contact_region_constr(self, contact_pts, env_q, compute_grads=True, compute_hess=False):
+        " contact pts are in the robot frame"
+        " constraint specifying that the index finger only has contact with the top of the screwdriver"
+        # N, T, _ = env_q.shape
+        env_q = torch.cat((env_q, torch.zeros(1, device=env_q.device)), dim=-1) # add the screwdriver cap dim
+        screwdriver_top_obj_frame = self.object_chain.forward_kinematics(env_q.unsqueeze(0))['screwdriver_cap']
+        screwdriver_top_obj_frame = screwdriver_top_obj_frame.get_matrix().reshape(4, 4)[:3, 3]
+        scene_trans = self.world_trans.inverse().compose(
+            pk.Transform3d(device=self.device).translate(self.object_asset_pos[0], self.object_asset_pos[1], self.object_asset_pos[2]))
+        screwdriver_top_robot_frame = scene_trans.transform_points(screwdriver_top_obj_frame.reshape(-1, 3)).reshape(3)
+        distance = torch.norm(contact_pts - screwdriver_top_robot_frame, dim=-1)
+        h = distance - 0.02
+        return h
+
+    def _index_contact_region_constraint(self, xu, compute_grads=True, compute_hess=False):
+        " constraint specifying that the index finger only has contact with the top of the screwdriver"
+        N, T, d = xu.shape
+        env_q = xu[:, :, 4 * self.num_fingers: 4 * self.num_fingers + self.obj_dof].reshape(-1, self.obj_dof)
+        # Retrieve pre-processed data
+        ret_scene = self.data['index']
+        index_contact_pts = ret_scene['closest_pt_world'].reshape(N, T + 1, 3)[:, 1:]
+        h = self.index_contact_region_constr(index_contact_pts.reshape(-1, 3), env_q.reshape(-1, self.obj_dof)).reshape(N, -1)
+        if compute_grads:
+            grad_h = torch.zeros(N, 1, T, T, d, device=self.device)
+            dh_dcontact, dh_denv_q = self.grad_index_contact_region_constr(index_contact_pts.reshape(-1, 3), env_q.reshape(-1, self.obj_dof))
+            dcontact_dq = ret_scene['closest_pt_q_grad'].reshape(N, T+1, 3, 4 * self.num_fingers)[:, 1:]
+            dh_dq = dh_dcontact.reshape(N, T, 1, 3) @ dcontact_dq.reshape(N, T, 3, 4 * self.num_fingers)
+
+            T_range = torch.arange(T, device=xu.device)
+            grad_h[:, :, T_range, T_range, :4 * self.num_fingers] = dh_dq.reshape(N, T, 1, 4 * self.num_fingers).transpose(1, 2)
+            grad_h[:, :, T_range, T_range, 4 * self.num_fingers: 4 * self.num_fingers + self.obj_dof] = dh_denv_q.reshape(N, T, 1, self.obj_dof).transpose(1, 2)
+            grad_h = grad_h.transpose(1, 2).reshape(N, -1, T * d)
+        else:
+            return h, None, None
+        if compute_hess:
+            hess_h = torch.zeros(N, h.shape[1], T * d, T * d, device=self.device)
+            return h, grad_h, hess_h
+        return h, grad_h, None
+
     
     def _friction_vel_constr(self, dq, contact_normal, contact_jacobian):
         # this will be vmapped, so takes in a 3 vector and a 3 x 8 jacobian and a dq vector
@@ -371,10 +419,17 @@ class AllegroScrewdriver(AllegroValveTurning):
         
             # h = torch.cat((h, h_vel), dim=1)
             h_rep = torch.cat((h_rep_1, h_rep_2), dim=1)
+        if self.contact_region:
+            h_con_region, grad_h_con_region, hess_h_con_region = self._index_contact_region_constraint(
+                xu=xu.reshape(-1, T, self.dx + self.du),
+                compute_grads=compute_grads,
+                compute_hess=compute_hess)
         if verbose:
             print(f"max friction constraint: {torch.max(h)}")
             if self.collision_checking:
                 print(f"max index repulsive constraint: {torch.max(h_rep)}")
+            if self.contact_region:
+                print(f"max contact region constraint: {torch.max(h_con_region)}")
             # print(f"max step size constraint: {torch.max(h_step_size)}")
             # print(f"max singularity constraint: {torch.max(h_sin)}")
             result_dict = {}
@@ -383,6 +438,9 @@ class AllegroScrewdriver(AllegroValveTurning):
             if self.collision_checking:
                 result_dict['index_rep'] = torch.max(h_rep).item()
                 result_dict['index_rep_mean'] = torch.mean(h_rep).item()
+            if self.contact_region:
+                result_dict['contact_region'] = torch.max(h_con_region).item()
+                result_dict['contact_region_mean'] = torch.mean(h_con_region).item()
             # result_dict['singularity'] = torch.max(h_sin).item()
             return result_dict
 
@@ -391,6 +449,8 @@ class AllegroScrewdriver(AllegroValveTurning):
         #                h_sin), dim=1)
         if self.collision_checking:
             h = torch.cat((h, h_rep), dim=1)  
+        if self.contact_region:
+            h = torch.cat((h, h_con_region), dim=1)
         if compute_grads:
             grad_h = grad_h.reshape(N, -1, self.T * (self.dx + self.du))
             # grad_h = torch.cat((grad_h, 
@@ -400,6 +460,8 @@ class AllegroScrewdriver(AllegroValveTurning):
             if self.collision_checking:
                 grad_h_rep = torch.cat((grad_h_rep_1, grad_h_rep_2), dim=1)
                 grad_h = torch.cat((grad_h, grad_h_rep), dim=1)
+            if self.contact_region:
+                grad_h = torch.cat((grad_h, grad_h_con_region), dim=1)
         else:
             return h, None, None
         if compute_hess:
@@ -508,6 +570,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         optimize_force=params['optimize_force'],
         force_balance=params['force_balance'],
         collision_checking=params['collision_checking'],
+        obj_gravity=params['obj_gravity'],
+        contact_region=params['contact_region']
     )
     turn_planner = PositionControlConstrainedSVGDMPC(turn_problem, params)
 
@@ -636,6 +700,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
         # distance2goal = (screwdriver_goal - screwdriver_state)).detach().cpu()
         print(distance2goal)
+        if torch.isnan(distance2goal).any().item():
+            env.reset()
+            print("NAN")
+            break
         info = {**equality_constr_dict, **inequality_constr_dict, **{'distance2goal': distance2goal}}
         info_list.append(info)
 

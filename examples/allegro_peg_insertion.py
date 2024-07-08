@@ -65,17 +65,19 @@ class AllegroPegInsertion(AllegroValveTurning):
                  friction_coefficient=0.95,
                  optimize_force=False,
                  obj_dof_code=[1, 1, 1, 1, 1, 1],
+                 obj_gravity=False,
                  device='cuda:0', **kwargs):
         self.num_fingers = len(fingers)
         self.optimize_force = optimize_force
         self.peg_asset_pos = peg_asset_pos
         self.wall_asset_pos = wall_asset_pos
         self.wall_dims = wall_dims.astype('float32')
+        self.obj_mass = 0.3
 
         super(AllegroPegInsertion, self).__init__(start=start, goal=goal, T=T, chain=chain, object_location=object_location,
                                                  object_type=object_type, world_trans=world_trans, object_asset_pos=peg_asset_pos,
                                                  fingers=fingers, friction_coefficient=friction_coefficient, obj_dof_code=obj_dof_code, 
-                                                 obj_joint_dim=0, optimize_force=optimize_force, device=device)
+                                                 obj_joint_dim=0, optimize_force=optimize_force, obj_gravity=obj_gravity, device=device)
         self.friction_coefficient = friction_coefficient
     
     def _cost(self, xu, start, goal):
@@ -534,7 +536,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         friction_coefficient=params['friction_coefficient'],
         world_trans=env.world_trans,
         fingers=turn_problem_fingers,
-        optimize_force=params['optimize_force']
+        optimize_force=params['optimize_force'],
+        obj_gravity=params['obj_gravity'],
     )
     turn_planner = PositionControlConstrainedSVGDMPC(turn_problem, params)
 

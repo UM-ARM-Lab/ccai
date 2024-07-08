@@ -1,4 +1,5 @@
 "this formulation considers contact forces from the wall to the peg"
+from isaacgym import gymapi
 from isaac_victor_envs.utils import get_assets_dir
 from isaac_victor_envs.tasks.allegro import AllegroPegInsertionEnv
 
@@ -29,7 +30,6 @@ from scipy.spatial.transform import Slerp
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
-device = 'cuda:0'
 obj_dof = 6
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
@@ -66,6 +66,7 @@ class AllegroPegInsertion(AllegroValveTurning):
                  friction_coefficient=0.95,
                  optimize_force=False,
                  obj_dof_code=[1, 1, 1, 1, 1, 1],
+                 obj_gravity=False,
                  device='cuda:0', **kwargs):
         self.num_fingers = len(fingers)
         self.optimize_force = optimize_force
@@ -77,14 +78,15 @@ class AllegroPegInsertion(AllegroValveTurning):
         self.wall_asset_pos = wall_asset_pos
         self.wall_dims = wall_dims.astype('float32')
         du = (4 + 3) * self.num_fingers + 3 
+        self.obj_mass = 0.03
 
         super(AllegroPegInsertion, self).__init__(start=start, goal=goal, T=T, chain=chain, object_location=object_location,
                                                  object_type=object_type, world_trans=world_trans, object_asset_pos=peg_asset_pos,
                                                  fingers=fingers, friction_coefficient=friction_coefficient, obj_dof_code=obj_dof_code, 
-                                                 obj_joint_dim=0, optimize_force=optimize_force, du=du, device=device)
+                                                 obj_joint_dim=0, optimize_force=optimize_force, du=du, obj_gravity=obj_gravity, device=device)
         self.friction_coefficient = friction_coefficient
         self.force_equlibrium_constr = vmap(self._force_equlibrium_constr_w_force)
-        self.grad_force_equlibrium_constr = vmap(jacrev(self._force_equlibrium_constr_w_force, argnums=(0, 1, 2, 3, 4, 5)))
+        self.grad_force_equlibrium_constr = vmap(jacrev(self._force_equlibrium_constr_w_force, argnums=(0, 1, 2, 3, 4, 5, 6)))
 
         self.wall_friction_constr = vmap(self._wall_friction_constr, randomness='same')
         self.grad_wall_friction_constr = vmap(jacrev(self._wall_friction_constr, argnums=(0, 1)))
@@ -494,7 +496,7 @@ class AllegroPegInsertion(AllegroValveTurning):
                                 device=self.device)
             return h, grad_h, hess_h
         return h, grad_h, None    
-    def _force_equlibrium_constr_w_force(self, q, u, next_q, force_list, contact_jac_list, contact_point_list):
+    def _force_equlibrium_constr_w_force(self, q, u, next_q, force_list, contact_jac_list, contact_point_list, next_env_q):
         # NOTE: the constriant is defined in the robot frame
         # the contact jac an contact points are all in the robot frame
         # this will be vmapped, so takes in a 3 vector and a [num_finger x 3 x 8] jacobian and a dq vector
@@ -520,6 +522,10 @@ class AllegroPegInsertion(AllegroValveTurning):
         peg_wall_torque = torch.linalg.cross(peg_wall_r, env_force_robot_frame)
         torque_list.append(peg_wall_torque)
         # contact_point_r_valve = contact_point_list[-1] - obj_robot_frame[0]
+        if self.obj_gravity:
+            if self.obj_translational_dim > 0:
+                g = self.obj_mass * torch.tensor([0, 0, -9.8], device=self.device, dtype=torch.float32)
+                force_list = torch.cat((force_list, g.unsqueeze(0)))
 
         # force_world_frame = self.world_trans.transform_normals(force.unsqueeze(0)).squeeze(0)
         torque_list = torch.stack(torque_list, dim=0)
@@ -552,6 +558,7 @@ class AllegroPegInsertion(AllegroValveTurning):
         x = torch.cat((self.start.reshape(1, 1, -1).repeat(N, 1, 1), x), dim=1)
         q = x[:, :-1, :self.num_fingers * 4]
         next_q = x[:, 1:, :self.num_fingers * 4]
+        next_env_q = x[:, 1:, self.num_fingers * 4: self.num_fingers * 4 + self.obj_dof]
         u = xu[:, :, self.dx: self.dx + 4 * self.num_fingers]
         force = xu[:, :, self.dx + 4 * self.num_fingers:]
         force_list = force.reshape((force.shape[0], force.shape[1], self.num_fingers + 1, 3))
@@ -569,15 +576,17 @@ class AllegroPegInsertion(AllegroValveTurning):
                                          next_q.reshape(-1, 4 * self.num_fingers), 
                                          force_list.reshape(-1, self.num_fingers + 1, 3),
                                          contact_jac_list,
-                                         contact_point_list).reshape(N, T, -1)
+                                         contact_point_list,
+                                         next_env_q.reshape(-1, self.obj_dof)).reshape(N, T, -1)
         # print(g.abs().max().detach().cpu().item(), g.abs().mean().detach().cpu().item())
         if compute_grads:
-            dg_dq, dg_du, dg_dnext_q, dg_dforce, dg_djac, dg_dcontact = self.grad_force_equlibrium_constr(q.reshape(-1, 4 * self.num_fingers), 
+            dg_dq, dg_du, dg_dnext_q, dg_dforce, dg_djac, dg_dcontact, dg_dnext_env_q = self.grad_force_equlibrium_constr(q.reshape(-1, 4 * self.num_fingers), 
                                                                                   u.reshape(-1, 4 * self.num_fingers), 
                                                                                   next_q.reshape(-1, 4 * self.num_fingers), 
                                                                                   force_list.reshape(-1, self.num_fingers + 1, 3),
                                                                                   contact_jac_list,
-                                                                                  contact_point_list)
+                                                                                  contact_point_list,
+                                                                                  next_env_q.reshape(-1, self.obj_dof))
             dg_dforce = dg_dforce.reshape(dg_dforce.shape[0], dg_dforce.shape[1], (self.num_fingers + 1) * 3)
             
             T_range = torch.arange(T, device=x.device)
@@ -600,6 +609,8 @@ class AllegroPegInsertion(AllegroValveTurning):
             dg_du = torch.cat((dg_du, dg_dforce), dim=-1)  # check the dim
             grad_g[:, :, T_range, T_range, self.dx:] = dg_du.reshape(N, T, -1, self.du).transpose(1, 2)
             grad_g[:, :, T_range, T_range, :4 * self.num_fingers] = dg_dnext_q.reshape(N, T, -1, 4 * self.num_fingers).transpose(1, 2)
+            if self.obj_gravity:
+                grad_g[:, :, T_range, T_range, 4 * self.num_fingers: 4 * self.num_fingers + self.obj_dof] = dg_dnext_env_q.reshape(N, T, -1, self.obj_dof).transpose(1, 2)
             grad_g = grad_g.transpose(1, 2)
         else:
             return g.reshape(N, -1), None, None
@@ -813,7 +824,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         friction_coefficient=params['friction_coefficient'],
         world_trans=env.world_trans,
         fingers=turn_problem_fingers,
-        optimize_force=params['optimize_force']
+        optimize_force=params['optimize_force'],
+        obj_gravity = params['obj_gravity'],
     )
     turn_planner = PositionControlConstrainedSVGDMPC(turn_problem, params)
 
@@ -841,6 +853,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         finger_traj_history[finger].append(ee.detach().cpu().numpy())
 
     num_fingers_to_plan = num_fingers
+    contact_list = [] # list of checking whether the peg is in contact with the wall
     info_list = []
 
     for k in range(params['num_steps']):
@@ -857,6 +870,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         print(f"current theta: {state['q'][0, -obj_dof:].detach().cpu().numpy()}")
         print(f"planned theta: {planned_theta_traj}")
         # add trajectory lines to sim
+        if k <= params['num_steps'] - 1:
+            gym.draw_env_rigid_contacts(viewer, env.envs[0], gymapi.Vec3(0,1,0), 10000, 1)
         if k < params['num_steps'] - 1:
             if params['mode'] == 'hardware':
                 add_trajectories_hardware(trajectories, best_traj, axes, env, config=params, state2ee_pos_func=state2ee_pos)
@@ -912,13 +927,25 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         #     # ros_node.apply_action(action[0].detach().cpu().numpy())
         #     ros_node.apply_action(partial_to_full_state(action[0]).detach().cpu().numpy())
         turn_problem._preprocess(best_traj.unsqueeze(0))
+
+        # process contact
+        contacts = gym.get_env_rigid_contacts(env.envs[0])
+        for body0, body1 in zip (contacts['body0'], contacts['body1']):
+            if body0 == 27 and body1 == 29:
+                print("contact with wall")
+                contact_list.append(True)
+                break
+            elif body0 == 29 and body1 == 27:
+                print("contact with wall")
+                contact_list.append(True)
+                break
         
         # print(turn_problem.thumb_contact_scene.scene_collision_check(partial_to_full_state(x[:, :8]), x[:, 8],
         #                                                         compute_gradient=False, compute_hessian=False))
         # distance2surface = torch.sqrt((best_traj_ee[:, 2] - object_location[2].unsqueeze(0)) ** 2 + (best_traj_ee[:, 0] - object_location[0].unsqueeze(0))**2)
         distance2goal = (params['valve_goal'].cpu() - env.get_state()['q'][:, -obj_dof:].cpu()).detach().cpu()
         print(distance2goal)
-        info = {**equality_constr_dict, **inequality_constr_dict, **{'distance2goal': distance2goal}}
+        info = {**equality_constr_dict, **inequality_constr_dict, 'distance2goal': distance2goal, 'contact': contact_list}
         info_list.append(info)
 
         gym.clear_lines(viewer)
@@ -932,6 +959,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             temp_for_plot = np.stack(traj_history, axis=0)
             if k >= 2:
                 axes[finger].plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray', label='actual')
+    print(contact_list)
     with open(f'{fpath.resolve()}/info.pkl', 'wb') as f:
         pkl.dump(info_list, f)
     action_list = torch.concat(action_list, dim=0)
@@ -1059,7 +1087,7 @@ if __name__ == "__main__":
             params['controller'] = controller
             params['valve_goal'] = goal.to(device=params['device'])
             params['chain'] = chain.to(device=params['device'])
-            object_location = torch.tensor(env.peg_pose).to(device).float() # TODO: confirm if this is the correct location
+            object_location = torch.tensor(env.peg_pose).to(params['device']).float() # TODO: confirm if this is the correct location
             params['object_location'] = object_location
             final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node)
             # final_distance_to_goal = turn(env, params, fpath)
