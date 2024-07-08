@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pathlib
 import pytorch_kinematics.transforms as tf
+from scipy.spatial.transform import Rotation as R
 # import pytorch3d.transforms as tf
 
 full_finger_list = ['index', 'middle', 'ring', 'thumb']
@@ -214,3 +215,17 @@ def axis_angle_to_euler(axis_angle):
     matrix = tf.axis_angle_to_matrix(axis_angle)
     euler = tf.matrix_to_euler_angles(matrix, convention='XYZ')
     return euler
+
+def euler_diff(euler1, euler2, representation='xyz'):
+    """
+    :params euler1: B x 3
+    :params euler2: B x 3
+    :return diff: B x 1
+    compute the difference between two orientations represented by euler angles
+    """
+    ori1_mat = R.from_euler(representation, euler1).as_matrix()
+    ori2_mat = R.from_euler(representation, euler2).as_matrix()
+    diff = tf.so3_relative_angle(torch.tensor(ori1_mat), torch.tensor(ori2_mat), cos_angle=False).detach().cpu()
+    return diff
+
+    
