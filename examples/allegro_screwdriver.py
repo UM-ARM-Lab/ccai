@@ -177,8 +177,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     if model_path is not None:
         trajectory_sampler = TrajectorySampler(T=16, dx=15, du=21, type='diffusion',
                                                timesteps=256, hidden_dim=128,
-                                               context_dim=3, generate_context=True)
-        trajectory_sampler.load_state_dict(torch.load(f'{CCAI_PATH}/{model_path}'))
+                                               context_dim=3, generate_context=False)
+        trajectory_sampler.load_state_dict(torch.load(f'{CCAI_PATH}/{model_path}', map_location=params['device']))
         trajectory_sampler.to(device=params['device'])
 
     start = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
@@ -437,14 +437,15 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         if trajectory_sampler is not None:
             with torch.no_grad():
                 start = state.clone()
-                if state[-1] < -1.0:
-                    start[-1] += 0.75
-
-                initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start.reshape(1, -1),
+                # if state[-1] < -1.0:
+                #     start[-1] += 0.75
+                print(contact)
+                initial_samples, _, _ = trajectory_sampler.sample(N=params['N'],
+                                                                  start=start.reshape(1, -1),
                                                                   H=params['T'] + 1,
                                                                   constraints=contact)
-                if state[-1] < -1.0:
-                    initial_samples[:, :, -1] -= 0.75
+                # if state[-1] < -1.0:
+                #     initial_samples[:, :, -1] -= 0.75
 
             initial_samples = _full_to_partial(initial_samples, mode)
             initial_x = initial_samples[:, 1:, :planner.problem.dx]
@@ -479,9 +480,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                 executed_trajectory = _partial_to_full(executed_trajectory, mode)
                 plans = _partial_to_full(plans, mode)
                 plans = torch.cat((executed_trajectory, plans), dim=1)
-                if state[-1] < -1.0:
-                    plans[:, :, 14] += 0.75
-                    executed_trajectory[:, :, 14] += 0.75
+                # if state[-1] < -1.0:
+                #     # plans[:, :, 14] += 0.75
+                #     # executed_trajectory[:, :, 14] += 0.75
 
                 if trajectory_sampler is not None:
                     with torch.no_grad():
@@ -497,8 +498,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                     initial_u = initial_samples[:, :-1, -planner.problem.du:]
                     initial_samples = torch.cat((initial_x, initial_u), dim=-1)
 
-                    if state[-1] < -1.0:
-                        initial_samples[:, :, 14] -= 0.75
+                    # if state[-1] < -1.0:
+                    #     initial_samples[:, :, 14] -= 0.75
                     # update the initial samples
                     planner.x = initial_samples[:, k:]
 
@@ -661,8 +662,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         if sample_contact:
             with torch.no_grad():
                 start = state.clone()
-                if state[-1] < -1.0:
-                    start[-1] += 0.75
+                #if state[-1] < -1.0:
+                #    start[-1] += 0.75
                 trajectories, contact, likelihoods = trajectory_sampler.sample(N=512, start=start.reshape(1, -1),
                                                                                H=(num_stages - stage) * 16)
             # choose highest likelihood trajectory
@@ -833,7 +834,7 @@ if __name__ == "__main__":
                                  frame_indices=frame_indices)  # full_to= _partial_state = partial(full_to_partial_state, fingers=config['fingers'])
     # partial_to_full_state = partial(partial_to_full_state, fingers=config['fingers'])
 
-    for i in tqdm(range(0, config['num_trials'])):
+    for i in tqdm(range(1, config['num_trials'])):
         goal = - 0.5 * torch.tensor([0, 0, np.pi])
         # goal = goal + 0.025 * torch.randn(1) + 0.2
         for controller in config['controllers'].keys():
