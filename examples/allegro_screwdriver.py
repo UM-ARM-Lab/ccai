@@ -115,10 +115,12 @@ class AllegroScrewdriver(AllegroValveTurning):
                  optimize_force=False,
                  force_balance=False,
                  collision_checking=False,
+                 static_init=False, # whether to initialize the screwdriver as the current state
                  device='cuda:0', **kwargs):
         self.num_fingers = len(fingers)
         self.obj_dof_code = [0, 0, 0, 1, 1, 1]
         self.optimize_force = optimize_force
+        self.static_init = static_init
         super(AllegroScrewdriver, self).__init__(start=start, goal=goal, T=T, chain=chain, object_location=object_location,
                                                  object_type=object_type, world_trans=world_trans, object_asset_pos=object_asset_pos,
                                                  fingers=fingers, friction_coefficient=friction_coefficient, obj_dof_code=self.obj_dof_code, 
@@ -173,11 +175,12 @@ class AllegroScrewdriver(AllegroValveTurning):
                 theta = np.concatenate((theta_position, interp_rots), axis=-1)
                 theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
             else:
-                theta = np.linspace(self.start[-self.obj_dof:].cpu().numpy(), self.goal.cpu().numpy(), self.T + 1)[1:]
-                theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
-
-                # repeat the current state
-                # theta = self.start[-self.obj_dof:].unsqueeze(0).repeat((self.T, 1))
+                if not self.static_init:
+                    theta = np.linspace(self.start[-self.obj_dof:].cpu().numpy(), self.goal.cpu().numpy(), self.T + 1)[1:]
+                    theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
+                else:
+                    # repeat the current state
+                    theta = self.start[-self.obj_dof:].unsqueeze(0).repeat((self.T, 1))
             theta = theta.unsqueeze(0).repeat((N,1,1))
 
             x = torch.cat((x, theta), dim=-1)
@@ -508,6 +511,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         optimize_force=params['optimize_force'],
         force_balance=params['force_balance'],
         collision_checking=params['collision_checking'],
+        static_init=params['static_init'],
     )
     turn_planner = PositionControlConstrainedSVGDMPC(turn_problem, params)
 
@@ -551,6 +555,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         else:
             best_traj, trajectories = turn_planner.step(start[:4 * num_fingers + obj_dof])
         
+        if torch.isnan(best_traj).any().item():
+            env.reset()
+            break
         #debug only
         # turn_problem.save_history(f'{fpath.resolve()}/op_traj.pkl')
 
@@ -635,6 +642,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             torch.tensor(screwdriver_goal_mat).unsqueeze(0), cos_angle=False).detach().cpu().abs()
 
         # distance2goal = (screwdriver_goal - screwdriver_state)).detach().cpu()
+        if torch.isnan(distance2goal).item():
+            env.reset()
+            break
         print(distance2goal)
         info = {**equality_constr_dict, **inequality_constr_dict, **{'distance2goal': distance2goal}}
         info_list.append(info)
