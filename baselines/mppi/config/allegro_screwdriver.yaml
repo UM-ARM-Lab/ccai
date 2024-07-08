@@ -1,10 +1,10 @@
 ---
-T: 11
+T: 12
 receding_horizon: False
-num_steps: 11
-num_trials: 10
+num_steps: 12
+num_trials: 20
 visualize: True
-experiment_name: 'allegro_peg_insertion'
+experiment_name: 'allegro_screwdriver'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -16,7 +16,7 @@ kp: 3.0
 controllers:
   mppi:
     # N: 16
-    N: 500
+    N: 200
     lambda: 1
     variance: 0.01
     step_size: 0.1
