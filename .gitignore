@@ -4,3 +4,4 @@ __pycache__/
 venv/
 ccai.egg-info/
 data/
+notebooks/diff_gif_imgs/*

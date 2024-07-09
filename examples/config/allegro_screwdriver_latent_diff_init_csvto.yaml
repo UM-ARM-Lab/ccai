@@ -1,4 +1,15 @@
 ---
+nx: 15
+nu: 21
+nc: 3
+nz: 16
+nzx: 8
+nzu: 16
+nzt: 24
+nhidden: 128
+lambda_recon: 1
+lambda_constraint: 1
+
 T: 15
 receding_horizon: False
 num_steps: 15
@@ -19,7 +30,10 @@ optimize_force: True
 exclude_index: False
 projected: False
 use_saved_plans: False
+use_saved_noise: False
+use_guidance: False
 type: 'latent_diffusion'
+vae_path: 'data/training/allegro_screwdriver/latent_diffusion_initial/allegro_vae.pth'
 model_path: 'data/training/allegro_screwdriver/latent_diffusion_initial/allegro_latent_diffusion.pt'
 controllers:
   csvgd:

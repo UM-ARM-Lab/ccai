@@ -115,13 +115,13 @@ class TrajectoryDiffusionModel(nn.Module):
 
     def __init__(self, T, dx, du, context_dim, problem=None, timesteps=20, hidden_dim=64, constrained=False,
                  unconditional=False, generate_context=False, score_model='conv_unet', latent_diffusion=False,
-                 vae=None):
+                 vae=None, inits_noise=None, noise_noise=None, guided=False):
         super().__init__()
         self.T = T
         self.dx = dx
         self.du = du
         self.context_dim = context_dim
-        print('problem:', problem)
+
         if latent_diffusion:
             self.diffusion_model = LatentDiffusion(vae, T, dx, du, context_dim,
                                                             timesteps=timesteps, sampling_timesteps=timesteps,
@@ -133,13 +133,17 @@ class TrajectoryDiffusionModel(nn.Module):
                                                             timesteps=timesteps, sampling_timesteps=timesteps,
                                                             constrain=constrained,
                                                             hidden_dim=hidden_dim,
-                                                            unconditional=unconditional)
+                                                            unconditional=unconditional,
+                                                            inits_noise=inits_noise, noise_noise=noise_noise,
+                                                            guided=guided)
             else:
                 if generate_context:
                     self.diffusion_model = JointDiffusion(T, dx, du, context_dim, timesteps=timesteps,
                                                         sampling_timesteps=timesteps,
                                                         hidden_dim=hidden_dim,
-                                                        model_type=score_model)
+                                                        model_type=score_model,
+                                                        inits_noise=inits_noise, noise_noise=noise_noise,
+                                                        guided=guided)
                 else:
                     self.diffusion_model = GaussianDiffusion(T, dx, du, context_dim, timesteps=timesteps,
                                                             sampling_timesteps=timesteps, hidden_dim=hidden_dim,
@@ -248,7 +252,7 @@ class TrajectorySampler(nn.Module):
 
     def __init__(self, T, dx, du, context_dim, type='nf', dynamics=None, problem=None, timesteps=50, hidden_dim=64,
                  constrain=False, unconditional=False, generate_context=False, score_model='conv_unet',
-                 latent_diffusion=False, vae=None):
+                 latent_diffusion=False, vae=None, inits_noise=None, noise_noise=None, guided=False):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -266,7 +270,8 @@ class TrajectorySampler(nn.Module):
                                                   latent_diffusion=True, vae=vae)
         else:
             self.model = TrajectoryDiffusionModel(T, dx, du, context_dim, problem, timesteps, hidden_dim, constrain,
-                                                  unconditional, generate_context=generate_context, score_model=score_model)
+                                                  unconditional, generate_context=generate_context, score_model=score_model,
+                                                  inits_noise=inits_noise, noise_noise=noise_noise, guided=guided)
 
         self.register_buffer('x_mean', torch.zeros(dx + du))
         self.register_buffer('x_std', torch.ones(dx + du))
@@ -282,14 +287,21 @@ class TrajectorySampler(nn.Module):
     def sample(self, N, H=10, start=None, goal=None, constraints=None, past=None):
         norm_start = None
         norm_past = None
-        if start is not None:
+        if start is not None and self.type != 'latent_diffusion':
             norm_start = (start - self.x_mean[:self.dx]) / self.x_std[:self.dx]
-        if past is not None:
+        else:
+            norm_start = start
+        if past is not None and self.type != 'latent_diffusion':
             norm_past = (past - self.x_mean) / self.x_std
+        else:
+            norm_past = past
 
         samples = self.model.sample(N, H, norm_start, goal, constraints, norm_past)
         x, c, likelihood = samples
-        return x * self.x_std + self.x_mean, c, likelihood
+        if self.type != 'latent_diffusion':
+            return x * self.x_std + self.x_mean, c, likelihood
+        else:
+            return x, c, likelihood
 
     def resample(self, start=None, goal=None, constraints=None, initial_trajectory=None, past=None, timestep=10):
         norm_start = None

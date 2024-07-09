@@ -1,0 +1,1976 @@
+Importing module 'gym_38' (/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.3.1+cu118
+Device count 1
+/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinav/Documents/ccai
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+2048
+4 128 4
+Loaded trajectory sampler
+['pregrasp', 'turn', 'thumb_middle', 'index', 'turn', 'index', 'thumb_middle', 'turn', 'thumb_middle', 'index', 'turn']
+0 pregrasp
+Sampling time 26.575327099999413
+Solve time for step 18.30686664581299
+Solve time for step 4.043222665786743
+Solve time for step 3.937863826751709
+Solve time for step 3.538242816925049
+Solve time for step 3.4244415760040283
+Solve time for step 3.3247475624084473
+Solve time for step 3.2358713150024414
+Solve time for step 3.2008581161499023
+Solve time for step 3.2991650104522705
+Solve time for step 8.539155721664429
+Solve time for step 8.336167812347412
+Solve time for step 8.063899517059326
+Solve time for step 7.985131740570068
+Solve time for step 8.09892749786377
+Solve time for step 8.095582723617554
+1 turn
+Sampling time 76.47874955896987
+Solve time for step 78.73211860656738
+Solve time for step 17.315811157226562
+Solve time for step 16.231899738311768
+Solve time for step 15.035724878311157
+Solve time for step 13.632307767868042
+Solve time for step 12.628731966018677
+Solve time for step 11.96660304069519
+Solve time for step 11.345841884613037
+Solve time for step 10.516889572143555
+Solve time for step 10.301692485809326
+Solve time for step 10.143908977508545
+Solve time for step 10.006921529769897
+Solve time for step 9.445047616958618
+Solve time for step 9.224668979644775
+Solve time for step 9.103565216064453
+2 thumb_middle
+Sampling time 61.942905298026744
+Solve time for step 49.63816475868225
+Solve time for step 12.390267133712769
+Solve time for step 11.869917869567871
+Solve time for step 11.313080787658691
+Solve time for step 11.394157409667969
+Solve time for step 11.087619066238403
+Solve time for step 10.754657506942749
+Solve time for step 10.186870098114014
+Solve time for step 10.269920825958252
+Solve time for step 10.216869831085205
+Solve time for step 9.83751130104065
+Solve time for step 9.523657083511353
+Solve time for step 9.459509372711182
+Solve time for step 9.629326343536377
+Solve time for step 9.408149242401123
+3 index
+Sampling time 67.86533158202656
+Solve time for step 65.9186544418335
+Solve time for step 15.932063341140747
+Solve time for step 14.792893409729004
+Solve time for step 14.381707668304443
+Solve time for step 13.355428457260132
+Solve time for step 13.256716966629028
+Solve time for step 12.319479703903198
+Solve time for step 11.778425455093384
+Solve time for step 11.637198686599731
+Solve time for step 12.03848934173584
+Solve time for step 11.688318252563477
+Solve time for step 11.329834461212158
+Solve time for step 11.217691659927368
+Solve time for step 11.092752933502197
+Solve time for step 10.773694038391113
+4 turn
+Sampling time 75.70008159801364
+Solve time for step 77.94830513000488
+Solve time for step 18.62204599380493
+Solve time for step 16.663135528564453
+Solve time for step 15.068768739700317
+Solve time for step 14.254199504852295
+Solve time for step 13.2172110080719
+Solve time for step 12.21776270866394
+Solve time for step 11.577516078948975
+Solve time for step 11.026270389556885
+Solve time for step 10.410380363464355
+Solve time for step 10.229946851730347
+Solve time for step 9.5582275390625
+Solve time for step 9.716545820236206
+Solve time for step 9.410226583480835
+Solve time for step 8.886988639831543
+5 index
+Sampling time 66.33656472800067
+Solve time for step 65.99117374420166
+Solve time for step 16.124662399291992
+Solve time for step 14.975668668746948
+Solve time for step 14.355069637298584
+Solve time for step 13.45846438407898
+Solve time for step 13.394647121429443
+Solve time for step 12.467100381851196
+Solve time for step 11.980324029922485
+Solve time for step 11.722703456878662
+Solve time for step 11.898396492004395
+Solve time for step 11.03440237045288
+Solve time for step 10.85783338546753
+Solve time for step 10.897854089736938
+Solve time for step 10.514479875564575
+Solve time for step 10.350739240646362
+6 thumb_middle
+Sampling time 59.6672365750419
+Solve time for step 49.11974620819092
+Solve time for step 12.065868616104126
+Solve time for step 11.594684839248657
+Solve time for step 11.305467128753662
+Solve time for step 11.071251630783081
+Solve time for step 10.737756967544556
+Solve time for step 10.589592695236206
+Solve time for step 10.325790405273438
+Solve time for step 9.908043146133423
+Solve time for step 9.680934429168701
+Solve time for step 9.60590147972107
+Solve time for step 9.640901803970337
+Solve time for step 9.421380758285522
+Solve time for step 9.110318899154663
+Solve time for step 9.342366695404053
+7 turn
+Sampling time 73.20056240895065
+Solve time for step 77.3639612197876
+Solve time for step 17.806649208068848
+Solve time for step 16.297926664352417
+Solve time for step 14.696784019470215
+Solve time for step 14.043097734451294
+Solve time for step 12.924255609512329
+Solve time for step 11.372647762298584
+Solve time for step 8.679115533828735
+Solve time for step 10.209240198135376
+Solve time for step 9.899950504302979
+Solve time for step 9.666518688201904
+Solve time for step 8.387643337249756
+Solve time for step 4.256274700164795
+Solve time for step 3.990432024002075
+Solve time for step 3.866395950317383
+8 thumb_middle
+Sampling time 29.24026471399702
+Solve time for step 22.968106746673584
+Solve time for step 5.643922567367554
+Solve time for step 5.2528300285339355
+Solve time for step 5.058215618133545
+Solve time for step 4.821922302246094
+Solve time for step 4.526561260223389
+Solve time for step 4.381482362747192
+Solve time for step 4.167942523956299
+Solve time for step 3.95550537109375
+Solve time for step 3.866323232650757
+Solve time for step 3.744283437728882
+Solve time for step 3.6409714221954346
+Solve time for step 3.467421054840088
+Solve time for step 3.438910722732544
+Solve time for step 3.3529739379882812
+9 index
+Sampling time 34.05768855201313
+Solve time for step 35.16132616996765
+Solve time for step 8.337383508682251
+Solve time for step 7.459059238433838
+Solve time for step 7.098520994186401
+Solve time for step 6.3655455112457275
+Solve time for step 6.091768503189087
+Solve time for step 5.715119123458862
+Solve time for step 5.340309143066406
+Solve time for step 4.995864391326904
+Solve time for step 4.870118141174316
+Solve time for step 4.605794191360474
+Solve time for step 4.385598421096802
+Solve time for step 4.211397171020508
+Solve time for step 4.06932806968689
+Solve time for step 3.9618988037109375
+10 turn
+Sampling time 38.52758315601386
+Solve time for step 50.34348177909851
+Solve time for step 11.475182056427002
+Solve time for step 10.124154806137085
+Solve time for step 8.859463214874268
+Solve time for step 8.122618913650513
+Solve time for step 7.166672468185425
+Solve time for step 6.538077116012573
+Solve time for step 5.887948989868164
+Solve time for step 5.372928857803345
+Solve time for step 4.9410271644592285
+Solve time for step 4.5902276039123535
+Solve time for step 4.324532747268677
+Solve time for step 4.13075065612793
+Solve time for step 3.984071731567383
+Solve time for step 3.8152668476104736
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+2048
+4 128 4
+Loaded trajectory sampler
+['pregrasp', 'turn', 'thumb_middle', 'index', 'turn', 'index', 'thumb_middle', 'turn', 'index', 'thumb_middle', 'turn']
+0 pregrasp
+Sampling time 24.681187409965787
+Solve time for step 15.47104287147522
+Solve time for step 3.769845485687256
+Solve time for step 3.7030203342437744
+Solve time for step 3.474571466445923
+Solve time for step 3.3940258026123047
+Solve time for step 3.407618761062622
+Solve time for step 3.1872944831848145
+Solve time for step 3.068169593811035
+Solve time for step 3.0013651847839355
+Solve time for step 2.893636703491211
+Solve time for step 2.9343934059143066
+Solve time for step 2.7588045597076416
+Solve time for step 2.661694049835205
+Solve time for step 2.5305590629577637
+Solve time for step 2.475917100906372
+1 turn
+Sampling time 38.15539957600413
+Solve time for step 49.075332164764404
+Solve time for step 11.223947525024414
+Solve time for step 9.924811363220215
+Solve time for step 8.665724754333496
+Solve time for step 7.93927788734436
+Solve time for step 7.080983400344849
+Solve time for step 6.319325923919678
+Solve time for step 5.843570232391357
+Solve time for step 5.331728219985962
+Solve time for step 4.8829920291900635
+Solve time for step 4.646595001220703
+Solve time for step 4.3689284324646
+Solve time for step 4.137204170227051
+Solve time for step 4.063446044921875
+Solve time for step 3.8001315593719482
+2 thumb_middle
+Sampling time 28.648217711015604
+Solve time for step 22.964303970336914
+Solve time for step 5.542210578918457
+Solve time for step 5.144991159439087
+Solve time for step 4.967188119888306
+Solve time for step 4.867083787918091
+Solve time for step 4.537089824676514
+Solve time for step 4.361795425415039
+Solve time for step 4.15106463432312
+Solve time for step 3.9713330268859863
+Solve time for step 3.9235174655914307
+Solve time for step 3.7121496200561523
+Solve time for step 3.6095259189605713
+Solve time for step 3.4558095932006836
+Solve time for step 3.4347481727600098
+Solve time for step 3.4345154762268066
+3 index
+Sampling time 33.558556625037454
+Solve time for step 34.86349320411682
+Solve time for step 8.277511835098267
+Solve time for step 7.33875036239624
+Solve time for step 6.902879476547241
+Solve time for step 6.3940589427948
+Solve time for step 6.042259693145752
+Solve time for step 5.560721397399902
+Solve time for step 5.285892724990845
+Solve time for step 4.954656600952148
+Solve time for step 4.858138799667358
+Solve time for step 4.535324573516846
+Solve time for step 4.376758337020874
+Solve time for step 4.206775903701782
+Solve time for step 4.107173681259155
+Solve time for step 4.034135341644287
+4 turn
+Sampling time 38.235718103009276
+Solve time for step 49.14060878753662
+Solve time for step 11.160423755645752
+Solve time for step 9.83022952079773
+Solve time for step 8.647833108901978
+Solve time for step 7.991573333740234
+Solve time for step 7.144949436187744
+Solve time for step 6.290386438369751
+Solve time for step 5.813050031661987
+Solve time for step 5.266863107681274
+Solve time for step 4.89087700843811
+Solve time for step 4.726452589035034
+Solve time for step 4.374264240264893
+Solve time for step 4.3674538135528564
+Solve time for step 4.104108810424805
+Solve time for step 4.453977346420288
+5 index
+Sampling time 36.08808863098966
+Solve time for step 36.859179973602295
+Solve time for step 8.305649995803833
+Solve time for step 7.47754693031311
+Solve time for step 6.972243785858154
+Solve time for step 6.364767551422119
+Solve time for step 6.26246190071106
+Solve time for step 5.583253622055054
+Solve time for step 5.525127410888672
+Solve time for step 5.117508172988892
+Solve time for step 4.989586591720581
+Solve time for step 4.865609884262085
+Solve time for step 4.6087729930877686
+Solve time for step 4.549727916717529
+Solve time for step 4.393746376037598
+Solve time for step 4.180314779281616
+6 thumb_middle
+Sampling time 28.817852378007956
+Solve time for step 22.62329864501953
+Solve time for step 5.587915897369385
+Solve time for step 5.2411048412323
+Solve time for step 5.0261054039001465
+Solve time for step 4.794283628463745
+Solve time for step 4.464834690093994
+Solve time for step 4.402486085891724
+Solve time for step 4.14282751083374
+Solve time for step 3.976127862930298
+Solve time for step 3.78305983543396
+Solve time for step 3.688678741455078
+Solve time for step 3.634335517883301
+Solve time for step 3.510854959487915
+Solve time for step 3.4702441692352295
+Solve time for step 3.3314952850341797
+7 turn
+Sampling time 38.00442843599012
+Solve time for step 49.18513035774231
+Solve time for step 11.200427055358887
+Solve time for step 9.902308940887451
+Solve time for step 8.770094156265259
+Solve time for step 8.015648603439331
+Solve time for step 7.105775833129883
+Solve time for step 6.42552375793457
+Solve time for step 5.8415727615356445
+Solve time for step 5.362071990966797
+Solve time for step 4.891504764556885
+Solve time for step 4.673445463180542
+Solve time for step 4.3200905323028564
+Solve time for step 4.1577370166778564
+Solve time for step 4.032477378845215
+Solve time for step 3.79407000541687
+8 index
+Sampling time 33.45819646702148
+Solve time for step 34.6981885433197
+Solve time for step 8.202554702758789
+Solve time for step 7.351583480834961
+Solve time for step 6.920665502548218
+Solve time for step 6.304386377334595
+Solve time for step 5.953462362289429
+Solve time for step 5.509437799453735
+Solve time for step 5.206244230270386
+Solve time for step 4.99709677696228
+Solve time for step 4.801077842712402
+Solve time for step 4.448493957519531
+Solve time for step 4.4291040897369385
+Solve time for step 4.280828952789307
+Solve time for step 4.068111181259155
+Solve time for step 4.003666639328003
+9 thumb_middle
+Sampling time 28.81887179799378
+Solve time for step 22.439356803894043
+Solve time for step 5.607844352722168
+Solve time for step 5.214570045471191
+Solve time for step 4.996055603027344
+Solve time for step 4.808884859085083
+Solve time for step 4.427911281585693
+Solve time for step 4.339655637741089
+Solve time for step 4.169812202453613
+Solve time for step 4.022712469100952
+Solve time for step 3.866427183151245
+Solve time for step 3.7152786254882812
+Solve time for step 3.625542402267456
+Solve time for step 3.52156138420105
+Solve time for step 3.4246888160705566
+Solve time for step 3.40688157081604
+10 turn
+Sampling time 38.501076903019566
+Solve time for step 49.97925639152527
+Solve time for step 11.410526514053345
+Solve time for step 9.982743978500366
+Solve time for step 8.82668685913086
+Solve time for step 8.115928173065186
+Solve time for step 7.228984117507935
+Solve time for step 6.390892028808594
+Solve time for step 5.941259860992432
+Solve time for step 5.321697235107422
+Solve time for step 4.964234352111816
+Solve time for step 4.736945390701294
+Solve time for step 4.451821327209473
+Solve time for step 4.245811700820923
+Solve time for step 4.0092668533325195
+Solve time for step 3.8408920764923096
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+2048
+4 128 4
+Loaded trajectory sampler
+['pregrasp', 'turn', 'index', 'thumb_middle', 'turn', 'thumb_middle', 'index', 'turn', 'thumb_middle', 'index', 'turn']
+0 pregrasp
+Sampling time 24.855912178987637
+Solve time for step 15.319851636886597
+Solve time for step 3.9205377101898193
+Solve time for step 3.7106006145477295
+Solve time for step 3.5304441452026367
+Solve time for step 3.397151470184326
+Solve time for step 3.3316283226013184
+Solve time for step 3.195761203765869
+Solve time for step 3.0637645721435547
+Solve time for step 2.970222234725952
+Solve time for step 2.8580336570739746
+Solve time for step 2.9044787883758545
+Solve time for step 2.717421531677246
+Solve time for step 2.702594041824341
+Solve time for step 2.57741641998291
+Solve time for step 2.574465036392212
+1 turn
+Sampling time 38.35574655799428
+Solve time for step 49.66602277755737
+Solve time for step 11.384404420852661
+Solve time for step 10.050598382949829
+Solve time for step 8.745158433914185
+Solve time for step 8.02705693244934
+Solve time for step 7.112912893295288
+Solve time for step 6.44532585144043
+Solve time for step 5.836142301559448
+Solve time for step 5.379504680633545
+Solve time for step 5.0129616260528564
+Solve time for step 4.696624755859375
+Solve time for step 4.425584316253662
+Solve time for step 4.203306198120117
+Solve time for step 4.0412819385528564
+Solve time for step 3.8341641426086426
+2 index
+Sampling time 34.04961075796746
+Solve time for step 34.71916127204895
+Solve time for step 8.291752338409424
+Solve time for step 7.403150796890259
+Solve time for step 6.931575059890747
+Solve time for step 6.4249982833862305
+Solve time for step 6.034562826156616
+Solve time for step 5.7745888233184814
+Solve time for step 5.36586856842041
+Solve time for step 5.02890944480896
+Solve time for step 4.7881457805633545
+Solve time for step 4.577915191650391
+Solve time for step 4.442052364349365
+Solve time for step 4.279754400253296
+Solve time for step 4.116070508956909
+Solve time for step 4.051044940948486
+3 thumb_middle
+Sampling time 29.262769902998116
+Solve time for step 22.981670379638672
+Solve time for step 5.558210849761963
+Solve time for step 5.240141868591309
+Solve time for step 4.9719884395599365
+Solve time for step 4.790576219558716
+Solve time for step 4.541427373886108
+Solve time for step 4.375398874282837
+Solve time for step 4.076918601989746
+Solve time for step 3.950594663619995
+Solve time for step 3.8408100605010986
+Solve time for step 3.713416576385498
+Solve time for step 3.5641727447509766
+Solve time for step 3.5402657985687256
+Solve time for step 3.4972870349884033
+Solve time for step 3.287576198577881
+4 turn
+Sampling time 38.65863993996754
+Solve time for step 49.693408489227295
+Solve time for step 11.325884103775024
+Solve time for step 10.026740550994873
+Solve time for step 8.755268335342407
+Solve time for step 8.072378635406494
+Solve time for step 7.138159990310669
+Solve time for step 6.434286594390869
+Solve time for step 5.826646089553833
+Solve time for step 5.366245985031128
+Solve time for step 4.957771062850952
+Solve time for step 4.715035915374756
+Solve time for step 4.536700010299683
+Solve time for step 4.21065616607666
+Solve time for step 4.04630184173584
+Solve time for step 3.861252784729004
+5 thumb_middle
+Sampling time 29.471534213982522
+Solve time for step 23.04936146736145
+Solve time for step 5.632734537124634
+Solve time for step 5.28060245513916
+Solve time for step 5.085533618927002
+Solve time for step 4.8565075397491455
+Solve time for step 4.525252342224121
+Solve time for step 4.324812889099121
+Solve time for step 4.151031255722046
+Solve time for step 3.980830430984497
+Solve time for step 3.90993595123291
+Solve time for step 3.700756311416626
+Solve time for step 3.620753765106201
+Solve time for step 3.4959628582000732
+Solve time for step 3.3922836780548096
+Solve time for step 3.348667860031128
+6 index
+Sampling time 34.09572973800823
+Solve time for step 35.217775106430054
+Solve time for step 8.407728433609009
+Solve time for step 7.506182670593262
+Solve time for step 7.0698466300964355
+Solve time for step 6.368269443511963
+Solve time for step 6.0644495487213135
+Solve time for step 5.614140510559082
+Solve time for step 5.398738384246826
+Solve time for step 5.006722450256348
+Solve time for step 4.744506597518921
+Solve time for step 4.546977519989014
+Solve time for step 4.441642999649048
+Solve time for step 4.139496326446533
+Solve time for step 4.1708362102508545
+Solve time for step 3.988006353378296
+7 turn
+Sampling time 38.56522024603328
+Solve time for step 49.731934547424316
+Solve time for step 11.347642421722412
+Solve time for step 9.952147960662842
+Solve time for step 8.707968950271606
+Solve time for step 8.11778473854065
+Solve time for step 7.174103260040283
+Solve time for step 6.383647441864014
+Solve time for step 5.986011505126953
+Solve time for step 5.457763195037842
+Solve time for step 4.932299375534058
+Solve time for step 4.644629001617432
+Solve time for step 4.357897043228149
+Solve time for step 4.207608461380005
+Solve time for step 4.0133960247039795
+Solve time for step 3.9262988567352295
+8 thumb_middle
+Sampling time 29.590067750017624
+Solve time for step 23.165454626083374
+Solve time for step 5.59658408164978
+Solve time for step 5.203587055206299
+Solve time for step 5.011728763580322
+Solve time for step 4.863117694854736
+Solve time for step 4.576352119445801
+Solve time for step 4.337150573730469
+Solve time for step 4.126842737197876
+Solve time for step 3.9406299591064453
+Solve time for step 3.8163750171661377
+Solve time for step 3.8083064556121826
+Solve time for step 3.6575064659118652
+Solve time for step 3.4328348636627197
+Solve time for step 3.3790955543518066
+Solve time for step 3.3313801288604736
+9 index
+Sampling time 33.953266706026625
+Solve time for step 34.94418525695801
+Solve time for step 8.309174299240112
+Solve time for step 7.5348145961761475
+Solve time for step 6.96832275390625
+Solve time for step 6.3330934047698975
+Solve time for step 5.970707654953003
+Solve time for step 5.648593902587891
+Solve time for step 5.328695774078369
+Solve time for step 4.985713005065918
+Solve time for step 4.813117742538452
+Solve time for step 4.491012334823608
+Solve time for step 4.354022741317749
+Solve time for step 4.237761735916138
+Solve time for step 4.205764532089233
+Solve time for step 3.9845082759857178
+10 turn
+Sampling time 38.26483016402926
+Solve time for step 50.00109100341797
+Solve time for step 11.320040464401245
+Solve time for step 10.049173593521118
+Solve time for step 8.796236753463745
+Solve time for step 8.024003982543945
+Solve time for step 7.210927963256836
+Solve time for step 6.436965227127075
+Solve time for step 5.887606382369995
+Solve time for step 5.297643661499023
+Solve time for step 4.993350982666016
+Solve time for step 4.740427494049072
+Solve time for step 4.362199306488037
+Solve time for step 4.253580331802368
+Solve time for step 4.008326053619385
+Solve time for step 3.843560218811035
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+2048
+4 128 4
+Loaded trajectory sampler
+['pregrasp', 'turn', 'index', 'thumb_middle', 'turn', 'index', 'thumb_middle', 'turn', 'index', 'thumb_middle', 'turn']
+0 pregrasp
+Sampling time 24.88193556899205
+Solve time for step 15.62427282333374
+Solve time for step 3.8354461193084717
+Solve time for step 3.6770334243774414
+Solve time for step 3.501352548599243
+Solve time for step 3.4682211875915527
+Solve time for step 3.357337474822998
+Solve time for step 3.2464065551757812
+Solve time for step 3.1556501388549805
+Solve time for step 3.0734708309173584
+Solve time for step 3.002262830734253
+Solve time for step 2.8574047088623047
+Solve time for step 2.764996290206909
+Solve time for step 2.683751106262207
+Solve time for step 2.6021392345428467
+Solve time for step 2.5237390995025635
+1 turn
+Sampling time 37.45729318604572
+Solve time for step 48.54941129684448
+Solve time for step 11.140447616577148
+Solve time for step 9.832842350006104
+Solve time for step 8.618739128112793
+Solve time for step 7.841365337371826
+Solve time for step 7.0190956592559814
+Solve time for step 6.279812812805176
+Solve time for step 5.7821338176727295
+Solve time for step 5.218140125274658
+Solve time for step 4.72994589805603
+Solve time for step 4.7243499755859375
+Solve time for step 4.327359199523926
+Solve time for step 4.21200704574585
+Solve time for step 4.060296297073364
+Solve time for step 3.818923234939575
+2 index
+Sampling time 33.22413934301585
+Solve time for step 34.365217447280884
+Solve time for step 8.157011985778809
+Solve time for step 7.411034107208252
+Solve time for step 6.899135589599609
+Solve time for step 6.242603540420532
+Solve time for step 5.931990146636963
+Solve time for step 5.584005117416382
+Solve time for step 5.232190370559692
+Solve time for step 4.955685377120972
+Solve time for step 4.762002944946289
+Solve time for step 4.592794179916382
+Solve time for step 4.446406364440918
+Solve time for step 4.2703001499176025
+Solve time for step 4.063860893249512
+Solve time for step 3.985177516937256
+3 thumb_middle
+Sampling time 29.551416481030174
+Solve time for step 22.894736766815186
+Solve time for step 5.5910069942474365
+Solve time for step 5.244539737701416
+Solve time for step 5.07965350151062
+Solve time for step 4.763169288635254
+Solve time for step 4.519230365753174
+Solve time for step 4.366952180862427
+Solve time for step 4.1390061378479
+Solve time for step 3.9508588314056396
+Solve time for step 3.807255268096924
+Solve time for step 3.7027535438537598
+Solve time for step 3.650557279586792
+Solve time for step 3.540466070175171
+Solve time for step 3.427633762359619
+Solve time for step 3.3929800987243652
+4 turn
+Sampling time 38.61178421496879
+Solve time for step 49.750523805618286
+Solve time for step 11.37815809249878
+Solve time for step 10.092365264892578
+Solve time for step 8.799968719482422
+Solve time for step 8.08402156829834
+Solve time for step 7.174475908279419
+Solve time for step 6.342406749725342
+Solve time for step 5.963754892349243
+Solve time for step 5.325190782546997
+Solve time for step 4.908153295516968
+Solve time for step 4.72351598739624
+Solve time for step 4.400359392166138
+Solve time for step 4.251339435577393
+Solve time for step 4.067832708358765
+Solve time for step 3.9401566982269287
+5 index
+Sampling time 33.91545438702451
+Solve time for step 35.04248881340027
+Solve time for step 8.336956024169922
+Solve time for step 7.499723434448242
+Solve time for step 7.064077854156494
+Solve time for step 6.4205710887908936
+Solve time for step 6.1261680126190186
+Solve time for step 5.629514932632446
+Solve time for step 5.31860876083374
+Solve time for step 4.9568822383880615
+Solve time for step 4.8266425132751465
+Solve time for step 4.599158763885498
+Solve time for step 4.389219522476196
+Solve time for step 4.212446212768555
+Solve time for step 4.189156770706177
+Solve time for step 4.020293951034546
+6 thumb_middle
+Sampling time 29.418338363000657
+Solve time for step 23.270495176315308
+Solve time for step 5.620386600494385
+Solve time for step 5.226408243179321
+Solve time for step 5.093805551528931
+Solve time for step 4.7766664028167725
+Solve time for step 4.5746588706970215
+Solve time for step 4.296313762664795
+Solve time for step 4.191306829452515
+Solve time for step 4.011002063751221
+Solve time for step 3.8686916828155518
+Solve time for step 3.7332732677459717
+Solve time for step 3.562114953994751
+Solve time for step 3.568363666534424
+Solve time for step 3.589933395385742
+Solve time for step 3.317763328552246
+7 turn
+Sampling time 38.48504501301795
+Solve time for step 49.906540393829346
+Solve time for step 11.391828298568726
+Solve time for step 10.014519691467285
+Solve time for step 8.748215198516846
+Solve time for step 8.08704400062561
+Solve time for step 7.14786434173584
+Solve time for step 6.4001076221466064
+Solve time for step 5.774062395095825
+Solve time for step 5.402512311935425
+Solve time for step 4.973153591156006
+Solve time for step 4.72405219078064
+Solve time for step 4.4172303676605225
+Solve time for step 4.222134828567505
+Solve time for step 4.072222471237183
+Solve time for step 3.9003849029541016
+8 index
+Sampling time 33.841398196003865
+Solve time for step 34.87046527862549
+Solve time for step 8.276551008224487
+Solve time for step 7.56925892829895
+Solve time for step 7.097105979919434
+Solve time for step 6.36030912399292
+Solve time for step 6.040502071380615
+Solve time for step 5.610021352767944
+Solve time for step 5.343268394470215
+Solve time for step 5.046806573867798
+Solve time for step 4.870004415512085
+Solve time for step 4.595374345779419
+Solve time for step 4.443845510482788
+Solve time for step 4.199459791183472
+Solve time for step 4.128673076629639
+Solve time for step 4.031743049621582
+9 thumb_middle
+Sampling time 29.479862344975118
+Solve time for step 23.243854999542236
+Solve time for step 5.721498012542725
+Solve time for step 5.287389755249023
+Solve time for step 5.0184080600738525
+Solve time for step 4.862063407897949
+Solve time for step 4.544774293899536
+Solve time for step 4.335470914840698
+Solve time for step 4.153359651565552
+Solve time for step 3.9749574661254883
+Solve time for step 3.8997325897216797
+Solve time for step 3.782808542251587
+Solve time for step 3.6985161304473877
+Solve time for step 3.576179027557373
+Solve time for step 3.5023951530456543
+Solve time for step 3.2926533222198486
+10 turn
+Sampling time 38.60357192403171
+Solve time for step 49.92674994468689
+Solve time for step 11.378393173217773
+Solve time for step 10.05585789680481
+Solve time for step 8.74309492111206
+Solve time for step 8.064745426177979
+Solve time for step 7.125557899475098
+Solve time for step 6.427599191665649
+Solve time for step 5.899977207183838
+Solve time for step 5.458492279052734
+Solve time for step 5.025902509689331
+Solve time for step 4.622621536254883
+Solve time for step 4.400935411453247
+Solve time for step 4.224946737289429
+Solve time for step 3.9512226581573486
+Solve time for step 3.923383951187134
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+2048
+4 128 4
+Loaded trajectory sampler
+['pregrasp', 'turn', 'thumb_middle', 'index', 'turn', 'thumb_middle', 'index', 'turn', 'thumb_middle', 'index', 'turn']
+0 pregrasp
+Sampling time 25.12398687901441
+Solve time for step 15.708592176437378
+Solve time for step 3.788640022277832
+Solve time for step 3.65026593208313
+Solve time for step 3.5504021644592285
+Solve time for step 3.4220974445343018
+Solve time for step 3.3524081707000732
+Solve time for step 3.279193639755249
+Solve time for step 3.1219139099121094
+Solve time for step 3.0239264965057373
+Solve time for step 2.9261951446533203
+Solve time for step 2.9262309074401855
+Solve time for step 2.727224826812744
+Solve time for step 2.7862305641174316
+Solve time for step 2.611102342605591
+Solve time for step 2.575120210647583
+1 turn
+Sampling time 38.8708335509873
+Solve time for step 49.884549140930176
+Solve time for step 11.255565643310547
+Solve time for step 10.04177975654602
+Solve time for step 8.756157159805298
+Solve time for step 8.030384540557861
+Solve time for step 7.210820436477661
+Solve time for step 6.461007833480835
+Solve time for step 5.842187404632568
+Solve time for step 5.393263816833496
+Solve time for step 5.034618616104126
+Solve time for step 4.742047309875488
+Solve time for step 4.411636829376221
+Solve time for step 4.151957750320435
+Solve time for step 3.9891440868377686
+Solve time for step 3.909343719482422
+2 thumb_middle
+Sampling time 29.540126362000592
+Solve time for step 22.83214569091797
+Solve time for step 5.733392000198364
+Solve time for step 5.335153341293335
+Solve time for step 5.0511085987091064
+Solve time for step 4.871702671051025
+Solve time for step 4.544445514678955
+Solve time for step 4.439866065979004
+Solve time for step 4.175580739974976
+Solve time for step 3.966357946395874
+Solve time for step 3.8067564964294434
+Solve time for step 3.679198741912842
+Solve time for step 3.6143736839294434
+Solve time for step 3.509585380554199
+Solve time for step 3.440173625946045
+Solve time for step 3.3366405963897705
+3 index
+Sampling time 33.97677415004
+Solve time for step 35.11591958999634
+Solve time for step 8.412166118621826
+Solve time for step 7.470225811004639
+Solve time for step 7.043644189834595
+Solve time for step 6.471163272857666
+Solve time for step 6.004855394363403
+Solve time for step 5.6242005825042725
+Solve time for step 5.311208963394165
+Solve time for step 5.019922494888306
+Solve time for step 4.73530912399292
+Solve time for step 4.571948766708374
+Solve time for step 4.40182900428772
+Solve time for step 4.24633264541626
+Solve time for step 4.04454231262207
+Solve time for step 4.0096917152404785
+4 turn
+Sampling time 39.03949252597522
+Solve time for step 49.91259813308716
+Solve time for step 11.381182670593262
+Solve time for step 10.145409107208252
+Solve time for step 8.791813135147095
+Solve time for step 8.145684242248535
+Solve time for step 7.1384594440460205
+Solve time for step 6.379263401031494
+Solve time for step 5.847951650619507
+Solve time for step 5.543109893798828
+Solve time for step 4.907047986984253
+Solve time for step 4.638891696929932
+Solve time for step 4.363875865936279
+Solve time for step 4.197375059127808
+Solve time for step 3.9322779178619385
+Solve time for step 3.8732495307922363
+5 thumb_middle
+Sampling time 29.317506631021388
+Solve time for step 23.05782461166382
+Solve time for step 5.623478651046753
+Solve time for step 5.243340015411377
+Solve time for step 5.084813117980957
+Solve time for step 4.760137319564819
+Solve time for step 4.5564844608306885
+Solve time for step 4.4317638874053955
+Solve time for step 4.194321155548096
+Solve time for step 4.008620738983154
+Solve time for step 3.848705291748047
+Solve time for step 3.7396087646484375
+Solve time for step 3.6256930828094482
+Solve time for step 3.4814887046813965
+Solve time for step 3.4379336833953857
+Solve time for step 3.2827606201171875
+6 index
+Sampling time 34.34584903396899
+Solve time for step 35.259642601013184
+Solve time for step 8.217777252197266
+Solve time for step 7.556454658508301
+Solve time for step 7.0941853523254395
+Solve time for step 6.497665882110596
+Solve time for step 6.12267804145813
+Solve time for step 5.686925888061523
+Solve time for step 5.322400331497192
+Solve time for step 4.951947927474976
+Solve time for step 4.815367698669434
+Solve time for step 4.554491281509399
+Solve time for step 4.444425821304321
+Solve time for step 4.282500743865967
+Solve time for step 4.202921152114868
+Solve time for step 4.042371511459351
+7 turn
+Sampling time 38.778476495004725
+Solve time for step 49.80166411399841
+Solve time for step 11.423473834991455
+Solve time for step 10.00206470489502
+Solve time for step 8.729872703552246
+Solve time for step 8.093381404876709
+Solve time for step 7.256696701049805
+Solve time for step 6.412403106689453
+Solve time for step 5.906319856643677
+Solve time for step 5.446953296661377
+Solve time for step 4.983084440231323
+Solve time for step 4.688949823379517
+Solve time for step 4.440549612045288
+Solve time for step 4.187738656997681
+Solve time for step 4.038501739501953
+Solve time for step 3.907271385192871
+8 thumb_middle
+Sampling time 29.741215226007625
+Solve time for step 23.205081939697266
+Solve time for step 5.651168584823608
+Solve time for step 5.358024835586548
+Solve time for step 5.0686585903167725
+Solve time for step 4.820748567581177
+Solve time for step 4.561211585998535
+Solve time for step 4.45720648765564
+Solve time for step 4.178016185760498
+Solve time for step 3.993431329727173
+Solve time for step 3.9293854236602783
+Solve time for step 3.774144411087036
+Solve time for step 3.607088565826416
+Solve time for step 3.457714319229126
+Solve time for step 3.525866985321045
+Solve time for step 3.331273317337036
+9 index
+Sampling time 34.15845314098988
+Solve time for step 35.082070112228394
+Solve time for step 8.27659821510315
+Solve time for step 7.59313178062439
+Solve time for step 7.002780437469482
+Solve time for step 6.450632572174072
+Solve time for step 6.0586769580841064
+Solve time for step 5.673562288284302
+Solve time for step 5.312692880630493
+Solve time for step 5.0712103843688965
+Solve time for step 4.855112314224243
+Solve time for step 4.546614408493042
+Solve time for step 4.349824905395508
+Solve time for step 4.2194788455963135
+Solve time for step 4.192823886871338
+Solve time for step 3.966951370239258
+10 turn
+Sampling time 38.889852148946375
+Solve time for step 50.10804343223572
+Solve time for step 11.371121883392334
+Solve time for step 10.02135705947876
+Solve time for step 8.727915048599243
+Solve time for step 7.983565092086792
+Solve time for step 7.21636438369751
+Solve time for step 6.489291667938232
+Solve time for step 5.808740615844727
+Solve time for step 5.436267375946045
+Solve time for step 4.955835819244385
+Solve time for step 4.714133977890015
+Solve time for step 4.455219745635986
+Solve time for step 4.158084392547607
+Solve time for step 4.041992902755737
+Solve time for step 3.798764228820801
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+2048
+4 128 4
+Loaded trajectory sampler
+['pregrasp', 'turn', 'thumb_middle', 'index', 'turn', 'thumb_middle', 'index', 'turn', 'thumb_middle', 'index', 'turn']
+0 pregrasp
+Sampling time 24.910822728998028
+Solve time for step 15.593469619750977
+Solve time for step 3.849466323852539
+Solve time for step 3.6818647384643555
+Solve time for step 3.5074310302734375
+Solve time for step 3.399501323699951
+Solve time for step 3.2961390018463135
+Solve time for step 3.1995809078216553
+Solve time for step 3.1880228519439697
+Solve time for step 3.0184338092803955
+Solve time for step 2.9346048831939697
+Solve time for step 2.9213509559631348
+Solve time for step 2.758434534072876
+Solve time for step 2.702255964279175
+Solve time for step 2.604700803756714
+Solve time for step 2.5004992485046387
+1 turn
+Sampling time 38.246005659981165
+Solve time for step 48.682772636413574
+Solve time for step 11.143482446670532
+Solve time for step 9.861594676971436
+Solve time for step 8.646135091781616
+Solve time for step 7.995894432067871
+Solve time for step 7.05266547203064
+Solve time for step 6.273279666900635
+Solve time for step 5.787153244018555
+Solve time for step 5.281930446624756
+Solve time for step 4.909244060516357
+Solve time for step 4.678302526473999
+Solve time for step 4.33211612701416
+Solve time for step 4.162057161331177
+Solve time for step 4.028266668319702
+Solve time for step 3.82533860206604
+2 thumb_middle
+Sampling time 28.82077426597243
+Solve time for step 22.64139699935913
+Solve time for step 5.534035921096802
+Solve time for step 5.143953323364258
+Solve time for step 4.909766435623169
+Solve time for step 4.690631151199341
+Solve time for step 4.534254550933838
+Solve time for step 4.349679946899414
+Solve time for step 4.110428333282471
+Solve time for step 3.892040491104126
+Solve time for step 3.801621198654175
+Solve time for step 3.7871572971343994
+Solve time for step 3.6943166255950928
+Solve time for step 3.5072948932647705
+Solve time for step 3.4907336235046387
+Solve time for step 3.365124464035034
+3 index
+Sampling time 34.38923008501297
+Solve time for step 35.23154664039612
+Solve time for step 8.376009941101074
+Solve time for step 7.49462628364563
+Solve time for step 7.07084846496582
+Solve time for step 6.435610294342041
+Solve time for step 6.114413738250732
+Solve time for step 5.718587398529053
+Solve time for step 5.403136968612671
+Solve time for step 4.91422438621521
+Solve time for step 4.853066444396973
+Solve time for step 4.567338466644287
+Solve time for step 4.477986097335815
+Solve time for step 4.288782596588135
+Solve time for step 4.095605850219727
+Solve time for step 3.988729476928711
+4 turn
+Sampling time 38.565780416014604
+Solve time for step 49.83920645713806
+Solve time for step 11.407014608383179
+Solve time for step 10.089680671691895
+Solve time for step 8.777074337005615
+Solve time for step 8.044008016586304
+Solve time for step 7.194162130355835
+Solve time for step 6.44986367225647
+Solve time for step 5.908022165298462
+Solve time for step 5.35800576210022
+Solve time for step 5.002052307128906
+Solve time for step 4.712652683258057
+Solve time for step 4.352675914764404
+Solve time for step 4.2452592849731445
+Solve time for step 4.084516763687134
+Solve time for step 3.8698389530181885
+5 thumb_middle
+Sampling time 29.699172942026053
+Solve time for step 23.153703927993774
+Solve time for step 5.688973665237427
+Solve time for step 5.264622688293457
+Solve time for step 5.031490802764893
+Solve time for step 4.866934299468994
+Solve time for step 4.54924201965332
+Solve time for step 4.364668369293213
+Solve time for step 4.124860525131226
+Solve time for step 3.961524248123169
+Solve time for step 3.8914084434509277
+Solve time for step 3.785780429840088
+Solve time for step 3.626837730407715
+Solve time for step 3.4662904739379883
+Solve time for step 3.459108829498291
+Solve time for step 3.4000775814056396
+6 index
+Sampling time 34.22964268003125
+Solve time for step 35.021435022354126
+Solve time for step 8.356778383255005
+Solve time for step 7.459819555282593
+Solve time for step 7.067948818206787
+Solve time for step 6.377767324447632
+Solve time for step 5.987973213195801
+Solve time for step 5.575794219970703
+Solve time for step 5.326866388320923
+Solve time for step 5.033985614776611
+Solve time for step 4.823071479797363
+Solve time for step 4.580957651138306
+Solve time for step 4.4095845222473145
+Solve time for step 4.173717021942139
+Solve time for step 4.162167310714722
+Solve time for step 3.9278969764709473
+7 turn
+Sampling time 38.68146310996963
+Solve time for step 50.09629511833191
+Solve time for step 11.377307653427124
+Solve time for step 10.068167209625244
+Solve time for step 8.803334712982178
+Solve time for step 8.09113621711731
+Solve time for step 7.12407660484314
+Solve time for step 6.461400985717773
+Solve time for step 5.926923990249634
+Solve time for step 5.350569009780884
+Solve time for step 4.981651782989502
+Solve time for step 4.671552419662476
+Solve time for step 4.332589864730835
+Solve time for step 4.269455194473267
+Solve time for step 4.078060626983643
+Solve time for step 3.850350856781006
+8 thumb_middle
+Sampling time 29.381951507006306
+Solve time for step 23.145736694335938
+Solve time for step 5.66252875328064
+Solve time for step 5.292157888412476
+Solve time for step 4.994312524795532
+Solve time for step 4.7993693351745605
+Solve time for step 4.500568628311157
+Solve time for step 4.393197536468506
+Solve time for step 4.167246341705322
+Solve time for step 4.054619312286377
+Solve time for step 3.8727221488952637
+Solve time for step 3.740257740020752
+Solve time for step 3.5621449947357178
+Solve time for step 3.537792921066284
+Solve time for step 3.427258014678955
+Solve time for step 3.31425404548645
+9 index
+Sampling time 34.04169228399405
+Solve time for step 35.08517050743103
+Solve time for step 8.332748174667358
+Solve time for step 7.49527907371521
+Solve time for step 7.052521705627441
+Solve time for step 6.5091001987457275
+Solve time for step 6.056235313415527
+Solve time for step 5.687309741973877
+Solve time for step 5.530645132064819
+Solve time for step 5.0809855461120605
+Solve time for step 4.858492612838745
+Solve time for step 4.552287340164185
+Solve time for step 4.401256799697876
+Solve time for step 4.356652021408081
+Solve time for step 4.203547477722168
+Solve time for step 4.038342714309692
+10 turn
+Sampling time 38.71765314898221
+Solve time for step 49.66130781173706
+Solve time for step 11.396801471710205
+Solve time for step 10.094281435012817
+Solve time for step 8.776977777481079
+Solve time for step 8.002233982086182
+Solve time for step 7.165156602859497
+Solve time for step 6.498551368713379
+Solve time for step 5.956785678863525
+Solve time for step 5.414026737213135
+Solve time for step 5.014261245727539
+Solve time for step 4.689156532287598
+Solve time for step 4.380818605422974
+Solve time for step 4.21085000038147
+Solve time for step 4.010823965072632
+Solve time for step 3.925034761428833
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+2048
+4 128 4
+Loaded trajectory sampler
+['pregrasp', 'turn', 'thumb_middle', 'index', 'turn', 'index', 'thumb_middle', 'turn', 'index', 'thumb_middle', 'turn']
+0 pregrasp
+Sampling time 25.00707988301292
+Solve time for step 15.452075719833374
+Solve time for step 3.800218343734741
+Solve time for step 3.683485507965088
+Solve time for step 3.5072875022888184
+Solve time for step 3.5236520767211914
+Solve time for step 3.356839179992676
+Solve time for step 3.3115732669830322
+Solve time for step 3.102837324142456
+Solve time for step 3.0859575271606445
+Solve time for step 2.9323294162750244
+Solve time for step 2.8813912868499756
+Solve time for step 2.803269624710083
+Solve time for step 2.7578604221343994
+Solve time for step 2.6029655933380127
+Solve time for step 2.520034074783325
+1 turn
+Sampling time 38.61397518997546
+Solve time for step 49.9418888092041
+Solve time for step 11.317548036575317
+Solve time for step 10.047334671020508
+Solve time for step 8.718332529067993
+Solve time for step 8.121267557144165
+Solve time for step 7.1718809604644775
+Solve time for step 6.4543492794036865
+Solve time for step 5.935717821121216
+Solve time for step 5.397363185882568
+Solve time for step 4.91704797744751
+Solve time for step 4.626922369003296
+Solve time for step 4.475242614746094
+Solve time for step 4.234953165054321
+Solve time for step 3.9389853477478027
+Solve time for step 3.9221699237823486
+2 thumb_middle
+Sampling time 29.369556589983404
+Solve time for step 22.956172227859497
+Solve time for step 5.678615570068359
+Solve time for step 5.188702821731567
+Solve time for step 5.102447271347046
+Solve time for step 4.859955549240112
+Solve time for step 4.495199203491211
+Solve time for step 4.370343446731567
+Solve time for step 4.108053922653198
+Solve time for step 4.014168977737427
+Solve time for step 3.781327486038208
+Solve time for step 3.7197036743164062
+Solve time for step 3.708003520965576
+Solve time for step 3.4926817417144775
+Solve time for step 3.4524903297424316
+Solve time for step 3.2970058917999268
+3 index
+Sampling time 34.462912835006136
+Solve time for step 34.953922748565674
+Solve time for step 8.25484037399292
+Solve time for step 7.532649755477905
+Solve time for step 6.963338613510132
+Solve time for step 6.413470983505249
+Solve time for step 6.016345500946045
+Solve time for step 5.66646146774292
+Solve time for step 5.2934370040893555
+Solve time for step 4.966606378555298
+Solve time for step 4.8288257122039795
+Solve time for step 4.572663068771362
+Solve time for step 4.48227071762085
+Solve time for step 4.275078296661377
+Solve time for step 4.037661075592041
+Solve time for step 4.034507751464844
+4 turn
+Sampling time 38.850579060963355
+Solve time for step 49.951634883880615
+Solve time for step 11.274261474609375
+Solve time for step 10.01714015007019
+Solve time for step 8.761711835861206
+Solve time for step 8.085625886917114
+Solve time for step 7.154155254364014
+Solve time for step 6.369288921356201
+Solve time for step 5.9538586139678955
+Solve time for step 5.39477014541626
+Solve time for step 5.000025272369385
+Solve time for step 4.663593769073486
+Solve time for step 4.421117544174194
+Solve time for step 4.208023548126221
+Solve time for step 4.102504730224609
+Solve time for step 3.9404754638671875
+5 index
+Sampling time 34.25522643601289
+Solve time for step 35.45617651939392
+Solve time for step 8.339256525039673
+Solve time for step 7.553112268447876
+Solve time for step 7.08330512046814
+Solve time for step 6.40852952003479
+Solve time for step 6.00920295715332
+Solve time for step 5.633289098739624
+Solve time for step 5.360048294067383
+Solve time for step 5.033444881439209
+Solve time for step 4.809785842895508
+Solve time for step 4.555651903152466
+Solve time for step 4.472768306732178
+Solve time for step 4.312711238861084
+Solve time for step 4.200505971908569
+Solve time for step 3.9649105072021484
+6 thumb_middle
+Sampling time 29.56944413599558
+Solve time for step 23.07387113571167
+Solve time for step 5.595653057098389
+Solve time for step 5.315576553344727
+Solve time for step 5.080869197845459
+Solve time for step 4.802872896194458
+Solve time for step 4.602289438247681
+Solve time for step 4.4390623569488525
+Solve time for step 4.1230409145355225
+Solve time for step 4.0597522258758545
+Solve time for step 3.889179229736328
+Solve time for step 3.6706130504608154
+Solve time for step 3.58479380607605
+Solve time for step 3.5582354068756104
+Solve time for step 3.5076255798339844
+Solve time for step 3.346919298171997
+7 turn
+Sampling time 38.584310639009345
+Solve time for step 49.73781609535217
+Solve time for step 11.32155179977417
+Solve time for step 10.1614670753479
+Solve time for step 8.769872426986694
+Solve time for step 8.1728835105896
+Solve time for step 7.204076766967773
+Solve time for step 6.463967800140381
+Solve time for step 5.9639434814453125
+Solve time for step 5.567060232162476
+Solve time for step 4.952110290527344
+Solve time for step 4.675312519073486
+Solve time for step 4.346365213394165
+Solve time for step 4.125068664550781
+Solve time for step 4.008765935897827
+Solve time for step 3.874237537384033
+8 index
+Sampling time 34.12378153402824
+Solve time for step 35.23254108428955
+Solve time for step 8.30405306816101
+Solve time for step 7.432224988937378
+Solve time for step 6.96520471572876
+Solve time for step 6.434068918228149
+Solve time for step 6.109444618225098
+Solve time for step 5.717623233795166
+Solve time for step 5.386847972869873
+Solve time for step 5.072275161743164
+Solve time for step 4.836166143417358
+Solve time for step 4.601070165634155
+Solve time for step 4.429371118545532
+Solve time for step 4.3243889808654785
+Solve time for step 4.134732007980347
+Solve time for step 3.996242046356201
+9 thumb_middle
+Sampling time 29.63135808898369
+Solve time for step 23.078057765960693
+Solve time for step 5.775713205337524
+Solve time for step 5.307812213897705
+Solve time for step 5.058715581893921
+Solve time for step 4.853689193725586
+Solve time for step 4.545740127563477
+Solve time for step 4.388205051422119
+Solve time for step 4.243307828903198
+Solve time for step 4.064781427383423
+Solve time for step 3.816209554672241
+Solve time for step 3.7216310501098633
+Solve time for step 3.5748331546783447
+Solve time for step 3.4457802772521973
+Solve time for step 3.4912290573120117
+Solve time for step 3.379124641418457
+10 turn
+Sampling time 38.93410949601093
+Solve time for step 50.31804156303406
+Solve time for step 11.377294540405273
+Solve time for step 10.01824688911438
+Solve time for step 8.786892175674438
+Solve time for step 8.068842887878418
+Solve time for step 7.207467317581177
+Solve time for step 6.482563257217407
+Solve time for step 5.859579801559448
+Solve time for step 5.419605255126953
+Solve time for step 4.9770355224609375
+Solve time for step 4.648274183273315
+Solve time for step 4.381075382232666
+Solve time for step 4.124901294708252
+Solve time for step 3.927640438079834
+Solve time for step 3.945988416671753
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+2048
+4 128 4
+Loaded trajectory sampler
+['pregrasp', 'turn', 'thumb_middle', 'index', 'turn', 'index', 'thumb_middle', 'turn', 'index', 'thumb_middle', 'turn']
+0 pregrasp
+Sampling time 25.08917425305117
+Solve time for step 15.534428358078003
+Solve time for step 3.8083720207214355
+Solve time for step 3.674759864807129
+Solve time for step 3.542888641357422
+Solve time for step 3.450989246368408
+Solve time for step 3.3201992511749268
+Solve time for step 3.219501495361328
+Solve time for step 3.1484313011169434
+Solve time for step 3.0036606788635254
+Solve time for step 2.9382808208465576
+Solve time for step 2.8296990394592285
+Solve time for step 2.8274402618408203
+Solve time for step 2.6632742881774902
+Solve time for step 2.6819770336151123
+Solve time for step 2.5734152793884277
+1 turn
+Sampling time 38.75470915395999
+Solve time for step 49.17926239967346
+Solve time for step 11.229398012161255
+Solve time for step 9.832498788833618
+Solve time for step 8.624848365783691
+Solve time for step 7.881633758544922
+Solve time for step 7.118644952774048
+Solve time for step 6.3918845653533936
+Solve time for step 5.840649127960205
+Solve time for step 5.37010931968689
+Solve time for step 4.976388454437256
+Solve time for step 4.74313759803772
+Solve time for step 4.409986972808838
+Solve time for step 4.183805704116821
+Solve time for step 4.01207160949707
+Solve time for step 3.93497896194458
+2 thumb_middle
+Sampling time 28.685225506022107
+Solve time for step 22.81313943862915
+Solve time for step 5.6295247077941895
+Solve time for step 5.201780557632446
+Solve time for step 4.9320361614227295
+Solve time for step 4.722238063812256
+Solve time for step 4.4591100215911865
+Solve time for step 4.310021877288818
+Solve time for step 4.190200328826904
+Solve time for step 3.9496870040893555
+Solve time for step 3.904597520828247
+Solve time for step 3.6963398456573486
+Solve time for step 3.552725315093994
+Solve time for step 3.4719598293304443
+Solve time for step 3.461749315261841
+Solve time for step 3.2817840576171875
+3 index
+Sampling time 34.366243847005535
+Solve time for step 35.104252338409424
+Solve time for step 8.351456642150879
+Solve time for step 7.486106634140015
+Solve time for step 7.178696632385254
+Solve time for step 6.470118761062622
+Solve time for step 5.997417449951172
+Solve time for step 5.602991104125977
+Solve time for step 5.373836994171143
+Solve time for step 4.994196653366089
+Solve time for step 4.781018495559692
+Solve time for step 4.530519485473633
+Solve time for step 4.454591274261475
+Solve time for step 4.364530324935913
+Solve time for step 4.210851669311523
+Solve time for step 4.084729194641113
+4 turn
+Sampling time 38.719652282015886
+Solve time for step 49.84152030944824
+Solve time for step 11.450333595275879
+Solve time for step 10.033156394958496
+Solve time for step 8.75257396697998
+Solve time for step 8.0791597366333
+Solve time for step 7.154573202133179
+Solve time for step 6.421941041946411
+Solve time for step 5.865189552307129
+Solve time for step 5.332984447479248
+Solve time for step 4.919670104980469
+Solve time for step 4.681485652923584
+Solve time for step 4.339095592498779
+Solve time for step 4.180595636367798
+Solve time for step 4.0626137256622314
+Solve time for step 3.870995044708252
+5 index
+Sampling time 33.98973050399218
+Solve time for step 34.97140121459961
+Solve time for step 8.259501934051514
+Solve time for step 7.582862615585327
+Solve time for step 6.987936973571777
+Solve time for step 6.462974309921265
+Solve time for step 6.092644691467285
+Solve time for step 5.6350014209747314
+Solve time for step 5.423364877700806
+Solve time for step 5.015247821807861
+Solve time for step 4.83730936050415
+Solve time for step 4.562092542648315
+Solve time for step 4.546066761016846
+Solve time for step 4.307388782501221
+Solve time for step 4.122390985488892
+Solve time for step 3.985867500305176
+6 thumb_middle
+Sampling time 29.648237298009917
+Solve time for step 22.868708610534668
+Solve time for step 5.6322855949401855
+Solve time for step 5.293658971786499
+Solve time for step 5.028187274932861
+Solve time for step 4.84811544418335
+Solve time for step 4.644002437591553
+Solve time for step 4.370037794113159
+Solve time for step 4.151216506958008
+Solve time for step 3.9727845191955566
+Solve time for step 3.8204944133758545
+Solve time for step 3.7487988471984863
+Solve time for step 3.6296756267547607
+Solve time for step 3.4824447631835938
+Solve time for step 3.451807737350464
+Solve time for step 3.353192090988159
+7 turn
+Sampling time 38.8331806359929
+Solve time for step 49.989622831344604
+Solve time for step 11.343061923980713
+Solve time for step 10.116664171218872
+Solve time for step 8.856442928314209
+Solve time for step 8.158182621002197
+Solve time for step 7.2600953578948975
+Solve time for step 6.460440158843994
+Solve time for step 5.951776742935181
+Solve time for step 5.453340530395508
+Solve time for step 4.980576992034912
+Solve time for step 4.687363624572754
+Solve time for step 4.459599494934082
+Solve time for step 4.1880388259887695
+Solve time for step 3.9604411125183105
+Solve time for step 3.9034547805786133
+8 index
+Sampling time 34.19309020898072
+Solve time for step 35.048527240753174
+Solve time for step 8.563017129898071
+Solve time for step 7.511474847793579
+Solve time for step 7.08884334564209
+Solve time for step 6.481005668640137
+Solve time for step 6.075408458709717
+Solve time for step 5.701329231262207
+Solve time for step 5.318816184997559
+Solve time for step 4.991899490356445
+Solve time for step 4.779616117477417
+Solve time for step 4.666470289230347
+Solve time for step 4.483289957046509
+Solve time for step 4.216589450836182
+Solve time for step 4.192476272583008
+Solve time for step 3.9828786849975586
+9 thumb_middle
+Sampling time 29.818465013988316
+Solve time for step 23.198057651519775
+Solve time for step 5.639022588729858
+Solve time for step 5.222936153411865
+Solve time for step 5.073248863220215
+Solve time for step 4.900996208190918
+Solve time for step 4.606454849243164
+Solve time for step 4.3946192264556885
+Solve time for step 4.207520484924316
+Solve time for step 4.071003198623657
+Solve time for step 3.908806800842285
+Solve time for step 3.7788424491882324
+Solve time for step 3.571928024291992
+Solve time for step 3.4368269443511963
+Solve time for step 3.465229034423828
+Solve time for step 3.3225045204162598
+10 turn
+Sampling time 38.555683740007225
+Solve time for step 50.01979947090149
+Solve time for step 11.402775287628174
+Solve time for step 10.06697964668274
+Solve time for step 8.867841958999634
+Solve time for step 8.164965391159058
+Solve time for step 7.223327159881592
+Solve time for step 6.4347076416015625
+Solve time for step 5.889997243881226
+Solve time for step 5.398986577987671
+Solve time for step 5.039954423904419
+Solve time for step 4.6457319259643555
+Solve time for step 4.424283266067505
+Solve time for step 4.130883455276489
+Solve time for step 4.086816787719727
+Solve time for step 3.9897682666778564
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+2048
+4 128 4
+Loaded trajectory sampler
+['pregrasp', 'turn', 'thumb_middle', 'index', 'turn', 'index', 'thumb_middle', 'turn', 'thumb_middle', 'index', 'turn']
+0 pregrasp
+Sampling time 25.11307309701806
+Solve time for step 15.57226848602295
+Solve time for step 3.8615922927856445
+Solve time for step 3.748765468597412
+Solve time for step 3.5879836082458496
+Solve time for step 3.3963069915771484
+Solve time for step 3.286298990249634
+Solve time for step 3.248560905456543
+Solve time for step 3.111778736114502
+Solve time for step 3.040156841278076
+Solve time for step 2.9513168334960938
+Solve time for step 2.8575644493103027
+Solve time for step 2.763484001159668
+Solve time for step 2.6858654022216797
+Solve time for step 2.56532883644104
+Solve time for step 2.54259991645813
+1 turn
+Sampling time 38.432009999
+Solve time for step 49.95824432373047
+Solve time for step 11.348984241485596
+Solve time for step 10.047671556472778
+Solve time for step 8.770096063613892
+Solve time for step 8.008238077163696
+Solve time for step 7.09927773475647
+Solve time for step 6.367828845977783
+Solve time for step 5.904233932495117
+Solve time for step 5.592285871505737
+Solve time for step 5.049793004989624
+Solve time for step 4.6440510749816895
+Solve time for step 4.474147796630859
+Solve time for step 4.318518400192261
+Solve time for step 3.9668185710906982
+Solve time for step 3.9195148944854736
+2 thumb_middle
+Sampling time 29.342987610027194
+Solve time for step 23.111039876937866
+Solve time for step 5.742784738540649
+Solve time for step 5.327485084533691
+Solve time for step 5.061315059661865
+Solve time for step 4.8551108837127686
+Solve time for step 4.542511940002441
+Solve time for step 4.429725408554077
+Solve time for step 4.189607620239258
+Solve time for step 4.049036502838135
+Solve time for step 3.9408469200134277
+Solve time for step 3.7868690490722656
+Solve time for step 3.6369211673736572
+Solve time for step 3.5643649101257324
+Solve time for step 3.436016798019409
+Solve time for step 3.366332530975342
+3 index
+Sampling time 34.05341839196626
+Solve time for step 35.06251931190491
+Solve time for step 8.363491773605347
+Solve time for step 7.517509460449219
+Solve time for step 7.096465587615967
+Solve time for step 6.494260787963867
+Solve time for step 6.172727108001709
+Solve time for step 5.747584104537964
+Solve time for step 5.4132959842681885
+Solve time for step 5.083049535751343
+Solve time for step 4.881214618682861
+Solve time for step 4.668842315673828
+Solve time for step 4.378938436508179
+Solve time for step 4.236087322235107
+Solve time for step 4.079050064086914
+Solve time for step 4.0936126708984375
+4 turn
+Sampling time 38.81136646104278
+Solve time for step 50.29297161102295
+Solve time for step 11.426914930343628
+Solve time for step 10.088529109954834
+Solve time for step 8.826119899749756
+Solve time for step 8.14887261390686
+Solve time for step 7.302058696746826
+Solve time for step 6.5006115436553955
+Solve time for step 6.040311813354492
+Solve time for step 5.455633878707886
+Solve time for step 5.030039310455322
+Solve time for step 4.660680770874023
+Solve time for step 4.450876235961914
+Solve time for step 4.26453971862793
+Solve time for step 4.039010286331177
+Solve time for step 3.9028701782226562
+5 index
+Sampling time 33.87514837097842
+Solve time for step 35.09052920341492
+Solve time for step 8.34607744216919
+Solve time for step 7.354400157928467
+Solve time for step 7.041729211807251
+Solve time for step 6.406681060791016
+Solve time for step 6.048547744750977
+Solve time for step 5.612389087677002
+Solve time for step 5.29262900352478
+Solve time for step 5.087354898452759
+Solve time for step 4.89692234992981
+Solve time for step 4.648313522338867
+Solve time for step 4.506595134735107
+Solve time for step 4.228562355041504
+Solve time for step 4.0860817432403564
+Solve time for step 4.113059043884277
+6 thumb_middle
+Sampling time 29.294077957980335
+Solve time for step 22.93371057510376
+Solve time for step 5.645393133163452
+Solve time for step 5.3177595138549805
+Solve time for step 5.123985052108765
+Solve time for step 4.819090366363525
+Solve time for step 4.525570869445801
+Solve time for step 4.533025741577148
+Solve time for step 4.230896234512329
+Solve time for step 4.007184028625488
+Solve time for step 3.937143564224243
+Solve time for step 3.806694269180298
+Solve time for step 3.710507392883301
+Solve time for step 3.5644102096557617
+Solve time for step 3.4837145805358887
+Solve time for step 3.4040355682373047
+7 turn
+Sampling time 38.426431871019304
+Solve time for step 50.001230239868164
+Solve time for step 11.414984703063965
+Solve time for step 10.025634050369263
+Solve time for step 8.760607242584229
+Solve time for step 8.019870042800903
+Solve time for step 7.171977519989014
+Solve time for step 6.401656866073608
+Solve time for step 5.945561408996582
+Solve time for step 5.474116325378418
+Solve time for step 5.032324314117432
+Solve time for step 4.717371940612793
+Solve time for step 4.320045709609985
+Solve time for step 4.224395751953125
+Solve time for step 3.965022087097168
+Solve time for step 3.9417080879211426
+8 thumb_middle
+Sampling time 29.293250038987026
+Solve time for step 22.980783700942993
+Solve time for step 5.623694896697998
+Solve time for step 5.343904972076416
+Solve time for step 5.125351667404175
+Solve time for step 4.824312686920166
+Solve time for step 4.569654703140259
+Solve time for step 4.460033178329468
+Solve time for step 4.122640609741211
+Solve time for step 4.048902988433838
+Solve time for step 3.835350751876831
+Solve time for step 3.7366538047790527
+Solve time for step 3.587527275085449
+Solve time for step 3.481311798095703
+Solve time for step 3.423290967941284
+Solve time for step 3.379087448120117
+9 index
+Sampling time 34.27132795698708
+Solve time for step 35.2734260559082
+Solve time for step 8.380780458450317
+Solve time for step 7.486511468887329
+Solve time for step 7.119574546813965
+Solve time for step 6.3941099643707275
+Solve time for step 6.113653182983398
+Solve time for step 5.7308619022369385
+Solve time for step 5.429627895355225
+Solve time for step 5.074304580688477
+Solve time for step 4.867119789123535
+Solve time for step 4.634415864944458
+Solve time for step 4.383676528930664
+Solve time for step 4.294260501861572
+Solve time for step 4.056219816207886
+Solve time for step 3.9545860290527344
+10 turn
+Sampling time 38.6670810150099
+Solve time for step 49.97869658470154
+Solve time for step 11.3652925491333
+Solve time for step 10.137685537338257
+Solve time for step 8.785518169403076
+Solve time for step 8.158037900924683
+Solve time for step 7.198583364486694
+Solve time for step 6.447641372680664
+Solve time for step 5.877357482910156
+Solve time for step 5.353614568710327
+Solve time for step 5.07040810585022
+Solve time for step 4.7134692668914795
+Solve time for step 4.399549961090088
+Solve time for step 4.20975399017334
+Solve time for step 4.006427764892578
+Solve time for step 3.9847280979156494
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+2048
+4 128 4
+Loaded trajectory sampler
+['pregrasp', 'turn', 'index', 'thumb_middle', 'turn', 'thumb_middle', 'index', 'turn', 'index', 'thumb_middle', 'turn']
+0 pregrasp
+Sampling time 25.24680864199763
+Solve time for step 15.679527997970581
+Solve time for step 3.861722946166992
+Solve time for step 3.785109758377075
+Solve time for step 3.5933594703674316
+Solve time for step 3.503937244415283
+Solve time for step 3.3967783451080322
+Solve time for step 3.2559850215911865
+Solve time for step 3.161947250366211
+Solve time for step 3.078606605529785
+Solve time for step 2.9975321292877197
+Solve time for step 2.840611219406128
+Solve time for step 2.7588517665863037
+Solve time for step 2.7279937267303467
+Solve time for step 2.605340003967285
+Solve time for step 2.596728563308716
+1 turn
+Sampling time 38.51986968895653
+Solve time for step 49.66847252845764
+Solve time for step 11.128422975540161
+Solve time for step 9.892590284347534
+Solve time for step 8.640944480895996
+Solve time for step 7.9711997509002686
+Solve time for step 7.050185441970825
+Solve time for step 6.3336944580078125
+Solve time for step 5.818974494934082
+Solve time for step 5.332839488983154
+Solve time for step 4.868364095687866
+Solve time for step 4.762409210205078
+Solve time for step 4.455249786376953
+Solve time for step 4.192933797836304
+Solve time for step 4.047041654586792
+Solve time for step 3.9225151538848877
+2 index
+Sampling time 33.37215702503454
+Solve time for step 34.33842730522156
+Solve time for step 8.355966091156006
+Solve time for step 7.476043939590454
+Solve time for step 6.924454689025879
+Solve time for step 6.396228313446045
+Solve time for step 5.966098070144653
+Solve time for step 5.697669506072998
+Solve time for step 5.267190217971802
+Solve time for step 4.949196815490723
+Solve time for step 4.867383718490601
+Solve time for step 4.603453636169434
+Solve time for step 4.419368267059326
+Solve time for step 4.250269889831543
+Solve time for step 4.179874897003174
+Solve time for step 4.1434006690979
+3 thumb_middle
+Sampling time 29.387888309021946
+Solve time for step 23.052370071411133
+Solve time for step 5.593820810317993
+Solve time for step 5.35577917098999
+Solve time for step 5.036572694778442
+Solve time for step 4.925669431686401
+Solve time for step 4.581598281860352
+Solve time for step 4.3808534145355225
+Solve time for step 4.104541301727295
+Solve time for step 4.028512477874756
+Solve time for step 3.939640998840332
+Solve time for step 3.777690887451172
+Solve time for step 3.6748268604278564
+Solve time for step 3.5773191452026367
+Solve time for step 3.4901652336120605
+Solve time for step 3.3619792461395264
+4 turn
+Sampling time 38.65853275102563
+Solve time for step 50.17130184173584
+Solve time for step 11.365768432617188
+Solve time for step 10.05701732635498
+Solve time for step 8.813029050827026
+Solve time for step 8.134284734725952
+Solve time for step 7.27305006980896
+Solve time for step 6.502703666687012
+Solve time for step 5.938796281814575
+Solve time for step 5.376508474349976
+Solve time for step 5.017791509628296
+Solve time for step 4.66535210609436
+Solve time for step 4.39313268661499
+Solve time for step 4.225142478942871
+Solve time for step 4.0140674114227295
+Solve time for step 3.9324843883514404
+5 thumb_middle
+Sampling time 29.72691039502388
+Solve time for step 23.11139225959778
+Solve time for step 5.6287877559661865
+Solve time for step 5.379702091217041
+Solve time for step 5.102670907974243
+Solve time for step 4.8327178955078125
+Solve time for step 4.621898651123047
+Solve time for step 4.3921215534210205
+Solve time for step 4.175430536270142
+Solve time for step 4.038447141647339
+Solve time for step 3.9109671115875244
+Solve time for step 3.7456014156341553
+Solve time for step 3.6513023376464844
+Solve time for step 3.552748441696167
+Solve time for step 3.458073377609253
+Solve time for step 3.354780673980713
+6 index
+Sampling time 34.312102512980346
+Solve time for step 35.35702109336853
+Solve time for step 8.389858484268188
+Solve time for step 7.501387357711792
+Solve time for step 7.16417384147644
+Solve time for step 6.539623975753784
+Solve time for step 6.1262736320495605
+Solve time for step 5.625822067260742
+Solve time for step 5.424233675003052
+Solve time for step 5.097813129425049
+Solve time for step 4.9110143184661865
+Solve time for step 4.581652879714966
+Solve time for step 4.45716404914856
+Solve time for step 4.3314313888549805
+Solve time for step 4.197742462158203
+Solve time for step 3.9863548278808594
+7 turn
+Sampling time 38.75310716801323
+Solve time for step 50.09678936004639
+Solve time for step 11.458559036254883
+Solve time for step 10.120752096176147
+Solve time for step 8.89189600944519
+Solve time for step 8.061064004898071
+Solve time for step 7.315622806549072
+Solve time for step 6.387969255447388
+Solve time for step 5.935158729553223
+Solve time for step 5.45767617225647
+Solve time for step 4.980457782745361
+Solve time for step 4.624369144439697
+Solve time for step 4.329897403717041
+Solve time for step 4.192095518112183
+Solve time for step 3.982585906982422
+Solve time for step 3.963688611984253
+8 index
+Sampling time 34.26078726298874
+Solve time for step 35.090940952301025
+Solve time for step 8.350979566574097
+Solve time for step 7.591057538986206
+Solve time for step 7.060791015625
+Solve time for step 6.427434921264648
+Solve time for step 6.068042516708374
+Solve time for step 5.671722412109375
+Solve time for step 5.383922815322876
+Solve time for step 5.109831094741821
+Solve time for step 4.877057075500488
+Solve time for step 4.557192802429199
+Solve time for step 4.413509130477905
+Solve time for step 4.330782413482666
+Solve time for step 4.080847263336182
+Solve time for step 3.96748423576355
+9 thumb_middle
+Sampling time 29.469472708005924
+Solve time for step 23.012613534927368
+Solve time for step 5.610060453414917
+Solve time for step 5.303206205368042
+Solve time for step 5.01354718208313
+Solve time for step 4.894953012466431
+Solve time for step 4.620506525039673
+Solve time for step 4.439974784851074
+Solve time for step 4.213290452957153
+Solve time for step 4.122373819351196
+Solve time for step 3.8880198001861572
+Solve time for step 3.8305115699768066
+Solve time for step 3.646186113357544
+Solve time for step 3.4762468338012695
+Solve time for step 3.551968812942505
+Solve time for step 3.4343674182891846
+10 turn
+Sampling time 38.62083671701839
+Solve time for step 50.100773334503174
+Solve time for step 11.417139053344727
+Solve time for step 10.093352556228638
+Solve time for step 8.854080438613892
+Solve time for step 8.063578605651855
+Solve time for step 7.158980131149292
+Solve time for step 6.548942565917969
+Solve time for step 5.944339036941528
+Solve time for step 5.455769300460815
+Solve time for step 4.973763465881348
+Solve time for step 4.685191631317139
+Solve time for step 4.373241662979126
+Solve time for step 4.132828950881958
+Solve time for step 4.066784143447876
+Solve time for step 3.924128293991089
+csvgd, Average time per step: 0.0
+{}

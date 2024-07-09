@@ -236,12 +236,12 @@ class GaussianDiffusion(nn.Module):
             B, N, _ = context.shape
         guidance_weights = torch.tensor([0.5, 0.5], device=x.device)
         w_total = 1.0
-        unconditional = self.model.compiled_unconditional_test(t, x)
+        unconditional, _ = self.model.compiled_unconditional_test(t, x)
         # print(context.shape)
         if not (context is None or self.unconditional):
             num_constraints = context.shape[1]
 
-            conditional = self.model.compiled_conditional_test(t.unsqueeze(1).expand(-1, N).reshape(-1),
+            conditional, _ = self.model.compiled_conditional_test(t.unsqueeze(1).expand(-1, N).reshape(-1),
                                                                x.unsqueeze(1).expand(-1, N, -1, -1).reshape(B * N,
                                                                                                             self.horizon,
                                                                                                             -1),
@@ -295,17 +295,18 @@ class GaussianDiffusion(nn.Module):
                       trajectory=None):
         batch, device = shape[0], self.betas.device
 
+        context_unsqueezed = context.unsqueeze(1).repeat(1, shape[1], 1)
         if trajectory is None:
             img = torch.randn(shape, device=device)
         else:
             img = trajectory
         if start_timestep is None:
             start_timestep = self.num_timesteps
-        img = self._apply_conditioning(img, condition)
+        img = self._apply_conditioning(img, condition, context_unsqueezed)
         imgs = [img]
         for t in reversed(range(0, start_timestep)):
-            img, x_start = self.p_sample(img, t, context)
-            img = self._apply_conditioning(img, condition)
+            img, x_start = self.p_sample(img, t, context.unsqueeze(1))
+            img = self._apply_conditioning(img, condition, context_unsqueezed)
             # img[:, -1, 8] = img[:, 0, 8] + np.pi / 4.0
             imgs.append(img)
 
@@ -582,7 +583,10 @@ class JointDiffusion(GaussianDiffusion):
             loss_type='l2',
             hidden_dim=32,
             model_type='conv_unet',
-            unconditional=True
+            unconditional=True,
+            inits_noise=None,
+            noise_noise=None,
+            guided=False
     ):
         super().__init__(
             horizon,
@@ -607,6 +611,11 @@ class JointDiffusion(GaussianDiffusion):
         self.register_buffer('context_dropout_p', torch.tensor([0.25]))
         self.grad_cost = torch.func.vmap(torch.func.jacrev(self._cost))
         self.cost = torch.func.vmap(self._cost)
+
+        self.inits_noise = inits_noise
+        self.noise_noise = noise_noise
+
+        self.guided = guided
 
     def model_predictions(self, x, t, context=None):
         B, N = x.shape[:2]
@@ -673,8 +682,13 @@ class JointDiffusion(GaussianDiffusion):
         batched_times = torch.full((b,), t, device=x.device, dtype=torch.long)
         mu_var = self.p_mean_variance(x=x, t=batched_times, context=context)
         # model_mean, _, model_log_variance, x_start = self.p_mean_variance(x=x, t=batched_times, context=context)
-        noise_x = torch.randn_like(x) if t > 0 else 0.  # no noise if t == 0
-        noise_c = torch.randn_like(context) if t > 0 else 0.  # no noise if t == 0
+        if self.noise_noise is not None:
+            noise_x = .707**2 * self.noise_noise[t].to(x.device) if t > 0 else 0.
+            # noise_x = 1 * self.noise_noise[t].to(x.device) if t > 0 else 0.
+            noise_c = 0
+        else:
+            noise_x = torch.randn_like(x) if t > 0 else 0.  # no noise if t == 0
+            noise_c = torch.randn_like(context) if t > 0 else 0.  # no noise if t == 0
         # make noise the same
         b, N = x.shape[:2]
         if t > 0 and len(x.shape) > 3:
@@ -684,7 +698,7 @@ class JointDiffusion(GaussianDiffusion):
         # use same noise vector
         grad = torch.zeros_like(mu_var['x']['mean'])
         # add some guidance using gradient - maximise turn angle, keep upright
-        eta = 0.0
+        eta = 0.0 if not self.guided else .05
         grad[:, :, :, self.dx - 3:self.dx - 1] = -2 * 0.1 * (mu_var['x']['mean'][:, :, :, self.dx - 3:self.dx - 1] +
                                                              self.mu[self.dx - 3:self.dx - 1].to(device=x.device))
         # grad[:, -1, -1, self.dx - 1] = -eta
@@ -703,7 +717,9 @@ class JointDiffusion(GaussianDiffusion):
                       trajectory=None):
         batch, device = shape[0], self.betas.device
 
-        if trajectory is None:
+        if self.inits_noise is not None:
+            x = self.inits_noise.to(device)
+        elif trajectory is None:
             x = torch.randn(shape, device=device)
         else:
             x = trajectory
@@ -922,7 +938,10 @@ class ConstrainedDiffusion(GaussianDiffusion):
             hidden_dim=32,
             unconditional=False,
             alpha_J=1e-4,
-            alpha_C=0.1
+            alpha_C=0.1,
+            inits_noise=None,
+            noise_noise=None,
+            guided=False
     ):
         super().__init__(
             horizon,
@@ -945,7 +964,7 @@ class ConstrainedDiffusion(GaussianDiffusion):
 
         self.skip_first = False
         self.anneal_factor = .1
-        self.noise_factor = 0.707
+        self.noise_factor = 1#0.707
         self.max_norm = 10
 
         self.model = TemporalUNetContext(horizon, dx + du, context_dim, dim=hidden_dim)
@@ -953,6 +972,11 @@ class ConstrainedDiffusion(GaussianDiffusion):
         self.register_buffer('context_dropout_p', torch.tensor([0.25]))
         self.grad_cost = torch.func.vmap(torch.func.jacrev(self._cost))
         self.cost = torch.func.vmap(self._cost)
+
+        self.inits_noise = inits_noise
+        self.noise_noise = noise_noise
+
+        self.guided = guided
 
     def model_predictions(self, x, t, context=None):
         B, N = x.shape[:2]
@@ -1032,12 +1056,17 @@ class ConstrainedDiffusion(GaussianDiffusion):
             H = self.horizon
 
         x_norm = _x.clone()
-        noise = self.noise_factor * torch.randn_like(_x)[:, :, :self.xu_dim] if t > 0 else 0.  # no noise if t == 0
 
         x_norm[:, :, :self.xu_dim] *= self.std
         x_norm[:, :, :self.xu_dim] += self.mu
 
         pred_x = torch.zeros_like(_x)
+
+        if self.noise_noise is not None:
+            sample = self.noise_noise[t].to(device).squeeze()
+        else:
+            sample = torch.randn_like(_x)
+        noise = self.noise_factor * sample[:, :, :self.xu_dim] if t > 0 else 0.  # no noise if t == 0
         update = _model_mean + (0.5 * model_log_variance).exp() * self.noise_factor * noise - _x[:, :, :self.xu_dim]
 
         # for b_ind in (range(context.shape[0])):
@@ -1048,9 +1077,7 @@ class ConstrainedDiffusion(GaussianDiffusion):
         update = torch.cat((update, torch.zeros(b, H, problem.dz, device=device)), dim=2)
 
         problem._preprocess(x_norm[:, :, mask_no_z], projected_diffusion=True)
-        # J, dJ, _ = problem._objective(x_norm[:, :, mask])
-        # Fix the indexing here
-        # dJ = dJ.reshape(b, H, -1)
+
         z_dim = problem.dz
 
         C, dC, _ = problem.combined_constraints(x_norm[:, :, mask], compute_hess=False, projected_diffusion=True)
@@ -1060,9 +1087,16 @@ class ConstrainedDiffusion(GaussianDiffusion):
         # make update be unnormalized
         # Fix the indexing here
         if problem.dz > 0:
-            unnormalized_update = update[:, :, mask_no_z] * self.std[mask_no_z[:-problem.dz]]# - self.alpha_J * dJ
+            unnormalized_update = update[:, :, mask_no_z] * self.std[mask_no_z[:-problem.dz]]
+
         else:
-            unnormalized_update = update[:, :, mask_no_z] * self.std[mask_no_z]# - self.alpha_J * dJ
+            unnormalized_update = update[:, :, mask_no_z] * self.std[mask_no_z]
+
+        if self.guided:
+            _, dJ, _ = problem._objective(x_norm[:, :, mask_no_z])
+            dJ = dJ.reshape(b, H, -1)
+            unnormalized_update -= self.alpha_J * dJ
+
         update_this_b_ind = torch.cat((unnormalized_update, torch.zeros(b, H, z_dim, device=device)[:, :, mask[36:]]), dim=2)
 
         dC = dC.reshape(b, -1, (H) * num_dim)
@@ -1150,7 +1184,10 @@ class ConstrainedDiffusion(GaussianDiffusion):
                       anneal=True):
         batch, T, xu_dim = shape
         device = context.device
-        if trajectory is None:
+
+        if self.inits_noise is not None:
+            trajectory = self.inits_noise.to(device)
+        elif trajectory is None:
             trajectory = torch.randn(shape, device=device)
         c_state, mask, mask_no_z = self.c_state_mask(context, trajectory)
         problem = self.problem_dict[c_state]
@@ -1292,16 +1329,16 @@ class LatentDiffusion(GaussianDiffusion):
             raise ValueError('VAE must be provided')
         self.vae = vae
 
-    def _apply_conditioning(self, x, condition=None):
+    def _apply_conditioning(self, x, condition=None, context=None):
         if condition is None:
             return x
 
         for t, (start_idx, val) in condition.items():
             val = val.reshape(val.shape[0], -1, val.shape[-1])
             n, h, d = val.shape
-            x_decode = self.vae.vae_t.decode(x)
+            x_decode = self.vae.vae_t.decode(x, context)
             x_decode[:, t:t + h, start_idx:start_idx + d] = val.clone()
-            _, x, _ = self.vae.vae_t.encode(x_decode)
+            _, x, _ = self.vae.vae_t.encode(x_decode, context)
         return x
     
     def sample(self, N, H=None, condition=None, context=None, return_all_timesteps=False):
@@ -1334,9 +1371,11 @@ class LatentDiffusion(GaussianDiffusion):
         latent_samples = sample_fn((B * N, H, self.xu_dim), condition=condition, context=context.squeeze(1),
                          return_all_timesteps=return_all_timesteps)
         
-        decoded_samples = self.vae.vae_t.decode(latent_samples)
+        context_repeated = context.repeat(1, H, 1)
+        
+        decoded_samples = self.vae.vae_t.decode(latent_samples, context_repeated)
 
-        decoded_samples_x = self.vae.vae_x.decode(decoded_samples[..., :8])
-        decoded_samples_u = self.vae.vae_u.decode(decoded_samples[..., 8:24])
+        decoded_samples_x = self.vae.vae_x.decode(decoded_samples[..., :8], context_repeated)
+        decoded_samples_u = self.vae.vae_u.decode(decoded_samples[..., 8:24], context_repeated)
 
-        return torch.cat((decoded_samples_x, decoded_samples_u), dim=-1)
+        return torch.cat((decoded_samples_x, decoded_samples_u), dim=-1), context, None
