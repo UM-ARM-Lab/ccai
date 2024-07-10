@@ -165,7 +165,7 @@ def do_trial(env, params, fpath):
 
     np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
             #  constr=constraint_val.cpu().numpy(),
-             d2goal=final_distance_to_goal.cpu().numpy())
+             d2goal=final_distance_to_goal)
     return final_distance_to_goal, validity_flag
 
 if __name__ == "__main__":
