@@ -656,7 +656,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     else:
         num_fingers_to_plan = num_fingers
     info_list = []
-    validity_flag = False
+    validity_flag = True
 
     for k in range(params['num_steps']):
         state = env.get_state()
