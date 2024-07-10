@@ -635,6 +635,14 @@ class AllegroContactProblem(AllegroObjectProblem):
                                             points_per_link=1000,
                                             partial_patch=False,
                                             )
+        object_sdf = pv.RobotSDF(self.object_chain, path_prefix=None, use_collision_geometry=False) # since we are using primitive shapes for the object, there's no need to define path for stl
+        robot_sdf = pv.RobotSDF(self.chain, path_prefix=get_assets_dir() + '/xela_models', use_collision_geometry=False)
+        self.viz_contact_scenes = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
+                                            collision_check_links=[self.ee_names['thumb']],
+                                            softmin_temp=1.0e3,
+                                            points_per_link=1000,
+                                            partial_patch=False,
+                                            )
         # self.contact_scenes.visualize_robot(partial_to_full_state(self.start[:4*self.num_fingers], fingers=self.fingers), self.start[4*self.num_fingers:].to(self.device))
 
 
@@ -937,6 +945,9 @@ class AllegroValveTurning(AllegroContactProblem):
                     body_com_pos = body_tf.get_matrix()[:, :3, -1]
                     torque = torch.linalg.cross(body_com_pos[0], g)
                     torque_list.append(torque)
+            if self.screwdriver_force_balance:
+                g = self.obj_mass * torch.tensor([0, 0, -9.8], device=self.device, dtype=torch.float32)
+                force_list.append(g)
         force_list = torch.stack(force_list, dim=0)
         force_list = torch.sum(force_list, dim=0)
         torque_list = torch.stack(torque_list, dim=0)
@@ -2114,7 +2125,7 @@ def add_trajectories(trajectories, best_traj, axes, env, sim, gym, viewer, confi
         else:
             initial_state = initial_state[:, :4 * num_fingers]
         if config['optimize_force']:
-            force = best_traj[:, (4 + 4) * num_fingers + obj_dof:].reshape(T, num_fingers, 3) / 5
+            force = best_traj[:, (4 + 4) * num_fingers + obj_dof:].reshape(T, num_fingers+1, 3) / 5
             # force = env.world_trans.transform_normals(force) / 10 # add a scaling factor since the force is too large now
         all_state = torch.cat((initial_state, best_traj[:-1, :4 * num_fingers]), dim=0)
         desired_state = all_state + best_traj[:, 4 * num_fingers + obj_dof: 4 * num_fingers + obj_dof + 4 * num_fingers]

@@ -116,7 +116,7 @@ def state2ee_pos(state, finger_name, fingers, chain, frame_indices, world_trans)
 
     """
     fk_dict = chain.forward_kinematics(partial_to_full_state(state, fingers), frame_indices=frame_indices)
-    m = world_trans.compose(fk_dict[finger_name])
+    m = world_trans.compose(fk_dict[finger_name]).to(state.device)
     points_finger_frame = torch.tensor([0.00, 0.03, 0.00], device=state.device).unsqueeze(0)
     ee_p = m.transform_points(points_finger_frame).squeeze(-2)
     return ee_p
@@ -227,5 +227,17 @@ def euler_diff(euler1, euler2, representation='xyz'):
     ori2_mat = R.from_euler(representation, euler2).as_matrix()
     diff = tf.so3_relative_angle(torch.tensor(ori1_mat), torch.tensor(ori2_mat), cos_angle=False).detach().cpu()
     return diff
+
+def get_screwdriver_top_in_world(env_q, object_chain, world2robot_trans, object_asset_pos):
+    """
+    env_q: 1 dimension without batch
+    """
+    env_q = torch.cat((env_q, torch.zeros(1, device=env_q.device)), dim=-1) # add the screwdriver cap dim
+    screwdriver_top_obj_frame = object_chain.forward_kinematics(env_q.unsqueeze(0).to(object_chain.device))['screwdriver_cap']
+    screwdriver_top_obj_frame = screwdriver_top_obj_frame.get_matrix().reshape(4, 4)[:3, 3]
+    world2obj_trans = tf.Transform3d(pos=torch.tensor(object_asset_pos, device=object_chain.device).float(),
+                                        rot=torch.tensor([1, 0, 0, 0], device=object_chain.device).float(), device=object_chain.device)
+    screwdriver_top_world_frame = world2obj_trans.transform_points(screwdriver_top_obj_frame.unsqueeze(0)).squeeze(0)
+    return screwdriver_top_world_frame
 
     

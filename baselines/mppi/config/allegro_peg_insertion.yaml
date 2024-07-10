@@ -1,5 +1,5 @@
 ---
-T: 11
+T: 2
 receding_horizon: False
 num_steps: 11
 num_trials: 10
@@ -10,15 +10,15 @@ mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 fingers: ['index', 'middle', 'thumb']
 object_type: 'peg'
 sim_device: 'cpu'
-include_velocity: True
+include_velocity: False
 friction_coefficient: 0.95
 kp: 3.0
 controllers:
   mppi:
     # N: 16
-    N: 500
-    lambda: 1
-    variance: 0.01
+    N: 200
+    lambda: 0.01
+    variance: 0.005
     step_size: 0.1
     momentum: 0.
     # device: 'cuda:0'

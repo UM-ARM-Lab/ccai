@@ -22,86 +22,20 @@ from utils.allegro_utils import *
 from examples.allegro_valve_roll import AllegroValveTurning, AllegroContactProblem, PositionControlConstrainedSVGDMPC, add_trajectories_hardware
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
-from pytorch_mppi import MPPI
-
+from naive_planner import NaivePlanner
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
+nominal_screwdriver_top = np.array([0, 0, 1.405])
 
 # device = 'cuda:0'
 obj_dof = 3
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
-nominal_screwdriver_top = np.array([0, 0, 1.405])
 
-
-class DynamicsModel:
-    "This uses the simulation environment as the dynamcis model"
-    def __init__(self, env, num_fingers, include_velocity=False, obj_joint_dim=0):
-        self.env = env
-        self.num_fingers = num_fingers
-        self.include_velocity = include_velocity
-        self.obj_joint_dim = obj_joint_dim
-    def __call__(self, state, action):
-        N = action.shape[0]
-        # for the 1st env, action is to repeat the current state
-        if self.include_velocity:
-            tmp_obj_joint = torch.zeros((state.shape[0], self.obj_joint_dim, 2)).to(device=state.device)
-            state = state.reshape((N, -1, 2))
-            full_state = torch.cat((state, tmp_obj_joint), dim=-2)
-            self.env.set_pose(full_state, semantic_order=False, zero_velocity=False)
-            action = self.env.get_state()['q'][0, : 4 * self.num_fingers] + action
-            self.env.step(action, ignore_img=True)
-            ret = self.env.dof_states.clone().reshape(N, -1)
-        else:
-            tmp_obj_joint = torch.zeros((state.shape[0], self.obj_joint_dim)).to(device=state.device)
-            full_state = torch.cat((state, tmp_obj_joint), dim=-1)
-            self.env.set_pose(full_state, semantic_order=True, zero_velocity=True)
-            action = state[:, :4 * self.num_fingers] + action
-            ret = self.env.step(action, ignore_img=True)['q']
-            if self.obj_joint_dim > 0:
-                ret = ret[:, :-self.obj_joint_dim]
-        return ret
-
-class RunningCost:
-    def __init__(self, start, goal, include_velocity=False):
-        self.start = start
-        self.goal = goal
-        self.obj_dof = 3
-        self.obj_translational_dim = 0
-        self.obj_rotational_dim = 3
-        self.include_velocity = include_velocity
-    
-    def __call__(self, state, action):
-        N = action.shape[0]
-        if self.include_velocity:
-            state = state.reshape(N, -1 ,2)
-            state = state[:, :, 0] # no the cost is only on the position
-            obj_orientation = state[:, -4:-1]
-        else:
-            obj_orientation = state[:, -4:-1]
-                
-        action_cost = torch.sum(action ** 2, dim=-1)
-
-        goal_cost = 0
-        # terminal cost
-        # obj_orientation = tf.euler_angles_to_matrix(obj_orientation, convention='XYZ')
-        # obj_orientation = tf.matrix_to_rotation_6d(obj_orientation)
-        # goal_orientation = tf.euler_angles_to_matrix(self.goal[-self.obj_rotational_dim:], convention='XYZ')
-        # goal_orientation = tf.matrix_to_rotation_6d(goal_orientation)
-        # terminal cost
-        goal_cost = goal_cost + torch.sum((20 * (obj_orientation - self.goal.unsqueeze(0)) ** 2), dim=-1)
-
-        #upright cost
-        upright_cost = 1000 * torch.sum(obj_orientation[:, :-1] ** 2, dim=-1)
-        # dropping cost
-        cost = action_cost + goal_cost + upright_cost
-        cost = torch.nan_to_num(cost, nan=1e6)
-
-        return cost
 
    
 def do_trial(env, params, fpath):
-    screwdriver_goal = params['screwdriver_goal'].cpu()
+    screwdriver_goal = params['object_goal'].cpu()
     screwdriver_goal_mat = R.from_euler('xyz', screwdriver_goal).as_matrix()
     # step multiple times untile it's stable
     if params['visualize']:
@@ -155,11 +89,24 @@ def do_trial(env, params, fpath):
         env.step(action)
         action_list.append(action)
 
-    prime_dof_state = env.dof_states.clone()[0]
-    prime_dof_state = prime_dof_state.unsqueeze(0).repeat(params['N'], 1, 1)
-    env.set_pose(prime_dof_state, semantic_order=False, zero_velocity=False)
     state = env.get_state()
     start = state['q'][0].reshape(1, 4 * num_fingers + obj_dof + 1)[:, :4 * num_fingers + obj_dof].to(device=params['device'])
+
+    # get the end effector point in the peg frame
+    fk_dict = forward_kinematics(partial_to_full_state(start[:, :12], fingers=params['fingers']))
+    fks = [fk_dict[finger] for finger in fk_dict.keys()]
+    fk_world = [env.world_trans.compose(fk) for fk in fks]
+    peg_state = start[:, -obj_dof:]
+    peg_quat = R.from_euler('XYZ', peg_state[0, :3].detach().cpu().numpy()).as_quat()
+    peg_trans = tf.Transform3d(pos=torch.tensor(env.table_pose, device=params['device']).float(),
+                                rot=torch.tensor(
+                                    [peg_quat[3], peg_quat[0], peg_quat[1], peg_quat[2]],
+                                    device=params['device']).float(), device=params['device'])
+    fk_peg_frame = [peg_trans.inverse().compose(fk) for fk in fk_world]
+
+    planner = NaivePlanner(chain=params['chain'], fingers=params['fingers'], ee_peg_frame=fk_peg_frame, T=params['T'], 
+                           world2robot=env.world_trans, goal=params['object_goal'],
+                            obj_dof_code=[0, 0, 0, 1, 1, 1], device=params['device'], obj_pos=env.table_pose)
     
 
     actual_trajectory = []
@@ -167,21 +114,7 @@ def do_trial(env, params, fpath):
 
     num_fingers_to_plan = num_fingers
     info_list = []
-    dynamics = DynamicsModel(env, num_fingers=len(params['fingers']), include_velocity=params['include_velocity'], obj_joint_dim=1)
-    running_cost = RunningCost(start, params['screwdriver_goal'], include_velocity=params['include_velocity'])
-    u_max = torch.ones(4 * len(params['fingers'])) * np.pi / 5 
-    u_min = - torch.ones(4 * len(params['fingers'])) * np.pi / 5
-    noise_sigma = torch.eye(4 * len(params['fingers'])).to(params['device']) * params['variance']
-    if params['include_velocity']:
-        nx = env.dof_states.shape[1] * 2
-    else:
-        nx = start.shape[1]
-    ctrl = MPPI(dynamics=dynamics, running_cost=running_cost, nx=nx, noise_sigma=noise_sigma, 
-                num_samples=params['N'], horizon=params['T'], lambda_=params['lambda'], u_min=u_min, u_max=u_max,
-                device=params['device'])
-    
     validity_flag = True
-
     with torch.no_grad():
         for k in range(params['num_steps']):
             state = env.get_state()
@@ -190,33 +123,18 @@ def do_trial(env, params, fpath):
             actual_trajectory.append(state['q'][0, :4 * num_fingers + obj_dof].clone())
             start_time = time.time()
 
-            prime_dof_state = env.dof_states.clone()[0]
-            prime_dof_state = prime_dof_state.unsqueeze(0).repeat(params['N'], 1, 1)
-            finger_state = start[:4 * num_fingers].clone()
-
-            if params['include_velocity']:
-                action = ctrl.command(prime_dof_state[0].reshape(-1))
-            else:
-                action = ctrl.command(start[:4 * num_fingers + obj_dof].unsqueeze(0)) # this call will modify the environment
-            
-            action = finger_state + action
-            action = action.unsqueeze(0).repeat(params['N'], 1)
-            # repeat the primary environment state to all the virtual environments        
-            env.set_pose(prime_dof_state, semantic_order=False, zero_velocity=False)
+            action = planner.step(start[:4 * num_fingers + obj_dof]) # this call will modify the environment
+            action = action.unsqueeze(0)
             state = env.step(action)
 
+            print(f"solve time: {time.time() - start_time}")
+            print(f"current theta: {state['q'][0, -(obj_dof+1):-1].detach().cpu().numpy()}")
+            # add trajectory lines to sim
             screwdriver_top_pos = get_screwdriver_top_in_world(state['q'][0, -(obj_dof + 1): -1], object_chain, env.world_trans, env.table_pose)
             screwdriver_top_pos = screwdriver_top_pos.detach().cpu().numpy()
             distance2nominal = np.linalg.norm(screwdriver_top_pos - nominal_screwdriver_top)
             if distance2nominal > 0.02:
                 validity_flag = False
-            
-            # if k < params['num_steps'] - 1:
-            #     ctrl.change_horizon(ctrl.T - 1)
-
-            print(f"solve time: {time.time() - start_time}")
-            print(f"current theta: {state['q'][0, -(obj_dof+1):-1].detach().cpu().numpy()}")
-            # add trajectory lines to sim
 
             
             action_list.append(action)
@@ -252,10 +170,10 @@ def do_trial(env, params, fpath):
 
 if __name__ == "__main__":
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/mppi/config/allegro_screwdriver.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/planning/config/allegro_screwdriver.yaml').read_text())
     from tqdm import tqdm
 
-    env = AllegroScrewdriverTurningEnv(config['controllers']['mppi']['N'], control_mode='joint_impedance',
+    env = AllegroScrewdriverTurningEnv(config['controllers']['planning']['N'], control_mode='joint_impedance',
                                 use_cartesian_controller=False,
                                 viewer=True,
                                 steps_per_action=60,
@@ -269,7 +187,6 @@ if __name__ == "__main__":
     sim, gym, viewer = env.get_sim()
     asset_object = get_assets_dir() + '/screwdriver/screwdriver.urdf'
     object_chain = pk.build_chain_from_urdf(open(asset_object).read()).to(device=config['sim_device'])
-
 
 
     # try:
@@ -287,10 +204,10 @@ if __name__ == "__main__":
     # set up the kinematic chain
     asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
     ee_names = {
-            'index': 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
-            'middle': 'allegro_hand_naka_finger_finger_1_aftc_base_link',
-            'ring': 'allegro_hand_kusuri_finger_finger_2_aftc_base_link',
-            'thumb': 'allegro_hand_oya_finger_3_aftc_base_link',
+            'index': 'hitosashi_ee',
+            'middle': 'naka_ee',
+            'ring': 'kusuri_ee',
+            'thumb': 'oya_ee',
             }
     config['ee_names'] = ee_names
     config['obj_dof_code'] = [1, 1, 1, 0, 0, 0]
@@ -321,7 +238,7 @@ if __name__ == "__main__":
             params.pop('controllers')
             params.update(config['controllers'][controller])
             params['controller'] = controller
-            params['screwdriver_goal'] = goal.to(device=params['device'])
+            params['object_goal'] = goal.to(device=params['device'])
             params['chain'] = chain.to(device=params['device'])
             object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
             params['object_location'] = object_location
@@ -340,4 +257,5 @@ if __name__ == "__main__":
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)
+
 
