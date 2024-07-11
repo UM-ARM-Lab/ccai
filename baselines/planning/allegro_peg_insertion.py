@@ -141,7 +141,6 @@ def do_trial(env, params, fpath):
 
 
 
-    env.reset()
     desired_table_pose = torch.tensor([0, 0, 0.105, 0, 0, 0, 1]).float().to(env.device)
     env.set_table_pose(env.handles['table'][0], desired_table_pose)
     state = env.get_state()
@@ -157,6 +156,7 @@ def do_trial(env, params, fpath):
     np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
             #  constr=constraint_val.cpu().numpy(),
              d2goal=final_distance_to_goal.cpu().numpy())
+    env.reset()
     return torch.min(final_distance_to_goal).cpu().numpy()
 
 if __name__ == "__main__":
