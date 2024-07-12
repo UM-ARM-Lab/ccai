@@ -215,7 +215,6 @@ def do_trial(env, params, fpath):
                     contact_list.append(True)
                     break
             print(f"solve time: {solve_time}")
-            print(f"current theta: {state['q'][0, -obj_dof:].detach().cpu().numpy()}")
             # add trajectory lines to sim
 
             
@@ -225,7 +224,7 @@ def do_trial(env, params, fpath):
             distance2goal_ori = tf.so3_relative_angle(torch.tensor(peg_mat).unsqueeze(0), \
             torch.tensor(peg_goal_mat).unsqueeze(0), cos_angle=False).detach().cpu().abs()
             distance2goal_pos = (peg_state[:3].unsqueeze(0) - peg_goal_pos.unsqueeze(0)).norm(dim=-1).detach().cpu()
-            
+            print(f"distance to goal pos: {distance2goal_pos}, ori: {distance2goal_ori}")
             print(distance2goal_pos, distance2goal_ori)
             if not check_peg_validity(peg_state):
                 validity_flag = False
