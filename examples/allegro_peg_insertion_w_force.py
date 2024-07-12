@@ -21,7 +21,7 @@ from torch.func import vmap, jacrev, hessian, jacfwd
 # import pytorch3d.transforms as tf
 
 import matplotlib.pyplot as plt
-from utils.allegro_utils import partial_to_full_state, full_to_partial_state, all_finger_constraints, state2ee_pos, visualize_trajectory, visualize_obj_trajectory
+from utils.allegro_utils import *
 from allegro_valve_roll import AllegroValveTurning, AllegroContactProblem, PositionControlConstrainedSVGDMPC, add_trajectories_hardware
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
@@ -78,7 +78,7 @@ class AllegroPegInsertion(AllegroValveTurning):
         self.wall_asset_pos = wall_asset_pos
         self.wall_dims = wall_dims.astype('float32')
         du = (4 + 3) * self.num_fingers + 3 
-        self.obj_mass = 0.03
+        self.obj_mass = 0.01
 
         super(AllegroPegInsertion, self).__init__(start=start, goal=goal, T=T, chain=chain, object_location=object_location,
                                                  object_type=object_type, world_trans=world_trans, object_asset_pos=peg_asset_pos,
@@ -98,43 +98,6 @@ class AllegroPegInsertion(AllegroValveTurning):
         self.x_min = torch.cat((self.x_min, min_f))
 
     
-    def _cost(self, xu, start, goal):
-        # TODO: consider using quaternion difference for the orientation.
-        state = xu[:, :self.dx]  # state dim = 9
-        state = torch.cat((start.reshape(1, self.dx), state), dim=0)  # combine the first time step into it
-        
-        action = xu[:, self.dx:self.dx + 4 * self.num_fingers]  # action dim = 8
-        next_q = state[:-1, :-self.obj_dof] + action
-        if self.optimize_force:
-            action_cost = 0
-        else:
-            action_cost = torch.sum((state[1:, :-self.obj_dof] - next_q) ** 2)
-
-        smoothness_cost = 1 * torch.sum((state[1:] - state[:-1]) ** 2)
-
-        goal_cost = 0
-        if self.obj_translational_dim:
-            obj_position = state[:, -self.obj_dof:-self.obj_dof+self.obj_translational_dim]
-            # terminal cost
-            goal_cost = goal_cost + torch.sum((100 * (obj_position[-1] - goal[:self.obj_translational_dim]) ** 2))
-            # running cost
-            goal_cost = goal_cost + torch.sum((1 * (obj_position - goal[:self.obj_translational_dim]) ** 2))
-            smoothness_cost = smoothness_cost + 100 * torch.sum((obj_position[1:] - obj_position[:-1]) ** 2)
-        if self.obj_rotational_dim:
-            obj_orientation = state[:, -self.obj_dof+self.obj_translational_dim:]
-            obj_orientation = tf.euler_angles_to_matrix(obj_orientation, convention='XYZ')
-            obj_orientation = tf.matrix_to_rotation_6d(obj_orientation)
-            goal_orientation = tf.euler_angles_to_matrix(goal[-self.obj_rotational_dim:], convention='XYZ')
-            goal_orientation = tf.matrix_to_rotation_6d(goal_orientation)
-            # terminal cost
-            goal_cost = goal_cost + torch.sum((20 * (obj_orientation[-1] - goal_orientation) ** 2))
-            # running cost 
-            goal_cost = goal_cost + torch.sum((10 * (obj_orientation - goal_orientation) ** 2))
-            smoothness_cost = smoothness_cost + 50 * torch.sum((obj_orientation[1:] - obj_orientation[:-1]) ** 2)
-        # goal_cost = torch.sum((1000 * (state[-1, -self.obj_dof:] - goal) ** 2)).reshape(-1)
-        # goal_cost += torch.sum((10 * (state[:, -self.obj_dof:] - goal.unsqueeze(0)) ** 2))
-
-        return smoothness_cost + action_cost + goal_cost 
     def _init_contact_scenes(self, asset_object, collision_checking):
         # robot and peg
         peg_chain = pk.build_chain_from_urdf(open(asset_object).read())
@@ -278,7 +241,8 @@ class AllegroPegInsertion(AllegroValveTurning):
 
         # u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
         u = 0.025 * torch.randn(N, self.T, 4 * self.num_fingers, device=self.device)
-        force = 0.025 * torch.randn(N, self.T, 3 * (self.num_fingers + 1), device=self.device)
+        force = 0.015 * torch.randn(N, self.T, 3 * (self.num_fingers + 1), device=self.device)
+        force[:, :, -3:] = force[:, :, -3:] * 0.1
         u = torch.cat((u, force), dim=-1)
 
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
@@ -346,19 +310,9 @@ class AllegroPegInsertion(AllegroValveTurning):
         
         action = xu[:, self.dx:self.dx + 4 * self.num_fingers]  # action dim = 8
         next_q = state[:-1, :-self.obj_dof] + action
-        if self.optimize_force:
-            action_cost = 0
-        else:
-            action_cost = torch.sum((state[1:, :-self.obj_dof] - next_q) ** 2)
-
         smoothness_cost = 1 * torch.sum((state[1:] - state[:-1]) ** 2)
-        # smoothness_cost += 10 * torch.sum((state[1:, -self.obj_dof:] - state[:-1, -self.obj_dof:]) ** 2)
-        # smoothness_cost += 5000 * torch.sum((state[1:, -self.obj_dof:-self.obj_dof+3] - state[:-1, -self.obj_dof:-self.obj_dof+3]) ** 2) # the position should stay smooth
-        # upright_cost = 1000 * torch.sum((state[:, -self.obj_dof:-self.obj_dof+3]) ** 2) # the screwdriver should only rotate in z direction
 
-        # goal_cost = torch.sum((10 * (state[-1, -self.obj_dof:] - goal) ** 2)).reshape(-1)
-        # goal_cost += torch.sum((0.1 * (state[:, -self.obj_dof:] - goal.unsqueeze(0)) ** 2))
-
+        action_cost = 0
         goal_cost = 0
         if self.obj_translational_dim:
             obj_position = state[:, -self.obj_dof:-self.obj_dof+self.obj_translational_dim]
@@ -374,21 +328,12 @@ class AllegroPegInsertion(AllegroValveTurning):
             goal_orientation = tf.euler_angles_to_matrix(goal[-self.obj_rotational_dim:], convention='XYZ')
             goal_orientation = tf.matrix_to_rotation_6d(goal_orientation)
             # terminal cost
-            goal_cost = goal_cost + torch.sum((50 * (obj_orientation[-1] - goal_orientation) ** 2))
+            goal_cost = goal_cost + torch.sum((250 * (obj_orientation[-1] - goal_orientation) ** 2))
             # running cost 
             goal_cost = goal_cost + torch.sum((3 * (obj_orientation - goal_orientation) ** 2))
-            smoothness_cost = smoothness_cost + 50 * torch.sum((obj_orientation[1:] - obj_orientation[:-1]) ** 2)
+            smoothness_cost = smoothness_cost + 40 * torch.sum((obj_orientation[1:] - obj_orientation[:-1]) ** 2)
         # goal_cost = torch.sum((1000 * (state[-1, -self.obj_dof:] - goal) ** 2)).reshape(-1)
         # goal_cost += torch.sum((10 * (state[:, -self.obj_dof:] - goal.unsqueeze(0)) ** 2))
-
-
-        # if self.optimize_force:
-        #     force = xu[:, self.dx + 4 * self.num_fingers: self.dx + (4 + 3) * self.num_fingers]
-        #     force = force.reshape(force.shape[0], self.num_fingers, 3)
-        #     force_norm = torch.norm(force, dim=-1)
-        #     force_norm = force_norm - 0.3 # desired maginitute
-        #     force_cost = 10 * torch.sum(force_norm ** 2)
-        #     action_cost += force_cost
         return smoothness_cost + action_cost + goal_cost 
 
     def _con_eq(self, xu, compute_grads=True, compute_hess=False, verbose=False):
@@ -496,6 +441,7 @@ class AllegroPegInsertion(AllegroValveTurning):
                                 device=self.device)
             return h, grad_h, hess_h
         return h, grad_h, None    
+    
     def _force_equlibrium_constr_w_force(self, q, u, next_q, force_list, contact_jac_list, contact_point_list, next_env_q):
         # NOTE: the constriant is defined in the robot frame
         # the contact jac an contact points are all in the robot frame
@@ -686,7 +632,7 @@ def add_trajectories(trajectories, best_traj, axes, env, sim, gym, viewer, confi
     if M > 0:
         initial_state = env.get_state()['q']
         # num_fingers = initial_state.shape[1] // 4
-        initial_state = initial_state[:, :4 * num_fingers]
+        initial_state = initial_state[:, :4 * num_fingers].to(trajectories.device)
         force = best_traj[:, (4 + 4) * num_fingers + obj_dof: -3].reshape(T, num_fingers, 3)
         env_force = best_traj[:, -3: ].reshape(T, 1, 3)
 
@@ -730,6 +676,9 @@ def add_trajectories(trajectories, best_traj, axes, env, sim, gym, viewer, confi
 
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     # step multiple times untile it's stable
+    peg_goal = params['object_goal'].cpu()
+    peg_goal_pos = peg_goal[:3]
+    peg_goal_mat = R.from_euler('xyz', peg_goal[-3:]).as_matrix()
     if params['visualize']:
         env.frame_fpath = fpath
         env.frame_id = 0
@@ -773,7 +722,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         )
 
         pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
-        pregrasp_planner.warmup_iters = 50
+        pregrasp_planner.warmup_iters = 75
     else:
         raise ValueError('Invalid controller')
     
@@ -812,7 +761,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     turn_problem_start = start[:4 * num_fingers + obj_dof]
     turn_problem = AllegroPegInsertion(
         start=turn_problem_start,
-        goal=params['valve_goal'],
+        goal=params['object_goal'],
         T=params['T'],
         chain=params['chain'],
         device=params['device'],
@@ -856,6 +805,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     contact_list = [] # list of checking whether the peg is in contact with the wall
     info_list = []
 
+    validity_flag = True
+
     for k in range(params['num_steps']):
         state = env.get_state()
         start = state['q'].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
@@ -865,7 +816,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
         best_traj, trajectories = turn_planner.step(start[:4 * num_fingers + obj_dof])
 
-        print(f"solve time: {time.time() - start_time}")
+        solve_time = time.time() - start_time
+        if k >= 0:
+            duration += solve_time
+        print(f"solve time: {solve_time}")
         planned_theta_traj = best_traj[:, 4 * num_fingers_to_plan: 4 * num_fingers_to_plan + obj_dof].detach().cpu().numpy()
         print(f"current theta: {state['q'][0, -obj_dof:].detach().cpu().numpy()}")
         print(f"planned theta: {planned_theta_traj}")
@@ -910,42 +864,44 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         if params['optimize_force']:
             print("planned force")
             print(action[:, 4 * num_fingers_to_plan:].reshape(num_fingers_to_plan + 1, 3)) # print out the action for debugging
-        # print(action)
+
         action = action[:, :4 * num_fingers_to_plan]
-        action = action + start.unsqueeze(0)[:, :4 * num_fingers] # NOTE: this is required since we define action as delta action
+        action = action + start.unsqueeze(0)[:, :4 * num_fingers].to(action.device) # NOTE: this is required since we define action as delta action
         if params['mode'] == 'hardware':
             sim_viz_env.set_pose(env.get_state()['all_state'].to(device=env.device))
             sim_viz_env.step(action)
         elif params['mode'] == 'hardware_copy':
             ros_copy_node.apply_action(partial_to_full_state(action[0], params['fingers']))
         # action = x[:, :4 * num_fingers].to(device=env.device)
-        # NOTE: DEBUG ONLY
-        # action = best_traj[1, :4 * turn_problem.num_fingers].unsqueeze(0)
         env.step(action)
         action_list.append(action)
-        # if params['hardware']:
-        #     # ros_node.apply_action(action[0].detach().cpu().numpy())
-        #     ros_node.apply_action(partial_to_full_state(action[0]).detach().cpu().numpy())
         turn_problem._preprocess(best_traj.unsqueeze(0))
 
         # process contact
         contacts = gym.get_env_rigid_contacts(env.envs[0])
         for body0, body1 in zip (contacts['body0'], contacts['body1']):
-            if body0 == 27 and body1 == 29:
+            if body0 == 31 and body1 == 33:
                 print("contact with wall")
                 contact_list.append(True)
                 break
-            elif body0 == 29 and body1 == 27:
+            elif body0 == 33 and body1 == 31:
                 print("contact with wall")
                 contact_list.append(True)
                 break
+
+        peg_state = env.get_state()['q'][:, -obj_dof:].cpu()
+        peg_mat = R.from_euler('xyz', peg_state[:, -3:]).as_matrix()
+        distance2goal_ori = tf.so3_relative_angle(torch.tensor(peg_mat), \
+        torch.tensor(peg_goal_mat).unsqueeze(0), cos_angle=False).detach().cpu().abs()
+        distance2goal_pos = (peg_state[:, :3] - peg_goal_pos.unsqueeze(0)).norm(dim=-1).detach().cpu()
         
-        # print(turn_problem.thumb_contact_scene.scene_collision_check(partial_to_full_state(x[:, :8]), x[:, 8],
-        #                                                         compute_gradient=False, compute_hessian=False))
-        # distance2surface = torch.sqrt((best_traj_ee[:, 2] - object_location[2].unsqueeze(0)) ** 2 + (best_traj_ee[:, 0] - object_location[0].unsqueeze(0))**2)
-        distance2goal = (params['valve_goal'].cpu() - env.get_state()['q'][:, -obj_dof:].cpu()).detach().cpu()
-        print(distance2goal)
-        info = {**equality_constr_dict, **inequality_constr_dict, 'distance2goal': distance2goal, 'contact': contact_list}
+        print(distance2goal_pos, distance2goal_ori)
+        if not check_peg_validity(peg_state[0]):
+            validity_flag = False
+        info = {**equality_constr_dict, **inequality_constr_dict, 
+        'distance2goal_pos': distance2goal_pos, 'distance2goal_ori': distance2goal_ori, 
+        'contact': contact_list,
+        'validity_flag': validity_flag}
         info_list.append(info)
 
         gym.clear_lines(viewer)
@@ -960,6 +916,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             if k >= 2:
                 axes[finger].plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray', label='actual')
     print(contact_list)
+    print(np.array(contact_list).mean())
     with open(f'{fpath.resolve()}/info.pkl', 'wb') as f:
         pkl.dump(info_list, f)
     action_list = torch.concat(action_list, dim=0)
@@ -979,24 +936,30 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
 
 
-    env.reset()
-    desired_table_pose = torch.tensor([0, 0, 0.105, 0, 0, 0, 1]).float().to(env.device)
-    env.set_table_pose(env.handles['table'][0], desired_table_pose)
     state = env.get_state()
-    state = state['q'].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
+    state = state['q'].reshape(4 * num_fingers + obj_dof).to(device=params['sim_device'])
     actual_trajectory.append(state.clone()[: 4 * num_fingers + obj_dof])
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
     turn_problem.T = actual_trajectory.shape[0]
     # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
-    final_distance_to_goal = (actual_trajectory[:, -obj_dof:] - params['valve_goal']).abs()
+    final_distance_to_goal_pos = distance2goal_pos
+    final_distance_to_goal_ori = distance2goal_ori
+    contact_rate = np.array(contact_list).mean()
 
-    print(f'Controller: {params["controller"]} Final distance to goal: {torch.min(final_distance_to_goal)}')
+    print(f'Controller: {params["controller"]} Final distance to goal pos: {final_distance_to_goal_pos.item()}, ori: {final_distance_to_goal_pos.item()}')
     print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
 
     np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
-            #  constr=constraint_val.cpu().numpy(),
-             d2goal=final_distance_to_goal.cpu().numpy())
-    return torch.min(final_distance_to_goal).cpu().numpy()
+            d2goal_pos=final_distance_to_goal_pos.item(),
+            d2goal_ori=final_distance_to_goal_ori.item())
+    env.reset()
+    ret = {'final_distance_to_goal_pos': final_distance_to_goal_pos.item(), 
+    'final_distance_to_goal_ori': final_distance_to_goal_ori.item(), 
+    'contact_rate': contact_rate,
+    'validity_flag': validity_flag,
+    'avg_online_time': duration / (params["num_steps"] - 1)}
+    
+    return ret
 
 if __name__ == "__main__":
     # get config
@@ -1031,21 +994,14 @@ if __name__ == "__main__":
 
     sim_env = None
     ros_copy_node = None
-    # if config['mode'] == 'hardware':
-    #     sim_env = env
-    #     from hardware.hardware_env import HardwareEnv
-    #     env = HardwareEnv(sim_env.default_dof_pos[:, :16], finger_list=['index', 'thumb'], kp=config['kp'])
-    #     env.world_trans = sim_env.world_trans
-    #     env.joint_stiffness = sim_env.joint_stiffness
-    #     env.device = sim_env.device
-    #     env.valve_pose = sim_env.valve_pose
-    # elif config['mode'] == 'hardware_copy':
-    #     from hardware.hardware_env import RosNode
-    #     ros_copy_node = RosNode()
 
 
 
-    results = {}
+    dist2goal_pos = {}
+    dist2goal_ori = {}
+    contact_rate = {}
+    validity_flag = {}
+    result = {}
 
     # set up the kinematic chain
     asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
@@ -1070,6 +1026,13 @@ if __name__ == "__main__":
     forward_kinematics = partial(chain.forward_kinematics, frame_indices=frame_indices) # full_to= _partial_state = partial(full_to_partial_state, fingers=config['fingers'])
     # partial_to_full_state = partial(partial_to_full_state, fingers=config['fingers'])
 
+    for controller in config['controllers'].keys():
+        result[controller] = {}
+        result[controller]['dist2goal_pos'] = []
+        result[controller]['dist2goal_ori'] = []
+        result[controller]['contact_rate'] = []
+        result[controller]['validity_flag'] = []
+        result[controller]['avg_online_time'] = []
 
     for i in tqdm(range(config['num_trials'])):
         goal = torch.tensor([0, 0, 0, 0, 0, 0])
@@ -1085,18 +1048,22 @@ if __name__ == "__main__":
             params.pop('controllers')
             params.update(config['controllers'][controller])
             params['controller'] = controller
-            params['valve_goal'] = goal.to(device=params['device'])
+            params['object_goal'] = goal.to(device=params['device'])
             params['chain'] = chain.to(device=params['device'])
             object_location = torch.tensor(env.peg_pose).to(params['device']).float() # TODO: confirm if this is the correct location
             params['object_location'] = object_location
-            final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node)
+            ret = do_trial(env, params, fpath, sim_env, ros_copy_node)
             # final_distance_to_goal = turn(env, params, fpath)
 
-            if controller not in results.keys():
-                results[controller] = [final_distance_to_goal]
-            else:
-                results[controller].append(final_distance_to_goal)
-        print(results)
+            result[controller]['dist2goal_pos'].append(ret['final_distance_to_goal_pos'])
+            result[controller]['dist2goal_ori'].append(ret['final_distance_to_goal_ori'])
+            result[controller]['contact_rate'].append(ret['contact_rate'])
+            result[controller]['validity_flag'].append(ret['validity_flag'])
+            result[controller]['avg_online_time'].append(ret['avg_online_time'])
+
+        print(result)
+        for key in result[controller].keys():
+            print(f"{controller} {key}: avg: {np.array(result[controller][key]).mean()}, std: {np.array(result[controller][key]).std()}")
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)

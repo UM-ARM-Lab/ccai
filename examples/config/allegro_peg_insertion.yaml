@@ -1,10 +1,10 @@
 ---
-T: 11
+T: 10
 receding_horizon: False
-num_steps: 11
-num_trials: 10
+num_steps: 10
+num_trials: 20
 visualize: True
-experiment_name: 'allegro_peg_insertion_gravity'
+experiment_name: 'allegro_peg_insertion_gravity_3'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']

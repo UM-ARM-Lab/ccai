@@ -18,11 +18,12 @@ import pytorch_kinematics.transforms as tf
 from torch.func import vmap, jacrev, hessian, jacfwd
 
 import matplotlib.pyplot as plt
-from utils.allegro_utils import partial_to_full_state, full_to_partial_state, state2ee_pos, visualize_trajectory, all_finger_constraints
+from utils.allegro_utils import *
 from examples.allegro_valve_roll import AllegroValveTurning, AllegroContactProblem, PositionControlConstrainedSVGDMPC, add_trajectories, add_trajectories_hardware
 from scipy.spatial.transform import Rotation as R
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
+nominal_screwdriver_top = np.array([0, 0, 1.405])
 
 # device = 'cuda:0'
 # torch.cuda.set_device(1)
@@ -517,7 +518,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
     fk_dict = forward_kinematics(partial_to_full_state(start[:4*num_fingers], fingers=params['fingers']))
     fks = [fk_dict[finger] for finger in fk_dict.keys()]
-    fk_world = [env.world_trans.compose(fk) for fk in fks]
+    fk_world = [env.world_trans.to(fk.device).compose(fk) for fk in fks]
     screwdriver_state = start[-(obj_dof+1):-1]
     screwdriver_quat = R.from_euler('XYZ', screwdriver_state.detach().cpu().numpy()).as_quat()
     screwdriver_trans = tf.Transform3d(pos=torch.tensor(env.table_pose).float().to(params['device']), 
@@ -573,6 +574,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     else:
         num_fingers_to_plan = num_fingers
     info_list = []
+    validity_flag = True
 
     for k in range(params['num_steps']):
         state = env.get_state()
@@ -630,11 +632,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             print(action[:, :4 * num_fingers_to_plan].reshape(num_fingers_to_plan, 4))
         # print(action)
         action = action[:, :4 * num_fingers_to_plan]
-        if params['exclude_index']:
-            action = start.unsqueeze(0)[:, 4:4 * num_fingers] + action
-            action = torch.cat((start.unsqueeze(0)[:, :4], action), dim=1) # add the index finger back
-        else:
-            action = action + start.unsqueeze(0)[:, :4 * num_fingers] # NOTE: this is required since we define action as delta action
+        action = action + start.unsqueeze(0)[:, :4 * num_fingers].to(action.device) # NOTE: this is required since we define action as delta action
         if params['mode'] == 'hardware':
             set_state = env.get_state()['all_state'].to(device=env.device)
             set_state = torch.cat((set_state, torch.zeros(1).float().to(env.device)), dim=0)
@@ -664,14 +662,18 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         screwdriver_mat = R.from_euler('xyz', screwdriver_state).as_matrix()
         distance2goal = tf.so3_relative_angle(torch.tensor(screwdriver_mat), \
             torch.tensor(screwdriver_goal_mat).unsqueeze(0), cos_angle=False).detach().cpu().abs()
+        
+        screwdriver_top_pos = get_screwdriver_top_in_world(screwdriver_state[0], turn_problem.object_chain, env.world_trans, turn_problem.object_asset_pos)
+        screwdriver_top_pos = screwdriver_top_pos.detach().cpu().numpy()
+        distance2nominal = np.linalg.norm(screwdriver_top_pos - nominal_screwdriver_top)
+        if distance2nominal > 0.02:
+            validity_flag = False
+        # distance2goal = (screwdriver_goal - screwdriver_state)).detach().cpu()
+        print(distance2goal, validity_flag)
 
         # distance2goal = (screwdriver_goal - screwdriver_state)).detach().cpu()
         print(distance2goal)
-        if torch.isnan(distance2goal).any().item():
-            env.reset()
-            print("NAN")
-            break
-        info = {**equality_constr_dict, **inequality_constr_dict, **{'distance2goal': distance2goal}}
+        info = {**equality_constr_dict, **inequality_constr_dict, **{'distance2goal': distance2goal, 'validity_flag': validity_flag, 'distance2nominal': distance2nominal}}
         info_list.append(info)
 
         gym.clear_lines(viewer)
@@ -705,7 +707,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
 
     state = env.get_state()
-    state = state['q'].reshape(4 * num_fingers + obj_dof + 1).to(device=params['device'])
+    state = state['q'].reshape(4 * num_fingers + obj_dof + 1)
     actual_trajectory.append(state.clone()[:4 * num_fingers + obj_dof])
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
     turn_problem.T = actual_trajectory.shape[0]
@@ -725,7 +727,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             #  constr=constraint_val.cpu().numpy(),
              d2goal=final_distance_to_goal)
     env.reset()
-    return final_distance_to_goal.cpu().detach().item()
+    return final_distance_to_goal.cpu().detach().item(), validity_flag
 
 if __name__ == "__main__":
     # get config
@@ -813,7 +815,7 @@ if __name__ == "__main__":
     #     pass
 
     results = {}
-    succ_rate = {}
+    validity_list = {}
 
     # set up the kinematic chain
     asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
@@ -862,22 +864,18 @@ if __name__ == "__main__":
             params['chain'] = chain.to(device=params['device'])
             object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
             params['object_location'] = object_location
-            final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node)
-            if final_distance_to_goal < 30 / 180 * np.pi:
-                succ = True
-            # final_distance_to_goal = turn(env, params, fpath)
-
+            final_distance_to_goal, validity = do_trial(env, params, fpath, sim_env, ros_copy_node)
             if controller not in results.keys():
                 results[controller] = [final_distance_to_goal]
-                succ_rate[controller] = [succ]
+                validity_list[controller] = [validity]
             else:
                 results[controller].append(final_distance_to_goal)
-                succ_rate[controller].append(succ)
+                validity_list[controller].append(validity)
         print(results)
-        print(succ_rate)
+        print(validity_list)
 
-    print(f"Average final distance to goal: {torch.mean(torch.tensor(results['csvgd']))}, std: {torch.std(torch.tensor(results['csvgd']))}")
-    print(f"Success rate: {torch.mean(torch.tensor(succ_rate['csvgd']).float())}")
+    print(f"Average final distance to goal: {torch.mean(torch.tensor(results[controller]))}, std: {torch.std(torch.tensor(results[controller]))}")
+    print(f"valid rate: {torch.mean(torch.tensor(validity_list[controller]).float())}")
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)

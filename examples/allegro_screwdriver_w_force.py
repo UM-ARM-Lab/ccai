@@ -752,7 +752,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             validity_flag = False
         # distance2goal = (screwdriver_goal - screwdriver_state)).detach().cpu()
         print(distance2goal, validity_flag)
-        info = {**equality_constr_dict, **inequality_constr_dict, **{'distance2goal': distance2goal, 'validity': validity_flag}}
+        info = {**equality_constr_dict, **inequality_constr_dict, **{'distance2goal': distance2goal, 'validity_flag': validity_flag, 'distance2nominal': distance2nominal}}
         info_list.append(info)
 
         gym.clear_lines(viewer)
@@ -951,8 +951,8 @@ if __name__ == "__main__":
         print(results)
         print(validity_list)
 
-    print(f"Average final distance to goal: {torch.mean(torch.tensor(results['csvgd']))}, std: {torch.std(torch.tensor(results['csvgd']))}")
-    print(f"valid rate: {torch.mean(torch.tensor(validity_list['csvgd']).float())}")
+    print(f"Average final distance to goal: {torch.mean(torch.tensor(results[controller]))}, std: {torch.std(torch.tensor(results[controller]))}")
+    print(f"valid rate: {torch.mean(torch.tensor(validity_list[controller]).float())}")
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)
