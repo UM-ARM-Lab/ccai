@@ -995,13 +995,7 @@ if __name__ == "__main__":
     sim_env = None
     ros_copy_node = None
 
-
-
-    dist2goal_pos = {}
-    dist2goal_ori = {}
-    contact_rate = {}
-    validity_flag = {}
-    result = {}
+    results = {}
 
     # set up the kinematic chain
     asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
@@ -1027,12 +1021,12 @@ if __name__ == "__main__":
     # partial_to_full_state = partial(partial_to_full_state, fingers=config['fingers'])
 
     for controller in config['controllers'].keys():
-        result[controller] = {}
-        result[controller]['dist2goal_pos'] = []
-        result[controller]['dist2goal_ori'] = []
-        result[controller]['contact_rate'] = []
-        result[controller]['validity_flag'] = []
-        result[controller]['avg_online_time'] = []
+        results[controller] = {}
+        results[controller]['dist2goal_pos'] = []
+        results[controller]['dist2goal_ori'] = []
+        results[controller]['contact_rate'] = []
+        results[controller]['validity_flag'] = []
+        results[controller]['avg_online_time'] = []
 
     for i in tqdm(range(config['num_trials'])):
         goal = torch.tensor([0, 0, 0, 0, 0, 0])
@@ -1055,15 +1049,15 @@ if __name__ == "__main__":
             ret = do_trial(env, params, fpath, sim_env, ros_copy_node)
             # final_distance_to_goal = turn(env, params, fpath)
 
-            result[controller]['dist2goal_pos'].append(ret['final_distance_to_goal_pos'])
-            result[controller]['dist2goal_ori'].append(ret['final_distance_to_goal_ori'])
-            result[controller]['contact_rate'].append(ret['contact_rate'])
-            result[controller]['validity_flag'].append(ret['validity_flag'])
-            result[controller]['avg_online_time'].append(ret['avg_online_time'])
+            results[controller]['dist2goal_pos'].append(ret['final_distance_to_goal_pos'])
+            results[controller]['dist2goal_ori'].append(ret['final_distance_to_goal_ori'])
+            results[controller]['contact_rate'].append(ret['contact_rate'])
+            results[controller]['validity_flag'].append(ret['validity_flag'])
+            results[controller]['avg_online_time'].append(ret['avg_online_time'])
 
-        print(result)
-        for key in result[controller].keys():
-            print(f"{controller} {key}: avg: {np.array(result[controller][key]).mean()}, std: {np.array(result[controller][key]).std()}")
+        print(results)
+        for key in results[controller].keys():
+            print(f"{controller} {key}: avg: {np.array(results[controller][key]).mean()}, std: {np.array(results[controller][key]).std()}")
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)

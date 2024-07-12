@@ -32,6 +32,9 @@ img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 
 
 def do_trial(env, params, fpath):
+    peg_goal = params['object_goal'].cpu()
+    peg_goal_pos = peg_goal[:3]
+    peg_goal_mat = R.from_euler('xyz', peg_goal[-3:]).as_matrix()
     # step multiple times untile it's stable
     if params['visualize']:
         env.frame_fpath = fpath

@@ -18,7 +18,7 @@ import pytorch_kinematics.transforms as tf
 # import pytorch3d.transforms as tf
 
 import matplotlib.pyplot as plt
-from utils.allegro_utils import partial_to_full_state, full_to_partial_state, all_finger_constraints, state2ee_pos, visualize_trajectory, visualize_obj_trajectory
+from utils.allegro_utils import *
 from examples.allegro_valve_roll import AllegroValveTurning, AllegroContactProblem, PositionControlConstrainedSVGDMPC, add_trajectories_hardware
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
@@ -90,6 +90,9 @@ class RunningCost:
 
    
 def do_trial(env, params, fpath):
+    peg_goal = params['object_goal'].cpu()
+    peg_goal_pos = peg_goal[:3]
+    peg_goal_mat = R.from_euler('xyz', peg_goal[-3:]).as_matrix()
     # step multiple times untile it's stable
     if params['visualize']:
         env.frame_fpath = fpath
@@ -160,7 +163,7 @@ def do_trial(env, params, fpath):
     num_fingers_to_plan = num_fingers
     info_list = []
     dynamics = DynamicsModel(env, num_fingers=len(params['fingers']), include_velocity=params['include_velocity'])
-    running_cost = RunningCost(start, params['valve_goal'], include_velocity=params['include_velocity'])
+    running_cost = RunningCost(start, params['object_goal'], include_velocity=params['include_velocity'])
     u_max = torch.ones(4 * len(params['fingers'])) * np.pi / 5 
     u_min = - torch.ones(4 * len(params['fingers'])) * np.pi / 5
     noise_sigma = torch.eye(4 * len(params['fingers'])).to(params['device']) * params['variance']
@@ -171,7 +174,8 @@ def do_trial(env, params, fpath):
     ctrl = MPPI(dynamics=dynamics, running_cost=running_cost, nx=nx, noise_sigma=noise_sigma, 
                 num_samples=params['N'], horizon=params['T'], lambda_=params['lambda'], u_min=u_min, u_max=u_max,
                 device=params['device'])
-
+    validity_flag = True
+    contact_list = []
     with torch.no_grad():
         for k in range(params['num_steps']):
             state = env.get_state()
@@ -197,16 +201,41 @@ def do_trial(env, params, fpath):
 
             # if k < params['num_steps'] - 1:
             #     ctrl.change_horizon(ctrl.T - 1)
-
-            print(f"solve time: {time.time() - start_time}")
+            solve_time = time.time() - start_time
+            if k >= 0:
+                duration += solve_time
+            contacts = gym.get_env_rigid_contacts(env.envs[0])
+            for body0, body1 in zip (contacts['body0'], contacts['body1']):
+                if body0 == 31 and body1 == 33:
+                    print("contact with wall")
+                    contact_list.append(True)
+                    break
+                elif body0 == 33 and body1 == 31:
+                    print("contact with wall")
+                    contact_list.append(True)
+                    break
+            print(f"solve time: {solve_time}")
             print(f"current theta: {state['q'][0, -obj_dof:].detach().cpu().numpy()}")
             # add trajectory lines to sim
 
             
             action_list.append(action)
-            distance2goal = (params['valve_goal'].cpu() - env.get_state()['q'][0, -obj_dof:].cpu()).detach().cpu()
-            print(distance2goal)
+            peg_state = state['q'][0, -obj_dof:].cpu()
+            peg_mat = R.from_euler('xyz', peg_state[-3:]).as_matrix()
+            distance2goal_ori = tf.so3_relative_angle(torch.tensor(peg_mat).unsqueeze(0), \
+            torch.tensor(peg_goal_mat).unsqueeze(0), cos_angle=False).detach().cpu().abs()
+            distance2goal_pos = (peg_state[:3].unsqueeze(0) - peg_goal_pos.unsqueeze(0)).norm(dim=-1).detach().cpu()
+            
+            print(distance2goal_pos, distance2goal_ori)
+            if not check_peg_validity(peg_state):
+                validity_flag = False
 
+            info = {'distance2goal_pos': distance2goal_pos, 'distance2goal_ori': distance2goal_ori, 
+            'validity_flag': validity_flag, 'contact': contact_list}
+            info_list.append(info)
+
+    with open(f'{fpath.resolve()}/info.pkl', 'wb') as f:
+        pkl.dump(info_list, f)
     action_list = torch.concat(action_list, dim=0)
     with open(f'{fpath.resolve()}/action.pkl', 'wb') as f:
         pkl.dump(action_list, f)
@@ -220,16 +249,23 @@ def do_trial(env, params, fpath):
     actual_trajectory.append(state.clone()[: 4 * num_fingers + obj_dof])
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
     # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
-    final_distance_to_goal = (actual_trajectory[:, -obj_dof:] - params['valve_goal']).abs()
+    final_distance_to_goal_pos = distance2goal_pos
+    final_distance_to_goal_ori = distance2goal_ori
+    contact_rate = np.array(contact_list).mean()
 
-    print(f'Controller: {params["controller"]} Final distance to goal: {torch.min(final_distance_to_goal)}')
+    print(f'Controller: {params["controller"]} Final distance to goal pos: {final_distance_to_goal_pos.item()}, ori: {final_distance_to_goal_pos.item()}')
     print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
 
     np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
-            #  constr=constraint_val.cpu().numpy(),
-             d2goal=final_distance_to_goal.cpu().numpy())
+            d2goal_pos=final_distance_to_goal_pos.item(),
+            d2goal_ori=final_distance_to_goal_ori.item())
     env.reset()
-    return torch.min(final_distance_to_goal).cpu().numpy()
+    ret = {'final_distance_to_goal_pos': final_distance_to_goal_pos.item(), 
+    'final_distance_to_goal_ori': final_distance_to_goal_ori.item(), 
+    'contact_rate': contact_rate,
+    'validity_flag': validity_flag,
+    'avg_online_time': duration / (params["num_steps"] - 1)}
+    return ret
 
 if __name__ == "__main__":
     # get config
@@ -285,7 +321,14 @@ if __name__ == "__main__":
     forward_kinematics = partial(chain.forward_kinematics, frame_indices=frame_indices) # full_to= _partial_state = partial(full_to_partial_state, fingers=config['fingers'])
     # partial_to_full_state = partial(partial_to_full_state, fingers=config['fingers'])
 
-
+    for controller in config['controllers'].keys():
+        results[controller] = {}
+        results[controller]['dist2goal_pos'] = []
+        results[controller]['dist2goal_ori'] = []
+        results[controller]['contact_rate'] = []
+        results[controller]['validity_flag'] = []
+        results[controller]['avg_online_time'] = []
+        
     for i in tqdm(range(config['num_trials'])):
         goal = torch.tensor([0, 0, 0, 0, 0, 0])
         for controller in config['controllers'].keys():
@@ -300,18 +343,22 @@ if __name__ == "__main__":
             params.pop('controllers')
             params.update(config['controllers'][controller])
             params['controller'] = controller
-            params['valve_goal'] = goal.to(device=params['device'])
+            params['object_goal'] = goal.to(device=params['device'])
             params['chain'] = chain.to(device=params['device'])
             object_location = torch.tensor(env.peg_pose).to(params['device']).float() # TODO: confirm if this is the correct location
             params['object_location'] = object_location
-            final_distance_to_goal = do_trial(env, params, fpath)
+            ret = do_trial(env, params, fpath)
             # final_distance_to_goal = turn(env, params, fpath)
 
-            if controller not in results.keys():
-                results[controller] = [final_distance_to_goal]
-            else:
-                results[controller].append(final_distance_to_goal)
+            results[controller]['dist2goal_pos'].append(ret['final_distance_to_goal_pos'])
+            results[controller]['dist2goal_ori'].append(ret['final_distance_to_goal_ori'])
+            results[controller]['contact_rate'].append(ret['contact_rate'])
+            results[controller]['validity_flag'].append(ret['validity_flag'])
+            results[controller]['avg_online_time'].append(ret['avg_online_time'])
+
         print(results)
+        for key in results[controller].keys():
+            print(f"{controller} {key}: avg: {np.array(results[controller][key]).mean()}, std: {np.array(results[controller][key]).std()}")
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)

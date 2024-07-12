@@ -109,7 +109,6 @@ class AllegroScrewdriver(AllegroValveTurning):
                                                  collision_checking=False, obj_gravity=obj_gravity,
                                                  contact_region=False, du=du, device=device)
         self.friction_coefficient = friction_coefficient
-        self.default_index_ee_loc_in_screwdriver = torch.tensor([0.0087, -0.016, 0.1293], device=device).unsqueeze(0)
         # self.contact_point_constr = vmap(self._contact_point_constr, randomness='same')
         # self.grad_contact_point_constr = vmap(jacrev(self._contact_point_constr, argnums=(0)))
         self.grad_contact_point_constr = jacrev(self._contact_point_constr, argnums=(0))
@@ -640,14 +639,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             sim_viz_env.step(action)
         elif params['mode'] == 'hardware_copy':
             ros_copy_node.apply_action(partial_to_full_state(action[0], params['fingers']))
-        # action = x[:, :4 * num_fingers].to(device=env.device)
-        # NOTE: DEBUG ONLY
-        # action = best_traj[1, :4 * turn_problem.num_fingers].unsqueeze(0)
-        # if params['exclude_index'] == True:
-        #     action = torch.cat((start.unsqueeze(0)[:, :4], action), dim=1)
-        #     action[:, 2] += 0.003
-        #     action[:, 3] += 0.008
-        # action = action + torch.randn(action.shape).to(action.device) * 0.1
         env.step(action)
         action_list.append(action)
         # if params['hardware']:
@@ -655,9 +646,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         #     ros_node.apply_action(partial_to_full_state(action[0]).detach().cpu().numpy())
         turn_problem._preprocess(best_traj.unsqueeze(0))
         
-        # print(turn_problem.thumb_contact_scene.scene_collision_check(partial_to_full_state(x[:, :8]), x[:, 8],
-        #                                                         compute_gradient=False, compute_hessian=False))
-        # distance2surface = torch.sqrt((best_traj_ee[:, 2] - object_location[2].unsqueeze(0)) ** 2 + (best_traj_ee[:, 0] - object_location[0].unsqueeze(0))**2)
         screwdriver_state = env.get_state()['q'][:, -obj_dof-1: -1].cpu()
         screwdriver_mat = R.from_euler('xyz', screwdriver_state).as_matrix()
         distance2goal = tf.so3_relative_angle(torch.tensor(screwdriver_mat), \
