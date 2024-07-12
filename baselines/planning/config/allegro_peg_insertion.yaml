@@ -1,8 +1,8 @@
 ---
-T: 12
+T: 10
 receding_horizon: False
-num_steps: 12
-num_trials: 10
+num_steps: 10
+num_trials: 20
 visualize: True
 experiment_name: 'allegro_peg_insertion'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'

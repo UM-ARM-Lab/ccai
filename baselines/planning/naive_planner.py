@@ -88,7 +88,7 @@ class NaivePlanner:
         _lambda = 1e-6
         eye = torch.eye(6, device=self.device)
         ret = torch.zeros(16)
-        num_iter = 3000
+        num_iter = 2000
         for i, finger in enumerate(self.fingers):
             tmp_target_pose = target_pose[i].get_matrix()
             tmp_target_position = tmp_target_pose[:, :3, 3]

@@ -16,7 +16,7 @@ import pytorch_kinematics as pk
 import pytorch_kinematics.transforms as tf
 # import pytorch3d.transforms as tf
 
-from utils.allegro_utils import partial_to_full_state, full_to_partial_state, state2ee_pos
+from utils.allegro_utils import *
 from examples.allegro_valve_roll import AllegroContactProblem, PositionControlConstrainedSVGDMPC
 from scipy.spatial.transform import Rotation as R
 from naive_planner import NaivePlanner
@@ -113,7 +113,8 @@ def do_trial(env, params, fpath):
 
     num_fingers_to_plan = num_fingers
     info_list = []
-
+    contact_list = []
+    validity_flag = True
     with torch.no_grad():
         for k in range(params['num_steps']):
             state = env.get_state()
@@ -131,12 +132,36 @@ def do_trial(env, params, fpath):
 
             print(f"solve time: {time.time() - start_time}")
             print(f"current theta: {state['q'][0, -obj_dof:].detach().cpu().numpy()}")
+            duration += time.time() - start_time
+
+            contacts = gym.get_env_rigid_contacts(env.envs[0])
+            for body0, body1 in zip (contacts['body0'], contacts['body1']):
+                if body0 == 31 and body1 == 33:
+                    print("contact with wall")
+                    contact_list.append(True)
+                    break
+                elif body0 == 33 and body1 == 31:
+                    print("contact with wall")
+                    contact_list.append(True)
+                    break
+
+            peg_state = env.get_state()['q'][:, -obj_dof:].cpu()
+            peg_mat = R.from_euler('xyz', peg_state[:, -3:]).as_matrix()
+            distance2goal_ori = tf.so3_relative_angle(torch.tensor(peg_mat), \
+            torch.tensor(peg_goal_mat).unsqueeze(0), cos_angle=False).detach().cpu().abs()
+            distance2goal_pos = (peg_state[:, :3] - peg_goal_pos.unsqueeze(0)).norm(dim=-1).detach().cpu()
+            
+            print(distance2goal_pos, distance2goal_ori)
+            if not check_peg_validity(peg_state[0]):
+                validity_flag = False
+            info = {'distance2goal_pos': distance2goal_pos, 'distance2goal_ori': distance2goal_ori, 
+            'contact': contact_list,
+            'validity_flag': validity_flag}
+            info_list.append(info)
             # add trajectory lines to sim
 
             
             action_list.append(action)
-            distance2goal = (params['object_goal'].cpu() - env.get_state()['q'][0, -obj_dof:].cpu()).detach().cpu()
-            print(distance2goal)
 
     action_list = torch.concat(action_list, dim=0)
     with open(f'{fpath.resolve()}/action.pkl', 'wb') as f:
@@ -144,23 +169,28 @@ def do_trial(env, params, fpath):
 
 
 
-    desired_table_pose = torch.tensor([0, 0, 0.105, 0, 0, 0, 1]).float().to(env.device)
-    env.set_table_pose(env.handles['table'][0], desired_table_pose)
     state = env.get_state()
     state = state['q'][0].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
     actual_trajectory.append(state.clone()[: 4 * num_fingers + obj_dof])
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
     # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
-    final_distance_to_goal = (actual_trajectory[:, -obj_dof:] - params['object_goal']).abs()
+    final_distance_to_goal_pos = distance2goal_pos
+    final_distance_to_goal_ori = distance2goal_ori
+    contact_rate = np.array(contact_list).mean()
 
-    print(f'Controller: {params["controller"]} Final distance to goal: {torch.min(final_distance_to_goal)}')
+    print(f'Controller: {params["controller"]} Final distance to goal pos: {final_distance_to_goal_pos.item()}, ori: {final_distance_to_goal_pos.item()}')
     print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
 
     np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
-            #  constr=constraint_val.cpu().numpy(),
-             d2goal=final_distance_to_goal.cpu().numpy())
+            d2goal_pos=final_distance_to_goal_pos.item(),
+            d2goal_ori=final_distance_to_goal_ori.item())
     env.reset()
-    return torch.min(final_distance_to_goal).cpu().numpy()
+    ret = {'final_distance_to_goal_pos': final_distance_to_goal_pos.item(), 
+    'final_distance_to_goal_ori': final_distance_to_goal_ori.item(), 
+    'contact_rate': contact_rate,
+    'validity_flag': validity_flag,
+    'avg_online_time': duration / (params["num_steps"] - 1)}
+    return ret
 
 if __name__ == "__main__":
     # get config
@@ -215,7 +245,13 @@ if __name__ == "__main__":
     
     forward_kinematics = partial(chain.forward_kinematics, frame_indices=frame_indices) # full_to= _partial_state = partial(full_to_partial_state, fingers=config['fingers'])
     # partial_to_full_state = partial(partial_to_full_state, fingers=config['fingers'])
-
+    for controller in config['controllers'].keys():
+        results[controller] = {}
+        results[controller]['dist2goal_pos'] = []
+        results[controller]['dist2goal_ori'] = []
+        results[controller]['contact_rate'] = []
+        results[controller]['validity_flag'] = []
+        results[controller]['avg_online_time'] = []
 
     for i in tqdm(range(config['num_trials'])):
         goal = torch.tensor([0, 0, 0, 0, 0, 0])
@@ -235,15 +271,18 @@ if __name__ == "__main__":
             params['chain'] = chain.to(device=params['device'])
             object_location = torch.tensor(env.peg_pose).to(params['device']).float() # TODO: confirm if this is the correct location
             params['object_location'] = object_location
-            final_distance_to_goal = do_trial(env, params, fpath)
+            ret = do_trial(env, params, fpath)
             # final_distance_to_goal = turn(env, params, fpath)
 
-            if controller not in results.keys():
-                results[controller] = [final_distance_to_goal]
-            else:
-                results[controller].append(final_distance_to_goal)
+            results[controller]['dist2goal_pos'].append(ret['final_distance_to_goal_pos'])
+            results[controller]['dist2goal_ori'].append(ret['final_distance_to_goal_ori'])
+            results[controller]['contact_rate'].append(ret['contact_rate'])
+            results[controller]['validity_flag'].append(ret['validity_flag'])
+            results[controller]['avg_online_time'].append(ret['avg_online_time'])
+
         print(results)
+        for key in results[controller].keys():
+            print(f"{controller} {key}: avg: {np.array(results[controller][key]).mean()}, std: {np.array(results[controller][key]).std()}")
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)
-
