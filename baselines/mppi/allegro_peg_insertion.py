@@ -241,8 +241,6 @@ def do_trial(env, params, fpath):
 
 
 
-    desired_table_pose = torch.tensor([0, 0, 0.105, 0, 0, 0, 1]).float().to(env.device)
-    env.set_table_pose(env.handles['table'][0], desired_table_pose)
     state = env.get_state()
     state = state['q'][0].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
     actual_trajectory.append(state.clone()[: 4 * num_fingers + obj_dof])
