@@ -155,12 +155,12 @@ class AllegroObjectProblemDiff(ConstrainedSVGDProblem):
         chain_object = chain_object.to(device=device)
         if 'valve' in object_type:
             object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/valve',
-                                     use_collision_geometry=True)
+                                     use_collision_geometry=False)
         elif 'screwdriver' in object_type:
             object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver',
-                                     use_collision_geometry=True)
+                                     use_collision_geometry=False)
         robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models',
-                                use_collision_geometry=True)
+                                use_collision_geometry=False)
 
         scene_trans = world_trans.inverse().compose(
             pk.Transform3d(device=device).translate(object_asset_pos[0], object_asset_pos[1], object_asset_pos[2]))

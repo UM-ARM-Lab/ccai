@@ -1,11 +1,11 @@
 ---
-T: 15
+T: 47
 receding_horizon: False
 num_steps: 15
 num_turns: 4
 num_trials: 10
-visualize: True
-experiment_name: 'allegro_screwdriver_diffusion_init_no_guidance_no_csvto_for_lab_meeting'
+visualize: False
+experiment_name: 'allegro_screwdriver_diffusion_init_no_guidance_long_horizon_no_csvto'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
@@ -14,11 +14,13 @@ object_type: 'screwdriver'
 sim_device: 'cuda:0'
 friction_coefficient: 1.0
 kp: 3.0
-visualize_plan: True
+visualize_plan: False
 optimize_force: True
 exclude_index: False
 projected: False
 use_saved_plans: True
+use_saved_noise: True
+use_guidance: False
 model_path: 'data/training/allegro_screwdriver/allegro_test_new_data_augment_angle_diffusion/allegro_screwdriver_diffusion.pt'
 controllers:
   csvgd:

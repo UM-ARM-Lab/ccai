@@ -434,7 +434,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             vae.load_state_dict(torch.load(f'{CCAI_PATH}/{vae_path}'))
             for param in vae.parameters():
                 param.requires_grad = False
-        trajectory_sampler = TrajectorySampler(T=16, dx=15 if not model_t else params['nzt'], du=21 if not model_t else 0, type=params['type'],
+        trajectory_sampler = TrajectorySampler(T=params['T'] + 1, dx=15 if not model_t else params['nzt'], du=21 if not model_t else 0, type=params['type'],
                                                timesteps=256, hidden_dim=128 if not model_t else 64,
                                                context_dim=3, generate_context=True,
                                                constrain=params['projected'],
@@ -459,6 +459,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     #     action_list.append(action)
     #     if params['mode'] == 'hardware_copy':
     #         ros_copy_node.apply_action(partial_to_full_state(x.reshape(-1, 4 * num_fingers)[0], params['fingers']))
+
 
     state = env.get_state()
     start = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
@@ -737,9 +738,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         for i, plan in enumerate(plans):
             t = plan.shape[1]
             data[t]['plans'].append(plan)
-            data[t]['inits'].append(inits)
+            data[t]['inits'].append(inits.cpu().numpy())
             data[t]['init_sim_rollouts'].append(init_sim_rollouts)
-            data[t]['optimizer_paths'].append(optimizer_paths)
+            data[t]['optimizer_paths'].append([i.cpu().numpy() for i in optimizer_paths])
             data[t]['starts'].append(traj[i].reshape(1, -1).repeat(plan.shape[0], 1))
             data[t]['contact_points'].append(contact_points[t])
             data[t]['contact_distance'].append(contact_distance[t])
@@ -748,12 +749,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     state = env.get_state()
 
     contact_label_to_vec = {'pregrasp': 0,
-                            'index': 3,
-                            'thumb_middle': 4,
-                            'turn': 7
+                            'index': 1,
+                            'thumb_middle': 2,
+                            'turn': 3
                             }
     contact_vec_to_label = dict((v, k) for k, v in contact_label_to_vec.items())
-    contact_vec_to_label[6] = 'thumb_middle'
+
 
     sample_contact = params.get('sample_contact', False)
     num_stages = 2 + 3 * (params['num_turns'] - 1)
@@ -771,24 +772,24 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         state = state['q'].reshape(-1)[:15].to(device=params['device'])
         valve_goal = torch.tensor([0, 0, state[-1]]).to(device=params['device'])
 
-        if sample_contact:
-            with torch.no_grad():
-                start = state.clone()
-                if state[-1] < -1.0:
-                    start[-1] += 0.75
-                trajectories, contact, likelihoods = trajectory_sampler.sample(N=512, start=start.reshape(1, -1),
-                                                                               H=(num_stages - stage) * 16)
-            # choose highest likelihood trajectory
-            contact_sequence = contact[torch.argmax(likelihoods)]
-            contact_sequence = torch.round(((contact_sequence + 1) / 2)).int()
-            print(contact_sequence)
-            # convert to number
-            contact_sequence = bin2dec(contact_sequence, 3)
-            # choose first in sequence
-            contact = contact_vec_to_label[contact_sequence.reshape(-1)[0].item()]
+        # if sample_contact:
+        #     with torch.no_grad():
+        #         start = state.clone()
+        #         if state[-1] < -1.0:
+        #             start[-1] += 0.75
+        #         trajectories, contact, likelihoods = trajectory_sampler.sample(N=512, start=start.reshape(1, -1),
+        #                                                                        H=(num_stages - stage) * 16)
+        #     # choose highest likelihood trajectory
+        #     contact_sequence = contact[torch.argmax(likelihoods)]
+        #     contact_sequence = torch.round(((contact_sequence + 1) / 2)).int()
+        #     print(contact_sequence)
+        #     # convert to number
+        #     contact_sequence = bin2dec(contact_sequence, 3)
+        #     # choose first in sequence
+        #     contact = contact_vec_to_label[contact_sequence.reshape(-1)[0].item()]
 
-        else:
-            contact = contact_sequence[stage]
+        # else:
+        contact = contact_sequence[stage]
         print(stage, contact)
         if contact == 'pregrasp':
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
@@ -950,7 +951,10 @@ if __name__ == "__main__":
     
     inits_noise, noise_noise = [None]*config['num_trials'], [None]*config['num_trials']
     if config['use_saved_noise']:
-        inits_noise, noise_noise = torch.load(f'{CCAI_PATH}/examples/saved_noise.pt')
+        if config['T'] > 16:
+            inits_noise, noise_noise = torch.load(f'{CCAI_PATH}/examples/saved_noise_long_horizon.pt')
+        else:
+            inits_noise, noise_noise = torch.load(f'{CCAI_PATH}/examples/saved_noise.pt')
     for i in tqdm(range(0, config['num_trials'])):
         
         torch.manual_seed(i)

@@ -574,7 +574,7 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         chain_object = pk.build_chain_from_urdf(open(asset_object).read())
         chain_object = chain_object.to(device=device)
-        object_sdf = pv.RobotSDF(chain_object, path_prefix=None, use_collision_geometry=True) # since we are using primitive shapes for the object, there's no need to define path for stl
+        object_sdf = pv.RobotSDF(chain_object, path_prefix=None, use_collision_geometry=False) # since we are using primitive shapes for the object, there's no need to define path for stl
         # if 'valve' in object_type:
         #     object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/valve')
         # elif 'screwdriver' == object_type:
@@ -583,7 +583,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         #     object_sdf = pv.RobotSDF(chain_object, path_prefix=None)
         # elif 'screwdriver_translation' == object_type:
         #     object_sdf = pv.RobotSDF(chain_object, path_prefix=None)
-        robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models', use_collision_geometry=True)
+        robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models', use_collision_geometry=False)
 
         scene_trans = world_trans.inverse().compose(
             pk.Transform3d(device=device).translate(object_asset_pos[0], object_asset_pos[1], object_asset_pos[2]))

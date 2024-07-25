@@ -5,7 +5,7 @@ num_steps: 15
 num_turns: 4
 num_trials: 10
 visualize: True
-experiment_name: 'allegro_screwdriver_projected_diffusion_init_no_guidance_pre_sampled'
+experiment_name: 'allegro_screwdriver_diffusion_init_no_guidance_pre_sampled_high_sample_noise'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
@@ -17,7 +17,7 @@ kp: 3.0
 visualize_plan: False
 optimize_force: True
 exclude_index: False
-projected: True
+projected: False
 use_saved_plans: False
 use_saved_noise: True
 use_guidance: False

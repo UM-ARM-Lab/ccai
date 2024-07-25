@@ -937,7 +937,7 @@ class ConstrainedDiffusion(GaussianDiffusion):
             constrain=True,
             hidden_dim=32,
             unconditional=False,
-            alpha_J=1e-4,
+            alpha_J=5e-2,
             alpha_C=0.1,
             inits_noise=None,
             noise_noise=None,
@@ -1096,6 +1096,13 @@ class ConstrainedDiffusion(GaussianDiffusion):
             _, dJ, _ = problem._objective(x_norm[:, :, mask_no_z])
             dJ = dJ.reshape(b, H, -1)
             unnormalized_update -= self.alpha_J * dJ
+            # grad = torch.zeros_like(mu_var['x']['mean'])
+            # # add some guidance using gradient - maximise turn angle, keep upright
+            # eta = 0.0 if not self.guided else .05
+            # grad[:, :, :, self.dx - 3:self.dx - 1] = -2 * 0.1 * (mu_var['x']['mean'][:, :, :, self.dx - 3:self.dx - 1] +
+            #                                                     self.mu[self.dx - 3:self.dx - 1].to(device=x.device))
+            # # grad[:, -1, -1, self.dx - 1] = -eta
+            # grad[:, :, :, self.dx - 1] = -1
 
         update_this_b_ind = torch.cat((unnormalized_update, torch.zeros(b, H, z_dim, device=device)[:, :, mask[36:]]), dim=2)
 
