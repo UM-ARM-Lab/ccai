@@ -449,51 +449,66 @@ if __name__ == "__main__":
     #                     scene, scene_fpath=f'{CCAI_PATH}/examples', headless=False)
     config['scene'] = scene
     config['env'] = env
-    #train_model(model, train_loader, config)
-    #vis_dataset(train_loader, config, N=8)
-    #
 
-    if config['discriminator_guidance']:
-        model_name = f'allegro_screwdriver_{config["model_type"]}_w_classifier.pt'
-    else:
-        model_name = f'allegro_screwdriver_{config["model_type"]}.pt'
+    if config['train_diffusion']:
+        train_model(model, train_loader, config)
 
-    #model.load_state_dict(torch.load(
-    #    f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/{model_name}'
-    #))
+    if config['vis_dataset']:
+        vis_dataset(train_loader, config, N=8)
 
-    #plot_long_horizon(model, train_loader, config, 'w_guidance' if config['discriminator_guidance'] else 'no_guidance')
-    #exit(0)
-    #model.model.diffusion_model.classifier = None
-    #generate_simulated_data(model, train_loader, config, name='')
-    train_loader.dataset.update_masks(p1=0.5, p2=0.75)
 
-    fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/simulated_dataset/simulated_trajectories_.npz'
+    if config['load_model']:
+        if config['discriminator_guidance']:
+            model_name = f'allegro_screwdriver_{config["model_type"]}_w_classifier.pt'
+        else:
+            model_name = f'allegro_screwdriver_{config["model_type"]}.pt'
 
-    fake_dataset = FakeDataset(fpath, config['sine_cosine'])
-    fake_dataset.set_norm_constants(train_dataset.mean, train_dataset.std)
-    train_loader = DataLoader(fake_dataset, batch_size=config['batch_size'])
-    vis_dataset(train_loader, config, N=8)
-    exit(0)
-    classifier_dataset = RealAndFakeDataset(train_dataset, fake_dataset)
-    classifier_sampler = RandomSampler(classifier_dataset)
-    # train_sampler = None
-    classifier_loader = DataLoader(classifier_dataset, batch_size=config['batch_size'],
+        model.load_state_dict(torch.load(
+            f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/{model_name}'
+        ))
+
+    if config['plot']:
+        if config['load_model'] and config['discriminator_guidance']:
+            plot_name = 'w_guidance'
+        else:
+            plot_name = 'no_guidance'
+        plot_long_horizon(model, train_loader, config, plot_name)
+
+    if config['train_classifier']:
+        model.model.diffusion_model.classifier = None
+        # generate dataset from trained diffusion model
+        generate_simulated_data(model, train_loader, config, name='')
+        train_loader.dataset.update_masks(p1=0.5, p2=0.75)
+
+        fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/simulated_dataset/simulated_trajectories_.npz'
+
+        fake_dataset = FakeDataset(fpath, config['sine_cosine'])
+        fake_dataset.set_norm_constants(train_dataset.mean, train_dataset.std)
+        train_loader = DataLoader(fake_dataset, batch_size=config['batch_size'])
+
+        classifier_dataset = RealAndFakeDataset(train_dataset, fake_dataset)
+        classifier_sampler = RandomSampler(classifier_dataset)
+        # train_sampler = None
+        classifier_loader = DataLoader(classifier_dataset, batch_size=config['batch_size'],
                                    sampler=classifier_sampler, num_workers=4, pin_memory=True, drop_last=True)
-    #
-    #train_classifier(model, classifier_loader, config)
-    # eval trained classifier
-    eval_classifier(model, classifier_loader, config)
 
-    # generate new test set with classifier guidance and evaluate on that - ideally classifier performance gets worse!
-    # generate_simulated_data(model, train_loader, config, name='with_guidance')
-    train_loader.dataset.update_masks(p1=0.5, p2=0.75)
-    fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/simulated_dataset/simulated_trajectories_with_guidance.npz'
-    fake_dataset = FakeDataset(fpath, config['sine_cosine'])
-    classifier_dataset = RealAndFakeDataset(train_dataset, fake_dataset)
-    classifier_sampler = RandomSampler(classifier_dataset)
-    # train_sampler = None
-    classifier_loader = DataLoader(classifier_dataset, batch_size=config['batch_size'],
-                                   sampler=classifier_sampler, num_workers=4, pin_memory=True, drop_last=True)
-    eval_classifier(model, classifier_loader, config)
-    #plot_long_horizon(model, train_loader, config, 'w_guidance')
+
+        train_classifier(model, classifier_loader, config)
+        # eval trained classifier on training data
+        eval_classifier(model, classifier_loader, config)
+
+    if config['eval_classifier']:
+        # generate new test set with classifier guidance and evaluate on that - ideally classifier performance gets worse!
+        generate_simulated_data(model, train_loader, config, name='with_guidance')
+        train_loader.dataset.update_masks(p1=0.5, p2=0.75)
+        fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/simulated_dataset/simulated_trajectories_with_guidance.npz'
+        fake_dataset = FakeDataset(fpath, config['sine_cosine'])
+        classifier_dataset = RealAndFakeDataset(train_dataset, fake_dataset)
+        classifier_sampler = RandomSampler(classifier_dataset)
+        # train_sampler = None
+        classifier_loader = DataLoader(classifier_dataset, batch_size=config['batch_size'],
+                                       sampler=classifier_sampler, num_workers=4, pin_memory=True, drop_last=True)
+        # evaluate the classifier on this new data set
+        # By using classifier guidance we should e slightly better at fooling the classifier
+        eval_classifier(model, classifier_loader, config)
+        plot_long_horizon(model, train_loader, config, 'w_guidance')
