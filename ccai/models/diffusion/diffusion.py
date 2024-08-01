@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import numpy as np
 
-from ccai.models.temporal import TemporalUnet, TemporalUNetContext, BinaryClassifier
+from ccai.models.temporal import TemporalUnet, TemporalUNetContext, BinaryClassifier, UnetClassifier
 from ccai.models.transformer import TransformerContext, TransformerForDiffusion
 
 from einops import reduce
@@ -129,11 +129,13 @@ class GaussianDiffusion(nn.Module):
         self.xu_dim = dx + du
         self.dx = dx
         self.du = du
+        self.hidden_dim = hidden_dim
         self.model = TemporalUnet(self.horizon, self.xu_dim, cond_dim=context_dim, dim=hidden_dim)
 
         self.classifier = None
         if discriminator_guidance:
-            self.classifier = BinaryClassifier()
+            self.classifier = UnetClassifier(self.horizon, self.xu_dim, cond_dim=context_dim, dim=hidden_dim)
+
 
         self.objective = objective
         self.unconditional = unconditional
@@ -202,8 +204,11 @@ class GaussianDiffusion(nn.Module):
         elif objective == 'pred_v':
             register_buffer('loss_weight', maybe_clipped_snr / (snr + 1))
 
+        self.classifier_guidance = torch.vmap(torch.func.jacrev(self._classifier_guidance, argnums=1))
+
     def add_classifier(self):
-        self.classifier = BinaryClassifier()
+        #self.classifier = BinaryClassifier()
+        self.classifier = UnetClassifier(self.horizon, self.xu_dim, cond_dim=self.context_dim, dim=self.hidden_dim)
 
     def predict_start_from_noise(self, x_t, t, noise):
         return (
@@ -239,13 +244,13 @@ class GaussianDiffusion(nn.Module):
         return posterior_mean, posterior_variance, posterior_log_variance_clipped
 
     def model_predictions(self, x, t, context=None):
+
         if context is not None:
             context = context.reshape(context.shape[0], -1, context.shape[-1])
             B, N, _ = context.shape
         guidance_weights = torch.tensor([0.5, 0.5], device=x.device)
-        w_total = 1.0
+        w_total = 1.2
         unconditional, _ = self.model.compiled_unconditional_test(t, x)
-        # print(context.shape)
         if not (context is None or self.unconditional):
             num_constraints = context.shape[1]
 
@@ -254,7 +259,15 @@ class GaussianDiffusion(nn.Module):
                                                                                                             self.horizon,
                                                                                                             -1),
                                                                context.reshape(B * N, -1))
+
+            if self.classifier is not None and False:
+                guidance = self.classifier_guidance(t.unsqueeze(1).expand(-1, N).reshape(-1),
+                                                    x.unsqueeze(1).expand(-1, N, -1, -1).reshape(B*N, self.horizon, -1),
+                                                    context.reshape(B*N, -1)).squeeze(1)
+                guidance = extract(torch.sqrt(self.posterior_variance), t, guidance.shape) * guidance
+                conditional = conditional - 0.0 * guidance
             conditional = conditional.reshape(B, N, self.horizon, -1)
+
             # classifier free guidance
             model_output = unconditional
             # compose multiple constraints
@@ -265,9 +278,18 @@ class GaussianDiffusion(nn.Module):
                 model_output += w_total * torch.sum(guidance_weights.reshape(1, -1, 1, 1) * diff, dim=1)
         else:
             model_output = unconditional
+
         pred_noise = model_output
+
         x_start = self.predict_start_from_noise(x, t, pred_noise)
         return ModelPrediction(pred_noise, x_start)
+
+    def _classifier_guidance(self, t, x, context):
+        #_, h = self.model(t[None], x[None], context[None])
+        pred = torch.clip(self.classifier.vmapped_fwd(t, x, context), min=1e-5, max=1 - 1e-5)
+        log_odds = torch.log(pred / (1 - pred))
+        return log_odds.squeeze(0)
+
 
     def p_mean_variance(self, x, t, context):
         preds = self.model_predictions(x, t, context)
@@ -289,6 +311,16 @@ class GaussianDiffusion(nn.Module):
         if condition is None:
             return x
 
+        lb = torch.tensor([-0.47, -0.196, -0.174, -0.227, -0.47, -0.196, -0.174,
+                           -0.227, 0.26, -0.105, -0.199, -0.162, -0.1, -0.1])
+        ub = torch.tensor([0.47, 1.61, 1.709, 1.618, 0.47, 1.61, 1.709,
+                           1.618, 1.396, 1.163, 1.644, 1.719, 0.1, 0.1])
+
+        lb = (lb - self.mu[:len(lb)]) / self.std[:len(lb)]
+        ub = (ub - self.mu[:len(ub)]) / self.std[:len(ub)]
+
+        lb, ub, = lb.to(device=x.device), ub.to(device=x.device)
+        torch.clip_(x[:, :, :len(lb)], min=lb, max=ub)
         for t, (start_idx, val) in condition.items():
             val = val.reshape(val.shape[0], -1, val.shape[-1])
             n, h, d = val.shape
@@ -356,12 +388,12 @@ class GaussianDiffusion(nn.Module):
                 img[:, i, 0, :self.dx] = (tmp + img[:, i - 1, -1, :self.dx]) / 2
                 img[:, i - 1, -1, :self.dx] = img[:, i, 0, :self.dx]
 
-            img[:, 0] = self._apply_conditioning(img[:, 0], condition)
+            img = self._apply_conditioning(img.reshape(B, H*N, -1), condition).reshape(B, N, H, -1)
 
             # add some guidance using gradient - maximise turn angle, keep upright
             eta = 0.0
             img[:, :, :, self.dx - 3:self.dx - 1] -= 0.1 * 2 * eta * img[:, :, :, self.dx - 3:self.dx - 1]
-            # img[:, -1, -1, self.dx - 1] -= 10 * eta
+            # img[:, -1, -1, self.dx - 1] -= 10 * /eta
             img[:, :, :, self.dx - 1] -= eta
 
             # img[:, -1, -1, 8] += 1.0e-3
@@ -429,16 +461,34 @@ class GaussianDiffusion(nn.Module):
             sample = self.p_multi_sample_loop((B * N, factor, self.horizon, self.xu_dim),
                                               condition=condition, context=context,
                                               return_all_timesteps=return_all_timesteps)
+
+            #likelihood = self.approximate_likelihood(sample.reshape(-1, self.horizon, self.xu_dim)).reshape(B*N, factor)
+            likelihood = self.classifier(
+                torch.zeros(B *N * factor, device=sample.device),
+                sample.reshape(-1, self.horizon, self.xu_dim),
+                context=context.reshape(-1, self.context_dim)
+            ).reshape(B*N, factor)
+            weight = 0.9 ** torch.arange(0, factor, device=sample.device)
+            likelihood = torch.sum(likelihood * weight[None, :], dim=1)
+
             # combine samples
             combined_samples = [sample[:, i, :-1] for i in range(0, factor - 1)]
             combined_samples.append(sample[:, -1])
             sample = torch.cat([sample[:, i] for i in range(0, factor)], dim=1)
             # get combined trajectory
             # sample = torch.cat(combined_samples, dim=1)
-            return sample
+            return sample, likelihood
 
-        return sample_fn((B * N, H, self.xu_dim), condition=condition, context=context.squeeze(1),
+        sample = sample_fn((B * N, H, self.xu_dim), condition=condition, context=context.squeeze(1),
                          return_all_timesteps=return_all_timesteps)
+
+        likelihood = self.classifier(
+            torch.zeros(B * N, device=sample.device),
+            sample.reshape(-1, self.horizon, self.xu_dim),
+            context=context.reshape(-1, self.context_dim)
+        )
+
+        return sample, likelihood
 
     def q_sample(self, x_start, t, noise=None):
         noise = default(noise, lambda: torch.randn_like(x_start))
@@ -461,7 +511,7 @@ class GaussianDiffusion(nn.Module):
         B = x_start.shape[0]
         noise = default(noise, lambda: torch.randn_like(x_start))
         x = self.q_sample(x_start=x_start, t=t, noise=noise)
-
+        mask = mask[:, :, :self.dx+self.du]
         # mask defines in-painting, model should receive un-noised copy of masked states
         # note -- only mask states, not controls
         masked_idx = (mask == 0).nonzero()
@@ -487,16 +537,17 @@ class GaussianDiffusion(nn.Module):
 
         # apply mask
         if mask is not None:
+            # TODO: I wanted to try this as it makes sense, unfortunately leads to nan loss - not exactly sure why
+            # mask should increase weight for turning angle
+            # mask[:, :, 14:16] *= 1.5
             loss = loss * mask
             loss = loss.reshape(B, -1).sum(dim=1) / mask.reshape(B, -1).sum(dim=1)
-
-        # loss = reduce(loss, 'b ... -> b (...)', 'mean')
-        # loss = loss * extract(self.loss_weight, t, loss.shape)
 
         return loss.mean()
 
     def loss(self, x, context, mask=None):
         b = x.shape[0]
+        x = x[:, :, :self.dx]
         x = x.reshape(b, -1, self.xu_dim)
         device = x.device
         t = torch.randint(0, self.num_timesteps, (b,), device=device).long()
@@ -584,11 +635,19 @@ class GaussianDiffusion(nn.Module):
             masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]]
 
         # get weights
-        eps, h = self.model(t, x, context, dropout=False)
-        pred_label = self.classifier(h)
+        #eps, h = self.model(t, x, context, dropout=False)
+        pred_label = self.classifier(t, x, context)
+
+        #print(torch.where(torch.isnan(h)))
+        #print(torch.where(torch.isnan(x)))
+
         loss = loss_fn(pred_label, label)
         loss = torch.mean(extract(torch.sqrt(self.betas), t, loss.shape) * loss)
-        return loss
+
+        # accuracy
+        pred = torch.round(pred_label)
+        accuracy = torch.mean(torch.where(pred == label, 1.0, 0.0))
+        return loss, accuracy
 
 
 class JointDiffusion(GaussianDiffusion):

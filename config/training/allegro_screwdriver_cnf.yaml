@@ -1,20 +1,18 @@
 ---
-model_name: 'allegro_test_new_new_data_dropout_v2_sin_cosine_valve'
+model_name: 'allegro_test_new_new_data_dropout'
 T: 16
 dx: 15
 du: 21
 load_checkpoint: False
 epochs: 10000
-classifier_epochs: 100
 batch_size: 256
 lr: 1.0e-4
-model_type: 'diffusion'
+model_type: 'cnf'
 discriminator_guidance: False
-inverse_dynamics: True
 data_directory: 'allegro_screwdriver_new_new'
-device: 'cuda:1'
+device: 'cuda:0'
 test_every: 10001
-save_every: 10
+save_every: 500
 normalize_data: True
 constraint_embedding_dim: 64
 constrained: False

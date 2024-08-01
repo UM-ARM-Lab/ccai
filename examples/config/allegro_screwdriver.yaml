@@ -5,7 +5,7 @@ num_steps: 15
 num_turns: 4
 num_trials: 10
 visualize: True
-experiment_name: 'allegro_diffusion_test_new'
+experiment_name: 'allegro_diffusion_test_new_mcts'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -33,96 +33,60 @@ controllers:
 #    penalty: 1000000
 #    collision_checking: False
 #    joint_friction: 0.0
-  csvgd_fixed_contact_diffusion:
-    # N: 16
-    N: 16
-    alpha_J: 5.0e-3
-    alpha_C: 1
-    step_size: 0.1
-    momentum: 0.
-    device: 'cuda:0'
-    online_iters: 25
-    warmup_iters: 100
-    resample_steps: 16
-    resample_sigma: 0.01
-    resample_temperature: 0.1
-    penalty: 1000000
-    collision_checking: False
-    joint_friction: 0.0
-    model_path: 'data/training/allegro_screwdriver/allegro_test_new_new_data_dropout_diffusion/allegro_screwdriver_diffusion.pt'
-  csvgd_fixed_contact_diffusion_no_opt:
-    # N: 16
-    N: 16
-    alpha_J: 5.0e-3
-    alpha_C: 1
-    step_size: 0.1
-    momentum: 0.
-    device: 'cuda:0'
-    online_iters: 0
-    warmup_iters: 0
-    resample_steps: 16
-    resample_sigma: 0.01
-    resample_temperature: 0.1
-    penalty: 1000000
-    collision_checking: False
-    joint_friction: 0.0
-    model_path: 'data/training/allegro_screwdriver/allegro_test_new_new_data_dropout_diffusion/allegro_screwdriver_diffusion.pt'
-#  csvgd_fixed_contact_diffusion_resample:
-#      # N: 16
-#      N: 16
-#      alpha_J: 5.0e-3
-#      alpha_C: 1
-#      step_size: 0.1
-#      momentum: 0.
-#      device: 'cuda:0'
-#      online_iters: 25
-#      warmup_iters: 25
-#      resample_steps: 16
-#      resample_sigma: 0.01
-#      resample_temperature: 0.1
-#      penalty: 1000000
-#      collision_checking: False
-#      joint_friction: 0.0
-#      model_path: 'data/training/allegro_screwdriver/allegro_test_new_new_data_dropout_diffusion/allegro_screwdriver_diffusion.pt'
-#      diffusion_resample: True
-#  csvgd_fixed_contact_diffusion_no_opt_resample:
-#      # N: 16
-#      N: 16
-#      alpha_J: 5.0e-3
-#      alpha_C: 1
-#      step_size: 0.1
-#      momentum: 0.
-#      device: 'cuda:0'
-#      online_iters: 0
-#      warmup_iters: 0
-#      resample_steps: 16
-#      resample_sigma: 0.01
-#      resample_temperature: 0.1
-#      penalty: 1000000
-#      collision_checking: False
-#      joint_friction: 0.0
-#      model_path: 'data/training/allegro_screwdriver/allegro_test_new_data_diffusion/allegro_screwdriver_diffusion.pt'
-#      diffusion_resample: True
-#  csvgd_var_contact_diffusion_2:
-#      # N: 16
-#      N: 16
-#      alpha_J: 5.0e-3
-#      alpha_C: 1
-#      step_size: 0.1
-#      momentum: 0.
-#      device: 'cuda:0'
-#      online_iters: 25
-#      warmup_iters: 25
-#      resample_steps: 16
-#      resample_sigma: 0.01
-#      resample_temperature: 0.1
-#      penalty: 1000000
-#      collision_checking: False
-#      joint_friction: 0.0
-#      model_path: 'data/training/allegro_screwdriver/allegro_test_new_data_dropout_diffusion/allegro_screwdriver_diffusion.pt'
-#      diffusion_resample: False
-#      sample_contact: False
-#  csvgd_var_contact_diffusion_no_opt_2:
+#  csvgd_fixed_contact_diffusion:
+#    # N: 16
+#    N: 16
+#    alpha_J: 5.0e-3
+#    alpha_C: 1
+#    step_size: 0.1
+#    momentum: 0.
+#    device: 'cuda:0'
+#    online_iters: 25
+#    warmup_iters: 100
+#    resample_steps: 16
+#    resample_sigma: 0.01
+#    resample_temperature: 0.1
+#    penalty: 1000000
+#    collision_checking: False
+#    joint_friction: 0.0
+#    model_path: 'data/training/allegro_screwdriver/allegro_upweight_angle_augment_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
+#  csvgd_fixed_contact_diffusion_no_opt:
+#    # N: 16
+#    N: 16
+#    alpha_J: 5.0e-3
+#    alpha_C: 1
+#    step_size: 0.1
+#    momentum: 0.
+#    device: 'cuda:0'
+#    online_iters: 0
+#    warmup_iters: 0
+#    resample_steps: 16
+#    resample_sigma: 0.01
+#    resample_temperature: 0.1
+#    penalty: 1000000
+#    collision_checking: False
+#    joint_friction: 0.0
+#    model_path: 'data/training/allegro_screwdriver/allegro_upweight_angle_augment_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
+  csvgd_var_contact_diffusion3:
+      # N: 16
+      N: 16
+      alpha_J: 5.0e-3
+      alpha_C: 1
+      step_size: 0.1
+      momentum: 0.
+      device: 'cuda:0'
+      online_iters: 25
+      warmup_iters: 100
+      resample_steps: 16
+      resample_sigma: 0.01
+      resample_temperature: 0.1
+      penalty: 1000000
+      collision_checking: False
+      joint_friction: 0.0
+      model_path: 'data/training/allegro_screwdriver/allegro_upweight_angle_augment_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
+      diffusion_resample: False
+      sample_contact: True
+# csvgd_var_contact_diffusion_no_opt:
 #      # N: 16
 #      N: 16
 #      alpha_J: 5.0e-3
@@ -138,7 +102,7 @@ controllers:
 #      penalty: 1000000
 #      collision_checking: False
 #      joint_friction: 0.0
-#      model_path: 'data/training/allegro_screwdriver/allegro_test_new_data_diffusion/allegro_screwdriver_diffusion.pt'
+#      model_path: 'data/training/allegro_screwdriver/allegro_upweight_angle_augment_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
 #      diffusion_resample: False
 #      sample_contact: True
 #  csvgd_var_contact_diffusion_resample:

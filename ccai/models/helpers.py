@@ -5,8 +5,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 import einops
 from einops.layers.torch import Rearrange
-import pdb
 
+import pdb
+class Mish(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.tanh = nn.Tanh()
+        self.softplus = nn.Softplus()
+
+    def forward(self, x):
+        return x * self.tanh(self.softplus(x))
+#Mish = nn.Mish
 
 # -----------------------------------------------------------------------------#
 # ---------------------------------- modules ----------------------------------#
@@ -74,7 +83,7 @@ class Conv1dBlock(nn.Module):
             Rearrange('batch channels horizon -> batch channels 1 horizon'),
             nn.GroupNorm(n_groups, out_channels),
             Rearrange('batch channels 1 horizon -> batch channels horizon'),
-            nn.Mish(),
+            Mish(),
         )
 
     def forward(self, x):

@@ -159,7 +159,8 @@ class TrajectoryDiffusionModel(nn.Module):
         if start is not None:
             condition[time_index] = [0, start]
         if goal is not None:
-            condition[-1] = [8, goal]
+            g = torch.stack((torch.cos(goal), torch.sin(goal)), dim=1).reshape(-1, 2)
+            condition[H - 1] = [14, g]
         if condition == {}:
             condition = None
 
@@ -177,7 +178,7 @@ class TrajectoryDiffusionModel(nn.Module):
         return self.diffusion_model.loss(trajectories, context=context, mask=mask).mean()
 
     def classifier_loss(self, trajectories, mask=None, context=None, label=None):
-        return self.diffusion_model.classifier_loss(trajectories, context=context, mask=mask, label=label).mean()
+        return self.diffusion_model.classifier_loss(trajectories, context=context, mask=mask, label=label)
 
 
     def set_norm_constants(self, x_mu, x_std):
@@ -269,7 +270,7 @@ class TrajectorySampler(nn.Module):
 
     def __init__(self, T, dx, du, context_dim, type='nf', dynamics=None, problem=None, timesteps=50, hidden_dim=64,
                  constrain=False, unconditional=False, generate_context=False, score_model='conv_unet',
-                 discriminator_guidance=False):
+                 discriminator_guidance=False, learn_inverse_dynamics=False):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -277,12 +278,26 @@ class TrajectorySampler(nn.Module):
         self.context_dim = context_dim
         self.type = type
         assert type in ['nf', 'diffusion', 'cnf']
-        if type == 'nf':
-            self.model = TrajectoryFlowModel(T, dx, du, context_dim, dynamics)
-        elif type == 'cnf':
-            self.model = TrajectoryCNFModel(T, dx, du, context_dim, hidden_dim=hidden_dim)
+        if learn_inverse_dynamics:
+            self.inverse_dynamics = nn.Sequential(
+                nn.Linear(2 * dx, 128),
+                nn.Mish(),
+                nn.Linear(128, 128),
+                nn.Mish(),
+                nn.Linear(128, 128),
+                nn.Mish(),
+                nn.Linear(128, du)
+            )
+            _du = 0
         else:
-            self.model = TrajectoryDiffusionModel(T, dx, du, context_dim, problem, timesteps, hidden_dim, constrain,
+            self.inverse_dynamics = None
+            _du = du
+        if type == 'nf':
+            self.model = TrajectoryFlowModel(T, dx, _du, context_dim, dynamics)
+        elif type == 'cnf':
+            self.model = TrajectoryCNFModel(T, dx, _du, context_dim, hidden_dim=hidden_dim)
+        else:
+            self.model = TrajectoryDiffusionModel(T, dx, _du, context_dim, problem, timesteps, hidden_dim, constrain,
                                                   unconditional, generate_context=generate_context,
                                                   discriminator_guidance=discriminator_guidance,
                                                   score_model=score_model)
@@ -302,6 +317,14 @@ class TrajectorySampler(nn.Module):
         norm_start = None
         norm_past = None
         if start is not None:
+            #print(start.shape)
+            #print(self.x_mean.shape)
+            #print(self.dx)
+            if start.shape[-1] == self.dx-1:
+                q = start[:, :14]
+                theta = start[:, 14][:, None]
+                start = torch.cat((q, torch.cos(theta), torch.sin(theta)), dim=1)
+
             norm_start = (start - self.x_mean[:self.dx]) / self.x_std[:self.dx]
         if past is not None:
             norm_past = (past - self.x_mean) / self.x_std
@@ -312,10 +335,28 @@ class TrajectorySampler(nn.Module):
             x = samples
             c = None,
             likelihood = None
+        elif len(samples) == 2:
+            x = samples[0]
+            c = None
+            likelihood = samples[1]
         else:
             x, c, likelihood = samples
 
-        return x * self.x_std + self.x_mean, c, likelihood
+        if self.inverse_dynamics is not None:
+            prev_x = x[:, :-1, :self.dx]
+            next_x = x[:, 1:, :self.dx]
+            prev_and_next = torch.cat((prev_x, next_x), dim=-1)
+            u = self.inverse_dynamics(prev_and_next)
+            u = torch.cat((u, torch.zeros(u.shape[0], 1, u.shape[-1], device=u.device)), dim=1)
+            x = torch.cat((x[:, :, :self.dx], u), dim=-1)
+
+        x = x * self.x_std + self.x_mean
+        q = x[:, :, :14]
+        u = x[:, :, 16:]
+        x = torch.cat((q, torch.atan2(x[:, :, 15], x[:, :, 14])[:, :, None], u),
+                      dim=-1).reshape(N, -1, x.shape[-1] - 1).detach()
+
+        return x, c, likelihood
 
     def resample(self, start=None, goal=None, constraints=None, initial_trajectory=None, past=None, timestep=10):
         norm_start = None
@@ -333,7 +374,16 @@ class TrajectorySampler(nn.Module):
         return x * self.x_std + self.x_mean, c
 
     def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
-        return self.model.loss(trajectories, mask=mask, start=start, goal=goal, constraints=constraints)
+        loss = self.model.loss(trajectories, mask=mask, start=start, goal=goal, constraints=constraints)
+        if self.inverse_dynamics is not None and False:
+            u = trajectories[:, :-1, self.dx:]
+            x = trajectories[:, :-1, :self.dx]
+            next_x = trajectories[:, 1:, :self.dx]
+            x = torch.cat((x, next_x), dim=-1)
+            pred_u = self.inverse_dynamics(x)
+            loss_id = torch.mean((pred_u - u)**2)
+            loss = loss + 0.1 * loss_id
+        return loss
 
     def grad(self, trajectories, t, start, goal, constraints=None):
         return self.model.grad(trajectories, t, start, goal, constraints)
@@ -343,4 +393,4 @@ class TrajectorySampler(nn.Module):
         return self.model.likelihood(norm_traj, context)
 
     def classifier_loss(self, trajectories, mask=None, context=None, label=None):
-        return self.model.classifier_loss(trajectories, context=context, mask=mask, label=label).mean()
+        return self.model.classifier_loss(trajectories, context=context, mask=mask, label=label)

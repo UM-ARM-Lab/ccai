@@ -213,7 +213,6 @@ class AllegroScrewDriverDataset(Dataset):
     def __init__(self, folders, cosine_sine=False, states_only=False):
         super().__init__()
         self.cosine_sine = cosine_sine
-        assert not cosine_sine
         # TODO: only using trajectories for now, also includes closest points and their sdf values
         starts = []
         trajectories = []
@@ -268,7 +267,7 @@ class AllegroScrewDriverDataset(Dataset):
         print(self.trajectories.shape)
         # TODO consider alternative SO3 representation that is better for learning
         if self.cosine_sine:
-            dx = self.trajectories.shape[-1] + 3
+            dx = self.trajectories.shape[-1] + 1
         else:
             dx = self.trajectories.shape[-1]
 
@@ -277,12 +276,12 @@ class AllegroScrewDriverDataset(Dataset):
         self.std = 1
 
         self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.75)
-        self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.75)
+        self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.5)
         self.states_only = states_only
 
-    def update_masks(self, p):
-        self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=p)
-        self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=p)
+    def update_masks(self, p1, p2):
+        self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=p2)
+        self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=p1)
 
     def __len__(self):
         return self.trajectories.shape[0]
@@ -295,10 +294,14 @@ class AllegroScrewDriverDataset(Dataset):
         dx = 15
 
         ## randomly perturb angle of screwdriver
-        ##traj[:, dx-1] += 2 * np.pi * (np.random.rand() - 0.5)
+        traj[:, dx-1] += 2 * np.pi * (np.random.rand() - 0.5)
 
         if self.cosine_sine:
-            raise NotImplementedError
+                traj_q = traj[:, :14]
+                traj_theta = traj[:, 14][:, None]
+                traj_u = traj[:, 15:]
+                dx = dx + 1
+                traj = torch.cat((traj_q, torch.cos(traj_theta), torch.sin(traj_theta), traj_u), dim=1)
 
         # randomly mask the initial state and the final state
         # need to find the final state - last part of mask that is 1
@@ -341,10 +344,10 @@ class AllegroScrewDriverDataset(Dataset):
         if self.cosine_sine:
             self.mean = torch.zeros(dim + 1)
             self.std = torch.ones(dim + 1)
-            self.mean[:8] = mean[:8]
-            self.std[:8] = torch.from_numpy(std[:8]).float()
-            self.mean[10:] = mean[9:]
-            self.std[10:] = torch.from_numpy(std[9:]).float()
+            self.mean[:14] = mean[:14]
+            self.std[:14] = torch.from_numpy(std[:14]).float()
+            self.mean[16:] = mean[15:]
+            self.std[16:] = torch.from_numpy(std[15:]).float()
         else:
             # mean[12:15] = 0
             # std[12:15] = np.pi
@@ -363,7 +366,7 @@ class AllegroScrewDriverDataset(Dataset):
 
 class FakeDataset(Dataset):
 
-    def __init__(self, fpath):
+    def __init__(self, fpath, cosine_sine=False):
         data = dict(np.load(fpath))
         self.trajectories = torch.from_numpy(data['trajectories'])
         self.contact = torch.from_numpy(data['contact'])
@@ -371,13 +374,13 @@ class FakeDataset(Dataset):
         self.N = len(self.trajectories)
         self.mean = 0
         self.std = 1
-
+        self.cosine_sine = cosine_sine
         self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.75)
-        self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.75)
+        self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.5)
 
-    def update_masks(self, p):
-        self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=p)
-        self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=p)
+    def update_masks(self, p1, p2):
+        self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=p2)
+        self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=p1)
 
     def set_norm_constants(self, mean, std):
         self.mean = mean
@@ -391,7 +394,16 @@ class FakeDataset(Dataset):
 
         # TODO: figure out how to do data augmentation on screwdriver angle
         # a little more complex due to rotation representation
+        # a little more complex due to rotation representation
         dx = 15
+
+        if self.cosine_sine:
+            traj_q = traj[:, :14]
+            traj_theta = traj[:, 14][:, None]
+            traj_u = traj[:, 15:]
+            dx = dx + 1
+            traj = torch.cat((traj_q, torch.cos(traj_theta), torch.sin(traj_theta), traj_u), dim=1)
+
         mask = torch.ones_like(traj)
         # sample mask for initial state
         mask[0, :dx] = self.initial_state_mask_dist.sample((1,)).to(device=traj.device)
@@ -420,7 +432,7 @@ class RealAndFakeDataset(Dataset):
         self.fake_dataset.set_norm_constants(self.real_dataset.mean, self.real_dataset.std)
 
     def __len__(self):
-        return len(self.real_dataset)
+        return len(self.fake_dataset)
 
     def __getitem__(self, idx):
         real_traj, real_contact, real_mask = self.real_dataset[idx]

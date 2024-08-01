@@ -18,7 +18,7 @@ from ccai.kernels import rbf_kernel, structured_rbf_kernel
 
 from ccai.problem import ConstrainedSVGDProblem, IpoptProblem
 from ccai.mpc.csvgd import Constrained_SVGD_MPC
-from ccai.mpc.ipopt import IpoptMPC
+#from ccai.mpc.ipopt import IpoptMPC
 
 import time
 import pytorch_volumetric as pv
@@ -525,6 +525,8 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
         if hessG is not None:
             hessG.detach_()
+
+        #print(J.mean(), G.abs().mean(), G.abs().max())
         return grad_J.detach(), hess_J, K.detach(), grad_K.detach(), G.detach(), dG.detach(), hessG
 
     def update(self, start, goal=None, T=None):
@@ -1831,13 +1833,13 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
         return h, grad_h, hess_h
 
 
-class IpoptManipulationProblem(AllegroManipulationProblem, IpoptProblem):
-
-    def __init__(self, *args, **kwargs):
-        device = kwargs.get('device', None)
-        if device is not None:
-            kwargs.pop('device')
-        super().__init__(*args, **kwargs, N=1, device='cpu')
+# class IpoptManipulationProblem(AllegroManipulationProblem, IpoptProblem):
+#
+#     def __init__(self, *args, **kwargs):
+#         device = kwargs.get('device', None)
+#         if device is not None:
+#             kwargs.pop('device')
+#         super().__init__(*args, **kwargs, N=1, device='cpu')
 
 
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
