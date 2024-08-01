@@ -1,8 +1,8 @@
 ---
-T: 47
+T: 15
 receding_horizon: False
 num_steps: 15
-num_turns: 4
+num_turns: 2
 num_trials: 10
 visualize: False
 experiment_name: 'allegro_screwdriver_diffusion_init_guided_long_horizon_no_csvto'
@@ -19,8 +19,9 @@ optimize_force: True
 exclude_index: False
 projected: False
 use_saved_plans: True
-use_saved_noise: True
+use_saved_noise: False
 use_guidance: True
+sample_contact: True
 model_path: 'data/training/allegro_screwdriver/allegro_test_new_data_augment_angle_diffusion/allegro_screwdriver_diffusion.pt'
 controllers:
   csvgd:

@@ -33,6 +33,7 @@ from scipy.spatial.transform import Rotation as R
 # from ccai.mpc.ipopt import IpoptMPC
 # from ccai.problem import IpoptProblem
 from ccai.models.trajectory_samplers import TrajectorySampler
+from ccai.models.contact_samplers import GraphSearch, Node
 
 from model import LatentDiffusionModel
 
@@ -348,7 +349,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
     if model_path is not None:
         problem_for_sampler = None
-        if params['projected']:
+        if params['projected'] or params['sample_contact']:
             pregrasp_problem_diff = AllegroScrewdriverDiff(
                 start=start[:4 * num_fingers + obj_dof],
                 goal=params['valve_goal'] * 0,
@@ -417,12 +418,20 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 default_dof_pos=env.default_dof_pos[:, :16]
             )
 
-            problem_for_sampler = {
-                (-1, -1, -1): pregrasp_problem_diff,
-                (-1, 1, 1): index_regrasp_problem_diff,
-                (1, -1, -1): thumb_and_middle_regrasp_problem_diff,
-                (1, 1, 1): turn_problem_diff
-            }
+            if params['use_partial_constraint']:
+                problem_for_sampler = {
+                    (-1, -1, -1): pregrasp_problem_diff,
+                    (-1, 1, 1): index_regrasp_problem_diff,
+                    (1, -1, -1): thumb_and_middle_regrasp_problem_diff,
+                    (1, 1, 1): turn_problem_diff
+                }
+            else:
+                problem_for_sampler = {
+                    (-1, -1, -1): pregrasp_problem,
+                    (-1, 1, 1): index_regrasp_problem,
+                    (1, -1, -1): thumb_and_middle_regrasp_problem,
+                    (1, 1, 1): turn_problem
+                }
         if 'type' not in params:
             params['type'] = 'diffusion'
 
@@ -434,15 +443,15 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             vae.load_state_dict(torch.load(f'{CCAI_PATH}/{vae_path}'))
             for param in vae.parameters():
                 param.requires_grad = False
-        trajectory_sampler = TrajectorySampler(T=params['T'] + 1, dx=15 if not model_t else params['nzt'], du=21 if not model_t else 0, type=params['type'],
+        trajectory_sampler = TrajectorySampler(T=params['T'] + 1, dx=16 if not model_t else params['nzt'], du=21 if not model_t else 0, type=params['type'],
                                                timesteps=256, hidden_dim=128 if not model_t else 64,
-                                               context_dim=3, generate_context=True,
+                                               context_dim=3, generate_context=False,
                                                constrain=params['projected'],
                                                problem=problem_for_sampler,
                                                inits_noise=inits_noise, noise_noise=noise_noise,
                                                guided=params['use_guidance'],
                                                vae=vae)
-        trajectory_sampler.load_state_dict(torch.load(f'{CCAI_PATH}/{model_path}'))
+        trajectory_sampler.load_state_dict(torch.load(f'{CCAI_PATH}/{model_path}', map_location=torch.device('cuda')), strict=True)
         trajectory_sampler.to(device=params['device'])
         trajectory_sampler.send_norm_constants_to_submodels()
         print('Loaded trajectory sampler')
@@ -512,12 +521,68 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
     def _full_to_partial(traj, mode):
         if mode == 'index':
-            traj = torch.cat((traj[..., :-3], traj[..., -3:]), dim=-1)
+            traj = torch.cat((traj[..., :-9], traj[..., -6:]), dim=-1)
         if mode == 'thumb_middle':
             traj = traj[..., :-6]
         if mode == 'pregrasp':
             traj = traj[..., :-9]
         return traj
+    
+    def convert_sine_cosine_to_yaw(xu):
+        """
+        xu is shape (N, T, 37)
+        Replace the sine and cosine in xu with yaw and return the new xu
+        """
+        sine = xu[..., 15]
+        cosine = xu[..., 14]
+        yaw = torch.atan2(sine, cosine)
+        xu_new = torch.cat([xu[..., :14], yaw.unsqueeze(-1), xu[..., 16:]], dim=-1)
+        return xu_new
+    
+    def convert_yaw_to_sine_cosine(xu):
+        """
+        xu is shape (N, T, 36)
+        Replace the yaw in xu with sine and cosine and return the new xu
+        """
+        yaw = xu[14]
+        sine = torch.sin(yaw)
+        cosine = torch.cos(yaw)
+        xu_new = torch.cat([xu[:14], cosine.unsqueeze(-1), sine.unsqueeze(-1), xu[15:]], dim=-1)
+        return xu_new
+    
+    def gen_initial_samples_multi_mode(modes):
+        # generate context from mode
+        contact = -torch.ones(params['N'], len(modes), 3).to(device=params['device'])
+        for i in range(len(modes)):
+            mode = modes[i]
+            if mode == 'thumb_middle':
+                contact[:, i, 0] = 1
+            elif mode == 'index':
+                contact[:, i, 1] = 1
+                contact[:, i, 2] = 1
+            elif mode == 'turn':
+                contact[:, i, :] = 1
+
+        # generate initial samples with diffusion model
+        initial_samples = None
+        sim_rollouts = None
+        if trajectory_sampler is not None:
+            with torch.no_grad():
+                start = state.clone()
+                # if state[-1] < -1.0:
+                #     start[-1] += 0.75
+                a = time.perf_counter()
+                start_for_diff = convert_yaw_to_sine_cosine(start)
+                initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
+                                                                  H=len(modes) * (params['T'] + 1),
+                                                                  constraints=contact)
+                initial_samples = convert_sine_cosine_to_yaw(initial_samples)
+
+                print('Sampling time', time.perf_counter() - a)
+                # if state[-1] < -1.0:
+                #     initial_samples[:, :, -1] -= 0.75
+
+            return initial_samples
 
     def execute_traj(planner, mode, goal=None, fname=None):
         # reset planner
@@ -540,15 +605,17 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         if trajectory_sampler is not None:
             with torch.no_grad():
                 start = state.clone()
-                if state[-1] < -1.0:
-                    start[-1] += 0.75
+                # if state[-1] < -1.0:
+                #     start[-1] += 0.75
                 a = time.perf_counter()
-                initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start.reshape(1, -1),
+                start_for_diff = convert_yaw_to_sine_cosine(start)
+                initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
                                                                   H=params['T'] + 1,
                                                                   constraints=contact)
+                initial_samples = convert_sine_cosine_to_yaw(initial_samples)
                 print('Sampling time', time.perf_counter() - a)
-                if state[-1] < -1.0:
-                    initial_samples[:, :, -1] -= 0.75
+                # if state[-1] < -1.0:
+                #     initial_samples[:, :, -1] -= 0.75
             
             sim_rollouts = torch.zeros_like(initial_samples)
             # for i in range(params['N']):
@@ -591,9 +658,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 executed_trajectory = _partial_to_full(executed_trajectory, mode)
                 plans = _partial_to_full(plans, mode)
                 plans = torch.cat((executed_trajectory, plans), dim=1)
-                if state[-1] < -1.0:
-                    plans[:, :, 14] += 0.75
-                    executed_trajectory[:, :, 14] += 0.75
+                # if state[-1] < -1.0:
+                #     plans[:, :, 14] += 0.75
+                #     executed_trajectory[:, :, 14] += 0.75
 
                 if trajectory_sampler is not None:
                     with torch.no_grad():
@@ -609,8 +676,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     initial_u = initial_samples[:, :-1, -planner.problem.du:]
                     initial_samples = torch.cat((initial_x, initial_u), dim=-1)
 
-                    if state[-1] < -1.0:
-                        initial_samples[:, :, 14] -= 0.75
+                    # if state[-1] < -1.0:
+                    #     initial_samples[:, :, 14] -= 0.75
                     # update the initial samples
                     planner.x = initial_samples[:, k:]
 
@@ -746,11 +813,20 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             data[t]['contact_distance'].append(contact_distance[t])
             data[t]['contact_state'].append(contact_state)
 
+    def visualize_trajectory_wrapper(traj, contact_scenes, fname, plan_or_init, index, fingers, obj_dof, k):
+        viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/{plan_or_init}/{index}/timestep_{k}")
+        img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
+        gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
+        pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
+        pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
+        visualize_trajectory(traj, contact_scenes, viz_fpath, fingers, obj_dof + 1)
+
     state = env.get_state()
+    state = state['q'].reshape(-1)[:15].to(device=params['device'])
 
     contact_label_to_vec = {'pregrasp': 0,
-                            'index': 1,
-                            'thumb_middle': 2,
+                            'index': 2,
+                            'thumb_middle': 1,
                             'turn': 3
                             }
     contact_vec_to_label = dict((v, k) for k, v in contact_label_to_vec.items())
@@ -762,12 +838,44 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         contact_sequence = ['pregrasp', 'turn']
         for k in range(params['num_turns'] - 1):
             contact_options = ['index', 'thumb_middle']
-            perm = np.random.permutation(2)
+            # perm = np.random.permutation(2)
+            perm = [0, 1]
             contact_sequence += [contact_options[perm[0]], contact_options[perm[1]], 'turn']
     else:
-        contact_sequence = None
+        state_for_search = convert_yaw_to_sine_cosine(state)
+        contact_sequence_sampler = GraphSearch(state_for_search, trajectory_sampler, problem_for_sampler, params['max_depth'], params['heuristic'], params['goal'], torch.device('cuda'))
+        node_0 = Node(
+            torch.empty(0, 37).to(device=params['device']),
+            0,
+            tuple(),
+            torch.empty(32, 0, 37),
+            torch.arange(16)
+        )
+        
+        a = time.perf_counter()
+        contact_node_sequence = contact_sequence_sampler.astar(node_0, None)
+        planning_time = time.perf_counter() - a
+        print('Contact sequence search time:', planning_time)
+        closed_set = contact_sequence_sampler.closed_set
+        if contact_node_sequence is not None:
+            contact_node_sequence = list(contact_node_sequence)
+        with open(f"{fpath}/contact_planning.pkl", "wb") as f:
+            pkl.dump((contact_node_sequence, closed_set, planning_time, contact_sequence_sampler.iter), f)
+        if contact_node_sequence is None:
+            print('No contact sequence found')
+            return -1
+        last_node = contact_node_sequence[-1]
+
+        contact_sequence = np.array(last_node.contact_sequence)
+        contact_sequence = (contact_sequence + 1)/2
+        contact_sequence = [contact_vec_to_label[contact_sequence[i].sum()] for i in range(contact_sequence.shape[0])]
     print(contact_sequence)
-    for stage in range(num_stages):
+    # state = state['q'].reshape(-1)[:15].to(device=params['device'])
+    # initial_samples = gen_initial_samples_multi_mode(contact_sequence)
+    # pkl.dump(initial_samples, open(f"{fpath}/long_horizon_inits.p", "wb"))
+    # return -1
+
+    for stage in range(len(contact_sequence)):
         state = env.get_state()
         state = state['q'].reshape(-1)[:15].to(device=params['device'])
         valve_goal = torch.tensor([0, 0, state[-1]]).to(device=params['device'])
@@ -864,7 +972,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 if __name__ == "__main__":
     # get config
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_latent_diff_init_csvto.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_diff_init_guided.yaml').read_text())
     from tqdm import tqdm
 
     if config['mode'] == 'hardware':
@@ -955,6 +1063,10 @@ if __name__ == "__main__":
             inits_noise, noise_noise = torch.load(f'{CCAI_PATH}/examples/saved_noise_long_horizon.pt')
         else:
             inits_noise, noise_noise = torch.load(f'{CCAI_PATH}/examples/saved_noise.pt')
+            if len(inits_noise.shape) == 5:
+                inits_noise = inits_noise[:, :, 0, :, :]
+            if len(noise_noise.shape) == 6:
+                noise_noise = noise_noise[:, :, :, 0, :, :]
     for i in tqdm(range(0, config['num_trials'])):
         
         torch.manual_seed(i)

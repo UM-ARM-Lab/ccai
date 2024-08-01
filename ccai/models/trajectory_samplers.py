@@ -128,7 +128,7 @@ class TrajectoryDiffusionModel(nn.Module):
                                                             hidden_dim=hidden_dim,
                                                             unconditional=unconditional)
         else:
-            if problem is not None:
+            if constrained:
                 self.diffusion_model = ConstrainedDiffusion(T, dx, du, context_dim, problem,
                                                             timesteps=timesteps, sampling_timesteps=timesteps,
                                                             constrain=constrained,

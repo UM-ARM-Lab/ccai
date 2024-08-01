@@ -302,17 +302,17 @@ class GaussianDiffusion(nn.Module):
             img = trajectory
         if start_timestep is None:
             start_timestep = self.num_timesteps
-        img = self._apply_conditioning(img, condition, context_unsqueezed)
+        img = self._apply_conditioning(img, condition)
         imgs = [img]
         for t in reversed(range(0, start_timestep)):
             img, x_start = self.p_sample(img, t, context.unsqueeze(1))
-            img = self._apply_conditioning(img, condition, context_unsqueezed)
+            img = self._apply_conditioning(img, condition)
             # img[:, -1, 8] = img[:, 0, 8] + np.pi / 4.0
             imgs.append(img)
 
         ret = img if not return_all_timesteps else torch.stack(imgs, dim=1)
 
-        return ret
+        return ret, None, None
 
     @torch.no_grad()
     def p_multi_sample_loop(self, shape, condition, context, return_all_timesteps=False,
@@ -698,7 +698,7 @@ class JointDiffusion(GaussianDiffusion):
         # use same noise vector
         grad = torch.zeros_like(mu_var['x']['mean'])
         # add some guidance using gradient - maximise turn angle, keep upright
-        eta = 0.0 if not self.guided else .05
+        eta = 0.0 if not self.guided else .02
         grad[:, :, :, self.dx - 3:self.dx - 1] = -2 * 0.1 * (mu_var['x']['mean'][:, :, :, self.dx - 3:self.dx - 1] +
                                                              self.mu[self.dx - 3:self.dx - 1].to(device=x.device))
         # grad[:, -1, -1, self.dx - 1] = -eta
@@ -807,7 +807,8 @@ class JointDiffusion(GaussianDiffusion):
                             trajectory=None):
         device = self.betas.device
         B, N, H, xu_dim = shape
-
+        if self.inits_noise is not None:
+            x = self.inits_noise.to(device)
         if trajectory is None:
             x = torch.randn(shape, device=device)
         else:
@@ -832,6 +833,10 @@ class JointDiffusion(GaussianDiffusion):
             x, x_start, c, c_start = self.p_sample(x.reshape(B, N, H, -1), t, c.reshape(B, N, -1))
             x = x.reshape(B, N, H, -1)
             c = c.reshape(B, N, -1)
+            for i in range(1, N):
+                tmp = x[:, i, 0, :self.dx].clone()
+                x[:, i, 0, :self.dx] = (tmp + x[:, i - 1, -1, :self.dx]) / 2
+                x[:, i - 1, -1, :self.dx] = x[:, i, 0, :self.dx]
             # apply conditioning
             x[:, 0] = self._apply_conditioning(x[:, 0], condition)
 
@@ -937,7 +942,7 @@ class ConstrainedDiffusion(GaussianDiffusion):
             constrain=True,
             hidden_dim=32,
             unconditional=False,
-            alpha_J=5e-2,
+            alpha_J=2.5e-4,
             alpha_C=0.1,
             inits_noise=None,
             noise_noise=None,
@@ -964,7 +969,7 @@ class ConstrainedDiffusion(GaussianDiffusion):
 
         self.skip_first = False
         self.anneal_factor = .1
-        self.noise_factor = 1#0.707
+        self.noise_factor = 0.707
         self.max_norm = 10
 
         self.model = TemporalUNetContext(horizon, dx + du, context_dim, dim=hidden_dim)
@@ -1040,19 +1045,21 @@ class ConstrainedDiffusion(GaussianDiffusion):
         b, *_, device = *x.shape, x.device
         batched_times = torch.full((b,), t, device=x.device, dtype=torch.long)
         with torch.no_grad():
-            model_mean, _, model_log_variance, x_start = self.p_mean_variance(x=x[:, :, :self.xu_dim],
+            model_mean, _, model_log_variance, x_start = self.p_mean_variance(x=x[..., :self.xu_dim],
                                                                               t=batched_times,
                                                                               context=context)
         # we have to unnormalize first
         if self.skip_first:
             _x = x[:, 1:].clone()
             _model_mean = model_mean[:, 1:].squeeze()
-            model_log_variance = model_log_variance.squeeze(-1)
+            if len(x.shape) < 4:
+                model_log_variance = model_log_variance.squeeze(-1)
             H = self.horizon - 1
         else:
             _x = x.clone()
             _model_mean = model_mean.squeeze()
-            model_log_variance = model_log_variance.squeeze(-1)
+            if len(x.shape) < 4:
+                model_log_variance = model_log_variance.squeeze(-1)
             H = self.horizon
 
         x_norm = _x.clone()
@@ -1067,114 +1074,116 @@ class ConstrainedDiffusion(GaussianDiffusion):
         else:
             sample = torch.randn_like(_x)
         noise = self.noise_factor * sample[:, :, :self.xu_dim] if t > 0 else 0.  # no noise if t == 0
+        if t > 0 and len(x.shape) > 3:
+            for i in range(1, x.shape[1]):
+                noise[:, i, 0, :self.dx] = noise[:, i - 1, -1, :self.dx]
         update = _model_mean + (0.5 * model_log_variance).exp() * self.noise_factor * noise - _x[:, :, :self.xu_dim]
 
-        # for b_ind in (range(context.shape[0])):
-        c_state, mask, mask_no_z = self.c_state_mask(context, x)
-        num_dim = mask.long().sum().item()
-        problem = self.problem_dict[c_state]
+        for context_ind in (range(context.shape[1])):
+            c_state, mask, mask_no_z = self.c_state_mask(context[:, context_ind], x)
+            num_dim = mask.long().sum().item()
+            problem = self.problem_dict[c_state]
 
-        update = torch.cat((update, torch.zeros(b, H, problem.dz, device=device)), dim=2)
 
-        problem._preprocess(x_norm[:, :, mask_no_z], projected_diffusion=True)
+            problem._preprocess(x_norm[:, context_ind, :, mask_no_z], projected_diffusion=True)
 
-        z_dim = problem.dz
+            z_dim = problem.dz
 
-        C, dC, _ = problem.combined_constraints(x_norm[:, :, mask], compute_hess=False, projected_diffusion=True)
-        # C, dC, _ = problem._con_eq(x_norm[:, :, mask_no_z], compute_hess=False, projected_diffusion=True)
-        # compute unconstrained update with cost guide
+            C, dC, _ = problem.combined_constraints(x_norm[:, context_ind, :, mask], compute_hess=False, projected_diffusion=True)
+            # C, dC, _ = problem._con_eq(x_norm[:, :, mask_no_z], compute_hess=False, projected_diffusion=True)
+            # compute unconstrained update with cost guide
 
-        # make update be unnormalized
-        # Fix the indexing here
-        if problem.dz > 0:
-            unnormalized_update = update[:, :, mask_no_z] * self.std[mask_no_z[:-problem.dz]]
+            # make update be unnormalized
+            # Fix the indexing here
+            if problem.dz > 0:
+                unnormalized_update = update[:, context_ind, :, mask_no_z] * self.std[mask_no_z[:-problem.dz]]
 
-        else:
-            unnormalized_update = update[:, :, mask_no_z] * self.std[mask_no_z]
+            else:
+                unnormalized_update = update[:, context_ind, :, mask_no_z] * self.std[mask_no_z]
 
-        if self.guided:
-            _, dJ, _ = problem._objective(x_norm[:, :, mask_no_z])
-            dJ = dJ.reshape(b, H, -1)
-            unnormalized_update -= self.alpha_J * dJ
-            # grad = torch.zeros_like(mu_var['x']['mean'])
-            # # add some guidance using gradient - maximise turn angle, keep upright
-            # eta = 0.0 if not self.guided else .05
-            # grad[:, :, :, self.dx - 3:self.dx - 1] = -2 * 0.1 * (mu_var['x']['mean'][:, :, :, self.dx - 3:self.dx - 1] +
-            #                                                     self.mu[self.dx - 3:self.dx - 1].to(device=x.device))
-            # # grad[:, -1, -1, self.dx - 1] = -eta
-            # grad[:, :, :, self.dx - 1] = -1
+            if self.guided:
+                # _, dJ, _ = problem._objective(x_norm[:, context_ind, :, mask_no_z])
+                # dJ = dJ.reshape(b, H, -1)
+                # unnormalized_update -= self.alpha_J * dJ
+                # grad = torch.zeros_like(mu_var['x']['mean'])
+                # # add some guidance using gradient - maximise turn angle, keep upright
+                eta = 0.0 if not self.guided else .0005
+                unnormalized_update[:, :, self.dx - 3:self.dx - 1] = -2 * 0.1 * (_model_mean[:, context_ind, :, self.dx - 3:self.dx - 1] +
+                                                                    self.mu[self.dx - 3:self.dx - 1].to(device=x.device))
+                # grad[:, -1, -1, self.dx - 1] = -eta
+                unnormalized_update[:, :, self.dx - 1] = -1
 
-        update_this_b_ind = torch.cat((unnormalized_update, torch.zeros(b, H, z_dim, device=device)[:, :, mask[36:]]), dim=2)
+            update_this_b_ind = torch.cat((unnormalized_update, torch.zeros(b, H, z_dim, device=device)[:, :, mask[36:]]), dim=2)
 
-        dC = dC.reshape(b, -1, (H) * num_dim)
+            dC = dC.reshape(b, -1, (H) * num_dim)
 
-        # add zero update for z
-        # update_this_b_ind = torch.cat((update, torch.zeros(1, H, z_dim, device=device)), dim=2)
+            # add zero update for z
+            # update_this_b_ind = torch.cat((update, torch.zeros(1, H, z_dim, device=device)), dim=2)
 
-        xi_C = None
-        if self.constrain:
-            with (torch.no_grad()):
-                # convert to float64
-                dtype = torch.float64
-                C = C.to(dtype=dtype)
-                dC = dC.to(dtype=dtype)
-                eye = torch.eye(C.shape[1]).repeat(b, 1, 1).to(device=C.device, dtype=dtype)
-                update_this_b_ind = update_this_b_ind.to(dtype=dtype)
-                # Damping anneals from 1 to 0
-                if anneal:
-                    max_damping = 1
-                    min_damping = 1e-6
-                    damping = min_damping + (max_damping - min_damping) * t / self.num_timesteps
-                else:
-                    damping = 0
+            xi_C = None
+            if self.constrain:
+                with (torch.no_grad()):
+                    # convert to float64
+                    dtype = torch.float64
+                    C = C.to(dtype=dtype)
+                    dC = dC.to(dtype=dtype)
+                    eye = torch.eye(C.shape[1]).repeat(b, 1, 1).to(device=C.device, dtype=dtype)
+                    update_this_b_ind = update_this_b_ind.to(dtype=dtype)
+                    # Damping anneals from 1 to 0
+                    if anneal:
+                        max_damping = 1
+                        min_damping = 1e-6
+                        damping = min_damping + (max_damping - min_damping) * t / self.num_timesteps
+                    else:
+                        damping = 0
 
-                # Compute damped projection matrix
-                try:
-                    dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1) +
-                                                damping * eye
-                                                , eye)
-                except Exception as e:
-                    dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1) * damping * eye)
-                projection = dC.permute(0, 2, 1) @ dCdCT_inv @ dC
+                    # Compute damped projection matrix
+                    try:
+                        dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1) +
+                                                    damping * eye
+                                                    , eye)
+                    except Exception as e:
+                        dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1) * damping * eye)
+                    projection = dC.permute(0, 2, 1) @ dCdCT_inv @ dC
 
-                # Compute constrained update
-                eye2 = torch.eye(_x.shape[1] * num_dim, device=x.device, dtype=dtype).unsqueeze(0)
-                update_this_b_ind = (eye2 - projection) @ update_this_b_ind.reshape(b, -1, 1)
-                update_this_b_ind = update_this_b_ind.squeeze(-1)
+                    # Compute constrained update
+                    eye2 = torch.eye(_x.shape[-2] * num_dim, device=x.device, dtype=dtype).unsqueeze(0)
+                    update_this_b_ind = (eye2 - projection) @ update_this_b_ind.reshape(b, -1, 1)
+                    update_this_b_ind = update_this_b_ind.squeeze(-1)
 
-                # Update to decrease constraint violation
-                if self.use_gauss_newton:
-                    xi_C = dCdCT_inv @ C.unsqueeze(-1)
-                    xi_C = (dC.permute(0, 2, 1) @ xi_C).squeeze(-1)
-                else:
-                    grad_C_sq = 2 * C.unsqueeze(-1) * dC
-                    xi_C = torch.sum(grad_C_sq, dim=1)
+                    # Update to decrease constraint violation
+                    if self.use_gauss_newton:
+                        xi_C = dCdCT_inv @ C.unsqueeze(-1)
+                        xi_C = (dC.permute(0, 2, 1) @ xi_C).squeeze(-1)
+                    else:
+                        grad_C_sq = 2 * C.unsqueeze(-1) * dC
+                        xi_C = torch.sum(grad_C_sq, dim=1)
 
-        # Update to minimize constraint if no projection
-        if xi_C is None:
-            grad_C_sq = 2 * C.unsqueeze(-1) * dC
-            xi_C = torch.sum(grad_C_sq, dim=1)
+            # Update to minimize constraint if no projection
+            if xi_C is None:
+                grad_C_sq = 2 * C.unsqueeze(-1) * dC
+                xi_C = torch.sum(grad_C_sq, dim=1)
 
-        # Convert back to single precision
-        dtype = torch.float32
-        update_this_b_ind = update_this_b_ind.to(dtype=dtype)
-        # update_this_b_ind = update_this_b_ind.reshape(1, -1)
+            # Convert back to single precision
+            dtype = torch.float32
+            update_this_b_ind = update_this_b_ind.to(dtype=dtype)
+            # update_this_b_ind = update_this_b_ind.reshape(1, -1)
 
-        # total update
-        update_this_b_ind -= self.alpha_C * xi_C
+            # total update
+            update_this_b_ind -= self.alpha_C * xi_C
 
-        # maximum norm on xi_C
-        norm_update = torch.linalg.norm(update_this_b_ind, dim=1, keepdim=True)
-        update_this_b_ind = torch.where(norm_update < self.max_norm, update_this_b_ind, update_this_b_ind * self.max_norm / norm_update)
+            # maximum norm on xi_C
+            norm_update = torch.linalg.norm(update_this_b_ind, dim=1, keepdim=True)
+            update_this_b_ind = torch.where(norm_update < self.max_norm, update_this_b_ind, update_this_b_ind * self.max_norm / norm_update)
 
-        # normalize update
-        update_this_b_ind = update_this_b_ind.reshape(b, H, -1)
-        if problem.dz > 0:
-            update_this_b_ind[:, :, :-problem.dz] = update_this_b_ind[:, :, :-problem.dz] / self.std[mask[:36]]
-        else:
-            update_this_b_ind[:, :, :] = update_this_b_ind[:, :, :] / self.std[mask[:36]]
+            # normalize update
+            update_this_b_ind = update_this_b_ind.reshape(b, H, -1)
+            if problem.dz > 0:
+                update_this_b_ind[:, :, :-problem.dz] = update_this_b_ind[:, :, :-problem.dz] / self.std[mask[:36]]
+            else:
+                update_this_b_ind = update_this_b_ind / self.std[mask[:36]]
 
-        update[:, :, mask] = update_this_b_ind
+            update[:, context_ind, :, mask] = update_this_b_ind
 
             # update
         pred_x = _x + update
@@ -1294,6 +1303,56 @@ class ConstrainedDiffusion(GaussianDiffusion):
         # theta = torch.atan2(stheta, ctheta)
         # return torch.sum((theta[0] - theta[1]) ** 2) + torch.sum((theta[-1] - theta[-1]) ** 2)# - 0.01*(theta[-1]-theta[0]) ** 2
 
+    @torch.no_grad()
+    def p_multi_sample_loop(self, shape, condition, context, return_all_timesteps=False,
+                            start_timestep=None,
+                            trajectory=None):
+        device = self.betas.device
+        B, N, H, xu_dim = shape
+        if self.inits_noise is not None:
+            x = self.inits_noise.to(device)
+        if trajectory is None:
+            x = torch.randn(shape, device=device)
+        else:
+            x = trajectory
+        if context is None:
+            c = torch.randn((*shape[:-2], self.context_dim), device=device)
+        else:
+            c = context
+
+        # first state of each subtrajectory should be the same as the final state of the previous
+        # make noises the same
+        for i in range(1, N):
+            x[:, i, 0, :self.dx] = x[:, i - 1, -1, :self.dx]
+
+        if start_timestep is None:
+            start_timestep = self.num_timesteps
+
+        x[:, 0] = self._apply_conditioning(x[:, 0], condition)
+        all_x = [x]
+        all_c = [c]
+        for t in reversed(range(0, start_timestep)):
+            x, x_start = self.p_sample(x.reshape(B, N, H, -1), t, c.reshape(B, N, -1))
+            x = x.reshape(B, N, H, -1)
+            c = c.reshape(B, N, -1)
+            
+            for i in range(1, N):
+                tmp = x[:, i, 0, :self.dx].clone()
+                x[:, i, 0, :self.dx] = (tmp + x[:, i - 1, -1, :self.dx]) / 2
+                x[:, i - 1, -1, :self.dx] = x[:, i, 0, :self.dx]
+            # apply conditioning
+            x[:, 0] = self._apply_conditioning(x[:, 0], condition)
+
+            if context is not None:
+                c = context
+
+            all_x.append(x)
+            all_c.append(c)
+
+        ret_x = x if not return_all_timesteps else torch.stack(all_x, dim=1)
+        ret_c = c if not return_all_timesteps else torch.stack(all_c, dim=1)
+
+        return ret_x, ret_c
 
 class LatentDiffusion(GaussianDiffusion):
     def __init__(

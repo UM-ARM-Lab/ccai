@@ -19,47 +19,68 @@ Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packag
 [ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
 Loaded trajectory sampler
 ['pregrasp', 'turn', 'index', 'thumb_middle', 'turn']
-Sampling time 204.33784564100097
+Sampling time 1.7248642159993324
 {}
 [ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
 [ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
 [ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
 Loaded trajectory sampler
 ['pregrasp', 'turn', 'index', 'thumb_middle', 'turn']
-Sampling time 201.0634280639988
+Sampling time 1.533367757000633
 {}
 [ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
 [ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
 [ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
 Loaded trajectory sampler
 ['pregrasp', 'turn', 'index', 'thumb_middle', 'turn']
-Sampling time 201.10498170699975
+Sampling time 1.5524499760003891
 {}
 [ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
 [ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
 [ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
 Loaded trajectory sampler
 ['pregrasp', 'turn', 'index', 'thumb_middle', 'turn']
-Sampling time 201.61466336000012
+Sampling time 1.5228770239991718
 {}
 [ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
 [ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
 [ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
 Loaded trajectory sampler
 ['pregrasp', 'turn', 'index', 'thumb_middle', 'turn']
-Sampling time 204.76964618799866
+Sampling time 1.5626922749997902
 {}
 [ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
 [ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
 [ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
 Loaded trajectory sampler
 ['pregrasp', 'turn', 'index', 'thumb_middle', 'turn']
-Sampling time 204.371103563999
+Sampling time 1.5444764829999258
 {}
 [ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
 [ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
 [ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
 Loaded trajectory sampler
 ['pregrasp', 'turn', 'index', 'thumb_middle', 'turn']
-Sampling time 204.18436684199878
+Sampling time 1.554244486999778
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+['pregrasp', 'turn', 'index', 'thumb_middle', 'turn']
+Sampling time 1.5434100009997564
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+['pregrasp', 'turn', 'index', 'thumb_middle', 'turn']
+Sampling time 1.5284483180003008
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+['pregrasp', 'turn', 'index', 'thumb_middle', 'turn']
+Sampling time 1.5624012369999036
 {}

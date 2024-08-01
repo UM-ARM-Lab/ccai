@@ -1,10 +1,10 @@
-python -u allegro_screwdriver.py allegro_screwdriver_diff_init_guided > ./logs/allegro_screwdriver_diff_init_long_horizon_guided.log
+# python -u allegro_screwdriver.py allegro_screwdriver_diff_init_guided > ./logs/allegro_screwdriver_diff_init_long_horizon_guided.log
 
-python -u allegro_screwdriver.py allegro_screwdriver_proj_diff_init_guided > ./logs/allegro_screwdriver_proj_diff_init_long_horizon_guided.log
+# python -u allegro_screwdriver.py allegro_screwdriver_proj_diff_init_guided > ./logs/allegro_screwdriver_proj_diff_init_long_horizon_guided_low_weight_1.log
 
-python -u allegro_screwdriver.py allegro_screwdriver_diff_init > ./logs/allegro_screwdriver_diff_init_long_horizon.log
+# python -u allegro_screwdriver.py allegro_screwdriver_diff_init > ./logs/allegro_screwdriver_diff_init_long_horizon.log
 
-python -u allegro_screwdriver.py allegro_screwdriver_proj_diff_init > ./logs/allegro_screwdriver_proj_diff_init_long_horizon.log
+# python -u allegro_screwdriver.py allegro_screwdriver_proj_diff_init > ./logs/allegro_screwdriver_proj_diff_init_long_horizon_1.log
 
 # python -u allegro_screwdriver.py allegro_screwdriver_latent_diff_init_csvto > ./logs/allegro_screwdriver_latent_diff_init_csvto.log
 
@@ -17,3 +17,40 @@ python -u allegro_screwdriver.py allegro_screwdriver_proj_diff_init > ./logs/all
 # python -u allegro_screwdriver.py allegro_screwdriver_latent_diff_init_csvto > ./logs/allegro_screwdriver_latent_diff_init_csvto.log
 
 # python -u allegro_screwdriver.py allegro_screwdriver_diff_init_csvto_guided > ./logs/allegro_screwdriver_diff_init_csvto_guided_1.log
+
+# python -u allegro_screwdriver.py allegro_screwdriver_diff_planned_init_medium_heuristic > ./logs/allegro_screwdriver_diff_planned_init_medium_heuristic.log
+# python viz_allegro_plan_init.py allegro_screwdriver_diff_planned_init_medium_heuristic
+# python make_plan_init_gifs.py allegro_screwdriver_diff_planned_init_medium_heuristic
+
+# python -u allegro_screwdriver.py allegro_screwdriver_diff_planned_init_lower_heuristic > ./logs/allegro_screwdriver_diff_planned_init_lower_heuristic.log
+# python viz_allegro_plan_init.py allegro_screwdriver_diff_planned_init_lower_heuristic
+# python make_plan_init_gifs.py allegro_screwdriver_diff_planned_init_lower_heuristic
+
+# python -u allegro_screwdriver.py allegro_screwdriver_diff_planned_init_low_heuristic > ./logs/allegro_screwdriver_diff_planned_init_low_heuristic.log
+# python viz_allegro_plan_init.py allegro_screwdriver_diff_planned_init_low_heuristic
+# python make_plan_init_gifs.py allegro_screwdriver_diff_planned_init_low_heuristic
+
+# python -u allegro_screwdriver.py allegro_screwdriver_diff_planned_init_higher_heuristic > ./logs/allegro_screwdriver_diff_planned_init_higher_heuristic.log
+# python viz_allegro_plan_init.py allegro_screwdriver_diff_planned_init_higher_heuristic
+# python make_plan_init_gifs.py allegro_screwdriver_diff_planned_init_higher_heuristic
+
+# python -u allegro_screwdriver.py allegro_screwdriver_diff_planned_init_partial_constraint_eval > ./logs/allegro_screwdriver_diff_planned_init_partial_constraint_eval.log
+# python -u allegro_screwdriver.py allegro_screwdriver_diff_planned_init > ./logs/allegro_screwdriver_diff_planned_init_full_constraint_eval.log
+
+# python viz_allegro_plan_init.py allegro_screwdriver_diff_planned_init_partial_constraint_eval
+# python make_plan_init_gifs.py allegro_screwdriver_diff_planned_init_partial_constraint_eval
+
+# python viz_allegro_plan_init.py allegro_screwdriver_diff_planned_init
+# python make_plan_init_gifs.py allegro_screwdriver_diff_planned_init
+
+# python -u allegro_screwdriver.py allegro_screwdriver_diff_planned_init_higher_planning_budget > ./logs/allegro_screwdriver_diff_planned_init_higher_planning_budget.log
+# python viz_allegro_plan_init.py allegro_screwdriver_diff_planned_init_higher_planning_budget
+# python make_plan_init_gifs.py allegro_screwdriver_diff_planned_init_higher_planning_budget
+
+# python -u allegro_screwdriver.py allegro_screwdriver_diff_planned_init_higher_planning_budget_likelihood_filter > ./logs/allegro_screwdriver_diff_planned_init_higher_planning_budget_likelihood_filter.log
+# python viz_allegro_plan_init.py allegro_screwdriver_diff_planned_init_higher_planning_budget_likelihood_filter
+# python make_plan_init_gifs.py allegro_screwdriver_diff_planned_init_higher_planning_budget_likelihood_filter
+
+python -u allegro_screwdriver.py allegro_screwdriver_diff_planned_init_higher_planning_budget_new_model > ./logs/allegro_screwdriver_diff_planned_init_higher_planning_budget_new_model.log
+python viz_allegro_plan_init.py allegro_screwdriver_diff_planned_init_higher_planning_budget_new_model
+python make_plan_init_gifs.py allegro_screwdriver_diff_planned_init_higher_planning_budget_new_model

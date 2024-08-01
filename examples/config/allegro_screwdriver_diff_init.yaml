@@ -1,8 +1,8 @@
 ---
-T: 47
+T: 15
 receding_horizon: False
 num_steps: 15
-num_turns: 4
+num_turns: 2
 num_trials: 10
 visualize: False
 experiment_name: 'allegro_screwdriver_diffusion_init_no_guidance_long_horizon_no_csvto'
