@@ -806,6 +806,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     info_list = []
 
     validity_flag = True
+    warmup_time = 0
 
     for k in range(params['num_steps']):
         state = env.get_state()
@@ -817,21 +818,20 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         best_traj, trajectories = turn_planner.step(start[:4 * num_fingers + obj_dof])
 
         solve_time = time.time() - start_time
-        if k >= 0:
+        if k == 0:
+            warmup_time = 0
+        else:
             duration += solve_time
         print(f"solve time: {solve_time}")
         planned_theta_traj = best_traj[:, 4 * num_fingers_to_plan: 4 * num_fingers_to_plan + obj_dof].detach().cpu().numpy()
         print(f"current theta: {state['q'][0, -obj_dof:].detach().cpu().numpy()}")
         print(f"planned theta: {planned_theta_traj}")
         # add trajectory lines to sim
-        if k <= params['num_steps'] - 1:
-            gym.draw_env_rigid_contacts(viewer, env.envs[0], gymapi.Vec3(0,1,0), 10000, 1)
-        if k < params['num_steps'] - 1:
-            if params['mode'] == 'hardware':
-                add_trajectories_hardware(trajectories, best_traj, axes, env, config=params, state2ee_pos_func=state2ee_pos)
-            else:
-                add_trajectories(trajectories, best_traj, axes, env, sim=sim, gym=gym, viewer=viewer,
-                                config=params, state2ee_pos_func=state2ee_pos)
+        # if k <= params['num_steps'] - 1:
+        #     gym.draw_env_rigid_contacts(viewer, env.envs[0], gymapi.Vec3(0,1,0), 10000, 1)
+        # if k < params['num_steps'] - 1:
+        #     add_trajectories(trajectories, best_traj, axes, env, sim=sim, gym=gym, viewer=viewer,
+        #                         config=params, state2ee_pos_func=state2ee_pos)
 
         if params['visualize_plan']:
             traj_for_viz = best_traj[:, :turn_problem.dx]
@@ -942,22 +942,23 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
     turn_problem.T = actual_trajectory.shape[0]
     # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
-    final_distance_to_goal_pos = distance2goal_pos
-    final_distance_to_goal_ori = distance2goal_ori
+    final_distance_to_goal_pos = distance2goal_pos.item()
+    final_distance_to_goal_ori = distance2goal_ori.item()
     contact_rate = np.array(contact_list).mean()
 
-    print(f'Controller: {params["controller"]} Final distance to goal pos: {final_distance_to_goal_pos.item()}, ori: {final_distance_to_goal_pos.item()}')
+    print(f'Controller: {params["controller"]} Final distance to goal pos: {final_distance_to_goal_pos}, ori: {final_distance_to_goal_pos}')
     print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
 
     np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
-            d2goal_pos=final_distance_to_goal_pos.item(),
-            d2goal_ori=final_distance_to_goal_ori.item())
+            d2goal_pos=final_distance_to_goal_pos,
+            d2goal_ori=final_distance_to_goal_ori)
     env.reset()
-    ret = {'final_distance_to_goal_pos': final_distance_to_goal_pos.item(), 
-    'final_distance_to_goal_ori': final_distance_to_goal_ori.item(), 
+    ret = {'final_distance_to_goal_pos': final_distance_to_goal_pos, 
+    'final_distance_to_goal_ori': final_distance_to_goal_ori, 
     'contact_rate': contact_rate,
     'validity_flag': validity_flag,
-    'avg_online_time': duration / (params["num_steps"] - 1)}
+    'avg_online_time': duration / (params["num_steps"] - 1),
+    'warmup_time': warmup_time}
     
     return ret
 
@@ -1027,6 +1028,7 @@ if __name__ == "__main__":
         results[controller]['contact_rate'] = []
         results[controller]['validity_flag'] = []
         results[controller]['avg_online_time'] = []
+        results[controller]['warmup_time'] = []
 
     for i in tqdm(range(config['num_trials'])):
         goal = torch.tensor([0, 0, 0, 0, 0, 0])
@@ -1054,10 +1056,11 @@ if __name__ == "__main__":
             results[controller]['contact_rate'].append(ret['contact_rate'])
             results[controller]['validity_flag'].append(ret['validity_flag'])
             results[controller]['avg_online_time'].append(ret['avg_online_time'])
+            results[controller]['warmup_time'].append(ret['warmup_time'])
 
         print(results)
-        for key in results[controller].keys():
-            print(f"{controller} {key}: avg: {np.array(results[controller][key]).mean()}, std: {np.array(results[controller][key]).std()}")
+    for key in results[controller].keys():
+        print(f"{controller} {key}: avg: {np.array(results[controller][key]).mean()}, std: {np.array(results[controller][key]).std()}")
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)

@@ -198,7 +198,9 @@ def do_trial(env, params, fpath):
                 action = ctrl.command(prime_dof_state[0].reshape(-1))
             else:
                 action = ctrl.command(start[:4 * num_fingers + obj_dof].unsqueeze(0)) # this call will modify the environment
-            
+            solve_time = time.time() - start_time
+            duration += solve_time
+
             action = finger_state + action
             action = action.unsqueeze(0).repeat(params['N'], 1)
             # repeat the primary environment state to all the virtual environments        
@@ -242,13 +244,17 @@ def do_trial(env, params, fpath):
     final_distance_to_goal = distance2goal.abs()[-1].item()
 
     print(f'Controller: {params["controller"]} Final distance to goal: {final_distance_to_goal}')
-    print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
+    print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"])}')
 
     np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
             #  constr=constraint_val.cpu().numpy(),
              d2goal=final_distance_to_goal)
     env.reset()
-    return final_distance_to_goal, validity_flag
+    ret = {
+    'final_distance_to_goal': final_distance_to_goal, 
+    'validity_flag': validity_flag,
+    'avg_online_time': duration / (params["num_steps"])}
+    return ret
 
 if __name__ == "__main__":
     # get config
@@ -283,7 +289,6 @@ if __name__ == "__main__":
 
 
     results = {}
-    validity_dict = {}
     # set up the kinematic chain
     asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
     ee_names = {
@@ -307,6 +312,12 @@ if __name__ == "__main__":
     forward_kinematics = partial(chain.forward_kinematics, frame_indices=frame_indices) # full_to= _partial_state = partial(full_to_partial_state, fingers=config['fingers'])
     # partial_to_full_state = partial(partial_to_full_state, fingers=config['fingers'])
 
+    for controller in config['controllers'].keys():
+        results[controller] = {}
+        results[controller]['dist2goal'] = []
+        results[controller]['validity_flag'] = []
+        results[controller]['avg_online_time'] = []
+
     for i in tqdm(range(config['num_trials'])):
         goal = torch.tensor([0, 0, -1.57])
         for controller in config['controllers'].keys():
@@ -325,18 +336,14 @@ if __name__ == "__main__":
             params['chain'] = chain.to(device=params['device'])
             object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
             params['object_location'] = object_location
-            final_distance_to_goal, validity = do_trial(env, params, fpath)
-            if controller not in results.keys():
-                results[controller] = [final_distance_to_goal]
-                validity_dict[controller] = [validity]
-            else:
-                results[controller].append(final_distance_to_goal)
-                validity_dict[controller].append(validity)
+            ret = do_trial(env, params, fpath)
+            results[controller]['dist2goal'].append(ret['final_distance_to_goal'])
+            results[controller]['validity_flag'].append(ret['validity_flag'])
+            results[controller]['avg_online_time'].append(ret['avg_online_time'])
         print(results)
-        print(validity_dict)
 
-    print(f"Average final distance to goal: {torch.mean(torch.tensor(results[controller]))}, std: {torch.std(torch.tensor(results[controller]))}")
-    print(f"valid rate: {torch.mean(torch.tensor(validity_dict[controller]).float())}")
+    for key in results[controller].keys():
+        print(f"{controller} {key}: avg: {np.array(results[controller][key]).mean()}, std: {np.array(results[controller][key]).std()}")
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)

@@ -251,7 +251,7 @@ def do_trial(env, params, fpath):
     contact_rate = np.array(contact_list).mean()
 
     print(f'Controller: {params["controller"]} Final distance to goal pos: {final_distance_to_goal_pos.item()}, ori: {final_distance_to_goal_pos.item()}')
-    print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
+    print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"])}')
 
     np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
             d2goal_pos=final_distance_to_goal_pos.item(),
@@ -261,7 +261,7 @@ def do_trial(env, params, fpath):
     'final_distance_to_goal_ori': final_distance_to_goal_ori.item(), 
     'contact_rate': contact_rate,
     'validity_flag': validity_flag,
-    'avg_online_time': duration / (params["num_steps"] - 1)}
+    'avg_online_time': duration / (params["num_steps"])}
     return ret
 
 if __name__ == "__main__":

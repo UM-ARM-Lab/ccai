@@ -1,10 +1,10 @@
 ---
 T: 10
 receding_horizon: False
-num_steps: 2
-num_trials: 2
+num_steps: 10
+num_trials: 20
 visualize: True
-experiment_name: 'allegro_peg_insertion'
+experiment_name: 'allegro_peg_insertion_viz'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -23,9 +23,9 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:0'
-    online_iters: 4
-    warmup_iters: 3
+    device: 'cpu'
+    online_iters: 40
+    warmup_iters: 300
     resample_steps: 1
     resample_sigma: 0.01
     resample_temperature: 0.1

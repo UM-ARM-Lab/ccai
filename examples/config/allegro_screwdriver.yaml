@@ -4,7 +4,7 @@ receding_horizon: False
 num_steps: 12
 num_trials: 20
 visualize: True
-experiment_name: 'allegro_screwdriver_paper_w_force_2'
+experiment_name: 'allegro_screwdriver_paper_computation_time'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']

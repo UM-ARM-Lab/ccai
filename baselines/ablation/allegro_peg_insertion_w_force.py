@@ -875,21 +875,21 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         best_traj, trajectories = turn_planner.step(start[:4 * num_fingers + obj_dof])
 
         solve_time = time.time() - start_time
-        if k >= 0:
+        if k >= 1:
             duration += solve_time
         print(f"solve time: {solve_time}")
         planned_theta_traj = best_traj[:, 4 * num_fingers_to_plan: 4 * num_fingers_to_plan + obj_dof].detach().cpu().numpy()
         print(f"current theta: {state['q'][0, -obj_dof:].detach().cpu().numpy()}")
         print(f"planned theta: {planned_theta_traj}")
         # add trajectory lines to sim
-        if k <= params['num_steps'] - 1:
-            gym.draw_env_rigid_contacts(viewer, env.envs[0], gymapi.Vec3(0,1,0), 10000, 1)
-        if k < params['num_steps'] - 1:
-            if params['mode'] == 'hardware':
-                add_trajectories_hardware(trajectories, best_traj, axes, env, config=params, state2ee_pos_func=state2ee_pos)
-            else:
-                add_trajectories(trajectories, best_traj, axes, env, sim=sim, gym=gym, viewer=viewer,
-                                config=params, state2ee_pos_func=state2ee_pos)
+        # if k <= params['num_steps'] - 1:
+        #     gym.draw_env_rigid_contacts(viewer, env.envs[0], gymapi.Vec3(0,1,0), 10000, 1)
+        # if k < params['num_steps'] - 1:
+        #     if params['mode'] == 'hardware':
+        #         add_trajectories_hardware(trajectories, best_traj, axes, env, config=params, state2ee_pos_func=state2ee_pos)
+        #     else:
+        #         add_trajectories(trajectories, best_traj, axes, env, sim=sim, gym=gym, viewer=viewer,
+        #                         config=params, state2ee_pos_func=state2ee_pos)
 
         if params['visualize_plan']:
             traj_for_viz = best_traj[:, :turn_problem.dx]
@@ -973,6 +973,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             temp_for_plot = np.stack(traj_history, axis=0)
             if k >= 2:
                 axes[finger].plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray', label='actual')
+        if state['peg_position'][0, 2] < -0.04: # the peg has been dropped 
+            break
     print(contact_list)
     print(np.array(contact_list).mean())
     with open(f'{fpath.resolve()}/info.pkl', 'wb') as f:

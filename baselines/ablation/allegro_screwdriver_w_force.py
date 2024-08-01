@@ -574,6 +574,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         num_fingers_to_plan = num_fingers
     info_list = []
     validity_flag = True
+    warmup_time = 0
 
     for k in range(params['num_steps']):
         state = env.get_state()
@@ -585,8 +586,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         
         #debug only
         # turn_problem.save_history(f'{fpath.resolve()}/op_traj.pkl')
-
-        print(f"solve time: {time.time() - start_time}")
+        solve_time = time.time() - start_time
+        print(f"solve time: {solve_time}")
+        if k == 0:
+            warmup_time = solve_time
+        else:
+            duration += solve_time
         planned_theta_traj = best_traj[:, 4 * num_fingers_to_plan: 4 * num_fingers_to_plan + obj_dof].detach().cpu().numpy()
         print(f"current theta: {state['q'][0, -(obj_dof+1): -1].detach().cpu().numpy()}")
         print(f"planned theta: {planned_theta_traj}")
@@ -715,7 +720,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             #  constr=constraint_val.cpu().numpy(),
              d2goal=final_distance_to_goal)
     env.reset()
-    return final_distance_to_goal.cpu().detach().item(), validity_flag
+    ret = {'warmup_time': warmup_time,
+    'final_distance_to_goal': final_distance_to_goal, 
+    'validity_flag': validity_flag,
+    'avg_online_time': duration / (params["num_steps"] - 1)}
+    return ret
 
 if __name__ == "__main__":
     # get config
@@ -834,7 +843,12 @@ if __name__ == "__main__":
     forward_kinematics = partial(chain.forward_kinematics, frame_indices=frame_indices) # full_to= _partial_state = partial(full_to_partial_state, fingers=config['fingers'])
     # partial_to_full_state = partial(partial_to_full_state, fingers=config['fingers'])
 
-
+    for controller in config['controllers'].keys():
+        results[controller] = {}
+        results[controller]['warmup_time'] = []
+        results[controller]['dist2goal'] = []
+        results[controller]['validity_flag'] = []
+        results[controller]['avg_online_time'] = []
     for i in tqdm(range(config['num_trials'])):
         goal = - 90 / 180 * torch.tensor([0, 0, np.pi])
         # goal = goal + 0.025 * torch.randn(1) + 0.2
@@ -852,18 +866,15 @@ if __name__ == "__main__":
             params['chain'] = chain.to(device=params['device'])
             object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
             params['object_location'] = object_location
-            final_distance_to_goal, validity = do_trial(env, params, fpath, sim_env, ros_copy_node)
-            if controller not in results.keys():
-                results[controller] = [final_distance_to_goal]
-                validity_list[controller] = [validity]
-            else:
-                results[controller].append(final_distance_to_goal)
-                validity_list[controller].append(validity)
+            ret = do_trial(env, params, fpath, sim_env, ros_copy_node)
+            results[controller]['warmup_time'].append(ret['warmup_time'])
+            results[controller]['dist2goal'].append(ret['final_distance_to_goal'])
+            results[controller]['validity_flag'].append(ret['validity_flag'])
+            results[controller]['avg_online_time'].append(ret['avg_online_time'])
         print(results)
-        print(validity_list)
 
-    print(f"Average final distance to goal: {torch.mean(torch.tensor(results[controller]))}, std: {torch.std(torch.tensor(results[controller]))}")
-    print(f"valid rate: {torch.mean(torch.tensor(validity_list[controller]).float())}")
+    for key in results[controller].keys():
+        print(f"{controller} {key}: avg: {np.array(results[controller][key]).mean()}, std: {np.array(results[controller][key]).std()}")
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)
