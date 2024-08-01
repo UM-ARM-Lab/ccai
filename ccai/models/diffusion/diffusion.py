@@ -462,15 +462,17 @@ class GaussianDiffusion(nn.Module):
                                               condition=condition, context=context,
                                               return_all_timesteps=return_all_timesteps)
 
-            #likelihood = self.approximate_likelihood(sample.reshape(-1, self.horizon, self.xu_dim)).reshape(B*N, factor)
-            likelihood = self.classifier(
-                torch.zeros(B *N * factor, device=sample.device),
-                sample.reshape(-1, self.horizon, self.xu_dim),
-                context=context.reshape(-1, self.context_dim)
-            ).reshape(B*N, factor)
+            if self.classifier is not None:
+                likelihood = self.classifier(
+                    torch.zeros(B *N * factor, device=sample.device),
+                    sample.reshape(-1, self.horizon, self.xu_dim),
+                    context=context.reshape(-1, self.context_dim)
+                ).reshape(B*N, factor)
+            else:
+                likelihood = self.approximate_likelihood(sample.reshape(-1, self.horizon, self.xu_dim)).reshape(B*N, factor)
+
             weight = 0.9 ** torch.arange(0, factor, device=sample.device)
             likelihood = torch.sum(likelihood * weight[None, :], dim=1)
-
             # combine samples
             combined_samples = [sample[:, i, :-1] for i in range(0, factor - 1)]
             combined_samples.append(sample[:, -1])
