@@ -451,7 +451,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                                                inits_noise=inits_noise, noise_noise=noise_noise,
                                                guided=params['use_guidance'],
                                                vae=vae)
-        trajectory_sampler.load_state_dict(torch.load(f'{CCAI_PATH}/{model_path}', map_location=torch.device('cuda')), strict=True)
+        trajectory_sampler.load_state_dict(torch.load(f'{CCAI_PATH}/{model_path}', map_location=torch.device('cuda')), strict=False)
         trajectory_sampler.to(device=params['device'])
         trajectory_sampler.send_norm_constants_to_submodels()
         print('Loaded trajectory sampler')
@@ -572,6 +572,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 # if state[-1] < -1.0:
                 #     start[-1] += 0.75
                 a = time.perf_counter()
+                # start_for_diff = start#convert_yaw_to_sine_cosine(start)
                 start_for_diff = convert_yaw_to_sine_cosine(start)
                 initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
                                                                   H=len(modes) * (params['T'] + 1),
@@ -608,6 +609,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 # if state[-1] < -1.0:
                 #     start[-1] += 0.75
                 a = time.perf_counter()
+                # start_for_diff = start#convert_yaw_to_sine_cosine(start)
                 start_for_diff = convert_yaw_to_sine_cosine(start)
                 initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
                                                                   H=params['T'] + 1,
@@ -821,6 +823,67 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
         visualize_trajectory(traj, contact_scenes, viz_fpath, fingers, obj_dof + 1)
 
+    def plan_contacts(state, depth, next_node, multi_particle=False):
+        state_for_search = state#convert_yaw_to_sine_cosine(state)
+        next_node_init = next_node is None
+
+        num_samples_per_node = 1
+        if multi_particle:
+            num_samples_per_node = 8
+        if next_node is None:
+            next_node = Node(
+                # torch.empty(0, 36).to(device=params['device']),
+                torch.empty(num_samples_per_node, 0, 37),#.to(device=params['device']),
+                0,
+                tuple(),
+                # torch.empty(32, 0, 36),
+                torch.empty(num_samples_per_node * 4, 0, 37),
+                # torch.arange(16)
+            )
+            initial_run = True
+        else:
+            next_node = Node(
+                # torch.empty(0, 36).to(device=params['device']),
+                torch.empty(num_samples_per_node, 0, 37),#.to(device=params['device']),
+                0,
+                (next_node, ),
+                # torch.empty(32, 0, 36),
+                torch.empty(num_samples_per_node * 4, 0, 37),
+                # torch.arange(16)
+            )
+            initial_run = False
+        
+        contact_sequence_sampler = GraphSearch(state_for_search, trajectory_sampler, problem_for_sampler, 
+                                               depth, params['heuristic'], params['goal'], 
+                                               torch.device('cuda'), initial_run=initial_run,
+                                               multi_particle=multi_particle)
+        a = time.perf_counter()
+        contact_node_sequence = contact_sequence_sampler.astar(next_node, None)
+        planning_time = time.perf_counter() - a
+        print('Contact sequence search time:', planning_time)
+        closed_set = contact_sequence_sampler.closed_set
+        if contact_node_sequence is not None:
+            contact_node_sequence = list(contact_node_sequence)
+        with open(f"{fpath}/contact_planning_{depth}.pkl", "wb") as f:
+            pkl.dump((contact_node_sequence, closed_set, planning_time, contact_sequence_sampler.iter), f)
+        if contact_node_sequence is None:
+            print('No contact sequence found')
+            return None, None
+        last_node = contact_node_sequence[-1]
+
+        if next_node_init:
+            offset = 0
+        else:
+            offset = 1
+        if offset == 1 and len(contact_node_sequence) == 1:
+            return [], None
+        next_node = last_node.contact_sequence[offset]
+        contact_sequence = np.array(last_node.contact_sequence)
+        contact_sequence = (contact_sequence + 1)/2
+        contact_sequence = [contact_vec_to_label[contact_sequence[i].sum()] for i in range(contact_sequence.shape[0])]
+        contact_sequence = contact_sequence[offset:] 
+        return contact_sequence, next_node
+
     state = env.get_state()
     state = state['q'].reshape(-1)[:15].to(device=params['device'])
 
@@ -842,40 +905,15 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             perm = [0, 1]
             contact_sequence += [contact_options[perm[0]], contact_options[perm[1]], 'turn']
     else:
-        state_for_search = convert_yaw_to_sine_cosine(state)
-        contact_sequence_sampler = GraphSearch(state_for_search, trajectory_sampler, problem_for_sampler, params['max_depth'], params['heuristic'], params['goal'], torch.device('cuda'))
-        node_0 = Node(
-            torch.empty(0, 37).to(device=params['device']),
-            0,
-            tuple(),
-            torch.empty(32, 0, 37),
-            torch.arange(16)
-        )
-        
-        a = time.perf_counter()
-        contact_node_sequence = contact_sequence_sampler.astar(node_0, None)
-        planning_time = time.perf_counter() - a
-        print('Contact sequence search time:', planning_time)
-        closed_set = contact_sequence_sampler.closed_set
-        if contact_node_sequence is not None:
-            contact_node_sequence = list(contact_node_sequence)
-        with open(f"{fpath}/contact_planning.pkl", "wb") as f:
-            pkl.dump((contact_node_sequence, closed_set, planning_time, contact_sequence_sampler.iter), f)
-        if contact_node_sequence is None:
-            print('No contact sequence found')
-            return -1
-        last_node = contact_node_sequence[-1]
-
-        contact_sequence = np.array(last_node.contact_sequence)
-        contact_sequence = (contact_sequence + 1)/2
-        contact_sequence = [contact_vec_to_label[contact_sequence[i].sum()] for i in range(contact_sequence.shape[0])]
-    print(contact_sequence)
+        contact_sequence = None
     # state = state['q'].reshape(-1)[:15].to(device=params['device'])
     # initial_samples = gen_initial_samples_multi_mode(contact_sequence)
     # pkl.dump(initial_samples, open(f"{fpath}/long_horizon_inits.p", "wb"))
     # return -1
-
-    for stage in range(len(contact_sequence)):
+    contact = None
+    next_node = None
+    executed_contacts = []
+    for stage in range(num_stages):
         state = env.get_state()
         state = state['q'].reshape(-1)[:15].to(device=params['device'])
         valve_goal = torch.tensor([0, 0, state[-1]]).to(device=params['device'])
@@ -897,7 +935,38 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         #     contact = contact_vec_to_label[contact_sequence.reshape(-1)[0].item()]
 
         # else:
-        contact = contact_sequence[stage]
+        # contact = contact_sequence[stage]
+        if sample_contact:
+            new_contact_sequence, new_next_node = plan_contacts(state, num_stages - stage, next_node, params['multi_particle_search'])
+            if new_contact_sequence is not None and len(new_contact_sequence) == 0:
+                print('Planner thinks task is complete')
+                print(executed_contacts)
+                with open(f"{fpath}/executed_contacts.pkl", "wb") as f:
+                    pkl.dump(executed_contacts, f)
+                break
+            if new_contact_sequence is not None:
+                contact_sequence = new_contact_sequence
+                next_node = new_next_node
+            else:
+                if len(contact_sequence) < 2:
+                    print('Planner thinks task is complete')
+                    print(executed_contacts)
+                    with open(f"{fpath}/executed_contacts.pkl", "wb") as f:
+                        pkl.dump(executed_contacts, f)
+                    break
+                contact_sequence = contact_sequence[1:]
+                if contact_sequence[0] == 'turn':
+                    next_node = (1, 1, 1)
+                elif contact_sequence[0] == 'index':
+                    next_node = (-1, 1, 1)
+                elif contact_sequence[0] == 'thumb_middle':
+                    next_node = (1, -1, -1)
+                else:
+                    next_node = (-1, -1, -1)
+            print(contact_sequence)
+
+        contact = contact_sequence[0]
+        executed_contacts.append(contact)
         print(stage, contact)
         if contact == 'pregrasp':
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
@@ -971,8 +1040,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_diff_init_guided.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_diff_planned_init_higher_planning_budget_mc_likelihood.yaml').read_text())
     from tqdm import tqdm
 
     if config['mode'] == 'hardware':
@@ -1068,6 +1137,7 @@ if __name__ == "__main__":
             if len(noise_noise.shape) == 6:
                 noise_noise = noise_noise[:, :, :, 0, :, :]
     for i in tqdm(range(0, config['num_trials'])):
+    # for i in tqdm(range(0, 7)):
         
         torch.manual_seed(i)
         np.random.seed(i)

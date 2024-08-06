@@ -1,0 +1,1920 @@
+Importing module 'gym_38' (/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.3.1+cu118
+Device count 1
+/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinav/Documents/ccai
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+3 ((-1.0, -1.0, -1.0),) -0.1354040503501892
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.6595920920372009
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.7013384699821472
+6 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.1711033582687378
+7 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.4337443113327026
+8 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.5223908424377441
+Contact sequence search time: 20.336268163002387
+['pregrasp', 'turn', 'thumb_middle', 'turn', 'index', 'index']
+0 pregrasp
+Sampling time 2.721911482003634
+Solve time for step 32.48958969116211
+Solve time for step 8.010363578796387
+Solve time for step 7.650598764419556
+Solve time for step 7.302393913269043
+Solve time for step 7.056341886520386
+Solve time for step 6.681265830993652
+Solve time for step 6.4512550830841064
+Solve time for step 6.245340824127197
+Solve time for step 5.96709418296814
+Solve time for step 5.709641218185425
+Solve time for step 5.526315212249756
+Solve time for step 5.410938501358032
+Solve time for step 5.120043754577637
+Solve time for step 4.929409742355347
+Solve time for step 4.952572584152222
+3 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.37412911653518677
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.46850886940956116
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.118720293045044
+6 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.6990923881530762
+Contact sequence search time: 13.511636794995866
+['turn', 'index', 'turn', 'turn']
+1 turn
+Sampling time 2.6469395980020636
+Solve time for step 99.53920888900757
+Solve time for step 22.620678186416626
+Solve time for step 19.992369651794434
+Solve time for step 17.43577742576599
+Solve time for step 16.01399564743042
+Solve time for step 14.104557275772095
+Solve time for step 12.633914232254028
+Solve time for step 11.558578729629517
+Solve time for step 10.601586103439331
+Solve time for step 9.599818468093872
+Solve time for step 9.026063919067383
+Solve time for step 8.435920476913452
+Solve time for step 7.985761642456055
+Solve time for step 7.793981552124023
+Solve time for step 7.564636468887329
+3 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.8729634284973145
+4 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.2873473167419434
+5 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.548865556716919
+6 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.2645529508590698
+7 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.4428961277008057
+8 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.5044444799423218
+Contact sequence search time: 20.151502318003622
+['turn', 'thumb_middle', 'turn', 'thumb_middle']
+2 turn
+Sampling time 2.6716394780014525
+Solve time for step 99.7974259853363
+Solve time for step 22.95387601852417
+Solve time for step 20.099018096923828
+Solve time for step 17.595874309539795
+Solve time for step 16.15763759613037
+Solve time for step 14.326598167419434
+Solve time for step 12.803592205047607
+Solve time for step 11.782381534576416
+Solve time for step 10.793320655822754
+Solve time for step 9.872081756591797
+Solve time for step 9.331437110900879
+Solve time for step 8.708573341369629
+Solve time for step 8.205670356750488
+Solve time for step 7.896059513092041
+Solve time for step 7.587870359420776
+3 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.4164621829986572
+4 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.7775764465332031
+Contact sequence search time: 6.974877952001407
+['turn', 'turn']
+3 turn
+Sampling time 2.8079900309967343
+Solve time for step 100.0323224067688
+Solve time for step 22.647765636444092
+Solve time for step 20.030980587005615
+Solve time for step 17.60344696044922
+Solve time for step 16.16820240020752
+Solve time for step 14.308637142181396
+Solve time for step 12.599896669387817
+Solve time for step 11.6858549118042
+Solve time for step 10.727750778198242
+Solve time for step 9.785252571105957
+Solve time for step 9.278225183486938
+Solve time for step 8.649153709411621
+Solve time for step 8.180202007293701
+Solve time for step 7.857614755630493
+Solve time for step 7.455487966537476
+3 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.4760550260543823
+4 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.6140574216842651
+Contact sequence search time: 6.758438924996881
+['turn', 'index']
+4 turn
+Sampling time 2.6968582550034625
+Solve time for step 99.85154247283936
+Solve time for step 22.498725414276123
+Solve time for step 19.90053081512451
+Solve time for step 17.385107278823853
+Solve time for step 16.086302042007446
+Solve time for step 14.314994096755981
+Solve time for step 12.960364580154419
+Solve time for step 11.719760656356812
+Solve time for step 10.47678804397583
+Solve time for step 10.013252973556519
+Solve time for step 9.173049211502075
+Solve time for step 8.556860208511353
+Solve time for step 8.174166679382324
+Solve time for step 7.8228068351745605
+Solve time for step 7.466188907623291
+3 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.7152987718582153
+Contact sequence search time: 3.4171050539953285
+['turn']
+5 turn
+Sampling time 2.7159977720002644
+Solve time for step 99.79794216156006
+Solve time for step 22.67608380317688
+Solve time for step 20.016451120376587
+Solve time for step 17.493173122406006
+Solve time for step 16.114670276641846
+Solve time for step 14.287059307098389
+Solve time for step 12.782159805297852
+Solve time for step 11.675325155258179
+Solve time for step 10.635659456253052
+Solve time for step 10.052493810653687
+Solve time for step 9.229939222335815
+Solve time for step 8.573383569717407
+Solve time for step 8.195120573043823
+Solve time for step 7.834409713745117
+Solve time for step 7.418431282043457
+3 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.203688144683838
+4 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -1.5004801750183105
+Contact sequence search time: 6.872793201000604
+['thumb_middle', 'index']
+6 thumb_middle
+Sampling time 2.7461200499965344
+Solve time for step 47.30091428756714
+Solve time for step 11.516165971755981
+Solve time for step 10.705246448516846
+Solve time for step 10.224668025970459
+Solve time for step 9.865602970123291
+Solve time for step 9.06286334991455
+Solve time for step 8.698166847229004
+Solve time for step 8.231742143630981
+Solve time for step 7.895047664642334
+Solve time for step 7.696990251541138
+Solve time for step 7.341533422470093
+Solve time for step 7.087907552719116
+Solve time for step 6.794106721878052
+Solve time for step 6.587620973587036
+Solve time for step 6.366414785385132
+3 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.1514383554458618
+4 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -1.0535590648651123
+5 ((1.0, -1.0, -1.0), (1.0, -1.0, -1.0)) -0.9517562389373779
+Contact sequence search time: 3.420429816003889
+No contact sequence found
+['index']
+7 index
+Sampling time 2.733080963997054
+Solve time for step 70.73229050636292
+Solve time for step 16.76308274269104
+Solve time for step 15.00257134437561
+Solve time for step 14.116979837417603
+Solve time for step 12.946318864822388
+Solve time for step 11.966872453689575
+Solve time for step 11.20427131652832
+Solve time for step 10.694873094558716
+Solve time for step 10.043058395385742
+Solve time for step 9.625427484512329
+Solve time for step 9.228087186813354
+Solve time for step 8.716382265090942
+Solve time for step 8.165891885757446
+Solve time for step 7.836270332336426
+Solve time for step 7.8545379638671875
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+3 ((-1.0, -1.0, -1.0),) 0.2534708082675934
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.2599261999130249
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.25002118945121765
+6 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.1463608294725418
+7 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.5666687488555908
+8 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.8068952560424805
+9 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.2830543518066406
+10 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.6207880973815918
+Contact sequence search time: 27.0430228740006
+['pregrasp', 'turn', 'turn', 'turn', 'turn']
+0 pregrasp
+Sampling time 2.725177647000237
+Solve time for step 32.640724658966064
+Solve time for step 7.940306186676025
+Solve time for step 7.743224382400513
+Solve time for step 7.3584935665130615
+Solve time for step 7.037755250930786
+Solve time for step 6.883169889450073
+Solve time for step 6.535579204559326
+Solve time for step 6.414332151412964
+Solve time for step 6.094614505767822
+Solve time for step 5.918301343917847
+Solve time for step 5.779702425003052
+Solve time for step 5.575933218002319
+Solve time for step 5.369023323059082
+Solve time for step 5.158446788787842
+Solve time for step 5.128813982009888
+3 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.5164415836334229
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.49382320046424866
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.4671999216079712
+6 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.7902675867080688
+7 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.318379521369934
+8 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.4907398223876953
+9 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -2.0892231464385986
+Contact sequence search time: 24.01397763800196
+['turn', 'index', 'turn', 'turn', 'index', 'turn']
+1 turn
+Sampling time 2.740118422996602
+Solve time for step 100.16621327400208
+Solve time for step 22.86100959777832
+Solve time for step 20.148794412612915
+Solve time for step 17.744134426116943
+Solve time for step 16.0463285446167
+Solve time for step 14.39252519607544
+Solve time for step 12.902720212936401
+Solve time for step 11.933876514434814
+Solve time for step 10.926445722579956
+Solve time for step 10.012202501296997
+Solve time for step 9.454799175262451
+Solve time for step 8.679929971694946
+Solve time for step 8.32813286781311
+Solve time for step 7.986861228942871
+Solve time for step 7.664424657821655
+3 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.4579993784427643
+4 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.4140468239784241
+5 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.8014193177223206
+6 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.5944430828094482
+Contact sequence search time: 13.82379356599995
+['index', 'turn', 'turn']
+2 index
+Sampling time 2.7593582210029126
+Solve time for step 71.44356513023376
+Solve time for step 16.804420709609985
+Solve time for step 15.116859912872314
+Solve time for step 14.232989072799683
+Solve time for step 13.040068864822388
+Solve time for step 12.136019945144653
+Solve time for step 11.378920078277588
+Solve time for step 10.740404844284058
+Solve time for step 10.270445823669434
+Solve time for step 9.679821014404297
+Solve time for step 9.132253885269165
+Solve time for step 8.777366638183594
+Solve time for step 8.279830694198608
+Solve time for step 8.042628765106201
+Solve time for step 7.9367921352386475
+3 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.7135913372039795
+4 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.49799931049346924
+5 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.8047025203704834
+6 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -1.1455190181732178
+7 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.7237803936004639
+Contact sequence search time: 17.426619213998492
+['turn', 'thumb_middle', 'index', 'turn']
+3 turn
+Sampling time 2.7392734509994625
+Solve time for step 100.09204077720642
+Solve time for step 22.638995885849
+Solve time for step 20.00545620918274
+Solve time for step 17.454803943634033
+Solve time for step 16.166219472885132
+Solve time for step 14.405981540679932
+Solve time for step 12.802728652954102
+Solve time for step 11.824461698532104
+Solve time for step 10.751551389694214
+Solve time for step 10.121160984039307
+Solve time for step 9.44895339012146
+Solve time for step 8.890116930007935
+Solve time for step 8.38695764541626
+Solve time for step 7.906280517578125
+Solve time for step 7.650146007537842
+3 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.8404795527458191
+4 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.316183090209961
+5 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.5237807035446167
+Contact sequence search time: 10.346028514002683
+['thumb_middle', 'turn', 'thumb_middle']
+4 thumb_middle
+Sampling time 2.7645302900054958
+Solve time for step 47.733052492141724
+Solve time for step 11.54318642616272
+Solve time for step 10.696425199508667
+Solve time for step 10.196965456008911
+Solve time for step 9.759818315505981
+Solve time for step 9.28227949142456
+Solve time for step 8.87977933883667
+Solve time for step 8.348154067993164
+Solve time for step 8.00753927230835
+Solve time for step 7.785663604736328
+Solve time for step 7.528249740600586
+Solve time for step 7.154901742935181
+Solve time for step 6.840460300445557
+Solve time for step 6.648388624191284
+Solve time for step 6.568067789077759
+3 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.6373623609542847
+Contact sequence search time: 3.414944561998709
+['turn']
+5 turn
+Sampling time 2.705345465001301
+Solve time for step 99.95497608184814
+Solve time for step 22.643644332885742
+Solve time for step 20.229488372802734
+Solve time for step 17.68015742301941
+Solve time for step 16.23851251602173
+Solve time for step 14.410247802734375
+Solve time for step 12.92637586593628
+Solve time for step 11.877174377441406
+Solve time for step 10.813656568527222
+Solve time for step 10.101966857910156
+Solve time for step 9.365817070007324
+Solve time for step 8.814749479293823
+Solve time for step 8.373861312866211
+Solve time for step 8.027580976486206
+Solve time for step 7.680562734603882
+3 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.5620501041412354
+Contact sequence search time: 3.5535515709998435
+['turn']
+6 turn
+Sampling time 2.8506815420041676
+Solve time for step 100.31193351745605
+Solve time for step 22.78175115585327
+Solve time for step 20.13383674621582
+Solve time for step 17.757156372070312
+Solve time for step 16.260464191436768
+Solve time for step 14.443415403366089
+Solve time for step 12.83324670791626
+Solve time for step 11.789032697677612
+Solve time for step 10.80066204071045
+Solve time for step 10.057839393615723
+Solve time for step 9.566255569458008
+Solve time for step 8.853234052658081
+Solve time for step 8.381406784057617
+Solve time for step 7.895721673965454
+Solve time for step 7.807474136352539
+3 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.9660249352455139
+4 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.8022478222846985
+5 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.1170319318771362
+Contact sequence search time: 3.470761266995396
+No contact sequence found
+Planner thinks task is complete
+['pregrasp', 'turn', 'index', 'turn', 'thumb_middle', 'turn', 'turn']
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+3 ((-1.0, -1.0, -1.0),) -0.18640722334384918
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.9037757515907288
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.9692086577415466
+6 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.2611277103424072
+7 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.49467933177948
+8 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.5000633001327515
+Contact sequence search time: 20.80370370500168
+['pregrasp', 'turn', 'index', 'turn', 'turn', 'turn']
+0 pregrasp
+Sampling time 2.8192032969964202
+Solve time for step 32.983027935028076
+Solve time for step 8.063495635986328
+Solve time for step 7.866480350494385
+Solve time for step 7.431358098983765
+Solve time for step 7.176396131515503
+Solve time for step 6.946278095245361
+Solve time for step 6.733849287033081
+Solve time for step 6.344538688659668
+Solve time for step 6.227097034454346
+Solve time for step 5.9091455936431885
+Solve time for step 5.7212746143341064
+Solve time for step 5.5450119972229
+Solve time for step 5.361834287643433
+Solve time for step 5.1073994636535645
+Solve time for step 4.963562488555908
+3 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.3465958833694458
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.6464051008224487
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.1209653615951538
+6 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.1479159593582153
+7 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.6009509563446045
+Contact sequence search time: 17.19691326699831
+['turn', 'index', 'turn', 'thumb_middle', 'turn']
+1 turn
+Sampling time 2.7462497489977977
+Solve time for step 100.22874021530151
+Solve time for step 22.737258672714233
+Solve time for step 20.02367401123047
+Solve time for step 17.548751831054688
+Solve time for step 16.079450368881226
+Solve time for step 14.322474718093872
+Solve time for step 12.980517387390137
+Solve time for step 11.923314809799194
+Solve time for step 10.89541244506836
+Solve time for step 10.10641098022461
+Solve time for step 9.47645354270935
+Solve time for step 8.816145181655884
+Solve time for step 8.343794107437134
+Solve time for step 7.989076375961304
+Solve time for step 7.65796160697937
+3 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.5354647040367126
+4 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.34995436668396
+5 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.3206872940063477
+6 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.6204338073730469
+Contact sequence search time: 14.237378457997693
+['index', 'turn', 'thumb_middle', 'turn']
+2 index
+Sampling time 2.85430336400168
+Solve time for step 71.67487597465515
+Solve time for step 16.861984252929688
+Solve time for step 15.243836402893066
+Solve time for step 14.213712215423584
+Solve time for step 13.016113519668579
+Solve time for step 12.152233600616455
+Solve time for step 11.377668619155884
+Solve time for step 10.793578863143921
+Solve time for step 10.215526580810547
+Solve time for step 9.772624731063843
+Solve time for step 9.309341430664062
+Solve time for step 8.87241005897522
+Solve time for step 8.448962211608887
+Solve time for step 8.22493052482605
+Solve time for step 7.903442144393921
+3 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.7923372387886047
+4 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.4586694538593292
+5 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.020485758781433
+6 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.538572907447815
+Contact sequence search time: 13.755415094005002
+['thumb_middle', 'turn', 'turn']
+3 thumb_middle
+Sampling time 2.7561719880031887
+Solve time for step 48.0463125705719
+Solve time for step 11.545353412628174
+Solve time for step 10.84624433517456
+Solve time for step 10.36306381225586
+Solve time for step 9.799004077911377
+Solve time for step 9.238903522491455
+Solve time for step 8.904563188552856
+Solve time for step 8.319639205932617
+Solve time for step 7.986543893814087
+Solve time for step 7.691441535949707
+Solve time for step 7.4506542682647705
+Solve time for step 7.351979494094849
+Solve time for step 6.986536026000977
+Solve time for step 6.836324453353882
+Solve time for step 6.517667531967163
+3 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.43863236904144287
+4 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.4219002425670624
+5 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.8421271443367004
+6 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.1370747089385986
+7 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.3797860145568848
+8 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.2224384546279907
+9 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.202283263206482
+10 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.5741262435913086
+Contact sequence search time: 21.0460995129979
+['turn', 'index', 'index', 'index']
+4 turn
+Sampling time 2.8201092229937785
+Solve time for step 100.33224701881409
+Solve time for step 22.914891481399536
+Solve time for step 20.04942560195923
+Solve time for step 17.58900499343872
+Solve time for step 16.20733380317688
+Solve time for step 14.28015685081482
+Solve time for step 12.952723979949951
+Solve time for step 11.857362747192383
+Solve time for step 10.933018445968628
+Solve time for step 10.125235557556152
+Solve time for step 9.369643688201904
+Solve time for step 8.733858585357666
+Solve time for step 8.31339979171753
+Solve time for step 8.195302724838257
+Solve time for step 7.6882312297821045
+3 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.4154636859893799
+4 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.5727331638336182
+Contact sequence search time: 7.014234524998756
+['turn', 'index']
+5 turn
+Sampling time 2.818326013002661
+Solve time for step 100.5752489566803
+Solve time for step 22.701711654663086
+Solve time for step 20.383387804031372
+Solve time for step 17.716373205184937
+Solve time for step 16.27345037460327
+Solve time for step 14.444206953048706
+Solve time for step 12.835469722747803
+Solve time for step 11.766611814498901
+Solve time for step 10.764719724655151
+Solve time for step 10.060940504074097
+Solve time for step 9.474409580230713
+Solve time for step 8.8356032371521
+Solve time for step 8.152948379516602
+Solve time for step 7.946925640106201
+Solve time for step 7.798532485961914
+3 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.2115306854248047
+4 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.7918972969055176
+Contact sequence search time: 6.902631771998131
+['thumb_middle', 'turn']
+6 thumb_middle
+Sampling time 2.774731244004215
+Solve time for step 47.78024625778198
+Solve time for step 11.526151657104492
+Solve time for step 10.89789342880249
+Solve time for step 10.253522157669067
+Solve time for step 9.771034002304077
+Solve time for step 9.090888977050781
+Solve time for step 8.725513696670532
+Solve time for step 8.348320484161377
+Solve time for step 8.001883506774902
+Solve time for step 7.7014381885528564
+Solve time for step 7.580670356750488
+Solve time for step 7.2956461906433105
+Solve time for step 6.998945474624634
+Solve time for step 6.847763299942017
+Solve time for step 6.607018947601318
+3 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.5663464069366455
+Contact sequence search time: 3.5738927089987556
+['turn']
+7 turn
+Sampling time 2.8539693860002444
+Solve time for step 100.89586138725281
+Solve time for step 22.999164581298828
+Solve time for step 20.353304862976074
+Solve time for step 17.722713232040405
+Solve time for step 16.204816818237305
+Solve time for step 14.370447874069214
+Solve time for step 12.769299745559692
+Solve time for step 11.728306531906128
+Solve time for step 10.678409099578857
+Solve time for step 9.841124057769775
+Solve time for step 9.251752376556396
+Solve time for step 8.626286506652832
+Solve time for step 8.233335018157959
+Solve time for step 8.031702995300293
+Solve time for step 7.849058628082275
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+3 ((-1.0, -1.0, -1.0),) -0.05508187785744667
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.5762090682983398
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.8652918934822083
+6 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.2892979383468628
+7 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.6404565572738647
+Contact sequence search time: 17.255776434001746
+['pregrasp', 'turn', 'index', 'turn', 'turn']
+0 pregrasp
+Sampling time 2.8352447020006366
+Solve time for step 33.11323428153992
+Solve time for step 8.09007740020752
+Solve time for step 7.803802251815796
+Solve time for step 7.458722829818726
+Solve time for step 7.222058534622192
+Solve time for step 6.864380359649658
+Solve time for step 6.633150815963745
+Solve time for step 6.319119691848755
+Solve time for step 6.086413860321045
+Solve time for step 5.865028142929077
+Solve time for step 5.693847894668579
+Solve time for step 5.503957271575928
+Solve time for step 5.373863458633423
+Solve time for step 5.127012491226196
+Solve time for step 5.133854389190674
+3 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.1650751680135727
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.2845899164676666
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.9790894985198975
+6 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.3644453287124634
+7 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.5085042715072632
+Contact sequence search time: 16.96853110899974
+['turn', 'thumb_middle', 'turn', 'turn', 'thumb_middle']
+1 turn
+Sampling time 2.7069457359975786
+Solve time for step 100.22155284881592
+Solve time for step 22.840721130371094
+Solve time for step 20.118608713150024
+Solve time for step 17.65083599090576
+Solve time for step 16.212443590164185
+Solve time for step 14.407246589660645
+Solve time for step 12.961902618408203
+Solve time for step 11.922556161880493
+Solve time for step 10.869572639465332
+Solve time for step 10.08175277709961
+Solve time for step 9.627191305160522
+Solve time for step 8.884026527404785
+Solve time for step 8.340306282043457
+Solve time for step 8.002923488616943
+Solve time for step 7.680728197097778
+3 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.6591225266456604
+4 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.5876030921936035
+5 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.134753942489624
+6 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.5841481685638428
+Contact sequence search time: 13.903837370002293
+['index', 'turn', 'turn']
+2 index
+Sampling time 2.7403073980021873
+Solve time for step 71.34170985221863
+Solve time for step 16.686492919921875
+Solve time for step 15.162537574768066
+Solve time for step 14.178741455078125
+Solve time for step 12.944995641708374
+Solve time for step 12.2760169506073
+Solve time for step 11.400413036346436
+Solve time for step 10.831543445587158
+Solve time for step 10.086593389511108
+Solve time for step 9.707226514816284
+Solve time for step 9.108222723007202
+Solve time for step 8.697489500045776
+Solve time for step 8.320396423339844
+Solve time for step 8.3285231590271
+Solve time for step 7.806285381317139
+3 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.8994476795196533
+4 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.6039911508560181
+5 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.444403052330017
+6 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.5496635437011719
+Contact sequence search time: 13.732751203999214
+['thumb_middle', 'turn', 'thumb_middle']
+3 thumb_middle
+Sampling time 2.7602188239980023
+Solve time for step 48.11287474632263
+Solve time for step 11.583306789398193
+Solve time for step 10.722604036331177
+Solve time for step 10.224489450454712
+Solve time for step 9.969472885131836
+Solve time for step 9.299877405166626
+Solve time for step 8.927740812301636
+Solve time for step 8.469215393066406
+Solve time for step 7.974985599517822
+Solve time for step 7.810034990310669
+Solve time for step 7.624756097793579
+Solve time for step 7.3204615116119385
+Solve time for step 7.0432538986206055
+Solve time for step 6.847791433334351
+Solve time for step 6.623561859130859
+3 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.1605913639068604
+4 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.6742130517959595
+Contact sequence search time: 7.194399804997374
+['turn', 'turn']
+4 turn
+Sampling time 2.867435341999226
+Solve time for step 100.86632418632507
+Solve time for step 22.86545205116272
+Solve time for step 20.088091373443604
+Solve time for step 17.647738933563232
+Solve time for step 16.186490535736084
+Solve time for step 14.516986608505249
+Solve time for step 12.98082971572876
+Solve time for step 11.800400972366333
+Solve time for step 10.883430480957031
+Solve time for step 9.878058671951294
+Solve time for step 9.321011304855347
+Solve time for step 8.730846643447876
+Solve time for step 8.282657384872437
+Solve time for step 7.943907976150513
+Solve time for step 7.696253299713135
+3 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.3718281984329224
+4 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.501883864402771
+Contact sequence search time: 6.901425501004269
+['turn', 'thumb_middle']
+5 turn
+Sampling time 2.7346834620038862
+Solve time for step 100.20281100273132
+Solve time for step 22.85309362411499
+Solve time for step 20.08657217025757
+Solve time for step 17.593534231185913
+Solve time for step 16.14515495300293
+Solve time for step 14.328340291976929
+Solve time for step 12.847187757492065
+Solve time for step 11.823328971862793
+Solve time for step 10.738830089569092
+Solve time for step 10.139064311981201
+Solve time for step 9.451134204864502
+Solve time for step 8.789188623428345
+Solve time for step 8.194005966186523
+Solve time for step 7.862370014190674
+Solve time for step 7.529217481613159
+3 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.5342141389846802
+Contact sequence search time: 3.4063455360010266
+['turn']
+6 turn
+Sampling time 2.7057603290013503
+Solve time for step 100.17364859580994
+Solve time for step 22.74250841140747
+Solve time for step 20.128456354141235
+Solve time for step 17.641037940979004
+Solve time for step 16.092645406723022
+Solve time for step 14.498371839523315
+Solve time for step 12.91422438621521
+Solve time for step 11.739505052566528
+Solve time for step 10.679707765579224
+Solve time for step 9.802087545394897
+Solve time for step 9.286363124847412
+Solve time for step 8.852126121520996
+Solve time for step 8.370765447616577
+Solve time for step 8.031451225280762
+Solve time for step 7.521170139312744
+3 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.6660038232803345
+Contact sequence search time: 3.4357583340024576
+['turn']
+7 turn
+Sampling time 2.71475298400037
+Solve time for step 100.46849274635315
+Solve time for step 22.842313766479492
+Solve time for step 20.140451431274414
+Solve time for step 17.738739728927612
+Solve time for step 16.25198221206665
+Solve time for step 14.566038131713867
+Solve time for step 12.905194282531738
+Solve time for step 11.836865901947021
+Solve time for step 10.699748992919922
+Solve time for step 9.81753396987915
+Solve time for step 9.478001594543457
+Solve time for step 8.678312063217163
+Solve time for step 8.22120976448059
+Solve time for step 7.927037715911865
+Solve time for step 7.5546839237213135
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+3 ((-1.0, -1.0, -1.0),) 0.1447407305240631
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.11677951365709305
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.42173582315444946
+6 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.8858007788658142
+7 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.2841404676437378
+8 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.8497213125228882
+Contact sequence search time: 20.306122425994545
+['pregrasp', 'turn', 'thumb_middle', 'turn', 'turn', 'turn']
+0 pregrasp
+Sampling time 2.6731523199996445
+Solve time for step 32.84100699424744
+Solve time for step 8.013662338256836
+Solve time for step 7.848219394683838
+Solve time for step 7.469569444656372
+Solve time for step 7.2317235469818115
+Solve time for step 6.930359840393066
+Solve time for step 6.6905059814453125
+Solve time for step 6.396573543548584
+Solve time for step 6.151973009109497
+Solve time for step 5.9872002601623535
+Solve time for step 5.832498550415039
+Solve time for step 5.615365982055664
+Solve time for step 5.3399646282196045
+Solve time for step 5.138190031051636
+Solve time for step 5.196623802185059
+3 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.5282979011535645
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.5134018659591675
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.42751413583755493
+6 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.1455966234207153
+7 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.6870648860931396
+Contact sequence search time: 17.438943492998078
+['turn', 'thumb_middle', 'turn', 'turn']
+1 turn
+Sampling time 2.8346479590036324
+Solve time for step 100.70354986190796
+Solve time for step 22.916105031967163
+Solve time for step 20.22857356071472
+Solve time for step 17.728866577148438
+Solve time for step 16.4113986492157
+Solve time for step 14.361187934875488
+Solve time for step 13.014499425888062
+Solve time for step 11.90468144416809
+Solve time for step 10.812147617340088
+Solve time for step 10.047086715698242
+Solve time for step 9.305874824523926
+Solve time for step 8.653702020645142
+Solve time for step 8.210047006607056
+Solve time for step 8.004226446151733
+Solve time for step 7.6929545402526855
+3 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.543074369430542
+Contact sequence search time: 3.4229817610030295
+['turn']
+2 turn
+Sampling time 2.71861957499641
+Solve time for step 100.32336139678955
+Solve time for step 22.76357412338257
+Solve time for step 20.10619592666626
+Solve time for step 17.67246961593628
+Solve time for step 16.289976358413696
+Solve time for step 14.384742498397827
+Solve time for step 12.991149425506592
+Solve time for step 11.913192987442017
+Solve time for step 10.8483407497406
+Solve time for step 9.981750249862671
+Solve time for step 9.417837619781494
+Solve time for step 8.772618055343628
+Solve time for step 8.315497398376465
+Solve time for step 7.935383319854736
+Solve time for step 7.645972728729248
+3 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.3720183372497559
+4 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.6116344928741455
+Contact sequence search time: 7.078279137000209
+['turn', 'turn']
+3 turn
+Sampling time 2.869167557997571
+Solve time for step 100.93080949783325
+Solve time for step 22.84157705307007
+Solve time for step 20.184458017349243
+Solve time for step 17.552902460098267
+Solve time for step 16.195958614349365
+Solve time for step 14.540305376052856
+Solve time for step 12.94346284866333
+Solve time for step 12.031287908554077
+Solve time for step 10.878544807434082
+Solve time for step 10.087877988815308
+Solve time for step 9.502916097640991
+Solve time for step 8.876038074493408
+Solve time for step 8.39566707611084
+Solve time for step 8.03615117073059
+Solve time for step 7.836077690124512
+3 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.003676176071167
+4 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.8258180618286133
+Contact sequence search time: 6.894761736999499
+['index', 'turn']
+4 index
+Sampling time 2.7788052830001106
+Solve time for step 71.28242897987366
+Solve time for step 16.838172674179077
+Solve time for step 15.132291316986084
+Solve time for step 14.284600734710693
+Solve time for step 13.000683069229126
+Solve time for step 12.134489297866821
+Solve time for step 11.322041511535645
+Solve time for step 10.672199249267578
+Solve time for step 10.170148134231567
+Solve time for step 9.807958841323853
+Solve time for step 9.120502710342407
+Solve time for step 8.781063795089722
+Solve time for step 8.460574626922607
+Solve time for step 8.081851720809937
+Solve time for step 7.82232666015625
+3 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.2469737529754639
+4 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.7269026041030884
+Contact sequence search time: 6.939715096996224
+['turn', 'turn']
+5 turn
+Sampling time 2.7734150789983687
+Solve time for step 100.53651237487793
+Solve time for step 22.81416130065918
+Solve time for step 20.039713859558105
+Solve time for step 17.60612392425537
+Solve time for step 16.138633251190186
+Solve time for step 14.316941499710083
+Solve time for step 12.939718961715698
+Solve time for step 11.983268976211548
+Solve time for step 10.921729564666748
+Solve time for step 10.060130596160889
+Solve time for step 9.546038389205933
+Solve time for step 8.974587678909302
+Solve time for step 8.366228342056274
+Solve time for step 8.045585632324219
+Solve time for step 7.719224452972412
+3 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.5898534655570984
+4 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.0721393823623657
+5 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.48692578077316284
+6 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.1447540521621704
+7 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.362708330154419
+8 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.2737181186676025
+9 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.9056781530380249
+10 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.207810401916504
+11 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.6879661679267883
+12 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.46252647042274475
+13 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, -1.0, -1.0)) -0.7632848024368286
+14 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.06483441591262817
+Contact sequence search time: 13.6484341280011
+No contact sequence found
+['turn']
+6 turn
+Sampling time 2.718538109998917
+Solve time for step 100.45660829544067
+Solve time for step 22.71644163131714
+Solve time for step 20.444056272506714
+Solve time for step 17.85793709754944
+Solve time for step 16.42387104034424
+Solve time for step 14.481200695037842
+Solve time for step 13.10144829750061
+Solve time for step 12.003657579421997
+Solve time for step 10.814341306686401
+Solve time for step 10.051295280456543
+Solve time for step 9.353747606277466
+Solve time for step 8.732485294342041
+Solve time for step 8.552820682525635
+Solve time for step 8.103878259658813
+Solve time for step 7.707828044891357
+3 ((1, 1, 1), (-1.0, 1.0, 1.0)) -0.5944520831108093
+4 ((1, 1, 1), (1.0, -1.0, -1.0)) -0.44021478295326233
+5 ((1, 1, 1), (1.0, 1.0, 1.0)) -0.7428467273712158
+Contact sequence search time: 3.591535945997748
+No contact sequence found
+Planner thinks task is complete
+['pregrasp', 'turn', 'turn', 'turn', 'index', 'turn', 'turn']
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+3 ((-1.0, -1.0, -1.0),) 0.10752114653587341
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.6255726218223572
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.699877142906189
+6 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.0781973600387573
+7 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.4753872156143188
+8 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.806897521018982
+Contact sequence search time: 20.74031231400295
+['pregrasp', 'turn', 'index', 'turn', 'turn', 'index']
+0 pregrasp
+Sampling time 2.828554196996265
+Solve time for step 33.19495224952698
+Solve time for step 8.14155387878418
+Solve time for step 7.836778163909912
+Solve time for step 7.426625728607178
+Solve time for step 7.121135234832764
+Solve time for step 6.869725704193115
+Solve time for step 6.623249530792236
+Solve time for step 6.340573310852051
+Solve time for step 6.2359373569488525
+Solve time for step 6.018723011016846
+Solve time for step 5.983207941055298
+Solve time for step 5.652749300003052
+Solve time for step 5.449686050415039
+Solve time for step 5.101603269577026
+Solve time for step 4.9546959400177
+3 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.44088414311408997
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.43804270029067993
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.9382593631744385
+6 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.598382830619812
+Contact sequence search time: 14.131338421997498
+['turn', 'thumb_middle', 'turn', 'turn']
+1 turn
+Sampling time 2.808886880004138
+Solve time for step 100.34875464439392
+Solve time for step 22.95162320137024
+Solve time for step 20.11537790298462
+Solve time for step 17.778849601745605
+Solve time for step 16.328696966171265
+Solve time for step 14.458378553390503
+Solve time for step 13.038302421569824
+Solve time for step 11.94347095489502
+Solve time for step 10.896867990493774
+Solve time for step 9.935316562652588
+Solve time for step 9.465024471282959
+Solve time for step 8.660877466201782
+Solve time for step 8.294633388519287
+Solve time for step 7.858006238937378
+Solve time for step 7.5860981941223145
+3 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.6267638206481934
+4 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.5950995087623596
+5 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.2660977840423584
+6 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.52692449092865
+Contact sequence search time: 13.704447298994637
+['index', 'turn', 'turn']
+2 index
+Sampling time 2.725787556999421
+Solve time for step 71.48247766494751
+Solve time for step 16.725064277648926
+Solve time for step 15.036428928375244
+Solve time for step 14.159647226333618
+Solve time for step 13.106948614120483
+Solve time for step 12.110827922821045
+Solve time for step 11.488787412643433
+Solve time for step 10.788822412490845
+Solve time for step 9.999090194702148
+Solve time for step 9.62277626991272
+Solve time for step 9.274872779846191
+Solve time for step 8.794037342071533
+Solve time for step 8.554359436035156
+Solve time for step 8.321838140487671
+Solve time for step 7.967526197433472
+3 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.2367846965789795
+4 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.5253198146820068
+Contact sequence search time: 7.182668162997288
+['turn', 'thumb_middle']
+3 turn
+Sampling time 2.8659545299960882
+Solve time for step 100.83817410469055
+Solve time for step 22.799906015396118
+Solve time for step 20.156875371932983
+Solve time for step 17.61105990409851
+Solve time for step 16.125870943069458
+Solve time for step 14.439279079437256
+Solve time for step 12.896074056625366
+Solve time for step 11.919700622558594
+Solve time for step 10.89465856552124
+Solve time for step 10.001065492630005
+Solve time for step 9.375581979751587
+Solve time for step 8.77953052520752
+Solve time for step 8.249932050704956
+Solve time for step 7.976123332977295
+Solve time for step 7.652204275131226
+3 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.1371443271636963
+4 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.621071696281433
+Contact sequence search time: 6.916848851004033
+['index', 'turn']
+4 index
+Sampling time 2.7593591320037376
+Solve time for step 71.35219860076904
+Solve time for step 16.912468433380127
+Solve time for step 15.166743755340576
+Solve time for step 14.34729528427124
+Solve time for step 13.074995756149292
+Solve time for step 12.314976930618286
+Solve time for step 11.282350301742554
+Solve time for step 10.60216474533081
+Solve time for step 9.989691734313965
+Solve time for step 9.598498106002808
+Solve time for step 9.03160810470581
+Solve time for step 8.67009949684143
+Solve time for step 8.311432838439941
+Solve time for step 8.019204378128052
+Solve time for step 7.767502784729004
+3 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.624122142791748
+Contact sequence search time: 3.4711972549994243
+['turn']
+5 turn
+Sampling time 2.7468179130009958
+Solve time for step 100.43076515197754
+Solve time for step 22.805346727371216
+Solve time for step 20.212885856628418
+Solve time for step 17.68483805656433
+Solve time for step 16.19128727912903
+Solve time for step 14.519201040267944
+Solve time for step 12.948503255844116
+Solve time for step 11.931289434432983
+Solve time for step 10.948445081710815
+Solve time for step 10.130666017532349
+Solve time for step 9.42880630493164
+Solve time for step 8.82490611076355
+Solve time for step 8.405269145965576
+Solve time for step 8.07763934135437
+Solve time for step 7.62061333656311
+3 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.1268794536590576
+4 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.3813118934631348
+5 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.419825792312622
+6 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.8927509784698486
+7 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.5445502996444702
+Contact sequence search time: 10.374048035999294
+['thumb_middle', 'turn']
+6 thumb_middle
+Sampling time 2.7518588320017443
+Solve time for step 48.05007195472717
+Solve time for step 11.788302183151245
+Solve time for step 10.825101375579834
+Solve time for step 10.36005187034607
+Solve time for step 9.981632709503174
+Solve time for step 9.354398727416992
+Solve time for step 9.074439287185669
+Solve time for step 8.529131174087524
+Solve time for step 8.1624755859375
+Solve time for step 7.8695127964019775
+Solve time for step 7.620559453964233
+Solve time for step 7.313741445541382
+Solve time for step 6.944941759109497
+Solve time for step 6.746085166931152
+Solve time for step 6.595874547958374
+3 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.455932378768921
+4 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -1.1972174644470215
+5 ((1.0, -1.0, -1.0), (1.0, -1.0, -1.0)) -1.1028778553009033
+Contact sequence search time: 3.498026667002705
+No contact sequence found
+['turn']
+7 turn
+Sampling time 2.8313884819945088
+Solve time for step 101.17715287208557
+Solve time for step 23.008193254470825
+Solve time for step 20.389363288879395
+Solve time for step 17.828901767730713
+Solve time for step 16.487481594085693
+Solve time for step 14.67613673210144
+Solve time for step 13.16347360610962
+Solve time for step 12.052856206893921
+Solve time for step 10.899178504943848
+Solve time for step 10.067779064178467
+Solve time for step 9.375632047653198
+Solve time for step 8.75454044342041
+Solve time for step 8.34935975074768
+Solve time for step 8.029067277908325
+Solve time for step 7.63036322593689
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+3 ((-1.0, -1.0, -1.0),) -0.14987583458423615
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.7429532408714294
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.7310478687286377
+Contact sequence search time: 10.175543439996545
+['pregrasp', 'turn', 'turn']
+0 pregrasp
+Sampling time 2.8336391240009107
+Solve time for step 32.82912087440491
+Solve time for step 8.032193660736084
+Solve time for step 7.844590187072754
+Solve time for step 7.402001857757568
+Solve time for step 7.3603315353393555
+Solve time for step 7.0228424072265625
+Solve time for step 6.757118225097656
+Solve time for step 6.4524571895599365
+Solve time for step 6.220231056213379
+Solve time for step 6.001398324966431
+Solve time for step 5.7307374477386475
+Solve time for step 5.550538063049316
+Solve time for step 5.368453502655029
+Solve time for step 5.149801015853882
+Solve time for step 4.9949188232421875
+3 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.9131258130073547
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.7559326887130737
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.7137857675552368
+Contact sequence search time: 10.327250611997442
+['turn', 'index', 'turn']
+1 turn
+Sampling time 2.7412621620023856
+Solve time for step 100.16455888748169
+Solve time for step 22.82948589324951
+Solve time for step 20.266238689422607
+Solve time for step 17.71228051185608
+Solve time for step 16.3734188079834
+Solve time for step 14.587361335754395
+Solve time for step 13.098560810089111
+Solve time for step 12.094560384750366
+Solve time for step 10.983311414718628
+Solve time for step 10.012447118759155
+Solve time for step 9.470438480377197
+Solve time for step 8.79273247718811
+Solve time for step 8.33345341682434
+Solve time for step 8.121275663375854
+Solve time for step 7.602417707443237
+3 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.746847927570343
+4 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.2776246070861816
+5 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.4488588571548462
+6 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.6140635013580322
+Contact sequence search time: 13.699407190993952
+['index', 'turn', 'turn', 'turn']
+2 index
+Sampling time 2.723642092998489
+Solve time for step 71.20044684410095
+Solve time for step 16.751116514205933
+Solve time for step 15.08188509941101
+Solve time for step 14.40915584564209
+Solve time for step 13.14210319519043
+Solve time for step 12.337632179260254
+Solve time for step 11.60417103767395
+Solve time for step 10.908954620361328
+Solve time for step 10.283353567123413
+Solve time for step 9.841918706893921
+Solve time for step 9.299209117889404
+Solve time for step 8.955199241638184
+Solve time for step 8.57174038887024
+Solve time for step 8.270848035812378
+Solve time for step 7.914372444152832
+3 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.089996337890625
+4 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.4085068702697754
+5 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.6165069341659546
+Contact sequence search time: 10.372031300001254
+['turn', 'index', 'thumb_middle']
+3 turn
+Sampling time 2.776684919001127
+Solve time for step 100.755544424057
+Solve time for step 23.110315799713135
+Solve time for step 20.267965078353882
+Solve time for step 17.7726571559906
+Solve time for step 16.245837926864624
+Solve time for step 14.45026683807373
+Solve time for step 13.038280725479126
+Solve time for step 11.85964560508728
+Solve time for step 10.866534948348999
+Solve time for step 9.88335657119751
+Solve time for step 9.417691469192505
+Solve time for step 8.761990308761597
+Solve time for step 8.256757020950317
+Solve time for step 7.948641777038574
+Solve time for step 7.65094780921936
+3 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.167093276977539
+4 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.7932108640670776
+Contact sequence search time: 6.945276543003274
+['thumb_middle', 'turn']
+4 thumb_middle
+Sampling time 2.767903780004417
+Solve time for step 47.938862562179565
+Solve time for step 11.566652297973633
+Solve time for step 10.737084150314331
+Solve time for step 10.260477304458618
+Solve time for step 9.834591150283813
+Solve time for step 9.259544372558594
+Solve time for step 8.86382532119751
+Solve time for step 8.517098426818848
+Solve time for step 8.240835666656494
+Solve time for step 7.685497045516968
+Solve time for step 7.441599607467651
+Solve time for step 7.27123236656189
+Solve time for step 6.87403678894043
+Solve time for step 6.671842813491821
+Solve time for step 6.418630361557007
+3 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.4206424951553345
+4 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.0444045066833496
+5 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.6872421503067017
+Contact sequence search time: 10.636024280996935
+['index', 'turn', 'turn']
+5 index
+Sampling time 2.8384272920011426
+Solve time for step 71.79501390457153
+Solve time for step 16.8253493309021
+Solve time for step 15.039847373962402
+Solve time for step 14.220026731491089
+Solve time for step 12.98196005821228
+Solve time for step 12.214459657669067
+Solve time for step 11.379247188568115
+Solve time for step 10.708872318267822
+Solve time for step 10.328166007995605
+Solve time for step 9.746694564819336
+Solve time for step 9.209479808807373
+Solve time for step 8.920681715011597
+Solve time for step 8.532227993011475
+Solve time for step 8.308114767074585
+Solve time for step 8.002150535583496
+3 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.7091975808143616
+4 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.5395519733428955
+5 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.39187195897102356
+6 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.9051122069358826
+7 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) 0.3499907851219177
+8 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) 0.08016668260097504
+9 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) 0.15470173954963684
+10 ((-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) 0.3749092221260071
+11 ((-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.2635036110877991
+12 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, -1.0, -1.0)) 0.20649564266204834
+13 ((-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) 0.4220719337463379
+14 ((-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) 0.38927769660949707
+Contact sequence search time: 13.660635895997984
+No contact sequence found
+['turn', 'turn']
+6 turn
+Sampling time 2.727715980996436
+Solve time for step 100.82696866989136
+Solve time for step 22.803049325942993
+Solve time for step 20.27515411376953
+Solve time for step 17.678176403045654
+Solve time for step 16.139619827270508
+Solve time for step 14.429320812225342
+Solve time for step 12.99451494216919
+Solve time for step 12.053793668746948
+Solve time for step 10.71414589881897
+Solve time for step 9.922451496124268
+Solve time for step 9.480563879013062
+Solve time for step 8.808448791503906
+Solve time for step 8.29002571105957
+Solve time for step 8.05447244644165
+Solve time for step 7.559427976608276
+3 ((1, 1, 1), (-1.0, 1.0, 1.0)) -1.148460865020752
+4 ((1, 1, 1), (1.0, -1.0, -1.0)) -0.27527543902397156
+5 ((1, 1, 1), (1.0, 1.0, 1.0)) -0.16762684285640717
+Contact sequence search time: 3.4471146229989245
+No contact sequence found
+['turn']
+7 turn
+Sampling time 2.747032904000662
+Solve time for step 100.39243817329407
+Solve time for step 22.838621854782104
+Solve time for step 20.24258518218994
+Solve time for step 17.788023948669434
+Solve time for step 16.27247953414917
+Solve time for step 14.35242247581482
+Solve time for step 12.977341175079346
+Solve time for step 11.93065094947815
+Solve time for step 10.692740440368652
+Solve time for step 10.040568351745605
+Solve time for step 9.509449243545532
+Solve time for step 8.852303981781006
+Solve time for step 8.335705041885376
+Solve time for step 8.034586191177368
+Solve time for step 7.714061975479126
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+3 ((-1.0, -1.0, -1.0),) -0.11044496297836304
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.1415395736694336
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.207594394683838
+6 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.500056266784668
+Contact sequence search time: 13.888308800000232
+['pregrasp', 'turn', 'thumb_middle', 'turn']
+0 pregrasp
+Sampling time 2.8771165409998503
+Solve time for step 33.540477991104126
+Solve time for step 8.124809265136719
+Solve time for step 7.836735010147095
+Solve time for step 7.416172027587891
+Solve time for step 7.15486478805542
+Solve time for step 6.92212176322937
+Solve time for step 6.6538777351379395
+Solve time for step 6.342242956161499
+Solve time for step 6.283987045288086
+Solve time for step 6.072418689727783
+Solve time for step 5.905981540679932
+Solve time for step 5.812317132949829
+Solve time for step 5.45893931388855
+Solve time for step 5.184803485870361
+Solve time for step 5.047354459762573
+3 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.004244089126587
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.8404685258865356
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.359652042388916
+6 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.3910789489746094
+7 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.6036397218704224
+Contact sequence search time: 17.337259639003605
+['turn', 'thumb_middle', 'turn', 'index', 'index']
+1 turn
+Sampling time 2.772223126004974
+Solve time for step 100.76641583442688
+Solve time for step 22.960429191589355
+Solve time for step 20.34377932548523
+Solve time for step 17.80411648750305
+Solve time for step 16.351757526397705
+Solve time for step 14.478479862213135
+Solve time for step 12.966031789779663
+Solve time for step 11.952985286712646
+Solve time for step 10.932412147521973
+Solve time for step 9.99325442314148
+Solve time for step 9.372989416122437
+Solve time for step 8.755795240402222
+Solve time for step 8.310359954833984
+Solve time for step 7.960537910461426
+Solve time for step 7.632212400436401
+3 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.03940749168396
+4 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.4633302688598633
+5 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.5660676956176758
+Contact sequence search time: 10.338911294005811
+['thumb_middle', 'turn', 'thumb_middle']
+2 thumb_middle
+Sampling time 2.7328020999993896
+Solve time for step 48.456323862075806
+Solve time for step 11.8312406539917
+Solve time for step 10.895555257797241
+Solve time for step 10.400488376617432
+Solve time for step 9.959319829940796
+Solve time for step 9.342797994613647
+Solve time for step 8.896253108978271
+Solve time for step 8.599523067474365
+Solve time for step 8.159803867340088
+Solve time for step 7.869873762130737
+Solve time for step 7.498226881027222
+Solve time for step 7.21050500869751
+Solve time for step 6.931649923324585
+Solve time for step 6.741980791091919
+Solve time for step 6.420938968658447
+3 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.2170498371124268
+4 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.7843281030654907
+Contact sequence search time: 6.864141478996316
+['turn', 'turn']
+3 turn
+Sampling time 2.7318638429933344
+Solve time for step 100.18820714950562
+Solve time for step 22.759162425994873
+Solve time for step 20.262256145477295
+Solve time for step 17.634000062942505
+Solve time for step 16.279855489730835
+Solve time for step 14.418120861053467
+Solve time for step 12.998750925064087
+Solve time for step 11.98094654083252
+Solve time for step 10.912715673446655
+Solve time for step 10.121673583984375
+Solve time for step 9.507737874984741
+Solve time for step 8.783503532409668
+Solve time for step 8.339177370071411
+Solve time for step 8.742796897888184
+Solve time for step 8.416815519332886
+3 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.9817267060279846
+4 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.5508836507797241
+Contact sequence search time: 7.314436628999829
+['index', 'turn']
+4 index
+Sampling time 2.9222256309949444
+Solve time for step 75.01800227165222
+Solve time for step 17.497511625289917
+Solve time for step 16.026773929595947
+Solve time for step 14.85589051246643
+Solve time for step 13.779133796691895
+Solve time for step 12.311707735061646
+Solve time for step 11.58675217628479
+Solve time for step 10.861618757247925
+Solve time for step 10.433439016342163
+Solve time for step 9.902506113052368
+Solve time for step 9.684809446334839
+Solve time for step 8.99982476234436
+Solve time for step 8.498558521270752
+Solve time for step 8.299883365631104
+Solve time for step 7.960082054138184
+3 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) 0.03640641272068024
+4 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.1339152306318283
+5 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.5121473073959351
+6 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) 0.11132130026817322
+7 ((-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.6874753832817078
+8 ((-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.9982503652572632
+9 ((-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.3273593187332153
+10 ((-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.2346746921539307
+11 ((-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.9546717405319214
+12 ((-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.6895524859428406
+13 ((-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.4335826635360718
+14 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) 0.9307130575180054
+15 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.18848691880702972
+16 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) 0.4937591254711151
+17 ((-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.7568544745445251
+18 ((-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.2340402603149414
+19 ((-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.1253010034561157
+20 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.02459624409675598
+21 ((-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.5872037410736084
+22 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) 0.7384999394416809
+23 ((-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, -1.0, -1.0)) -0.8254183530807495
+24 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) 0.050134919583797455
+25 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) 0.18695372343063354
+26 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) 0.2438441962003708
+27 ((-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.6601433157920837
+28 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.30269426107406616
+29 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) 0.5097780227661133
+30 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) 0.0756840780377388
+31 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) 0.6042191982269287
+32 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.07136379182338715
+33 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.35466352105140686
+34 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) 0.10453204065561295
+35 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) 0.14510542154312134
+36 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, -1.0, -1.0)) 0.5726765990257263
+37 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) 0.027783166617155075
+38 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, -1.0, -1.0)) 0.2619023025035858
+39 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) 0.38756608963012695
+40 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) 0.6190129518508911
+41 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, -1.0, -1.0), (1.0, -1.0, -1.0)) 0.6929193139076233
+Contact sequence search time: 45.06032097100251
+No contact sequence found
+['turn']
+5 turn
+Sampling time 2.7638856589983334
+Solve time for step 100.85598349571228
+Solve time for step 22.899449110031128
+Solve time for step 20.17331624031067
+Solve time for step 17.73919653892517
+Solve time for step 16.237435340881348
+Solve time for step 14.523095607757568
+Solve time for step 12.83972978591919
+Solve time for step 11.903803586959839
+Solve time for step 10.758042812347412
+Solve time for step 9.945104837417603
+Solve time for step 9.372633218765259
+Solve time for step 8.898061037063599
+Solve time for step 8.414318084716797
+Solve time for step 8.047722816467285
+Solve time for step 7.794870376586914
+3 ((1, 1, 1), (1.0, -1.0, -1.0)) -0.6984294652938843
+4 ((1, 1, 1), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -1.0672990083694458
+5 ((1, 1, 1), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.9286113977432251
+6 ((1, 1, 1), (-1.0, 1.0, 1.0)) -0.7053016424179077
+7 ((1, 1, 1), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.1326547861099243
+8 ((1, 1, 1), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.8723755478858948
+9 ((1, 1, 1), (1.0, 1.0, 1.0)) -0.9517659544944763
+10 ((1, 1, 1), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.5765622854232788
+Contact sequence search time: 14.328252526996948
+['turn', 'turn']
+6 turn
+Sampling time 2.9196481620019767
+Solve time for step 101.03554916381836
+Solve time for step 22.84238624572754
+Solve time for step 20.23597478866577
+Solve time for step 17.737385988235474
+Solve time for step 16.281034469604492
+Solve time for step 14.436389684677124
+Solve time for step 13.066524744033813
+Solve time for step 11.971630811691284
+Solve time for step 10.7783682346344
+Solve time for step 10.117368698120117
+Solve time for step 9.318908452987671
+Solve time for step 9.019667625427246
+Solve time for step 8.447372674942017
+Solve time for step 8.103269577026367
+Solve time for step 7.485945224761963
+3 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.7019189596176147
+Contact sequence search time: 3.551841737003997
+['turn']
+7 turn
+Sampling time 2.8440119970036903
+Solve time for step 101.27879786491394
+Solve time for step 22.977810382843018
+Solve time for step 20.325334072113037
+Solve time for step 17.833051204681396
+Solve time for step 16.266807317733765
+Solve time for step 14.398515462875366
+Solve time for step 12.88260006904602
+Solve time for step 11.859210014343262
+Solve time for step 10.81785774230957
+Solve time for step 10.115625381469727
+Solve time for step 9.555409669876099
+Solve time for step 8.807368993759155
+Solve time for step 8.488791227340698
+Solve time for step 7.92732834815979
+Solve time for step 7.769731283187866
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+3 ((-1.0, -1.0, -1.0),) 0.13877934217453003
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.36206531524658203
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.42518350481987
+6 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.0971271991729736
+7 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.5285682678222656
+Contact sequence search time: 17.348268487003224
+['pregrasp', 'turn', 'thumb_middle', 'turn', 'turn']
+0 pregrasp
+Sampling time 2.8386722079958417
+Solve time for step 33.49681258201599
+Solve time for step 8.146127223968506
+Solve time for step 7.88289999961853
+Solve time for step 7.386822462081909
+Solve time for step 7.164438247680664
+Solve time for step 6.925784587860107
+Solve time for step 6.65899920463562
+Solve time for step 6.385816335678101
+Solve time for step 6.141098260879517
+Solve time for step 6.062162637710571
+Solve time for step 5.862439393997192
+Solve time for step 5.702268600463867
+Solve time for step 5.60638427734375
+Solve time for step 5.2573888301849365
+Solve time for step 5.193483829498291
+3 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.2740190029144287
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.25617462396621704
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.11342881619930267
+6 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.6078631281852722
+7 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.5308263897895813
+8 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.8463913798332214
+9 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.177478313446045
+10 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.440354824066162
+11 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.6297907829284668
+Contact sequence search time: 31.402558617002796
+['turn', 'thumb_middle', 'index', 'thumb_middle', 'turn', 'turn', 'turn']
+1 turn
+Sampling time 2.804753812000854
+Solve time for step 101.00021123886108
+Solve time for step 22.948505401611328
+Solve time for step 20.25507664680481
+Solve time for step 17.76965832710266
+Solve time for step 16.298527479171753
+Solve time for step 14.607036113739014
+Solve time for step 13.098437070846558
+Solve time for step 11.896111249923706
+Solve time for step 10.86540174484253
+Solve time for step 10.08906888961792
+Solve time for step 9.519932746887207
+Solve time for step 8.833548784255981
+Solve time for step 8.375706195831299
+Solve time for step 8.164170265197754
+Solve time for step 7.802666664123535
+3 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.3871460258960724
+4 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.3774367570877075
+5 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.5056579113006592
+Contact sequence search time: 10.764563725002517
+['thumb_middle', 'turn', 'turn']
+2 thumb_middle
+Sampling time 2.828044417001365
+Solve time for step 48.49872279167175
+Solve time for step 11.752990245819092
+Solve time for step 10.916810512542725
+Solve time for step 10.44658637046814
+Solve time for step 10.025052785873413
+Solve time for step 9.394330739974976
+Solve time for step 9.016132831573486
+Solve time for step 8.555801391601562
+Solve time for step 8.255325078964233
+Solve time for step 7.981823682785034
+Solve time for step 7.683517217636108
+Solve time for step 7.413252115249634
+Solve time for step 7.105494976043701
+Solve time for step 6.7502851486206055
+Solve time for step 6.570830345153809
+3 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.566072940826416
+4 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.336248755455017
+5 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -2.067193031311035
+Contact sequence search time: 10.222617252999044
+['index', 'turn', 'turn']
+3 index
+Sampling time 2.742416363005759
+Solve time for step 71.7548565864563
+Solve time for step 16.819008111953735
+Solve time for step 15.065959215164185
+Solve time for step 14.21182632446289
+Solve time for step 13.105496644973755
+Solve time for step 12.23564100265503
+Solve time for step 11.382620096206665
+Solve time for step 10.788761854171753
+Solve time for step 10.165107488632202
+Solve time for step 9.7531099319458
+Solve time for step 9.266855001449585
+Solve time for step 8.816693782806396
+Solve time for step 8.46063232421875
+Solve time for step 8.17178201675415
+Solve time for step 7.842034339904785
+3 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.525133490562439
+4 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.3609214127063751
+5 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.9673309922218323
+6 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.479476809501648
+7 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.58766770362854
+Contact sequence search time: 17.123628699999244
+['thumb_middle', 'turn', 'turn', 'thumb_middle']
+4 thumb_middle
+Sampling time 2.715983911002695
+Solve time for step 48.23115015029907
+Solve time for step 11.72887134552002
+Solve time for step 10.979881763458252
+Solve time for step 10.43329644203186
+Solve time for step 10.041354417800903
+Solve time for step 9.462367296218872
+Solve time for step 8.949186325073242
+Solve time for step 8.530339479446411
+Solve time for step 8.231205463409424
+Solve time for step 7.85019588470459
+Solve time for step 7.522782325744629
+Solve time for step 7.252256155014038
+Solve time for step 6.95703125
+Solve time for step 6.7411274909973145
+Solve time for step 6.5219361782073975
+3 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.6506333351135254
+4 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.4347204566001892
+5 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.8107328414916992
+6 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.7128790020942688
+7 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.1898928880691528
+8 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.6932787299156189
+9 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.9657398462295532
+10 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.5044185519218445
+11 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.2194437980651855
+12 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.8197787404060364
+13 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.9474809765815735
+14 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.160378336906433
+15 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.7674954533576965
+16 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.7383018732070923
+17 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.6793287396430969
+18 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.675794243812561
+19 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.1334705352783203
+20 ((1.0, -1.0, -1.0), (1.0, -1.0, -1.0)) -0.5057862997055054
+21 ((1.0, -1.0, -1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.4358477592468262
+22 ((1.0, -1.0, -1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.8578612804412842
+Contact sequence search time: 34.51238264999847
+['thumb_middle', 'turn', 'turn']
+5 thumb_middle
+Sampling time 2.762680274005106
+Solve time for step 48.33923840522766
+Solve time for step 11.723450899124146
+Solve time for step 10.964925050735474
+Solve time for step 10.456310749053955
+Solve time for step 9.99498176574707
+Solve time for step 9.319146156311035
+Solve time for step 8.864681959152222
+Solve time for step 8.384228467941284
+Solve time for step 8.04059648513794
+Solve time for step 7.765571594238281
+Solve time for step 7.6699042320251465
+Solve time for step 7.399060964584351
+Solve time for step 7.1273956298828125
+Solve time for step 6.878321647644043
+Solve time for step 6.649120092391968
+3 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.137938380241394
+4 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.8217254281044006
+5 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.374543309211731
+6 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.1752870082855225
+7 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.0733791589736938
+8 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.2998377084732056
+9 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.6752397418022156
+10 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.9401237964630127
+11 ((1.0, -1.0, -1.0), (1.0, -1.0, -1.0)) -0.37956902384757996
+12 ((1.0, -1.0, -1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.9279601573944092
+13 ((1.0, -1.0, -1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.3865775167942047
+14 ((1.0, -1.0, -1.0), (1.0, -1.0, -1.0), (1.0, -1.0, -1.0)) -0.558844804763794
+Contact sequence search time: 14.125201267997909
+No contact sequence found
+['turn', 'turn']
+6 turn
+Sampling time 2.8527896710002096
+Solve time for step 101.03851890563965
+Solve time for step 22.871877908706665
+Solve time for step 20.21483325958252
+Solve time for step 17.85585069656372
+Solve time for step 16.373278617858887
+Solve time for step 14.528932809829712
+Solve time for step 13.047247886657715
+Solve time for step 11.847169160842896
+Solve time for step 10.961545467376709
+Solve time for step 10.01445484161377
+Solve time for step 9.414912700653076
+Solve time for step 8.792121410369873
+Solve time for step 8.510919094085693
+Solve time for step 8.146235227584839
+Solve time for step 7.610797166824341
+3 ((1, 1, 1), (1.0, -1.0, -1.0)) -1.1171159744262695
+4 ((1, 1, 1), (-1.0, 1.0, 1.0)) -0.9932703971862793
+5 ((1, 1, 1), (1.0, 1.0, 1.0)) -1.1409413814544678
+Contact sequence search time: 3.426131525004166
+No contact sequence found
+['turn']
+7 turn
+Sampling time 2.728543321005418
+Solve time for step 101.05927586555481
+Solve time for step 23.138784408569336
+Solve time for step 20.25149416923523
+Solve time for step 17.872113943099976
+Solve time for step 16.346845149993896
+Solve time for step 14.392812252044678
+Solve time for step 12.908128261566162
+Solve time for step 11.997405290603638
+Solve time for step 10.941872119903564
+Solve time for step 10.181280136108398
+Solve time for step 9.584937572479248
+Solve time for step 9.000556707382202
+Solve time for step 8.453480958938599
+Solve time for step 8.147178888320923
+Solve time for step 7.845352411270142
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+3 ((-1.0, -1.0, -1.0),) 0.0826847106218338
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.2673999071121216
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.13313312828540802
+6 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.7714601755142212
+7 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.1346764713525772
+8 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.04988431930542
+9 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.3633663654327393
+10 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.5587294101715088
+Contact sequence search time: 27.099962666994543
+['pregrasp', 'turn', 'thumb_middle', 'turn', 'turn', 'thumb_middle']
+0 pregrasp
+Sampling time 2.6948739569925237
+Solve time for step 33.04249048233032
+Solve time for step 8.253801584243774
+Solve time for step 7.840773344039917
+Solve time for step 7.542168855667114
+Solve time for step 7.272500038146973
+Solve time for step 6.979521036148071
+Solve time for step 6.767448902130127
+Solve time for step 6.4745728969573975
+Solve time for step 6.243559122085571
+Solve time for step 6.170109033584595
+Solve time for step 5.948373317718506
+Solve time for step 5.730751991271973
+Solve time for step 5.544461727142334
+Solve time for step 5.272263288497925
+Solve time for step 5.082984447479248
+3 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.6620310544967651
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.4540871381759644
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.6301909685134888
+Contact sequence search time: 10.64970356899721
+['turn', 'turn', 'index']
+1 turn
+Sampling time 2.8422611160058295
+Solve time for step 101.61258816719055
+Solve time for step 22.984561681747437
+Solve time for step 20.317743062973022
+Solve time for step 17.89824914932251
+Solve time for step 16.250187635421753
+Solve time for step 14.569015264511108
+Solve time for step 13.102757215499878
+Solve time for step 11.986034393310547
+Solve time for step 10.979572772979736
+Solve time for step 10.206434726715088
+Solve time for step 9.446954250335693
+Solve time for step 8.851213216781616
+Solve time for step 8.560139656066895
+Solve time for step 8.220276832580566
+Solve time for step 7.798032760620117
+3 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.9024484753608704
+4 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.6007063388824463
+Contact sequence search time: 6.940875606000191
+['index', 'turn']
+2 index
+Sampling time 2.7829637539980467
+Solve time for step 71.82821369171143
+Solve time for step 16.869719743728638
+Solve time for step 15.283314943313599
+Solve time for step 14.389482021331787
+Solve time for step 13.145302057266235
+Solve time for step 12.346393585205078
+Solve time for step 11.491083860397339
+Solve time for step 10.876593351364136
+Solve time for step 10.277898788452148
+Solve time for step 9.835105180740356
+Solve time for step 9.303481340408325
+Solve time for step 8.913105964660645
+Solve time for step 8.623777627944946
+Solve time for step 8.310193061828613
+Solve time for step 8.069408178329468
+3 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.075728178024292
+4 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.565301239490509
+5 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.0828107595443726
+6 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.0399882793426514
+7 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.2042381763458252
+8 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.8503079414367676
+Contact sequence search time: 21.448713060992304
+['turn', 'index', 'thumb_middle', 'turn']
+3 turn
+Sampling time 2.9042527450073976
+Solve time for step 101.50913310050964
+Solve time for step 23.107285499572754
+Solve time for step 20.423094987869263
+Solve time for step 17.79859161376953
+Solve time for step 16.318137168884277
+Solve time for step 14.51997184753418
+Solve time for step 12.965608835220337
+Solve time for step 11.942595481872559
+Solve time for step 10.886405944824219
+Solve time for step 10.091449499130249
+Solve time for step 9.496252536773682
+Solve time for step 8.91633677482605
+Solve time for step 8.501970529556274
+Solve time for step 8.053114891052246
+Solve time for step 7.755967617034912
+3 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.0522065162658691
+4 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.438008189201355
+5 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.7871342897415161
+Contact sequence search time: 10.45626791199902
+['index', 'turn', 'turn']
+4 index
+Sampling time 2.7809240259957733
+Solve time for step 72.14920783042908
+Solve time for step 16.979142904281616
+Solve time for step 15.269717931747437
+Solve time for step 14.40165400505066
+Solve time for step 13.150333881378174
+Solve time for step 12.181057453155518
+Solve time for step 11.341803073883057
+Solve time for step 10.723443746566772
+Solve time for step 10.14992380142212
+Solve time for step 9.758086681365967
+Solve time for step 9.184670686721802
+Solve time for step 8.801782608032227
+Solve time for step 8.472519159317017
+Solve time for step 8.227928400039673
+Solve time for step 8.070695638656616
+3 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.9515953660011292
+4 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.5617375373840332
+Contact sequence search time: 6.845062772001256
+['thumb_middle', 'turn']
+5 thumb_middle
+Sampling time 2.7349856910004746
+Solve time for step 48.04271411895752
+Solve time for step 11.604624271392822
+Solve time for step 10.768790245056152
+Solve time for step 10.254801750183105
+Solve time for step 10.009540796279907
+Solve time for step 9.40816855430603
+Solve time for step 9.004946947097778
+Solve time for step 8.442190647125244
+Solve time for step 8.133100271224976
+Solve time for step 7.848393201828003
+Solve time for step 7.5732645988464355
+Solve time for step 7.380136013031006
+Solve time for step 7.096805572509766
+Solve time for step 6.886853933334351
+Solve time for step 6.637784481048584
+3 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.8977975249290466
+4 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.4695146083831787
+5 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.9025045037269592
+6 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.3830533027648926
+7 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.9019837975502014
+8 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.7720890641212463
+9 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.4526668190956116
+10 ((1.0, -1.0, -1.0), (1.0, -1.0, -1.0)) -0.6537878513336182
+11 ((1.0, -1.0, -1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.93629390001297
+12 ((1.0, -1.0, -1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.8887885808944702
+13 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.5497809052467346
+14 ((1.0, -1.0, -1.0), (1.0, -1.0, -1.0), (1.0, -1.0, -1.0)) -0.7667040228843689
+Contact sequence search time: 14.109858292998979
+No contact sequence found
+['turn']
+6 turn
+Sampling time 2.7813878540036967
+Solve time for step 101.11709308624268
+Solve time for step 22.90780806541443
+Solve time for step 20.39499020576477
+Solve time for step 17.838823318481445
+Solve time for step 16.196033000946045
+Solve time for step 14.379927396774292
+Solve time for step 12.923047065734863
+Solve time for step 12.222613096237183
+Solve time for step 10.896587133407593
+Solve time for step 10.231019020080566
+Solve time for step 9.561066627502441
+Solve time for step 8.929213285446167
+Solve time for step 8.453673124313354
+Solve time for step 8.098620176315308
+Solve time for step 7.738328695297241
+3 ((1, 1, 1), (1.0, -1.0, -1.0)) -0.951158344745636
+4 ((1, 1, 1), (1.0, 1.0, 1.0)) -1.3098407983779907
+5 ((1, 1, 1), (-1.0, 1.0, 1.0)) -0.30154624581336975
+Contact sequence search time: 3.5524554180010455
+No contact sequence found
+Planner thinks task is complete
+['pregrasp', 'turn', 'index', 'turn', 'index', 'thumb_middle', 'turn']
+csvgd, Average time per step: 0.0
+{}

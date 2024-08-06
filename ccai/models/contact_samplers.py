@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 from abc import abstractmethod
 from better_abc import ABCMeta, abstract_attribute
 
@@ -31,12 +32,12 @@ class MCContactSampler(ContactSampler):
     
 
 class Node:
-    def __init__(self, trajectory, cost, contact_sequence, all_trajectory_samples, likelihood_indices=None):
+    def __init__(self, trajectory, cost, contact_sequence, likelihoods=None):
         self.trajectory = trajectory
         self.cost = cost
         self.contact_sequence = contact_sequence
-        self.all_trajectory_samples = all_trajectory_samples
-        self.likelihood_indices = likelihood_indices
+        # self.all_trajectory_samples = all_trajectory_samples
+        self.likelihoods = likelihoods
 
     def __hash__(self):
         return hash(self.contact_sequence)
@@ -47,17 +48,53 @@ class Node:
         return NotImplemented
 
 class GraphSearch(ContactSampler, AStar):
-    def __init__(self, start, model, problem_dict, max_depth, heuristic_weight, goal, device, *args, **kwargs):
+    def __init__(self, start, model, problem_dict, max_depth, heuristic_weight, goal, device,
+                  *args, initial_run=False, multi_particle=False, **kwargs):
         ContactSampler.__init__(self, *args, **kwargs)
 
         self.start = start
+        self.start_yaw = start[14].item()
+
+        self.start = self.convert_yaw_to_sine_cosine(self.start)
+
         self.problem_dict = problem_dict
         self.device = device
         self.model = model
 
-        self.num_samples = 32
+        self.num_samples = 8
         self.max_depth = max_depth
         self.heuristic_weight = heuristic_weight
+
+        self.initial_run = initial_run
+
+        self.multi_particle = multi_particle
+
+        self.num_samples_multi = 1
+        self.trajectory_dim_0 = 1
+        if self.multi_particle:
+            self.num_samples_multi = 8
+            self.trajectory_dim_0 = self.num_samples
+
+        self.markov_chain = MarkovChain(
+            torch.tensor([
+                [0, .2, .2, .6],
+                [0, .1, .3, .6],
+                [0, .3, .1, .6],
+                [0, .45, .45, .1]
+            ])
+            # torch.tensor([
+            #     [0, .2, .2, .6],
+            #     [0, .1, .4, .5],
+            #     [0, .4, .1, .5],
+            #     [0, .45, .45, .1]
+            # ])
+            # torch.tensor([
+            #     [0, .1, .1, .8],
+            #     [0, .1, .45, .45],
+            #     [0, .45, .1, .45],
+            #     [0, .45, .45, .1]
+            # ])
+        )
 
         self.goal = goal
 
@@ -70,22 +107,36 @@ class GraphSearch(ContactSampler, AStar):
         
         self.num_c_states = self.neighbors_c_states.shape[0]
         self.neighbors_c_states_orig = self.neighbors_c_states.clone()
-        self.neighbors_c_states = self.neighbors_c_states.repeat_interleave(self.num_samples, 0)
+        self.neighbors_c_states = self.neighbors_c_states.repeat_interleave(self.num_samples*self.num_samples_multi, 0)
+        # Get the index of num_samples that each neighbors_c_states corresponds to
+        self.neighbors_c_states_indices = torch.arange(self.num_samples).repeat(self.num_samples_multi)
         self.iter = 0
 
+    def normalize_likelihood(self, likelihood):
+        return torch.nn.functional.softmax(likelihood, dim=0)
+
+
+    def get_expected_yaw(self, node):
+        if node.trajectory.shape[1] == 0:
+            return self.start_yaw
+        yaw = self.get_yaw_from_sine_cosine(node.trajectory[:, -1, :16])
+        # likelihood_for_average = torch.nn.functional.softmax(node.likelihoods, dim=0)
+        likelihood_for_average = self.normalize_likelihood(node.likelihoods)
+        yaw = (yaw * likelihood_for_average.to(yaw.device)).sum().item()
+        return yaw
+
     def get_yaw_from_sine_cosine(self, state):
-        sine = state[15]
-        cosine = state[14]
+        sine = state[:, 15]
+        cosine = state[:, 14]
         return torch.atan2(sine, cosine)
     
     def is_goal_reached(self, current, goal):
         self.iter += 1
-        if current.trajectory.shape[0] > 0:
-            yaw = self.get_yaw_from_sine_cosine(current.trajectory[-1, :16]).item()
-            print(self.iter, current.contact_sequence, yaw)
-            return yaw <= self.goal
-        else:
-            return False
+        # if current.trajectory.shape[0] > 0:
+        yaw = self.get_expected_yaw(current)
+        # yaw = current.trajectory[-1, 14].item()
+        print(self.iter, current.contact_sequence, yaw)
+        return yaw <= self.goal
         
     def convert_sine_cosine_to_yaw(self, xu):
         """
@@ -112,22 +163,19 @@ class GraphSearch(ContactSampler, AStar):
     def neighbors(self, node):
         neighbors = []
         cur_seq = list(node.contact_sequence)
-        if len(cur_seq) == self.max_depth:
+        max_depth = self.max_depth
+        if not self.initial_run:
+            max_depth += 1
+        if len(cur_seq) == max_depth:
             return neighbors
-        if node.trajectory.shape[0] == 0:
+        if node.trajectory.shape[1] == 0 and len(cur_seq) == 0:
             last_state = self.start
             samples, _, likelihood = self.model.sample(N=self.num_samples, start=last_state.reshape(1, -1),
                                     H=16, constraints=self.neighbors_c_states[:self.num_samples])
+            likelihood = likelihood.flatten()
             samples_orig = samples.clone()
             samples = self.convert_sine_cosine_to_yaw(samples)
             for i in range(1):
-                sample_range = torch.arange(i*self.num_samples, (i+1)*self.num_samples)
-                # top_likelihoods = torch.topk(likelihood[sample_range], k=self.num_samples//2, largest=True)
-                c_state = tuple(self.neighbors_c_states_orig[i].cpu().tolist())
-                mask, mask_no_z, mask_without_z = self.c_state_mask(c_state)
-                problem = self.problem_dict[c_state]
-                # sample_range_mask = samples[sample_range][top_likelihoods.indices][: , :, mask_without_z]
-                sample_range_mask = samples[sample_range][: , :, mask_without_z]
                 problem._preprocess(sample_range_mask, projected_diffusion=True)
                 J, _, _ = problem._objective(sample_range_mask)
                 g, _, _ = problem._con_eq(sample_range_mask, compute_grads=False, compute_hess=False, verbose=False, projected_diffusion=True)
@@ -137,27 +185,62 @@ class GraphSearch(ContactSampler, AStar):
                 if h is not None:
                     h = torch.relu(h)
                     constraint_val += h.sum(1)
-                min_violation_ind = torch.argmin(constraint_val)
-                cost = J[min_violation_ind].item()
+                sample_range = torch.arange(i*self.num_samples, (i+1)*self.num_samples)
+                # if likelihood[sample_range].max().item() < .5:
+                #     print('Skipping mode')
+                #     continue
+                # top_likelihoods = torch.topk(likelihood[sample_range], k=self.num_samples//2, largest=True)
+                c_state = tuple(self.neighbors_c_states_orig[i].cpu().tolist())
+                mask, mask_no_z, mask_without_z = self.c_state_mask(c_state)
+                problem = self.problem_dict[c_state]
+                # sample_range_mask = samples[sample_range][top_likelihoods.indices][: , :, mask_without_z]
+                sample_range_mask = samples[sample_range][: , :, mask_without_z]
+
+                # print(constraint_val)
+                # print(likelihood[sample_range].max().item())
+                # min_violation_ind = torch.argmax(likelihood[sample_range])
+                # min_violation_ind = torch.argmin(constraint_val)
+                # cost = J[min_violation_ind].item()
+                # cost is weighted average of J, where weight is likelihood (normalized)
+                # likelihood_for_average = torch.nn.functional.softmax(likelihood[sample_range], dim=0)
+                # likelihood = likelihood[sample_range][top_likelihoods.indices]
+                likelihood = -constraint_val
+                likelihood_for_average = self.normalize_likelihood(likelihood)
+                cost = (J * likelihood_for_average).sum().item()
+
                 # traj_this_step = samples[sample_range][top_likelihoods.indices][min_violation_ind]
-                traj_this_step = samples_orig[sample_range][min_violation_ind]
-                full_traj = torch.cat([node.trajectory, traj_this_step], dim=0)
-                neighbors.append(Node(trajectory=full_traj, cost=cost, contact_sequence=tuple(cur_seq + [c_state]), all_trajectory_samples=samples[sample_range].cpu()))
+                # traj_this_step = samples_orig[sample_range][min_violation_ind]
+                traj_this_step = samples_orig[sample_range]
+                
+                full_traj = torch.cat([node.trajectory, traj_this_step.cpu()], dim=1)
+                neighbors.append(Node(trajectory=full_traj, cost=cost, contact_sequence=tuple(cur_seq + [c_state]), likelihoods=likelihood[sample_range].cpu()))
             return neighbors
+        elif node.trajectory.shape[1] == 0:
+            last_state = self.start
+            last_state = last_state.reshape(1, -1).repeat(self.num_samples, 1)
         else:
-            last_state = node.trajectory[-1, :16]
-        samples, _, likelihood = self.model.sample(N=3*self.num_samples, start=last_state.reshape(1, -1),
-                                    H=16, constraints=self.neighbors_c_states[self.num_samples:])
+            # last_state = node.trajectory[-1, :15]
+            last_state = node.trajectory[:, -1, :16]
+        last_state = last_state.to(self.device)
+        samples, _, likelihood = self.model.sample(N=3*self.num_samples * self.num_samples_multi, start=last_state.reshape(self.num_samples, -1).repeat(3*self.num_samples_multi, 1),
+                                    H=16, constraints=self.neighbors_c_states[self.num_samples*self.num_samples_multi:])
+        likelihood = likelihood.flatten()
         samples_orig = samples.clone()
         samples = self.convert_sine_cosine_to_yaw(samples)
 
         for i in range(self.num_c_states - 1):
-            sample_range = torch.arange(i*self.num_samples, (i+1)*self.num_samples)
-            # top_likelihoods = torch.topk(likelihood[sample_range], k=self.num_samples//2, largest=True)
+            sample_range = torch.arange(i*(self.num_samples * self.num_samples_multi), (i+1)*(self.num_samples * self.num_samples_multi))
+            # if likelihood[sample_range].max().item() < .5:
+            #     print('Skipping mode')
+            #     continue
+            top_likelihoods = torch.topk(likelihood[sample_range], k=self.num_samples, largest=True)
+            top_samples = samples[sample_range][top_likelihoods.indices]
+            top_samples_orig = samples_orig[sample_range][top_likelihoods.indices]
+
             c_state = tuple(self.neighbors_c_states_orig[i+1].cpu().tolist())
             mask, mask_no_z, mask_without_z = self.c_state_mask(c_state)
             problem = self.problem_dict[c_state]
-            sample_range_mask = samples[sample_range][: , :, mask_without_z]
+            sample_range_mask = top_samples[: , :, mask_without_z]
             problem._preprocess(sample_range_mask, projected_diffusion=True)
             J, _, _ = problem._objective(sample_range_mask)
             g, _, _ = problem._con_eq(sample_range_mask, compute_grads=False, compute_hess=False, verbose=False, projected_diffusion=True)
@@ -167,11 +250,20 @@ class GraphSearch(ContactSampler, AStar):
             if h is not None:
                 h = torch.relu(h)
                 constraint_val += h.sum(1)
-            min_violation_ind = torch.argmin(constraint_val)
-            cost = J[min_violation_ind].item()
-            traj_this_step = samples_orig[sample_range][min_violation_ind]
-            full_traj = torch.cat([node.trajectory, traj_this_step], dim=0)
-            neighbors.append(Node(trajectory=full_traj, cost=cost, contact_sequence=tuple(cur_seq + [c_state]), all_trajectory_samples=samples[sample_range].cpu()))
+            # print(likelihood[sample_range].max().item())
+            # min_violation_ind = top_likelihoods.indices[0]
+            # min_violation_ind = torch.argmin(constraint_val)
+            # likelihood = likelihood[sample_range][top_likelihoods.indices]
+            likelihood = -constraint_val
+            likelihood_for_average = self.normalize_likelihood(likelihood)
+            cost = (J * likelihood_for_average).sum().item()
+            traj_this_step = top_samples_orig
+
+            prior_traj_indices = self.neighbors_c_states_indices[top_likelihoods.indices.cpu()]
+            # full_traj = torch.cat([node.trajectory, traj_this_step], dim=0)
+            old_traj = node.trajectory[prior_traj_indices]
+            full_traj = torch.cat([old_traj, traj_this_step.cpu()], dim=1)
+            neighbors.append(Node(trajectory=full_traj, cost=cost, contact_sequence=tuple(cur_seq + [c_state]), likelihoods=top_likelihoods.values.cpu()))
         return neighbors
 
     def distance_between(self, n1, n2):
@@ -179,9 +271,16 @@ class GraphSearch(ContactSampler, AStar):
 
     def heuristic_cost_estimate(self, current, goal):
         if current.trajectory.shape[0] == 0:
-            return self.heuristic_weight * .5 * torch.pi
-        yaw = self.get_yaw_from_sine_cosine(current.trajectory[-1, :16]).item()
-        return self.heuristic_weight * max(0, yaw - self.goal)
+            return self.heuristic_weight * max(0, self.start_yaw - self.goal)
+        c_seq = [((np.array(i) + 1) /2).sum().astype(int) for i in current.contact_sequence]
+        nll = -self.markov_chain.eval_log_prob(c_seq)
+        yaw = self.get_expected_yaw(current)
+        # yaw = current.trajectory[-1, 14].item()
+        # return self.heuristic_weight * max(0, yaw - self.goal)
+        return self.heuristic_weight * (nll * max(0, yaw - self.goal))
+        # return self.heuristic_weight * (nll)
+
+        # return self.heuristic_weight * max(0, yaw - self.goal)
 
     def c_state_mask(self, c_state):
         z_dim = self.problem_dict[c_state].dz

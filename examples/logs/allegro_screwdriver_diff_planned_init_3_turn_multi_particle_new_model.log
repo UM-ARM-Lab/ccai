@@ -1,0 +1,19 @@
+Importing module 'gym_38' (/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.3.1+cu118
+Device count 1
+/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+[Open3D INFO] Memory Statistics: (Device) (#Malloc) (#Free)
+[Open3D INFO] ---------------------------------------------
+[1;33m[Open3D WARNING] CPU:0: 30 21 --> 9 with 896 total bytes[0;m
+[1;33m[Open3D WARNING]     0x73e9d50 @ 64 bytes[0;m
+[1;33m[Open3D WARNING]     0x73e6f90 @ 64 bytes[0;m
+[1;33m[Open3D WARNING]     0x73bf0f0 @ 128 bytes[0;m
+[1;33m[Open3D WARNING]     0x73c06f0 @ 128 bytes[0;m
+[1;33m[Open3D WARNING]     0x73e9220 @ 64 bytes[0;m
+[1;33m[Open3D WARNING]     0x73e8450 @ 64 bytes[0;m
+[1;33m[Open3D WARNING]     0x73d4360 @ 128 bytes[0;m
+[1;33m[Open3D WARNING]     0x73bdeb0 @ 128 bytes[0;m
+[1;33m[Open3D WARNING]     0x73ae480 @ 128 bytes[0;m
+[Open3D INFO] ---------------------------------------------

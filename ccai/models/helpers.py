@@ -6,7 +6,15 @@ import torch.nn.functional as F
 import einops
 from einops.layers.torch import Rearrange
 import pdb
+class Mish(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.tanh = nn.Tanh()
+        self.softplus = nn.Softplus()
 
+    def forward(self, x):
+        return x * self.tanh(self.softplus(x))
+#Mish = nn.Mish
 
 # -----------------------------------------------------------------------------#
 # ---------------------------------- modules ----------------------------------#

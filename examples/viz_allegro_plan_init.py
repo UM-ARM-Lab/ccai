@@ -555,18 +555,18 @@ def do_trial(trial_ind, env, data_saved, params, fpath, sim_viz_env=None, ros_co
         initial_samples = None
         sim_rollouts = None
 
-        initial_samples = data_saved[15]['inits'][stage][..., inds]
-        initial_samples = torch.tensor(initial_samples, device=params['device'])
-        for sample_ind in range(params['N']):
-            init_traj_for_viz = initial_samples[sample_ind][:, :planner.problem.dx]
+        # initial_samples = data_saved[15]['inits'][stage][..., inds]
+        # initial_samples = torch.tensor(initial_samples, device=params['device'])
+        # for sample_ind in range(params['N']):
+        #     init_traj_for_viz = initial_samples[sample_ind][:, :planner.problem.dx]
 
-            tmp = torch.zeros((init_traj_for_viz.shape[0], 1),
-                                device=initial_samples.device)  # add the joint for the screwdriver cap
-            init_traj_for_viz = torch.cat((init_traj_for_viz, tmp), dim=1)
-            # traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof] = axis_angle_to_euler(traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof])
+        #     tmp = torch.zeros((init_traj_for_viz.shape[0], 1),
+        #                         device=initial_samples.device)  # add the joint for the screwdriver cap
+        #     init_traj_for_viz = torch.cat((init_traj_for_viz, tmp), dim=1)
+        #     # traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof] = axis_angle_to_euler(traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof])
 
-            visualize_trajectory_wrapper(init_traj_for_viz, turn_problem.contact_scenes, fname,
-                                    'init', sample_ind, turn_problem.fingers, turn_problem.obj_dof, 0)
+        #     visualize_trajectory_wrapper(init_traj_for_viz, turn_problem.contact_scenes, fname,
+        #                             'init', sample_ind, turn_problem.fingers, turn_problem.obj_dof, 0)
 
         state = env.get_state()
         state = state['q'].reshape(-1).to(device=params['device'])
@@ -610,18 +610,18 @@ def do_trial(trial_ind, env, data_saved, params, fpath, sim_viz_env=None, ros_co
                                  axes, env, sim=sim, gym=gym, viewer=viewer,
                                  config=params, state2ee_pos_func=state2ee_pos,
                                  show_force=(planner == turn_planner and params['optimize_force']))
-            if k == 0:
-                for sample_ind in range(params['N']):
+            # if k == 0:
+            #     for sample_ind in range(params['N']):
 
-                    traj_for_viz = plans[sample_ind][:, :planner.problem.dx]
+            #         traj_for_viz = plans[sample_ind][:, :planner.problem.dx]
 
-                    tmp = torch.zeros((traj_for_viz.shape[0], 1),
-                                        device=best_traj.device)  # add the joint for the screwdriver cap
-                    traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
-                    # traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof] = axis_angle_to_euler(traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof])
+            #         tmp = torch.zeros((traj_for_viz.shape[0], 1),
+            #                             device=best_traj.device)  # add the joint for the screwdriver cap
+            #         traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
+            #         # traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof] = axis_angle_to_euler(traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof])
 
-                    visualize_trajectory_wrapper(traj_for_viz, turn_problem.contact_scenes, fname,
-                                            'plan', sample_ind, turn_problem.fingers, turn_problem.obj_dof, k)
+            #         visualize_trajectory_wrapper(traj_for_viz, turn_problem.contact_scenes, fname,
+            #                                 'plan', sample_ind, turn_problem.fingers, turn_problem.obj_dof, k)
 
             # env.step(action.to(device=env.device))
 
@@ -709,7 +709,7 @@ def do_trial(trial_ind, env, data_saved, params, fpath, sim_viz_env=None, ros_co
             perm = [0, 1]
             contact_sequence += [contact_options[perm[0]], contact_options[perm[1]], 'turn']
     else:
-        with open(f'{fpath}/contact_planning.pkl', 'rb') as f:
+        with open(f'{fpath}/contact_planning_8.pkl', 'rb') as f:
             contact_node_sequence, _, _, _ = pkl.load(f)
         last_node = contact_node_sequence[-1]
 

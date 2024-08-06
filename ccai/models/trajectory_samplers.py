@@ -168,9 +168,11 @@ class TrajectoryDiffusionModel(nn.Module):
         if start is not None:
             condition[time_index] = [0, start]
         if goal is not None:
-            condition[-1] = [8, goal]
+            g = torch.stack((torch.cos(goal), torch.sin(goal)), dim=1).reshape(-1, 2)
+            condition[H - 1] = [14, g]
         if condition == {}:
             condition = None
+
         samples = self.diffusion_model.sample(N=N, H=H, context=context, condition=condition)  # .reshape(-1, H#,
         #         self.dx + self.du)
         return samples
@@ -181,9 +183,12 @@ class TrajectoryDiffusionModel(nn.Module):
             context = torch.cat((start, goal, constraints), dim=1)
         else:
             context = constraints
-
         # context=None
-        return self.diffusion_model.loss(trajectories.reshape(B, -1), context=context, mask=mask).mean()
+        return self.diffusion_model.loss(trajectories, context=context, mask=mask).mean()
+
+    def classifier_loss(self, trajectories, mask=None, context=None, label=None):
+        return self.diffusion_model.classifier_loss(trajectories, context=context, mask=mask, label=label)
+
 
     def set_norm_constants(self, x_mu, x_std):
         self.diffusion_model.set_norm_constants(x_mu, x_std)
@@ -297,7 +302,17 @@ class TrajectorySampler(nn.Module):
             norm_past = past
 
         samples = self.model.sample(N, H, norm_start, goal, constraints, norm_past)
-        x, c, likelihood = samples
+        if len(samples) == N:
+            x = samples
+            c = None
+            likelihood = None
+        elif len(samples) == 2:
+            x = samples[0]
+            c = None
+            likelihood = samples[1]
+        else:
+            x, c, likelihood = samples
+            
         if self.type != 'latent_diffusion':
             return x * self.x_std + self.x_mean, c, likelihood
         else:
