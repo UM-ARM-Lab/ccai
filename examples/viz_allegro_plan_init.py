@@ -585,31 +585,31 @@ def do_trial(trial_ind, env, data_saved, params, fpath, sim_viz_env=None, ros_co
         }
         plans = None
         resample = params.get('diffusion_resample', False)
-        for k in range(planner.problem.T):  # range(params['num_steps']):
-            state = env.get_state()
-            state = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
-            state = state[:planner.problem.dx]
+        # for k in range(planner.problem.T):  # range(params['num_steps']):
+        #     state = env.get_state()
+        #     state = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
+        #     state = state[:planner.problem.dx]
 
-            # s = time.time()
-            # best_traj, plans = planner.step(state)
-            plans = data_saved[planner.problem.T - k]['plans'][stage][..., inds_plans]
-            plans = torch.tensor(plans)
-            best_traj = plans[0]
-            # print('Solve time for step', time.time() - s)
-            planned_trajectories.append(plans)
-            optimizer_paths.append(copy.deepcopy(planner.path))
-            N, T, _ = plans.shape
+        #     # s = time.time()
+        #     # best_traj, plans = planner.step(state)
+        #     plans = data_saved[planner.problem.T - k]['plans'][stage][..., inds_plans]
+        #     plans = torch.tensor(plans)
+        #     best_traj = plans[0]
+        #     # print('Solve time for step', time.time() - s)
+        #     planned_trajectories.append(plans)
+        #     optimizer_paths.append(copy.deepcopy(planner.path))
+        #     N, T, _ = plans.shape
 
-            # execute the action
-            action = best_traj[0, planner.problem.dx:planner.problem.dx + planner.problem.du]
-            state = env.get_state()
-            state = state['q'].reshape(-1).cpu()#.to(device=params['device'])
+        #     # execute the action
+        #     action = best_traj[0, planner.problem.dx:planner.problem.dx + planner.problem.du]
+        #     state = env.get_state()
+        #     state = state['q'].reshape(-1).cpu()#.to(device=params['device'])
 
-            if params['visualize'] and best_traj.shape[0] > 1 and False:
-                add_trajectories(plans.to(device=env.device), best_traj.to(device=env.device),
-                                 axes, env, sim=sim, gym=gym, viewer=viewer,
-                                 config=params, state2ee_pos_func=state2ee_pos,
-                                 show_force=(planner == turn_planner and params['optimize_force']))
+        #     if params['visualize'] and best_traj.shape[0] > 1 and False:
+        #         add_trajectories(plans.to(device=env.device), best_traj.to(device=env.device),
+        #                          axes, env, sim=sim, gym=gym, viewer=viewer,
+        #                          config=params, state2ee_pos_func=state2ee_pos,
+        #                          show_force=(planner == turn_planner and params['optimize_force']))
             # if k == 0:
             #     for sample_ind in range(params['N']):
 
@@ -636,19 +636,19 @@ def do_trial(trial_ind, env, data_saved, params, fpath, sim_viz_env=None, ros_co
             # print(distance2goal)
             # info = {**equality_constr_dict, **inequality_constr_dict, **{'distance2goal': distance2goal}}
             # info_list.append(info)
-            if params['visualize'] and False:
-                gym.clear_lines(viewer)
-                state = env.get_state()
-                start = state['q'][:, :4 * num_fingers + obj_dof].squeeze(0).to(device=params['device'])
-                for finger in params['fingers']:
-                    ee = state2ee_pos(start[:4 * num_fingers], turn_problem.ee_names[finger])
-                    finger_traj_history[finger].append(ee.detach().cpu().numpy())
-                for finger in params['fingers']:
-                    traj_history = finger_traj_history[finger]
-                    temp_for_plot = np.stack(traj_history, axis=0)
-                    if k >= 2:
-                        axes[finger].plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray',
-                                            label='actual')
+            # if params['visualize'] and False:
+            #     gym.clear_lines(viewer)
+            #     state = env.get_state()
+            #     start = state['q'][:, :4 * num_fingers + obj_dof].squeeze(0).to(device=params['device'])
+            #     for finger in params['fingers']:
+            #         ee = state2ee_pos(start[:4 * num_fingers], turn_problem.ee_names[finger])
+            #         finger_traj_history[finger].append(ee.detach().cpu().numpy())
+            #     for finger in params['fingers']:
+            #         traj_history = finger_traj_history[finger]
+            #         temp_for_plot = np.stack(traj_history, axis=0)
+            #         if k >= 2:
+            #             axes[finger].plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray',
+            #                                 label='actual')
 
         # actual_trajectory.append(env.get_state()['q'].reshape(9).to(device=params['device']))
         actual_trajectory = torch.tensor([])
@@ -690,6 +690,17 @@ def do_trial(trial_ind, env, data_saved, params, fpath, sim_viz_env=None, ros_co
             data[t]['contact_distance'].append(contact_distance[t])
             data[t]['contact_state'].append(contact_state)
 
+    def convert_sine_cosine_to_yaw(xu):
+        """
+        xu is shape (N, T, 37)
+        Replace the sine and cosine in xu with yaw and return the new xu
+        """
+        sine = xu[..., 15]
+        cosine = xu[..., 14]
+        yaw = torch.atan2(sine, cosine)
+        xu_new = torch.cat([xu[..., :14], yaw.unsqueeze(-1), xu[..., 16:]], dim=-1)
+        return xu_new
+
     state = env.get_state()
 
     contact_label_to_vec = {'pregrasp': 0,
@@ -717,7 +728,7 @@ def do_trial(trial_ind, env, data_saved, params, fpath, sim_viz_env=None, ros_co
         contact_sequence = (contact_sequence + 1)/2
         contact_sequence = [contact_vec_to_label[int(contact_sequence[i].sum())] for i in range(contact_sequence.shape[0])]
 
-        traj = last_node.trajectory.reshape(len(contact_sequence), -1, 36)
+        traj = convert_sine_cosine_to_yaw(last_node.trajectory)[0].reshape(len(contact_sequence), -1, 36)
         for stage in range(len(contact_sequence)):
             contact = -torch.ones(params['N'], 3).to(device=params['device'])
             mode = contact_sequence[stage]
@@ -938,7 +949,10 @@ if __name__ == "__main__":
         for controller in config['controllers'].keys():
             env.reset()
             fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_{i + 1}')
-            data_saved = pkl.load(open(f"{fpath}/traj_data.p", "rb"))
+            try:
+                data_saved = pkl.load(open(f"{fpath}/traj_data.p", "rb"))
+            except:
+                data_saved = None
             # set up params
             params = config.copy()
             params.pop('controllers')

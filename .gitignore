@@ -5,3 +5,4 @@ venv/
 ccai.egg-info/
 data/
 notebooks/diff_gif_imgs/*
+*.pt

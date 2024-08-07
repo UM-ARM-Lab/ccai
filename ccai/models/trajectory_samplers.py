@@ -302,11 +302,11 @@ class TrajectorySampler(nn.Module):
             norm_past = past
 
         samples = self.model.sample(N, H, norm_start, goal, constraints, norm_past)
-        if len(samples) == N:
-            x = samples
-            c = None
-            likelihood = None
-        elif len(samples) == 2:
+        # if len(samples) == N:
+        #     x = samples
+        #     c = None
+        #     likelihood = None
+        if len(samples) == 2:
             x = samples[0]
             c = None
             likelihood = samples[1]
