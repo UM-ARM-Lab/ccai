@@ -128,6 +128,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                  obj_ori_rep='euler',
                  obj_joint_dim=0,
                  optimize_force=False,
+                 turn=False,
                  device='cuda:0', **kwargs):
         super(AllegroScrewdriver, self).__init__(start=start, goal=goal, T=T, chain=chain,
                                                  object_location=object_location,
@@ -138,7 +139,8 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                                                  friction_coefficient=friction_coefficient,
                                                  obj_dof=obj_dof,
                                                  obj_ori_rep=obj_ori_rep, obj_joint_dim=1,
-                                                 optimize_force=optimize_force, device=device)
+                                                 optimize_force=optimize_force, device=device,
+                                                 turn=turn)
         self.friction_coefficient = friction_coefficient
 
     def _cost(self, xu, start, goal):
@@ -260,7 +262,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             obj_dof=obj_dof,
             obj_joint_dim=1,
             optimize_force=params['optimize_force'],
-            default_dof_pos=env.default_dof_pos[:, :16]
+            default_dof_pos=env.default_dof_pos[:, :16],
+            turn=True
         )
         pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
         index_regrasp_planner = PositionControlConstrainedSVGDMPC(index_regrasp_problem, params)
@@ -690,8 +693,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             print(_contact)
             mcts = DiffusionMCTS(state, trajectory_sampler, max_depth=num_stages - stage,
                                  num_evals=250, exploration_weight=1.0,
-                                 prev_action=_contact)
+                                 prev_action=_contact, prior=params.get('prior_enum', 0))
+            time_before = time.perf_counter()
             contact = mcts.plan(n_rollouts=25, goal=valve_goal[-1]) # next contact mode
+            print('MCTS time', time.perf_counter() - time_before)
             contact = _contact_list[contact]
         else:
             contact = contact_sequence[stage]
@@ -794,7 +799,8 @@ if __name__ == "__main__":
                                            steps_per_action=60,
                                            friction_coefficient=config['friction_coefficient'] * 1.05,
                                            # friction_coefficient=1.0,  # DEBUG ONLY, set the friction very high
-                                           device=config['sim_device'],
+                                        #    device=config['sim_device'],
+                                           device='cpu',
                                            video_save_path=img_save_dir,
                                            joint_stiffness=config['kp'],
                                            fingers=config['fingers'],

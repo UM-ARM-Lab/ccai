@@ -403,6 +403,8 @@ if __name__ == "__main__":
         train_dataset.compute_norm_constants()
         model.set_norm_constants(*train_dataset.get_norm_constants())
 
+    print('Dset size', len(train_dataset))
+    
     print(train_dataset.mean)
     train_sampler = RandomSampler(train_dataset)
     #train_sampler = None

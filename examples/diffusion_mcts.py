@@ -20,7 +20,7 @@ CHILDREN = {
 }
 
 class Node:
-    def __init__(self, state, sampler, max_depth=10, num_evals=10, prev_action=None, goal=None):
+    def __init__(self, state, sampler, max_depth=10, num_evals=10, prev_action=None, goal=None, prior_enum=0):
         # state is action history
         self.state = state
         self.max_depth = max_depth
@@ -29,6 +29,7 @@ class Node:
         self.children = None
         self.prev_action = prev_action
         self.goal = goal
+        self.prior_enum = prior_enum
 
     def is_terminal(self):
         # terminates once max depth is reached
@@ -47,12 +48,29 @@ class Node:
             contact_sequence = torch.stack(contact_sequence, dim=1).reshape(1, -1, 3).to(initial_x.device).repeat(self.N,
                                                                                                                   1,
                                                                                                                   1)
-        transition_d = torch.tensor([
-            [0.0, 0.2, 0.2, 0.6],
-            [0.0, 0.1, 0.4, 0.5],
-            [0.0, 0.4, 0.1, 0.5],
-            [0.0, 0.45, 0.45, 0.1]
-        ])
+        if self.prior_enum == 0:
+            transition_d = torch.tensor([
+                [0.0, 0.2, 0.2, 0.6],
+                [0.0, 0.1, 0.4, 0.5],
+                [0.0, 0.4, 0.1, 0.5],
+                [0.0, 0.45, 0.45, 0.1]
+            ])
+        elif self.prior_enum == 1:
+            transition_d = torch.tensor([
+                [0.0, 0.2, 0.2, 0.6],
+                [0.0, 0.1, 0.3, 0.6],
+                [0.0, 0.3, 0.1, 0.6],
+                [0.0, 0.45, 0.45, 0.1]
+            ])
+        elif self.prior_enum == 2:
+            transition_d = torch.tensor([
+                [0.0, 0.1, 0.1, 0.8],
+                [0.0, 0.1, 0.45, 0.45],
+                [0.0, 0.45, 0.1, 0.45],
+                [0.0, 0.45, 0.45, 0.1]
+            ])
+        else:
+            raise ValueError("Invalid prior enum")
         prior_ll = torch.zeros(1, device=initial_x.device)
         discount_factor = 0.9
         k = 0
@@ -166,7 +184,7 @@ class Node:
         else:
             viable_actions = CHILDREN[self.state[-1]]
 
-        return {Node(self.state + [i], self.sampler, self.max_depth, self.N, goal=self.goal, prev_action=self.prev_action) for i in viable_actions}
+        return {Node(self.state + [i], self.sampler, self.max_depth, self.N, goal=self.goal, prev_action=self.prev_action, prior_enum=self.prior_enum) for i in viable_actions}
 
     def __eq__(self, other):
         return self.state == other.state
@@ -183,7 +201,7 @@ class DiffusionMCTS:
         Monte Carlo Tree Search with Diffusion Model as transition model
     """
 
-    def __init__(self, initial_x, sampler, prev_action=None, exploration_weight=1.0, max_depth=5, num_evals=100):
+    def __init__(self, initial_x, sampler, prev_action=None, exploration_weight=1.0, max_depth=5, num_evals=100, prior_enum=0):
 
         self.Q = defaultdict(int)  # total action value
         self.N = defaultdict(int)
@@ -194,6 +212,7 @@ class DiffusionMCTS:
         self.exploration_weight = exploration_weight
         self.num_evals = num_evals
         self.prev_action = prev_action
+        self.prior_enum = prior_enum
 
     def do_rollout(self, node):
         """ Improve the tree with one iteration of MCTS """
@@ -283,7 +302,7 @@ class DiffusionMCTS:
         # starting node
         node = Node([], self.sampler, max_depth=self.max_depth,
                     num_evals=self.num_evals, prev_action=self.prev_action,
-                    goal=goal)
+                    goal=goal, prior_enum=prior_enum)
         for i in range(n_rollouts):
             self.do_rollout(node)
             if (i + 1) % 10 == 0:
@@ -315,7 +334,7 @@ if __name__ == "__main__":
 
     # let's check the best plan has a good evaluation
     def eval_plan(plan):
-        best_node = Node(plan, trajectory_sampler, max_depth=5, num_evals=100)
+        best_node = Node(plan, trajectory_sampler, max_depth=5, num_evals=100, prior_enum=prior_enum)
         return best_node.evaluate(initial_x)
 
 

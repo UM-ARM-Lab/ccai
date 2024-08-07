@@ -188,6 +188,13 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                 'ring': [6, 7, 8],
                 'thumb': [9, 10, 11]
             }
+
+            self.contact_force_indices_dict = {
+                'index': [0, 1, 2],
+                'middle': [3, 4, 5],
+                'thumb': [6, 7, 8]
+            }
+
             self._contact_force_indices = [self._contact_force_indices_dict[finger] for finger in contact_fingers]
             self._contact_force_indices = list(itertools.chain.from_iterable(self._contact_force_indices))
             self.contact_force_indices = [32 + self.obj_dof + idx for idx in self._contact_force_indices]
@@ -553,6 +560,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         """
 
         u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
+        # u[...,]
 
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
         for t in range(self.T):
@@ -816,8 +824,10 @@ class AllegroContactProblem(AllegroObjectProblem):
                  obj_ori_rep='euler',
                  obj_joint_dim=0,
                  optimize_force=False,
+                 turn=False,
                  device='cuda:0', **kwargs):
         self.optimize_force = optimize_force
+        self.turn = turn
         self.num_contacts = len(contact_fingers)
         self.contact_fingers = contact_fingers
         num_fingers = self.num_contacts + len(regrasp_fingers)
@@ -881,6 +891,12 @@ class AllegroContactProblem(AllegroObjectProblem):
         """
 
         u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
+        if self.optimize_force and self.turn:
+            print(self.regrasp_fingers, self.contact_fingers)
+            for i, finger in enumerate(self.contact_fingers):
+                if finger != 'index':
+                    idx = self.contact_force_indices_dict[finger]
+                    u[..., idx] = 1.5
 
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
         for t in range(self.T):
@@ -1693,6 +1709,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                  obj_ori_rep='euler',
                  obj_joint_dim=0,
                  optimize_force=False,
+                 turn=False,
                  device='cuda:0', **kwargs):
 
         # super(AllegroManipulationProblem, self).__init__(start=start, goal=goal, T=T, chain=chain,
@@ -1712,6 +1729,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                                        friction_coefficient=friction_coefficient, obj_dof=obj_dof,
                                        obj_ori_rep=obj_ori_rep, obj_joint_dim=obj_joint_dim,
                                        optimize_force=optimize_force, device=device,
+                                       turn=turn,
                                        **kwargs)
 
         AllegroRegraspProblem.__init__(self, start=start, goal=goal, T=T, chain=chain,
@@ -1722,6 +1740,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                                        obj_dof=obj_dof,
                                        obj_ori_rep=obj_ori_rep, obj_joint_dim=obj_joint_dim,
                                        device=device, optimize_force=optimize_force, moveable_object=moveable_object,
+                                       turn=turn,
                                        **kwargs)
         self.dg, self.dz, self.dh = 0, 0, 0
         if self.num_regrasps > 0:
