@@ -5,7 +5,7 @@ num_steps: 15
 num_turns: 3
 num_trials: 10
 visualize: True
-experiment_name: 'allegro_screwdriver_diffusion_planned_initialization_3_turn_multi-particle_new_model_less_turn_softmax'
+experiment_name: 'allegro_screwdriver_diffusion_planned_initialization_3_turn_multi-particle_new_model_less_turn_replan_softmax'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
@@ -14,12 +14,12 @@ object_type: 'screwdriver'
 sim_device: 'cuda:0'
 friction_coefficient: 1.0
 kp: 3.0
-heuristic: 333
+heuristic: 1000
 max_depth: 11
 goal: -1.5
 prior: 1
 multi_particle_search: True
-replan: False
+replan: True
 visualize_plan: False
 optimize_force: True
 exclude_index: False

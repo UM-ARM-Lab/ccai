@@ -415,4 +415,5 @@ class UnetClassifier(nn.Module):
         x = self.mid_block3(x, t)
         x = self.mid_block4(x, t)
         x = self.pooling(x).reshape(B, -1)
+        
         return self.output_act_fn(self.output_layer(x))

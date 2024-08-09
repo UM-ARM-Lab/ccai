@@ -125,8 +125,8 @@ class GraphSearch(ContactSampler, AStar):
         self.discount = .9
 
     def normalize_likelihood(self, likelihood):
-        # return torch.nn.functional.softmax(likelihood/.001, dim=0)
-        return likelihood / likelihood.sum()
+        return torch.nn.functional.softmax(likelihood, dim=0)
+        # return likelihood / likelihood.sum()
 
     def get_expected_yaw(self, node):
         if node.trajectory.shape[1] == 0:
@@ -188,6 +188,7 @@ class GraphSearch(ContactSampler, AStar):
                                     H=16, constraints=self.neighbors_c_states[:self.num_samples])
             if likelihood is not None:
                 likelihood = likelihood.flatten()
+                likelihood = torch.log(likelihood / (1 - likelihood))
             samples_orig = samples.clone()
             samples = self.convert_sine_cosine_to_yaw(samples)
             for i in range(1):

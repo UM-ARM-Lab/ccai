@@ -944,7 +944,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         # else:
         # contact = contact_sequence[stage]
-        if sample_contact:
+        if sample_contact and (stage == 0 or params['replan']):
             new_contact_sequence, new_next_node = plan_contacts(state, num_stages - stage, next_node, params['multi_particle_search'])
             if new_contact_sequence is not None and len(new_contact_sequence) == 0:
                 print('Planner thinks task is complete')
@@ -973,8 +973,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     next_node = (-1, -1, -1)
             print(contact_sequence)
             # return -1
-
-            contact = contact_sequence[0]
+            contact = contact_sequence[0]  
+        elif stage >= len(contact_sequence):
+            print('Planner thinks task is complete')
+            break
         else:
             contact = contact_sequence[stage]
         executed_contacts.append(contact)
@@ -1149,7 +1151,7 @@ if __name__ == "__main__":
                 inits_noise = inits_noise[:, :, 0, :, :]
             if len(noise_noise.shape) == 6:
                 noise_noise = noise_noise[:, :, :, 0, :, :]
-    start_ind = 3 if not config['sample_contact'] else 0
+    start_ind = 0 if not config['sample_contact'] else 0
     for i in tqdm(range(start_ind, config['num_trials'])):
     # for i in tqdm(range(0, 7)):
         
