@@ -20,6 +20,8 @@ from torch.func import vmap, jacrev, hessian, jacfwd
 # import pytorch3d.transforms as tf
 
 import matplotlib.pyplot as plt
+import sys
+sys.path.append('..')
 from utils.allegro_utils import *
 # from allegro_valve_roll import AllegroValveTurning, AllegroContactProblem, PositionControlConstrainedSVGDMPC, \
 #    add_trajectories, add_trajectories_hardware
