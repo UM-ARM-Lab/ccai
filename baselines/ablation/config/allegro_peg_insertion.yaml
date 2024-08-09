@@ -24,7 +24,7 @@ controllers:
     step_size: 0.1
     momentum: 0.
     device: 'cpu'
-    online_iters: 40
+    online_iters: 50
     warmup_iters: 300
     resample_steps: 1
     resample_sigma: 0.01
