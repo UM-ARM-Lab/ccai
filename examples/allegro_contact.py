@@ -880,7 +880,7 @@ class AllegroContactProblem(AllegroObjectProblem):
             # self.dg_per_t = self.num_fingers * (1 + 3 + 2)
         self._contact_dg_constant = 0
         self._contact_dg = self._contact_dg_per_t * T + self._contact_dg_constant  # terminal contact points, terminal sdf=0, and dynamics
-        self._contact_dz = 2 * (self.friction_polytope_k) * self.num_contacts  # one friction constraints per finger
+        self._contact_dz = 1 * (self.friction_polytope_k) * self.num_contacts  # one friction constraints per finger
         self._contact_dh = self._contact_dz * T  # inequality
 
     def get_initial_xu(self, N):
@@ -906,9 +906,9 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         # if valve angle in state
         if self.dx == (4 * self.num_fingers + self.obj_dof):
-            theta = np.linspace(self.start[-self.obj_dof:].cpu().numpy(), self.goal.cpu().numpy(), self.T + 1)[:-1]
-            theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
-            theta = theta.unsqueeze(0).repeat((N, 1, 1))
+            # theta = np.linspace(self.start[-self.obj_dof:].cpu().numpy(), self.goal.cpu().numpy(), self.T + 1)[:-1]
+            # theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
+            # theta = theta.unsqueeze(0).repeat((N, 1, 1))
             # theta = self.start[-self.obj_dof:].unsqueeze(0).repeat((N, self.T, 1))
             theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
             x = torch.cat((x, theta), dim=-1)
@@ -1070,7 +1070,6 @@ class AllegroContactProblem(AllegroObjectProblem):
             return g.reshape(N, -1), grad_g.reshape(N, -1, T * d), None
 
     def _force_equlibrium_constr_w_force(self, q, u, next_q, force_list, contact_jac_list, contact_point_list):
-        # NOTE: the constriant is defined in the robot frame
         # NOTE: the constriant is defined in the robot frame
         # the contact jac an contact points are all in the robot frame
         # this will be vmapped, so takes in a 3 vector and a [num_finger x 3 x 8] jacobian and a dq vector
@@ -1449,15 +1448,8 @@ class AllegroContactProblem(AllegroObjectProblem):
         B = self.get_friction_polytope().detach()
 
         # compute contact point velocity in contact frame
-        if False:  # self.optimize_force:
-            # here dq means the force in the world frame
-            contact_v_contact_frame = R.transpose(0, 1) @ dq
-        else:
-            contact_v_contact_frame = R.transpose(0, 1) @ self.world_trans.transform_normals(
-                (contact_jacobian @ dq).unsqueeze(0)).squeeze(0)
-        # TODO: there are two different ways of doing a friction cone
-        # Linearized friction cone - but based on the contact point velocity
-        # force is defined as the force of robot pushing the object
+        # here dq means the force in the world frame
+        contact_v_contact_frame = R.transpose(0, 1) @ dq
         return B @ contact_v_contact_frame
 
     def _friction_constr(self, dq, contact_normal, contact_jacobian, use_force=False):
@@ -1591,24 +1583,37 @@ class AllegroContactProblem(AllegroObjectProblem):
         delta_q = xu[:, :, self.num_fingers * 4 + self.obj_dof:self.num_fingers * 8 + self.obj_dof]
         q = partial_to_full_state(q, fingers=self.fingers)
         delta_q = partial_to_full_state(delta_q, fingers=self.fingers)
-        force = None
-        h, grad_h, hess_h = self._friction_constraint(
-            q=q, delta_q=delta_q, force=None,
-            compute_grads=compute_grads,
-            compute_hess=compute_hess)
 
-        if self.optimize_force:
-            force = torch.zeros(N, T, 12, device=self.device)
-            force[:, :, self._contact_force_indices] = xu[:, :, -self.num_contacts * 3:]
-            h2, grad_h2, hess_h2 = self._friction_constraint(
-                q=q, delta_q=delta_q,
-                compute_grads=compute_grads,
-                compute_hess=compute_hess)
-            h = torch.cat((h, h2), dim=1)
-            if grad_h is not None:
-                grad_h = torch.cat((grad_h, grad_h2), dim=1)
-            if hess_h is not None:
-                hess_h = torch.cat((hess_h, hess_h2), dim=1)
+        # "previous version of using only the approximated friction"
+        # force = None
+        # h, grad_h, hess_h = self._friction_constraint(
+        #     q=q, delta_q=delta_q, force=None,
+        #     compute_grads=compute_grads,
+        #     compute_hess=compute_hess)
+
+        # if self.optimize_force:
+        #     force = torch.zeros(N, T, 12, device=self.device)
+        #     force[:, :, self._contact_force_indices] = xu[:, :, -self.num_contacts * 3:]
+        #     h2, grad_h2, hess_h2 = self._friction_constraint(
+        #         q=q, delta_q=delta_q, 
+        #         compute_grads=compute_grads,
+        #         compute_hess=compute_hess)
+        #     h = torch.cat((h, h2), dim=1)
+        #     if grad_h is not None:
+        #         grad_h = torch.cat((grad_h, grad_h2), dim=1)
+        #     if hess_h is not None:
+        #         hess_h = torch.cat((hess_h, hess_h2), dim=1)
+
+        force = None
+        # if self.optimize_force:
+        #     force = torch.zeros(N, T, 12, device=self.device)
+        #     force[:, :, self._contact_force_indices] = xu[:, :, -self.num_contacts * 3:]
+        h, grad_h, hess_h = self._friction_constraint(
+        q=q, delta_q=delta_q, force=force,
+        compute_grads=compute_grads,
+        compute_hess=compute_hess)
+
+
 
         if verbose:
             print(f"max friction constraint: {torch.max(h)}")
