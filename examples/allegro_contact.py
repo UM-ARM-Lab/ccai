@@ -190,9 +190,9 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             }
 
             self.contact_force_indices_dict = {
-                'index': [0, 1, 2],
-                'middle': [3, 4, 5],
-                'thumb': [6, 7, 8]
+                'index': [-9, -8, -7],
+                'middle': [-6, -5, -4],
+                'thumb': [-3, -2, -1]
             }
 
             self._contact_force_indices = [self._contact_force_indices_dict[finger] for finger in contact_fingers]
@@ -892,11 +892,10 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
         if self.optimize_force and self.turn:
-            print(self.regrasp_fingers, self.contact_fingers)
             for i, finger in enumerate(self.contact_fingers):
                 if finger != 'index':
                     idx = self.contact_force_indices_dict[finger]
-                    u[..., idx] = 1.5
+                    u[..., idx] = 1.5 * torch.randn(N, self.T, 3, device=self.device)
 
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
         for t in range(self.T):

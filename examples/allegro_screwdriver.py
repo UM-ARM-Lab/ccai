@@ -212,6 +212,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             obj_dof=obj_dof,
             obj_joint_dim=1,
             optimize_force=params['optimize_force'],
+            default_dof_pos=env.default_dof_pos[:, :16]
         )
         # finger gate index
         index_regrasp_problem = AllegroScrewdriver(
@@ -799,11 +800,13 @@ if __name__ == "__main__":
                                            steps_per_action=60,
                                            friction_coefficient=config['friction_coefficient'] * 1.05,
                                            # friction_coefficient=1.0,  # DEBUG ONLY, set the friction very high
-                                        #    device=config['sim_device'],
-                                           device='cpu',
+                                           device=config['sim_device'],
                                            video_save_path=img_save_dir,
                                            joint_stiffness=config['kp'],
                                            fingers=config['fingers'],
+                                           gradual_control=True,
+                                           gravity=False, # For data generation only
+                                           randomize_screwdriver_start=config['randomize_screwdriver_start'],
                                            )
 
     sim, gym, viewer = env.get_sim()

@@ -3,19 +3,21 @@ T: 15
 receding_horizon: False
 num_steps: 15
 num_turns: 3
-num_trials: 160
+num_trials: 80
 visualize: True
-experiment_name: 'allegro_high_force_data'
+experiment_name: 'allegro_high_force_data_1'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
 object_type: 'screwdriver'
-sim_device: 'cuda:0'
+# sim_device: 'cuda:0'
+sim_device: 'cpu'
 friction_coefficient: 1.0
 kp: 3.0
 visualize_plan: False
 optimize_force: True
 exclude_index: False
+randomize_screwdriver_start: True
 controllers:
     csvgd:
         N: 16
@@ -23,9 +25,9 @@ controllers:
         alpha_C: 1
         step_size: 0.1
         momentum: 0.
-        device: 'cuda:0'
+        device: 'cuda:1'
         online_iters: 50
-        warmup_iters: 300
+        warmup_iters: 200
         resample_steps: 16
         resample_sigma: 0.01
         resample_temperature: 0.1
