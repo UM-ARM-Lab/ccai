@@ -643,7 +643,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                                             points_per_link=1000,
                                             partial_patch=False,
                                             )
-        # self.contact_scenes.visualize_robot(partial_to_full_state(self.start[:4*self.num_fingers], fingers=self.fingers), self.start[4*self.num_fingers:].to(self.device))
+        # self.viz_contact_scenes.visualize_robot(partial_to_full_state(self.start[:4*self.num_fingers], fingers=self.fingers), None)
 
 
     @all_finger_constraints

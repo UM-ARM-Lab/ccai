@@ -864,6 +864,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     info_list = []
 
     validity_flag = True
+    warmup_time = 0
 
     for k in range(params['num_steps']):
         state = env.get_state()
@@ -875,7 +876,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         best_traj, trajectories = turn_planner.step(start[:4 * num_fingers + obj_dof])
 
         solve_time = time.time() - start_time
-        if k >= 1:
+        if k == 0:
+            warmup_time = solve_time
+        else:
             duration += solve_time
         print(f"solve time: {solve_time}")
         planned_theta_traj = best_traj[:, 4 * num_fingers_to_plan: 4 * num_fingers_to_plan + obj_dof].detach().cpu().numpy()
@@ -1013,11 +1016,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             d2goal_pos=final_distance_to_goal_pos.item(),
             d2goal_ori=final_distance_to_goal_ori.item())
     env.reset()
-    ret = {'final_distance_to_goal_pos': final_distance_to_goal_pos.item(), 
+    ret = {
+    'final_distance_to_goal_pos': final_distance_to_goal_pos.item(), 
     'final_distance_to_goal_ori': final_distance_to_goal_ori.item(), 
     'contact_rate': contact_rate,
     'validity_flag': validity_flag,
-    'avg_online_time': duration / (params["num_steps"] - 1)}
+    'avg_online_time': duration / (params["num_steps"] - 1),
+    'warmup_time': warmup_time}
     
     return ret
 
@@ -1084,6 +1089,7 @@ if __name__ == "__main__":
         result[controller]['contact_rate'] = []
         result[controller]['validity_flag'] = []
         result[controller]['avg_online_time'] = []
+        result[controller]['warmup_time'] = []
 
     for i in tqdm(range(config['num_trials'])):
         goal = torch.tensor([0, 0, 0, 0, 0, 0])
@@ -1111,6 +1117,8 @@ if __name__ == "__main__":
             result[controller]['contact_rate'].append(ret['contact_rate'])
             result[controller]['validity_flag'].append(ret['validity_flag'])
             result[controller]['avg_online_time'].append(ret['avg_online_time'])
+            result[controller]['warmup_time'].append(ret['warmup_time'])
+
 
         print(result)
         for key in result[controller].keys():

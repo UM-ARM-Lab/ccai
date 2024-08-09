@@ -197,11 +197,11 @@ def do_trial(env, params, fpath):
             action = action.unsqueeze(0).repeat(params['N'], 1)
             # repeat the primary environment state to all the virtual environments        
             env.set_pose(prime_dof_state, semantic_order=False, zero_velocity=False)
+            solve_time = time.time() - start_time
             state = env.step(action)
 
             # if k < params['num_steps'] - 1:
             #     ctrl.change_horizon(ctrl.T - 1)
-            solve_time = time.time() - start_time
             if k >= 0:
                 duration += solve_time
             contacts = gym.get_env_rigid_contacts(env.envs[0])

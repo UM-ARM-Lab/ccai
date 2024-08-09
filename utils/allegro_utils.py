@@ -244,8 +244,8 @@ def check_peg_validity(peg_state):
     validity_flag = True
     if peg_state[0] < - 0.1 or peg_state[0] > 0.1:
         validity_flag = False
-    if peg_state[1] < -0.02 or peg_state[1] > 0.1:
-        validity_flag = False
+    # if peg_state[1] < -0.02 or peg_state[1] > 0.1:
+    #     validity_flag = False
     if peg_state[2] < 0.0 or peg_state[2] > 0.15:
         validity_flag = False
     return validity_flag
