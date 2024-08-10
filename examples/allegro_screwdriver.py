@@ -170,7 +170,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         pregrasp_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
             goal=pregrasp_params['valve_goal'] * 0,
-            T=1,
+            T=2,
             chain=pregrasp_params['chain'],
             device=pregrasp_params['device'],
             object_asset_pos=env.table_pose,
@@ -434,9 +434,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         state = state['q'].reshape(-1).to(device=params['device'])
         state = state[:planner.problem.dx]
         # print(params['T'], state.shape, initial_samples)
-        # planner.reset(state, T=params['T'], goal=goal, initial_x=initial_samples)
+        planner.reset(state, T=params['T'], goal=goal, initial_x=initial_samples)
         print(f"DEBUG, problem horizon: {planner.problem.T}")
-        planner.reset(state, T=planner.problem.T, goal=goal, initial_x=initial_samples)
+        # planner.reset(state, T=planner.problem.T, goal=goal, initial_x=initial_samples)
         planned_trajectories = []
         actual_trajectory = []
         contact_points = {
@@ -776,13 +776,13 @@ if __name__ == "__main__":
                                            use_cartesian_controller=False,
                                            viewer=config['visualize'],
                                            steps_per_action=60,
-                                           friction_coefficient=config['friction_coefficient'] * 1.05,
+                                           friction_coefficient=config['friction_coefficient'] * 2.5,
                                            # friction_coefficient=1.0,  # DEBUG ONLY, set the friction very high
                                            device=config['sim_device'],
                                            video_save_path=img_save_dir,
                                            joint_stiffness=config['kp'],
                                            fingers=config['fingers'],
-                                           gradual_control=True,
+                                           gradual_control=False,
                                            gravity=True, # For data generation only
                                            randomize_screwdriver_start=config['randomize_screwdriver_start'],
                                            )

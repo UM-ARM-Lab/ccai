@@ -1,7 +1,7 @@
 ---
-T: 15
+T: 12
 receding_horizon: False
-num_steps: 15
+num_steps: 12
 num_turns: 3
 num_trials: 80
 visualize: True
@@ -25,7 +25,7 @@ controllers:
         alpha_C: 1
         step_size: 0.1
         momentum: 0.
-        device: 'cuda:1'
+        device: 'cuda:0'
         online_iters: 50
         warmup_iters: 200
         resample_steps: 16
