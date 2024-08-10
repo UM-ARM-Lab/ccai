@@ -97,7 +97,9 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                  obj_joint_dim=0,
                  optimize_force=False,
                  turn=False,
+                 obj_gravity=False,
                  device='cuda:0', **kwargs):
+        self.obj_mass = 0.1
         super(AllegroScrewdriver, self).__init__(start=start, goal=goal, T=T, chain=chain,
                                                  object_location=object_location,
                                                  object_type=object_type, world_trans=world_trans,
@@ -108,7 +110,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                                                  obj_dof=obj_dof,
                                                  obj_ori_rep=obj_ori_rep, obj_joint_dim=1,
                                                  optimize_force=optimize_force, device=device,
-                                                 turn=turn)
+                                                 turn=turn, obj_gravity=obj_gravity)
         self.friction_coefficient = friction_coefficient
 
     def _cost(self, xu, start, goal):
@@ -120,7 +122,8 @@ class AllegroScrewdriver(AllegroManipulationProblem):
         upright_cost = 500 * torch.sum(
             (state[:, -self.obj_dof:-1]) ** 2)  # the screwdriver should only rotate in z direction
         return smoothness_cost + upright_cost + super()._cost(xu, start, goal)
-
+    
+    
 
 class IpoptScrewdriver(AllegroScrewdriver, IpoptProblem):
 
@@ -182,7 +185,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             obj_dof=obj_dof,
             obj_joint_dim=1,
             optimize_force=pregrasp_params['optimize_force'],
-            default_dof_pos=env.default_dof_pos[:, :16]
+            default_dof_pos=env.default_dof_pos[:, :16],
+            obj_gravity=pregrasp_params.get('obj_gravity', False),
         )
         # finger gate index
         index_regrasp_problem = AllegroScrewdriver(
@@ -200,7 +204,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             obj_dof=obj_dof,
             obj_joint_dim=1,
             optimize_force=params['optimize_force'],
-            default_dof_pos=env.default_dof_pos[:, :16]
+            default_dof_pos=env.default_dof_pos[:, :16],
+            obj_gravity=params.get('obj_gravity', False),
         )
         thumb_and_middle_regrasp_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
@@ -217,7 +222,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             obj_dof=obj_dof,
             obj_joint_dim=1,
             optimize_force=params['optimize_force'],
-            default_dof_pos=env.default_dof_pos[:, :16]
+            default_dof_pos=env.default_dof_pos[:, :16],
+            obj_gravity=params.get('obj_gravity', False),
         )
         turn_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
@@ -234,7 +240,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             obj_joint_dim=1,
             optimize_force=params['optimize_force'],
             default_dof_pos=env.default_dof_pos[:, :16],
-            turn=True
+            turn=True,
+            obj_gravity=params.get('obj_gravity', False),
         )
         pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
         index_regrasp_planner = PositionControlConstrainedSVGDMPC(index_regrasp_problem, params)
