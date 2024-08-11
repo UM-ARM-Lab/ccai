@@ -548,8 +548,9 @@ class GaussianDiffusion(nn.Module):
         return loss.mean()
 
     def loss(self, x, context, mask=None):
+        # print('x shape', x.shape, self.dx, self.xu_dim)
         b = x.shape[0]
-        x = x[:, :, :self.dx]
+        # x = x[:, :, :self.dx]
         x = x.reshape(b, -1, self.xu_dim)
         device = x.device
         t = torch.randint(0, self.num_timesteps, (b,), device=device).long()

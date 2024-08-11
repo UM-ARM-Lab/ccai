@@ -366,17 +366,18 @@ if __name__ == "__main__":
     else:
         dcontext = 0
 
-    env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
-                                       use_cartesian_controller=False,
-                                       viewer=True,
-                                       steps_per_action=60,
-                                       friction_coefficient=1.05,
-                                       # friction_coefficient=1.0,  # DEBUG ONLY, set the friction very high
-                                       device=config['device'],
-                                       video_save_path=f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}',
-                                       joint_stiffness=3,
-                                       fingers=['index', 'middle', 'thumb'],
-                                       )
+    env = None
+    # env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
+    #                                    use_cartesian_controller=False,
+    #                                    viewer=True,
+    #                                    steps_per_action=60,
+    #                                    friction_coefficient=1.05,
+    #                                    # friction_coefficient=1.0,  # DEBUG ONLY, set the friction very high
+    #                                    device=config['device'],
+    #                                    video_save_path=f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}',
+    #                                    joint_stiffness=3,
+    #                                    fingers=['index', 'middle', 'thumb'],
+    #                                    )
     # import time
     # try:
     #     while True:

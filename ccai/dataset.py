@@ -321,7 +321,6 @@ class AllegroScrewDriverDataset(Dataset):
         if mask.sum() == 0:
             # randomly choose an index to un-mask
             mask[np.random.randint(0, final_idx)] = 1
-
         # print(mask)
         return self.masks[idx] * (traj - self.mean) / self.std, self.trajectory_type[idx], mask
 
