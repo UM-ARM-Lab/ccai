@@ -1,7 +1,7 @@
 ---
-T: 15
+T: 12
 receding_horizon: False
-num_steps: 15
+num_steps: 12
 num_turns: 3
 num_trials: 80
 visualize: True
@@ -27,13 +27,14 @@ controllers:
         momentum: 0.
         device: 'cuda:0'
         online_iters: 50
-        warmup_iters: 200
+        warmup_iters: 300
         resample_steps: 16
         resample_sigma: 0.01
         resample_temperature: 0.1
         penalty: 1000000
         collision_checking: False
         joint_friction: 0.0
+        obj_gravity: True
 
 #  csvgd_fixed_contact:
 #    # N: 16
