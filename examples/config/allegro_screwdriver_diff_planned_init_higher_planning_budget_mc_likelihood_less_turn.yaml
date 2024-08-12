@@ -14,7 +14,7 @@ object_type: 'screwdriver'
 sim_device: 'cuda:0'
 friction_coefficient: 1.0
 kp: 3.0
-heuristic: 333
+heuristic: 1000
 max_depth: 11
 goal: -1.5
 prior: 1
