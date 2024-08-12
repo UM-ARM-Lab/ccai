@@ -122,6 +122,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                  obj_ori_rep='euler',
                  obj_joint_dim=0,
                  optimize_force=False,
+                 turn=False,
                  device='cuda:0', **kwargs):
         super(AllegroScrewdriver, self).__init__(start=start, goal=goal, T=T, chain=chain,
                                                  object_location=object_location,
@@ -132,7 +133,8 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                                                  friction_coefficient=friction_coefficient,
                                                  obj_dof=obj_dof,
                                                  obj_ori_rep=obj_ori_rep, obj_joint_dim=1,
-                                                 optimize_force=optimize_force, device=device)
+                                                 optimize_force=optimize_force, device=device,
+                                                 turn=turn)
         self.friction_coefficient = friction_coefficient
 
     def _cost(self, xu, start, goal):
@@ -314,7 +316,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         obj_dof=obj_dof,
         obj_joint_dim=1,
         optimize_force=params['optimize_force'],
-        default_dof_pos=default_dof_pos
+        default_dof_pos=default_dof_pos,
+        turn=True
     )
     turn_planner = PositionControlConstrainedSVGDMPC(turn_problem, params)
 

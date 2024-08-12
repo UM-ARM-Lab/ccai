@@ -82,7 +82,7 @@ class Conv1dBlock(nn.Module):
             Rearrange('batch channels horizon -> batch channels 1 horizon'),
             nn.GroupNorm(n_groups, out_channels),
             Rearrange('batch channels 1 horizon -> batch channels horizon'),
-            nn.Mish(),
+            Mish(),
         )
 
     def forward(self, x):

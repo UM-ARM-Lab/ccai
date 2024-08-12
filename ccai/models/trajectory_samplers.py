@@ -233,24 +233,46 @@ class TrajectoryCNFModel(TrajectoryCNF):
     def __init__(self, horizon, dx, du, context_dim, hidden_dim=32):
         super().__init__(horizon, dx, du, context_dim, hidden_dim=hidden_dim)
 
-    def sample(self, start=None, goal=None, constraints=None):
-        context = None
+    def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None):
+        # B, N, _ = constraints.shape
         if constraints is not None:
-            B, N, _ = constraints.shape
-            context = torch.cat((start, goal, constraints.reshape(B, -1)), dim=1)
+            constraints = constraints.reshape(constraints.shape[0], -1, constraints.shape[-1])
+            context = constraints
+        else:
+            context = None
+        condition = {}
+        time_index = 0
+        mask = torch.ones(N, self.horizon, self.dx + self.du, device=self._grad_mask.device)
+        if past is not None:
+            condition[0] = [0, past]
+            time_index = past.shape[1]
+            mask[:, :time_index] = torch.zeros_like(past)
+        if start is not None:
+            condition[time_index] = [0, start]
+            mask[:, time_index, :start.shape[1]] = torch.zeros_like(start)
+        if goal is not None:
+            condition[-1] = [8, goal]
+        if condition == {}:
+            condition = None
 
-            # context = torch.cat((start.unsqueeze(1).repeat(1, N, 1),
-            #                     goal.unsqueeze(1).repeat(1, N, 1),
-            #                     constraints), dim=-1)
-            if N > 1:
-                raise NotImplementedError('composability TODO')
-        return self._sample(context=context, start=start)
+        # TODO: in-painting for sample generation with CNF
+        # I guess just a case of intervening on the required gradient?
+        # initialize trajectory to right amount, set gradient of components to be zero
+        trajectories, likelihood = self._sample(context=context, condition=condition, mask=mask, H=H)
+        return trajectories, context, likelihood
 
-    def loss(self, x, start=None, goal=None, constraints=None, mask=None):
-        context = None
+
+    def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
+        B = trajectories.shape[0]
         if start is not None:
             context = torch.cat((start, goal, constraints), dim=1)
-        return self.flow_matching_loss(x, context, mask)
+        else:
+            context = constraints
+        return self.flow_matching_loss(trajectories, context=context, mask=mask)
+
+    def set_norm_constants(self, x_mu, x_std):
+        self.x_mean.data = x_mu.to(device=self.x_mean.device, dtype=self.x_mean.dtype)
+        self.x_std.data = x_std.to(device=self.x_std.device, dtype=self.x_std.dtype)
 
 
 class TrajectorySampler(nn.Module):
@@ -334,7 +356,16 @@ class TrajectorySampler(nn.Module):
         return x * self.x_std + self.x_mean, c
 
     def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
-        return self.model.loss(trajectories, mask=mask, start=start, goal=goal, constraints=constraints)
+        loss = self.model.loss(trajectories, mask=mask, start=start, goal=goal, constraints=constraints)
+        if self.inverse_dynamics is not None and False:
+            u = trajectories[:, :-1, self.dx:]
+            x = trajectories[:, :-1, :self.dx]
+            next_x = trajectories[:, 1:, :self.dx]
+            x = torch.cat((x, next_x), dim=-1)
+            pred_u = self.inverse_dynamics(x)
+            loss_id = torch.mean((pred_u - u)**2)
+            loss = loss + 0.1 * loss_id
+        return loss
 
     def grad(self, trajectories, t, start, goal, constraints=None):
         return self.model.grad(trajectories, t, start, goal, constraints)
@@ -342,3 +373,6 @@ class TrajectorySampler(nn.Module):
     def likelihood(self, trajectories, mask=None, start=None, goal=None, context=None):
         norm_traj = (trajectories - self.x_mean) / self.x_std
         return self.model.likelihood(norm_traj, context)
+
+    def classifier_loss(self, trajectories, mask=None, context=None, label=None):
+        return self.model.classifier_loss(trajectories, context=context, mask=mask, label=label)

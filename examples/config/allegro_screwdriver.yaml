@@ -1,5 +1,5 @@
 ---
-T: 15
+T: 12
 receding_horizon: False
 num_steps: 15
 num_turns: 4
@@ -11,7 +11,8 @@ mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
 object_type: 'screwdriver'
-sim_device: 'cuda:0'
+# sim_device: 'cuda:0'
+sim_device: 'cpu'
 friction_coefficient: 1.0
 kp: 3.0
 visualize_plan: False

@@ -1409,54 +1409,7 @@ class AllegroValveTurning(AllegroContactProblem):
             xu=xu.reshape(N, T, self.dx + self.du),
             compute_grads=compute_grads,
             compute_hess=compute_hess)
-        
-        # DEBUG ONLY
-        # g_friction, grad_g_friction, hess_g_friction = self._friction_constraint(
-        #     xu=xu.reshape(-1, T, self.dx + self.du),
-        #     compute_grads=compute_grads,
-        #     compute_hess=compute_hess)
-        
-        # if compute_grads:
-        #     # NOTE: DEBUG CODE for finite differencing
-        #     delta_x = torch.randn_like(xu) * 1e-4
-        #     xu_plus = xu + delta_x
-        #     self._preprocess(xu_plus)
-        #     g_valve_plus, _, _ = self._kinematics_constraints(
-        #                                         xu=xu_plus.reshape(N, T, self.dx + self.du),
-        #                                         compute_grads=False,
-        #                                         compute_hess=False)
-        #     analytical = (grad_g_valve @ delta_x.reshape(N, -1).unsqueeze(-1)).squeeze(-1)
-        #     delta_g = g_valve_plus - g_valve
-        #     error = (analytical - delta_g) / 1e-4
-        #     print(error.abs().max())
-        #     print(error.abs().mean())
-
-
-        #     N, T, d = xu.shape
-        #     delta = 1e-4
-        #     numerical_grad = torch.zeros(N, T, 3 * self.num_fingers, T, self.dx + self.du, device=self.device)
-        #     with torch.no_grad():
-        #         for i in range(T):
-        #             print(i)
-        #             for j in range(self.dx):
-        #                 dx = torch.zeros_like(xu)
-        #                 dx[:, i, j] = delta
-        #                 self._preprocess(xu + dx.reshape(N, T, self.dx + self.du))
-        #                 g_plus, _, _ = self._kinematics_constraints(
-        #                                             xu=xu + dx.reshape(N, T, self.dx + self.du),
-        #                                             compute_grads=False,
-        #                                             compute_hess=False)
-        #                 self._preprocess(xu - dx.reshape(N, T, self.dx + self.du))
-        #                 g_neg, _, _ = self._kinematics_constraints(
-        #                                             xu=xu - dx.reshape(N, T, self.dx + self.du),
-        #                                             compute_grads=False,
-        #                                             compute_hess=False)     
-        #                 numerical_grad[:, :, :, i, j] = (g_plus.reshape(N, T, 3 * self.num_fingers)- g_neg.reshape(N, T, 3 * self.num_fingers)) / (2 * delta)
-        #     numerical_grad = numerical_grad.reshape(N, T * 3 * self.num_fingers, T * (self.dx + self.du))
-        #     print((numerical_grad - grad_g_valve).abs().mean())
-        #     print((numerical_grad - grad_g_valve).abs().max())
-            # finite_grad = (g_valve_plus - g_valve) / detal_x
-            # error = finite_grad - grad_g_valve
+      
 
         if verbose:
             print(f"max contact constraint: {torch.max(torch.abs(g_contact))}")
