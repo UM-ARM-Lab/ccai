@@ -404,8 +404,10 @@ if __name__ == "__main__":
 
     data_path = pathlib.Path(f'{CCAI_PATH}/data/training_data/{config["data_directory"]}')
     train_dataset = AllegroScrewDriverDataset([p for p in data_path.glob('*train_data*')],
+                                              config['T']-1,
                                               cosine_sine=config['sine_cosine'],
-                                              states_only=config['du'] == 0)
+                                              states_only=config['du'] == 0,
+                                              skip_pregrasp=config['skip_pregrasp'])
 
     if config['normalize_data']:
         # normalize data
