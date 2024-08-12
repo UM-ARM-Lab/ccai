@@ -1001,7 +1001,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 turn_planner, mode='turn', goal=_goal, fname=f'turn_{stage}')
 
             _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, contact_state=torch.ones(3))
-        actual_trajectory.append(traj)
+        if contact != 'pregrasp':
+            actual_trajectory.append(traj)
     # change to numpy and save data
     for t in range(1, 1 + params['T']):
         data[t]['plans'] = torch.stack(data[t]['plans']).cpu().numpy()
