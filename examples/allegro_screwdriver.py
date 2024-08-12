@@ -432,7 +432,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                                                inits_noise=inits_noise, noise_noise=noise_noise,
                                                guided=params['use_guidance'],
                                                vae=vae)
-        trajectory_sampler.load_state_dict(torch.load(f'{CCAI_PATH}/{model_path}', map_location=torch.device('cuda')), strict=True)
+        trajectory_sampler.load_state_dict(torch.load(f'{CCAI_PATH}/{model_path}', map_location=torch.device(params['device'])), strict=True)
         trajectory_sampler.to(device=params['device'])
         trajectory_sampler.send_norm_constants_to_submodels()
         print('Loaded trajectory sampler')
@@ -554,11 +554,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 #     start[-1] += 0.75
                 a = time.perf_counter()
                 # start_for_diff = start#convert_yaw_to_sine_cosine(start)
-                start_for_diff = convert_yaw_to_sine_cosine(start)
+                if params['sine_cosine']:
+                    start_for_diff = convert_yaw_to_sine_cosine(start)
                 initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
                                                                   H=len(modes) * (params['T'] + 1),
                                                                   constraints=contact)
-                initial_samples = convert_sine_cosine_to_yaw(initial_samples)
+                if params['sine_cosine']:
+                    initial_samples = convert_sine_cosine_to_yaw(initial_samples)
 
                 print('Sampling time', time.perf_counter() - a)
                 # if state[-1] < -1.0:
@@ -591,11 +593,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 #     start[-1] += 0.75
                 a = time.perf_counter()
                 # start_for_diff = start#convert_yaw_to_sine_cosine(start)
-                start_for_diff = convert_yaw_to_sine_cosine(start)
+                if params['sine_cosine']:
+                    start_for_diff = convert_yaw_to_sine_cosine(start)
                 initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
                                                                   H=params['T'] + 1,
                                                                   constraints=contact)
-                initial_samples = convert_sine_cosine_to_yaw(initial_samples)
+                if params['sine_cosine']:
+                    initial_samples = convert_sine_cosine_to_yaw(initial_samples)
                 print('Sampling time', time.perf_counter() - a)
                 # if state[-1] < -1.0:
                 #     initial_samples[:, :, -1] -= 0.75
@@ -838,9 +842,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         
         contact_sequence_sampler = GraphSearch(state_for_search, trajectory_sampler, problem_for_sampler, 
                                                depth, params['heuristic'], params['goal'], 
-                                               torch.device('cuda'), initial_run=initial_run,
+                                               torch.device(params['device']), initial_run=initial_run,
                                                multi_particle=multi_particle,
-                                               prior=params['prior'])
+                                               prior=params['prior'],
+                                               sine_cosine=params['sine_cosine'])
         a = time.perf_counter()
         contact_node_sequence = contact_sequence_sampler.astar(next_node, None)
         planning_time = time.perf_counter() - a

@@ -49,13 +49,15 @@ class Node:
 
 class GraphSearch(ContactSampler, AStar):
     def __init__(self, start, model, problem_dict, max_depth, heuristic_weight, goal, device,
-                  *args, initial_run=False, multi_particle=False, prior=0, **kwargs):
+                  *args, initial_run=False, multi_particle=False, prior=0, sine_cosine=False, **kwargs):
         ContactSampler.__init__(self, *args, **kwargs)
 
         self.start = start
         self.start_yaw = start[14].item()
+        self.sine_cosine = sine_cosine
 
-        self.start = self.convert_yaw_to_sine_cosine(self.start)
+        if sine_cosine:
+            self.start = self.convert_yaw_to_sine_cosine(self.start)
 
         self.problem_dict = problem_dict
         self.device = device
@@ -113,7 +115,7 @@ class GraphSearch(ContactSampler, AStar):
             [-1, 1, 1],
             [1, -1, -1],
             [1, 1, 1]
-        ]).cuda()
+        ]).to(self.device)
         
         self.num_c_states = self.neighbors_c_states.shape[0]
         self.neighbors_c_states_orig = self.neighbors_c_states.clone()
@@ -124,14 +126,18 @@ class GraphSearch(ContactSampler, AStar):
 
         self.discount = .9
 
+
     def normalize_likelihood(self, likelihood):
-        return torch.nn.functional.softmax(likelihood, dim=0)
-        # return likelihood / likelihood.sum()
+        # return torch.nn.functional.softmax(likelihood, dim=0)
+        return likelihood / likelihood.sum()
 
     def get_expected_yaw(self, node):
         if node.trajectory.shape[1] == 0:
             return self.start_yaw
-        yaw = self.get_yaw_from_sine_cosine(node.trajectory[:, -1, :16])
+        if self.sine_cosine:
+            yaw = self.get_yaw_from_sine_cosine(node.trajectory[:, -1, :16])
+        else:
+            yaw = node.trajectory[:, -1, 14]
         # likelihood_for_average = torch.nn.functional.softmax(node.likelihoods, dim=0)
         likelihood_for_average = self.normalize_likelihood(node.likelihoods)
         yaw = (yaw * likelihood_for_average.to(yaw.device)).sum().item()
@@ -188,9 +194,10 @@ class GraphSearch(ContactSampler, AStar):
                                     H=16, constraints=self.neighbors_c_states[:self.num_samples])
             if likelihood is not None:
                 likelihood = likelihood.flatten()
-                likelihood = torch.log(likelihood / (1 - likelihood))
+                # likelihood = torch.log(likelihood / (1 - likelihood))
             samples_orig = samples.clone()
-            samples = self.convert_sine_cosine_to_yaw(samples)
+            if self.sine_cosine:
+                samples = self.convert_sine_cosine_to_yaw(samples)
             for i in range(1):
                 sample_range = torch.arange(i*self.num_samples, (i+1)*self.num_samples)
                 c_state = tuple(self.neighbors_c_states_orig[i].cpu().tolist())
@@ -247,7 +254,8 @@ class GraphSearch(ContactSampler, AStar):
         if likelihood is not None:
             likelihood = likelihood.flatten()
         samples_orig = samples.clone()
-        samples = self.convert_sine_cosine_to_yaw(samples)
+        if self.sine_cosine:
+            samples = self.convert_sine_cosine_to_yaw(samples)
 
         for i in range(self.num_c_states - 1):
             sample_range = torch.arange(i*(self.num_samples * self.num_samples_multi), (i+1)*(self.num_samples * self.num_samples_multi))
