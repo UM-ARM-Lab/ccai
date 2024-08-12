@@ -189,61 +189,61 @@ class GraphSearch(ContactSampler, AStar):
             max_depth += 1
         if len(cur_seq) == max_depth:
             return neighbors
-        if node.trajectory.shape[1] == 0 and len(cur_seq) == 0:
-            last_state = self.start
-            samples, _, likelihood = self.model.sample(N=self.num_samples, start=last_state.reshape(1, -1),
-                                    H=16, constraints=self.neighbors_c_states[:self.num_samples])
-            if likelihood is not None:
-                likelihood = likelihood.flatten()
-                # likelihood = torch.log(likelihood / (1 - likelihood))
-            samples_orig = samples.clone()
-            if self.sine_cosine:
-                samples = self.convert_sine_cosine_to_yaw(samples)
-            for i in range(1):
-                sample_range = torch.arange(i*self.num_samples, (i+1)*self.num_samples)
-                c_state = tuple(self.neighbors_c_states_orig[i].cpu().tolist())
-                mask, mask_no_z, mask_without_z = self.c_state_mask(c_state)
-                problem = self.problem_dict[c_state]
-                # sample_range_mask = samples[sample_range][top_likelihoods.indices][: , :, mask_without_z]
-                sample_range_mask = samples[sample_range][: , :, mask_without_z]
-                problem._preprocess(sample_range_mask, projected_diffusion=True)
-                J, _, _ = problem._objective(sample_range_mask)
-                # g, _, _ = problem._con_eq(sample_range_mask, compute_grads=False, compute_hess=False, verbose=False, projected_diffusion=True)
-                # h, _, _ = problem._con_ineq(sample_range_mask, compute_grads=False, compute_hess=False, verbose=False, projected_diffusion=True)
-                # g = torch.abs(g)
-                # constraint_val = g.sum(1)
-                # if h is not None:
-                #     h = torch.relu(h)
-                #     constraint_val += h.sum(1)
-                # constraint_val *= -1
+        # if node.trajectory.shape[1] == 0 and len(cur_seq) == 0:
+        #     last_state = self.start
+        #     samples, _, likelihood = self.model.sample(N=self.num_samples, start=last_state.reshape(1, -1),
+        #                             H=16, constraints=self.neighbors_c_states[:self.num_samples])
+        #     if likelihood is not None:
+        #         likelihood = likelihood.flatten()
+        #         # likelihood = torch.log(likelihood / (1 - likelihood))
+        #     samples_orig = samples.clone()
+        #     if self.sine_cosine:
+        #         samples = self.convert_sine_cosine_to_yaw(samples)
+        #     for i in range(1):
+        #         sample_range = torch.arange(i*self.num_samples, (i+1)*self.num_samples)
+        #         c_state = tuple(self.neighbors_c_states_orig[i].cpu().tolist())
+        #         mask, mask_no_z, mask_without_z = self.c_state_mask(c_state)
+        #         problem = self.problem_dict[c_state]
+        #         # sample_range_mask = samples[sample_range][top_likelihoods.indices][: , :, mask_without_z]
+        #         sample_range_mask = samples[sample_range][: , :, mask_without_z]
+        #         problem._preprocess(sample_range_mask, projected_diffusion=True)
+        #         J, _, _ = problem._objective(sample_range_mask)
+        #         # g, _, _ = problem._con_eq(sample_range_mask, compute_grads=False, compute_hess=False, verbose=False, projected_diffusion=True)
+        #         # h, _, _ = problem._con_ineq(sample_range_mask, compute_grads=False, compute_hess=False, verbose=False, projected_diffusion=True)
+        #         # g = torch.abs(g)
+        #         # constraint_val = g.sum(1)
+        #         # if h is not None:
+        #         #     h = torch.relu(h)
+        #         #     constraint_val += h.sum(1)
+        #         # constraint_val *= -1
                 
-                # if likelihood[sample_range].max().item() < .5:
-                #     print('Skipping mode')
-                #     continue
-                # top_likelihoods = torch.topk(likelihood[sample_range], k=self.num_samples//2, largest=True)
+        #         # if likelihood[sample_range].max().item() < .5:
+        #         #     print('Skipping mode')
+        #         #     continue
+        #         # top_likelihoods = torch.topk(likelihood[sample_range], k=self.num_samples//2, largest=True)
 
-                # print(constraint_val)
-                # print(likelihood[sample_range].max().item())
-                # min_violation_ind = torch.argmax(likelihood[sample_range])
-                # min_violation_ind = torch.argmin(constraint_val)
-                # cost = J[min_violation_ind].item()
-                # cost is weighted average of J, where weight is likelihood (normalized)
-                # likelihood_for_average = torch.nn.functional.softmax(likelihood[sample_range], dim=0)
+        #         # print(constraint_val)
+        #         # print(likelihood[sample_range].max().item())
+        #         # min_violation_ind = torch.argmax(likelihood[sample_range])
+        #         # min_violation_ind = torch.argmin(constraint_val)
+        #         # cost = J[min_violation_ind].item()
+        #         # cost is weighted average of J, where weight is likelihood (normalized)
+        #         # likelihood_for_average = torch.nn.functional.softmax(likelihood[sample_range], dim=0)
 
-                likelihood_this_c = likelihood[sample_range]
-                # likelihood_this_c = constraint_val
+        #         likelihood_this_c = likelihood[sample_range]
+        #         # likelihood_this_c = constraint_val
 
-                likelihood_for_average = self.normalize_likelihood(likelihood_this_c)
-                cost = (J * likelihood_for_average).sum().item()
+        #         likelihood_for_average = self.normalize_likelihood(likelihood_this_c)
+        #         cost = (J * likelihood_for_average).sum().item()
 
-                # traj_this_step = samples[sample_range][top_likelihoods.indices][min_violation_ind]
-                # traj_this_step = samples_orig[sample_range][min_violation_ind]
-                traj_this_step = samples_orig[sample_range]
+        #         # traj_this_step = samples[sample_range][top_likelihoods.indices][min_violation_ind]
+        #         # traj_this_step = samples_orig[sample_range][min_violation_ind]
+        #         traj_this_step = samples_orig[sample_range]
                 
-                full_traj = torch.cat([node.trajectory, traj_this_step.cpu()], dim=1)
-                neighbors.append(Node(trajectory=full_traj, cost=cost, contact_sequence=tuple(cur_seq + [c_state]), likelihoods=likelihood_this_c.cpu()))
-            return neighbors
-        elif node.trajectory.shape[1] == 0:
+        #         full_traj = torch.cat([node.trajectory, traj_this_step.cpu()], dim=1)
+        #         neighbors.append(Node(trajectory=full_traj, cost=cost, contact_sequence=tuple(cur_seq + [c_state]), likelihoods=likelihood_this_c.cpu()))
+        #     return neighbors
+        if node.trajectory.shape[1] == 0:
             last_state = self.start
             last_state = last_state.reshape(1, -1).repeat(self.num_samples, 1)
         else:
