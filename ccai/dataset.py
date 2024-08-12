@@ -210,9 +210,10 @@ class AllegroValveDataset(Dataset):
 
 class AllegroScrewDriverDataset(Dataset):
 
-    def __init__(self, folders, cosine_sine=False, states_only=False):
+    def __init__(self, folders, max_T, cosine_sine=False, states_only=False, skip_pregrasp=False):
         super().__init__()
         self.cosine_sine = cosine_sine
+        self.skip_pregrasp = skip_pregrasp
         # TODO: only using trajectories for now, also includes closest points and their sdf values
         starts = []
         trajectories = []
@@ -220,7 +221,6 @@ class AllegroScrewDriverDataset(Dataset):
         masks = []
 
         min_t = 1
-        max_T = 15
 
         use_actual_traj = True
         for fpath in folders:
