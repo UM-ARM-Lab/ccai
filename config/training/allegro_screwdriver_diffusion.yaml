@@ -4,9 +4,9 @@ T: 16
 dx: 15
 du: 21
 load_checkpoint: False
-load_model: False
-train_diffusion: True
-train_classifier: False
+load_model: True
+train_diffusion: False
+train_classifier: True
 eval_classifier: False
 plot: False
 vis_dataset: False

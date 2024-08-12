@@ -135,7 +135,7 @@ class GaussianDiffusion(nn.Module):
         self.classifier = None
         if discriminator_guidance:
             self.classifier = UnetClassifier(self.horizon, self.xu_dim, cond_dim=context_dim, dim=hidden_dim)
-
+            self.skip_classifier = False
 
         self.objective = objective
         self.unconditional = unconditional
@@ -208,6 +208,7 @@ class GaussianDiffusion(nn.Module):
 
     def add_classifier(self):
         #self.classifier = BinaryClassifier()
+        self.skip_classifier = False
         self.classifier = UnetClassifier(self.horizon, self.xu_dim, cond_dim=self.context_dim, dim=self.hidden_dim)
 
     def predict_start_from_noise(self, x_t, t, noise):
@@ -462,7 +463,7 @@ class GaussianDiffusion(nn.Module):
                                               condition=condition, context=context,
                                               return_all_timesteps=return_all_timesteps)
 
-            if self.classifier is not None:
+            if self.classifier is not None and not self.skip_classifier:
                 likelihood = self.classifier(
                     torch.zeros(B *N * factor, device=sample.device),
                     sample.reshape(-1, self.horizon, self.xu_dim),
@@ -483,12 +484,14 @@ class GaussianDiffusion(nn.Module):
 
         sample = sample_fn((B * N, H, self.xu_dim), condition=condition, context=context.squeeze(1),
                          return_all_timesteps=return_all_timesteps)
-
-        likelihood = self.classifier(
-            torch.zeros(B * N, device=sample.device),
-            sample.reshape(-1, self.horizon, self.xu_dim),
-            context=context.reshape(-1, self.context_dim)
-        )
+        if self.classifier is not None and not self.skip_classifier:
+            likelihood = self.classifier(
+                torch.zeros(B * N, device=sample.device),
+                sample.reshape(-1, self.horizon, self.xu_dim),
+                context=context.reshape(-1, self.context_dim)
+            )
+        else:
+            likelihood = self.approximate_likelihood(sample, context=context)
 
         return sample, likelihood
 

@@ -224,13 +224,17 @@ def visualize_trajectory_in_sim(trajectory, env, fpath):
 
 def generate_simulated_data(model, loader, config, name=None):
     fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/simulated_dataset'
+
+    #if f'{fpath}/simulated_trajectories_{name}.npz' exists, return
+    # if pathlib.Path(f'{fpath}/simulated_trajectories_{name}.npz').exists():
+    #     return
     pathlib.Path.mkdir(pathlib.Path(fpath), parents=True, exist_ok=True)
     # assume we want a dataset size as large as the original dataset
     N = len(loader.dataset)
     loader.dataset.update_masks(p1=1.0, p2=1.0)  # no masking
 
     # generate three subtrajectories
-    num_sub_traj = 3
+    num_sub_traj = 1
 
     ACTION_DICT = {
         0: torch.tensor([[-1.0, -1.0, -1.0]]),  # pregrasp
@@ -244,6 +248,8 @@ def generate_simulated_data(model, loader, config, name=None):
     simulated_class = []
     dataset_size = 0
 
+    # TQDM bar with max length N
+    pbar = tqdm.tqdm(total=N)
     for trajectories, traj_class, _ in train_loader:
 
         if train_loader.dataset.cosine_sine:
@@ -255,16 +261,16 @@ def generate_simulated_data(model, loader, config, name=None):
         B = trajectories.shape[0]
         trajectories = trajectories.to(device=config['device'])
         traj_class = traj_class.to(device=config['device'])
-        p = torch.tensor([0.25, 0.25, 0.25, 0.25], device=config['device'])
-        idx = p.multinomial(num_samples=((num_sub_traj - 1) * B), replacement=True)
-        _next_class = ACTION_TENSOR[idx].reshape(B, -1, 3)
+        # p = torch.tensor([0.25, 0.25, 0.25, 0.25], device=config['device'])
+        # idx = p.multinomial(num_samples=((num_sub_traj - 1) * B), replacement=True)
+        # _next_class = ACTION_TENSOR[idx].reshape(B, -1, 3)
 
-        traj_class = torch.cat((traj_class.reshape(B, 1, 3), _next_class), dim=1)
+        # traj_class = torch.cat((traj_class.reshape(B, 1, 3), _next_class), dim=1)
+        traj_class = traj_class.reshape(B, 1, 3)
         start = (trajectories[:N, 0, :dx] * model.x_std[:dx].to(device=trajectories.device) +
                  model.x_mean[:dx].to(device=trajectories.device))
 
         new_traj, _, _ = model.sample(N=B, H=num_sub_traj * 16, start=start, constraints=traj_class)
-
         # visualize_trajectories(new_traj, config['scene'], fpath, headless=False)
 
         for i in range(num_sub_traj):
@@ -277,6 +283,7 @@ def generate_simulated_data(model, loader, config, name=None):
             simulated_class.append(traj_class[:, i].detach().cpu())
 
         dataset_size += B * num_sub_traj
+        pbar.update(B)
         if dataset_size >= N:
             break
 
@@ -392,7 +399,8 @@ if __name__ == "__main__":
                               hidden_dim=config['hidden_dim'], timesteps=config['timesteps'],
                               generate_context=config['diffuse_class'],
                               discriminator_guidance=config['discriminator_guidance'],
-                              learn_inverse_dynamics=config['inverse_dynamics'])
+                              learn_inverse_dynamics=config['inverse_dynamics'],
+                              cosine_sine=config['sine_cosine'])
 
     data_path = pathlib.Path(f'{CCAI_PATH}/data/training_data/{config["data_directory"]}')
     train_dataset = AllegroScrewDriverDataset([p for p in data_path.glob('*train_data*')],
@@ -478,7 +486,8 @@ if __name__ == "__main__":
         plot_long_horizon(model, train_loader, config, plot_name)
 
     if config['train_classifier']:
-        model.model.diffusion_model.classifier = None
+        # model.model.diffusion_model.classifier = None
+        model.model.skip_classifier = True
         # generate dataset from trained diffusion model
         generate_simulated_data(model, train_loader, config, name='')
         train_loader.dataset.update_masks(p1=0.5, p2=0.75)

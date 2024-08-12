@@ -270,7 +270,7 @@ class TrajectorySampler(nn.Module):
 
     def __init__(self, T, dx, du, context_dim, type='nf', dynamics=None, problem=None, timesteps=50, hidden_dim=64,
                  constrain=False, unconditional=False, generate_context=False, score_model='conv_unet',
-                 discriminator_guidance=False, learn_inverse_dynamics=False):
+                 discriminator_guidance=False, learn_inverse_dynamics=False, cosine_sine=False):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -305,6 +305,7 @@ class TrajectorySampler(nn.Module):
         self.register_buffer('x_mean', torch.zeros(dx + du))
         self.register_buffer('x_std', torch.ones(dx + du))
         self.send_norm_constants_to_submodels()
+        self.cosine_sine = cosine_sine
 
     def set_norm_constants(self, x_mean, x_std):
         self.x_mean.data = x_mean.to(device=self.x_mean.device, dtype=self.x_mean.dtype)
@@ -351,10 +352,11 @@ class TrajectorySampler(nn.Module):
             x = torch.cat((x[:, :, :self.dx], u), dim=-1)
 
         x = x * self.x_std + self.x_mean
-        q = x[:, :, :14]
-        u = x[:, :, 16:]
-        x = torch.cat((q, torch.atan2(x[:, :, 15], x[:, :, 14])[:, :, None], u),
-                      dim=-1).reshape(N, -1, x.shape[-1] - 1).detach()
+        if self.cosine_sine:
+            q = x[:, :, :14]
+            u = x[:, :, 16:]
+            x = torch.cat((q, torch.atan2(x[:, :, 15], x[:, :, 14])[:, :, None], u),
+                        dim=-1).reshape(N, -1, x.shape[-1] - 1).detach()
 
         return x, c, likelihood
 
