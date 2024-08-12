@@ -72,10 +72,11 @@ class GraphSearch(ContactSampler, AStar):
         self.multi_particle = multi_particle
 
         self.num_samples_multi = 1
-        self.trajectory_dim_0 = 1
         if self.multi_particle:
             self.num_samples_multi = 8
-            self.trajectory_dim_0 = self.num_samples
+        else:
+            self.num_samples_multi = 32
+            self.num_samples = 1
 
         if prior == 0:
             prior_tensor = torch.tensor([
@@ -284,26 +285,42 @@ class GraphSearch(ContactSampler, AStar):
                 likelihood_this_c += node.likelihoods.repeat(self.num_samples_multi).to(likelihood_this_c.device)
             # likelihood_this_c = constraint_val
             # top_likelihoods = torch.topk(likelihood_this_c, k=self.num_samples, largest=True)
-            probs = self.normalize_likelihood(likelihood_this_c)
-            # print(probs)
-            # Sample from the probs
-            top_likelihoods = torch.multinomial(probs, self.num_samples, replacement=True)
-            # top_likelihoods = torch.topk(constraint_val, k=self.num_samples, largest=True)
-            top_samples = samples[sample_range][top_likelihoods]
-            top_samples_orig = samples_orig[sample_range][top_likelihoods]
+            if self.multi_particle:
+                probs = self.normalize_likelihood(likelihood_this_c)
+                # print(probs)
+                # Sample from the probs
+                top_likelihoods = torch.multinomial(probs, self.num_samples, replacement=True)
+                # top_likelihoods = torch.topk(constraint_val, k=self.num_samples, largest=True)
+                top_samples = samples[sample_range][top_likelihoods]
+                top_samples_orig = samples_orig[sample_range][top_likelihoods]
 
-            # print(likelihood[sample_range].max().item())
-            # min_violation_ind = top_likelihoods.indices[0]
-            # min_violation_ind = torch.argmin(constraint_val)
-            likelihood_for_average = self.normalize_likelihood(likelihood_this_c[top_likelihoods])
-            cost = (J[top_likelihoods] * likelihood_for_average).sum().item()
-            traj_this_step = top_samples_orig
+                # print(likelihood[sample_range].max().item())
+                # min_violation_ind = top_likelihoods.indices[0]
+                # min_violation_ind = torch.argmin(constraint_val)
+                sample_likelihoods = likelihood_this_c[top_likelihoods].cpu()
+                likelihood_for_average = self.normalize_likelihood(likelihood_this_c[top_likelihoods])
+                cost = (J[top_likelihoods] * likelihood_for_average).sum().item()
+                traj_this_step = top_samples_orig
 
-            prior_traj_indices = self.neighbors_c_states_indices[top_likelihoods.cpu()]
-            # full_traj = torch.cat([node.trajectory, traj_this_step], dim=0)
-            old_traj = node.trajectory[prior_traj_indices]
+                prior_traj_indices = self.neighbors_c_states_indices[top_likelihoods.cpu()]
+                # full_traj = torch.cat([node.trajectory, traj_this_step], dim=0)
+                old_traj = node.trajectory[prior_traj_indices]
+            else:
+                # Select argmax likelihood_this_c
+                min_violation_ind = torch.argmax(likelihood_this_c)
+                cost = J[min_violation_ind].item()
+                traj_this_step = samples_orig[sample_range][min_violation_ind]
+                sample_likelihoods = likelihood_this_c[min_violation_ind].cpu()
+                # Ensure that the sample_likelihood is a vector
+                if len(sample_likelihoods.shape) == 0:
+                    sample_likelihoods = sample_likelihoods.unsqueeze(0)
+                
+                old_traj = node.trajectory
+                # traj_this_step needs to be a 3D tensor
+                traj_this_step = traj_this_step.unsqueeze(0)
+
             full_traj = torch.cat([old_traj, traj_this_step.cpu()], dim=1)
-            neighbors.append(Node(trajectory=full_traj, cost=cost, contact_sequence=tuple(cur_seq + [c_state]), likelihoods=likelihood_this_c[top_likelihoods].cpu()))
+            neighbors.append(Node(trajectory=full_traj, cost=cost, contact_sequence=tuple(cur_seq + [c_state]), likelihoods=sample_likelihoods))
         return neighbors
 
     def distance_between(self, n1, n2):
