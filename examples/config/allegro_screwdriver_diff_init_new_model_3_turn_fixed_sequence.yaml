@@ -4,14 +4,14 @@ receding_horizon: False
 num_steps: 15
 num_turns: 3
 num_trials: 10
-visualize: True
-experiment_name: 'allegro_screwdriver_diffusion_new_model_fixed_sequence'
+visualize: False
+experiment_name: 'allegro_screwdriver_diffusion_new_model_fixed_sequence_with_diff'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
 object_type: 'screwdriver'
-sim_device: 'cuda:0'
+sim_device: 'cpu'
 friction_coefficient: 1.0
 kp: 3.0
 heuristic: 4000
@@ -38,7 +38,7 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:0'
+    device: 'cuda:1'
     online_iters: 25
     warmup_iters: 100
     resample_steps: 16

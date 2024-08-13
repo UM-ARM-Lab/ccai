@@ -1,0 +1,82 @@
+Importing module 'gym_38' (/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.0+cu121
+Device count 2
+/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinav/Documents/ccai
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+1 () -0.0003411447396501899
+2 () -0.0003411447396501899
+3 ((-1.0, -1.0, -1.0),) 0.0472504198551178
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.23164284229278564
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.4645337760448456
+6 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) 0.14025290310382843
+7 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.8098187446594238
+8 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.1282062530517578
+9 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.4732615947723389
+10 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.6799668073654175
+Contact sequence search time: 39.06160481297411
+['pregrasp', 'turn', 'thumb_middle', 'turn', 'index', 'turn', 'index']
+0 pregrasp
+Solve time for step 37.10487365722656
+Solve time for step 5.814746618270874
+Solve time for step 5.662115573883057
+Solve time for step 5.436789035797119
+Solve time for step 5.367862939834595
+Solve time for step 5.427239179611206
+Solve time for step 5.343598365783691
+Solve time for step 5.087903022766113
+Solve time for step 5.033070802688599
+Solve time for step 4.767622232437134
+Solve time for step 4.82851505279541
+Solve time for step 4.694725036621094
+Solve time for step 4.5332324504852295
+Solve time for step 4.499677419662476
+Solve time for step 4.573217868804932
+1 turn
+Solve time for step 94.29169845581055
+Solve time for step 13.901423692703247
+Solve time for step 13.199072122573853
+Solve time for step 12.09606671333313
+Solve time for step 11.45542025566101
+Solve time for step 10.780644416809082
+Solve time for step 9.819249153137207
+Solve time for step 9.224682092666626
+Solve time for step 8.510597705841064
+Solve time for step 8.35521388053894
+Solve time for step 7.869082689285278
+Solve time for step 7.580437183380127
+Solve time for step 7.492897987365723
+Solve time for step 7.303399085998535
+Solve time for step 7.421509742736816
+2 thumb_middle
+Solve time for step 52.910603523254395
+Solve time for step 8.099632024765015
+Solve time for step 7.814200162887573
+Solve time for step 7.5827062129974365
+Solve time for step 7.2664830684661865
+Solve time for step 7.12380313873291
+Solve time for step 7.041893482208252
+Solve time for step 6.805592775344849
+Solve time for step 6.688483953475952
+Solve time for step 6.473895788192749
+Solve time for step 6.3578407764434814
+Solve time for step 6.243366241455078
+Solve time for step 6.339797258377075
+Solve time for step 6.126870393753052
+Solve time for step 6.135024547576904
+3 turn
+Solve time for step 96.55698990821838
+Solve time for step 15.177581548690796

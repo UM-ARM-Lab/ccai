@@ -451,7 +451,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                                                inits_noise=inits_noise, noise_noise=noise_noise,
                                                guided=params['use_guidance'],
                                                vae=vae)
-        trajectory_sampler.load_state_dict(torch.load(f'{CCAI_PATH}/{model_path}', map_location=torch.device('cuda')), strict=True)
+        trajectory_sampler.load_state_dict(torch.load(f'{CCAI_PATH}/{model_path}', map_location=torch.device(params['device'])), strict=True)
         trajectory_sampler.to(device=params['device'])
         trajectory_sampler.send_norm_constants_to_submodels()
         print('Loaded trajectory sampler')
@@ -603,40 +603,40 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # generate initial samples with diffusion model
         initial_samples = None
         sim_rollouts = None
-        if trajectory_sampler is not None:
-            with torch.no_grad():
-                start = state.clone()
-                # if state[-1] < -1.0:
-                #     start[-1] += 0.75
-                a = time.perf_counter()
-                # start_for_diff = start#convert_yaw_to_sine_cosine(start)
-                start_for_diff = convert_yaw_to_sine_cosine(start)
-                initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
-                                                                  H=params['T'] + 1,
-                                                                  constraints=contact)
-                initial_samples = convert_sine_cosine_to_yaw(initial_samples)
-                print('Sampling time', time.perf_counter() - a)
-                # if state[-1] < -1.0:
-                #     initial_samples[:, :, -1] -= 0.75
+        # if trajectory_sampler is not None:
+        #     with torch.no_grad():
+        #         start = state.clone()
+        #         # if state[-1] < -1.0:
+        #         #     start[-1] += 0.75
+        #         a = time.perf_counter()
+        #         # start_for_diff = start#convert_yaw_to_sine_cosine(start)
+        #         start_for_diff = convert_yaw_to_sine_cosine(start)
+        #         initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
+        #                                                           H=params['T'] + 1,
+        #                                                           constraints=contact)
+        #         initial_samples = convert_sine_cosine_to_yaw(initial_samples)
+        #         print('Sampling time', time.perf_counter() - a)
+        #         # if state[-1] < -1.0:
+        #         #     initial_samples[:, :, -1] -= 0.75
             
-            sim_rollouts = torch.zeros_like(initial_samples)
-            # for i in range(params['N']):
-            #     sim_rollout = rollout_trajectory_in_sim(env_sim_rollout, initial_samples[i])
-            #     sim_rollouts[i] = sim_rollout
+        #     sim_rollouts = torch.zeros_like(initial_samples)
+        #     # for i in range(params['N']):
+        #     #     sim_rollout = rollout_trajectory_in_sim(env_sim_rollout, initial_samples[i])
+        #     #     sim_rollouts[i] = sim_rollout
 
-            initial_samples = _full_to_partial(initial_samples, mode)
-            initial_x = initial_samples[:, 1:, :planner.problem.dx]
-            initial_u = initial_samples[:, :-1, -planner.problem.du:]
-            initial_samples = torch.cat((initial_x, initial_u), dim=-1)
+        #     initial_samples = _full_to_partial(initial_samples, mode)
+        #     initial_x = initial_samples[:, 1:, :planner.problem.dx]
+        #     initial_u = initial_samples[:, :-1, -planner.problem.du:]
+        #     initial_samples = torch.cat((initial_x, initial_u), dim=-1)
 
         state = env.get_state()
         state = state['q'].reshape(-1).to(device=params['device'])
         state = state[:planner.problem.dx]
         # print(params['T'], state.shape, initial_samples)
         planner.reset(state, T=params['T'], goal=goal, initial_x=initial_samples)
-        if trajectory_sampler is None:
-            initial_samples = planner.x.detach().clone()
-            sim_rollouts = torch.zeros_like(initial_samples)
+        # if trajectory_sampler is None:
+        initial_samples = planner.x.detach().clone()
+        sim_rollouts = torch.zeros_like(initial_samples)
         planned_trajectories = []
         actual_trajectory = []
         optimizer_paths = []
@@ -856,7 +856,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         
         contact_sequence_sampler = GraphSearch(state_for_search, trajectory_sampler, problem_for_sampler, 
                                                depth, params['heuristic'], params['goal'], 
-                                               torch.device('cuda'), initial_run=initial_run,
+                                               torch.device(params['device']), initial_run=initial_run,
                                                multi_particle=multi_particle,
                                                prior=params['prior'])
         a = time.perf_counter()
@@ -921,6 +921,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     valve_goal = torch.tensor([0, 0, state[-1] - 2 * np.pi / 3.0]).to(device=params['device'])
 
     executed_contacts = []
+
+    replan = params.get('replan', False)
     for stage in range(num_stages):
         state = env.get_state()
         state = state['q'].reshape(-1)[:15].to(device=params['device'])
@@ -944,7 +946,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         # else:
         # contact = contact_sequence[stage]
-        if sample_contact:
+        if sample_contact and (stage == 0 or replan):
             new_contact_sequence, new_next_node = plan_contacts(state, num_stages - stage, next_node, params['multi_particle_search'])
             if new_contact_sequence is not None and len(new_contact_sequence) == 0:
                 print('Planner thinks task is complete')
@@ -973,8 +975,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     next_node = (-1, -1, -1)
             print(contact_sequence)
             # return -1
-
-            contact = contact_sequence[0]
+            contact = contact_sequence[0]  
+        elif stage >= len(contact_sequence):
+            print('Planner thinks task is complete')
+            break
         else:
             contact = contact_sequence[stage]
         executed_contacts.append(contact)
@@ -1149,7 +1153,7 @@ if __name__ == "__main__":
                 inits_noise = inits_noise[:, :, 0, :, :]
             if len(noise_noise.shape) == 6:
                 noise_noise = noise_noise[:, :, :, 0, :, :]
-    start_ind = 3 if not config['sample_contact'] else 0
+    start_ind = 3 if config['experiment_name'] == 'allegro_screwdriver_diffusion_new_model_fixed_sequence' else 0
     for i in tqdm(range(start_ind, config['num_trials'])):
     # for i in tqdm(range(0, 7)):
         

@@ -113,7 +113,7 @@ class GraphSearch(ContactSampler, AStar):
             [-1, 1, 1],
             [1, -1, -1],
             [1, 1, 1]
-        ]).cuda()
+        ]).to(self.device)
         
         self.num_c_states = self.neighbors_c_states.shape[0]
         self.neighbors_c_states_orig = self.neighbors_c_states.clone()

@@ -5,7 +5,7 @@ num_steps: 15
 num_turns: 3
 num_trials: 10
 visualize: False
-experiment_name: 'allegro_screwdriver_diffusion_new_model_diff_only'
+experiment_name: 'allegro_screwdriver_diffusion_new_model_fixed_sequence'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
@@ -28,7 +28,7 @@ use_saved_plans: True
 use_saved_noise: False
 use_guidance: False
 use_partial_constraint: True
-model_path: 'data/training/allegro_screwdriver/allegro_better_model/allegro_screwdriver_diffusion_w_classifier.pt'
+# model_path: 'data/training/allegro_screwdriver/allegro_better_model/allegro_screwdriver_diffusion_w_classifier.pt'
 # model_path: 'data/training/allegro_screwdriver/allegro_test_new_data_augment_angle_diffusion/allegro_screwdriver_diffusion.pt'
 controllers:
   csvgd:
@@ -39,8 +39,8 @@ controllers:
     step_size: 0.1
     momentum: 0.
     device: 'cuda:1'
-    online_iters: 0
-    warmup_iters: 0
+    online_iters: 25
+    warmup_iters: 100
     resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1

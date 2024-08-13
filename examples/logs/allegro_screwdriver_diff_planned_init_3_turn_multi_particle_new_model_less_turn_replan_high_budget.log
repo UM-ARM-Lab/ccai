@@ -1,0 +1,134 @@
+Importing module 'gym_38' (/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.0+cu121
+Device count 2
+/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinav/Documents/ccai
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+1 () -0.0003411447396501899
+2 () -0.0003411447396501899
+3 ((-1.0, -1.0, -1.0),) 0.0472504198551178
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.23164284229278564
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.4645337760448456
+6 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) 0.14025290310382843
+7 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.8098187446594238
+8 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.1282062530517578
+9 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.4732615947723389
+10 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.6799668073654175
+Contact sequence search time: 38.69152435497381
+['pregrasp', 'turn', 'thumb_middle', 'turn', 'index', 'turn', 'index']
+0 pregrasp
+Sampling time 3.3344779410399497
+Solve time for step 36.10803508758545
+Solve time for step 5.701178312301636
+Solve time for step 5.4561357498168945
+Solve time for step 5.3993072509765625
+Solve time for step 5.234821319580078
+Solve time for step 5.224700450897217
+Solve time for step 4.914865016937256
+Solve time for step 4.890490770339966
+Solve time for step 4.97649884223938
+Solve time for step 4.735409736633301
+Solve time for step 4.716841220855713
+Solve time for step 4.773080348968506
+Solve time for step 4.8998026847839355
+Solve time for step 4.638928413391113
+Solve time for step 4.58962082862854
+1 ((-1.0, -1.0, -1.0),) -0.01958463340997696
+2 ((-1.0, -1.0, -1.0),) -0.01958463340997696
+3 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.6270602941513062
+4 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.7199207544326782
+5 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.3668932318687439
+6 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.9891460537910461
+7 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.6947247385978699
+8 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.7435599565505981
+9 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.2749295234680176
+10 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.4179145097732544
+11 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.8955597877502441
+12 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.220768690109253
+13 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.5112726092338562
+14 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.0476642847061157
+15 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.0467045307159424
+16 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.2226011753082275
+17 ((-1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.5090537071228027
+Contact sequence search time: 73.67429070104845
+['turn', 'turn', 'turn', 'turn']
+1 turn
+Sampling time 3.277250893006567
+Solve time for step 91.93873286247253
+Solve time for step 13.553786516189575
+Solve time for step 12.712003469467163
+Solve time for step 11.504539012908936
+Solve time for step 10.940850973129272
+Solve time for step 9.908893346786499
+Solve time for step 9.01470685005188
+Solve time for step 8.95735788345337
+Solve time for step 8.511242866516113
+Solve time for step 8.072489023208618
+Solve time for step 7.670288562774658
+Solve time for step 7.4057276248931885
+Solve time for step 7.297534942626953
+Solve time for step 7.097982883453369
+Solve time for step 7.004692554473877
+1 ((1.0, 1.0, 1.0),) -0.9060903191566467
+2 ((1.0, 1.0, 1.0),) -0.9060903191566467
+3 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.7326734066009521
+4 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.937345564365387
+5 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.2645814418792725
+6 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.5995354652404785
+7 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.4813340902328491
+8 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.0188031196594238
+9 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.0083367824554443
+10 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, -1.0, -1.0)) -1.3097254037857056
+11 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.825070858001709
+Contact sequence search time: 44.33040338597493
+['thumb_middle', 'index', 'thumb_middle', 'thumb_middle', 'turn']
+2 thumb_middle
+Sampling time 3.2490866479929537
+Solve time for step 51.92809748649597
+Solve time for step 8.081729888916016
+Solve time for step 7.770735263824463
+Solve time for step 7.57770299911499
+Solve time for step 7.386233568191528
+Solve time for step 7.181711912155151
+Solve time for step 6.9800331592559814
+Solve time for step 6.784701347351074
+Solve time for step 6.424998760223389
+Solve time for step 6.427844285964966
+Solve time for step 6.2953736782073975
+Solve time for step 6.3444647789001465
+Solve time for step 6.029492378234863
+Solve time for step 6.017812252044678
+Solve time for step 6.0861122608184814
+1 ((1.0, -1.0, -1.0),) -0.9304201602935791
+2 ((1.0, -1.0, -1.0),) -0.9304201602935791
+3 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.225648045539856
+4 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.7780950665473938
+5 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.5386111736297607
+Contact sequence search time: 14.719853415037505
+['turn', 'turn']
+3 turn
+Sampling time 3.176245887996629
+Solve time for step 91.95138621330261
+Solve time for step 13.54980182647705
+Solve time for step 12.656491041183472
+Solve time for step 12.329312801361084
+Solve time for step 11.328734874725342
+Solve time for step 10.688376188278198
+Solve time for step 9.449409008026123
+Solve time for step 9.516273260116577
+Solve time for step 9.693776845932007
+Solve time for step 8.367960453033447
+Solve time for step 8.238402366638184

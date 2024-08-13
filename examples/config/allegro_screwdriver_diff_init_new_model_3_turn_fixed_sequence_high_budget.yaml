@@ -5,7 +5,7 @@ num_steps: 15
 num_turns: 3
 num_trials: 10
 visualize: False
-experiment_name: 'allegro_screwdriver_diffusion_new_model_diff_only'
+experiment_name: 'allegro_screwdriver_diffusion_new_model_fixed_sequence_with_diff_high_budget'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
@@ -38,9 +38,9 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:1'
-    online_iters: 0
-    warmup_iters: 0
+    device: 'cuda:0'
+    online_iters: 40
+    warmup_iters: 250
     resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1
