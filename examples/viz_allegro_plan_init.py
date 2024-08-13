@@ -702,6 +702,24 @@ def do_trial(trial_ind, env, data_saved, params, fpath, sim_viz_env=None, ros_co
         return xu_new
 
     state = env.get_state()
+    print(str(fpath) + f'/trajectory.pkl')
+    with open(str(fpath) + f'/trajectory.pkl', 'rb') as data:
+        d = pkl.load(data)
+        traj = np.stack((d[:-1]), axis=0)
+
+    # cosine = traj[..., 14]
+    # sine = traj[..., 15]
+    # traj = np.concatenate((traj[..., :14], np.expand_dims(np.arctan2(sine, cosine), -1)), axis=-1)
+    traj = traj[..., :15]
+    tmp = np.zeros((traj.shape[0], traj.shape[1], 1))
+    print(traj.shape, tmp.shape)
+    traj = np.concatenate((traj, tmp), axis=-1)
+    traj = traj.reshape(-1, 16)
+    traj = torch.tensor(traj, device=params['device']).float()
+    visualize_trajectory_wrapper(traj, turn_problem.contact_scenes, 'traj',
+                                    'traj', 0, turn_problem.fingers, turn_problem.obj_dof, 0)
+    
+    return -1
 
     contact_label_to_vec = {'pregrasp': 0,
                             'index': 2,
