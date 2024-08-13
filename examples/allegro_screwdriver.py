@@ -1047,7 +1047,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 if __name__ == "__main__":
     # get config
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_sine_cosine_planned_contact.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_planned_replanned_contact_sine_cosine.yaml').read_text())
     from tqdm import tqdm
 
     if config['mode'] == 'hardware':
@@ -1168,6 +1168,9 @@ if __name__ == "__main__":
             object_location = torch.tensor([0, 0, 1.205]).to(
                 params['device'])  # TODO: confirm if this is the correct location
             params['object_location'] = object_location
+            # If params['device'] is cuda:1 but the computer only has 1 gpu, change to cuda:0
+            if torch.cuda.device_count() == 1 and torch.cuda.current_device() == 1:
+                params['device'] = 'cuda:0'
             final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node, inits_noise[i], noise_noise[i])
             #
             # try:
