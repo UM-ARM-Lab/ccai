@@ -424,7 +424,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             vae.load_state_dict(torch.load(f'{CCAI_PATH}/{vae_path}'))
             for param in vae.parameters():
                 param.requires_grad = False
-        trajectory_sampler = TrajectorySampler(T=params['T'] + 1, dx=16 if not model_t else params['nzt'], du=21 if not model_t else 0, type=params['type'],
+        trajectory_sampler = TrajectorySampler(T=params['T'] + 1, dx=(15 + (1 if params['sine_cosine'] else 0)) if not model_t else params['nzt'], du=21 if not model_t else 0, type=params['type'],
                                                timesteps=256, hidden_dim=128 if not model_t else 64,
                                                context_dim=3, generate_context=False,
                                                constrain=params['projected'],
@@ -820,7 +820,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         if next_node is None:
             next_node = Node(
                 # torch.empty(num_samples_per_node, 0, 36),
-                torch.empty(num_samples_per_node, 0, 37),#.to(device=params['device']),
+                torch.empty(num_samples_per_node, 0, 37 if params['sine_cosine'] else 36),#.to(device=params['device']),
                 0,
                 tuple(),
                 # torch.empty(num_samples_per_node * 4, 0, 36),
@@ -831,7 +831,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         else:
             next_node = Node(
                 # torch.empty(num_samples_per_node, 0, 36),
-                torch.empty(num_samples_per_node, 0, 37),#.to(device=params['device']),
+                torch.empty(num_samples_per_node, 0, 37 if params['sine_cosine'] else 36),#.to(device=params['device']),
                 0,
                 (next_node, ),
                 # torch.empty(num_samples_per_node * 4, 0, 36),
@@ -840,7 +840,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             )
             initial_run = False
         
-        contact_sequence_sampler = GraphSearch(state_for_search, trajectory_sampler, problem_for_sampler, 
+        contact_sequence_sampler = GraphSearch(state_for_search, trajectory_sampler, params['T'], problem_for_sampler, 
                                                depth, params['heuristic'], params['goal'], 
                                                torch.device(params['device']), initial_run=initial_run,
                                                multi_particle=multi_particle,
@@ -932,7 +932,15 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         # else:
         # contact = contact_sequence[stage]
-        if sample_contact and (stage == 0 or params['replan']):
+        if stage == 0:
+            contact = 'pregrasp'
+            start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
+            best_traj, _ = pregrasp_planner.step(start[:pregrasp_planner.problem.dx])
+            for x in best_traj[:, :4 * num_fingers]:
+                action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
+                env.step(action)
+                continue
+        elif sample_contact and (stage == 1 or params['replan']):
             new_contact_sequence, new_next_node = plan_contacts(state, num_stages - stage, next_node, params['multi_particle_search'])
             if new_contact_sequence is not None and len(new_contact_sequence) == 0:
                 print('Planner thinks task is complete')
@@ -969,13 +977,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             contact = contact_sequence[stage]
         executed_contacts.append(contact)
         print(stage, contact)
-        if contact == 'pregrasp':
-            start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
-            best_traj, _ = pregrasp_planner.step(start[:pregrasp_planner.problem.dx])
-            for x in best_traj[:, :4 * num_fingers]:
-                action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
-                env.step(action)
-        elif contact == 'index':
+        if contact == 'index':
             _goal = torch.tensor([0, 0, state[-1]]).to(device=params['device'])
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
                 index_regrasp_planner, mode='index', goal=_goal, fname=f'index_regrasp_{stage}')
@@ -1040,8 +1042,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_diff_planned_init_higher_planning_budget_mc_likelihood_less_turn.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_planned_contact.yaml').read_text())
     from tqdm import tqdm
 
     if config['mode'] == 'hardware':

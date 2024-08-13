@@ -48,10 +48,12 @@ class Node:
         return NotImplemented
 
 class GraphSearch(ContactSampler, AStar):
-    def __init__(self, start, model, problem_dict, max_depth, heuristic_weight, goal, device,
+    def __init__(self, start, model, T, problem_dict, max_depth, heuristic_weight, goal, device,
                   *args, initial_run=False, multi_particle=False, prior=0, sine_cosine=False, **kwargs):
         ContactSampler.__init__(self, *args, **kwargs)
 
+        self.T = T + 1
+        self.dx = 16 if sine_cosine else 15
         self.start = start
         self.start_yaw = start[14].item()
         self.sine_cosine = sine_cosine
@@ -192,7 +194,7 @@ class GraphSearch(ContactSampler, AStar):
         # if node.trajectory.shape[1] == 0 and len(cur_seq) == 0:
         #     last_state = self.start
         #     samples, _, likelihood = self.model.sample(N=self.num_samples, start=last_state.reshape(1, -1),
-        #                             H=16, constraints=self.neighbors_c_states[:self.num_samples])
+        #                             H=self.T, constraints=self.neighbors_c_states[:self.num_samples])
         #     if likelihood is not None:
         #         likelihood = likelihood.flatten()
         #         # likelihood = torch.log(likelihood / (1 - likelihood))
@@ -248,10 +250,10 @@ class GraphSearch(ContactSampler, AStar):
             last_state = last_state.reshape(1, -1).repeat(self.num_samples, 1)
         else:
             # last_state = node.trajectory[:, -1, :15]
-            last_state = node.trajectory[:, -1, :16]
+            last_state = node.trajectory[:, -1, :self.dx]
         last_state = last_state.to(self.device)
         samples, _, likelihood = self.model.sample(N=3*self.num_samples * self.num_samples_multi, start=last_state.reshape(self.num_samples, -1).repeat(3*self.num_samples_multi, 1),
-                                    H=16, constraints=self.neighbors_c_states[self.num_samples*self.num_samples_multi:])
+                                    H=self.T, constraints=self.neighbors_c_states[self.num_samples*self.num_samples_multi:])
         if likelihood is not None:
             likelihood = likelihood.flatten()
         samples_orig = samples.clone()
