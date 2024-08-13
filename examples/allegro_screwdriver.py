@@ -861,6 +861,14 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             pkl.dump((contact_node_sequence, closed_set, planning_time, contact_sequence_sampler.iter), f)
         if contact_node_sequence is None:
             print('No contact sequence found')
+            # Find the node in the closed set with the lowest cost
+            min_cost = float('inf')
+            min_node = None
+            for node in closed_set:
+                if node.cost < min_cost:
+                    min_cost = node.cost
+                    min_node = node
+            contact_node_sequence = [min_node]
             return None, None
         last_node = contact_node_sequence[-1]
 
