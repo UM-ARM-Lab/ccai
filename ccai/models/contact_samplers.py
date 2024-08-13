@@ -75,9 +75,9 @@ class GraphSearch(ContactSampler, AStar):
 
         self.num_samples_multi = 1
         if self.multi_particle:
-            self.num_samples_multi = 8
+            self.num_samples_multi = 4
         else:
-            self.num_samples_multi = 32
+            self.num_samples_multi = 64
             self.num_samples = 1
 
         if prior == 0:

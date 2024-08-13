@@ -30,7 +30,7 @@ use_guidance: False
 sample_contact: False
 use_partial_constraint: True
 sine_cosine: False
-model_path: 'data/training/allegro_screwdriver/allegro_better_model/allegro_screwdriver_diffusion_w_classifier.pt'
+model_path: 'data/training/allegro_screwdriver/allegro_high_force_gravity_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
 # model_path: 'data/training/allegro_screwdriver/allegro_test_new_data_augment_angle_diffusion/allegro_screwdriver_diffusion.pt'
 controllers:
   csvgd:

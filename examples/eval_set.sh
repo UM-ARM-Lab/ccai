@@ -1,4 +1,4 @@
-python -u allegro_screwdriver.py allegro_screwdriver_csvto_only > allegro_screwdriver_csvto_only.log
+# python -u allegro_screwdriver.py allegro_screwdriver_csvto_only > allegro_screwdriver_csvto_only.log
 python -u allegro_screwdriver.py allegro_screwdriver_diff_only > allegro_screwdriver_diff_only.log
 python -u allegro_screwdriver.py allegro_screwdriver_csvto_diff > allegro_screwdriver_csvto_diff.log
 python -u allegro_screwdriver.py allegro_screwdriver_csvto_diff_planned_contact > allegro_screwdriver_csvto_diff_planned_contact.log
