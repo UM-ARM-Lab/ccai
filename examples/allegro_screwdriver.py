@@ -1040,17 +1040,43 @@ if __name__ == "__main__":
     from tqdm import tqdm
 
     if config['mode'] == 'hardware':
-        env = RosAllegroValveTurningEnv(1, control_mode='joint_impedance',
-                                        use_cartesian_controller=False,
-                                        viewer=True,
-                                        steps_per_action=60,
-                                        friction_coefficient=1.0,
-                                        device=config['sim_device'],
-                                        valve=config['object_type'],
-                                        video_save_path=img_save_dir,
-                                        joint_stiffness=config['kp'],
-                                        fingers=config['fingers'],
-                                        )
+        from hardware.hardware_env import HardwareEnv
+        default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
+                                    torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float(),
+                                    torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
+                                    torch.tensor([[1.2, 0.3, 0.3, 1.2]]).float()),
+                                    dim=1)
+        env = HardwareEnv(default_dof_pos[:, :16], 
+                          finger_list=config['fingers'], 
+                          kp=config['kp'], 
+                          obj='screwdriver',
+                          mode='relative',
+                          gradual_control=True,
+                          num_repeat=10)
+        root_coor, root_ori = env.obj_reader.get_state()
+        root_coor = root_coor / 1000 # convert to meters
+        # robot_p = np.array([-0.025, -0.1, 1.33])
+        robot_p = np.array([0, -0.095, 1.33])
+        root_coor = root_coor + robot_p
+        sim_env = RosAllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
+                                 use_cartesian_controller=False,
+                                 viewer=True,
+                                 steps_per_action=60,
+                                 friction_coefficient=1.0,
+                                 device=config['sim_device'],
+                                 valve=config['object_type'],
+                                 video_save_path=img_save_dir,
+                                 joint_stiffness=config['kp'],
+                                 fingers=config['fingers'],
+                                 table_pose=root_coor,
+                                 )
+        sim, gym, viewer = sim_env.get_sim()
+        assert (np.array(sim_env.robot_p) == robot_p).all()
+        assert (sim_env.default_dof_pos[:, :16] == default_dof_pos.to(config['sim_device'])).all()
+        env.world_trans = sim_env.world_trans
+        env.joint_stiffness = sim_env.joint_stiffness
+        env.device = sim_env.device
+        env.table_pose = sim_env.table_pose
     else:
         if not config['visualize']:
             img_save_dir = None

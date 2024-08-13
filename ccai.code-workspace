@@ -1,0 +1,30 @@
+{
+	"folders": [
+		{
+			"name": "ccai",
+			"path": "."
+		},
+		{
+			"name": "isaacgym-arm-envs",
+			"path": "../isaacgym-arm-envs"
+		},
+		{
+			"name": "victor_multi_finger",
+			"path": "../victor_multi_finger"
+		},
+		{
+			"name": "pytorch_volumetric",
+			"path": "../pytorch_volumetric"
+		},
+		{
+			"path": "../pytorch_mppi"
+		},
+		{
+			"path": "../pytorch_kinematics"
+		},
+		{
+			"path": "../pytorch-soft-actor-critic"
+		}
+	],
+	"settings": {}
+}
