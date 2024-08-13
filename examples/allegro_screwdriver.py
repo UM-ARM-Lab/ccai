@@ -556,6 +556,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 # start_for_diff = start#convert_yaw_to_sine_cosine(start)
                 if params['sine_cosine']:
                     start_for_diff = convert_yaw_to_sine_cosine(start)
+                else:
+                    start_for_diff = start
                 initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
                                                                   H=len(modes) * (params['T'] + 1),
                                                                   constraints=contact)
@@ -595,6 +597,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 # start_for_diff = start#convert_yaw_to_sine_cosine(start)
                 if params['sine_cosine']:
                     start_for_diff = convert_yaw_to_sine_cosine(start)
+                else:
+                    start_for_diff = start
                 initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
                                                                   H=params['T'] + 1,
                                                                   constraints=contact)
