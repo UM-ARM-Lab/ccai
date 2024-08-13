@@ -978,7 +978,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             print('Planner thinks task is complete')
             break
         else:
-            contact = contact_sequence[stage]
+            contact = contact_sequence[stage - 1]
         executed_contacts.append(contact)
         print(stage, contact)
         if contact == 'index':
@@ -1046,8 +1046,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_planned_contact.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_sine_cosine_planned_contact.yaml').read_text())
     from tqdm import tqdm
 
     if config['mode'] == 'hardware':
