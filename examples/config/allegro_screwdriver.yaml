@@ -3,9 +3,9 @@ T: 12
 receding_horizon: False
 num_steps: 12
 num_turns: 3
-num_trials: 80
-visualize: True
-experiment_name: 'allegro_high_force_data_0'
+num_trials: 60
+visualize: False
+experiment_name: 'allegro_high_force_high_eps_data_0'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -25,7 +25,7 @@ controllers:
         alpha_C: 1
         step_size: 0.1
         momentum: 0.
-        device: 'cuda:0'
+        device: 'cuda:1'
         online_iters: 50
         warmup_iters: 300
         resample_steps: 16
@@ -34,7 +34,7 @@ controllers:
         penalty: 1000000
         collision_checking: False
         joint_friction: 0.0
-        obj_gravity: True
+        obj_gravity: False
 
 #  csvgd_fixed_contact:
 #    # N: 16
