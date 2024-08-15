@@ -1155,7 +1155,7 @@ if __name__ == "__main__":
             if len(noise_noise.shape) == 6:
                 noise_noise = noise_noise[:, :, :, 0, :, :]
     start_ind = 0 if not config['sample_contact'] else 0
-    for i in tqdm(range(start_ind, config['num_trials'])):
+    for i in tqdm(range(5, config['num_trials'])):
     # for i in tqdm(range(0, 7)):
         
         torch.manual_seed(i)

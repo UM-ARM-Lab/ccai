@@ -18,7 +18,7 @@ heuristic: 1000
 max_depth: 11
 goal: -1.5
 prior: 1
-multi_particle_search: True
+multi_particle_search: False
 replan: True
 visualize_plan: False
 optimize_force: True

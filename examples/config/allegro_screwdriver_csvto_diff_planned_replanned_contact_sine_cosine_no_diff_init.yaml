@@ -5,7 +5,7 @@ num_steps: 12
 num_turns: 3
 num_trials: 10
 visualize: True
-experiment_name: 'allegro_screwdriver_csvto_diff_planned_replanned_contact_sine_cosine_fixed_goal'
+experiment_name: 'allegro_screwdriver_csvto_diff_planned_replanned_contact_sine_cosine_no_diff_init'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
@@ -16,7 +16,7 @@ friction_coefficient: 1.0
 kp: 3.0
 heuristic: 1000
 max_depth: 11
-goal: -1.75
+goal: -1.5
 prior: 1
 multi_particle_search: True
 replan: True
@@ -30,6 +30,7 @@ use_guidance: False
 sample_contact: True
 use_partial_constraint: True
 sine_cosine: True
+diff_init: False
 model_path: 'data/training/allegro_screwdriver/allegro_high_force_gravity_sine_cosine_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
 # model_path: 'data/training/allegro_screwdriver/allegro_test_new_data_augment_angle_diffusion/allegro_screwdriver_diffusion.pt'
 controllers:
