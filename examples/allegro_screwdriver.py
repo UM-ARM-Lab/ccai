@@ -333,7 +333,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         if params['projected'] or params['sample_contact']:
             pregrasp_problem_diff = AllegroScrewdriverDiff(
                 start=start[:4 * num_fingers + obj_dof],
-                goal=params['valve_goal'] * 0,
+                goal=params['valve_goal'],
                 T=params['T'],
                 chain=params['chain'],
                 device=params['device'],
@@ -350,7 +350,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             # finger gate index
             index_regrasp_problem_diff = AllegroScrewdriverDiff(
                 start=start[:4 * num_fingers + obj_dof],
-                goal=params['valve_goal'] * 0,
+                goal=params['valve_goal'],
                 T=params['T'],
                 chain=params['chain'],
                 device=params['device'],
@@ -367,7 +367,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             )
             thumb_and_middle_regrasp_problem_diff = AllegroScrewdriverDiff(
                 start=start[:4 * num_fingers + obj_dof],
-                goal=params['valve_goal'] * 0,
+                goal=params['valve_goal'],
                 T=params['T'],
                 chain=params['chain'],
                 device=params['device'],
@@ -384,7 +384,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             )
             turn_problem_diff = AllegroScrewdriverDiff(
                 start=start[:4 * num_fingers + obj_dof],
-                goal=params['valve_goal'] * 0,
+                goal=params['valve_goal'],
                 T=params['T'],
                 chain=params['chain'],
                 device=params['device'],
@@ -588,7 +588,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # generate initial samples with diffusion model
         initial_samples = None
         sim_rollouts = None
-        if trajectory_sampler is not None:
+        if trajectory_sampler is not None and params.get('diff_init', True):
             with torch.no_grad():
                 start = state.clone()
                 # if state[-1] < -1.0:
@@ -623,7 +623,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         state = state[:planner.problem.dx]
         # print(params['T'], state.shape, initial_samples)
         planner.reset(state, T=params['T'], goal=goal, initial_x=initial_samples)
-        if trajectory_sampler is None:
+        if trajectory_sampler is None or not params.get('diff_init', True):
             initial_samples = planner.x.detach().clone()
             sim_rollouts = torch.zeros_like(initial_samples)
         planned_trajectories = []
@@ -862,13 +862,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         if contact_node_sequence is None:
             print('No contact sequence found')
             # Find the node in the closed set with the lowest cost
-            min_cost = float('inf')
-            min_node = None
-            for node in closed_set:
-                if node.cost < min_cost:
-                    min_cost = node.cost
-                    min_node = node
-            contact_node_sequence = [min_node]
+            # min_cost = float('inf')
+            # min_node = None
+            # for node in closed_set:
+            #     if node.fscore < min_cost and node.fscore > 0:
+            #         min_cost = node.fscore
+            #         min_node = node
+            # contact_node_sequence = [min_node]
             return None, None
         last_node = contact_node_sequence[-1]
 
@@ -918,7 +918,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     next_node = None
     state = env.get_state()
     state = state['q'].reshape(-1)[:15].to(device=params['device'])
-    valve_goal = torch.tensor([0, 0, state[-1] - 2 * np.pi / 3.0]).to(device=params['device'])
 
     executed_contacts = []
     for stage in range(num_stages):
@@ -985,8 +984,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         elif stage >= len(contact_sequence):
             print('Planner thinks task is complete')
             break
-        else:
+        elif sample_contact:
             contact = contact_sequence[stage - 1]
+        else:
+            contact = contact_sequence[stage]
         executed_contacts.append(contact)
         print(stage, contact)
         if contact == 'index':
@@ -1054,8 +1055,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_planned_replanned_contact_sine_cosine.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_planned_replanned_contact_sine_cosine.yaml').read_text())
     from tqdm import tqdm
 
     if config['mode'] == 'hardware':
@@ -1160,7 +1161,7 @@ if __name__ == "__main__":
         torch.manual_seed(i)
         np.random.seed(i)
 
-        goal = - 0.5 * torch.tensor([0, 0, np.pi])
+        goal = torch.tensor([0, 0, config['goal']])
         # goal = goal + 0.025 * torch.randn(1) + 0.2
         for controller in config['controllers'].keys():
             env.reset()
@@ -1170,6 +1171,8 @@ if __name__ == "__main__":
             params = config.copy()
             params.pop('controllers')
             params.update(config['controllers'][controller])
+            if torch.cuda.device_count() == 1 and torch.cuda.current_device() == 1:
+                params['device'] = 'cuda:0'
             params['controller'] = controller
             params['valve_goal'] = goal.to(device=params['device'])
             params['chain'] = chain.to(device=params['device'])
@@ -1177,8 +1180,6 @@ if __name__ == "__main__":
                 params['device'])  # TODO: confirm if this is the correct location
             params['object_location'] = object_location
             # If params['device'] is cuda:1 but the computer only has 1 gpu, change to cuda:0
-            if torch.cuda.device_count() == 1 and torch.cuda.current_device() == 1:
-                params['device'] = 'cuda:0'
             final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node, inits_noise[i], noise_noise[i])
             #
             # try:

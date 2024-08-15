@@ -75,9 +75,9 @@ class GraphSearch(ContactSampler, AStar):
 
         self.num_samples_multi = 1
         if self.multi_particle:
-            self.num_samples_multi = 4
+            self.num_samples_multi = 8
         else:
-            self.num_samples_multi = 64
+            self.num_samples_multi = 128
             self.num_samples = 1
 
         if prior == 0:
@@ -267,6 +267,9 @@ class GraphSearch(ContactSampler, AStar):
             problem = self.problem_dict[c_state]
             sample_range_mask = samples[sample_range][: , :, mask_without_z]
             problem._preprocess(sample_range_mask, projected_diffusion=True)
+            if c_state in set([(-1, -1, -1), (-1, 1, 1), (1, -1, -1)]):
+                # Update problem goal to be beginning of trajectory
+                problem.goal = last_state[:, -3:]
             J, _, _ = problem._objective(sample_range_mask)
             # g, _, _ = problem._con_eq(sample_range_mask, compute_grads=False, compute_hess=False, verbose=False, projected_diffusion=True)
             # h, _, _ = problem._con_ineq(sample_range_mask, compute_grads=False, compute_hess=False, verbose=False, projected_diffusion=True)
@@ -332,6 +335,8 @@ class GraphSearch(ContactSampler, AStar):
         if current.trajectory.shape[0] == 0:
             return self.heuristic_weight * max(0, self.start_yaw - self.goal)
         c_seq = [((np.array(i) + 1) /2).sum().astype(int) for i in current.contact_sequence]
+        if self.initial_run:
+            c_seq = [0] + c_seq
         nll = -self.markov_chain.eval_log_prob(c_seq)
         yaw = self.get_expected_yaw(current)
         # yaw = current.trajectory[-1, 14].item()
