@@ -18,6 +18,9 @@ from ccai.dataset import AllegroScrewDriverDataset, FakeDataset, RealAndFakeData
 from isaac_victor_envs.utils import get_assets_dir
 from torch.utils.data import DataLoader, RandomSampler
 from ccai.models.trajectory_samplers import TrajectorySampler
+
+import sys
+sys.path.append('..')
 from utils.allegro_utils import partial_to_full_state, visualize_trajectory
 
 TORCH_LOGS = "+dynamo"
@@ -257,7 +260,7 @@ def generate_simulated_data(model, loader, config, name=None):
         else:
             dx = 15
 
-
+        T = config['T']
         B = trajectories.shape[0]
         trajectories = trajectories.to(device=config['device'])
         traj_class = traj_class.to(device=config['device'])
@@ -270,16 +273,16 @@ def generate_simulated_data(model, loader, config, name=None):
         start = (trajectories[:N, 0, :dx] * model.x_std[:dx].to(device=trajectories.device) +
                  model.x_mean[:dx].to(device=trajectories.device))
 
-        new_traj, _, _ = model.sample(N=B, H=num_sub_traj * 16, start=start, constraints=traj_class)
+        new_traj, _, _ = model.sample(N=B, H=num_sub_traj * T, start=start, constraints=traj_class)
         # visualize_trajectories(new_traj, config['scene'], fpath, headless=False)
 
         for i in range(num_sub_traj):
             if i == 0:
                 idx = 0
             else:
-                idx = i * 16 - 1
+                idx = i * T - 1
 
-            simulated_trajectories.append(new_traj[:, idx:idx + 16].detach().cpu())
+            simulated_trajectories.append(new_traj[:, idx:idx + T].detach().cpu())
             simulated_class.append(traj_class[:, i].detach().cpu())
 
         dataset_size += B * num_sub_traj
