@@ -603,31 +603,31 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # generate initial samples with diffusion model
         initial_samples = None
         sim_rollouts = None
-        # if trajectory_sampler is not None:
-        #     with torch.no_grad():
-        #         start = state.clone()
-        #         # if state[-1] < -1.0:
-        #         #     start[-1] += 0.75
-        #         a = time.perf_counter()
-        #         # start_for_diff = start#convert_yaw_to_sine_cosine(start)
-        #         start_for_diff = convert_yaw_to_sine_cosine(start)
-        #         initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
-        #                                                           H=params['T'] + 1,
-        #                                                           constraints=contact)
-        #         initial_samples = convert_sine_cosine_to_yaw(initial_samples)
-        #         print('Sampling time', time.perf_counter() - a)
-        #         # if state[-1] < -1.0:
-        #         #     initial_samples[:, :, -1] -= 0.75
+        if trajectory_sampler is not None:
+            with torch.no_grad():
+                start = state.clone()
+                # if state[-1] < -1.0:
+                #     start[-1] += 0.75
+                a = time.perf_counter()
+                # start_for_diff = start#convert_yaw_to_sine_cosine(start)
+                start_for_diff = convert_yaw_to_sine_cosine(start)
+                initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
+                                                                  H=params['T'] + 1,
+                                                                  constraints=contact)
+                initial_samples = convert_sine_cosine_to_yaw(initial_samples)
+                print('Sampling time', time.perf_counter() - a)
+                # if state[-1] < -1.0:
+                #     initial_samples[:, :, -1] -= 0.75
             
-        #     sim_rollouts = torch.zeros_like(initial_samples)
-        #     # for i in range(params['N']):
-        #     #     sim_rollout = rollout_trajectory_in_sim(env_sim_rollout, initial_samples[i])
-        #     #     sim_rollouts[i] = sim_rollout
+            sim_rollouts = torch.zeros_like(initial_samples)
+            # for i in range(params['N']):
+            #     sim_rollout = rollout_trajectory_in_sim(env_sim_rollout, initial_samples[i])
+            #     sim_rollouts[i] = sim_rollout
 
-        #     initial_samples = _full_to_partial(initial_samples, mode)
-        #     initial_x = initial_samples[:, 1:, :planner.problem.dx]
-        #     initial_u = initial_samples[:, :-1, -planner.problem.du:]
-        #     initial_samples = torch.cat((initial_x, initial_u), dim=-1)
+            initial_samples = _full_to_partial(initial_samples, mode)
+            initial_x = initial_samples[:, 1:, :planner.problem.dx]
+            initial_u = initial_samples[:, :-1, -planner.problem.du:]
+            initial_samples = torch.cat((initial_x, initial_u), dim=-1)
 
         state = env.get_state()
         state = state['q'].reshape(-1).to(device=params['device'])
@@ -1153,7 +1153,7 @@ if __name__ == "__main__":
                 inits_noise = inits_noise[:, :, 0, :, :]
             if len(noise_noise.shape) == 6:
                 noise_noise = noise_noise[:, :, :, 0, :, :]
-    start_ind = 3 if config['experiment_name'] == 'allegro_screwdriver_diffusion_new_model_fixed_sequence' else 0
+    start_ind = 5 if config['experiment_name'] == 'allegro_screwdriver_diffusion_planned_initialization_3_turn_multi-particle_new_model_less_turn_replan_high_budget' else 0
     for i in tqdm(range(start_ind, config['num_trials'])):
     # for i in tqdm(range(0, 7)):
         
