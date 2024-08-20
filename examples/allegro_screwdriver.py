@@ -723,7 +723,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             _add_to_dataset(traj, plans, contact_points, contact_distance,
                             contact_state=torch.tensor([1.0, 0.0, 0.0]))
         elif contact == 'turn':
-            _goal = torch.tensor([0, 0, state[-1] - np.pi / 3]).to(device=params['device'])
+            _goal = torch.tensor([0, 0, state[-1] - np.pi / 6]).to(device=params['device'])
             traj, plans, contact_points, contact_distance = execute_traj(
                 turn_planner, mode='turn', goal=_goal, fname=f'turn_{stage}')
 
