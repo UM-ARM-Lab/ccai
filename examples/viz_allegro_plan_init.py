@@ -716,10 +716,10 @@ def do_trial(trial_ind, env, data_saved, params, fpath, sim_viz_env=None, ros_co
     traj = np.concatenate((traj, tmp), axis=-1)
     traj = traj.reshape(-1, 16)
     traj = torch.tensor(traj, device=params['device']).float()
-    visualize_trajectory_wrapper(traj, turn_problem.contact_scenes, 'traj',
-                                    'traj', 0, turn_problem.fingers, turn_problem.obj_dof, 0)
+    # visualize_trajectory_wrapper(traj, turn_problem.contact_scenes, 'traj',
+                                    # 'traj', 0, turn_problem.fingers, turn_problem.obj_dof, 0)
     
-    return -1
+    # return -1
 
     contact_label_to_vec = {'pregrasp': 0,
                             'index': 2,
@@ -738,74 +738,77 @@ def do_trial(trial_ind, env, data_saved, params, fpath, sim_viz_env=None, ros_co
             perm = [0, 1]
             contact_sequence += [contact_options[perm[0]], contact_options[perm[1]], 'turn']
     else:
-        with open(f'{fpath}/contact_planning_8.pkl', 'rb') as f:
+        with open(f'{fpath}/contact_planning_4.pkl', 'rb') as f:
             contact_node_sequence, _, _, _ = pkl.load(f)
         last_node = contact_node_sequence[-1]
 
         contact_sequence = np.array(last_node.contact_sequence)
         contact_sequence = (contact_sequence + 1)/2
         contact_sequence = [contact_vec_to_label[int(contact_sequence[i].sum())] for i in range(contact_sequence.shape[0])]
+        print(contact_sequence)
+        print(last_node.trajectory.shape)
+        for particle in range(last_node.trajectory.shape[0]):
+            traj = convert_sine_cosine_to_yaw(last_node.trajectory)[particle].reshape(len(contact_sequence)-1, -1, 36)
+            for stage in range(1, len(contact_sequence)):
+                contact = -torch.ones(params['N'], 3).to(device=params['device'])
+                mode = contact_sequence[stage]
+                if mode == 'thumb_middle':
+                    contact[:, 0] = 1
+                    inds = torch.arange(30)
+                    inds_plans = inds
+                    planner = thumb_and_middle_regrasp_planner
+                    fname = f'thumb_middle_regrasp_{stage}'
+                elif mode == 'index':
+                    contact[:, 1] = 1
+                    contact[:, 2] = 1
+                    inds = torch.arange(33)
+                    inds_plans = torch.cat((torch.arange(27), torch.arange(30, 36)))
+                    planner = index_regrasp_planner
+                    fname = f'index_regrasp_{stage}'
+                elif mode == 'turn':
+                    contact[:, :] = 1
+                    inds = torch.arange(36)
+                    inds_plans = inds
+                    planner = turn_planner
+                    fname = f'turn_{stage}'
+                elif mode == 'pregrasp':
+                    inds = torch.arange(27)
+                    inds_plans = inds
+                    planner = pregrasp_planner
+                    fname = f'pregrasp_{stage}'
+                    continue
 
-        traj = convert_sine_cosine_to_yaw(last_node.trajectory)[0].reshape(len(contact_sequence), -1, 36)
-        for stage in range(len(contact_sequence)):
-            contact = -torch.ones(params['N'], 3).to(device=params['device'])
-            mode = contact_sequence[stage]
-            if mode == 'thumb_middle':
-                contact[:, 0] = 1
-                inds = torch.arange(30)
-                inds_plans = inds
-                planner = thumb_and_middle_regrasp_planner
-                fname = f'thumb_middle_regrasp_{stage}'
-            elif mode == 'index':
-                contact[:, 1] = 1
-                contact[:, 2] = 1
-                inds = torch.arange(33)
-                inds_plans = torch.cat((torch.arange(27), torch.arange(30, 36)))
-                planner = index_regrasp_planner
-                fname = f'index_regrasp_{stage}'
-            elif mode == 'turn':
-                contact[:, :] = 1
-                inds = torch.arange(36)
-                inds_plans = inds
-                planner = turn_planner
-                fname = f'turn_{stage}'
-            elif mode == 'pregrasp':
-                inds = torch.arange(27)
-                inds_plans = inds
-                planner = pregrasp_planner
-                fname = f'pregrasp_{stage}'
+                init_traj_for_viz = traj[stage-1, :, :16]
 
-            init_traj_for_viz = traj[stage, :, :16]
+                cosine = init_traj_for_viz[..., 14]
+                sine = init_traj_for_viz[..., 15]
+                init_traj_for_viz = torch.cat((init_traj_for_viz[..., :14], torch.atan2(sine, cosine).unsqueeze(-1)), dim=-1)
 
-            cosine = init_traj_for_viz[..., 14]
-            sine = init_traj_for_viz[..., 15]
-            init_traj_for_viz = torch.cat((init_traj_for_viz[..., :14], torch.atan2(sine, cosine).unsqueeze(-1)), dim=-1)
+                tmp = torch.zeros((init_traj_for_viz.shape[0], 1),
+                                    device=init_traj_for_viz.device)  # add the joint for the screwdriver cap
+                init_traj_for_viz = torch.cat((init_traj_for_viz, tmp), dim=1)
 
-            tmp = torch.zeros((init_traj_for_viz.shape[0], 1),
-                                device=init_traj_for_viz.device)  # add the joint for the screwdriver cap
-            init_traj_for_viz = torch.cat((init_traj_for_viz, tmp), dim=1)
+                visualize_trajectory_wrapper(init_traj_for_viz, turn_problem.contact_scenes, fname,
+                                                'planned_init', particle, turn_problem.fingers, turn_problem.obj_dof, 0)
 
-            visualize_trajectory_wrapper(init_traj_for_viz, turn_problem.contact_scenes, fname,
-                                            'planned_init', 0, turn_problem.fingers, turn_problem.obj_dof, 0)
+                contact = contact_sequence[stage]
+                print(stage, contact)
+                if contact == 'pregrasp':
+                    _, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
+                        pregrasp_planner, data_saved, stage, mode='pregrasp', fname=f'pregrasp_{stage}')
 
-            contact = contact_sequence[stage]
-            print(stage, contact)
-            if contact == 'pregrasp':
-                _, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
-                    pregrasp_planner, data_saved, stage, mode='pregrasp', fname=f'pregrasp_{stage}')
+                elif contact == 'index':
+                    _, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
+                        index_regrasp_planner, data_saved, stage, mode='index', goal=None, fname=f'index_regrasp_{stage}')
 
-            elif contact == 'index':
-                _, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
-                    index_regrasp_planner, data_saved, stage, mode='index', goal=None, fname=f'index_regrasp_{stage}')
+                elif contact == 'thumb_middle':
+                    _, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
+                        thumb_and_middle_regrasp_planner, data_saved, stage, mode='thumb_middle',
+                        goal=None, fname=f'thumb_middle_regrasp_{stage}')
 
-            elif contact == 'thumb_middle':
-                _, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
-                    thumb_and_middle_regrasp_planner, data_saved, stage, mode='thumb_middle',
-                    goal=None, fname=f'thumb_middle_regrasp_{stage}')
-
-            elif contact == 'turn':
-                _, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
-                    turn_planner, data_saved, stage, mode='turn', goal=None, fname=f'turn_{stage}')
+                elif contact == 'turn':
+                    _, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
+                        turn_planner, data_saved, stage, mode='turn', goal=None, fname=f'turn_{stage}')
 
 
 
