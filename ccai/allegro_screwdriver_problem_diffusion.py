@@ -1,5 +1,6 @@
 from ccai.allegro_contact_diffusion import AllegroManipulationProblemDiff
 import torch
+
 class AllegroScrewdriverDiff(AllegroManipulationProblemDiff):
     def __init__(self,
                  start,
@@ -40,11 +41,3 @@ class AllegroScrewdriverDiff(AllegroManipulationProblemDiff):
             (state[:, -self.obj_dof:-1]) ** 2)  # the screwdriver should only rotate in z direction
         return smoothness_cost + upright_cost + super()._cost(xu, start, goal)
 
-
-# class IpoptScrewdriver(AllegroScrewdriver, IpoptProblem):
-
-#     def __init__(self, *args, **kwargs):
-#         device = kwargs.get('device', None)
-#         if device is not None:
-#             kwargs.pop('device')
-#         super().__init__(*args, **kwargs, N=1, device='cpu')
