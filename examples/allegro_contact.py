@@ -714,7 +714,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
     def _contact_avoidance(self, xu, finger_name, compute_grads=True, compute_hess=False, projected_diffusion=False):
         h, grad_h, hess_h = self._contact_constraints(xu, finger_name, compute_grads, compute_hess, terminal=False, projected_diffusion=projected_diffusion)
         eps = torch.zeros_like(h)
-        eps[:, :-1] = 5e-3
+        eps[:, :-1] = 1.5e-2
         h = -h + eps
         if grad_h is not None:
             grad_h = -grad_h
