@@ -120,7 +120,7 @@ def state2ee_pos(state, finger_name, fingers, chain, frame_indices, world_trans)
     return ee_p
 
 
-def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headless=False):
+def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headless=False, task='screwdriver'):
     num_fingers = len(fingers)
     # for a single trajectory
     T, dxu = trajectory.shape
@@ -140,7 +140,10 @@ def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headl
         for mesh in meshes:
             vis.add_geometry(mesh)
         ctr = vis.get_view_control()
-        parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-06-27-13-07-52.json")
+        if task == 'screwdriver':
+            parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-06-27-13-07-52.json")
+        elif task == 'card':
+            parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_card.json")
         #parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-04-05-13-17-03.json")
         ctr.convert_from_pinhole_camera_parameters(parameters)
         vis.poll_events()
