@@ -123,11 +123,12 @@ class GraphSearch(ContactSampler, AStar):
         self.num_c_states = self.neighbors_c_states.shape[0]
         self.neighbors_c_states_orig = self.neighbors_c_states.clone()
         self.neighbors_c_states = self.neighbors_c_states.repeat_interleave(self.num_samples*self.num_samples_multi, 0)
+
         # Get the index of num_samples that each neighbors_c_states corresponds to
         self.neighbors_c_states_indices = torch.arange(self.num_samples).repeat(self.num_samples_multi)
         self.iter = 0
 
-        self.discount = .9
+        self.discount = 1
 
 
     def normalize_likelihood(self, likelihood):
@@ -152,13 +153,17 @@ class GraphSearch(ContactSampler, AStar):
         cosine = state[:, 14]
         return torch.atan2(sine, cosine)
     
+    def _goal_reached(self, current):
+        yaw = self.get_expected_yaw(current)
+        return yaw, yaw <= self.goal
+
     def is_goal_reached(self, current, goal):
         self.iter += 1
         # if current.trajectory.shape[0] > 0:
-        yaw = self.get_expected_yaw(current)
         # yaw = current.trajectory[-1, 14].item()
+        yaw, success = self._goal_reached(current)
         print(self.iter, current.contact_sequence, yaw)
-        return yaw <= self.goal
+        return success
         
     def convert_sine_cosine_to_yaw(self, xu):
         """
@@ -254,6 +259,8 @@ class GraphSearch(ContactSampler, AStar):
         last_state = last_state.to(self.device)
         samples, _, likelihood = self.model.sample(N=3*self.num_samples * self.num_samples_multi, start=last_state.reshape(self.num_samples, -1).repeat(3*self.num_samples_multi, 1),
                                     H=self.T, constraints=self.neighbors_c_states[self.num_samples*self.num_samples_multi:])
+        
+
         if likelihood is not None:
             likelihood = likelihood.flatten()
         samples_orig = samples.clone()
@@ -269,7 +276,17 @@ class GraphSearch(ContactSampler, AStar):
             problem._preprocess(sample_range_mask, projected_diffusion=True)
             if c_state in set([(-1, -1, -1), (-1, 1, 1), (1, -1, -1)]):
                 # Update problem goal to be beginning of trajectory
-                problem.goal = last_state[:, -3:]
+                if self.sine_cosine:
+                    problem.goal = self.convert_sine_cosine_to_yaw(last_state)[:, -3:]
+                else:
+                    problem.goal = last_state[:, -3:]
+            else:
+                if self.sine_cosine:
+                    problem.goal = self.convert_sine_cosine_to_yaw(last_state)[:, -3:]
+                    problem.goal[:, -1] -= torch.pi/6
+                else:
+                    problem.goal = last_state[:, -3:]
+                    problem.goal[:, -1] -= torch.pi/6
             J, _, _ = problem._objective(sample_range_mask)
             # g, _, _ = problem._con_eq(sample_range_mask, compute_grads=False, compute_hess=False, verbose=False, projected_diffusion=True)
             # h, _, _ = problem._con_ineq(sample_range_mask, compute_grads=False, compute_hess=False, verbose=False, projected_diffusion=True)
@@ -341,7 +358,8 @@ class GraphSearch(ContactSampler, AStar):
         yaw = self.get_expected_yaw(current)
         # yaw = current.trajectory[-1, 14].item()
         # return self.heuristic_weight * max(0, yaw - self.goal)
-        return self.heuristic_weight * (nll * max(0, yaw - self.goal))
+        # return self.heuristic_weight * (nll * max(0, yaw - self.goal))
+        return self.heuristic_weight * (nll + 10* max(0, yaw - self.goal))
         # return self.heuristic_weight * (nll)
 
         # return self.heuristic_weight * max(0, yaw - self.goal)

@@ -5,7 +5,7 @@ num_steps: 12
 num_turns: 3
 num_trials: 10
 visualize: True
-experiment_name: 'allegro_screwdriver_csvto_diff_planned_replanned_contact_sine_cosine_no_diff_init'
+experiment_name: 'allegro_screwdriver_csvto_only_eps_.01_1_damping'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
@@ -19,7 +19,7 @@ max_depth: 11
 goal: -1.5
 prior: 1
 multi_particle_search: True
-replan: True
+replan: False
 visualize_plan: False
 optimize_force: True
 exclude_index: False
@@ -27,11 +27,10 @@ projected: False
 use_saved_plans: True
 use_saved_noise: False
 use_guidance: False
-sample_contact: True
+sample_contact: False
 use_partial_constraint: True
-sine_cosine: True
-diff_init: False
-model_path: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_high_damping_gravity_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
+sine_cosine: False
+# model_path: 'data/training/allegro_screwdriver/allegro_better_model/allegro_screwdriver_diffusion_w_classifier.pt'
 # model_path: 'data/training/allegro_screwdriver/allegro_test_new_data_augment_angle_diffusion/allegro_screwdriver_diffusion.pt'
 controllers:
   csvgd:

@@ -530,47 +530,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         cosine = torch.cos(yaw)
         xu_new = torch.cat([xu[:14], cosine.unsqueeze(-1), sine.unsqueeze(-1), xu[15:]], dim=-1)
         return xu_new
-    
-    def gen_initial_samples_multi_mode(modes):
-        # generate context from mode
-        contact = -torch.ones(params['N'], len(modes), 3).to(device=params['device'])
-        for i in range(len(modes)):
-            mode = modes[i]
-            if mode == 'thumb_middle':
-                contact[:, i, 0] = 1
-            elif mode == 'index':
-                contact[:, i, 1] = 1
-                contact[:, i, 2] = 1
-            elif mode == 'turn':
-                contact[:, i, :] = 1
 
-        # generate initial samples with diffusion model
-        initial_samples = None
-        sim_rollouts = None
-        if trajectory_sampler is not None:
-            with torch.no_grad():
-                start = state.clone()
-                # if state[-1] < -1.0:
-                #     start[-1] += 0.75
-                a = time.perf_counter()
-                # start_for_diff = start#convert_yaw_to_sine_cosine(start)
-                if params['sine_cosine']:
-                    start_for_diff = convert_yaw_to_sine_cosine(start)
-                else:
-                    start_for_diff = start
-                initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
-                                                                  H=len(modes) * (params['T'] + 1),
-                                                                  constraints=contact)
-                if params['sine_cosine']:
-                    initial_samples = convert_sine_cosine_to_yaw(initial_samples)
-
-                print('Sampling time', time.perf_counter() - a)
-                # if state[-1] < -1.0:
-                #     initial_samples[:, :, -1] -= 0.75
-
-            return initial_samples
-
-    def execute_traj(planner, mode, goal=None, fname=None):
+    def execute_traj(planner, mode, goal=None, fname=None, initial_samples=None):
         # reset planner
         state = env.get_state()
         state = state['q'].reshape(-1)[:15].to(device=params['device'])
@@ -586,9 +547,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             contact[:, :] = 1
 
         # generate initial samples with diffusion model
-        initial_samples = None
         sim_rollouts = None
-        if trajectory_sampler is not None and params.get('diff_init', True):
+        if initial_samples is None and trajectory_sampler is not None and params.get('diff_init', True):
             with torch.no_grad():
                 start = state.clone()
                 # if state[-1] < -1.0:
@@ -612,11 +572,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             # for i in range(params['N']):
             #     sim_rollout = rollout_trajectory_in_sim(env_sim_rollout, initial_samples[i])
             #     sim_rollouts[i] = sim_rollout
-
+        elif initial_samples is not None:
             initial_samples = _full_to_partial(initial_samples, mode)
             initial_x = initial_samples[:, 1:, :planner.problem.dx]
             initial_u = initial_samples[:, :-1, -planner.problem.du:]
             initial_samples = torch.cat((initial_x, initial_u), dim=-1)
+
 
         state = env.get_state()
         state = state['q'].reshape(-1).to(device=params['device'])
@@ -869,7 +830,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             #         min_cost = node.fscore
             #         min_node = node
             # contact_node_sequence = [min_node]
-            return None, None
+            return None, None, None
         last_node = contact_node_sequence[-1]
 
         if next_node_init:
@@ -877,15 +838,19 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         else:
             offset = 1
         if offset == 1 and len(contact_node_sequence) == 1:
-            return [], None
+            return [], None, None
         next_node = last_node.contact_sequence[offset]
         contact_sequence = np.array(last_node.contact_sequence)
         contact_sequence = (contact_sequence + 1)/2
         contact_sequence = [contact_vec_to_label[contact_sequence[i].sum()] for i in range(contact_sequence.shape[0])]
         contact_sequence = contact_sequence[offset:] 
-        del contact_sequence_sampler
+
+        traj = last_node.trajectory
+        initial_samples = traj[:, :params['T'] + 1].to(device=params['device'])
+        if params['sine_cosine']:
+            initial_samples = convert_sine_cosine_to_yaw(initial_samples)
         torch.cuda.empty_cache()
-        return contact_sequence, next_node
+        return contact_sequence, next_node, initial_samples
 
     state = env.get_state()
     state = state['q'].reshape(-1)[:15].to(device=params['device'])
@@ -910,6 +875,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             contact_sequence += [contact_options[perm[0]], contact_options[perm[1]], 'turn']
     else:
         contact_sequence = None
+        num_stages
     # state = state['q'].reshape(-1)[:15].to(device=params['device'])
     # initial_samples = gen_initial_samples_multi_mode(contact_sequence)
     # pkl.dump(initial_samples, open(f"{fpath}/long_horizon_inits.p", "wb"))
@@ -920,9 +886,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     state = state['q'].reshape(-1)[:15].to(device=params['device'])
 
     executed_contacts = []
+    stages_since_plan = 0
     for stage in range(num_stages):
         state = env.get_state()
         state = state['q'].reshape(-1)[:15].to(device=params['device'])
+        yaw = state[-1]
+        print('Current yaw:', yaw)
         # valve_goal = torch.tensor([0, 0, state[-1]]).to(device=params['device'])
 
         # if sample_contact:
@@ -943,6 +912,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         # else:
         # contact = contact_sequence[stage]
+        initial_samples = None
         if stage == 0:
             contact = 'pregrasp'
             start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
@@ -951,8 +921,17 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
                 env.step(action)
                 continue
-        elif sample_contact and (stage == 1 or params['replan']):
-            new_contact_sequence, new_next_node = plan_contacts(state, num_stages - stage, next_node, params['multi_particle_search'])
+        elif sample_contact and (stage == 1 or (params['replan'] and (stages_since_plan == 1 or len(contact_sequence) == 1))):
+            # if yaw <= params['goal']:
+            #     # params['goal'] -= .5
+            #     params['goal'] = yaw + float(params['goal_update'])
+            #     print('Adjusting goal to', params['goal'])
+            # new_contact_sequence, new_next_node, initial_samples = plan_contacts(state, num_stages - stage, next_node, params['multi_particle_search'])
+            
+            params['goal'] = yaw + float(params['goal_update'])
+            print('Adjusting goal to', params['goal'])
+            new_contact_sequence, new_next_node, initial_samples = plan_contacts(state, 4, next_node, params['multi_particle_search'])
+            stages_since_plan = 0
             if new_contact_sequence is not None and len(new_contact_sequence) == 0:
                 print('Planner thinks task is complete')
                 print(executed_contacts)
@@ -981,11 +960,21 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             print(contact_sequence)
             # return -1
             contact = contact_sequence[0]  
-        elif stage >= len(contact_sequence):
-            print('Planner thinks task is complete')
-            break
+        # elif stage >= len(contact_sequence):
+        #     print('Planner thinks task is complete')
+        #     break
         elif sample_contact:
-            contact = contact_sequence[stage - 1]
+            stages_since_plan += 1
+            contact = contact_sequence[stages_since_plan]
+            contact_sequence = contact_sequence[1:]
+            if contact_sequence[0] == 'turn':
+                next_node = (1, 1, 1)
+            elif contact_sequence[0] == 'index':
+                next_node = (-1, 1, 1)
+            elif contact_sequence[0] == 'thumb_middle':
+                next_node = (1, -1, -1)
+            else:
+                next_node = (-1, -1, -1)
         else:
             contact = contact_sequence[stage]
         executed_contacts.append(contact)
@@ -993,7 +982,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         if contact == 'index':
             _goal = torch.tensor([0, 0, state[-1]]).to(device=params['device'])
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
-                index_regrasp_planner, mode='index', goal=_goal, fname=f'index_regrasp_{stage}')
+                index_regrasp_planner, mode='index', goal=_goal, fname=f'index_regrasp_{stage}', initial_samples=initial_samples)
 
             plans = [torch.cat((plan[..., :-6],
                                 torch.zeros(*plan.shape[:-1], 3).to(device=params['device']),
@@ -1007,7 +996,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             _goal = torch.tensor([0, 0, state[-1]]).to(device=params['device'])
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
                 thumb_and_middle_regrasp_planner, mode='thumb_middle',
-                goal=_goal, fname=f'thumb_middle_regrasp_{stage}')
+                goal=_goal, fname=f'thumb_middle_regrasp_{stage}', initial_samples=initial_samples)
             plans = [torch.cat((plan,
                                 torch.zeros(*plan.shape[:-1], 6).to(device=params['device'])),
                                dim=-1) for plan in plans]
@@ -1016,9 +1005,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance,
                             contact_state=torch.tensor([1.0, 0.0, 0.0]))
         elif contact == 'turn':
-            _goal = torch.tensor([0, 0, state[-1] - np.pi / 3]).to(device=params['device'])
+            _goal = torch.tensor([0, 0, state[-1] - np.pi / 6]).to(device=params['device'])
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
-                turn_planner, mode='turn', goal=_goal, fname=f'turn_{stage}')
+                turn_planner, mode='turn', goal=_goal, fname=f'turn_{stage}', initial_samples=initial_samples)
 
             _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, contact_state=torch.ones(3))
         if contact != 'pregrasp':
@@ -1155,7 +1144,7 @@ if __name__ == "__main__":
             if len(noise_noise.shape) == 6:
                 noise_noise = noise_noise[:, :, :, 0, :, :]
     start_ind = 0 if not config['sample_contact'] else 0
-    for i in tqdm(range(5, config['num_trials'])):
+    for i in tqdm(range(0, config['num_trials'])):
     # for i in tqdm(range(0, 7)):
         
         torch.manual_seed(i)

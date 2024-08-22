@@ -190,6 +190,11 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                 'ring': [6, 7, 8],
                 'thumb': [9, 10, 11]
             }
+            self.contact_force_indices_dict = {
+                'index': [-9, -8, -7],
+                'middle': [-6, -5, -4],
+                'thumb': [-3, -2, -1]
+            }
             self._contact_force_indices = [self._contact_force_indices_dict[finger] for finger in contact_fingers]
             self._contact_force_indices = list(itertools.chain.from_iterable(self._contact_force_indices))
             self.contact_force_indices = [32 + self.obj_dof + idx for idx in self._contact_force_indices]
@@ -740,7 +745,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         h, grad_h, hess_h = self._contact_constraints(xu, finger_name, compute_grads, compute_hess, terminal=False, projected_diffusion=projected_diffusion)
         eps = torch.zeros_like(h)
         # eps[:, :-1] = 5e-3
-        eps[:, :-1] = 1e-2
+        eps[:, :-1] = 1.5e-2
         h = -h + eps
         if grad_h is not None:
             grad_h = -grad_h
@@ -859,8 +864,12 @@ class AllegroContactProblem(AllegroObjectProblem):
                  obj_joint_dim=0,
                  optimize_force=False,
                  env_force=False,
+                 turn=False,
+                 obj_gravity=False,
                  device='cuda:0', **kwargs):
+        self.obj_gravity = obj_gravity
         self.optimize_force = optimize_force
+        self.turn = turn
         self.num_contacts = len(contact_fingers)
         self.contact_fingers = contact_fingers
         self.env_force = env_force
@@ -928,6 +937,13 @@ class AllegroContactProblem(AllegroObjectProblem):
         """
 
         u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
+        if self.optimize_force and self.turn:
+            for i, finger in enumerate(self.contact_fingers):
+                idx = self.contact_force_indices_dict[finger]
+                if finger != 'index':
+                    u[..., idx] = 1.5 * torch.randn(N, self.T, 3, device=self.device)
+                else:
+                    u[..., idx] = 1.5 *.01 * torch.randn(N, self.T, 3, device=self.device)
 
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
         for t in range(self.T):
