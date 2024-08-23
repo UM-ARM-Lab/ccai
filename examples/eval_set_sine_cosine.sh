@@ -1,6 +1,6 @@
 # python -u allegro_screwdriver.py allegro_screwdriver_csvto_only > allegro_screwdriver_csvto_only_eps_.015_2.5_damping_pi_6.log
 python -u allegro_screwdriver.py allegro_screwdriver_diff_sine_cosine_only > allegro_screwdriver_diff_sine_cosine_only_eps_.015_2.5_damping_pi_6.log
-# python -u allegro_screwdriver.py allegro_screwdriver_csvto_diff_sine_cosine > allegro_screwdriver_csvto_diff_sine_cosine_eps_.01_2.5_damping.log
+python -u allegro_screwdriver.py allegro_screwdriver_csvto_diff_sine_cosine > allegro_screwdriver_csvto_diff_sine_cosine_eps_.015_2.5_damping_pi_6.log
 # python -u allegro_screwdriver.py allegro_screwdriver_csvto_diff_sine_cosine_planned_contact > allegro_screwdriver_csvto_diff_sine_cosine_planned_contact.log
 # python -u allegro_screwdriver.py allegro_screwdriver_csvto_diff_planned_replanned_contact_sine_cosine > allegro_screwdriver_csvto_diff_sine_cosine_planned_replanned_contact_eps_.01_2.5_damping.log
 # python -u allegro_screwdriver.py allegro_screwdriver_csvto_diff_planned_replanned_contact_sine_cosine_more_goal_update > allegro_screwdriver_csvto_diff_sine_cosine_planned_replanned_contact_eps_.01_2.5_damping_more_goal_update.log
@@ -12,7 +12,7 @@ python -u allegro_screwdriver.py allegro_screwdriver_diff_sine_cosine_only > all
 
 # python -u make_plan_init_gifs.py allegro_screwdriver_csvto_only
 python -u make_plan_init_gifs.py allegro_screwdriver_diff_sine_cosine_only
-# python -u make_plan_init_gifs.py allegro_screwdriver_csvto_diff_sine_cosine
+python -u make_plan_init_gifs.py allegro_screwdriver_csvto_diff_sine_cosine
 # # python -u allegro_screwdriver.py allegro_screwdriver_csvto_diff_sine_cosine_planned_contact > allegro_screwdriver_csvto_diff_sine_cosine_planned_contact.log
 # python -u make_plan_init_gifs.py allegro_screwdriver_csvto_diff_planned_replanned_contact_sine_cosine
 # python -u make_plan_init_gifs.py allegro_screwdriver_csvto_diff_planned_replanned_contact_sine_cosine_less_goal_update

@@ -106,6 +106,13 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                  device='cuda:0', **kwargs):
         self.obj_mass = 0.1
         self.obj_dof_type = None
+        if obj_dof == 3:
+            object_link_name = 'screwdriver_body'
+        elif obj_dof == 1:
+            object_link_name = 'valve'
+        elif obj_dof == 6:
+            object_link_name = 'card'
+        self.obj_link_name = object_link_name
         super(AllegroScrewdriver, self).__init__(start=start, goal=goal, T=T, chain=chain,
                                                  object_location=object_location,
                                                  object_type=object_type, world_trans=world_trans,
@@ -573,7 +580,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             # for i in range(params['N']):
             #     sim_rollout = rollout_trajectory_in_sim(env_sim_rollout, initial_samples[i])
             #     sim_rollouts[i] = sim_rollout
-        elif initial_samples is not None:
+        if initial_samples is not None:
             initial_samples = _full_to_partial(initial_samples, mode)
             initial_x = initial_samples[:, 1:, :planner.problem.dx]
             initial_u = initial_samples[:, :-1, -planner.problem.du:]
@@ -1045,8 +1052,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_planned_replanned_contact_sine_cosine.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_diff_sine_cosine_only.yaml').read_text())
     from tqdm import tqdm
 
     if config['mode'] == 'hardware':
