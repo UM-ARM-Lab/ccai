@@ -105,6 +105,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                  obj_gravity=False,
                  device='cuda:0', **kwargs):
         self.obj_mass = 0.1
+        self.obj_dof_type = None
         super(AllegroScrewdriver, self).__init__(start=start, goal=goal, T=T, chain=chain,
                                                  object_location=object_location,
                                                  object_type=object_type, world_trans=world_trans,
