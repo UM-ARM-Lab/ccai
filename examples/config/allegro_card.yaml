@@ -2,7 +2,7 @@
 T: 8
 receding_horizon: False
 num_steps: 8
-num_turns: 3
+num_turns: 5
 num_trials: 10
 visualize: True
 experiment_name: 'allegro_card_test'
@@ -11,13 +11,13 @@ mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 fingers: ['index', 'middle']
 sim_device: 'cpu'
 friction_coefficient: 1.0
-kp: 3.0
+kp: 10.0
 heuristic: 1000
 max_depth: 11
 prior: 1
 multi_particle_search: True
 replan: False
-visualize_plan: True
+visualize_plan: False
 optimize_force: True
 projected: False
 use_saved_plans: True
@@ -32,13 +32,13 @@ controllers:
   csvgd:
     # N: 16
     N: 16
-    alpha_J: 5.0e-3
+    alpha_J: 1.0e-2
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
     device: 'cuda:1'
-    online_iters: 25
-    warmup_iters: 100
+    online_iters: 35
+    warmup_iters: 150
     resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1

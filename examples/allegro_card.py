@@ -121,6 +121,14 @@ class AllegroCard(AllegroManipulationExternalContactProblem):
         u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
         # u = 0.5 * torch.randn(N, self.T, self.du, device=self.device)
         # u[:, :, 0] -= 0.05
+        if self.optimize_force:
+            u[..., 4*self.num_fingers:] = .5 * torch.randn(N, self.T, 3 * (self.num_contacts + 1), device=self.device)
+            # for i, finger in enumerate(self.contact_fingers):
+            #     idx = self.contact_force_indices_dict[finger]
+            #     # if finger != 'index':
+            #     #     u[..., idx] = 1.5 * torch.randn(N, self.T, 3, device=self.device)
+            #     # else:
+            #     u[..., idx] = 1.5 *.01 * torch.randn(N, self.T, 3, device=self.device)
 
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
         for t in range(self.T):
@@ -367,7 +375,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
             vae.load_state_dict(torch.load(f'{CCAI_PATH}/{vae_path}'))
             for param in vae.parameters():
                 param.requires_grad = False
-        trajectory_sampler = TrajectorySampler(T=params['T'] + 1, dx=(15 + (1 if params['sine_cosine'] else 0)) if not model_t else params['nzt'], du=21 if not model_t else 0, type=params['type'],
+        trajectory_sampler = TrajectorySampler(T=params['T'] + 1, dx=(11 + (1 if params['sine_cosine'] else 0)) if not model_t else params['nzt'], du=21 if not model_t else 0, type=params['type'],
                                                timesteps=256, hidden_dim=128 if not model_t else 64,
                                                context_dim=3, generate_context=False,
                                                constrain=params['projected'],
@@ -399,29 +407,6 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
     actual_trajectory = []
     duration = 0
 
-
-    info_list = []
-    
-    # only complete for the forces
-    # def _partial_to_full(traj, mode):
-    #     if mode == 'index':
-    #         traj = torch.cat((traj[..., :-6], torch.zeros(*traj.shape[:-1], 3).to(device=params['device']),
-    #                           traj[..., -6:]), dim=-1)
-    #     if mode == 'thumb_middle':
-    #         traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 6).to(device=params['device'])), dim=-1)
-    #     if mode == 'pregrasp':
-    #         traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 9).to(device=params['device'])), dim=-1)
-    #     return traj
-
-    # def _full_to_partial(traj, mode):
-    #     if mode == 'index':
-    #         traj = torch.cat((traj[..., :-9], traj[..., -6:]), dim=-1)
-    #     if mode == 'thumb_middle':
-    #         traj = traj[..., :-6]
-    #     if mode == 'pregrasp':
-    #         traj = traj[..., :-9]
-    #     return traj
-
     def _partial_to_full(traj, mode):
         if mode == 'index':
             traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 3).to(device=params['device'])), dim=-1)
@@ -446,10 +431,10 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         xu is shape (N, T, 37)
         Replace the sine and cosine in xu with yaw and return the new xu
         """
-        sine = xu[..., 15]
-        cosine = xu[..., 14]
+        sine = xu[..., 11]
+        cosine = xu[..., 10]
         yaw = torch.atan2(sine, cosine)
-        xu_new = torch.cat([xu[..., :14], yaw.unsqueeze(-1), xu[..., 16:]], dim=-1)
+        xu_new = torch.cat([xu[..., :10], yaw.unsqueeze(-1), xu[..., 12:]], dim=-1)
         return xu_new
     
     def convert_yaw_to_sine_cosine(xu):
@@ -457,51 +442,12 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         xu is shape (N, T, 36)
         Replace the yaw in xu with sine and cosine and return the new xu
         """
-        yaw = xu[14]
+        yaw = xu[10]
         sine = torch.sin(yaw)
         cosine = torch.cos(yaw)
-        xu_new = torch.cat([xu[:14], cosine.unsqueeze(-1), sine.unsqueeze(-1), xu[15:]], dim=-1)
+        xu_new = torch.cat([xu[:10], cosine.unsqueeze(-1), sine.unsqueeze(-1), xu[11:]], dim=-1)
         return xu_new
     
-    def gen_initial_samples_multi_mode(modes):
-        # generate context from mode
-        contact = -torch.ones(params['N'], len(modes), 3).to(device=params['device'])
-        for i in range(len(modes)):
-            mode = modes[i]
-            if mode == 'thumb_middle':
-                contact[:, i, 0] = 1
-            elif mode == 'index':
-                contact[:, i, 1] = 1
-                contact[:, i, 2] = 1
-            elif mode == 'turn':
-                contact[:, i, :] = 1
-
-        # generate initial samples with diffusion model
-        initial_samples = None
-        sim_rollouts = None
-        if trajectory_sampler is not None:
-            with torch.no_grad():
-                start = state.clone()
-                # if state[-1] < -1.0:
-                #     start[-1] += 0.75
-                a = time.perf_counter()
-                # start_for_diff = start#convert_yaw_to_sine_cosine(start)
-                if params['sine_cosine']:
-                    start_for_diff = convert_yaw_to_sine_cosine(start)
-                else:
-                    start_for_diff = start
-                initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
-                                                                  H=len(modes) * (params['T'] + 1),
-                                                                  constraints=contact)
-                if params['sine_cosine']:
-                    initial_samples = convert_sine_cosine_to_yaw(initial_samples)
-
-                print('Sampling time', time.perf_counter() - a)
-                # if state[-1] < -1.0:
-                #     initial_samples[:, :, -1] -= 0.75
-
-            return initial_samples
-
     def execute_traj(planner, mode, goal=None, fname=None):
         # reset planner
         state = env.get_state()
@@ -605,6 +551,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
                     planner.x = initial_samples[:, k:]
 
             s = time.time()
+
             best_traj, plans = planner.step(state)
             print('Solve time for step', time.time() - s)
             planned_trajectories.append(plans)
@@ -790,7 +737,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         return contact_sequence, next_node
 
     state = env.get_state()
-    state = state['q'].reshape(-1)[:15].to(device=params['device'])
+    state = state['q'].reshape(-1)[:11].to(device=params['device'])
 
 
     contact_label_to_vec = {
@@ -803,29 +750,29 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
 
 
     sample_contact = params.get('sample_contact', False)
-    num_stages = 2 + 3 * (params['num_turns'] - 1)
+    # num_stages = 2 + 3 * (params['num_turns'] - 1)
     if not sample_contact:
-        contact_sequence = ['index', 'middle']
-        for k in range(params['num_turns'] - 1):
-            contact_options = ['index', 'middle']
-            perm = np.random.permutation(2)
-            # perm = [0, 1]
-            contact_sequence += [contact_options[perm[0]], contact_options[perm[1]]]
+        contact_sequence = ['index_middle']
+        contact_options = list(contact_label_to_vec.keys())
+        for k in range(params['num_turns']):
+            # single random choice from contact_label_to_vec keys
+            contact_sequence.append(np.random.choice(contact_options))
     else:
         contact_sequence = None
-    # state = state['q'].reshape(-1)[:15].to(device=params['device'])
+    num_stages = len(contact_sequence)
+    # state = state['q'].reshape(-1)[:11].to(device=params['device'])
     # initial_samples = gen_initial_samples_multi_mode(contact_sequence)
     # pkl.dump(initial_samples, open(f"{fpath}/long_horizon_inits.p", "wb"))
     # return -1
     contact = None
     next_node = None
     state = env.get_state()
-    state = state['q'].reshape(-1)[:15].to(device=params['device'])
+    state = state['q'].reshape(-1)[:11].to(device=params['device'])
 
     executed_contacts = []
     for stage in range(num_stages):
         state = env.get_state()
-        state = state['q'].reshape(-1)[:15].to(device=params['device'])
+        state = state['q'].reshape(-1)[:11].to(device=params['device'])
         # valve_goal = torch.tensor([0, 0, state[-1]]).to(device=params['device'])
 
         # if sample_contact:
@@ -873,14 +820,14 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
                         pkl.dump(executed_contacts, f)
                     break
                 contact_sequence = contact_sequence[1:]
-                if contact_sequence[0] == 'turn':
-                    next_node = (1, 1, 1)
-                elif contact_sequence[0] == 'index':
-                    next_node = (-1, 1, 1)
-                elif contact_sequence[0] == 'thumb_middle':
-                    next_node = (1, -1, -1)
+                if contact_sequence[0] == 'index':
+                    next_node = (1, -1)
+                elif contact_sequence[0] == 'middle':
+                    next_node = (-1, 1)
+                elif contact_sequence[0] == 'index_middle':
+                    next_node = (1, 1)
                 else:
-                    next_node = (-1, -1, -1)
+                    next_node = (-1, -1)
             print(contact_sequence)
             # return -1
             contact = contact_sequence[0]  
@@ -895,12 +842,12 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         print(stage, contact)
         if contact == 'index':
             # _goal = torch.tensor([0, 0, state[-1]]).to(device=params['device'])
-            _goal = torch.tensor([0, -0.15, 0]).to(device=params['device'])
+            _goal = torch.tensor([0, -0.02 + state[-2], 0]).to(device=params['device'])
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
                 index_planner, mode='index', goal=_goal, fname=f'index_{stage}')
 
             plans = [_full_to_partial(plan, 'index') for plan in plans]
-            traj = [_full_to_partial(traj, 'index') for traj in traj]
+            traj = torch.cat((traj[..., :-3], torch.zeros(*traj.shape[:-1], 3).to(device=params['device']), traj[..., -3:]), dim=-1)
             # plans = [torch.cat((plan[..., :-6],
             #                     torch.zeros(*plan.shape[:-1], 3).to(device=params['device']),
             #                     plan[..., -6:]),
@@ -908,29 +855,31 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
             # traj = torch.cat((traj[..., :-6], torch.zeros(*traj.shape[:-1], 3).to(device=params['device']),
             #                   traj[..., -6:]), dim=-1)
             _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance,
-                            contact_state=torch.tensor([0.0, 1.0, 1.0]))
+                            contact_state=torch.tensor([1.0, 0.0]))
         elif contact == 'middle':
-            _goal = torch.tensor([0, -0.15, 0]).to(device=params['device'])
+            _goal = torch.tensor([0, -0.02 + state[-2], 0]).to(device=params['device'])
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
                 middle_planner, mode='middle', goal=_goal, fname=f'middle_{stage}')
-        # elif contact == 'thumb_middle':
-        #     _goal = torch.tensor([0, 0, state[-1]]).to(device=params['device'])
-        #     traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
-        #         thumb_and_middle_regrasp_planner, mode='thumb_middle',
-        #         goal=_goal, fname=f'thumb_middle_regrasp_{stage}')
-        #     plans = [torch.cat((plan,
-        #                         torch.zeros(*plan.shape[:-1], 6).to(device=params['device'])),
-        #                        dim=-1) for plan in plans]
-        #     traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 6).to(device=params['device'])), dim=-1)
+            
+            plans = [_full_to_partial(plan, 'middle') for plan in plans]
+            traj = torch.cat((traj[..., :-6], torch.zeros(*traj.shape[:-1], 3).to(device=params['device']), traj[..., -6:]), dim=-1)
 
-        #     _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance,
-        #                     contact_state=torch.tensor([1.0, 0.0, 0.0]))
-        # elif contact == 'turn':
-        #     _goal = torch.tensor([0, 0, state[-1] - np.pi / 3]).to(device=params['device'])
-        #     traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
-        #         turn_planner, mode='turn', goal=_goal, fname=f'turn_{stage}')
-
-        #     _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, contact_state=torch.ones(3))
+            _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance,
+                            contact_state=torch.tensor([0.0, 1.0]))
+        elif contact == 'index_middle':
+            _goal = torch.tensor([0, -0.02 + state[-2], 0]).to(device=params['device'])
+            traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
+                index_middle_planner, mode='index_middle', goal=_goal, fname=f'index_middle_{stage}')
+            
+            _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance,
+                            contact_state=torch.tensor([1.0, 1.0]))
+        elif contact == 'reposition':
+            _goal = torch.tensor([0, state[-2], 0]).to(device=params['device'])
+            traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
+                reposition_planner, mode='reposition', goal=_goal, fname=f'reposition_{stage}')
+            
+            _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance,
+                            contact_state=torch.tensor([0.0, 0.0]))          
         if contact != 'pregrasp':
             actual_trajectory.append(traj)
     # change to numpy and save data
@@ -944,7 +893,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
     import pickle
     pickle.dump(data, open(f"{fpath}/traj_data.p", "wb"))
     state = env.get_state()
-    state = state['q'].reshape(4 * num_fingers + obj_dof + 1).to(device=params['device'])
+    state = state['q'].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
     actual_trajectory.append(state.clone()[: 4 * num_fingers + obj_dof])
     # actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
     # turn_problem.T = actual_trajectory.shape[0]
@@ -1037,13 +986,13 @@ if __name__ == "__main__":
             if len(noise_noise.shape) == 6:
                 noise_noise = noise_noise[:, :, :, 0, :, :]
     start_ind = 0 if not config['sample_contact'] else 0
-    for i in tqdm(range(5, config['num_trials'])):
+    for i in tqdm(range(0, config['num_trials'])):
     # for i in tqdm(range(0, 7)):
         
         torch.manual_seed(i)
         np.random.seed(i)
 
-        goal = torch.tensor([0, -0.15, 0])
+        goal = torch.tensor([0, 0.0, 0])
         # goal = goal + 0.025 * torch.randn(1) + 0.2
         for controller in config['controllers'].keys():
             env.reset()

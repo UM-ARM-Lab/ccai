@@ -886,7 +886,6 @@ class AllegroContactProblem(AllegroObjectProblem):
             du = (4 + 3) * num_fingers
             if env_force:
                 du += 3
-                self.num_contacts += 1
         else:
             du = 4 * num_fingers
         super().__init__(dx=dx, du=du, start=start, goal=goal,
@@ -1801,7 +1800,7 @@ class AllegroContactWithEnvProblem(AllegroContactProblem):
                                                            obj_ori_rep=obj_ori_rep, obj_joint_dim=obj_joint_dim,
                                                            optimize_force=optimize_force, device=device, env_force=True, 
                                                            obj_dof_type=obj_dof_type, **kwargs)
-        self._contact_dg_per_t = self.num_contacts * (1 + 2 + 4 + 1) + 3
+        self._contact_dg_per_t = self.num_contacts * (1 + 2 + 4) + 3 + 1 # 1 for env friction constraint
         self._contact_dz = (self.friction_polytope_k) * self.num_contacts 
         self._contact_dh = self._contact_dz * T  # inequality
         self.force_equlibrium_constr = vmap(self._force_equlibrium_constr_w_force)
@@ -1985,7 +1984,7 @@ class AllegroContactWithEnvProblem(AllegroContactProblem):
         if self.optimize_force:
             force = torch.zeros(N, T, 12, device=self.device)
             if self.env_force:
-                force[:, :, self._contact_force_indices] = xu[:, :, -(self.num_contacts) * 3: -3]
+                force[:, :, self._contact_force_indices] = xu[:, :, -(self.num_contacts + 1) * 3: -3]
             else:
                 force[:, :, self._contact_force_indices] = xu[:, :, -self.num_contacts * 3:]
             h, grad_h, hess_h = self._friction_constraint(
