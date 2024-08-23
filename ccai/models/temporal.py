@@ -157,7 +157,7 @@ class TemporalUnet(nn.Module):
         return self(t.reshape(1), x.unsqueeze(0), context.unsqueeze(0)).squeeze(0)
 
 
-    def forward(self, t, x, context=None, dropout=False):
+    def forward(self, t, x, context=None, dropout=False, downs_only=False):
         '''
             x : [ batch x horizon x transition ]
         '''
@@ -204,6 +204,8 @@ class TemporalUnet(nn.Module):
         x = self.mid_block3(x, t)
         x = self.mid_block4(x, t)
         latent = x.clone()
+        if downs_only:
+            return latent
         for resnet, resnet2, attn, upsample in self.ups:
             x = torch.cat((x, h.pop()), dim=1)
             x = resnet(x, t)
@@ -316,49 +318,52 @@ class UnetClassifier(nn.Module):
             dim=32,
             dim_mults=(1, 2, 4),
             attention=False,
+            model=None
     ):
         super().__init__()
+        if model is None:
+            dims = [transition_dim, *map(lambda m: dim * m, dim_mults)]
+            in_out = list(zip(dims[:-1], dims[1:]))
+            print(f'[ models/temporal ] Channel dimensions: {in_out}')
 
-        dims = [transition_dim, *map(lambda m: dim * m, dim_mults)]
-        in_out = list(zip(dims[:-1], dims[1:]))
-        print(f'[ models/temporal ] Channel dimensions: {in_out}')
+            self.time_embedding = SinusoidalPosEmb(32)
+            self.constraint_type_embed = nn.Sequential(
+                nn.Linear(cond_dim, 32),
+                Mish()
+            )
+            # self.constraint_type_embed = SinusoidalPosEmb(32)
+            self.time_mlp = nn.Sequential(
+                nn.Linear(32 + 32, 256),
+                Mish()
+            )
 
-        self.time_embedding = SinusoidalPosEmb(32)
-        self.constraint_type_embed = nn.Sequential(
-            nn.Linear(cond_dim, 32),
-            Mish()
-        )
-        # self.constraint_type_embed = SinusoidalPosEmb(32)
-        self.time_mlp = nn.Sequential(
-            nn.Linear(32 + 32, 256),
-            Mish()
-        )
+            time_dim = 256
 
-        time_dim = 256
+            self.downs = nn.ModuleList([])
+            num_resolutions = len(in_out)
+            feature_dims = [horizon]
+            for ind, (dim_in, dim_out) in enumerate(in_out):
+                is_last = ind >= (num_resolutions - 1)
+                feature_dims.append(np.ceil(feature_dims[-1] / 2))
+                self.downs.append(nn.ModuleList([
+                    ResidualTemporalBlock(dim_in, dim_out, embed_dim=time_dim, horizon=horizon),
+                    ResidualTemporalBlock(dim_out, dim_out, embed_dim=time_dim, horizon=horizon),
+                    Residual(PreNorm(dim_out, LinearAttention(dim_out))) if attention else nn.Identity(),
+                    Downsample1d(dim_out) if not is_last else nn.Identity()
+                    # nn.Identity()
+                ]))
 
-        self.downs = nn.ModuleList([])
-        num_resolutions = len(in_out)
-        feature_dims = [horizon]
-        for ind, (dim_in, dim_out) in enumerate(in_out):
-            is_last = ind >= (num_resolutions - 1)
-            feature_dims.append(np.ceil(feature_dims[-1] / 2))
-            self.downs.append(nn.ModuleList([
-                ResidualTemporalBlock(dim_in, dim_out, embed_dim=time_dim, horizon=horizon),
-                ResidualTemporalBlock(dim_out, dim_out, embed_dim=time_dim, horizon=horizon),
-                Residual(PreNorm(dim_out, LinearAttention(dim_out))) if attention else nn.Identity(),
-                Downsample1d(dim_out) if not is_last else nn.Identity()
-                # nn.Identity()
-            ]))
+                if not is_last:
+                    horizon = horizon // 2
 
-            if not is_last:
-                horizon = horizon // 2
-
-        mid_dim = dims[-1]
-        self.mid_block1 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
-        self.mid_attn = Residual(PreNorm(mid_dim, LinearAttention(mid_dim))) if attention else nn.Identity()
-        self.mid_block2 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
-        self.mid_block3 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
-        self.mid_block4 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
+            mid_dim = dims[-1]
+            self.mid_block1 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
+            self.mid_attn = Residual(PreNorm(mid_dim, LinearAttention(mid_dim))) if attention else nn.Identity()
+            self.mid_block2 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
+            self.mid_block3 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
+            self.mid_block4 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
+        else:
+            self.model = model
         self.pooling = nn.AdaptiveAvgPool1d(1)
         self.output_layer = nn.Linear(mid_dim, 1)
         self.output_act_fn = nn.Sigmoid()
@@ -371,48 +376,50 @@ class UnetClassifier(nn.Module):
         '''
             x : [ batch x horizon x transition ]
         '''
-
-        # ensure t is a batched tensor
-        B, H, d = x.shape
-        t = t.reshape(-1)
-        if t.shape[0] == 1:
-            t = t.repeat(B)
-        t = self.time_embedding(t)
-        # x = einops.rearrange(x, 'b h t -> b t h')
-        x = x.permute(0, 2, 1)
-        x = pad_to_multiple(x, m=2 ** len(self.downs))
-
-        if context is not None:
-            # constraint_type = context[:, -2:]
-            # context = context[:, :-2]
-            context = context.reshape(B, -1)
-            c = self.constraint_type_embed(context)
-            # c = context
-            # c = torch.cat((context, ctype_embed), dim=-1)
-            # need to do dropout on context embedding to train unconditional model alongside conditional
-            if dropout:
-                mask_dist = Bernoulli(probs=1 - self.context_dropout_p)
-                mask = mask_dist.sample((B,))  # .to(device=context.device)
-                c = mask * c
-                t = torch.cat((t, c), dim=-1)
-            else:
-                t = torch.cat((t, c), dim=-1)
+        if hasattr(self, 'model'):
+            x = self.model(t, x, context, dropout)
         else:
-            t = torch.cat((t, torch.zeros(B, 32, device=t.device)), dim=-1)
+            # ensure t is a batched tensor
+            B, H, d = x.shape
+            t = t.reshape(-1)
+            if t.shape[0] == 1:
+                t = t.repeat(B)
+            t = self.time_embedding(t)
+            # x = einops.rearrange(x, 'b h t -> b t h')
+            x = x.permute(0, 2, 1)
+            x = pad_to_multiple(x, m=2 ** len(self.downs))
 
-        t = self.time_mlp(t)
-        h = []
-        for resnet, resnet2, attn, downsample in self.downs:
-            x = resnet(x, t)
-            x = resnet2(x, t)
-            # x = attn(x)
-            h.append(x)
-            x = downsample(x)
+            if context is not None:
+                # constraint_type = context[:, -2:]
+                # context = context[:, :-2]
+                context = context.reshape(B, -1)
+                c = self.constraint_type_embed(context)
+                # c = context
+                # c = torch.cat((context, ctype_embed), dim=-1)
+                # need to do dropout on context embedding to train unconditional model alongside conditional
+                if dropout:
+                    mask_dist = Bernoulli(probs=1 - self.context_dropout_p)
+                    mask = mask_dist.sample((B,))  # .to(device=context.device)
+                    c = mask * c
+                    t = torch.cat((t, c), dim=-1)
+                else:
+                    t = torch.cat((t, c), dim=-1)
+            else:
+                t = torch.cat((t, torch.zeros(B, 32, device=t.device)), dim=-1)
 
-        x = self.mid_block1(x, t)
-        # x = self.mid_attn(x)
-        x = self.mid_block2(x, t)
-        x = self.mid_block3(x, t)
-        x = self.mid_block4(x, t)
+            t = self.time_mlp(t)
+            h = []
+            for resnet, resnet2, attn, downsample in self.downs:
+                x = resnet(x, t)
+                x = resnet2(x, t)
+                # x = attn(x)
+                h.append(x)
+                x = downsample(x)
+
+            x = self.mid_block1(x, t)
+            # x = self.mid_attn(x)
+            x = self.mid_block2(x, t)
+            x = self.mid_block3(x, t)
+            x = self.mid_block4(x, t)
         x = self.pooling(x).reshape(B, -1)
         return self.output_act_fn(self.output_layer(x))

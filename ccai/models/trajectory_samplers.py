@@ -114,7 +114,8 @@ class TrajectoryFlowModel(nn.Module):
 class TrajectoryDiffusionModel(nn.Module):
 
     def __init__(self, T, dx, du, context_dim, problem=None, timesteps=20, hidden_dim=64, constrained=False,
-                 unconditional=False, generate_context=False, discriminator_guidance=False, score_model='conv_unet'):
+                 unconditional=False, generate_context=False, discriminator_guidance=False, score_model='conv_unet',
+                 discriminator_share_weights=False):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -139,7 +140,8 @@ class TrajectoryDiffusionModel(nn.Module):
                                                          sampling_timesteps=timesteps, hidden_dim=hidden_dim,
                                                          unconditional=unconditional,
                                                          discriminator_guidance=discriminator_guidance,
-                                                         model_type=score_model)
+                                                         model_type=score_model,
+                                                         discriminator_share_weights=discriminator_share_weights)
 
     def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None):
         # B, N, _ = constraints.shape
@@ -270,7 +272,8 @@ class TrajectorySampler(nn.Module):
 
     def __init__(self, T, dx, du, context_dim, type='nf', dynamics=None, problem=None, timesteps=50, hidden_dim=64,
                  constrain=False, unconditional=False, generate_context=False, score_model='conv_unet',
-                 discriminator_guidance=False, learn_inverse_dynamics=False, cosine_sine=False):
+                 discriminator_guidance=False, learn_inverse_dynamics=False, cosine_sine=False,
+                 discriminator_share_weights=False):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -300,7 +303,8 @@ class TrajectorySampler(nn.Module):
             self.model = TrajectoryDiffusionModel(T, dx, _du, context_dim, problem, timesteps, hidden_dim, constrain,
                                                   unconditional, generate_context=generate_context,
                                                   discriminator_guidance=discriminator_guidance,
-                                                  score_model=score_model)
+                                                  score_model=score_model,
+                                                  discriminator_share_weights=discriminator_share_weights)
 
         self.register_buffer('x_mean', torch.zeros(dx + du))
         self.register_buffer('x_std', torch.ones(dx + du))
