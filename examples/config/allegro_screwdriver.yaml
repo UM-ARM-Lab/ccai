@@ -4,8 +4,8 @@ receding_horizon: False
 num_steps: 12
 num_turns: 3
 num_trials: 60
-visualize: False
-experiment_name: 'allegro_high_force_high_eps_pi_6_data_1'
+visualize: True
+experiment_name: 'allegro_high_force_high_eps_pi_6_data_3'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -25,7 +25,7 @@ controllers:
         alpha_C: 1
         step_size: 0.1
         momentum: 0.
-        device: 'cuda:1'
+        device: 'cuda:0'
         online_iters: 35
         warmup_iters: 200
         resample_steps: 16

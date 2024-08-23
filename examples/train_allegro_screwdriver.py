@@ -403,7 +403,8 @@ if __name__ == "__main__":
                               generate_context=config['diffuse_class'],
                               discriminator_guidance=config['discriminator_guidance'],
                               learn_inverse_dynamics=config['inverse_dynamics'],
-                              cosine_sine=config['sine_cosine'])
+                              cosine_sine=config['sine_cosine'],
+                              discriminator_share_weights=config['discriminator_share_weights'])
 
     data_path = pathlib.Path(f'{CCAI_PATH}/data/training_data/{config["data_directory"]}')
     train_dataset = AllegroScrewDriverDataset([p for p in data_path.glob('*train_data*')],

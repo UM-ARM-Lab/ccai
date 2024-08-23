@@ -112,7 +112,8 @@ class GaussianDiffusion(nn.Module):
             hidden_dim=32,
             unconditional=True,
             model_type='conv_unet',
-            discriminator_guidance=False
+            discriminator_guidance=False,
+            discriminator_share_weights=False
     ):
         super().__init__()
 
@@ -134,7 +135,7 @@ class GaussianDiffusion(nn.Module):
 
         self.classifier = None
         if discriminator_guidance:
-            self.classifier = UnetClassifier(self.horizon, self.xu_dim, cond_dim=context_dim, dim=hidden_dim)
+            self.classifier = UnetClassifier(self.horizon, self.xu_dim, cond_dim=context_dim, dim=hidden_dim, model=self.model if discriminator_share_weights else None)
             self.skip_classifier = False
 
         self.objective = objective
