@@ -5,7 +5,7 @@ num_steps: 8
 num_turns: 5
 num_trials: 80
 visualize: False
-experiment_name: 'allegro_card_data_1'
+experiment_name: 'allegro_card_data_4'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 fingers: ['index', 'middle']
