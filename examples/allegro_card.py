@@ -375,9 +375,9 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
             vae.load_state_dict(torch.load(f'{CCAI_PATH}/{vae_path}'))
             for param in vae.parameters():
                 param.requires_grad = False
-        trajectory_sampler = TrajectorySampler(T=params['T'] + 1, dx=(11 + (1 if params['sine_cosine'] else 0)) if not model_t else params['nzt'], du=21 if not model_t else 0, type=params['type'],
+        trajectory_sampler = TrajectorySampler(T=params['T'] + 1, dx=(11 + (1 if params['sine_cosine'] else 0)) if not model_t else params['nzt'], du=17 if not model_t else 0, type=params['type'],
                                                timesteps=256, hidden_dim=128 if not model_t else 64,
-                                               context_dim=3, generate_context=False,
+                                               context_dim=2, generate_context=False,
                                                constrain=params['projected'],
                                                problem=problem_for_sampler,
                                                inits_noise=inits_noise, noise_noise=noise_noise,
@@ -454,7 +454,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         state = state['q'].reshape(-1).to(device=params['device'])
 
         # generate context from mode
-        contact = -torch.ones(params['N'], 3).to(device=params['device'])
+        contact = -torch.ones(params['N'], 2).to(device=params['device'])
         if mode == 'index': 
             contact[:, 0] = 1
         elif mode == 'middle':
@@ -914,8 +914,8 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
 
 if __name__ == "__main__":
     # get config
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_card.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_card.yaml').read_text())
     from tqdm import tqdm
 
     if not config['visualize']:

@@ -1,15 +1,2 @@
-python -u allegro_screwdriver.py allegro_screwdriver_csvto_only > allegro_screwdriver_csvto_only_eps_.01_1_damping.log
-# python -u allegro_screwdriver.py allegro_screwdriver_diff_only > allegro_screwdriver_diff_only.log
-# python -u allegro_screwdriver.py allegro_screwdriver_csvto_diff > allegro_screwdriver_csvto_diff.log
-# python -u allegro_screwdriver.py allegro_screwdriver_csvto_diff_planned_contact > allegro_screwdriver_csvto_diff_planned_contact.log
-# python -u allegro_screwdriver.py allegro_screwdriver_csvto_diff_planned_replanned_contact > allegro_screwdriver_csvto_diff_planned_replanned_contact.log
-# python -u allegro_screwdriver.py allegro_screwdriver_csvto_diff_planned_replanned_contact_single_particle > allegro_screwdriver_csvto_diff_planned_replanned_contact_single_particle.log
-# python -u allegro_screwdriver.py allegro_screwdriver_csvto_diff_planned_contact_single_particle > allegro_screwdriver_csvto_diff_planned_contact_single_particle.log
-
-# python make_plan_init_gifs.py allegro_screwdriver_csvto_only
-# python make_plan_init_gifs.py allegro_screwdriver_diff_only
-# python make_plan_init_gifs.py allegro_screwdriver_csvto_diff
-# python make_plan_init_gifs.py allegro_screwdriver_csvto_diff_planned_contact
-# python make_plan_init_gifs.py allegro_screwdriver_csvto_diff_planned_replanned_contact
-# python make_plan_init_gifs.py allegro_screwdriver_csvto_diff_planned_contact_single_particle
-# python make_plan_init_gifs.py allegro_screwdriver_csvto_diff_planned_replanned_contact_single_particle
+python -u allegro_card.py allegro_card_diff_only > ./logs/allegro_card_diff_only.log
+# python -u allegro_card.py allegro_card_csvto_only > ./logs/allegro_card_csvto_only.log
