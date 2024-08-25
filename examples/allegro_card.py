@@ -122,7 +122,7 @@ class AllegroCard(AllegroManipulationExternalContactProblem):
         # u = 0.5 * torch.randn(N, self.T, self.du, device=self.device)
         # u[:, :, 0] -= 0.05
         if self.optimize_force:
-            u[..., 4*self.num_fingers:] = .5 * torch.randn(N, self.T, 3 * (self.num_contacts + 1), device=self.device)
+            u[..., 4*self.num_fingers:] = .75 * torch.randn(N, self.T, 3 * (self.num_contacts + 1), device=self.device)
             # for i, finger in enumerate(self.contact_fingers):
             #     idx = self.contact_force_indices_dict[finger]
             #     # if finger != 'index':
@@ -572,7 +572,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
             action = best_traj[0, planner.problem.dx:planner.problem.dx + planner.problem.du]
             state = env.get_state()
             state = state['q'].reshape(-1).to(device=params['device'])
-            xu = torch.cat((state[:-1], action))
+            xu = torch.cat((state, action))
 
             # record the actual trajectory
             actual_trajectory.append(xu)
@@ -600,6 +600,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
                                      index_middle_problem.fingers, 6, task='card')
 
             action = action + state[:4 * num_fingers].unsqueeze(0).to(env.device)
+
             env.step(action.to(device=env.device))
 
             # turn_problem._preprocess(best_traj.unsqueeze(0))
@@ -752,7 +753,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
     sample_contact = params.get('sample_contact', False)
     # num_stages = 2 + 3 * (params['num_turns'] - 1)
     if not sample_contact:
-        contact_sequence = ['index_middle']
+        contact_sequence = []
         contact_options = list(contact_label_to_vec.keys())
         for k in range(params['num_turns']):
             # single random choice from contact_label_to_vec keys
@@ -845,9 +846,10 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
             _goal = torch.tensor([0, -0.02 + state[-2], 0]).to(device=params['device'])
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
                 index_planner, mode='index', goal=_goal, fname=f'index_{stage}')
-
-            plans = [_full_to_partial(plan, 'index') for plan in plans]
+            print('traj pre index', traj.shape)
+            plans = [_partial_to_full(plan, 'index') for plan in plans]
             traj = torch.cat((traj[..., :-3], torch.zeros(*traj.shape[:-1], 3).to(device=params['device']), traj[..., -3:]), dim=-1)
+            print('traj post index', traj.shape)
             # plans = [torch.cat((plan[..., :-6],
             #                     torch.zeros(*plan.shape[:-1], 3).to(device=params['device']),
             #                     plan[..., -6:]),
@@ -861,8 +863,10 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
                 middle_planner, mode='middle', goal=_goal, fname=f'middle_{stage}')
             
-            plans = [_full_to_partial(plan, 'middle') for plan in plans]
+            print('traj pre middle', traj.shape)
+            plans = [_partial_to_full(plan, 'middle') for plan in plans]
             traj = torch.cat((traj[..., :-6], torch.zeros(*traj.shape[:-1], 3).to(device=params['device']), traj[..., -6:]), dim=-1)
+            print('traj post middle', traj.shape)
 
             _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance,
                             contact_state=torch.tensor([0.0, 1.0]))
@@ -871,6 +875,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
                 index_middle_planner, mode='index_middle', goal=_goal, fname=f'index_middle_{stage}')
             
+            print('traj index middle', traj.shape)
             _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance,
                             contact_state=torch.tensor([1.0, 1.0]))
         elif contact == 'reposition':
@@ -878,6 +883,10 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
                 reposition_planner, mode='reposition', goal=_goal, fname=f'reposition_{stage}')
             
+            print('traj pre reposition', traj.shape)
+            plans = [_partial_to_full(plan, 'reposition') for plan in plans]
+            traj = torch.cat((traj[..., :-3], torch.zeros(*traj.shape[:-1], 6).to(device=params['device']), traj[..., -3:]), dim=-1)
+            print('traj post reposition', traj.shape)
             _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance,
                             contact_state=torch.tensor([0.0, 0.0]))          
         if contact != 'pregrasp':
@@ -933,6 +942,7 @@ if __name__ == "__main__":
                                         fingers=config['fingers'],
                                         gradual_control=False,
                                         gravity=True, # For data generation only
+                                        randomize_obj_start=config.get('randomize_obj_start', False)
                                         )
 
     sim, gym, viewer = env.get_sim()
@@ -988,9 +998,9 @@ if __name__ == "__main__":
     start_ind = 0 if not config['sample_contact'] else 0
     for i in tqdm(range(0, config['num_trials'])):
     # for i in tqdm(range(0, 7)):
-        
-        torch.manual_seed(i)
-        np.random.seed(i)
+        if not config['data_gen']:
+            torch.manual_seed(i)
+            np.random.seed(i)
 
         goal = torch.tensor([0, 0.0, 0])
         # goal = goal + 0.025 * torch.randn(1) + 0.2

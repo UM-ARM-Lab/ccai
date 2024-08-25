@@ -1094,7 +1094,7 @@ if __name__ == "__main__":
                                            fingers=config['fingers'],
                                            gradual_control=False,
                                            gravity=True, # For data generation only
-                                           randomize_screwdriver_start=config.get('randomize_screwdriver_start', False),
+                                           randomize_obj_start=config.get('randomize_obj_start', False),
                                            )
 
     sim, gym, viewer = env.get_sim()
