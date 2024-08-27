@@ -41,13 +41,20 @@ class Diffusion_Policy:
         self.policy.to(self.device)
         self.policy.eval()
 
+        self.obs_hist = torch.zeros(1, 0, self.problem.dx + 1).to(self.device)
+
     def step(self, state, **kwargs):
 
         if self.sine_cosine:
             state = torch.cat([state[..., :-1], torch.cos(state[..., -1:]), torch.sin(state[..., -1:])], dim=-1)
             
+        # Add the state to the history
+        self.obs_hist = torch.cat([self.obs_hist, state.to(self.device).reshape(1, 1, -1)], dim=1)
+        if self.obs_hist.shape[1] == 1:
+            # Add again to make the history length 2
+            self.obs_hist = torch.cat([self.obs_hist, state.to(self.device).reshape(1, 1, -1)], dim=1)
         obs_dict = {
-            'obs': state.to(torch.float32).reshape(1, 1, -1)
+            'obs': self.obs_hist[:, -2:].to(torch.float32)
         }
 
         with torch.no_grad():
@@ -55,6 +62,7 @@ class Diffusion_Policy:
 
         action = action_dict['action']
 
+        #Swap action[..., :4] and action[..., 4:8]
         return action[:, 0], action.repeat(self.N, 1, 1)
 
     def shift(self):
@@ -62,3 +70,4 @@ class Diffusion_Policy:
 
     def reset(self, start, initial_x=None, **kwargs):
         self.policy.reset()
+        self.obs_hist = torch.zeros(1, 1, self.problem.dx + 1).to(self.device)
