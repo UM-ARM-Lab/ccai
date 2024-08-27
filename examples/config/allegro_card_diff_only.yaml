@@ -3,15 +3,15 @@ T: 8
 receding_horizon: False
 num_steps: 8
 num_turns: 5
-num_trials: 80
-visualize: False
-experiment_name: 'allegro_card_data_3'
+num_trials: 10
+visualize: True
+experiment_name: 'allegro_card_diff_only'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 fingers: ['index', 'middle']
 sim_device: 'cpu'
 friction_coefficient: 1.0
-kp: 5.0
+kp: 10.0
 heuristic: 1000
 max_depth: 11
 prior: 1
@@ -25,11 +25,8 @@ use_saved_noise: False
 use_guidance: False
 sample_contact: False
 use_partial_constraint: True
-sine_cosine: False
-randomize_obj_start: False
-data_gen: True
-# model_path: 'data/training/allegro_screwdriver/allegro_better_model/allegro_screwdriver_diffusion_w_classifier.pt'
-# model_path: 'data/training/allegro_screwdriver/allegro_test_new_data_augment_angle_diffusion/allegro_screwdriver_diffusion.pt'
+sine_cosine: True
+model_path: 'data/training/allegro_card/allegro_card_diffusion/allegro_screwdriver_diffusion.pt'
 controllers:
   csvgd:
     # N: 16
@@ -38,9 +35,9 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:0'
-    online_iters: 35
-    warmup_iters: 150
+    device: 'cuda:1'
+    online_iters: 0
+    warmup_iters: 0
     resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1

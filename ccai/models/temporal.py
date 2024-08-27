@@ -323,14 +323,13 @@ class UnetClassifier(nn.Module):
         in_out = list(zip(dims[:-1], dims[1:]))
         print(f'[ models/temporal ] Channel dimensions: {in_out}')
 
-        self.time_embedding = SinusoidalPosEmb(32)
         self.constraint_type_embed = nn.Sequential(
             nn.Linear(cond_dim, 32),
             Mish()
         )
         # self.constraint_type_embed = SinusoidalPosEmb(32)
         self.time_mlp = nn.Sequential(
-            nn.Linear(32 + 32, 256),
+            nn.Linear(32, 256),
             Mish()
         )
 
@@ -374,10 +373,6 @@ class UnetClassifier(nn.Module):
 
         # ensure t is a batched tensor
         B, H, d = x.shape
-        t = t.reshape(-1)
-        if t.shape[0] == 1:
-            t = t.repeat(B)
-        t = self.time_embedding(t)
         # x = einops.rearrange(x, 'b h t -> b t h')
         x = x.permute(0, 2, 1)
         x = pad_to_multiple(x, m=2 ** len(self.downs))
@@ -394,13 +389,8 @@ class UnetClassifier(nn.Module):
                 mask_dist = Bernoulli(probs=1 - self.context_dropout_p)
                 mask = mask_dist.sample((B,))  # .to(device=context.device)
                 c = mask * c
-                t = torch.cat((t, c), dim=-1)
-            else:
-                t = torch.cat((t, c), dim=-1)
-        else:
-            t = torch.cat((t, torch.zeros(B, 32, device=t.device)), dim=-1)
 
-        t = self.time_mlp(t)
+        t = self.time_mlp(c)
         h = []
         for resnet, resnet2, attn, downsample in self.downs:
             x = resnet(x, t)

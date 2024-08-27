@@ -1,0 +1,51 @@
+Importing module 'gym_38' (/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.0+cu121
+Device count 2
+/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinav/Documents/ccai
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+0 index_middle
+Sampling time 3.682306339032948
+Solve time for step 17.02869153022766
+Solve time for step 3.8579368591308594
+Solve time for step 3.796117067337036
+Solve time for step 3.8494255542755127
+Solve time for step 4.033121824264526
+Solve time for step 5.246251106262207
+Solve time for step 3.7903809547424316
+Solve time for step 3.695974111557007
+1 reposition
+Sampling time 3.740821257000789
+Solve time for step 16.65122699737549
+Solve time for step 3.8497376441955566
+Solve time for step 3.6229445934295654
+Solve time for step 5.040957450866699
+Solve time for step 3.584073781967163
+Solve time for step 3.47413969039917
+Solve time for step 4.710960626602173
+Solve time for step 3.4626424312591553
+2 reposition
+Sampling time 3.4888261089799926
+Solve time for step 16.802207946777344
+Solve time for step 3.6642210483551025
+Solve time for step 3.50948166847229
+Solve time for step 3.7025976181030273
+Solve time for step 3.489003896713257
+Solve time for step 3.272608995437622
+Solve time for step 3.2997472286224365
+Solve time for step 3.3015353679656982
+3 index
+Sampling time 3.7143472090829164

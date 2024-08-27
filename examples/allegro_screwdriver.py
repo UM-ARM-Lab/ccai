@@ -842,7 +842,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
         visualize_trajectory(traj, contact_scenes, viz_fpath, fingers, obj_dof + 1)
 
-    def plan_contacts(state, depth, next_node, multi_particle=False):
+    def plan_contacts(state, stage, depth, next_node, multi_particle=False):
         torch.cuda.empty_cache()
         state_for_search = state#convert_yaw_to_sine_cosine(state)
         next_node_init = next_node is None
@@ -886,19 +886,20 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         closed_set = contact_sequence_sampler.closed_set
         if contact_node_sequence is not None:
             contact_node_sequence = list(contact_node_sequence)
-        with open(f"{fpath}/contact_planning_{depth}.pkl", "wb") as f:
+        with open(f"{fpath}/contact_planning_{stage}.pkl", "wb") as f:
             pkl.dump((contact_node_sequence, closed_set, planning_time, contact_sequence_sampler.iter), f)
         if contact_node_sequence is None:
             print('No contact sequence found')
             # Find the node in the closed set with the lowest cost
-            # min_cost = float('inf')
-            # min_node = None
-            # for node in closed_set:
-            #     if node.fscore < min_cost and node.fscore > 0:
-            #         min_cost = node.fscore
-            #         min_node = node
-            # contact_node_sequence = [min_node]
-            return None, None, None
+            min_yaw = float('inf')
+            min_node = None
+            for node in closed_set:
+                yaw = contact_sequence_sampler.get_expected_yaw(node.data)
+                if yaw < min_yaw:
+                    min_yaw = yaw
+                    min_node = node
+            contact_node_sequence = [min_node.data]
+            # return None, None, None
         last_node = contact_node_sequence[-1]
 
         if next_node_init:
@@ -913,10 +914,17 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         contact_sequence = [contact_vec_to_label[contact_sequence[i].sum()] for i in range(contact_sequence.shape[0])]
         contact_sequence = contact_sequence[offset:] 
 
-        traj = last_node.trajectory
-        initial_samples = traj[:, :params['T'] + 1].to(device=params['device'])
-        if params['sine_cosine']:
-            initial_samples = convert_sine_cosine_to_yaw(initial_samples)
+        initial_samples = None
+        if params['multi_particle_search'] and last_node.trajectory is not None and last_node.trajectory.shape[0] >= params['N']:
+            traj = last_node.trajectory
+            initial_samples = traj[:, :params['T'] + 1].to(device=params['device'])
+            if params['sine_cosine']:
+                initial_samples = convert_sine_cosine_to_yaw(initial_samples)
+
+            # Pick the top params['N'] trajectories from initial_samples based on likelihood
+            likelihoods = last_node.likelihoods
+            top_indices = torch.argsort(likelihoods, descending=True)[:params['N']]
+            initial_samples = initial_samples[top_indices]
         torch.cuda.empty_cache()
         return contact_sequence, next_node, initial_samples
 
@@ -998,7 +1006,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
                 env.step(action)
                 continue
-        elif sample_contact and (stage == 1 or (params['replan'] and (stages_since_plan == 1 or len(contact_sequence) == 1))):
+        elif sample_contact and (stage == 1 or (params['replan'] and (stages_since_plan == 0 or len(contact_sequence) == 1))):
             # if yaw <= params['goal']:
             #     # params['goal'] -= .5
             #     params['goal'] = yaw + float(params['goal_update'])
@@ -1007,7 +1015,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             
             params['goal'] = yaw + float(params['goal_update'])
             print('Adjusting goal to', params['goal'])
-            new_contact_sequence, new_next_node, initial_samples = plan_contacts(state, 4, next_node, params['multi_particle_search'])
+            for key in problem_for_sampler:
+                problem_for_sampler[key].goal = torch.tensor([0, 0, params['goal']]).to(device=params['device'])
+            new_contact_sequence, new_next_node, initial_samples = plan_contacts(state, stage, 7, next_node, params['multi_particle_search'])
             stages_since_plan = 0
             if new_contact_sequence is not None and len(new_contact_sequence) == 0:
                 print('Planner thinks task is complete')
@@ -1123,8 +1133,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_diffusion_policy.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_diff_sine_cosine_only.yaml').read_text())
     from tqdm import tqdm
 
     if config['mode'] == 'hardware':
@@ -1222,8 +1232,8 @@ if __name__ == "__main__":
                 inits_noise = inits_noise[:, :, 0, :, :]
             if len(noise_noise.shape) == 6:
                 noise_noise = noise_noise[:, :, :, 0, :, :]
-    start_ind = 0 if not config['sample_contact'] else 0
-    for i in tqdm(range(0, config['num_trials'])):
+    start_ind = 0 if config['experiment_name'] == 'allegro_screwdriver_csvto_diff_sine_cosine_eps_.015_2.5_damping_pi_6' else 0
+    for i in tqdm(range(start_ind, config['num_trials'])):
     # for i in tqdm(range(0, 7)):
         
         torch.manual_seed(i)

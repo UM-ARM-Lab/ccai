@@ -5,7 +5,7 @@ num_steps: 8
 num_turns: 5
 num_trials: 80
 visualize: False
-experiment_name: 'allegro_card_data_1'
+experiment_name: 'allegro_card_data_5'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 fingers: ['index', 'middle']
@@ -38,7 +38,7 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:1'
+    device: 'cuda:0'
     online_iters: 35
     warmup_iters: 150
     resample_steps: 16
