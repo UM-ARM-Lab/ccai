@@ -572,7 +572,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
             action = best_traj[0, planner.problem.dx:planner.problem.dx + planner.problem.du]
             state = env.get_state()
             state = state['q'].reshape(-1).to(device=params['device'])
-            xu = torch.cat((state[:-1], action))
+            xu = torch.cat((state, action))
 
             # record the actual trajectory
             actual_trajectory.append(xu)
