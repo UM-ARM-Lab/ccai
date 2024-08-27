@@ -430,15 +430,16 @@ class AllegroScrewdriverDiffusionPolicyDataset(AllegroScrewDriverDataset):
         def __init__(self, folders, max_T, horizon, cosine_sine=False, states_only=False, skip_pregrasp=False):
             super().__init__(folders, max_T, cosine_sine, states_only, skip_pregrasp)
             # Flatten time dimension of self.trajectories
+            self.trajectories_orig = self.trajectories_orig[:, :, :-1]
             self.N, self.C, self.T, self.dxu = self.trajectories_orig.shape
             self.horizon = horizon
             # self.samples_per_traj = 1 + self.T - self.horizon + self.C * self.T
-            self.samples_per_traj = self.C * self.T
+            self.samples_per_traj = self.T
 
-            self.trajectories_full_time = self.trajectories_orig.reshape(self.N, self.C*self.T, self.dxu)
+            self.trajectories_full_time = self.trajectories_orig.reshape(self.N*self.C, self.T, self.dxu)
             self.trajectories_full_time = torch.from_numpy(self.trajectories_full_time).float()
-            self.trajectories_full_time[:, -1, 15:] = 0
-            self.trajectories_full_time = torch.cat((self.trajectories_full_time, torch.zeros(self.N, self.T-1, self.dxu)), dim=1)
+            # self.trajectories_full_time[:, -1, 15:] = 0
+            self.trajectories_full_time = torch.cat((self.trajectories_full_time, torch.zeros(self.N*self.C, self.horizon-1, self.dxu)), dim=1)
 
             self.trajectories_full_time_states = self.trajectories_full_time[:, :, :15]
             self.trajectories_full_time_controls = self.trajectories_full_time[:, :, 15:27]
@@ -493,7 +494,7 @@ class AllegroScrewdriverDiffusionPolicyDataset(AllegroScrewDriverDataset):
                     traj_theta = traj[:, 14][:, None]
                     traj_u = traj[:, 15:]
                     traj = torch.cat((traj_q, torch.cos(traj_theta), torch.sin(traj_theta), traj_u), dim=1)
-
+            # print(traj.shape)
             data = {
                 'obs': traj.numpy(),
                 'action': self.trajectories_full_time_controls[traj_id, t_id:t_id+self.horizon].numpy()
