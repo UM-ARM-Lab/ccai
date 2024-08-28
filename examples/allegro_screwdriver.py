@@ -1233,8 +1233,8 @@ if __name__ == "__main__":
             if len(noise_noise.shape) == 6:
                 noise_noise = noise_noise[:, :, :, 0, :, :]
     start_ind = 0 if config['experiment_name'] == 'allegro_screwdriver_csvto_diff_sine_cosine_eps_.015_2.5_damping_pi_6' else 0
-    # for i in tqdm(range(start_ind, config['num_trials'])):
-    for i in tqdm([1, 2, 4, 7]):
+    for i in tqdm(range(start_ind, config['num_trials'])):
+    # for i in tqdm([1, 2, 4, 7]):
         
         torch.manual_seed(i)
         np.random.seed(i)
