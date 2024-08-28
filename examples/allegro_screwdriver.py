@@ -831,15 +831,15 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         if contact_node_sequence is None:
             print('No contact sequence found')
             # Find the node in the closed set with the lowest cost
-            min_yaw = float('inf')
-            min_node = None
-            for node in closed_set:
-                yaw = contact_sequence_sampler.get_expected_yaw(node.data)
-                if yaw < min_yaw:
-                    min_yaw = yaw
-                    min_node = node
-            contact_node_sequence = [min_node.data]
-            # return None, None, None
+            # min_yaw = float('inf')
+            # min_node = None
+            # for node in closed_set:
+            #     yaw = contact_sequence_sampler.get_expected_yaw(node.data)
+            #     if yaw < min_yaw:
+            #         min_yaw = yaw
+            #         min_node = node
+            # contact_node_sequence = [min_node.data]
+            return None, None, None
         last_node = contact_node_sequence[-1]
 
         if next_node_init:
@@ -1162,8 +1162,8 @@ if __name__ == "__main__":
             if len(noise_noise.shape) == 6:
                 noise_noise = noise_noise[:, :, :, 0, :, :]
     start_ind = 0 if config['experiment_name'] == 'allegro_screwdriver_csvto_diff_sine_cosine_eps_.015_2.5_damping_pi_6' else 0
-    for i in tqdm(range(start_ind, config['num_trials'])):
-    # for i in tqdm(range(0, 7)):
+    # for i in tqdm(range(start_ind, config['num_trials'])):
+    for i in tqdm([1, 2, 4, 7]):
         
         torch.manual_seed(i)
         np.random.seed(i)
