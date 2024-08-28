@@ -313,11 +313,17 @@ class GaussianDiffusion(nn.Module):
     def _apply_conditioning(self, x, condition=None):
         if condition is None:
             return x
-
-        lb = torch.tensor([-0.47, -0.196, -0.174, -0.227, -0.47, -0.196, -0.174,
-                           -0.227, 0.26, -0.105, -0.199, -0.162, -0.1, -0.1])
-        ub = torch.tensor([0.47, 1.61, 1.709, 1.618, 0.47, 1.61, 1.709,
-                           1.618, 1.396, 1.163, 1.644, 1.719, 0.1, 0.1])
+        self.screwdriver_bounds = False
+        if self.screwdriver_bounds:
+            lb = torch.tensor([-0.47, -0.196, -0.174, -0.227, -0.47, -0.196, -0.174,
+                            -0.227, 0.26, -0.105, -0.199, -0.162, -0.1, -0.1])
+            ub = torch.tensor([0.47, 1.61, 1.709, 1.618, 0.47, 1.61, 1.709,
+                            1.618, 1.396, 1.163, 1.644, 1.719, 0.1, 0.1])
+        else:
+            lb = torch.tensor([-0.47, -0.196, -0.174, -0.227, -0.47, -0.196, -0.174,
+                            -0.227, -5, -5, -1, -1])
+            ub = torch.tensor([0.47, 1.61, 1.709, 1.618, 0.47, 1.61, 1.709,
+                            1.618, 5, 5, 1, 1])
 
         lb, ub, = lb.to(device=x.device), ub.to(device=x.device)
         lb = (lb - self.mu[:len(lb)]) / self.std[:len(lb)]

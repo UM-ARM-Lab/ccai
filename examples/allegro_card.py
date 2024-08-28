@@ -23,7 +23,7 @@ from ccai.utils.allegro_utils import *
 from ccai.allegro_contact import AllegroManipulationExternalContactProblem, PositionControlConstrainedSVGDMPC
 from ccai.allegro_screwdriver_problem_diffusion import AllegroScrewdriverDiff
 from ccai.models.trajectory_samplers import TrajectorySampler
-from ccai.models.contact_samplers import GraphSearch, Node
+from ccai.models.contact_samplers import GraphSearchCard, Node
 
 from model import LatentDiffusionModel
 
@@ -674,7 +674,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         if next_node is None:
             next_node = Node(
                 # torch.empty(num_samples_per_node, 0, 36),
-                torch.empty(num_samples_per_node, 0, 37 if params['sine_cosine'] else 36),#.to(device=params['device']),
+                torch.empty(num_samples_per_node, 0, 28 if params['sine_cosine'] else 29),#.to(device=params['device']),
                 0,
                 tuple(),
                 # torch.empty(num_samples_per_node * 4, 0, 36),
@@ -685,7 +685,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         else:
             next_node = Node(
                 # torch.empty(num_samples_per_node, 0, 36),
-                torch.empty(num_samples_per_node, 0, 37 if params['sine_cosine'] else 36),#.to(device=params['device']),
+                torch.empty(num_samples_per_node, 0, 28 if params['sine_cosine'] else 29),#.to(device=params['device']),
                 0,
                 (next_node, ),
                 # torch.empty(num_samples_per_node * 4, 0, 36),
@@ -694,7 +694,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
             )
             initial_run = False
         
-        contact_sequence_sampler = GraphSearch(state_for_search, trajectory_sampler, params['T'], problem_for_sampler, 
+        contact_sequence_sampler = GraphSearchCard(state_for_search, 28 if params['sine_cosine'] else 29, trajectory_sampler, params['T'], problem_for_sampler, 
                                                depth, params['heuristic'], params['goal'], 
                                                torch.device(params['device']), initial_run=initial_run,
                                                multi_particle=multi_particle,
