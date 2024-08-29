@@ -27,7 +27,7 @@ from ccai.utils.allegro_utils import *
 from ccai.allegro_contact import AllegroManipulationProblem, PositionControlConstrainedSVGDMPC, add_trajectories, \
     add_trajectories_hardware
 from ccai.allegro_screwdriver_problem_diffusion import AllegroScrewdriverDiff
-from ccai.mpc.diffusion_policy import Diffusion_Policy, DummyProblem
+# from ccai.mpc.diffusion_policy import Diffusion_Policy, DummyProblem
 from train_allegro_screwdriver import rollout_trajectory_in_sim
 from scipy.spatial.transform import Rotation as R
 
@@ -723,7 +723,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 action = x[:, planner.problem.dx:planner.problem.dx + planner.problem.du].to(device=env.device)
             else:
                 action = best_traj
-            xu = torch.cat((state[:-1], action[0]))
+            xu = torch.cat((state[:-1].cpu(), action[0].cpu()))
             actual_trajectory.append(xu)
             # print(action)
             action = action[:, :4 * num_fingers_to_plan]
@@ -791,7 +791,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                                             label='actual')
 
         # actual_trajectory.append(env.get_state()['q'].reshape(9).to(device=params['device']))
-        actual_trajectory = torch.stack(actual_trajectory, dim=0)
+        actual_trajectory = torch.stack(actual_trajectory, dim=0).to(device=params['device'])
         # can't stack plans as each is of a different length
 
         # for memory reasons we clear the data
@@ -891,15 +891,15 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         if contact_node_sequence is None:
             print('No contact sequence found')
             # Find the node in the closed set with the lowest cost
-            # min_yaw = float('inf')
-            # min_node = None
-            # for node in closed_set:
-            #     yaw = contact_sequence_sampler.get_expected_yaw(node.data)
-            #     if yaw < min_yaw:
-            #         min_yaw = yaw
-            #         min_node = node
-            # contact_node_sequence = [min_node.data]
-            return None, None, None
+            min_yaw = float('inf')
+            min_node = None
+            for node in closed_set:
+                yaw = contact_sequence_sampler.get_expected_yaw(node.data)
+                if yaw < min_yaw:
+                    min_yaw = yaw
+                    min_node = node
+            contact_node_sequence = [min_node.data]
+            # return None, None, None
         last_node = contact_node_sequence[-1]
 
         if next_node_init:
@@ -1013,7 +1013,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             #     print('Adjusting goal to', params['goal'])
             # new_contact_sequence, new_next_node, initial_samples = plan_contacts(state, num_stages - stage, next_node, params['multi_particle_search'])
             
-            params['goal'] = yaw + float(params['goal_update'])
+            if params['replan']:
+                params['goal'] = yaw + float(params['goal_update'])
             print('Adjusting goal to', params['goal'])
             for key in problem_for_sampler:
                 problem_for_sampler[key].goal = torch.tensor([0, 0, params['goal']]).to(device=params['device'])
@@ -1047,23 +1048,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             print(contact_sequence)
             # return -1
             contact = contact_sequence[0]  
-        # elif stage >= len(contact_sequence):
-        #     print('Planner thinks task is complete')
-        #     break
-        elif sample_contact:
-            stages_since_plan += 1
-            contact = contact_sequence[stages_since_plan]
-            contact_sequence = contact_sequence[1:]
-            if contact_sequence[0] == 'turn':
-                next_node = (1, 1, 1)
-            elif contact_sequence[0] == 'index':
-                next_node = (-1, 1, 1)
-            elif contact_sequence[0] == 'thumb_middle':
-                next_node = (1, -1, -1)
-            else:
-                next_node = (-1, -1, -1)
+        elif stage > len(contact_sequence):
+            print('Planner thinks task is complete')
+            print(executed_contacts)
+            break
         else:
-            contact = contact_sequence[stage]
+            contact = contact_sequence[stage-1]
         executed_contacts.append(contact)
         print(stage, contact)
         if contact == 'index':
@@ -1233,13 +1223,13 @@ if __name__ == "__main__":
             if len(noise_noise.shape) == 6:
                 noise_noise = noise_noise[:, :, :, 0, :, :]
     start_ind = 0 if config['experiment_name'] == 'allegro_screwdriver_csvto_diff_sine_cosine_eps_.015_2.5_damping_pi_6' else 0
-    # for i in tqdm(range(start_ind, config['num_trials'])):
-    for i in tqdm([1, 2, 4, 7]):
+    for i in tqdm(range(start_ind, config['num_trials'])):
+    # for i in tqdm([1, 2, 4, 7]):
         
         torch.manual_seed(i)
         np.random.seed(i)
 
-        goal = torch.tensor([0, 0, config['goal']])
+        goal = torch.tensor([0, 0, float(config['goal'])])
         # goal = goal + 0.025 * torch.randn(1) + 0.2
         for controller in config['controllers'].keys():
             env.reset()

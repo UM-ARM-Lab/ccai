@@ -13,57 +13,561 @@ Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
 Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
 Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
 Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
-0 index_middle
-Solve time for step 19.153064966201782
-Solve time for step 4.308265209197998
-Solve time for step 3.699063777923584
-Solve time for step 3.649188280105591
-Solve time for step 3.565354347229004
-Solve time for step 3.5289618968963623
-Solve time for step 3.58793306350708
-Solve time for step 3.487769603729248
+0 reposition
+Solve time for step 24.94995927810669
+Solve time for step 5.722533464431763
+Solve time for step 5.7052083015441895
+Solve time for step 5.730529546737671
+Solve time for step 5.519157886505127
+Solve time for step 5.524524927139282
+Solve time for step 5.490679740905762
+Solve time for step 5.4224512577056885
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
 1 reposition
-Solve time for step 14.205035924911499
-Solve time for step 3.2903683185577393
-Solve time for step 3.373373508453369
-Solve time for step 3.2611448764801025
-Solve time for step 3.2990972995758057
-Solve time for step 3.2933475971221924
-Solve time for step 3.4425885677337646
-Solve time for step 3.3429043292999268
+Solve time for step 23.78653311729431
+Solve time for step 5.768934726715088
+Solve time for step 5.672315835952759
+Solve time for step 5.6846959590911865
+Solve time for step 5.5904693603515625
+Solve time for step 5.489914894104004
+Solve time for step 5.633588075637817
+Solve time for step 5.590473413467407
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+2 index
+Solve time for step 28.24932336807251
+Solve time for step 6.526715040206909
+Solve time for step 6.518885374069214
+Solve time for step 6.392422914505005
+Solve time for step 6.473959922790527
+Solve time for step 6.490861892700195
+Solve time for step 6.500807046890259
+Solve time for step 6.578916549682617
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+3 index_middle
+Solve time for step 23.757067441940308
+Solve time for step 5.5477941036224365
+Solve time for step 5.441865921020508
+Solve time for step 5.478518009185791
+Solve time for step 5.410293817520142
+Solve time for step 5.509248971939087
+Solve time for step 6.0355751514434814
+Solve time for step 5.530272483825684
+traj index middle torch.Size([8, 28])
+4 reposition
+Solve time for step 22.84583854675293
+Solve time for step 5.758778810501099
+Solve time for step 5.732473134994507
+Solve time for step 5.787772178649902
+Solve time for step 5.577574253082275
+Solve time for step 5.506761789321899
+Solve time for step 5.6988091468811035
+Solve time for step 5.455451488494873
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+0 index_middle
+Solve time for step 24.22105598449707
+Solve time for step 5.546367645263672
+Solve time for step 5.469064235687256
+Solve time for step 5.412404537200928
+Solve time for step 5.398477554321289
+Solve time for step 5.297905445098877
+Solve time for step 5.303839206695557
+Solve time for step 5.184803009033203
+traj index middle torch.Size([8, 28])
+1 middle
+Solve time for step 28.67355728149414
+Solve time for step 5.455981254577637
+Solve time for step 6.588581323623657
+Solve time for step 6.443090915679932
+Solve time for step 6.789204359054565
+Solve time for step 6.545074701309204
+Solve time for step 6.344287633895874
+Solve time for step 6.2987892627716064
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
 2 reposition
-Solve time for step 14.9021155834198
-Solve time for step 3.3841118812561035
-Solve time for step 3.412241220474243
-Solve time for step 3.347451686859131
-Solve time for step 3.3609235286712646
-Solve time for step 3.2969794273376465
-Solve time for step 3.3826582431793213
-Solve time for step 3.3520593643188477
+Solve time for step 23.334558963775635
+Solve time for step 5.610498428344727
+Solve time for step 5.7406086921691895
+Solve time for step 5.663774251937866
+Solve time for step 5.624725341796875
+Solve time for step 5.639489412307739
+Solve time for step 5.611302614212036
+Solve time for step 5.722974538803101
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
 3 index
-Solve time for step 17.534483194351196
-Solve time for step 4.173001527786255
-Solve time for step 4.151048183441162
-Solve time for step 3.952996253967285
-Solve time for step 3.973573684692383
-Solve time for step 4.065765857696533
-Solve time for step 3.922811269760132
-Solve time for step 3.827164649963379
+Solve time for step 28.239477157592773
+Solve time for step 6.611904859542847
+Solve time for step 6.214361667633057
+Solve time for step 6.639625072479248
+Solve time for step 6.525949478149414
+Solve time for step 6.4796552658081055
+Solve time for step 6.444454669952393
+Solve time for step 6.55441427230835
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+4 middle
+Solve time for step 28.19737982749939
+Solve time for step 6.634539604187012
+Solve time for step 6.664394855499268
+Solve time for step 6.551353693008423
+Solve time for step 6.6258933544158936
+Solve time for step 6.6008617877960205
+Solve time for step 6.62203049659729
+Solve time for step 6.436752796173096
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+0 index
+Solve time for step 28.005442142486572
+Solve time for step 6.797357797622681
+Solve time for step 6.447602033615112
+Solve time for step 6.555246591567993
+Solve time for step 6.441533327102661
+Solve time for step 6.476166248321533
+Solve time for step 6.337110280990601
+Solve time for step 6.358645439147949
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+1 middle
+Solve time for step 28.65897536277771
+Solve time for step 6.505047082901001
+Solve time for step 6.769263505935669
+Solve time for step 6.48574423789978
+Solve time for step 6.7435407638549805
+Solve time for step 6.383734703063965
+Solve time for step 6.606359004974365
+Solve time for step 6.39499044418335
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+2 reposition
+Solve time for step 22.853297233581543
+Solve time for step 5.622129440307617
+Solve time for step 5.8586061000823975
+Solve time for step 5.6948912143707275
+Solve time for step 5.470263957977295
+Solve time for step 5.635919570922852
+Solve time for step 5.556546926498413
+Solve time for step 5.649647235870361
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+3 index
+Solve time for step 28.233816385269165
+Solve time for step 6.69374942779541
+Solve time for step 6.630680799484253
+Solve time for step 6.558315277099609
+Solve time for step 6.487128257751465
+Solve time for step 6.481841802597046
+Solve time for step 6.358019828796387
+Solve time for step 6.703155279159546
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+4 middle
+Solve time for step 27.70849323272705
+Solve time for step 6.511883020401001
+Solve time for step 6.496314764022827
+Solve time for step 6.629377126693726
+Solve time for step 6.411364555358887
+Solve time for step 6.521747827529907
+Solve time for step 6.410249471664429
+Solve time for step 6.418371915817261
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+0 middle
+Solve time for step 28.012712001800537
+Solve time for step 6.704704999923706
+Solve time for step 6.497419834136963
+Solve time for step 6.383697748184204
+Solve time for step 6.612370252609253
+Solve time for step 6.435353994369507
+Solve time for step 6.685785293579102
+Solve time for step 6.377353668212891
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+1 index_middle
+Solve time for step 23.76905059814453
+Solve time for step 5.605852365493774
+Solve time for step 5.377923250198364
+Solve time for step 5.426321744918823
+Solve time for step 5.385487794876099
+Solve time for step 5.3210742473602295
+Solve time for step 5.43996787071228
+Solve time for step 5.18816614151001
+traj index middle torch.Size([8, 28])
+2 index
+Solve time for step 28.248915195465088
+Solve time for step 5.904425382614136
+Solve time for step 6.618391752243042
+Solve time for step 6.599869966506958
+Solve time for step 6.356732606887817
+Solve time for step 6.78801703453064
+Solve time for step 6.36547327041626
+Solve time for step 6.497003555297852
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+3 middle
+Solve time for step 28.133285999298096
+Solve time for step 6.702337265014648
+Solve time for step 6.53267765045166
+Solve time for step 6.7303924560546875
+Solve time for step 6.459469318389893
+Solve time for step 6.6401543617248535
+Solve time for step 6.512007236480713
+Solve time for step 6.384548664093018
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
 4 index_middle
-Solve time for step 16.375358819961548
-Solve time for step 3.769376277923584
-Solve time for step 3.79697322845459
-Solve time for step 3.827685832977295
-Solve time for step 3.659161329269409
-Solve time for step 3.7951436042785645
-Solve time for step 3.721278429031372
-Solve time for step 3.4863240718841553
-5 reposition
-Solve time for step 15.04433798789978
-Solve time for step 3.3968772888183594
-Solve time for step 3.4724807739257812
-Solve time for step 3.5358026027679443
-Solve time for step 3.399780035018921
-Solve time for step 3.470991611480713
-Solve time for step 3.285914182662964
-Solve time for step 3.1295971870422363
+Solve time for step 24.105581760406494
+Solve time for step 5.500335931777954
+Solve time for step 5.67665696144104
+Solve time for step 5.555108547210693
+Solve time for step 5.474886178970337
+Solve time for step 5.3457324504852295
+Solve time for step 5.344615697860718
+Solve time for step 5.255296230316162
+traj index middle torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+0 reposition
+Solve time for step 24.54520058631897
+Solve time for step 5.796063661575317
+Solve time for step 5.8080925941467285
+Solve time for step 5.661269187927246
+Solve time for step 4.402097463607788
+Solve time for step 5.739209890365601
+Solve time for step 5.568758964538574
+Solve time for step 5.614623785018921
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+1 reposition
+Solve time for step 24.288733959197998
+Solve time for step 5.668251037597656
+Solve time for step 5.808358430862427
+Solve time for step 5.648043870925903
+Solve time for step 5.718010425567627
+Solve time for step 5.696930170059204
+Solve time for step 5.744304418563843
+Solve time for step 6.100845098495483
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+2 reposition
+Solve time for step 25.079617977142334
+Solve time for step 5.820960998535156
+Solve time for step 5.958176136016846
+Solve time for step 5.7921531200408936
+Solve time for step 5.599109649658203
+Solve time for step 5.539374351501465
+Solve time for step 5.659080505371094
+Solve time for step 5.661708116531372
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+3 index
+Solve time for step 28.641090631484985
+Solve time for step 6.573745965957642
+Solve time for step 6.5045647621154785
+Solve time for step 6.400078296661377
+Solve time for step 6.525502681732178
+Solve time for step 6.466423034667969
+Solve time for step 6.441133737564087
+Solve time for step 6.369462490081787
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+4 index
+Solve time for step 28.101991891860962
+Solve time for step 5.772602796554565
+Solve time for step 6.892569065093994
+Solve time for step 6.966963291168213
+Solve time for step 6.756835460662842
+Solve time for step 6.601592302322388
+Solve time for step 6.707692623138428
+Solve time for step 6.605807781219482
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+0 middle
+Solve time for step 29.38378381729126
+Solve time for step 6.896665811538696
+Solve time for step 6.712563514709473
+Solve time for step 6.8632121086120605
+Solve time for step 6.619618892669678
+Solve time for step 6.639876365661621
+Solve time for step 6.486954689025879
+Solve time for step 6.330248117446899
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+1 index
+Solve time for step 28.343166828155518
+Solve time for step 6.848650217056274
+Solve time for step 6.504326105117798
+Solve time for step 6.646965503692627
+Solve time for step 6.384990692138672
+Solve time for step 5.273878574371338
+Solve time for step 6.541942596435547
+Solve time for step 6.370237827301025
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+2 index_middle
+Solve time for step 24.321991443634033
+Solve time for step 5.559599876403809
+Solve time for step 5.3984763622283936
+Solve time for step 5.435854911804199
+Solve time for step 5.118459701538086
+Solve time for step 5.426612854003906
+Solve time for step 5.284815311431885
+Solve time for step 5.198696136474609
+traj index middle torch.Size([8, 28])
+3 index_middle
+Solve time for step 24.006439208984375
+Solve time for step 5.496791124343872
+Solve time for step 5.864270925521851
+Solve time for step 5.581602573394775
+Solve time for step 5.450092792510986
+Solve time for step 5.468764305114746
+Solve time for step 5.230551719665527
+Solve time for step 5.499497413635254
+traj index middle torch.Size([8, 28])
+4 index_middle
+Solve time for step 23.78526473045349
+Solve time for step 5.697095155715942
+Solve time for step 5.536126613616943
+Solve time for step 5.442586660385132
+Solve time for step 5.63593053817749
+Solve time for step 5.2979090213775635
+Solve time for step 5.415026903152466
+Solve time for step 5.147601366043091
+traj index middle torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+0 reposition
+Solve time for step 24.675572872161865
+Solve time for step 5.7214438915252686
+Solve time for step 5.628860712051392
+Solve time for step 5.782857894897461
+Solve time for step 5.646387100219727
+Solve time for step 5.472451210021973
+Solve time for step 5.657434463500977
+Solve time for step 5.549492835998535
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+1 index
+Solve time for step 28.813767194747925
+Solve time for step 6.682232141494751
+Solve time for step 6.522165775299072
+Solve time for step 6.3968353271484375
+Solve time for step 6.791384696960449
+Solve time for step 6.447722911834717
+Solve time for step 6.590237140655518
+Solve time for step 6.3546366691589355
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+2 reposition
+Solve time for step 23.039305686950684
+Solve time for step 5.6162848472595215
+Solve time for step 5.775474309921265
+Solve time for step 5.646912574768066
+Solve time for step 5.58087944984436
+Solve time for step 5.601122617721558
+Solve time for step 5.541211366653442
+Solve time for step 5.709479331970215
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+3 reposition
+Solve time for step 24.143938064575195
+Solve time for step 5.768128395080566
+Solve time for step 5.6344993114471436
+Solve time for step 5.874717473983765
+Solve time for step 5.803870439529419
+Solve time for step 5.579720497131348
+Solve time for step 5.665145635604858
+Solve time for step 5.660676956176758
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+4 reposition
+Solve time for step 24.575310230255127
+Solve time for step 5.877478122711182
+Solve time for step 5.709949731826782
+Solve time for step 5.588689565658569
+Solve time for step 5.6896233558654785
+Solve time for step 5.587716102600098
+Solve time for step 5.682308197021484
+Solve time for step 5.547410488128662
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+0 middle
+Solve time for step 28.068922519683838
+Solve time for step 6.619800090789795
+Solve time for step 6.7771079540252686
+Solve time for step 6.406398773193359
+Solve time for step 6.631713151931763
+Solve time for step 6.50145411491394
+Solve time for step 6.543405294418335
+Solve time for step 6.4303765296936035
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+1 reposition
+Solve time for step 23.958258152008057
+Solve time for step 5.673332452774048
+Solve time for step 5.976973533630371
+Solve time for step 5.6241302490234375
+Solve time for step 5.694668769836426
+Solve time for step 5.604788780212402
+Solve time for step 5.520483493804932
+Solve time for step 5.64398455619812
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+2 index_middle
+Solve time for step 24.362388610839844
+Solve time for step 5.639572381973267
+Solve time for step 5.559905767440796
+Solve time for step 5.6640849113464355
+Solve time for step 5.679155111312866
+Solve time for step 5.531072378158569
+Solve time for step 5.344288110733032
+Solve time for step 5.27477502822876
+traj index middle torch.Size([8, 28])
+3 reposition
+Solve time for step 24.188374280929565
+Solve time for step 5.719273328781128
+Solve time for step 5.657479286193848
+Solve time for step 5.9187657833099365
+Solve time for step 5.574211120605469
+Solve time for step 5.747999668121338
+Solve time for step 5.490025997161865
+Solve time for step 5.822976589202881
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+4 middle
+Solve time for step 28.544360399246216
+Solve time for step 6.667315244674683
+Solve time for step 6.524805068969727
+Solve time for step 6.492358207702637
+Solve time for step 6.339837312698364
+Solve time for step 6.649791717529297
+Solve time for step 6.430081605911255
+Solve time for step 6.393557071685791
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+0 index_middle
+Solve time for step 23.704090356826782
+Solve time for step 5.674010992050171
+Solve time for step 5.469094753265381
+Solve time for step 5.425814867019653
+Solve time for step 5.431039333343506
+Solve time for step 5.576441049575806
+Solve time for step 5.28383469581604
+Solve time for step 5.280047178268433
+traj index middle torch.Size([8, 28])
+1 index_middle
+Solve time for step 16.816301584243774
+Solve time for step 3.7338032722473145
+Solve time for step 3.6858913898468018
+Solve time for step 3.5842831134796143
+Solve time for step 3.5894405841827393
+Solve time for step 3.7246179580688477
+Solve time for step 3.6963088512420654
+Solve time for step 3.645860433578491
+traj index middle torch.Size([8, 28])
+2 reposition
+Solve time for step 14.39576244354248
+Solve time for step 3.418006181716919
+Solve time for step 3.384093761444092
+Solve time for step 3.3939902782440186
+Solve time for step 3.4301137924194336
+Solve time for step 3.415757179260254
+Solve time for step 3.3994498252868652
+Solve time for step 3.361534357070923
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+3 index
+Solve time for step 17.795875787734985
+Solve time for step 4.114993572235107
+Solve time for step 4.0939435958862305
+Solve time for step 4.102508068084717
+Solve time for step 4.094626188278198
+Solve time for step 4.052500009536743
+Solve time for step 3.9429943561553955
+Solve time for step 4.032886028289795
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+4 index_middle
+Solve time for step 16.11378526687622
+Solve time for step 3.6958982944488525
+Solve time for step 3.728243112564087
+Solve time for step 3.7928824424743652
+Solve time for step 3.7896780967712402
+Solve time for step 3.5722897052764893
+Solve time for step 3.494328022003174
+Solve time for step 3.484572649002075
+traj index middle torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+0 index_middle
+Solve time for step 15.981529712677002
+Solve time for step 3.7643656730651855
+Solve time for step 4.014740467071533
+Solve time for step 3.649702787399292
+Solve time for step 3.6188838481903076
+Solve time for step 3.492708683013916
+Solve time for step 3.4821295738220215
+Solve time for step 3.442321300506592
+traj index middle torch.Size([8, 28])
+1 middle
+Solve time for step 17.666436195373535
+Solve time for step 4.00111985206604
+Solve time for step 4.124401807785034
+Solve time for step 3.9488394260406494
+Solve time for step 4.121284484863281
+Solve time for step 3.983037233352661
+Solve time for step 4.006424903869629
+Solve time for step 4.259178400039673
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+2 index
+Solve time for step 18.45764708518982
+Solve time for step 4.729475975036621
+Solve time for step 4.846628904342651
+Solve time for step 4.362023591995239
+Solve time for step 4.75495719909668
+Solve time for step 4.632351398468018
+Solve time for step 4.519122123718262
+Solve time for step 4.897326231002808
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+3 middle
+Solve time for step 19.438629150390625
+Solve time for step 4.315509080886841
+Solve time for step 4.410842418670654
+Solve time for step 4.5520477294921875
+Solve time for step 4.574780702590942
+Solve time for step 4.339816331863403
+Solve time for step 4.19184422492981
+Solve time for step 4.200242280960083
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+4 reposition
+Solve time for step 15.785905122756958
+Solve time for step 3.515937328338623
+Solve time for step 3.440667152404785
+Solve time for step 3.3952207565307617
+Solve time for step 3.460408926010132
+Solve time for step 3.274415969848633
+Solve time for step 3.4592928886413574
+Solve time for step 3.4645376205444336
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}

@@ -49,6 +49,7 @@ class Node:
 
 class GraphSearch(ContactSampler, AStar):
     def __init__(self, start, model, T, problem_dict, max_depth, heuristic_weight, goal, device,
+                 num_samples=16,
                   *args, initial_run=False, multi_particle=False, prior=0, sine_cosine=False, **kwargs):
         ContactSampler.__init__(self, *args, **kwargs)
 
@@ -65,7 +66,7 @@ class GraphSearch(ContactSampler, AStar):
         self.device = device
         self.model = model
 
-        self.num_samples = 1
+        self.num_samples = num_samples
         self.max_depth = max_depth
         self.heuristic_weight = heuristic_weight
 
@@ -77,7 +78,7 @@ class GraphSearch(ContactSampler, AStar):
         if self.multi_particle:
             self.num_samples_multi = 1
         else:
-            self.num_samples_multi = 128
+            self.num_samples_multi = 16
             self.num_samples = 1
 
         if prior == 0:
@@ -325,6 +326,7 @@ class GraphSearch(ContactSampler, AStar):
 
 class GraphSearchCard(ContactSampler, AStar):
     def __init__(self, start, dx, model, T, problem_dict, max_depth, heuristic_weight, goal, device,
+                 num_samples=16,
                   *args, initial_run=False, multi_particle=False, prior=0, sine_cosine=False, **kwargs):
         ContactSampler.__init__(self, *args, **kwargs)
 
@@ -341,7 +343,9 @@ class GraphSearchCard(ContactSampler, AStar):
         self.device = device
         self.model = model
 
-        self.num_samples = 1
+        self.num_samples = num_samples
+        # print('num_samples', num_samples)
+        # print('multi particle', multi_particle)
         self.max_depth = max_depth
         self.heuristic_weight = heuristic_weight
 
@@ -353,7 +357,7 @@ class GraphSearchCard(ContactSampler, AStar):
         if self.multi_particle:
             self.num_samples_multi = 1
         else:
-            self.num_samples_multi = 128
+            self.num_samples_multi = num_samples
             self.num_samples = 1
 
         if prior == 0:
@@ -411,6 +415,20 @@ class GraphSearchCard(ContactSampler, AStar):
         # return torch.nn.functional.softmax(likelihood, dim=0)
         return likelihood / likelihood.sum()
 
+
+    def get_expected_yaw(self, node):
+        if node.trajectory.shape[1] == 0:
+            return self.start_yaw
+        if self.sine_cosine:
+            yaw = self.get_yaw_from_sine_cosine(node.trajectory[:, -1, :self.dx])
+        else:
+            yaw = node.trajectory[:, -1, self.dx-1]
+        # likelihood_for_average = torch.nn.functional.softmax(node.likelihoods, dim=0)
+        likelihood_for_average = self.normalize_likelihood(node.likelihoods)
+        yaw = (yaw * likelihood_for_average.to(yaw.device)).sum().item()
+        return yaw
+    
+    
     def get_expected_yaw(self, node):
         if node.trajectory.shape[1] == 0:
             return self.start_yaw
@@ -427,13 +445,14 @@ class GraphSearchCard(ContactSampler, AStar):
         if node.trajectory.shape[1] == 0:
             return self.start_y
         if self.sine_cosine:
-            yaw = self.get_yaw_from_sine_cosine(node.trajectory[:, -1, :self.dx])
+            y = node.trajectory[:, -1, self.dx-3]
         else:
-            yaw = node.trajectory[:, -1, self.dx-1]
+            y = node.trajectory[:, -1, self.dx-2]
         # likelihood_for_average = torch.nn.functional.softmax(node.likelihoods, dim=0)
         likelihood_for_average = self.normalize_likelihood(node.likelihoods)
-        yaw = (yaw * likelihood_for_average.to(yaw.device)).sum().item()
-        return yaw
+        y = (y * likelihood_for_average.to(y.device)).sum().item()
+        return y
+
     def get_yaw_from_sine_cosine(self, state):
         # return state[:, 14]
         sine = state[:, self.dx-1]
@@ -441,8 +460,8 @@ class GraphSearchCard(ContactSampler, AStar):
         return torch.atan2(sine, cosine)
     
     def _goal_reached(self, current):
-        yaw = self.get_expected_yaw(current)
-        return yaw, yaw <= self.goal
+        y = self.get_expected_y(current)
+        return y, y <= self.goal
 
     def is_goal_reached(self, current, goal):
         self.iter += 1
@@ -491,8 +510,8 @@ class GraphSearchCard(ContactSampler, AStar):
             # last_state = node.trajectory[:, -1, :15]
             last_state = node.trajectory[:, -1, :self.dx]
         last_state = last_state.to(self.device)
-        samples, _, likelihood = self.model.sample(N=self.num_c_states*self.num_samples * self.num_samples_multi, start=last_state.reshape(self.num_samples, -1).repeat(3*self.num_samples_multi, 1),
-                                    H=self.T, constraints=self.neighbors_c_states[self.num_samples*self.num_samples_multi:])
+        samples, _, likelihood = self.model.sample(N=self.num_c_states*self.num_samples * self.num_samples_multi, start=last_state.reshape(self.num_samples, -1).repeat(self.num_c_states*self.num_samples_multi, 1),
+                                    H=self.T, constraints=self.neighbors_c_states)
         
 
         if likelihood is not None:
@@ -501,9 +520,9 @@ class GraphSearchCard(ContactSampler, AStar):
         if self.sine_cosine:
             samples = self.convert_sine_cosine_to_yaw(samples)
 
-        for i in range(self.num_c_states - 1):
+        for i in range(self.num_c_states):
             sample_range = torch.arange(i*(self.num_samples * self.num_samples_multi), (i+1)*(self.num_samples * self.num_samples_multi))
-            c_state = tuple(self.neighbors_c_states_orig[i+1].cpu().tolist())
+            c_state = tuple(self.neighbors_c_states_orig[i].cpu().tolist())
             mask, mask_no_z, mask_without_z = self.c_state_mask(c_state)
             problem = self.problem_dict[c_state]
             sample_range_mask = samples[sample_range][: , :, mask_without_z]
@@ -512,7 +531,7 @@ class GraphSearchCard(ContactSampler, AStar):
             J, _, _ = problem._objective(sample_range_mask)
 
             likelihood_this_c = likelihood[sample_range] * self.discount ** (len(cur_seq) - 1 * self.initial_run)
-
+            print(likelihood[sample_range])
             # Add node's likelihood to likelihood_this_c
             if node.likelihoods is not None:
                 likelihood_this_c += node.likelihoods.repeat(self.num_samples_multi).to(likelihood_this_c.device)
@@ -560,30 +579,30 @@ class GraphSearchCard(ContactSampler, AStar):
         return n2.cost - n1.cost
 
     def heuristic_cost_estimate(self, current, goal):
-        if current.trajectory.shape[0] == 0:
-            return self.heuristic_weight * max(0, self.start_yaw - self.goal)
-        c_seq = [((np.array(i) + 1) /2).sum().astype(int) for i in current.contact_sequence]
-        if self.initial_run:
-            c_seq = [0] + c_seq
-        nll = -self.markov_chain.eval_log_prob(c_seq)
-        yaw = self.get_expected_yaw(current)
+        if current.trajectory.shape[1] == 0:
+            return self.heuristic_weight * max(0, self.start_y - self.goal)
+        # c_seq = [((np.array(i) + 1) /2).sum().astype(int) for i in current.contact_sequence]
+        # if self.initial_run:
+        #     c_seq = [0] + c_seq
+        # nll = -self.markov_chain.eval_log_prob(c_seq)
+        y = self.get_expected_y(current)
         # yaw = current.trajectory[-1, 14].item()
         # return self.heuristic_weight * max(0, yaw - self.goal)
         # return self.heuristic_weight * (nll * max(0, yaw - self.goal))
-        return self.heuristic_weight * (nll + 10* max(0, yaw - self.goal))
+        return self.heuristic_weight * (max(0, y - self.goal))
         # return self.heuristic_weight * (nll)
 
         # return self.heuristic_weight * max(0, yaw - self.goal)
 
     def c_state_mask(self, c_state):
         z_dim = self.problem_dict[c_state].dz
-        mask = torch.ones((36 + z_dim), device=self.device).bool()
+        mask = torch.ones((28 + z_dim), device=self.device).bool()
         if c_state == (-1, -1):
             mask[19:25] = False
         elif c_state == (-1 , 1):
-            mask[22:25] = False
+            mask[19:22] = False
         elif c_state == (1, -1):
-            mask[25:28] = False
+            mask[22:25] = False
         # Concat False to mask to match the size of x
         mask_no_z = mask.clone()
         if z_dim > 0:

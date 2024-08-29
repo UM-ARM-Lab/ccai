@@ -282,73 +282,73 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
     if model_path is not None:
         problem_for_sampler = None
         if params['projected'] or params['sample_contact']:
-            pregrasp_problem_diff = AllegroScrewdriverDiff(
-                start=start[:4 * num_fingers + obj_dof],
-                goal=params['valve_goal'],
-                T=params['T'],
-                chain=params['chain'],
-                device=params['device'],
-                object_asset_pos=env.card_pose,
-                object_location=params['object_location'],
-                object_type='card',
-                world_trans=env.world_trans,
-                regrasp_fingers=fingers,
-                contact_fingers=[],
-                obj_dof=obj_dof,
-                obj_joint_dim=1,
-                optimize_force=params['optimize_force'],
-            )
-            # finger gate index
-            index_regrasp_problem_diff = AllegroScrewdriverDiff(
-                start=start[:4 * num_fingers + obj_dof],
-                goal=params['valve_goal'],
-                T=params['T'],
-                chain=params['chain'],
-                device=params['device'],
-                object_asset_pos=env.card_pose,
-                object_location=params['object_location'],
-                object_type='card',
-                world_trans=env.world_trans,
-                regrasp_fingers=['index'],
-                contact_fingers=['middle', 'thumb'],
-                obj_dof=obj_dof,
-                obj_joint_dim=1,
-                optimize_force=params['optimize_force'],
-                default_dof_pos=env.default_dof_pos[:, :16]
-            )
-            thumb_and_middle_regrasp_problem_diff = AllegroScrewdriverDiff(
-                start=start[:4 * num_fingers + obj_dof],
-                goal=params['valve_goal'],
-                T=params['T'],
-                chain=params['chain'],
-                device=params['device'],
-                object_asset_pos=env.card_pose,
-                object_location=params['object_location'],
-                object_type='card',
-                world_trans=env.world_trans,
-                contact_fingers=['index'],
-                regrasp_fingers=['middle', 'thumb'],
-                obj_dof=obj_dof,
-                obj_joint_dim=1,
-                optimize_force=params['optimize_force'],
-                default_dof_pos=env.default_dof_pos[:, :16]
-            )
-            turn_problem_diff = AllegroScrewdriverDiff(
-                start=start[:4 * num_fingers + obj_dof],
-                goal=params['valve_goal'],
-                T=params['T'],
-                chain=params['chain'],
-                device=params['device'],
-                object_asset_pos=env.card_pose,
-                object_location=params['object_location'],
-                object_type='card',
-                world_trans=env.world_trans,
-                contact_fingers=['index', 'middle', 'thumb'],
-                obj_dof=obj_dof,
-                obj_joint_dim=1,
-                optimize_force=params['optimize_force'],
-                default_dof_pos=env.default_dof_pos[:, :16]
-            )
+            # pregrasp_problem_diff = AllegroScrewdriverDiff(
+            #     start=start[:4 * num_fingers + obj_dof],
+            #     goal=params['valve_goal'],
+            #     T=params['T'],
+            #     chain=params['chain'],
+            #     device=params['device'],
+            #     object_asset_pos=env.card_pose,
+            #     object_location=params['object_location'],
+            #     object_type='card',
+            #     world_trans=env.world_trans,
+            #     regrasp_fingers=fingers,
+            #     contact_fingers=[],
+            #     obj_dof=obj_dof,
+            #     obj_joint_dim=1,
+            #     optimize_force=params['optimize_force'],
+            # )
+            # # finger gate index
+            # index_regrasp_problem_diff = AllegroScrewdriverDiff(
+            #     start=start[:4 * num_fingers + obj_dof],
+            #     goal=params['valve_goal'],
+            #     T=params['T'],
+            #     chain=params['chain'],
+            #     device=params['device'],
+            #     object_asset_pos=env.card_pose,
+            #     object_location=params['object_location'],
+            #     object_type='card',
+            #     world_trans=env.world_trans,
+            #     regrasp_fingers=['index'],
+            #     contact_fingers=['middle', 'thumb'],
+            #     obj_dof=obj_dof,
+            #     obj_joint_dim=1,
+            #     optimize_force=params['optimize_force'],
+            #     default_dof_pos=env.default_dof_pos[:, :16]
+            # )
+            # thumb_and_middle_regrasp_problem_diff = AllegroScrewdriverDiff(
+            #     start=start[:4 * num_fingers + obj_dof],
+            #     goal=params['valve_goal'],
+            #     T=params['T'],
+            #     chain=params['chain'],
+            #     device=params['device'],
+            #     object_asset_pos=env.card_pose,
+            #     object_location=params['object_location'],
+            #     object_type='card',
+            #     world_trans=env.world_trans,
+            #     contact_fingers=['index'],
+            #     regrasp_fingers=['middle', 'thumb'],
+            #     obj_dof=obj_dof,
+            #     obj_joint_dim=1,
+            #     optimize_force=params['optimize_force'],
+            #     default_dof_pos=env.default_dof_pos[:, :16]
+            # )
+            # turn_problem_diff = AllegroScrewdriverDiff(
+            #     start=start[:4 * num_fingers + obj_dof],
+            #     goal=params['valve_goal'],
+            #     T=params['T'],
+            #     chain=params['chain'],
+            #     device=params['device'],
+            #     object_asset_pos=env.card_pose,
+            #     object_location=params['object_location'],
+            #     object_type='card',
+            #     world_trans=env.world_trans,
+            #     contact_fingers=['index', 'middle', 'thumb'],
+            #     obj_dof=obj_dof,
+            #     obj_joint_dim=1,
+            #     optimize_force=params['optimize_force'],
+            #     default_dof_pos=env.default_dof_pos[:, :16]
+            # )
 
             if params['use_partial_constraint']:
                 problem_for_sampler = {
@@ -359,10 +359,10 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
                 }
             else:
                 problem_for_sampler = {
-                    (-1, -1, -1): pregrasp_problem,
-                    (-1, 1, 1): index_regrasp_problem,
-                    (1, -1, -1): thumb_and_middle_regrasp_problem,
-                    (1, 1, 1): turn_problem
+                    (-1, -1): reposition_problem,
+                    (-1, 1): middle_problem,
+                    (1, -1): index_problem,
+                    (1, 1): index_middle_problem
                 }
         if 'type' not in params:
             params['type'] = 'diffusion'
@@ -448,7 +448,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         xu_new = torch.cat([xu[:10], cosine.unsqueeze(-1), sine.unsqueeze(-1), xu[11:]], dim=-1)
         return xu_new
     
-    def execute_traj(planner, mode, goal=None, fname=None):
+    def execute_traj(planner, mode, goal=None, fname=None, initial_samples=None):
         # reset planner
         state = env.get_state()
         state = state['q'].reshape(-1).to(device=params['device'])
@@ -466,7 +466,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         # generate initial samples with diffusion model
         initial_samples = None
         sim_rollouts = None
-        if trajectory_sampler is not None and params.get('diff_init', True):
+        if initial_samples is None and trajectory_sampler is not None and params.get('diff_init', True):
             with torch.no_grad():
                 start = state.clone()
                 # if state[-1] < -1.0:
@@ -490,7 +490,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
             # for i in range(params['N']):
             #     sim_rollout = rollout_trajectory_in_sim(env_sim_rollout, initial_samples[i])
             #     sim_rollouts[i] = sim_rollout
-
+        if initial_samples is not None:
             initial_samples = _full_to_partial(initial_samples, mode)
             initial_x = initial_samples[:, 1:, :planner.problem.dx]
             initial_u = initial_samples[:, :-1, -planner.problem.du:]
@@ -663,18 +663,18 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
         visualize_trajectory(traj, contact_scenes, viz_fpath, fingers, obj_dof + 1)
 
-    def plan_contacts(state, depth, next_node, multi_particle=False):
+    def plan_contacts(state, stage, depth, next_node, multi_particle=False):
         torch.cuda.empty_cache()
         state_for_search = state#convert_yaw_to_sine_cosine(state)
         next_node_init = next_node is None
 
         num_samples_per_node = 1
         if multi_particle:
-            num_samples_per_node = 16
+            num_samples_per_node = params.get('num_samples', 16)
         if next_node is None:
             next_node = Node(
                 # torch.empty(num_samples_per_node, 0, 36),
-                torch.empty(num_samples_per_node, 0, 28 if params['sine_cosine'] else 29),#.to(device=params['device']),
+                torch.zeros(num_samples_per_node, 0, 29 if params['sine_cosine'] else 28),#.to(device=params['device']),
                 0,
                 tuple(),
                 # torch.empty(num_samples_per_node * 4, 0, 36),
@@ -685,7 +685,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         else:
             next_node = Node(
                 # torch.empty(num_samples_per_node, 0, 36),
-                torch.empty(num_samples_per_node, 0, 28 if params['sine_cosine'] else 29),#.to(device=params['device']),
+                torch.zeros(num_samples_per_node, 0, 29 if params['sine_cosine'] else 28),#.to(device=params['device']),
                 0,
                 (next_node, ),
                 # torch.empty(num_samples_per_node * 4, 0, 36),
@@ -693,10 +693,12 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
                 # torch.arange(16)
             )
             initial_run = False
-        
-        contact_sequence_sampler = GraphSearchCard(state_for_search, 28 if params['sine_cosine'] else 29, trajectory_sampler, params['T'], problem_for_sampler, 
+        # print(params['num_samples'])
+        print('params num_samples', params.get('num_samples', 16))
+        contact_sequence_sampler = GraphSearchCard(state_for_search, 12 if params['sine_cosine'] else 11, trajectory_sampler, params['T'], problem_for_sampler, 
                                                depth, params['heuristic'], params['goal'], 
                                                torch.device(params['device']), initial_run=initial_run,
+                                               num_samples=params.get('num_samples', 16),
                                                multi_particle=multi_particle,
                                                prior=params['prior'],
                                                sine_cosine=params['sine_cosine'])
@@ -707,7 +709,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         closed_set = contact_sequence_sampler.closed_set
         if contact_node_sequence is not None:
             contact_node_sequence = list(contact_node_sequence)
-        with open(f"{fpath}/contact_planning_{depth}.pkl", "wb") as f:
+        with open(f"{fpath}/contact_planning_{stage}.pkl", "wb") as f:
             pkl.dump((contact_node_sequence, closed_set, planning_time, contact_sequence_sampler.iter), f)
         if contact_node_sequence is None:
             print('No contact sequence found')
@@ -719,7 +721,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
             #         min_cost = node.fscore
             #         min_node = node
             # contact_node_sequence = [min_node]
-            return None, None
+            return None, None, None
         last_node = contact_node_sequence[-1]
 
         if next_node_init:
@@ -729,23 +731,33 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         if offset == 1 and len(contact_node_sequence) == 1:
             return [], None
         next_node = last_node.contact_sequence[offset]
-        contact_sequence = np.array(last_node.contact_sequence)
-        contact_sequence = (contact_sequence + 1)/2
-        contact_sequence = [contact_vec_to_label[contact_sequence[i].sum()] for i in range(contact_sequence.shape[0])]
+        contact_sequence = list(last_node.contact_sequence)
+        contact_sequence = [contact_vec_to_label[tuple(contact_sequence[i])] for i in range(len(contact_sequence))]
         contact_sequence = contact_sequence[offset:] 
+        initial_samples = None
+        if params['multi_particle_search'] and last_node.trajectory is not None and last_node.trajectory.shape[0] >= params['N']:
+            traj = last_node.trajectory
+            initial_samples = traj[:, :params['T'] + 1].to(device=params['device'])
+            if params['sine_cosine']:
+                initial_samples = convert_sine_cosine_to_yaw(initial_samples)
+
+            # Pick the top params['N'] trajectories from initial_samples based on likelihood
+            likelihoods = last_node.likelihoods
+            top_indices = torch.argsort(likelihoods, descending=True)[:params['N']]
+            initial_samples = initial_samples[top_indices]
         del contact_sequence_sampler
         torch.cuda.empty_cache()
-        return contact_sequence, next_node
+        return contact_sequence, next_node, initial_samples
 
     state = env.get_state()
     state = state['q'].reshape(-1)[:11].to(device=params['device'])
 
 
     contact_label_to_vec = {
-                            'index': 0,
-                            'middle': 1,
-                            'index_middle': 2,
-                            'reposition': 3
+                            'index': (1, -1),
+                            'middle': (-1, 1),
+                            'index_middle': (1, 1),
+                            'reposition': (-1, -1)
                             }
     contact_vec_to_label = dict((v, k) for k, v in contact_label_to_vec.items())
 
@@ -760,7 +772,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
             contact_sequence.append(np.random.choice(contact_options))
     else:
         contact_sequence = None
-    num_stages = len(contact_sequence)
+    num_stages = params['num_turns']
     # state = state['q'].reshape(-1)[:11].to(device=params['device'])
     # initial_samples = gen_initial_samples_multi_mode(contact_sequence)
     # pkl.dump(initial_samples, open(f"{fpath}/long_horizon_inits.p", "wb"))
@@ -774,6 +786,8 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
     for stage in range(num_stages):
         state = env.get_state()
         state = state['q'].reshape(-1)[:11].to(device=params['device'])
+        y = state[-2]
+        print('Current y:', y)
         # valve_goal = torch.tensor([0, 0, state[-1]]).to(device=params['device'])
 
         # if sample_contact:
@@ -802,8 +816,16 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         #         action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
         #         env.step(action)
         #         continue
-        if sample_contact and (stage == 1 or params['replan']):
-            new_contact_sequence, new_next_node = plan_contacts(state, num_stages - stage, next_node, params['multi_particle_search'])
+        initial_samples = None
+        if sample_contact and (stage == 0 or params['replan']):
+            if params['replan']:
+                params['goal'] = min(y + float(params['goal_update']), -.06)
+            print('Adjusting goal to', params['goal'])
+            for key in problem_for_sampler:
+                problem_for_sampler[key].goal = torch.tensor([0, params['goal'], 0]).to(device=params['device'])
+                problem_for_sampler[key].T = params['T']
+            new_contact_sequence, new_next_node, initial_samples = plan_contacts(state, stage, 5, next_node, params['multi_particle_search'])
+            stages_since_plan = 0
             if new_contact_sequence is not None and len(new_contact_sequence) == 0:
                 print('Planner thinks task is complete')
                 print(executed_contacts)
@@ -832,20 +854,28 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
             print(contact_sequence)
             # return -1
             contact = contact_sequence[0]  
-        elif stage >= len(contact_sequence):
-            print('Planner thinks task is complete')
-            break
         elif sample_contact:
-            contact = contact_sequence[stage - 1]
+            stages_since_plan += 1
+            contact = contact_sequence[stages_since_plan]
+            contact_sequence = contact_sequence[1:]
+            if contact_sequence[0] == 'index':
+                next_node = (1, -1)
+            elif contact_sequence[0] == 'middle':
+                next_node = (-1, 1)
+            elif contact_sequence[0] == 'index_middle':
+                next_node = (1, 1)
+            else:
+                next_node = (-1, -1)
         else:
             contact = contact_sequence[stage]
+
         executed_contacts.append(contact)
         print(stage, contact)
         if contact == 'index':
             # _goal = torch.tensor([0, 0, state[-1]]).to(device=params['device'])
             _goal = torch.tensor([0, -0.02 + state[-2], 0]).to(device=params['device'])
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
-                index_planner, mode='index', goal=_goal, fname=f'index_{stage}')
+                index_planner, mode='index', goal=_goal, fname=f'index_{stage}', initial_samples=initial_samples)
             print('traj pre index', traj.shape)
             plans = [_partial_to_full(plan, 'index') for plan in plans]
             traj = torch.cat((traj[..., :-3], torch.zeros(*traj.shape[:-1], 3).to(device=params['device']), traj[..., -3:]), dim=-1)
@@ -861,7 +891,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         elif contact == 'middle':
             _goal = torch.tensor([0, -0.02 + state[-2], 0]).to(device=params['device'])
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
-                middle_planner, mode='middle', goal=_goal, fname=f'middle_{stage}')
+                middle_planner, mode='middle', goal=_goal, fname=f'middle_{stage}', initial_samples=initial_samples)
             
             print('traj pre middle', traj.shape)
             plans = [_partial_to_full(plan, 'middle') for plan in plans]
@@ -873,7 +903,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         elif contact == 'index_middle':
             _goal = torch.tensor([0, -0.02 + state[-2], 0]).to(device=params['device'])
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
-                index_middle_planner, mode='index_middle', goal=_goal, fname=f'index_middle_{stage}')
+                index_middle_planner, mode='index_middle', goal=_goal, fname=f'index_middle_{stage}', initial_samples=initial_samples)
             
             print('traj index middle', traj.shape)
             _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance,
@@ -881,7 +911,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         elif contact == 'reposition':
             _goal = torch.tensor([0, state[-2], 0]).to(device=params['device'])
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
-                reposition_planner, mode='reposition', goal=_goal, fname=f'reposition_{stage}')
+                reposition_planner, mode='reposition', goal=_goal, fname=f'reposition_{stage}', initial_samples=initial_samples)
             
             print('traj pre reposition', traj.shape)
             plans = [_partial_to_full(plan, 'reposition') for plan in plans]
@@ -924,7 +954,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
 if __name__ == "__main__":
     # get config
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_card.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_card_csvto_diff_plan.yaml').read_text())
     from tqdm import tqdm
 
     if not config['visualize']:

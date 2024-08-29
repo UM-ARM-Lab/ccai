@@ -1,0 +1,2 @@
+python -u allegro_screwdriver.py allegro_screwdriver_csvto_diff_planned_contact_sine_cosine_2 > ./logs/allegro_screwdriver_csvto_diff_planned_contact_sine_cosine_2.log
+python -u allegro_screwdriver.py allegro_screwdriver_csvto_diff_planned_contact_sine_cosine_1.7 > ./logs/allegro_screwdriver_csvto_diff_planned_contact_sine_cosine_1.7.log

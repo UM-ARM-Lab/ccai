@@ -17,35 +17,697 @@ Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isa
 [ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
 [ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
 Loaded trajectory sampler
-0 index_middle
-Sampling time 3.682306339032948
-Solve time for step 17.02869153022766
-Solve time for step 3.8579368591308594
-Solve time for step 3.796117067337036
-Solve time for step 3.8494255542755127
-Solve time for step 4.033121824264526
-Solve time for step 5.246251106262207
-Solve time for step 3.7903809547424316
-Solve time for step 3.695974111557007
+Current y: tensor(0.0003, device='cuda:0')
+0 reposition
+Sampling time 3.485026412992738
+Solve time for step 14.849637746810913
+Solve time for step 3.5414650440216064
+Solve time for step 3.6277639865875244
+Solve time for step 3.3545820713043213
+Solve time for step 3.4202427864074707
+Solve time for step 3.402883529663086
+Solve time for step 3.497580051422119
+Solve time for step 3.3341619968414307
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+Current y: tensor(0.0029, device='cuda:0')
 1 reposition
-Sampling time 3.740821257000789
-Solve time for step 16.65122699737549
-Solve time for step 3.8497376441955566
-Solve time for step 3.6229445934295654
-Solve time for step 5.040957450866699
-Solve time for step 3.584073781967163
-Solve time for step 3.47413969039917
-Solve time for step 4.710960626602173
-Solve time for step 3.4626424312591553
+Sampling time 3.5304725269961637
+Solve time for step 14.589094161987305
+Solve time for step 3.498859167098999
+Solve time for step 3.4106438159942627
+Solve time for step 3.3859732151031494
+Solve time for step 3.3821451663970947
+Solve time for step 3.328603982925415
+Solve time for step 3.346184015274048
+Solve time for step 3.214846611022949
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+Current y: tensor(0.0024, device='cuda:0')
+2 index
+Sampling time 3.5128169340023305
+Solve time for step 17.4903826713562
+Solve time for step 4.0984485149383545
+Solve time for step 4.037140369415283
+Solve time for step 4.009373903274536
+Solve time for step 3.9856860637664795
+Solve time for step 3.9746947288513184
+Solve time for step 3.957292079925537
+Solve time for step 3.878870725631714
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0017, device='cuda:0')
+3 index_middle
+Sampling time 3.3784120510099456
+Solve time for step 16.305408477783203
+Solve time for step 3.7511353492736816
+Solve time for step 3.685598373413086
+Solve time for step 3.6237800121307373
+Solve time for step 3.5956859588623047
+Solve time for step 3.538490056991577
+Solve time for step 3.5532162189483643
+Solve time for step 3.4679460525512695
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0093, device='cuda:0')
+4 reposition
+Sampling time 3.5513642280129716
+Solve time for step 14.301196336746216
+Solve time for step 3.467007637023926
+Solve time for step 3.4418089389801025
+Solve time for step 3.5006814002990723
+Solve time for step 3.5026779174804688
+Solve time for step 3.3942582607269287
+Solve time for step 3.292813539505005
+Solve time for step 3.480710744857788
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current y: tensor(0.0003, device='cuda:0')
+0 index_middle
+Sampling time 3.5333341590012424
+Solve time for step 16.973679065704346
+Solve time for step 3.8139894008636475
+Solve time for step 3.810319423675537
+Solve time for step 3.7359561920166016
+Solve time for step 3.6803905963897705
+Solve time for step 3.749526023864746
+Solve time for step 3.5706238746643066
+Solve time for step 3.559070587158203
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0096, device='cuda:0')
+1 middle
+Sampling time 3.415540560003137
+Solve time for step 17.791805028915405
+Solve time for step 4.04275369644165
+Solve time for step 4.306236267089844
+Solve time for step 4.116175413131714
+Solve time for step 4.319496393203735
+Solve time for step 4.311604738235474
+Solve time for step 4.0738205909729
+Solve time for step 3.959360361099243
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+Current y: tensor(-0.0212, device='cuda:0')
 2 reposition
-Sampling time 3.4888261089799926
-Solve time for step 16.802207946777344
-Solve time for step 3.6642210483551025
-Solve time for step 3.50948166847229
-Solve time for step 3.7025976181030273
-Solve time for step 3.489003896713257
-Solve time for step 3.272608995437622
-Solve time for step 3.2997472286224365
-Solve time for step 3.3015353679656982
+Sampling time 3.5032550509931752
+Solve time for step 14.893981456756592
+Solve time for step 3.7741146087646484
+Solve time for step 3.667501211166382
+Solve time for step 3.649951219558716
+Solve time for step 3.384632110595703
+Solve time for step 3.3896124362945557
+Solve time for step 3.3607537746429443
+Solve time for step 3.381934404373169
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+Current y: tensor(-0.0198, device='cuda:0')
 3 index
-Sampling time 3.7143472090829164
+Sampling time 3.3967985689960187
+Solve time for step 17.97652268409729
+Solve time for step 4.174065828323364
+Solve time for step 4.4090611934661865
+Solve time for step 4.145867109298706
+Solve time for step 4.099447011947632
+Solve time for step 4.412809610366821
+Solve time for step 4.132905721664429
+Solve time for step 3.9885802268981934
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0339, device='cuda:0')
+4 middle
+Sampling time 3.6446729119925294
+Solve time for step 18.641894578933716
+Solve time for step 4.277387857437134
+Solve time for step 4.1746485233306885
+Solve time for step 4.158994674682617
+Solve time for step 4.090888500213623
+Solve time for step 4.0671751499176025
+Solve time for step 3.973524808883667
+Solve time for step 3.9109649658203125
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current y: tensor(0.0003, device='cuda:0')
+0 index
+Sampling time 3.3870829189982032
+Solve time for step 17.931888580322266
+Solve time for step 4.313653469085693
+Solve time for step 4.235091209411621
+Solve time for step 4.118075370788574
+Solve time for step 4.281453371047974
+Solve time for step 4.062502384185791
+Solve time for step 4.066413640975952
+Solve time for step 3.9916508197784424
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0079, device='cuda:0')
+1 middle
+Sampling time 3.6611097529967083
+Solve time for step 18.462496280670166
+Solve time for step 4.2071356773376465
+Solve time for step 4.354405641555786
+Solve time for step 4.141708850860596
+Solve time for step 4.196161270141602
+Solve time for step 4.100189447402954
+Solve time for step 4.196944236755371
+Solve time for step 4.10956883430481
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+Current y: tensor(-0.0237, device='cuda:0')
+2 reposition
+Sampling time 3.553567244001897
+Solve time for step 14.91773247718811
+Solve time for step 3.6133787631988525
+Solve time for step 3.4485018253326416
+Solve time for step 3.55206298828125
+Solve time for step 3.511230707168579
+Solve time for step 3.5745532512664795
+Solve time for step 3.55574893951416
+Solve time for step 3.5955638885498047
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+Current y: tensor(-0.0218, device='cuda:0')
+3 index
+Sampling time 3.5231294940022053
+Solve time for step 18.115861177444458
+Solve time for step 4.519006967544556
+Solve time for step 4.522797584533691
+Solve time for step 4.444174528121948
+Solve time for step 4.1159257888793945
+Solve time for step 4.057892322540283
+Solve time for step 3.999849796295166
+Solve time for step 4.187016487121582
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0363, device='cuda:0')
+4 middle
+Sampling time 3.480462968989741
+Solve time for step 17.9777193069458
+Solve time for step 4.1862452030181885
+Solve time for step 4.067766189575195
+Solve time for step 3.9895009994506836
+Solve time for step 4.05794358253479
+Solve time for step 4.106900691986084
+Solve time for step 4.19397234916687
+Solve time for step 3.957292079925537
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current y: tensor(0.0003, device='cuda:0')
+0 middle
+Sampling time 3.5420538159960415
+Solve time for step 18.33060121536255
+Solve time for step 4.202451467514038
+Solve time for step 4.231693983078003
+Solve time for step 4.154406785964966
+Solve time for step 4.044381618499756
+Solve time for step 4.186708927154541
+Solve time for step 4.050282001495361
+Solve time for step 4.083466053009033
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+Current y: tensor(-0.0093, device='cuda:0')
+1 index_middle
+Sampling time 3.520312736000051
+Solve time for step 17.01886510848999
+Solve time for step 3.8606865406036377
+Solve time for step 3.765125274658203
+Solve time for step 3.901052951812744
+Solve time for step 3.7026121616363525
+Solve time for step 3.6421520709991455
+Solve time for step 3.6044137477874756
+Solve time for step 3.561248302459717
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0179, device='cuda:0')
+2 index
+Sampling time 3.495836791989859
+Solve time for step 18.266047716140747
+Solve time for step 4.284008741378784
+Solve time for step 4.236725807189941
+Solve time for step 4.205096483230591
+Solve time for step 4.266134023666382
+Solve time for step 4.312155485153198
+Solve time for step 4.147414684295654
+Solve time for step 4.346661567687988
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0339, device='cuda:0')
+3 middle
+Sampling time 3.4429941549897194
+Solve time for step 18.05111527442932
+Solve time for step 4.258661270141602
+Solve time for step 4.3671956062316895
+Solve time for step 4.172966480255127
+Solve time for step 4.226640939712524
+Solve time for step 4.410742998123169
+Solve time for step 4.192664384841919
+Solve time for step 4.178084373474121
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+Current y: tensor(-0.0487, device='cuda:0')
+4 index_middle
+Sampling time 3.519333222997375
+Solve time for step 17.195635318756104
+Solve time for step 4.151623725891113
+Solve time for step 4.0668251514434814
+Solve time for step 3.8965370655059814
+Solve time for step 3.788498878479004
+Solve time for step 3.7514219284057617
+Solve time for step 3.6504790782928467
+Solve time for step 3.5897574424743652
+traj index middle torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current y: tensor(0.0003, device='cuda:0')
+0 reposition
+Sampling time 3.69423454500793
+Solve time for step 14.958672285079956
+Solve time for step 3.4591925144195557
+Solve time for step 3.459578514099121
+Solve time for step 3.4271931648254395
+Solve time for step 3.38362979888916
+Solve time for step 3.4225237369537354
+Solve time for step 3.352562189102173
+Solve time for step 3.2578275203704834
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+Current y: tensor(0.0031, device='cuda:0')
+1 reposition
+Sampling time 3.400413303010282
+Solve time for step 14.661529779434204
+Solve time for step 3.494265079498291
+Solve time for step 3.3940887451171875
+Solve time for step 3.5481207370758057
+Solve time for step 3.3750834465026855
+Solve time for step 3.4661705493927
+Solve time for step 3.361801862716675
+Solve time for step 3.3635401725769043
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+Current y: tensor(0.0026, device='cuda:0')
+2 reposition
+Sampling time 3.459138025995344
+Solve time for step 15.223705053329468
+Solve time for step 3.4280076026916504
+Solve time for step 3.455517292022705
+Solve time for step 3.3855226039886475
+Solve time for step 3.328521251678467
+Solve time for step 3.3475987911224365
+Solve time for step 3.1706066131591797
+Solve time for step 3.166696548461914
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+Current y: tensor(0.0019, device='cuda:0')
+3 index
+Sampling time 3.390254718004144
+Solve time for step 17.454715490341187
+Solve time for step 4.173710823059082
+Solve time for step 4.241802215576172
+Solve time for step 4.156610488891602
+Solve time for step 4.03635835647583
+Solve time for step 4.089362144470215
+Solve time for step 4.118852853775024
+Solve time for step 4.0189924240112305
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0001, device='cuda:0')
+4 index
+Sampling time 3.5837604599946644
+Solve time for step 18.168780088424683
+Solve time for step 4.344624042510986
+Solve time for step 4.225069999694824
+Solve time for step 4.423513174057007
+Solve time for step 4.105330944061279
+Solve time for step 4.327049970626831
+Solve time for step 3.94669246673584
+Solve time for step 3.95381498336792
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current y: tensor(0.0003, device='cuda:0')
+0 middle
+Sampling time 3.3843585919967154
+Solve time for step 18.143020629882812
+Solve time for step 4.1683759689331055
+Solve time for step 4.274946451187134
+Solve time for step 4.167696475982666
+Solve time for step 4.305529356002808
+Solve time for step 4.039769649505615
+Solve time for step 4.064746141433716
+Solve time for step 4.001560211181641
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+Current y: tensor(-0.0122, device='cuda:0')
+1 index
+Sampling time 3.402133739000419
+Solve time for step 18.247681140899658
+Solve time for step 4.35381007194519
+Solve time for step 4.278943300247192
+Solve time for step 4.3365068435668945
+Solve time for step 4.440317153930664
+Solve time for step 4.276865720748901
+Solve time for step 4.075421571731567
+Solve time for step 4.031329154968262
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0244, device='cuda:0')
+2 index_middle
+Sampling time 3.4813742140104296
+Solve time for step 17.10775899887085
+Solve time for step 4.010898590087891
+Solve time for step 3.76920485496521
+Solve time for step 3.7238564491271973
+Solve time for step 3.6909728050231934
+Solve time for step 3.6371028423309326
+Solve time for step 3.557981014251709
+Solve time for step 3.5193803310394287
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0362, device='cuda:0')
+3 index_middle
+Sampling time 3.637313012004597
+Solve time for step 16.504622220993042
+Solve time for step 3.870903730392456
+Solve time for step 3.7679924964904785
+Solve time for step 3.7296903133392334
+Solve time for step 3.7445874214172363
+Solve time for step 3.8172361850738525
+Solve time for step 3.6404526233673096
+Solve time for step 3.746835231781006
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0491, device='cuda:0')
+4 index_middle
+Sampling time 3.6328419799974654
+Solve time for step 16.767557382583618
+Solve time for step 3.8567211627960205
+Solve time for step 3.937973737716675
+Solve time for step 3.9709179401397705
+Solve time for step 4.0456414222717285
+Solve time for step 3.715425729751587
+Solve time for step 3.729140043258667
+Solve time for step 3.8049609661102295
+traj index middle torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current y: tensor(0.0003, device='cuda:0')
+0 reposition
+Sampling time 3.393964289003634
+Solve time for step 15.043843269348145
+Solve time for step 3.5310380458831787
+Solve time for step 3.5540599822998047
+Solve time for step 3.448319435119629
+Solve time for step 3.499488115310669
+Solve time for step 3.345663547515869
+Solve time for step 3.3435680866241455
+Solve time for step 3.3530566692352295
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+Current y: tensor(0.0030, device='cuda:0')
+1 index
+Sampling time 3.4714754769956926
+Solve time for step 18.322794437408447
+Solve time for step 4.4443700313568115
+Solve time for step 4.0988569259643555
+Solve time for step 4.391490459442139
+Solve time for step 4.261351585388184
+Solve time for step 4.413656711578369
+Solve time for step 4.340996026992798
+Solve time for step 4.197978496551514
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0054, device='cuda:0')
+2 reposition
+Sampling time 3.5413758319918998
+Solve time for step 15.023452758789062
+Solve time for step 3.570648431777954
+Solve time for step 3.4539601802825928
+Solve time for step 3.6632821559906006
+Solve time for step 3.4624505043029785
+Solve time for step 3.4845759868621826
+Solve time for step 3.424600601196289
+Solve time for step 3.459975004196167
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+Current y: tensor(-0.0029, device='cuda:0')
+3 reposition
+Sampling time 3.6925406840018695
+Solve time for step 14.827690124511719
+Solve time for step 3.489274740219116
+Solve time for step 3.4310150146484375
+Solve time for step 3.4769394397735596
+Solve time for step 3.609287738800049
+Solve time for step 3.6646852493286133
+Solve time for step 3.5056824684143066
+Solve time for step 3.5428245067596436
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+Current y: tensor(-0.0028, device='cuda:0')
+4 reposition
+Sampling time 3.7378066780074732
+Solve time for step 15.414515733718872
+Solve time for step 3.6211466789245605
+Solve time for step 3.4391679763793945
+Solve time for step 3.4119644165039062
+Solve time for step 3.6987359523773193
+Solve time for step 3.430016279220581
+Solve time for step 3.371605634689331
+Solve time for step 3.5402469635009766
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current y: tensor(0.0003, device='cuda:0')
+0 middle
+Sampling time 3.505044616002124
+Solve time for step 18.729333877563477
+Solve time for step 4.323071002960205
+Solve time for step 4.240551710128784
+Solve time for step 4.245422840118408
+Solve time for step 4.245039701461792
+Solve time for step 4.26997971534729
+Solve time for step 4.233902215957642
+Solve time for step 4.132165431976318
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+Current y: tensor(-0.0129, device='cuda:0')
+1 reposition
+Sampling time 3.409994995992747
+Solve time for step 15.190268754959106
+Solve time for step 3.6243295669555664
+Solve time for step 3.507930278778076
+Solve time for step 3.3807783126831055
+Solve time for step 3.4037320613861084
+Solve time for step 3.5251922607421875
+Solve time for step 3.313654661178589
+Solve time for step 3.8162269592285156
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+Current y: tensor(-0.0102, device='cuda:0')
+2 index_middle
+Sampling time 3.4016097330022603
+Solve time for step 16.86408257484436
+Solve time for step 4.165936708450317
+Solve time for step 3.9379448890686035
+Solve time for step 3.8254520893096924
+Solve time for step 3.8038644790649414
+Solve time for step 3.7540509700775146
+Solve time for step 3.6492292881011963
+Solve time for step 3.6811933517456055
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0182, device='cuda:0')
+3 reposition
+Sampling time 3.50913869899523
+Solve time for step 14.820327281951904
+Solve time for step 3.388421058654785
+Solve time for step 3.38520884513855
+Solve time for step 3.716141700744629
+Solve time for step 3.4149093627929688
+Solve time for step 3.3341424465179443
+Solve time for step 3.3969011306762695
+Solve time for step 3.382380485534668
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+Current y: tensor(-0.0171, device='cuda:0')
+4 middle
+Sampling time 3.5787130999960937
+Solve time for step 18.428690910339355
+Solve time for step 4.281207799911499
+Solve time for step 4.317579746246338
+Solve time for step 4.322416067123413
+Solve time for step 4.205214023590088
+Solve time for step 4.317580223083496
+Solve time for step 4.337132930755615
+Solve time for step 3.986018657684326
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current y: tensor(0.0003, device='cuda:0')
+0 index_middle
+Sampling time 3.35957963099645
+Solve time for step 16.960292100906372
+Solve time for step 3.857105255126953
+Solve time for step 3.921086549758911
+Solve time for step 3.6319642066955566
+Solve time for step 3.6927671432495117
+Solve time for step 3.644943952560425
+Solve time for step 3.6766197681427
+Solve time for step 3.5662147998809814
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0101, device='cuda:0')
+1 index_middle
+Sampling time 3.4124606270052027
+Solve time for step 17.151938438415527
+Solve time for step 4.039395809173584
+Solve time for step 3.9185054302215576
+Solve time for step 3.7725815773010254
+Solve time for step 3.788999557495117
+Solve time for step 3.6343159675598145
+Solve time for step 3.6011974811553955
+Solve time for step 3.563507080078125
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0217, device='cuda:0')
+2 reposition
+Sampling time 3.410288125000079
+Solve time for step 14.899024963378906
+Solve time for step 3.5043540000915527
+Solve time for step 3.479379415512085
+Solve time for step 3.5867300033569336
+Solve time for step 3.4450151920318604
+Solve time for step 3.483351945877075
+Solve time for step 3.3939199447631836
+Solve time for step 3.4162914752960205
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+Current y: tensor(-0.0190, device='cuda:0')
+3 index
+Sampling time 3.555699309988995
+Solve time for step 18.353867053985596
+Solve time for step 4.257465124130249
+Solve time for step 4.119377851486206
+Solve time for step 4.182239294052124
+Solve time for step 4.3376171588897705
+Solve time for step 4.479996681213379
+Solve time for step 4.351252317428589
+Solve time for step 4.212862730026245
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0265, device='cuda:0')
+4 index_middle
+Sampling time 3.425731890005409
+Solve time for step 17.562748908996582
+Solve time for step 4.41749382019043
+Solve time for step 3.820702075958252
+Solve time for step 4.038975715637207
+Solve time for step 3.8070313930511475
+Solve time for step 3.834836006164551
+Solve time for step 3.8413307666778564
+Solve time for step 3.6919033527374268
+traj index middle torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current y: tensor(0.0003, device='cuda:0')
+0 index_middle
+Sampling time 3.843510133010568
+Solve time for step 17.497900247573853
+Solve time for step 4.2705864906311035
+Solve time for step 3.9847824573516846
+Solve time for step 4.146716356277466
+Solve time for step 3.795459032058716
+Solve time for step 3.807021141052246
+Solve time for step 3.7326571941375732
+Solve time for step 3.654496192932129
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0093, device='cuda:0')
+1 middle
+Sampling time 3.496832313001505
+Solve time for step 17.904136896133423
+Solve time for step 4.160053968429565
+Solve time for step 4.170153617858887
+Solve time for step 4.066209077835083
+Solve time for step 4.0474772453308105
+Solve time for step 3.9935810565948486
+Solve time for step 3.9550836086273193
+Solve time for step 3.9419050216674805
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+Current y: tensor(-0.0178, device='cuda:0')
+2 index
+Sampling time 3.648742499994114
+Solve time for step 18.150217294692993
+Solve time for step 4.159408092498779
+Solve time for step 4.151221752166748
+Solve time for step 4.076894521713257
+Solve time for step 4.06627631187439
+Solve time for step 4.091550350189209
+Solve time for step 4.074217081069946
+Solve time for step 4.313875436782837
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0325, device='cuda:0')
+3 middle
+Sampling time 3.7064948939951137
+Solve time for step 17.922362327575684
+Solve time for step 4.14998459815979
+Solve time for step 4.14100193977356
+Solve time for step 4.13511323928833
+Solve time for step 3.9715352058410645
+Solve time for step 4.057384490966797
+Solve time for step 3.9599714279174805
+Solve time for step 3.9705305099487305
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+Current y: tensor(-0.0471, device='cuda:0')
+4 reposition
+Sampling time 3.6478111909964355
+Solve time for step 14.940059185028076
+Solve time for step 3.4302287101745605
+Solve time for step 3.429413318634033
+Solve time for step 3.434025287628174
+Solve time for step 3.4703187942504883
+Solve time for step 3.4379522800445557
+Solve time for step 3.4391164779663086
+Solve time for step 3.3304834365844727
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}

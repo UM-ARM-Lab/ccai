@@ -1,0 +1,26 @@
+---
+T: 2
+receding_horizon: False
+num_steps: 84
+num_trials: 10
+visualize: True
+experiment_name: 'allegro_screwdriver_mppi'
+mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
+# fingers: ['index', 'thumb']
+fingers: ['index', 'middle', 'thumb']
+object_type: 'screwdriver'
+sim_device: 'cpu'
+include_velocity: False
+friction_coefficient: 0.95
+optimize_force: True
+kp: 3.0
+controllers:
+  mppi:
+    # N: 16
+    N: 200
+    lambda: 0.3
+    variance: 0.01
+    step_size: 0.1
+    momentum: 0.
+    # device: 'cuda:0'
+    device: 'cpu'

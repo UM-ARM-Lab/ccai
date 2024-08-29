@@ -28,7 +28,7 @@ import pytorch_kinematics.transforms as tf
 # import pytorch3d.transforms as tf
 
 import matplotlib.pyplot as plt
-from utils.allegro_utils import *
+from ccai.utils.allegro_utils import *
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
