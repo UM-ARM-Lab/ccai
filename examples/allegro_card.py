@@ -714,14 +714,15 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         if contact_node_sequence is None:
             print('No contact sequence found')
             # Find the node in the closed set with the lowest cost
-            # min_cost = float('inf')
-            # min_node = None
-            # for node in closed_set:
-            #     if node.fscore < min_cost and node.fscore > 0:
-            #         min_cost = node.fscore
-            #         min_node = node
-            # contact_node_sequence = [min_node]
-            return None, None, None
+            min_y = float('inf')
+            min_node = None
+            for node in closed_set:
+                y = contact_sequence_sampler.get_expected_y(node.data)
+                if y < min_y:
+                    min_y = y
+                    min_node = node
+            contact_node_sequence = [min_node.data]
+            # return None, None, None
         last_node = contact_node_sequence[-1]
 
         if next_node_init:
@@ -822,9 +823,9 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
                 params['goal'] = min(y + float(params['goal_update']), -.06)
             print('Adjusting goal to', params['goal'])
             for key in problem_for_sampler:
-                problem_for_sampler[key].goal = torch.tensor([0, params['goal'], 0]).to(device=params['device'])
+                problem_for_sampler[key].goal = torch.tensor([0, float(params['goal']), 0]).to(device=params['device'])
                 problem_for_sampler[key].T = params['T']
-            new_contact_sequence, new_next_node, initial_samples = plan_contacts(state, stage, 5, next_node, params['multi_particle_search'])
+            new_contact_sequence, new_next_node, initial_samples = plan_contacts(state, stage, 5-stage, next_node, params['multi_particle_search'])
             stages_since_plan = 0
             if new_contact_sequence is not None and len(new_contact_sequence) == 0:
                 print('Planner thinks task is complete')

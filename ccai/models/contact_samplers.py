@@ -580,7 +580,7 @@ class GraphSearchCard(ContactSampler, AStar):
 
     def heuristic_cost_estimate(self, current, goal):
         if current.trajectory.shape[1] == 0:
-            return self.heuristic_weight * max(0, self.start_y - self.goal)
+            return self.heuristic_weight * (self.start_y - self.goal) ** 2
         # c_seq = [((np.array(i) + 1) /2).sum().astype(int) for i in current.contact_sequence]
         # if self.initial_run:
         #     c_seq = [0] + c_seq
@@ -589,7 +589,7 @@ class GraphSearchCard(ContactSampler, AStar):
         # yaw = current.trajectory[-1, 14].item()
         # return self.heuristic_weight * max(0, yaw - self.goal)
         # return self.heuristic_weight * (nll * max(0, yaw - self.goal))
-        return self.heuristic_weight * (max(0, y - self.goal))
+        return self.heuristic_weight * (y - self.goal) ** 2
         # return self.heuristic_weight * (nll)
 
         # return self.heuristic_weight * max(0, yaw - self.goal)
