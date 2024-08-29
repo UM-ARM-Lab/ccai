@@ -423,83 +423,130 @@ class FakeDataset(Dataset):
         # print(mask)
         return (traj - self.mean) / self.std, self.contact[idx], mask
     
+class AllegroScrewdriverDiffusionPolicyDataset(Dataset):
 
+    def __init__(self, folders, max_T, horizon, cosine_sine=False, states_only=False, skip_pregrasp=False):
+        super().__init__()
+        self.cosine_sine = cosine_sine
+        self.skip_pregrasp = skip_pregrasp
+        # TODO: only using trajectories for now, also includes closest points and their sdf values
+        starts = []
+        trajectories = []
+        classes = []
+        masks = []
 
-class AllegroScrewdriverDiffusionPolicyDataset(AllegroScrewDriverDataset):
-    
-        def __init__(self, folders, max_T, horizon, cosine_sine=False, states_only=False, skip_pregrasp=False):
-            super().__init__(folders, max_T, cosine_sine, states_only, skip_pregrasp)
-            # Flatten time dimension of self.trajectories
-            self.trajectories_orig = self.trajectories_orig[:, :, :-1]
-            self.N, self.C, self.T, self.dxu = self.trajectories_orig.shape
-            self.horizon = horizon
-            # self.samples_per_traj = 1 + self.T - self.horizon + self.C * self.T
-            self.samples_per_traj = self.T
+        min_t = 1
 
-            self.trajectories_full_time = self.trajectories_orig.reshape(self.N*self.C, self.T, self.dxu)
-            self.trajectories_full_time = torch.from_numpy(self.trajectories_full_time).float()
-            # self.trajectories_full_time[:, -1, 15:] = 0
-            self.trajectories_full_time = torch.cat((self.trajectories_full_time, torch.zeros(self.N*self.C, self.horizon-1, self.dxu)), dim=1)
+        use_actual_traj = True
+        for fpath in folders:
+            path = pathlib.Path(fpath)
+            plans = []
+            for p in path.rglob('*traj_data.p'):
+                with open(p, 'rb') as f:
+                    data = pickle.load(f)
+                    actual_traj = []
+                    
+                    for t in range(max_T, min_t - 1, -1):
+                        actual_traj.append(data[t]['starts'][:, 0:1])
 
-            self.trajectories_full_time_states = self.trajectories_full_time[:, :, :15]
-            self.trajectories_full_time_controls = self.trajectories_full_time[:, :, 15:27]
+                    actual_traj = np.concatenate(actual_traj, axis=1).transpose(1, 0, 2)
+                    actual_traj = actual_traj.reshape(-1, actual_traj.shape[-1])
+                    trajectories.append(actual_traj)
 
-        def compute_norm_constants(self):
-            # compute norm constants not including the zero padding
-            x = self.trajectories_full_time_states.clone()
-            # x[:, :, 8] += 2 * np.pi * (torch.rand(x.shape[0], 1) - 0.5)
-            x = x.reshape(-1, x.shape[-1])
+        self.trajectories = np.stack(trajectories, axis=0)
+        print('orig shape', self.trajectories.shape)
 
-            mean_obs = x.mean(dim=0)
-            std_obs = x.std(dim=0)
+        self.trajectories_orig = self.trajectories.copy()
 
-            dim = 15
+        self.trajectories = self.trajectories.reshape(-1, self.trajectories.shape[-2], self.trajectories.shape[-1])
+        print('new shape', self.trajectories.shape)
+        self.trajectories = torch.from_numpy(self.trajectories).float()
 
-            # for angle we force to be between [-1, 1]
-            if self.cosine_sine:
-                self.mean_obs = torch.zeros(dim + 1)
-                self.std_obs = torch.ones(dim + 1)
-                self.mean_obs[:14] = mean_obs[:14]
-                self.std_obs[:14] = std_obs[:14]
-                self.mean_obs[16:] = mean_obs[15:]
-                self.std_obs[16:] = std_obs[15:]
-            else:
-                # mean[12:15] = 0
-                # std[12:15] = np.pi
-                # mean[14] = 0
-                # std[14] = np.pi
-                self.mean_obs = mean_obs
-                self.std_obs = std_obs
+        if states_only:
+            self.trajectories = self.trajectories[:, :, :15]
 
-            u = self.trajectories_full_time_controls.clone()
-            u = u.reshape(-1, u.shape[-1])
-            mean_act = u.mean(dim=0)
-            std_act = u.std(dim=0)
-            self.mean_act = mean_act
-            self.std_act = std_act
+        print(self.trajectories.shape)
+        # TODO consider alternative SO3 representation that is better for learning
+        if self.cosine_sine:
+            dx = self.trajectories.shape[-1] + 1
+        else:
+            dx = self.trajectories.shape[-1]
 
-        def get_norm_constants(self):
-            return self.mean_obs, self.std_obs, self.mean_act, self.std_act
+        self.mean = 0
+        self.std = 1
 
-        def __len__(self):
-            return self.N * self.samples_per_traj
+        self.states_only = states_only
+        # Flatten time dimension of self.trajectories
+        self.trajectories_orig = self.trajectories_orig[:, :, :-1]
+        self.N, self.T, self.dxu = self.trajectories_orig.shape
+        self.horizon = horizon
+        # self.samples_per_traj = 1 + self.T - self.horizon + self.C * self.T
+        self.samples_per_traj = self.T
 
-        def __getitem__(self, idx):
-            traj_id = idx // self.samples_per_traj
-            t_id = idx % self.samples_per_traj
-            traj = self.trajectories_full_time_states[traj_id, t_id:t_id+self.horizon]
-            traj[:, -1] += 2 * np.pi * (np.random.rand() - 0.5)
-            if self.cosine_sine:
-                    traj_q = traj[:, :14]
-                    traj_theta = traj[:, 14][:, None]
-                    traj_u = traj[:, 15:]
-                    traj = torch.cat((traj_q, torch.cos(traj_theta), torch.sin(traj_theta), traj_u), dim=1)
-            # print(traj.shape)
-            data = {
-                'obs': traj.numpy(),
-                'action': self.trajectories_full_time_controls[traj_id, t_id:t_id+self.horizon].numpy()
-            }
-            return data
+        self.trajectories_full_time = self.trajectories_orig.reshape(self.N, self.T, self.dxu)
+        self.trajectories_full_time = torch.from_numpy(self.trajectories_full_time).float()
+        # self.trajectories_full_time[:, -1, 15:] = 0
+        self.trajectories_full_time = torch.cat((self.trajectories_full_time, torch.zeros(self.N, self.horizon-1, self.dxu)), dim=1)
+
+        self.trajectories_full_time_states = self.trajectories_full_time[:, :, :15]
+        self.trajectories_full_time_controls = self.trajectories_full_time[:, :, 15:27]
+
+    def compute_norm_constants(self):
+        # compute norm constants not including the zero padding
+        x = self.trajectories_full_time_states.clone()
+        # x[:, :, 8] += 2 * np.pi * (torch.rand(x.shape[0], 1) - 0.5)
+        x = x.reshape(-1, x.shape[-1])
+
+        mean_obs = x.mean(dim=0)
+        std_obs = x.std(dim=0)
+
+        dim = 15
+
+        # for angle we force to be between [-1, 1]
+        if self.cosine_sine:
+            self.mean_obs = torch.zeros(dim + 1)
+            self.std_obs = torch.ones(dim + 1)
+            self.mean_obs[:14] = mean_obs[:14]
+            self.std_obs[:14] = std_obs[:14]
+            self.mean_obs[16:] = mean_obs[15:]
+            self.std_obs[16:] = std_obs[15:]
+        else:
+            # mean[12:15] = 0
+            # std[12:15] = np.pi
+            # mean[14] = 0
+            # std[14] = np.pi
+            self.mean_obs = mean_obs
+            self.std_obs = std_obs
+
+        u = self.trajectories_full_time_controls.clone()
+        u = u.reshape(-1, u.shape[-1])
+        mean_act = u.mean(dim=0)
+        std_act = u.std(dim=0)
+        self.mean_act = mean_act
+        self.std_act = std_act
+
+    def get_norm_constants(self):
+        return self.mean_obs, self.std_obs, self.mean_act, self.std_act
+
+    def __len__(self):
+        return self.N * self.samples_per_traj
+
+    def __getitem__(self, idx):
+        traj_id = idx // self.samples_per_traj
+        t_id = idx % self.samples_per_traj
+        traj = self.trajectories_full_time_states[traj_id, t_id:t_id+self.horizon]
+        traj[:, -1] += 2 * np.pi * (np.random.rand() - 0.5)
+        if self.cosine_sine:
+                traj_q = traj[:, :14]
+                traj_theta = traj[:, 14][:, None]
+                traj_u = traj[:, 15:]
+                traj = torch.cat((traj_q, torch.cos(traj_theta), torch.sin(traj_theta), traj_u), dim=1)
+        # print(traj.shape)
+        data = {
+            'obs': traj.numpy(),
+            'action': self.trajectories_full_time_controls[traj_id, t_id:t_id+self.horizon].numpy()
+        }
+        return data
 
 
 class RealAndFakeDataset(Dataset):
