@@ -26,6 +26,7 @@ use_saved_plans: True
 use_saved_noise: False
 use_guidance: False
 sample_contact: True
+astar_receding: True
 use_partial_constraint: False
 sine_cosine: True
 data_gen: False

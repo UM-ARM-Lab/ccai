@@ -5,7 +5,7 @@ num_steps: 12
 num_turns: 3
 num_trials: 10
 visualize: True
-experiment_name: 'allegro_screwdriver_csvto_diff_planned_replanned_contact_single_particle_16_sine_cosine_eps_.015_2.5_damping_pi_6'
+experiment_name: 'allegro_screwdriver_csvto_diff_planned_replanned_contact_single_particle_single_sample_sine_cosine_eps_.015_.5_damping_pi_6'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
@@ -19,7 +19,8 @@ max_depth: 11
 goal: -1.0471975512
 goal_update: -1.0471975512
 prior: 1
-multi_particle_search: False
+multi_particle_search: True
+num_samples: 1
 replan: True
 visualize_plan: False
 optimize_force: True
@@ -41,7 +42,7 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:0'
+    device: 'cuda:1'
     online_iters: 25
     warmup_iters: 100
     resample_steps: 16

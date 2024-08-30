@@ -5,7 +5,7 @@ num_steps: 12
 num_turns: 3
 num_trials: 10
 visualize: True
-experiment_name: 'allegro_screwdriver_csvto_diff_planned_replanned_contact_sine_cosine_eps_.015_2.5_damping_pi_6'
+experiment_name: 'allegro_screwdriver_csvto_diff_planned_replanned_contact_sine_cosine_eps_.015_.5_damping_pi_6'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']

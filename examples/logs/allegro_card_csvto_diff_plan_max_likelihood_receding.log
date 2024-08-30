@@ -58,18 +58,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 6 ((1.0, 1.0), (1.0, -1.0)) -0.022500749677419662
-Contact sequence search time: 16.024854838993633
+Contact sequence search time: 21.25317850599822
 ['index_middle', 'index']
 0 index_middle
-Sampling time 3.404061423992971
-Solve time for step 16.667038679122925
-Solve time for step 3.61027193069458
-Solve time for step 3.5676534175872803
-Solve time for step 3.497865676879883
-Solve time for step 3.476531505584717
-Solve time for step 3.4181673526763916
-Solve time for step 3.407876491546631
-Solve time for step 3.759000062942505
+Sampling time 4.55726381498971
+Solve time for step 37.23541235923767
+Solve time for step 7.500106573104858
+Solve time for step 7.097689628601074
+Solve time for step 6.718979597091675
+Solve time for step 6.4742960929870605
+Solve time for step 6.958264112472534
+Solve time for step 5.882170915603638
+Solve time for step 6.590228796005249
 traj index middle torch.Size([8, 28])
 Current y: tensor(-0.0098, device='cuda:1')
 Adjusting goal to tensor(-0.0298, device='cuda:1')
@@ -103,18 +103,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 5 ((1.0, 1.0), (1.0, -1.0), (1.0, -1.0)) -0.037663355469703674
-Contact sequence search time: 11.11896998899465
+Contact sequence search time: 12.967070228012744
 ['index', 'index']
 1 index
-Sampling time 3.417084326996701
-Solve time for step 18.43181610107422
-Solve time for step 4.288058280944824
-Solve time for step 4.065756320953369
-Solve time for step 3.9419636726379395
-Solve time for step 3.9979474544525146
-Solve time for step 7.047622203826904
-Solve time for step 4.839740514755249
-Solve time for step 5.850928544998169
+Sampling time 4.406152969997493
+Solve time for step 29.20124363899231
+Solve time for step 7.191175937652588
+Solve time for step 7.167979001998901
+Solve time for step 6.660455226898193
+Solve time for step 6.964232683181763
+Solve time for step 7.114246845245361
+Solve time for step 8.002960443496704
+Solve time for step 6.9601891040802
 traj pre index torch.Size([8, 25])
 traj post index torch.Size([8, 28])
 Current y: tensor(-0.0212, device='cuda:1')
@@ -131,18 +131,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 3 ((1.0, -1.0), (1.0, -1.0)) -0.041594602167606354
-Contact sequence search time: 4.934797594003612
+Contact sequence search time: 4.8683730569900945
 ['index']
 2 index
-Sampling time 4.110743149998598
-Solve time for step 30.45824909210205
-Solve time for step 6.916013240814209
-Solve time for step 7.127680063247681
-Solve time for step 6.718456268310547
-Solve time for step 7.6666178703308105
-Solve time for step 6.628689765930176
-Solve time for step 6.640336036682129
-Solve time for step 6.47961950302124
+Sampling time 3.7868513580033323
+Solve time for step 30.045899391174316
+Solve time for step 7.255976676940918
+Solve time for step 7.409159183502197
+Solve time for step 6.832630395889282
+Solve time for step 7.667022466659546
+Solve time for step 7.398127317428589
+Solve time for step 6.870229244232178
+Solve time for step 6.711354732513428
 traj pre index torch.Size([8, 25])
 traj post index torch.Size([8, 28])
 Current y: tensor(-0.0263, device='cuda:1')
@@ -168,18 +168,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 4 ((1.0, -1.0), (1.0, -1.0), (1.0, -1.0)) -0.060055553913116455
-Contact sequence search time: 9.727305253996747
+Contact sequence search time: 8.644428660991252
 ['index', 'index']
 3 index
-Sampling time 4.501141877000919
-Solve time for step 29.32589840888977
-Solve time for step 6.807056665420532
-Solve time for step 7.060152530670166
-Solve time for step 6.833825349807739
-Solve time for step 6.555548906326294
-Solve time for step 7.053964614868164
-Solve time for step 7.070079803466797
-Solve time for step 6.400046348571777
+Sampling time 4.007762682987959
+Solve time for step 30.93385124206543
+Solve time for step 7.248323440551758
+Solve time for step 7.26043701171875
+Solve time for step 7.494534492492676
+Solve time for step 7.588130712509155
+Solve time for step 7.050546169281006
+Solve time for step 6.909809589385986
+Solve time for step 6.535594940185547
 traj pre index torch.Size([8, 25])
 traj post index torch.Size([8, 28])
 Current y: tensor(-0.0333, device='cuda:1')
@@ -197,18 +197,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 3 ((1.0, -1.0), (1.0, 1.0)) -0.03985828161239624
 4 ((1.0, -1.0), (1.0, -1.0)) -0.056950636208057404
-Contact sequence search time: 4.428360931997304
+Contact sequence search time: 4.6378468870098
 ['index']
 4 index
-Sampling time 4.092868940002518
-Solve time for step 30.19254970550537
-Solve time for step 7.2017505168914795
-Solve time for step 7.0824878215789795
-Solve time for step 7.07087779045105
-Solve time for step 6.883997917175293
-Solve time for step 7.096122741699219
-Solve time for step 6.893486261367798
-Solve time for step 6.56364893913269
+Sampling time 4.331794665005873
+Solve time for step 29.689516067504883
+Solve time for step 7.784999847412109
+Solve time for step 7.167437553405762
+Solve time for step 7.411864757537842
+Solve time for step 6.684068202972412
+Solve time for step 7.388264417648315
+Solve time for step 7.0667784214019775
+Solve time for step 6.639635324478149
 traj pre index torch.Size([8, 25])
 traj post index torch.Size([8, 28])
 csvgd, Average time per step: 0.0
@@ -286,18 +286,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 9 ((-1.0, 1.0), (1.0, 1.0), (-1.0, -1.0), (-1.0, 1.0), (-1.0, -1.0)) -3.98559495806694e-05
 10 ((1.0, 1.0), (-1.0, 1.0)) -0.02217654138803482
-Contact sequence search time: 32.14044438999554
+Contact sequence search time: 32.65673643100308
 ['index_middle', 'middle']
 0 index_middle
-Sampling time 3.654846167002688
-Solve time for step 28.244274139404297
-Solve time for step 5.85271954536438
-Solve time for step 7.38446831703186
-Solve time for step 6.540062189102173
-Solve time for step 6.326216459274292
-Solve time for step 6.574523448944092
-Solve time for step 5.648367166519165
-Solve time for step 6.082798719406128
+Sampling time 3.575702880989411
+Solve time for step 27.604641437530518
+Solve time for step 7.070636034011841
+Solve time for step 6.985912084579468
+Solve time for step 6.99239706993103
+Solve time for step 6.830287456512451
+Solve time for step 7.27978253364563
+Solve time for step 6.207326650619507
+Solve time for step 6.557456970214844
 traj index middle torch.Size([8, 28])
 Current y: tensor(-0.0094, device='cuda:1')
 Adjusting goal to tensor(-0.0294, device='cuda:1')
@@ -331,18 +331,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 5 ((1.0, 1.0), (1.0, -1.0)) -0.029556337743997574
-Contact sequence search time: 13.856220175992348
+Contact sequence search time: 13.976180983998347
 ['index']
 1 index
-Sampling time 4.05465008498868
-Solve time for step 29.44732141494751
-Solve time for step 6.194247722625732
-Solve time for step 7.196666240692139
-Solve time for step 6.853089332580566
-Solve time for step 7.237228155136108
-Solve time for step 7.0638039112091064
-Solve time for step 7.636354923248291
-Solve time for step 6.480539798736572
+Sampling time 4.299277740996331
+Solve time for step 30.053372383117676
+Solve time for step 7.3481481075286865
+Solve time for step 7.322726011276245
+Solve time for step 7.0518224239349365
+Solve time for step 7.592427492141724
+Solve time for step 6.852745056152344
+Solve time for step 7.340860605239868
+Solve time for step 6.221616744995117
 traj pre index torch.Size([8, 25])
 traj post index torch.Size([8, 28])
 Current y: tensor(-0.0182, device='cuda:1')
@@ -377,18 +377,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 5 ((1.0, -1.0), (1.0, -1.0)) -0.03993232548236847
-Contact sequence search time: 13.659680673998082
+Contact sequence search time: 13.277754159993492
 ['index']
 2 index
-Sampling time 3.829497689002892
-Solve time for step 30.75448250770569
-Solve time for step 5.549910545349121
-Solve time for step 7.375556707382202
-Solve time for step 7.121231555938721
-Solve time for step 7.013749122619629
-Solve time for step 5.871520280838013
-Solve time for step 7.370440244674683
-Solve time for step 6.590014457702637
+Sampling time 4.565503449004609
+Solve time for step 29.310373306274414
+Solve time for step 7.737875699996948
+Solve time for step 7.317835330963135
+Solve time for step 6.760608911514282
+Solve time for step 7.439431667327881
+Solve time for step 7.281531810760498
+Solve time for step 7.152881622314453
+Solve time for step 5.28495717048645
 traj pre index torch.Size([8, 25])
 traj post index torch.Size([8, 28])
 Current y: tensor(-0.0241, device='cuda:1')
@@ -414,18 +414,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 4 ((1.0, -1.0), (1.0, -1.0)) -0.04756097495555878
-Contact sequence search time: 9.582208553998498
+Contact sequence search time: 9.645392788006575
 ['index']
 3 index
-Sampling time 3.802314753003884
-Solve time for step 29.847047090530396
-Solve time for step 6.187163352966309
-Solve time for step 7.957738876342773
-Solve time for step 6.974084377288818
-Solve time for step 7.131860017776489
-Solve time for step 6.439730644226074
-Solve time for step 7.26941442489624
-Solve time for step 6.796578407287598
+Sampling time 3.747892437997507
+Solve time for step 31.359824895858765
+Solve time for step 5.191978931427002
+Solve time for step 7.185716867446899
+Solve time for step 7.327484130859375
+Solve time for step 6.930203437805176
+Solve time for step 7.311300992965698
+Solve time for step 7.4417877197265625
+Solve time for step 5.510581731796265
 traj pre index torch.Size([8, 25])
 traj post index torch.Size([8, 28])
 Current y: tensor(-0.0295, device='cuda:1')
@@ -443,18 +443,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 3 ((1.0, -1.0), (-1.0, -1.0)) -0.0009812787175178528
 4 ((1.0, -1.0), (1.0, -1.0)) -0.05283862352371216
-Contact sequence search time: 4.199053150994587
+Contact sequence search time: 4.882961259994772
 ['index']
 4 index
-Sampling time 4.254860444998485
-Solve time for step 29.47857928276062
-Solve time for step 7.446928262710571
-Solve time for step 6.027022123336792
-Solve time for step 7.507209300994873
-Solve time for step 6.714355945587158
-Solve time for step 6.8519299030303955
-Solve time for step 7.060257911682129
-Solve time for step 6.225831508636475
+Sampling time 4.661381854006322
+Solve time for step 31.271589040756226
+Solve time for step 7.3733601570129395
+Solve time for step 7.387673377990723
+Solve time for step 8.032157182693481
+Solve time for step 6.467469215393066
+Solve time for step 7.248129367828369
+Solve time for step 7.371022462844849
+Solve time for step 7.292416572570801
 traj pre index torch.Size([8, 25])
 traj post index torch.Size([8, 28])
 csvgd, Average time per step: 0.0
@@ -531,18 +531,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 9 ((1.0, 1.0), (1.0, 1.0), (-1.0, 1.0)) -0.0287308469414711
-Contact sequence search time: 31.448176801000955
+Contact sequence search time: 33.02757045600447
 ['index_middle', 'index_middle', 'middle']
 0 index_middle
-Sampling time 4.389816369992332
-Solve time for step 27.695711612701416
-Solve time for step 6.408461809158325
-Solve time for step 6.333397626876831
-Solve time for step 6.282098054885864
-Solve time for step 6.243494033813477
-Solve time for step 6.2811195850372314
-Solve time for step 6.265894412994385
-Solve time for step 5.750738620758057
+Sampling time 3.9349404129898176
+Solve time for step 30.007369995117188
+Solve time for step 5.80160665512085
+Solve time for step 7.122135162353516
+Solve time for step 6.955683946609497
+Solve time for step 6.8239500522613525
+Solve time for step 6.677842617034912
+Solve time for step 6.601055860519409
+Solve time for step 4.9731080532073975
 traj index middle torch.Size([8, 28])
 Current y: tensor(-0.0071, device='cuda:1')
 Adjusting goal to tensor(-0.0271, device='cuda:1')
@@ -585,18 +585,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 6 ((1.0, 1.0), (-1.0, 1.0)) -0.03004731424152851
-Contact sequence search time: 18.34616219099553
+Contact sequence search time: 18.847593880011118
 ['middle']
 1 middle
-Sampling time 3.737553262995789
-Solve time for step 29.094220638275146
-Solve time for step 6.461451768875122
-Solve time for step 7.061646223068237
-Solve time for step 6.590104341506958
-Solve time for step 6.767981767654419
-Solve time for step 6.4978766441345215
-Solve time for step 6.540084600448608
-Solve time for step 6.5722880363464355
+Sampling time 4.276384354001493
+Solve time for step 29.348582983016968
+Solve time for step 7.1272056102752686
+Solve time for step 7.225536584854126
+Solve time for step 7.140144348144531
+Solve time for step 7.358656406402588
+Solve time for step 6.240872621536255
+Solve time for step 6.631673336029053
+Solve time for step 6.76284122467041
 traj pre middle torch.Size([8, 25])
 traj post middle torch.Size([8, 28])
 Current y: tensor(-0.0163, device='cuda:1')
@@ -613,18 +613,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 3 ((-1.0, 1.0), (-1.0, 1.0)) -0.03694982826709747
-Contact sequence search time: 4.619710950006265
+Contact sequence search time: 4.6080088279995834
 ['middle']
 2 middle
-Sampling time 3.8409323360101553
-Solve time for step 30.83660626411438
-Solve time for step 7.319089412689209
-Solve time for step 7.247128009796143
-Solve time for step 7.170699119567871
-Solve time for step 6.8613505363464355
-Solve time for step 7.0566747188568115
-Solve time for step 6.998834609985352
-Solve time for step 6.252247333526611
+Sampling time 4.192983018991072
+Solve time for step 30.854459285736084
+Solve time for step 7.793192148208618
+Solve time for step 7.517726898193359
+Solve time for step 7.1757307052612305
+Solve time for step 7.296264171600342
+Solve time for step 7.166221857070923
+Solve time for step 7.684528350830078
+Solve time for step 6.987805128097534
 traj pre middle torch.Size([8, 25])
 traj post middle torch.Size([8, 28])
 Current y: tensor(-0.0268, device='cuda:1')
@@ -659,18 +659,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 5 ((-1.0, 1.0), (1.0, -1.0), (-1.0, 1.0)) -0.051561132073402405
-Contact sequence search time: 13.869156239001313
+Contact sequence search time: 13.682819527995889
 ['index', 'middle']
 3 index
-Sampling time 3.8215519869991113
-Solve time for step 30.626742601394653
-Solve time for step 7.101417779922485
-Solve time for step 7.172770023345947
-Solve time for step 7.034969806671143
-Solve time for step 7.406939744949341
-Solve time for step 6.18478798866272
-Solve time for step 6.95444655418396
-Solve time for step 7.201651096343994
+Sampling time 4.366278319008416
+Solve time for step 29.566030740737915
+Solve time for step 7.365957021713257
+Solve time for step 7.805811882019043
+Solve time for step 7.066173553466797
+Solve time for step 7.729376792907715
+Solve time for step 7.616182565689087
+Solve time for step 7.284389019012451
+Solve time for step 5.697726726531982
 traj pre index torch.Size([8, 25])
 traj post index torch.Size([8, 28])
 Current y: tensor(-0.0408, device='cuda:1')
@@ -690,19 +690,19 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 4 ((1.0, -1.0), (1.0, -1.0)) -0.04767405986785889
 5 ((1.0, -1.0), (-1.0, -1.0)) 0.0003172829747200012
 6 ((1.0, -1.0), (1.0, 1.0)) -0.04844221472740173
-Contact sequence search time: 4.778001793005387
+Contact sequence search time: 5.220385477994569
 No contact sequence found
 ['index_middle']
 4 index_middle
-Sampling time 4.27655491400219
-Solve time for step 30.498313903808594
-Solve time for step 6.804365873336792
-Solve time for step 6.454732894897461
-Solve time for step 6.24991774559021
-Solve time for step 6.431724548339844
-Solve time for step 6.460621118545532
-Solve time for step 6.706537246704102
-Solve time for step 4.892353773117065
+Sampling time 4.1213162889907835
+Solve time for step 31.043658018112183
+Solve time for step 6.466761589050293
+Solve time for step 7.023179292678833
+Solve time for step 4.872676610946655
+Solve time for step 7.0197670459747314
+Solve time for step 7.2021496295928955
+Solve time for step 6.8628740310668945
+Solve time for step 6.20237922668457
 traj index middle torch.Size([8, 28])
 csvgd, Average time per step: 0.0
 {}
@@ -799,18 +799,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 13 ((-1.0, 1.0), (-1.0, -1.0), (-1.0, -1.0), (1.0, -1.0), (1.0, 1.0)) -0.014191936701536179
 14 ((-1.0, 1.0), (-1.0, -1.0), (-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0)) -0.023366834968328476
-Contact sequence search time: 40.58511986301164
+Contact sequence search time: 41.870692691998556
 ['middle', 'reposition', 'reposition', 'index', 'middle']
 0 middle
-Sampling time 4.177233688998967
-Solve time for step 29.559536457061768
-Solve time for step 7.61794638633728
-Solve time for step 7.576186418533325
-Solve time for step 7.088925361633301
-Solve time for step 6.914800405502319
-Solve time for step 6.9491071701049805
-Solve time for step 7.255136489868164
-Solve time for step 6.808054208755493
+Sampling time 4.253850171997328
+Solve time for step 32.34697413444519
+Solve time for step 6.861682415008545
+Solve time for step 7.004964590072632
+Solve time for step 8.316184759140015
+Solve time for step 7.294669151306152
+Solve time for step 7.824282884597778
+Solve time for step 6.963728189468384
+Solve time for step 6.72312068939209
 traj pre middle torch.Size([8, 25])
 traj post middle torch.Size([8, 28])
 Current y: tensor(-0.0108, device='cuda:1')
@@ -845,18 +845,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 5 ((-1.0, 1.0), (1.0, -1.0), (1.0, -1.0)) -0.03166890889406204
-Contact sequence search time: 14.004639645994757
+Contact sequence search time: 13.564761724992422
 ['index', 'index']
 1 index
-Sampling time 3.7874027969955932
-Solve time for step 29.96611738204956
-Solve time for step 7.618136167526245
-Solve time for step 7.090026378631592
-Solve time for step 7.324585914611816
-Solve time for step 7.084327697753906
-Solve time for step 7.282550096511841
-Solve time for step 7.5466694831848145
-Solve time for step 6.943028450012207
+Sampling time 3.970306363000418
+Solve time for step 32.18363881111145
+Solve time for step 7.678892135620117
+Solve time for step 7.926579713821411
+Solve time for step 7.3220579624176025
+Solve time for step 5.605408191680908
+Solve time for step 7.458632946014404
+Solve time for step 7.206644773483276
+Solve time for step 6.886146783828735
 traj pre index torch.Size([8, 25])
 traj post index torch.Size([8, 28])
 Current y: tensor(-0.0223, device='cuda:1')
@@ -931,18 +931,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 13 ((1.0, -1.0), (-1.0, 1.0), (1.0, 1.0), (-1.0, 1.0)) -0.045772358775138855
-Contact sequence search time: 31.479790012992453
+Contact sequence search time: 33.81874328300182
 ['middle', 'index_middle', 'middle']
 2 middle
-Sampling time 3.724447839005734
-Solve time for step 29.94128394126892
-Solve time for step 7.563981533050537
-Solve time for step 7.314484119415283
-Solve time for step 7.020583152770996
-Solve time for step 7.3256542682647705
-Solve time for step 5.983189582824707
-Solve time for step 7.008820295333862
-Solve time for step 6.769560098648071
+Sampling time 3.7366163020051317
+Solve time for step 32.09993362426758
+Solve time for step 7.020036935806274
+Solve time for step 7.518953800201416
+Solve time for step 6.058646202087402
+Solve time for step 6.87858247756958
+Solve time for step 7.64235520362854
+Solve time for step 7.794641971588135
+Solve time for step 6.753534317016602
 traj pre middle torch.Size([8, 25])
 traj post middle torch.Size([8, 28])
 Current y: tensor(-0.0381, device='cuda:1')
@@ -1010,19 +1010,19 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 20 ((-1.0, 1.0), (1.0, 1.0), (1.0, 1.0)) -0.026184426620602608
 21 ((-1.0, 1.0), (-1.0, -1.0), (-1.0, -1.0)) 0.00034949369728565216
 22 ((-1.0, 1.0), (-1.0, -1.0), (1.0, 1.0)) -0.007231062278151512
-Contact sequence search time: 23.85473772000114
+Contact sequence search time: 22.17268601899559
 No contact sequence found
 ['index', 'middle']
 3 index
-Sampling time 4.082027059994289
-Solve time for step 30.874804973602295
-Solve time for step 7.094651222229004
-Solve time for step 7.0581724643707275
-Solve time for step 7.228862285614014
-Solve time for step 6.401857376098633
-Solve time for step 7.257443428039551
-Solve time for step 7.325010776519775
-Solve time for step 6.389222145080566
+Sampling time 3.8589472260064213
+Solve time for step 31.14235019683838
+Solve time for step 7.621576309204102
+Solve time for step 7.590139150619507
+Solve time for step 7.028341770172119
+Solve time for step 7.290846347808838
+Solve time for step 6.573285341262817
+Solve time for step 7.416650295257568
+Solve time for step 6.862736940383911
 traj pre index torch.Size([8, 25])
 traj post index torch.Size([8, 28])
 Current y: tensor(-0.0516, device='cuda:1')
@@ -1042,19 +1042,19 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 4 ((1.0, -1.0), (-1.0, 1.0)) -0.05926882475614548
 5 ((1.0, -1.0), (1.0, -1.0)) -0.03911181539297104
 6 ((1.0, -1.0), (-1.0, -1.0)) 0.0008494462817907333
-Contact sequence search time: 4.590219860008801
+Contact sequence search time: 5.109789717011154
 No contact sequence found
 ['middle']
 4 middle
-Sampling time 4.023065404006047
-Solve time for step 29.486154794692993
-Solve time for step 7.417560338973999
-Solve time for step 7.41522479057312
-Solve time for step 6.737874984741211
-Solve time for step 7.125959873199463
-Solve time for step 6.975526332855225
-Solve time for step 6.870870351791382
-Solve time for step 5.577384948730469
+Sampling time 4.099621675006347
+Solve time for step 30.350504159927368
+Solve time for step 7.319085121154785
+Solve time for step 7.335101842880249
+Solve time for step 6.7620391845703125
+Solve time for step 7.603712320327759
+Solve time for step 6.836981534957886
+Solve time for step 7.105427980422974
+Solve time for step 7.2331702709198
 traj pre middle torch.Size([8, 25])
 traj post middle torch.Size([8, 28])
 csvgd, Average time per step: 0.0
@@ -1113,18 +1113,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 7 ((1.0, -1.0), (1.0, -1.0)) -0.022012978792190552
-Contact sequence search time: 22.877372261995333
+Contact sequence search time: 23.7555798329995
 ['index', 'index']
 0 index
-Sampling time 3.424880895006936
-Solve time for step 18.59541606903076
-Solve time for step 4.338890790939331
-Solve time for step 4.3115174770355225
-Solve time for step 4.235137939453125
-Solve time for step 4.214193344116211
-Solve time for step 4.168328762054443
-Solve time for step 4.143891096115112
-Solve time for step 4.116683721542358
+Sampling time 4.24710983899422
+Solve time for step 29.025252103805542
+Solve time for step 6.794673919677734
+Solve time for step 7.560027122497559
+Solve time for step 8.120629787445068
+Solve time for step 7.332761287689209
+Solve time for step 7.7150490283966064
+Solve time for step 7.212350368499756
+Solve time for step 6.680986642837524
 traj pre index torch.Size([8, 25])
 traj post index torch.Size([8, 28])
 Current y: tensor(-0.0091, device='cuda:1')
@@ -1196,18 +1196,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 10 ((1.0, -1.0), (1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)) -0.03633546084165573
-Contact sequence search time: 26.16792610999255
+Contact sequence search time: 32.21146451099776
 ['index_middle', 'middle', 'middle']
 1 index_middle
-Sampling time 3.409656193005503
-Solve time for step 17.818583965301514
-Solve time for step 4.09592342376709
-Solve time for step 4.159436941146851
-Solve time for step 4.0169477462768555
-Solve time for step 3.990593910217285
-Solve time for step 3.9218997955322266
-Solve time for step 3.8749632835388184
-Solve time for step 3.864260196685791
+Sampling time 4.06352035299642
+Solve time for step 29.336562156677246
+Solve time for step 6.945903062820435
+Solve time for step 7.401655912399292
+Solve time for step 6.498478174209595
+Solve time for step 6.557407379150391
+Solve time for step 6.628429651260376
+Solve time for step 6.600940465927124
+Solve time for step 6.2155420780181885
 traj index middle torch.Size([8, 28])
 Current y: tensor(-0.0182, device='cuda:1')
 Adjusting goal to tensor(-0.0382, device='cuda:1')
@@ -1250,18 +1250,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 6 ((1.0, 1.0), (1.0, 1.0), (1.0, 1.0), (-1.0, 1.0)) -0.03825107216835022
-Contact sequence search time: 15.288055652010371
+Contact sequence search time: 18.926292442993145
 ['index_middle', 'index_middle', 'middle']
 2 index_middle
-Sampling time 3.4330019030021504
-Solve time for step 16.44206190109253
-Solve time for step 3.6790597438812256
-Solve time for step 3.6655497550964355
-Solve time for step 3.549048662185669
-Solve time for step 3.5609347820281982
-Solve time for step 3.516054630279541
-Solve time for step 3.4293861389160156
-Solve time for step 3.379934072494507
+Sampling time 3.9090285069978563
+Solve time for step 30.45211148262024
+Solve time for step 5.818990230560303
+Solve time for step 7.363023042678833
+Solve time for step 6.878109693527222
+Solve time for step 7.069398880004883
+Solve time for step 6.895696640014648
+Solve time for step 4.81653356552124
+Solve time for step 5.981433868408203
 traj index middle torch.Size([8, 28])
 Current y: tensor(-0.0273, device='cuda:1')
 Adjusting goal to tensor(-0.0473, device='cuda:1')
@@ -1286,18 +1286,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 4 ((1.0, 1.0), (1.0, -1.0), (1.0, -1.0)) -0.0523984357714653
-Contact sequence search time: 7.489558399000089
+Contact sequence search time: 9.323988905991428
 ['index', 'index']
 3 index
-Sampling time 3.5433131009922363
-Solve time for step 17.357487201690674
-Solve time for step 4.042277097702026
-Solve time for step 3.999785900115967
-Solve time for step 4.0256898403167725
-Solve time for step 3.98427677154541
-Solve time for step 3.9065136909484863
-Solve time for step 3.811976432800293
-Solve time for step 3.8033266067504883
+Sampling time 4.043631519001792
+Solve time for step 29.317843198776245
+Solve time for step 7.531810998916626
+Solve time for step 6.943174123764038
+Solve time for step 7.190242290496826
+Solve time for step 7.145464897155762
+Solve time for step 7.296119213104248
+Solve time for step 7.0697057247161865
+Solve time for step 7.144274711608887
 traj pre index torch.Size([8, 25])
 traj post index torch.Size([8, 28])
 Current y: tensor(-0.0321, device='cuda:1')
@@ -1317,19 +1317,19 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 4 ((1.0, -1.0), (-1.0, -1.0)) 0.0008631376549601555
 5 ((1.0, -1.0), (1.0, -1.0)) -0.04623022675514221
 6 ((1.0, -1.0), (-1.0, 1.0)) -0.05159076303243637
-Contact sequence search time: 3.729277409001952
+Contact sequence search time: 4.372325315998751
 No contact sequence found
 ['middle']
 4 middle
-Sampling time 3.423476723008207
-Solve time for step 17.329689979553223
-Solve time for step 4.068136215209961
-Solve time for step 4.024448394775391
-Solve time for step 4.012264966964722
-Solve time for step 3.963836669921875
-Solve time for step 3.868917465209961
-Solve time for step 3.888422727584839
-Solve time for step 3.8689258098602295
+Sampling time 3.8487932379939593
+Solve time for step 30.971745014190674
+Solve time for step 7.2321953773498535
+Solve time for step 7.602487087249756
+Solve time for step 7.259288311004639
+Solve time for step 7.351064443588257
+Solve time for step 6.385709047317505
+Solve time for step 7.060237407684326
+Solve time for step 6.818440914154053
 traj pre middle torch.Size([8, 25])
 traj post middle torch.Size([8, 28])
 csvgd, Average time per step: 0.0
@@ -1451,18 +1451,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 14 ((1.0, -1.0), (-1.0, 1.0), (1.0, -1.0)) -0.02224990911781788
-Contact sequence search time: 44.69657216400083
+Contact sequence search time: 54.1549396259943
 ['index', 'middle', 'index']
 0 index
-Sampling time 3.413673834002111
-Solve time for step 17.346216201782227
-Solve time for step 4.093189716339111
-Solve time for step 4.000440835952759
-Solve time for step 3.9662435054779053
-Solve time for step 3.9158213138580322
-Solve time for step 3.9070122241973877
-Solve time for step 3.833543539047241
-Solve time for step 3.8660531044006348
+Sampling time 3.906655785991461
+Solve time for step 30.483355283737183
+Solve time for step 7.304203510284424
+Solve time for step 5.853776454925537
+Solve time for step 7.112913131713867
+Solve time for step 7.8893983364105225
+Solve time for step 7.375196933746338
+Solve time for step 7.132606506347656
+Solve time for step 6.244890213012695
 traj pre index torch.Size([8, 25])
 traj post index torch.Size([8, 28])
 Current y: tensor(-0.0103, device='cuda:1')
@@ -1479,18 +1479,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 3 ((1.0, -1.0), (1.0, -1.0)) -0.032167114317417145
-Contact sequence search time: 3.9475459509994835
+Contact sequence search time: 4.640520013999776
 ['index']
 1 index
-Sampling time 3.638897699987865
-Solve time for step 17.34566378593445
-Solve time for step 4.017690420150757
-Solve time for step 3.9998106956481934
-Solve time for step 3.939685344696045
-Solve time for step 3.9389164447784424
-Solve time for step 3.949305534362793
-Solve time for step 3.8523638248443604
-Solve time for step 3.802002429962158
+Sampling time 3.918223777000094
+Solve time for step 30.467690229415894
+Solve time for step 7.905880451202393
+Solve time for step 7.223279237747192
+Solve time for step 6.797888278961182
+Solve time for step 6.870746374130249
+Solve time for step 5.379472970962524
+Solve time for step 6.8474180698394775
+Solve time for step 6.804272174835205
 traj pre index torch.Size([8, 25])
 traj post index torch.Size([8, 28])
 Current y: tensor(-0.0195, device='cuda:1')
@@ -1545,18 +1545,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 9 ((1.0, -1.0), (1.0, 1.0), (-1.0, 1.0), (1.0, -1.0)) -0.041714467108249664
-Contact sequence search time: 19.079370438004844
+Contact sequence search time: 23.411519084009342
 ['index_middle', 'middle', 'index']
 2 index_middle
-Sampling time 3.413792471998022
-Solve time for step 15.876012802124023
-Solve time for step 3.7299888134002686
-Solve time for step 3.6803858280181885
-Solve time for step 3.607834577560425
-Solve time for step 3.5068118572235107
-Solve time for step 3.4636733531951904
-Solve time for step 3.351879596710205
-Solve time for step 3.334853172302246
+Sampling time 4.294322193993139
+Solve time for step 28.948084354400635
+Solve time for step 7.242655038833618
+Solve time for step 7.014471530914307
+Solve time for step 6.528538227081299
+Solve time for step 6.762522459030151
+Solve time for step 6.231743335723877
+Solve time for step 6.613451719284058
+Solve time for step 6.0008087158203125
 traj index middle torch.Size([8, 28])
 Current y: tensor(-0.0226, device='cuda:1')
 Adjusting goal to tensor(-0.0426, device='cuda:1')
@@ -1583,18 +1583,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 4 ((1.0, 1.0), (1.0, 1.0), (1.0, 1.0)) -0.02631508931517601
 5 ((1.0, 1.0), (1.0, 1.0), (-1.0, -1.0)) 0.0002886764705181122
 6 ((1.0, 1.0), (1.0, 1.0), (1.0, -1.0)) -0.04315877705812454
-Contact sequence search time: 7.60945656299009
+Contact sequence search time: 8.989169628999662
 ['index_middle', 'index']
 3 index_middle
-Sampling time 3.414506604996859
-Solve time for step 16.025524616241455
-Solve time for step 3.608397960662842
-Solve time for step 3.562941789627075
-Solve time for step 3.56649112701416
-Solve time for step 3.424124002456665
-Solve time for step 3.353243350982666
-Solve time for step 3.41320538520813
-Solve time for step 3.3006935119628906
+Sampling time 3.7616226529935375
+Solve time for step 29.780614137649536
+Solve time for step 6.7690510749816895
+Solve time for step 6.552586555480957
+Solve time for step 6.167553901672363
+Solve time for step 6.4996771812438965
+Solve time for step 5.2905051708221436
+Solve time for step 6.0435497760772705
+Solve time for step 5.775373458862305
 traj index middle torch.Size([8, 28])
 Current y: tensor(-0.0348, device='cuda:1')
 Adjusting goal to tensor(-0.0548, device='cuda:1')
@@ -1613,19 +1613,19 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 4 ((1.0, 1.0), (-1.0, -1.0)) 0.0009780218824744225
 5 ((1.0, 1.0), (1.0, -1.0)) -0.04177292436361313
 6 ((1.0, 1.0), (1.0, 1.0)) -0.030895888805389404
-Contact sequence search time: 3.731591182993725
+Contact sequence search time: 4.598303830003715
 No contact sequence found
 ['middle']
 4 middle
-Sampling time 3.4170902960031526
-Solve time for step 17.044249057769775
-Solve time for step 3.8925390243530273
-Solve time for step 3.851360321044922
-Solve time for step 3.808631181716919
-Solve time for step 3.7938880920410156
-Solve time for step 3.7709813117980957
-Solve time for step 3.7089245319366455
-Solve time for step 3.7675929069519043
+Sampling time 3.8685239079932217
+Solve time for step 31.05364441871643
+Solve time for step 5.809526205062866
+Solve time for step 7.193379878997803
+Solve time for step 6.935688018798828
+Solve time for step 7.331418991088867
+Solve time for step 6.991732597351074
+Solve time for step 6.838486671447754
+Solve time for step 6.304404258728027
 traj pre middle torch.Size([8, 25])
 traj post middle torch.Size([8, 28])
 csvgd, Average time per step: 0.0
@@ -1684,18 +1684,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 7 ((1.0, 1.0), (-1.0, 1.0)) -0.02086120843887329
-Contact sequence search time: 18.732264251011657
+Contact sequence search time: 22.761807881004643
 ['index_middle', 'middle']
 0 index_middle
-Sampling time 3.410747978996369
-Solve time for step 18.09115982055664
-Solve time for step 3.6628835201263428
-Solve time for step 3.6201136112213135
-Solve time for step 3.5442657470703125
-Solve time for step 3.4996497631073
-Solve time for step 3.4334521293640137
-Solve time for step 3.4292290210723877
-Solve time for step 3.3554508686065674
+Sampling time 3.6669114990072558
+Solve time for step 29.79740023612976
+Solve time for step 6.3620617389678955
+Solve time for step 5.57663369178772
+Solve time for step 6.9442455768585205
+Solve time for step 6.498333930969238
+Solve time for step 6.951041221618652
+Solve time for step 6.339611291885376
+Solve time for step 5.906159400939941
 traj index middle torch.Size([8, 28])
 Current y: tensor(-0.0105, device='cuda:1')
 Adjusting goal to tensor(-0.0305, device='cuda:1')
@@ -1729,18 +1729,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 5 ((1.0, 1.0), (1.0, 1.0), (1.0, -1.0)) -0.032234642654657364
-Contact sequence search time: 11.153644585996517
+Contact sequence search time: 14.052847332990495
 ['index_middle', 'index']
 1 index_middle
-Sampling time 3.4087615349999396
-Solve time for step 15.920741319656372
-Solve time for step 3.698591947555542
-Solve time for step 3.640054225921631
-Solve time for step 3.8288636207580566
-Solve time for step 3.5431137084960938
-Solve time for step 3.4761791229248047
-Solve time for step 3.398191213607788
-Solve time for step 3.377224922180176
+Sampling time 3.795916426999611
+Solve time for step 28.053820848464966
+Solve time for step 6.440341472625732
+Solve time for step 6.865686416625977
+Solve time for step 6.395002365112305
+Solve time for step 5.249943017959595
+Solve time for step 6.114978551864624
+Solve time for step 6.374483108520508
+Solve time for step 5.781635761260986
 traj index middle torch.Size([8, 28])
 Current y: tensor(-0.0219, device='cuda:1')
 Adjusting goal to tensor(-0.0419, device='cuda:1')
@@ -1774,18 +1774,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 5 ((1.0, 1.0), (-1.0, 1.0), (1.0, 1.0)) -0.043037012219429016
-Contact sequence search time: 11.229333112001768
+Contact sequence search time: 14.407237047009403
 ['middle', 'index_middle']
 2 middle
-Sampling time 3.426491539008566
-Solve time for step 17.49695134162903
-Solve time for step 4.011337518692017
-Solve time for step 3.988765239715576
-Solve time for step 3.9487786293029785
-Solve time for step 3.9349279403686523
-Solve time for step 3.8858561515808105
-Solve time for step 3.8396236896514893
-Solve time for step 3.852017641067505
+Sampling time 4.307636833997094
+Solve time for step 30.814385414123535
+Solve time for step 6.960167407989502
+Solve time for step 7.220649242401123
+Solve time for step 6.954702854156494
+Solve time for step 7.075530052185059
+Solve time for step 6.959499835968018
+Solve time for step 6.862438917160034
+Solve time for step 6.688251733779907
 traj pre middle torch.Size([8, 25])
 traj post middle torch.Size([8, 28])
 Current y: tensor(-0.0368, device='cuda:1')
@@ -1821,18 +1821,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 5 ((-1.0, 1.0), (1.0, -1.0), (1.0, -1.0)) -0.05006690323352814
 6 ((-1.0, 1.0), (1.0, -1.0), (-1.0, 1.0)) -0.060855478048324585
-Contact sequence search time: 11.189941509990604
+Contact sequence search time: 13.436755457994877
 ['index', 'middle']
 3 index
-Sampling time 3.415602280991152
-Solve time for step 17.483930349349976
-Solve time for step 4.0701234340667725
-Solve time for step 4.009188413619995
-Solve time for step 3.962554931640625
-Solve time for step 3.9080307483673096
-Solve time for step 3.882401466369629
-Solve time for step 3.8487484455108643
-Solve time for step 3.8535189628601074
+Sampling time 4.039821976999519
+Solve time for step 30.22022843360901
+Solve time for step 7.310006380081177
+Solve time for step 6.927759170532227
+Solve time for step 7.284861326217651
+Solve time for step 6.804999113082886
+Solve time for step 7.144326210021973
+Solve time for step 6.717323303222656
+Solve time for step 6.547922611236572
 traj pre index torch.Size([8, 25])
 traj post index torch.Size([8, 28])
 Current y: tensor(-0.0492, device='cuda:1')
@@ -1852,19 +1852,19 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 4 ((1.0, -1.0), (-1.0, -1.0)) 0.0009485399350523949
 5 ((1.0, -1.0), (1.0, 1.0)) -0.042537935078144073
 6 ((1.0, -1.0), (1.0, -1.0)) -0.057963885366916656
-Contact sequence search time: 3.965401068009669
+Contact sequence search time: 4.440151246992173
 No contact sequence found
 ['middle']
 4 middle
-Sampling time 3.421333851001691
-Solve time for step 17.356922149658203
-Solve time for step 4.154440641403198
-Solve time for step 3.9994590282440186
-Solve time for step 3.945383310317993
-Solve time for step 3.9209794998168945
-Solve time for step 3.8738369941711426
-Solve time for step 3.8523950576782227
-Solve time for step 3.8136093616485596
+Sampling time 4.499716164995334
+Solve time for step 31.733659744262695
+Solve time for step 7.182842493057251
+Solve time for step 7.354701995849609
+Solve time for step 5.758162260055542
+Solve time for step 7.471771955490112
+Solve time for step 6.981723785400391
+Solve time for step 6.810750246047974
+Solve time for step 7.235036373138428
 traj pre middle torch.Size([8, 25])
 traj post middle torch.Size([8, 28])
 csvgd, Average time per step: 0.0
@@ -1905,18 +1905,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 5 ((1.0, 1.0), (-1.0, 1.0)) -0.020037032663822174
-Contact sequence search time: 11.357862474993453
+Contact sequence search time: 14.630943869997282
 ['index_middle', 'middle']
 0 index_middle
-Sampling time 3.410295951005537
-Solve time for step 16.087493896484375
-Solve time for step 3.688664674758911
-Solve time for step 3.6692183017730713
-Solve time for step 3.5765552520751953
-Solve time for step 3.5196187496185303
-Solve time for step 3.4490702152252197
-Solve time for step 3.4352872371673584
-Solve time for step 3.3480312824249268
+Sampling time 3.951342011001543
+Solve time for step 29.349384546279907
+Solve time for step 6.841224908828735
+Solve time for step 6.644418478012085
+Solve time for step 6.680040121078491
+Solve time for step 6.457749128341675
+Solve time for step 5.82688307762146
+Solve time for step 6.613626003265381
+Solve time for step 5.885666131973267
 traj index middle torch.Size([8, 28])
 Current y: tensor(-0.0110, device='cuda:1')
 Adjusting goal to tensor(-0.0310, device='cuda:1')
@@ -1932,18 +1932,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 3 ((1.0, 1.0), (-1.0, 1.0)) -0.03487061709165573
-Contact sequence search time: 3.8323423879919574
+Contact sequence search time: 4.581211985001573
 ['middle']
 1 middle
-Sampling time 3.4264342130045407
-Solve time for step 17.46542739868164
-Solve time for step 4.419798851013184
-Solve time for step 4.407384157180786
-Solve time for step 4.3639748096466064
-Solve time for step 4.233574867248535
-Solve time for step 4.143672466278076
-Solve time for step 4.18256402015686
-Solve time for step 4.118839263916016
+Sampling time 3.826427132997196
+Solve time for step 29.66042184829712
+Solve time for step 6.490024566650391
+Solve time for step 6.93209171295166
+Solve time for step 7.045793533325195
+Solve time for step 6.898164510726929
+Solve time for step 6.490621566772461
+Solve time for step 6.956902980804443
+Solve time for step 6.399783372879028
 traj pre middle torch.Size([8, 25])
 traj post middle torch.Size([8, 28])
 Current y: tensor(-0.0241, device='cuda:1')
@@ -1960,18 +1960,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 3 ((-1.0, 1.0), (-1.0, 1.0)) -0.045113854110240936
-Contact sequence search time: 3.745684542998788
+Contact sequence search time: 4.513551498996094
 ['middle']
 2 middle
-Sampling time 3.4085111079912167
-Solve time for step 18.601212978363037
-Solve time for step 4.347844123840332
-Solve time for step 4.313533544540405
-Solve time for step 4.26056432723999
-Solve time for step 4.238532066345215
-Solve time for step 4.188201665878296
-Solve time for step 4.14867377281189
-Solve time for step 4.118414878845215
+Sampling time 4.05113235799945
+Solve time for step 29.80398654937744
+Solve time for step 7.309542894363403
+Solve time for step 7.438364267349243
+Solve time for step 7.0341081619262695
+Solve time for step 5.665925025939941
+Solve time for step 6.9665703773498535
+Solve time for step 6.769618511199951
+Solve time for step 6.408930540084839
 traj pre middle torch.Size([8, 25])
 traj post middle torch.Size([8, 28])
 Current y: tensor(-0.0388, device='cuda:1')
@@ -2035,18 +2035,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 17 ((-1.0, 1.0), (1.0, -1.0), (-1.0, -1.0)) 0.0006208959966897964
 18 ((-1.0, 1.0), (1.0, -1.0), (-1.0, 1.0)) -0.059071339666843414
-Contact sequence search time: 18.716770375001943
+Contact sequence search time: 23.111093408995657
 ['index', 'middle']
 3 index
-Sampling time 3.42736277700169
-Solve time for step 18.7639217376709
-Solve time for step 4.37676477432251
-Solve time for step 4.349660158157349
-Solve time for step 4.268234968185425
-Solve time for step 4.218822479248047
-Solve time for step 4.157371759414673
-Solve time for step 4.148960113525391
-Solve time for step 4.1257898807525635
+Sampling time 4.29609483400418
+Solve time for step 30.408860683441162
+Solve time for step 7.170935869216919
+Solve time for step 6.9713661670684814
+Solve time for step 6.945789575576782
+Solve time for step 7.188774824142456
+Solve time for step 7.177560567855835
+Solve time for step 7.1677467823028564
+Solve time for step 6.568246364593506
 traj pre index torch.Size([8, 25])
 traj post index torch.Size([8, 28])
 Current y: tensor(-0.0487, device='cuda:1')
@@ -2066,19 +2066,19 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 4 ((1.0, -1.0), (-1.0, -1.0)) 0.0010515889152884483
 5 ((1.0, -1.0), (-1.0, 1.0)) -0.05891043692827225
 6 ((1.0, -1.0), (1.0, -1.0)) -0.050926484167575836
-Contact sequence search time: 3.758990255999379
+Contact sequence search time: 4.5166075009910855
 No contact sequence found
 ['middle']
 4 middle
-Sampling time 3.4595357090001926
-Solve time for step 18.151905298233032
-Solve time for step 4.3730010986328125
-Solve time for step 4.35620641708374
-Solve time for step 4.280972719192505
-Solve time for step 4.225258111953735
-Solve time for step 4.190094947814941
-Solve time for step 4.183170318603516
-Solve time for step 4.1433939933776855
+Sampling time 3.9010457010008395
+Solve time for step 30.294294357299805
+Solve time for step 7.136244297027588
+Solve time for step 6.744850158691406
+Solve time for step 7.016509294509888
+Solve time for step 6.203092336654663
+Solve time for step 6.776392698287964
+Solve time for step 7.228443622589111
+Solve time for step 6.287603139877319
 traj pre middle torch.Size([8, 25])
 traj post middle torch.Size([8, 28])
 csvgd, Average time per step: 0.0
@@ -2146,18 +2146,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 8 ((1.0, 1.0), (-1.0, 1.0)) -0.019933249801397324
-Contact sequence search time: 22.563666963993455
+Contact sequence search time: 27.937724274001084
 ['index_middle', 'middle']
 0 index_middle
-Sampling time 3.5658346860000165
-Solve time for step 18.112506866455078
-Solve time for step 4.18354058265686
-Solve time for step 4.087252855300903
-Solve time for step 4.020894765853882
-Solve time for step 3.963238000869751
-Solve time for step 3.9126570224761963
-Solve time for step 3.8598439693450928
-Solve time for step 3.783808946609497
+Sampling time 4.033996404003119
+Solve time for step 29.9814772605896
+Solve time for step 6.780532121658325
+Solve time for step 6.993497371673584
+Solve time for step 6.9137725830078125
+Solve time for step 6.909937858581543
+Solve time for step 6.075806617736816
+Solve time for step 6.2998046875
+Solve time for step 4.844273805618286
 traj index middle torch.Size([8, 28])
 Current y: tensor(-0.0067, device='cuda:1')
 Adjusting goal to tensor(-0.0267, device='cuda:1')
@@ -2200,18 +2200,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 6 ((1.0, 1.0), (-1.0, 1.0)) -0.03214271366596222
-Contact sequence search time: 15.041456435996224
+Contact sequence search time: 18.77312375100155
 ['middle']
 1 middle
-Sampling time 3.411514906998491
-Solve time for step 18.665679931640625
-Solve time for step 4.343111991882324
-Solve time for step 4.309524059295654
-Solve time for step 4.256428956985474
-Solve time for step 4.24750018119812
-Solve time for step 4.228629112243652
-Solve time for step 4.142390966415405
-Solve time for step 4.141706705093384
+Sampling time 3.6867276480043074
+Solve time for step 32.25232696533203
+Solve time for step 7.3474204540252686
+Solve time for step 5.65645432472229
+Solve time for step 6.771114826202393
+Solve time for step 6.862131595611572
+Solve time for step 6.853243827819824
+Solve time for step 6.818545818328857
+Solve time for step 6.591739177703857
 traj pre middle torch.Size([8, 25])
 traj post middle torch.Size([8, 28])
 Current y: tensor(-0.0177, device='cuda:1')
@@ -2246,18 +2246,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 5 ((-1.0, 1.0), (1.0, 1.0), (-1.0, 1.0)) -0.03798113018274307
-Contact sequence search time: 11.240552112009027
+Contact sequence search time: 13.382186823000666
 ['index_middle', 'middle']
 2 index_middle
-Sampling time 3.4370699309947668
-Solve time for step 16.390671253204346
-Solve time for step 4.216977834701538
-Solve time for step 4.162036657333374
-Solve time for step 4.0903894901275635
-Solve time for step 4.036321640014648
-Solve time for step 3.9793741703033447
-Solve time for step 3.943509578704834
-Solve time for step 3.8584177494049072
+Sampling time 4.198855722002918
+Solve time for step 30.017662525177002
+Solve time for step 7.163471221923828
+Solve time for step 7.047416687011719
+Solve time for step 5.168922185897827
+Solve time for step 6.481994867324829
+Solve time for step 6.351736307144165
+Solve time for step 6.091764211654663
+Solve time for step 5.764481067657471
 traj index middle torch.Size([8, 28])
 Current y: tensor(-0.0290, device='cuda:1')
 Adjusting goal to tensor(-0.0490, device='cuda:1')
@@ -2282,18 +2282,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 4 ((1.0, 1.0), (1.0, 1.0), (-1.0, 1.0)) -0.05997291952371597
-Contact sequence search time: 7.527725697000278
+Contact sequence search time: 8.95313879600144
 ['index_middle', 'middle']
 3 index_middle
-Sampling time 3.4212236200110056
-Solve time for step 17.97315740585327
-Solve time for step 4.163630247116089
-Solve time for step 4.091179609298706
-Solve time for step 4.0497777462005615
-Solve time for step 4.0014731884002686
-Solve time for step 3.904390573501587
-Solve time for step 3.94087553024292
-Solve time for step 3.8719825744628906
+Sampling time 4.1310857589996886
+Solve time for step 28.145405292510986
+Solve time for step 7.005016088485718
+Solve time for step 6.915434122085571
+Solve time for step 6.5694358348846436
+Solve time for step 4.852668762207031
+Solve time for step 5.929106950759888
+Solve time for step 6.735286474227905
+Solve time for step 5.741290807723999
 traj index middle torch.Size([8, 28])
 Current y: tensor(-0.0431, device='cuda:1')
 Adjusting goal to -0.06
@@ -2312,19 +2312,19 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 4 ((1.0, 1.0), (-1.0, 1.0)) -0.05300778150558472
 5 ((1.0, 1.0), (1.0, 1.0)) -0.048028379678726196
 6 ((1.0, 1.0), (-1.0, -1.0)) -2.5210902094841003e-06
-Contact sequence search time: 3.7465624150063377
+Contact sequence search time: 4.737575417995686
 No contact sequence found
 ['middle']
 4 middle
-Sampling time 3.406977666003513
-Solve time for step 18.184757471084595
-Solve time for step 4.413412570953369
-Solve time for step 4.367159366607666
-Solve time for step 4.335453748703003
-Solve time for step 4.232597351074219
-Solve time for step 4.204981565475464
-Solve time for step 4.185382604598999
-Solve time for step 4.126871824264526
+Sampling time 4.074982384991017
+Solve time for step 29.87309455871582
+Solve time for step 7.185695648193359
+Solve time for step 7.335693836212158
+Solve time for step 7.394119501113892
+Solve time for step 6.573214769363403
+Solve time for step 6.65548300743103
+Solve time for step 7.242727041244507
+Solve time for step 6.4808349609375
 traj pre middle torch.Size([8, 25])
 traj post middle torch.Size([8, 28])
 csvgd, Average time per step: 0.0
@@ -2392,18 +2392,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 8 ((1.0, 1.0), (-1.0, 1.0)) -0.021579500287771225
-Contact sequence search time: 22.417624834008166
+Contact sequence search time: 27.480033380998066
 ['index_middle', 'middle']
 0 index_middle
-Sampling time 3.4287824539933354
-Solve time for step 17.854274034500122
-Solve time for step 4.15229058265686
-Solve time for step 4.088540315628052
-Solve time for step 4.037164926528931
-Solve time for step 3.9954819679260254
-Solve time for step 3.942324161529541
-Solve time for step 3.9206533432006836
-Solve time for step 3.7825326919555664
+Sampling time 3.877117822004948
+Solve time for step 29.50328540802002
+Solve time for step 5.7679595947265625
+Solve time for step 6.648442268371582
+Solve time for step 6.897274017333984
+Solve time for step 6.666514158248901
+Solve time for step 6.4156858921051025
+Solve time for step 6.0111470222473145
+Solve time for step 5.947223901748657
 traj index middle torch.Size([8, 28])
 Current y: tensor(-0.0116, device='cuda:1')
 Adjusting goal to tensor(-0.0316, device='cuda:1')
@@ -2455,18 +2455,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 7 ((1.0, 1.0), (-1.0, -1.0), (-1.0, -1.0), (-1.0, 1.0), (1.0, -1.0)) -0.03508364409208298
-Contact sequence search time: 18.70758620799461
+Contact sequence search time: 22.840681501998915
 ['reposition', 'reposition', 'middle', 'index']
 1 reposition
-Sampling time 3.4280792880017543
-Solve time for step 15.040858745574951
-Solve time for step 3.5483591556549072
-Solve time for step 3.545091390609741
-Solve time for step 3.4775924682617188
-Solve time for step 3.45094633102417
-Solve time for step 3.399878978729248
-Solve time for step 3.389441728591919
-Solve time for step 3.3754234313964844
+Sampling time 3.8012117210018914
+Solve time for step 26.44450855255127
+Solve time for step 4.5159080028533936
+Solve time for step 6.225897550582886
+Solve time for step 6.333963394165039
+Solve time for step 6.111643552780151
+Solve time for step 6.891956567764282
+Solve time for step 5.754302024841309
+Solve time for step 5.9669108390808105
 traj pre reposition torch.Size([8, 22])
 traj post reposition torch.Size([8, 28])
 Current y: tensor(-0.0099, device='cuda:1')
@@ -2511,18 +2511,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 6 ((-1.0, -1.0), (-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0)) -0.02662387117743492
 7 ((-1.0, -1.0), (-1.0, -1.0), (1.0, -1.0), (1.0, -1.0)) -0.03730614110827446
-Contact sequence search time: 14.971344756006147
+Contact sequence search time: 18.032450758997584
 ['reposition', 'index', 'index']
 2 reposition
-Sampling time 3.4167923990025884
-Solve time for step 14.885820627212524
-Solve time for step 3.5035223960876465
-Solve time for step 3.47072172164917
-Solve time for step 3.4561214447021484
-Solve time for step 3.441586494445801
-Solve time for step 3.410555124282837
-Solve time for step 3.388929605484009
-Solve time for step 3.385664939880371
+Sampling time 4.1795582990016555
+Solve time for step 27.411750555038452
+Solve time for step 5.247441053390503
+Solve time for step 6.289100170135498
+Solve time for step 6.671675205230713
+Solve time for step 6.004077672958374
+Solve time for step 6.402335166931152
+Solve time for step 6.020673036575317
+Solve time for step 6.257756233215332
 traj pre reposition torch.Size([8, 22])
 traj post reposition torch.Size([8, 28])
 Current y: tensor(-0.0076, device='cuda:1')
@@ -2557,18 +2557,18 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
        device='cuda:1')
 5 ((-1.0, -1.0), (1.0, -1.0), (1.0, -1.0)) -0.03768087923526764
-Contact sequence search time: 11.442329122000956
+Contact sequence search time: 14.313948879993404
 ['index', 'index']
 3 index
-Sampling time 3.510989825008437
-Solve time for step 18.638020515441895
-Solve time for step 4.35109806060791
-Solve time for step 4.4245781898498535
-Solve time for step 4.270769357681274
-Solve time for step 4.231319904327393
-Solve time for step 4.174940347671509
-Solve time for step 4.181494235992432
-Solve time for step 4.149497985839844
+Sampling time 4.286041123996256
+Solve time for step 31.71425771713257
+Solve time for step 5.557041168212891
+Solve time for step 7.28051233291626
+Solve time for step 7.149540424346924
+Solve time for step 7.537734270095825
+Solve time for step 6.735553026199341
+Solve time for step 5.882305383682251
+Solve time for step 6.862262964248657
 traj pre index torch.Size([8, 25])
 traj post index torch.Size([8, 28])
 Current y: tensor(-0.0188, device='cuda:1')
@@ -2588,19 +2588,19 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
 4 ((1.0, -1.0), (-1.0, -1.0)) -0.0002618599683046341
 5 ((1.0, -1.0), (1.0, 1.0)) -0.02292957529425621
 6 ((1.0, -1.0), (1.0, -1.0)) -0.03871878981590271
-Contact sequence search time: 3.7512878900015494
+Contact sequence search time: 4.564463702990906
 No contact sequence found
 ['index']
 4 index
-Sampling time 3.4142902540042996
-Solve time for step 18.633764505386353
-Solve time for step 4.284916877746582
-Solve time for step 4.298923015594482
-Solve time for step 4.214833974838257
-Solve time for step 4.25459623336792
-Solve time for step 4.171029329299927
-Solve time for step 4.140969276428223
-Solve time for step 4.154767036437988
+Sampling time 4.434419213997899
+Solve time for step 29.95590901374817
+Solve time for step 7.4649739265441895
+Solve time for step 7.192485570907593
+Solve time for step 7.170569896697998
+Solve time for step 6.7667555809021
+Solve time for step 7.3165552616119385
+Solve time for step 6.9006507396698
+Solve time for step 7.396157503128052
 traj pre index torch.Size([8, 25])
 traj post index torch.Size([8, 28])
 csvgd, Average time per step: 0.0

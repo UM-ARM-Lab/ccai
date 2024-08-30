@@ -752,8 +752,8 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
             offset = 0
         else:
             offset = 1
-        if offset == 1 and len(contact_node_sequence) == 1:
-            return [], None
+        if offset == 1 and len(last_node.contact_sequence) == 1:
+            return [], None, None
         next_node = last_node.contact_sequence[offset]
         contact_sequence = list(last_node.contact_sequence)
         contact_sequence = [contact_vec_to_label[tuple(contact_sequence[i])] for i in range(len(contact_sequence))]
@@ -852,12 +852,16 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         initial_samples = None
         if sample_contact and (stage == 0 or params['replan']):
             if params['replan']:
-                params['goal'] = min(y + float(params['goal_update']), -.06)
+                params['goal'] = max(y + float(params['goal_update']), -.06)
             print('Adjusting goal to', params['goal'])
             for key in problem_for_sampler:
                 problem_for_sampler[key].goal = torch.tensor([0, float(params['goal']), 0]).to(device=params['device'])
                 problem_for_sampler[key].T = params['T']
-            new_contact_sequence, new_next_node, initial_samples = plan_contacts(state, stage, 5-stage, next_node, params['multi_particle_search'])
+            if params.get('astar_receding', False):
+                depth = 5-stage
+            else:
+                depth = 5
+            new_contact_sequence, new_next_node, initial_samples = plan_contacts(state, stage, depth, next_node, params['multi_particle_search'])
             stages_since_plan = 0
             if new_contact_sequence is not None and len(new_contact_sequence) == 0:
                 print('Planner thinks task is complete')
