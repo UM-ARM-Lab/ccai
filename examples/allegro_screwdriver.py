@@ -943,7 +943,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     sample_contact = params.get('sample_contact', False)
     num_stages = 2 + 3 * (params['num_turns'] - 1)
     if not sample_contact:
-        contact_sequence = ['pregrasp', 'turn']
+        contact_sequence = ['turn']
         for k in range(params['num_turns'] - 1):
             contact_options = ['index', 'thumb_middle']
             perm = np.random.permutation(2)
@@ -951,7 +951,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             contact_sequence += [contact_options[perm[0]], contact_options[perm[1]], 'turn']
     else:
         contact_sequence = None
-        num_stages
+
     # state = state['q'].reshape(-1)[:15].to(device=params['device'])
     # initial_samples = gen_initial_samples_multi_mode(contact_sequence)
     # pkl.dump(initial_samples, open(f"{fpath}/long_horizon_inits.p", "wb"))
