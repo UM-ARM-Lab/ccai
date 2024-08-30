@@ -3,6 +3,7 @@ import pickle
 import pathlib
 import numpy as np
 from torch.utils.data import Dataset
+import io
 
 
 class AllegroValveDataset(Dataset):
@@ -422,7 +423,14 @@ class FakeDataset(Dataset):
 
         # print(mask)
         return (traj - self.mean) / self.std, self.contact[idx], mask
-    
+
+class CPU_Unpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        if module == 'torch.storage' and name == '_load_from_bytes':
+            return lambda b: torch.load(io.BytesIO(b), map_location='cpu')
+        else:
+            return super().find_class(module, name)
+
 class AllegroScrewdriverDiffusionPolicyDataset(Dataset):
 
     def __init__(self, folders, max_T, horizon, cosine_sine=False, states_only=False, skip_pregrasp=False):
@@ -436,14 +444,13 @@ class AllegroScrewdriverDiffusionPolicyDataset(Dataset):
         masks = []
 
         min_t = 1
-
         use_actual_traj = True
         for fpath in folders:
             path = pathlib.Path(fpath)
             plans = []
             for p in path.rglob('*traj_data.p'):
                 with open(p, 'rb') as f:
-                    data = pickle.load(f)
+                    data = CPU_Unpickler(f).load()
                     actual_traj = []
                     
                     for t in range(max_T, min_t - 1, -1):
