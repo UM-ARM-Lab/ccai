@@ -22,6 +22,7 @@ sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 from ccai.utils.allegro_utils import *
 from ccai.allegro_contact import AllegroManipulationExternalContactProblem, PositionControlConstrainedSVGDMPC
 from ccai.allegro_screwdriver_problem_diffusion import AllegroScrewdriverDiff
+from ccai.mpc.diffusion_policy import Diffusion_Policy, DummyProblem
 from ccai.models.trajectory_samplers import TrajectorySampler
 from ccai.models.contact_samplers import GraphSearchCard, Node
 
@@ -274,6 +275,10 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         index_middle_planner = PositionControlConstrainedSVGDMPC(index_middle_problem, params)
         reposition_planner = PositionControlConstrainedSVGDMPC(reposition_problem, params)
 
+    elif params['controller'] == 'diffusion_policy':
+        fingers = params['fingers']
+        problem = DummyProblem(params['dx'], params['T'])
+        planner = Diffusion_Policy(problem, params)
 
     # warm-starting using learned sampler
     trajectory_sampler = None
@@ -501,8 +506,11 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         state = state[:planner.problem.dx]
         # print(params['T'], state.shape, initial_samples)
         planner.reset(state, T=params['T'], goal=goal, initial_x=initial_samples)
-        if trajectory_sampler is None or not params.get('diff_init', True):
+        if params['controller'] != 'diffusion_policy' and trajectory_sampler is None or not params.get('diff_init', True):
             initial_samples = planner.x.detach().clone()
+            sim_rollouts = torch.zeros_like(initial_samples)
+        elif params['controller'] == 'diffusion_policy':
+            initial_samples = torch.tensor([])
             sim_rollouts = torch.zeros_like(initial_samples)
         planned_trajectories = []
         actual_trajectory = []
@@ -519,7 +527,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
             state = state[:planner.problem.dx]
 
             # Do diffusion replanning
-            if plans is not None and resample:
+            if params['controller'] != 'diffusion_policy' and plans is not None and resample:
                 # combine past with plans
                 executed_trajectory = torch.stack(actual_trajectory, dim=0)
                 executed_trajectory = executed_trajectory.reshape(1, -1, planner.problem.dx + planner.problem.du)
@@ -569,19 +577,33 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
                                             dim=2).detach().cpu()
 
             # execute the action
-            action = best_traj[0, planner.problem.dx:planner.problem.dx + planner.problem.du]
+            # action = best_traj[0, planner.problem.dx:planner.problem.dx + planner.problem.du]
+            # state = env.get_state()
+            # state = state['q'].reshape(-1).to(device=params['device'])
+            # xu = torch.cat((state, action))
+
+            # # record the actual trajectory
+            # actual_trajectory.append(xu)
+            # x = best_traj[0, :planner.problem.dx + planner.problem.du]
+            # x = x.reshape(1, planner.problem.dx + planner.problem.du)
+            # action = x[:, planner.problem.dx:planner.problem.dx + planner.problem.du].to(device=env.device)
+            # # print(action)
+            # action = action[:, :4 * num_fingers]
             state = env.get_state()
             state = state['q'].reshape(-1).to(device=params['device'])
-            xu = torch.cat((state, action))
 
             # record the actual trajectory
+            if params['controller'] != 'diffusion_policy':
+                action = best_traj[0, planner.problem.dx:planner.problem.dx + planner.problem.du]
+                x = best_traj[0, :planner.problem.dx + planner.problem.du]
+                x = x.reshape(1, planner.problem.dx + planner.problem.du)
+                action = x[:, planner.problem.dx:planner.problem.dx + planner.problem.du].to(device=env.device)
+            else:
+                action = best_traj
+            xu = torch.cat((state[:-1].cpu(), action[0].cpu()))
             actual_trajectory.append(xu)
-            x = best_traj[0, :planner.problem.dx + planner.problem.du]
-            x = x.reshape(1, planner.problem.dx + planner.problem.du)
-            action = x[:, planner.problem.dx:planner.problem.dx + planner.problem.du].to(device=env.device)
             # print(action)
             action = action[:, :4 * num_fingers]
-
 
             if params['visualize_plan']:
                 traj_for_viz = best_traj[:, :planner.problem.dx]
@@ -620,7 +642,8 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         # can't stack plans as each is of a different length
 
         # for memory reasons we clear the data
-        planner.problem.data = {}
+        if params['controller'] != 'diffusion_policy':
+            planner.problem.data = {}
         return actual_trajectory, planned_trajectories, initial_samples, sim_rollouts, optimizer_paths, contact_points, contact_distance
 
     data = {}
@@ -817,6 +840,15 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         #         action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
         #         env.step(action)
         #         continue
+        if params['controller'] == 'diffusion_policy':
+            _goal = torch.tensor([0, -0.02 + state[-2], 0]).to(device=params['device'])
+            traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
+                planner, mode='diffusion_policy', goal=_goal, fname=f'diffusion_policy_{stage}')
+
+            _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance,
+                            contact_state=torch.tensor([0.0, 0.0]))
+            actual_trajectory.append(traj)
+            continue
         initial_samples = None
         if sample_contact and (stage == 0 or params['replan']):
             if params['replan']:
