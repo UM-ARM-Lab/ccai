@@ -495,8 +495,8 @@ class AllegroScrewdriverDiffusionPolicyDataset(Dataset):
         # self.trajectories_full_time[:, -1, 15:] = 0
         self.trajectories_full_time = torch.cat((self.trajectories_full_time, torch.zeros(self.N, self.horizon-1, self.dxu)), dim=1)
 
-        self.trajectories_full_time_states = self.trajectories_full_time[:, :, :15]
-        self.trajectories_full_time_controls = self.trajectories_full_time[:, :, 15:27]
+        self.trajectories_full_time_states = self.trajectories_full_time[:, :, :11]
+        self.trajectories_full_time_controls = self.trajectories_full_time[:, :, 11:19]
 
     def compute_norm_constants(self):
         # compute norm constants not including the zero padding
