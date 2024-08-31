@@ -447,6 +447,8 @@ class AllegroScrewdriverDiffusionPolicyDataset(Dataset):
         use_actual_traj = True
         for fpath in folders:
             path = pathlib.Path(fpath)
+            self.dim = 11 if 'card' in fpath else 15
+            self.u_dim = 8 if 'card' in fpath else 12
             plans = []
             for p in path.rglob('*traj_data.p'):
                 with open(p, 'rb') as f:
@@ -495,8 +497,8 @@ class AllegroScrewdriverDiffusionPolicyDataset(Dataset):
         # self.trajectories_full_time[:, -1, 15:] = 0
         self.trajectories_full_time = torch.cat((self.trajectories_full_time, torch.zeros(self.N, self.horizon-1, self.dxu)), dim=1)
 
-        self.trajectories_full_time_states = self.trajectories_full_time[:, :, :11]
-        self.trajectories_full_time_controls = self.trajectories_full_time[:, :, 11:19]
+        self.trajectories_full_time_states = self.trajectories_full_time[:, :, :self.dim]
+        self.trajectories_full_time_controls = self.trajectories_full_time[:, :, self.dim:self.dim + self.u_dim]
 
     def compute_norm_constants(self):
         # compute norm constants not including the zero padding
@@ -507,16 +509,15 @@ class AllegroScrewdriverDiffusionPolicyDataset(Dataset):
         mean_obs = x.mean(dim=0)
         std_obs = x.std(dim=0)
 
-        dim = 15
 
         # for angle we force to be between [-1, 1]
         if self.cosine_sine:
-            self.mean_obs = torch.zeros(dim + 1)
-            self.std_obs = torch.ones(dim + 1)
-            self.mean_obs[:14] = mean_obs[:14]
-            self.std_obs[:14] = std_obs[:14]
-            self.mean_obs[16:] = mean_obs[15:]
-            self.std_obs[16:] = std_obs[15:]
+            self.mean_obs = torch.zeros(self.dim + 1)
+            self.std_obs = torch.ones(self.dim + 1)
+            self.mean_obs[:self.dim-1] = mean_obs[:self.dim-1]
+            self.std_obs[:self.dim-1] = std_obs[:self.dim-1]
+            self.mean_obs[self.dim+1:] = mean_obs[self.dim:]
+            self.std_obs[self.dim+1:] = std_obs[self.dim:]
         else:
             # mean[12:15] = 0
             # std[12:15] = np.pi
@@ -542,11 +543,11 @@ class AllegroScrewdriverDiffusionPolicyDataset(Dataset):
         traj_id = idx // self.samples_per_traj
         t_id = idx % self.samples_per_traj
         traj = self.trajectories_full_time_states[traj_id, t_id:t_id+self.horizon]
-        traj[:, -1] += 2 * np.pi * (np.random.rand() - 0.5)
+        # traj[:, -1] += 2 * np.pi * (np.random.rand() - 0.5)
         if self.cosine_sine:
-                traj_q = traj[:, :14]
-                traj_theta = traj[:, 14][:, None]
-                traj_u = traj[:, 15:]
+                traj_q = traj[:, :self.dim-1]
+                traj_theta = traj[:, self.dim-1][:, None]
+                traj_u = traj[:, self.dim:]
                 traj = torch.cat((traj_q, torch.cos(traj_theta), torch.sin(traj_theta), traj_u), dim=1)
         # print(traj.shape)
         data = {
