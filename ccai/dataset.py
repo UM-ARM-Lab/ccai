@@ -447,8 +447,9 @@ class AllegroScrewdriverDiffusionPolicyDataset(Dataset):
         use_actual_traj = True
         for fpath in folders:
             path = pathlib.Path(fpath)
-            self.dim = 11 if 'card' in fpath else 15
-            self.u_dim = 8 if 'card' in fpath else 12
+            self.dim = 11 if 'card' in str(fpath) else 15
+            self.u_dim = 8 if 'card' in str(fpath) else 12
+            print(self.dim, self.u_dim)
             plans = []
             for p in path.rglob('*traj_data.p'):
                 with open(p, 'rb') as f:
