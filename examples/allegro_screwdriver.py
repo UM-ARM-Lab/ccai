@@ -4,6 +4,8 @@ from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
 
 import numpy as np
 import pickle as pkl
+import pickle
+from copy import deepcopy
 
 import torch
 import time
@@ -631,6 +633,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             #     sim_rollout = rollout_trajectory_in_sim(env_sim_rollout, initial_samples[i])
             #     sim_rollouts[i] = sim_rollout
         if initial_samples is not None:
+            if params['mode'] == 'hardware' and mode == 'turn':
+                initial_samples[..., 30:] = 1.5 * torch.randn(params['N'], params['T']+1, 6, device=initial_samples.device)
+            
             initial_samples = _full_to_partial(initial_samples, mode)
             initial_x = initial_samples[:, 1:, :planner.problem.dx]
             initial_u = initial_samples[:, :-1, -planner.problem.du:]
@@ -641,6 +646,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         state = state['q'].reshape(-1).to(device=params['device'])
         state = state[:planner.problem.dx]
         # print(params['T'], state.shape, initial_samples)
+
         planner.reset(state, T=params['T'], goal=goal, initial_x=initial_samples)
         if params['controller'] != 'diffusion_policy' and (trajectory_sampler is None or not params.get('diff_init', True)):
             initial_samples = planner.x.detach().clone()
@@ -696,7 +702,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
             s = time.time()
             best_traj, plans = planner.step(state)
-            print('Solve time for step', time.time() - s)
+            print(f'Solve time for step {k+1}', time.time() - s)
             planned_trajectories.append(plans)
             optimizer_paths.append(copy.deepcopy(planner.path))
             N, T, _ = plans.shape
@@ -715,7 +721,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             # execute the action
             state = env.get_state()
             state = state['q'].reshape(-1).to(device=params['device'])
-
+            yaw = state[:15][-1]
+            print('Current yaw:', yaw)
             # record the actual trajectory
             if params['controller'] != 'diffusion_policy':
                 action = best_traj[0, planner.problem.dx:planner.problem.dx + planner.problem.du]
@@ -738,7 +745,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 set_state = env.get_state()['q'].to(device=env.device)
                 # print(set_state.shape)
                 sim_viz_env.set_pose(set_state)
-                sim_viz_env.step(action)
+                # sim_viz_env.step(action)
             elif params['mode'] == 'hardware_copy':
                 ros_copy_node.apply_action(partial_to_full_state(action[0], params['fingers']))
 
@@ -949,8 +956,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         contact_sequence = ['turn']
         for k in range(params['num_turns'] - 1):
             contact_options = ['index', 'thumb_middle']
-            # perm = np.random.permutation(2)
-            perm = [0, 1]
+            perm = np.random.permutation(2)
+            # perm = [0, 1]
             contact_sequence += [contact_options[perm[0]], contact_options[perm[1]], 'turn']
     else:
         contact_sequence = None
@@ -1008,7 +1015,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             for x in best_traj[:, :4 * num_fingers]:
                 action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
                 env.step(action)
-                continue
+            input("Pregrasp complete. Ready to execute. Press <ENTER> to continue.")
+            continue
         elif sample_contact and (stage == 1 or (params['replan'] and (stages_since_plan == 0 or len(contact_sequence) == 1))):
             # if yaw <= params['goal']:
             #     # params['goal'] -= .5
@@ -1092,34 +1100,39 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, contact_state=torch.ones(3))
         if contact != 'pregrasp':
             actual_trajectory.append(traj)
-    # change to numpy and save data
-    for t in range(1, 1 + params['T']):
-        try:
-            data[t]['plans'] = torch.stack(data[t]['plans']).cpu().numpy()
-            data[t]['starts'] = torch.stack(data[t]['starts']).cpu().numpy()
-            data[t]['contact_points'] = torch.stack(data[t]['contact_points']).cpu().numpy()
-            data[t]['contact_distance'] = torch.stack(data[t]['contact_distance']).cpu().numpy()
-            data[t]['contact_state'] = torch.stack(data[t]['contact_state']).cpu().numpy()
-        except:
-            pass
-    import pickle
-    pickle.dump(data, open(f"{fpath}/traj_data.p", "wb"))
-    state = env.get_state()
-    state = state['q'].reshape(4 * num_fingers + obj_dof + 1).to(device=params['device'])
-    actual_trajectory.append(state.clone()[: 4 * num_fingers + obj_dof])
-    # actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
-    # turn_problem.T = actual_trajectory.shape[0]
-    # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
-    # final_distance_to_goal = (state.clone()[:, -obj_dof:] - params['valve_goal']).abs()
+        # change to numpy and save data
+        data_save = deepcopy(data)
+        for t in range(1, 1 + params['T']):
+            try:
+                data_save[t]['plans'] = torch.stack(data_save[t]['plans']).cpu().numpy()
+                data_save[t]['starts'] = torch.stack(data_save[t]['starts']).cpu().numpy()
+                data_save[t]['contact_points'] = torch.stack(data_save[t]['contact_points']).cpu().numpy()
+                data_save[t]['contact_distance'] = torch.stack(data_save[t]['contact_distance']).cpu().numpy()
+                data_save[t]['contact_state'] = torch.stack(data_save[t]['contact_state']).cpu().numpy()
+            except:
+                pass
+        pickle.dump(data_save, open(f"{fpath}/traj_data.p", "wb"))
+        del data_save
+        state = env.get_state()
+        state = state['q'].reshape(4 * num_fingers + obj_dof + 1).to(device=params['device'])
+        actual_trajectory_save = deepcopy(actual_trajectory)
+        actual_trajectory_save.append(state.clone()[: 4 * num_fingers + obj_dof])
+        # actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
+        # turn_problem.T = actual_trajectory.shape[0]
+        # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
+        # final_distance_to_goal = (state.clone()[:, -obj_dof:] - params['valve_goal']).abs()
 
-    # print(f'Controller: {params["controller"]} Final distance to goal: {torch.min(final_distance_to_goal)}')
-    print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
+        # print(f'Controller: {params["controller"]} Final distance to goal: {torch.min(final_distance_to_goal)}')
+        # print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
 
-    with open(f'{fpath.resolve()}/trajectory.pkl', 'wb') as f:
-        pickle.dump([i.cpu().numpy() for i in actual_trajectory], f)
+        with open(f'{fpath.resolve()}/trajectory.pkl', 'wb') as f:
+            pickle.dump([i.cpu().numpy() for i in actual_trajectory_save], f)
+        del actual_trajectory_save
     # np.savez(f'{fpath.resolve()}/trajectory.npz', x=[i.cpu().numpy() for i in actual_trajectory],)
              #  constr=constraint_val.cpu().numpy(),
             #  d2goal=final_distance_to_goal.cpu().numpy())
+    input("Ready to regrasp. Press <ENTER> to continue.")
+
     env.reset()
     return -1#torch.min(final_distance_to_goal).cpu().numpy()
 
@@ -1128,7 +1141,8 @@ if __name__ == "__main__":
     # get config
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_diff_sine_cosine_only.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_hardware.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_hardware.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_planned_replanned_hardware.yaml').read_text())
     from tqdm import tqdm
 
     sim_env = None
@@ -1157,7 +1171,7 @@ if __name__ == "__main__":
                                  use_cartesian_controller=False,
                                  viewer=True,
                                  steps_per_action=60,
-                                 friction_coefficient=1.0,
+                                 friction_coefficient=2.5,
                                  device=config['sim_device'],
                                  valve=config['object_type'],
                                  video_save_path=img_save_dir,
@@ -1240,6 +1254,10 @@ if __name__ == "__main__":
                 inits_noise = inits_noise[:, :, 0, :, :]
             if len(noise_noise.shape) == 6:
                 noise_noise = noise_noise[:, :, :, 0, :, :]
+
+    # Get datetime
+    import datetime
+    now = datetime.datetime.now().strftime("%m.%d.%y:%I:%M:%S")
     start_ind = 0 if config['experiment_name'] == 'allegro_screwdriver_csvto_diff_sine_cosine_eps_.015_2.5_damping_pi_6' else 0
     for i in tqdm(range(start_ind, config['num_trials'])):
     # for i in tqdm([1, 2, 4, 7]):
@@ -1251,7 +1269,7 @@ if __name__ == "__main__":
         # goal = goal + 0.025 * torch.randn(1) + 0.2
         for controller in config['controllers'].keys():
             env.reset()
-            fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_{i + 1}')
+            fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}.{now}/{controller}/trial_{i + 1}')
             pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
             # set up params
             params = config.copy()

@@ -4,15 +4,23 @@ from scipy.spatial.transform import Rotation as R
 from .allegro_ros import RosNode
 import torch
 import rospy
+from shapely.geometry import Polygon
 
 class ObjectPoseReader:
     def __init__(self, obj='valve', mode='relative') -> None:
         self.mode = mode
         self.obj = obj
-        self.__intrinsic = np.array([[621.80984333,   0.,         651.09118583],
-        [  0.,         621.66658768, 352.88384525],
+        # self.__intrinsic = np.array([[621.80984333,   0.,         651.09118583],
+        # [  0.,         621.66658768, 352.88384525],
+        # [  0.,           0. ,          1.,        ]])
+        # self.__dist = np.array([[0.07583722,  0.00042308, -0.00245659 , 0.00797877 , 0.01058895]])
+        
+        self.__intrinsic = np.array([[620.01947778,   0.,         634.39543476],
+        [  0.,         621.01114219, 373.00241614],
         [  0.,           0. ,          1.,        ]])
-        self.__dist = np.array([[0.07583722,  0.00042308, -0.00245659 , 0.00797877 , 0.01058895]])
+        self.__dist = np.array([[0.10693622,  -0.11111605, 0.00523414 , -0.00723972 , 0.0405243]])
+
+        
         aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
         aruco_params = cv2.aruco.DetectorParameters()
         self.__detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
@@ -133,10 +141,15 @@ class ObjectPoseReader:
         markerCorners, markerIds, rejectedCandidates = self.__detector.detectMarkers(frame)
         if len(markerCorners) > 0 and markerIds.max() <= 4:
             # cv2.aruco.drawDetectedMarkers(frame, markerCorners, markerIds)
+            areas = []
             for marker_corner, marker_id in zip(markerCorners, markerIds):
                 if marker_id.item() >= 4:
                     continue
-
+                
+                # Use the marker_corners to calculate the area of the marker
+                polygon = Polygon(np.array(marker_corner).squeeze())
+                area = polygon.area
+                areas.append(area)
                 ret, rvecs, tvecs = cv2.solvePnP(self.__objp, marker_corner, self.__intrinsic, self.__dist) 
                 # cv2.drawFrameAxes(frame, self.__intrinsic, self.__dist, rvecs, tvecs, 35 / 2) # debug
                 rotation = R.from_rotvec(rvecs[:,0])
@@ -154,8 +167,18 @@ class ObjectPoseReader:
                 # print(markerIds[i].item(), screwdriver_ori_euler)
                 root_coors.append(root_coor)
                 screwdriver_ori_eulers.append(screwdriver_ori_euler)
-            root_coor = np.mean(root_coors, axis=0)
-            screwdriver_ori_euler = np.mean(screwdriver_ori_eulers, axis=0)
+            areas = np.array(areas)
+            # print(areas)
+            # print(root_coors)
+            # print(screwdriver_ori_eulers)
+            areas = areas / areas.sum()
+            areas = areas[:, None]
+            # root_coor is weighted average of the root coor of the screwdriver
+            root_coor = (np.array(root_coors) * areas).sum(axis=0)
+
+            root_coor += np.array([-8, 0, 2])
+
+            screwdriver_ori_euler = (np.array(screwdriver_ori_eulers) * areas).sum(axis=0)
             screwdriver_ori_euler = screwdriver_ori_euler / 180 * np.pi # change to radian
             # cv2.imshow('frame', frame) # debug
             return root_coor, screwdriver_ori_euler

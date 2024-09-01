@@ -1,0 +1,485 @@
+Importing module 'gym_38' (/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.0+cu121
+Device count 1
+/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinav/Documents/ccai
+joint command publisher initialized.
+ros listner initialized.
+joint command publisher initialized.
+joint state subscriber initialized.
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current yaw: tensor(-0.1289, device='cuda:0')
+Pregrasp complete. Ready to execute. Press <ENTER> to continue.Current yaw: tensor(-0.1919, device='cuda:0')
+Adjusting goal to tensor(-1.2391, device='cuda:0')
+1 () -0.19194842875003815
+2 () -0.19194842875003815
+3 ((1.0, 1.0, 1.0),) -0.4624702036380768
+4 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.5491523742675781
+Contact sequence search time: 8.412418955995236
+['turn', 'turn']
+1 turn
+Solve time for step 1 59.640756368637085
+Current yaw: tensor(-0.1529, device='cuda:0')
+Solve time for step 2 9.244487047195435
+Current yaw: tensor(-0.1683, device='cuda:0')
+Solve time for step 3 8.38593339920044
+Current yaw: tensor(-0.1683, device='cuda:0')
+Solve time for step 4 7.53762674331665
+Current yaw: tensor(-0.2526, device='cuda:0')
+Solve time for step 5 7.031085968017578
+Current yaw: tensor(-0.3179, device='cuda:0')
+Solve time for step 6 6.055666446685791
+Current yaw: tensor(-0.3687, device='cuda:0')
+Solve time for step 7 5.489176511764526
+Current yaw: tensor(-0.4207, device='cuda:0')
+Solve time for step 8 5.182077646255493
+Current yaw: tensor(-0.5215, device='cuda:0')
+Solve time for step 9 4.721473932266235
+Current yaw: tensor(-0.6140, device='cuda:0')
+Solve time for step 10 4.551711082458496
+Current yaw: tensor(-0.6195, device='cuda:0')
+Solve time for step 11 4.676859140396118
+Current yaw: tensor(-0.6393, device='cuda:0')
+Solve time for step 12 4.2246787548065186
+No readings from camera.
+Current yaw: tensor(-0.6566, device='cuda:0')
+Current yaw: tensor(-0.6729, device='cuda:0')
+Adjusting goal to tensor(-1.7201, device='cuda:0')
+1 ((1.0, 1.0, 1.0),) -0.672886848449707
+2 ((1.0, 1.0, 1.0),) -0.672886848449707
+3 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.574583888053894
+4 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.7255271673202515
+Contact sequence search time: 7.496504503986216
+['turn', 'index']
+2 turn
+Solve time for step 1 55.25439739227295
+Current yaw: tensor(-0.6676, device='cuda:0')
+Solve time for step 2 8.683556318283081
+Current yaw: tensor(-0.7043, device='cuda:0')
+Solve time for step 3 7.923264265060425
+Current yaw: tensor(-0.6577, device='cuda:0')
+Solve time for step 4 6.9945337772369385
+Current yaw: tensor(-0.6509, device='cuda:0')
+Solve time for step 5 6.37532901763916
+Current yaw: tensor(-0.5680, device='cuda:0')
+Solve time for step 6 6.002117872238159
+Current yaw: tensor(-0.6448, device='cuda:0')
+Solve time for step 7 5.440762519836426
+Current yaw: tensor(-0.6398, device='cuda:0')
+Solve time for step 8 5.1793742179870605
+Current yaw: tensor(-0.6634, device='cuda:0')
+Solve time for step 9 4.913249731063843
+Current yaw: tensor(-0.6902, device='cuda:0')
+Solve time for step 10 4.771057844161987
+Current yaw: tensor(-0.7246, device='cuda:0')
+Solve time for step 11 4.521856069564819
+No readings from camera.
+Current yaw: tensor(-0.7632, device='cuda:0')
+Solve time for step 12 4.318079948425293
+Current yaw: tensor(-0.8352, device='cuda:0')
+Current yaw: tensor(-0.8555, device='cuda:0')
+Adjusting goal to tensor(-1.9027, device='cuda:0')
+1 ((1.0, 1.0, 1.0),) -0.855478823184967
+2 ((1.0, 1.0, 1.0),) -0.855478823184967
+3 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.7723498344421387
+4 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.7809276580810547
+5 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -2.029766798019409
+Contact sequence search time: 11.197469396007364
+['thumb_middle', 'turn', 'index']
+3 thumb_middle
+Solve time for step 1 32.71150827407837
+Current yaw: tensor(-0.8698, device='cuda:0')
+Solve time for step 2 5.368076324462891
+Current yaw: tensor(-0.8028, device='cuda:0')
+Solve time for step 3 5.155157804489136
+Current yaw: tensor(-0.7708, device='cuda:0')
+Solve time for step 4 4.957111120223999
+Current yaw: tensor(-0.7518, device='cuda:0')
+Solve time for step 5 4.694613218307495
+Current yaw: tensor(-0.7381, device='cuda:0')
+Solve time for step 6 4.5313720703125
+Current yaw: tensor(-0.7383, device='cuda:0')
+No readings from camera.
+Solve time for step 7 4.45403790473938
+Current yaw: tensor(-0.7300, device='cuda:0')
+Solve time for step 8 4.2132439613342285
+Current yaw: tensor(-0.7295, device='cuda:0')
+Solve time for step 9 4.041596174240112
+Current yaw: tensor(-0.7117, device='cuda:0')
+Solve time for step 10 3.901930093765259
+Current yaw: tensor(-0.7171, device='cuda:0')
+Solve time for step 11 3.857746124267578
+Current yaw: tensor(-0.7191, device='cuda:0')
+Solve time for step 12 3.7781410217285156
+Current yaw: tensor(-0.7081, device='cuda:0')
+Current yaw: tensor(-0.6092, device='cuda:0')
+Adjusting goal to tensor(-1.6564, device='cuda:0')
+1 ((1.0, -1.0, -1.0),) -0.6092042922973633
+2 ((1.0, -1.0, -1.0),) -0.6092042922973633
+3 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.3280878067016602
+4 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.9409430027008057
+Contact sequence search time: 7.845112115988741
+['turn', 'turn']
+4 turn
+Solve time for step 1 56.184685468673706
+Current yaw: tensor(-0.6204, device='cuda:0')
+Solve time for step 2 8.577844858169556
+Current yaw: tensor(-0.7139, device='cuda:0')
+Solve time for step 3 7.827816724777222
+Current yaw: tensor(-0.6860, device='cuda:0')
+Solve time for step 4 6.9412455558776855
+Current yaw: tensor(-0.7605, device='cuda:0')
+Solve time for step 5 6.431085824966431
+Current yaw: tensor(-0.7973, device='cuda:0')
+Solve time for step 6 5.967732191085815
+Current yaw: tensor(-0.8529, device='cuda:0')
+Solve time for step 7 5.521657943725586
+Current yaw: tensor(-0.8437, device='cuda:0')
+Solve time for step 8 5.228418827056885
+No readings from camera.
+Current yaw: tensor(-0.8468, device='cuda:0')
+Solve time for step 9 4.929258108139038
+Current yaw: tensor(-0.8531, device='cuda:0')
+Solve time for step 10 4.685086250305176
+Current yaw: tensor(-0.8437, device='cuda:0')
+No readings from camera.
+Solve time for step 11 4.532379388809204
+Current yaw: tensor(-0.8413, device='cuda:0')
+No readings from camera.
+Solve time for step 12 4.446592807769775
+Current yaw: tensor(-0.8387, device='cuda:0')
+Ready to regrasp. Press <ENTER> to continue.{}
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current yaw: tensor(-0.0127, device='cuda:0')
+Pregrasp complete. Ready to execute. Press <ENTER> to continue.Current yaw: tensor(-0.2299, device='cuda:0')
+Adjusting goal to tensor(-1.2771, device='cuda:0')
+1 () -0.22993072867393494
+2 () -0.22993072867393494
+3 ((1.0, 1.0, 1.0),) -0.6720041632652283
+4 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.3981075286865234
+Contact sequence search time: 7.647172848999617
+['turn', 'thumb_middle']
+1 turn
+No readings from camera.
+Solve time for step 1 55.73814940452576
+Current yaw: tensor(-0.2038, device='cuda:0')
+Solve time for step 2 8.818405389785767
+Current yaw: tensor(-0.4726, device='cuda:0')
+Solve time for step 3 8.074702501296997
+Current yaw: tensor(-0.5301, device='cuda:0')
+Solve time for step 4 7.051075220108032
+Current yaw: tensor(-0.5772, device='cuda:0')
+Solve time for step 5 6.554735898971558
+Current yaw: tensor(-0.5982, device='cuda:0')
+Solve time for step 6 6.137743711471558
+Current yaw: tensor(-0.6330, device='cuda:0')
+No readings from camera.
+Solve time for step 7 5.6663289070129395
+Current yaw: tensor(-0.6507, device='cuda:0')
+Solve time for step 8 5.315110445022583
+Current yaw: tensor(-0.6868, device='cuda:0')
+Solve time for step 9 5.004386901855469
+Current yaw: tensor(-0.6892, device='cuda:0')
+Solve time for step 10 4.818509101867676
+Current yaw: tensor(-0.7831, device='cuda:0')
+Solve time for step 11 4.573097229003906
+Current yaw: tensor(-0.7633, device='cuda:0')
+Solve time for step 12 4.514734506607056
+Current yaw: tensor(-0.7831, device='cuda:0')
+Current yaw: tensor(-0.7322, device='cuda:0')
+Adjusting goal to tensor(-1.7794, device='cuda:0')
+1 ((1.0, 1.0, 1.0),) -0.7321893572807312
+2 ((1.0, 1.0, 1.0),) -0.7321893572807312
+3 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.5421555042266846
+4 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -2.009899377822876
+Contact sequence search time: 7.836658667991287
+['turn', 'turn']
+2 turn
+Solve time for step 1 56.10659122467041
+Current yaw: tensor(-0.7299, device='cuda:0')
+Solve time for step 2 8.6039559841156
+Current yaw: tensor(-0.8801, device='cuda:0')
+Solve time for step 3 7.76057767868042
+Current yaw: tensor(-0.8759, device='cuda:0')
+Solve time for step 4 7.0888166427612305
+Current yaw: tensor(-0.9131, device='cuda:0')
+No readings from camera.
+Solve time for step 5 6.5845465660095215
+Current yaw: tensor(-0.9131, device='cuda:0')
+Solve time for step 6 6.058410882949829
+Current yaw: tensor(-0.9366, device='cuda:0')
+Solve time for step 7 5.700014352798462
+Current yaw: tensor(-0.9495, device='cuda:0')
+Solve time for step 8 5.384078741073608
+Current yaw: tensor(-1.0103, device='cuda:0')
+Solve time for step 9 5.0036656856536865
+Current yaw: tensor(-1.0234, device='cuda:0')
+Solve time for step 10 4.746819734573364
+Current yaw: tensor(-1.0307, device='cuda:0')
+Solve time for step 11 4.606282949447632
+Current yaw: tensor(-1.0295, device='cuda:0')
+Solve time for step 12 4.435511827468872
+Current yaw: tensor(-1.0211, device='cuda:0')
+Current yaw: tensor(-1.0316, device='cuda:0')
+Adjusting goal to tensor(-2.0788, device='cuda:0')
+1 ((1.0, 1.0, 1.0),) -1.0316104888916016
+2 ((1.0, 1.0, 1.0),) -1.0316104888916016
+3 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.5262694358825684
+4 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.8991624116897583
+5 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -2.246076822280884
+Contact sequence search time: 11.478378101994167
+['turn', 'turn', 'thumb_middle']
+3 turn
+Solve time for step 1 55.640960454940796
+Current yaw: tensor(-1.0382, device='cuda:0')
+Solve time for step 2 8.743601560592651
+Current yaw: tensor(-1.1623, device='cuda:0')
+Solve time for step 3 7.836365222930908
+Current yaw: tensor(-1.1355, device='cuda:0')
+Solve time for step 4 7.046857118606567
+Current yaw: tensor(-1.1479, device='cuda:0')
+Solve time for step 5 6.6125547885894775
+Current yaw: tensor(-1.1723, device='cuda:0')
+Solve time for step 6 6.161929607391357
+Current yaw: tensor(-1.1394, device='cuda:0')
+Solve time for step 7 5.630432844161987
+Current yaw: tensor(-1.1664, device='cuda:0')
+Solve time for step 8 5.291192054748535
+Current yaw: tensor(-1.1664, device='cuda:0')
+Solve time for step 9 5.03719687461853
+Current yaw: tensor(-1.1678, device='cuda:0')
+Solve time for step 10 4.772274971008301
+Current yaw: tensor(-1.1771, device='cuda:0')
+Solve time for step 11 4.6095967292785645
+Current yaw: tensor(-1.1650, device='cuda:0')
+Solve time for step 12 4.937169551849365
+Current yaw: tensor(-1.1936, device='cuda:0')
+Current yaw: tensor(-1.2102, device='cuda:0')
+Adjusting goal to tensor(-2.2574, device='cuda:0')
+1 ((1.0, 1.0, 1.0),) -1.2102004289627075
+2 ((1.0, 1.0, 1.0),) -1.2102004289627075
+3 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.6756385564804077
+4 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -2.3124399185180664
+Contact sequence search time: 7.6991211240092525
+['turn', 'turn']
+4 turn
+Solve time for step 1 55.58434462547302
+Current yaw: tensor(-1.1936, device='cuda:0')
+Solve time for step 2 8.645965099334717
+Current yaw: tensor(-1.1309, device='cuda:0')
+Solve time for step 3 7.747080326080322
+Current yaw: tensor(-1.1696, device='cuda:0')
+Solve time for step 4 7.0463573932647705
+Current yaw: tensor(-1.1460, device='cuda:0')
+Solve time for step 5 6.484405755996704
+Current yaw: tensor(-1.1744, device='cuda:0')
+Solve time for step 6 5.9751129150390625
+Current yaw: tensor(-1.1866, device='cuda:0')
+Solve time for step 7 5.6211981773376465
+Current yaw: tensor(-1.1736, device='cuda:0')
+Solve time for step 8 5.306557655334473
+Current yaw: tensor(-1.1697, device='cuda:0')
+Solve time for step 9 4.9693169593811035
+Current yaw: tensor(-1.1562, device='cuda:0')
+Solve time for step 10 4.726001501083374
+Current yaw: tensor(-1.1715, device='cuda:0')
+Solve time for step 11 4.596295118331909
+Current yaw: tensor(-1.1613, device='cuda:0')
+Solve time for step 12 4.437406063079834
+Current yaw: tensor(-1.1684, device='cuda:0')
+No readings from camera.
+Ready to regrasp. Press <ENTER> to continue.{}
+Importing module 'gym_38' (/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.0+cu121
+Device count 1
+/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinav/Documents/ccai
+joint command publisher initialized.
+ros listner initialized.
+No readings from camera.
+joint command publisher initialized.
+joint state subscriber initialized.
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current yaw: tensor(0.0181, device='cuda:0')
+Pregrasp complete. Ready to execute. Press <ENTER> to continue.Current yaw: tensor(-0.1019, device='cuda:0')
+Adjusting goal to tensor(-1.1491, device='cuda:0')
+1 () -0.1018906757235527
+2 () -0.1018906757235527
+3 ((1.0, -1.0, -1.0),) -0.7992107272148132
+4 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.9540519714355469
+Contact sequence search time: 7.909028260000014
+['thumb_middle', 'turn']
+1 thumb_middle
+No readings from camera.
+Solve time for step 1 34.56740427017212
+Current yaw: tensor(-0.1404, device='cuda:0')
+Solve time for step 2 5.58182168006897
+Current yaw: tensor(-0.1404, device='cuda:0')
+Solve time for step 3 5.303662538528442
+Current yaw: tensor(-0.0817, device='cuda:0')
+Solve time for step 4 5.10050368309021
+Current yaw: tensor(-0.0423, device='cuda:0')
+Solve time for step 5 4.919475078582764
+Current yaw: tensor(-0.0445, device='cuda:0')
+No readings from camera.
+No readings from camera.
+Solve time for step 6 4.739619016647339
+Current yaw: tensor(-0.1147, device='cuda:0')
+Solve time for step 7 4.518716812133789
+Current yaw: tensor(-0.1148, device='cuda:0')
+No readings from camera.
+Solve time for step 8 4.444966554641724
+No readings from camera.
+Current yaw: tensor(-0.1162, device='cuda:0')
+Solve time for step 9 4.429216384887695
+Current yaw: tensor(-0.0887, device='cuda:0')
+Solve time for step 10 4.149474143981934
+Current yaw: tensor(0.0382, device='cuda:0')
+Solve time for step 11 4.028335332870483
+Current yaw: tensor(0.0034, device='cuda:0')
+Solve time for step 12 3.938732147216797
+Current yaw: tensor(0.0504, device='cuda:0')
+Current yaw: tensor(0.0467, device='cuda:0')
+Adjusting goal to tensor(-1.0005, device='cuda:0')
+1 ((1.0, -1.0, -1.0),) 0.04671378806233406
+2 ((1.0, -1.0, -1.0),) 0.04671378806233406
+3 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.201061487197876
+Contact sequence search time: 3.9425427810001565
+['turn']
+2 turn
+Solve time for step 1 57.44996643066406
+Current yaw: tensor(0.0431, device='cuda:0')
+Solve time for step 2 8.890809297561646
+Current yaw: tensor(-0.0580, device='cuda:0')
+No readings from camera.
+No readings from camera.
+Solve time for step 3 8.061824560165405
+Current yaw: tensor(-0.0222, device='cuda:0')
+Solve time for step 4 7.187679290771484
+Current yaw: tensor(-0.0938, device='cuda:0')
+Solve time for step 5 6.655661344528198
+Current yaw: tensor(-0.1571, device='cuda:0')
+Solve time for step 6 6.10995888710022
+Current yaw: tensor(-0.2344, device='cuda:0')
+Solve time for step 7 5.773054838180542
+No readings from camera.
+Current yaw: tensor(-0.2688, device='cuda:0')
+No readings from camera.
+No readings from camera.
+Solve time for step 8 5.492498397827148
+Current yaw: tensor(-0.2916, device='cuda:0')
+Solve time for step 9 5.1284003257751465
+Current yaw: tensor(-0.2747, device='cuda:0')
+Solve time for step 10 4.845937728881836
+Current yaw: tensor(-0.2905, device='cuda:0')
+Solve time for step 11 4.667279481887817
+No readings from camera.
+Current yaw: tensor(-0.2866, device='cuda:0')
+Solve time for step 12 4.487460136413574
+Current yaw: tensor(-0.3306, device='cuda:0')
+No readings from camera.
+Current yaw: tensor(-0.3529, device='cuda:0')
+Adjusting goal to tensor(-1.4001, device='cuda:0')
+1 ((1.0, 1.0, 1.0),) -0.35292932391166687
+2 ((1.0, 1.0, 1.0),) -0.35292932391166687
+3 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.1538623571395874
+4 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.751313328742981
+Contact sequence search time: 7.534122503000162
+['thumb_middle', 'turn']
+3 thumb_middle
+Solve time for step 1 34.991010904312134
+Current yaw: tensor(-0.3529, device='cuda:0')
+Solve time for step 2 5.680927991867065
+Current yaw: tensor(-0.3348, device='cuda:0')
+Solve time for step 3 5.426942348480225
+Current yaw: tensor(-0.3363, device='cuda:0')
+Solve time for step 4 5.156338930130005
+Current yaw: tensor(-0.3348, device='cuda:0')
+Solve time for step 5 4.882497310638428
+Current yaw: tensor(-0.3348, device='cuda:0')
+Solve time for step 6 4.759171485900879
+Current yaw: tensor(-0.3301, device='cuda:0')
+Solve time for step 7 4.563927173614502
+Current yaw: tensor(-0.3374, device='cuda:0')
+Solve time for step 8 4.408140420913696
+Current yaw: tensor(-0.3394, device='cuda:0')
+Solve time for step 9 4.345906019210815
+Current yaw: tensor(-0.3394, device='cuda:0')
+Solve time for step 10 4.195737838745117
+Current yaw: tensor(-0.3394, device='cuda:0')
+Solve time for step 11 4.314619064331055
+No readings from camera.
+Current yaw: tensor(-0.3394, device='cuda:0')
+Solve time for step 12 3.9619956016540527
+Current yaw: tensor(-0.3374, device='cuda:0')
+No readings from camera.
+Current yaw: tensor(-0.3271, device='cuda:0')
+Adjusting goal to tensor(-1.3743, device='cuda:0')
+1 ((1.0, -1.0, -1.0),) -0.32705938816070557
+2 ((1.0, -1.0, -1.0),) -0.32705938816070557
+3 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.4322515726089478
+Contact sequence search time: 3.8591124809995563
+['turn']
+4 turn
+No readings from camera.
+Solve time for step 1 57.70811486244202
+Current yaw: tensor(-0.3168, device='cuda:0')
+Solve time for step 2 8.925537586212158
+Current yaw: tensor(-0.3161, device='cuda:0')
+Solve time for step 3 7.975947856903076
+Current yaw: tensor(-0.3156, device='cuda:0')
+Solve time for step 4 7.247704267501831
+No readings from camera.
+Current yaw: tensor(-0.3535, device='cuda:0')
+No readings from camera.
+Solve time for step 5 6.749446153640747
+Current yaw: tensor(-0.3572, device='cuda:0')
+Solve time for step 6 6.150980472564697
+Current yaw: tensor(-0.3735, device='cuda:0')
+No readings from camera.
+Solve time for step 7 5.659006118774414
+Current yaw: tensor(-0.4052, device='cuda:0')
+Solve time for step 8 5.354997873306274
+Current yaw: tensor(-0.4327, device='cuda:0')
+Solve time for step 9 5.06772255897522
+Current yaw: tensor(-0.4810, device='cuda:0')
+No readings from camera.
+Solve time for step 10 4.895906925201416
+Current yaw: tensor(-0.5132, device='cuda:0')
+No readings from camera.
+Solve time for step 11 4.619909048080444
+Current yaw: tensor(-0.5025, device='cuda:0')
+No readings from camera.
+Solve time for step 12 4.545470476150513
+Current yaw: tensor(-0.5092, device='cuda:0')
+No readings from camera.
+Ready to regrasp. Press <ENTER> to continue.{}

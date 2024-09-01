@@ -984,8 +984,13 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         if self.optimize_force:
             force = xu[:, -self.num_contacts * 3:]
-            cost += torch.sum(force ** 2)
-
+            sq = force ** 2
+            cost += torch.sum(sq)
+            # if not self.turn:
+            #     cost += torch.sum(sq)
+            # else:
+            #     sq[:, -6:] *= .01
+            #     cost += torch.sum(sq)
         return cost
 
     def get_friction_polytope(self):
