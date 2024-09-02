@@ -39,4 +39,4 @@ controllers:
     du: 
     device: 'cuda:0'
     # diffusion_policy_fpath: '/home/abhinav/Documents/diffusion_policy/data/outputs/2024.08.22/11.01.05_allegro/checkpoints/latest.ckpt'
-    diffusion_policy_fpath: '/home/abhinav/Documents/diffusion_policy/data/outputs/2024.08.28/19.10.30_allegro/checkpoints/latest.ckpt'
+    diffusion_policy_fpath: '/home/abhinav/Documents/diffusion_policy/data/outputs/2024.09.01/01.29.17_allegro/checkpoints/latest.ckpt'

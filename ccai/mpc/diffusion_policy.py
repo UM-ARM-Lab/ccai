@@ -69,5 +69,6 @@ class Diffusion_Policy:
         pass
 
     def reset(self, start, initial_x=None, **kwargs):
-        self.policy.reset()
-        self.obs_hist = torch.zeros(1, 1, self.problem.dx + 1).to(self.device)
+        pass
+        # self.policy.reset()
+        # self.obs_hist = torch.zeros(1, 1, self.problem.dx + 1).to(self.device)

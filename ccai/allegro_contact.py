@@ -982,10 +982,11 @@ class AllegroContactProblem(AllegroObjectProblem):
         cost = 10 * torch.sum((theta[-1] - goal) ** 2)
         cost += torch.sum((3 * (theta[:-1] - goal) ** 2))
 
-        if self.optimize_force:
-            force = xu[:, -self.num_contacts * 3:]
-            sq = force ** 2
-            cost += torch.sum(sq)
+        # if self.optimize_force:
+        #     force = xu[:, -self.num_contacts * 3:]
+        #     sq = force ** 2
+        #     cost += torch.sum(sq)
+        
             # if not self.turn:
             #     cost += torch.sum(sq)
             # else:

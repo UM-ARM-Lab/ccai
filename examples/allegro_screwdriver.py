@@ -30,7 +30,7 @@ from ccai.utils.allegro_utils import *
 from ccai.allegro_contact import AllegroManipulationProblem, PositionControlConstrainedSVGDMPC, add_trajectories, \
     add_trajectories_hardware
 from ccai.allegro_screwdriver_problem_diffusion import AllegroScrewdriverDiff
-# from ccai.mpc.diffusion_policy import Diffusion_Policy, DummyProblem
+from ccai.mpc.diffusion_policy import Diffusion_Policy, DummyProblem
 from train_allegro_screwdriver import rollout_trajectory_in_sim
 from scipy.spatial.transform import Rotation as R
 
@@ -151,7 +151,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
 #             kwargs.pop('device')
 #         super().__init__(*args, **kwargs, N=1, device='cpu')
 
-def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noise=None, noise_noise=None, sim=None,):
+def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noise=None, noise_noise=None, sim=None, seed=None):
     "only turn the valve once"
     num_fingers = len(params['fingers'])
     state = env.get_state()
@@ -383,6 +383,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             turn=True,
             obj_gravity=params.get('obj_gravity', False),
         )
+        if seed is not None:
+            torch.manual_seed(seed)
+            np.random.seed(seed)
 
     # warm-starting using learned sampler
     trajectory_sampler = None
@@ -633,8 +636,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             #     sim_rollout = rollout_trajectory_in_sim(env_sim_rollout, initial_samples[i])
             #     sim_rollouts[i] = sim_rollout
         if initial_samples is not None:
-            if params['mode'] == 'hardware' and mode == 'turn':
-                initial_samples[..., 30:] = 1.5 * torch.randn(params['N'], params['T']+1, 6, device=initial_samples.device)
+            # if params['mode'] == 'hardware' and mode == 'turn':
+            #     initial_samples[..., 30:] = 1.5 * torch.randn(params['N'], params['T']+1, 6, device=initial_samples.device)
             
             initial_samples = _full_to_partial(initial_samples, mode)
             initial_x = initial_samples[:, 1:, :planner.problem.dx]
@@ -998,6 +1001,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         # else:
         # contact = contact_sequence[stage]
+        initial_samples = None
         if params['controller'] == 'diffusion_policy' and stage > 0:
             _goal = torch.tensor([0, 0, state[-1]]).to(device=params['device'])
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
@@ -1006,8 +1010,34 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance,
                             contact_state=torch.tensor([0.0, 0.0, 0.0]))
             actual_trajectory.append(traj)
+            data_save = deepcopy(data)
+            for t in range(1, 1 + params['T']):
+                try:
+                    data_save[t]['plans'] = torch.stack(data_save[t]['plans']).cpu().numpy()
+                    data_save[t]['starts'] = torch.stack(data_save[t]['starts']).cpu().numpy()
+                    data_save[t]['contact_points'] = torch.stack(data_save[t]['contact_points']).cpu().numpy()
+                    data_save[t]['contact_distance'] = torch.stack(data_save[t]['contact_distance']).cpu().numpy()
+                    data_save[t]['contact_state'] = torch.stack(data_save[t]['contact_state']).cpu().numpy()
+                except:
+                    pass
+            pickle.dump(data_save, open(f"{fpath}/traj_data.p", "wb"))
+            del data_save
+            state = env.get_state()
+            state = state['q'].reshape(4 * num_fingers + obj_dof + 1).to(device=params['device'])
+            actual_trajectory_save = deepcopy(actual_trajectory)
+            actual_trajectory_save.append(state.clone()[: 4 * num_fingers + obj_dof])
+            # actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
+            # turn_problem.T = actual_trajectory.shape[0]
+            # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
+            # final_distance_to_goal = (state.clone()[:, -obj_dof:] - params['valve_goal']).abs()
+
+            # print(f'Controller: {params["controller"]} Final distance to goal: {torch.min(final_distance_to_goal)}')
+            # print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
+
+            with open(f'{fpath.resolve()}/trajectory.pkl', 'wb') as f:
+                pickle.dump([i.cpu().numpy() for i in actual_trajectory_save], f)
+            del actual_trajectory_save
             continue
-        initial_samples = None
         if stage == 0:
             contact = 'pregrasp'
             start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
@@ -1015,7 +1045,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             for x in best_traj[:, :4 * num_fingers]:
                 action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
                 env.step(action)
-            input("Pregrasp complete. Ready to execute. Press <ENTER> to continue.")
+            if params['mode'] == 'hardware':
+                input("Pregrasp complete. Ready to execute. Press <ENTER> to continue.")
             continue
         elif sample_contact and (stage == 1 or (params['replan'] and (stages_since_plan == 0 or len(contact_sequence) == 1))):
             # if yaw <= params['goal']:
@@ -1131,7 +1162,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     # np.savez(f'{fpath.resolve()}/trajectory.npz', x=[i.cpu().numpy() for i in actual_trajectory],)
              #  constr=constraint_val.cpu().numpy(),
             #  d2goal=final_distance_to_goal.cpu().numpy())
-    input("Ready to regrasp. Press <ENTER> to continue.")
+    if params['mode'] == 'hardware':
+        input("Ready to regrasp. Press <ENTER> to continue.")
 
     env.reset()
     return -1#torch.min(final_distance_to_goal).cpu().numpy()
@@ -1141,8 +1173,8 @@ if __name__ == "__main__":
     # get config
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_diff_sine_cosine_only.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_hardware.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_planned_replanned_hardware.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_hardware.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_planned_replanned_hardware.yaml').read_text())
     from tqdm import tqdm
 
     sim_env = None
@@ -1162,6 +1194,7 @@ if __name__ == "__main__":
                           mode='relative',
                           gradual_control=True,
                           num_repeat=10)
+        env.get_state()
         root_coor, root_ori = env.obj_reader.get_state()
         root_coor = root_coor / 1000 # convert to meters
         # robot_p = np.array([-0.025, -0.1, 1.33])
@@ -1256,8 +1289,11 @@ if __name__ == "__main__":
                 noise_noise = noise_noise[:, :, :, 0, :, :]
 
     # Get datetime
-    import datetime
-    now = datetime.datetime.now().strftime("%m.%d.%y:%I:%M:%S")
+    if config['mode'] == 'hardware':
+        import datetime
+        now = datetime.datetime.now().strftime("%m.%d.%y:%I:%M:%S")
+    else:
+        now = ''
     start_ind = 0 if config['experiment_name'] == 'allegro_screwdriver_csvto_diff_sine_cosine_eps_.015_2.5_damping_pi_6' else 0
     for i in tqdm(range(start_ind, config['num_trials'])):
     # for i in tqdm([1, 2, 4, 7]):
@@ -1284,7 +1320,7 @@ if __name__ == "__main__":
                 params['device'])  # TODO: confirm if this is the correct location
             params['object_location'] = object_location
             # If params['device'] is cuda:1 but the computer only has 1 gpu, change to cuda:0
-            final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node, inits_noise[i], noise_noise[i])
+            final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node, inits_noise[i], noise_noise[i], seed=i)
             #
             # try:
             #     final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node)
