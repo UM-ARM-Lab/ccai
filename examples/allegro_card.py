@@ -174,7 +174,7 @@ class AllegroCard(AllegroManipulationExternalContactProblem):
 #             kwargs.pop('device')
 #         super().__init__(*args, **kwargs, N=1, device='cpu')
 
-def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
+def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None, seed=None):
     "only turn the valve once"
     num_fingers = len(params['fingers'])
     state = env.get_state()
@@ -279,7 +279,9 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None,):
         fingers = params['fingers']
         problem = DummyProblem(params['dx'], params['T'])
         planner = Diffusion_Policy(problem, params)
-
+        if seed is not None:
+            torch.manual_seed(seed)
+            np.random.seed(seed)
     # warm-starting using learned sampler
     trajectory_sampler = None
     model_path = params.get('model_path', None)
@@ -1088,7 +1090,7 @@ if __name__ == "__main__":
                 params['device'])  # TODO: confirm if this is the correct location
             params['object_location'] = object_location
             # If params['device'] is cuda:1 but the computer only has 1 gpu, change to cuda:0
-            final_distance_to_goal = do_trial(env, params, fpath, inits_noise[i], noise_noise[i])
+            final_distance_to_goal = do_trial(env, params, fpath, inits_noise[i], noise_noise[i], seed=i)
         print(results)
 
     gym.destroy_viewer(viewer)

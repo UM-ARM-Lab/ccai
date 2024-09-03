@@ -776,7 +776,7 @@ Current yaw: tensor(-0.4499, device='cuda:0')
 Sampling time 3.554557810000915
 No readings from camera.
 Solve time for step 1 29.611777782440186
-Current yaw: tensor(-0.4593, device='cuda:0')
+Current yaw: tensor(-0.4593, device='cuda:0')b  
 No readings from camera.
 No readings from camera.
 Solve time for step 2 8.163954973220825

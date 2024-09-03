@@ -636,8 +636,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             #     sim_rollout = rollout_trajectory_in_sim(env_sim_rollout, initial_samples[i])
             #     sim_rollouts[i] = sim_rollout
         if initial_samples is not None:
-            # if params['mode'] == 'hardware' and mode == 'turn':
-            #     initial_samples[..., 30:] = 1.5 * torch.randn(params['N'], params['T']+1, 6, device=initial_samples.device)
+            if params['mode'] == 'hardware' and mode == 'turn':
+                initial_samples[..., 30:] = 1.5 * torch.randn(params['N'], params['T']+1, 6, device=initial_samples.device)
             
             initial_samples = _full_to_partial(initial_samples, mode)
             initial_x = initial_samples[:, 1:, :planner.problem.dx]
@@ -1045,6 +1045,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             for x in best_traj[:, :4 * num_fingers]:
                 action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
                 env.step(action)
+                if params['mode'] == 'hardware':
+                    set_state = env.get_state()['q'].to(device=env.device)
+                    # print(set_state.shape)
+                    sim_viz_env.set_pose(set_state)            
             if params['mode'] == 'hardware':
                 input("Pregrasp complete. Ready to execute. Press <ENTER> to continue.")
             continue
@@ -1196,6 +1200,8 @@ if __name__ == "__main__":
                           num_repeat=10)
         env.get_state()
         root_coor, root_ori = env.obj_reader.get_state()
+        print('Root coor:', root_coor)
+        print('Root ori:', root_ori)
         root_coor = root_coor / 1000 # convert to meters
         # robot_p = np.array([-0.025, -0.1, 1.33])
         robot_p = np.array([0, -0.095, 1.33])
@@ -1297,9 +1303,9 @@ if __name__ == "__main__":
     start_ind = 0 if config['experiment_name'] == 'allegro_screwdriver_csvto_diff_sine_cosine_eps_.015_2.5_damping_pi_6' else 0
     for i in tqdm(range(start_ind, config['num_trials'])):
     # for i in tqdm([1, 2, 4, 7]):
-        
-        torch.manual_seed(i)
-        np.random.seed(i)
+        if config['mode'] != 'hardware':
+            torch.manual_seed(i)
+            np.random.seed(i)
 
         goal = torch.tensor([0, 0, float(config['goal'])])
         # goal = goal + 0.025 * torch.randn(1) + 0.2

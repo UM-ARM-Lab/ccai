@@ -176,14 +176,16 @@ class ObjectPoseReader:
             # root_coor is weighted average of the root coor of the screwdriver
             root_coor = (np.array(root_coors) * areas).sum(axis=0)
 
-            root_coor += np.array([-8, 0, 2])
+            root_coor += np.array([-4, 0, 5])
+            # root_coor += np.array([-4, -4, 6])
+            # root_coor += np.array([-8, 8, 6])
 
             screwdriver_ori_euler = (np.array(screwdriver_ori_eulers) * areas).sum(axis=0)
             screwdriver_ori_euler = screwdriver_ori_euler / 180 * np.pi # change to radian
             # cv2.imshow('frame', frame) # debug
             return root_coor, screwdriver_ori_euler
         else:
-            print("No readings from camera.")
+            print(f"No readings from camera, {len(markerCorners), markerIds.max()}.")
             return None, None
     def get_robot_frame(self):
         
