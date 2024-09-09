@@ -57,10 +57,16 @@ class ObjectPoseReader:
                                                     [0, 1, 0, 55],
                                                     [0, 0, 1, -120],
                                                     [0, 0, 0, 1]])
-                world2hand_center = np.array([[0.7071068, 0, 0.7071068, 0],
+                # assume 40 degrees rotation around y axis
+                world2hand_center = np.array([[0.7660444, 0, 0.6427876, 0],
                                             [0, 1, 0, 0],
-                                            [-0.7071068, 0, 0.7071068, 0],
+                                            [-0.6427876, 0, 0.7660444, 0],
                                             [0, 0, 0, 1]])
+                # assume 45 degrees rotation around y axis
+                # world2hand_center = np.array([[0.7071068, 0, 0.7071068, 0],
+                #                             [0, 1, 0, 0],
+                #                             [-0.7071068, 0, 0.7071068, 0],
+                #                             [0, 0, 0, 1]])
                 self.__world2palm_marker =  hand_center2palm_marker @ world2hand_center
                 # self.__world2palm_marker = np.array([[0.7071068, 0, -0.7071068, -25],
                 #                                     [0, 1, 0, -50],
