@@ -625,8 +625,6 @@ def add_trajectories(trajectories, best_traj, axes, env, sim, gym, viewer, confi
     M = len(trajectories)
     T = len(best_traj)
     fingers = copy.copy(config['fingers'])
-    if 'exclude_index' in config.keys() and config['exclude_index']:
-        fingers.remove('index')
     num_fingers = len(fingers)
     obj_dof = config['obj_dof']
     if M > 0:

@@ -591,13 +591,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
     state = env.get_state()
     start = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
-    if params['exclude_index']:
-            turn_problem_fingers = copy.copy(params['fingers'])
-            turn_problem_fingers.remove('index')
-            turn_problem_start = start[4:4 * num_fingers + obj_dof]
-    else:
-        turn_problem_fingers = params['fingers']
-        turn_problem_start = start[:4 * num_fingers + obj_dof]
+    turn_problem_fingers = params['fingers']
+    turn_problem_start = start[:4 * num_fingers + obj_dof]
     turn_problem = AllegroScrewdriver(
         start=turn_problem_start,
         goal=params['screwdriver_goal'],
@@ -641,10 +636,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         ee = state2ee_pos(start[:4 * num_fingers], turn_problem.ee_names[finger])
         finger_traj_history[finger].append(ee.detach().cpu().numpy())
 
-    if params['exclude_index']:
-        num_fingers_to_plan = num_fingers - 1
-    else:
-        num_fingers_to_plan = num_fingers
+    num_fingers_to_plan = num_fingers
     info_list = []
     validity_flag = True
     warmup_time = 0
@@ -655,10 +647,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
         actual_trajectory.append(state['q'][:, :4 * num_fingers + obj_dof].squeeze(0).clone())
         start_time = time.time()
-        if params['exclude_index']:
-            best_traj, trajectories = turn_planner.step(start[4:4 * num_fingers + obj_dof])
-        else:
-            best_traj, trajectories = turn_planner.step(start[:4 * num_fingers + obj_dof])
+        best_traj, trajectories = turn_planner.step(start[:4 * num_fingers + obj_dof])
         
         #debug only
         # turn_problem.save_history(f'{fpath.resolve()}/op_traj.pkl')
@@ -682,10 +671,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
         if params['visualize_plan']:
             traj_for_viz = best_traj[:, :turn_problem.dx]
-            if params['exclude_index']:
-                traj_for_viz = torch.cat((start[4:4 + turn_problem.dx].unsqueeze(0), traj_for_viz), dim=0)
-            else:
-                traj_for_viz = torch.cat((start[:turn_problem.dx].unsqueeze(0), traj_for_viz), dim=0)
+            traj_for_viz = torch.cat((start[:turn_problem.dx].unsqueeze(0), traj_for_viz), dim=0)
             tmp = torch.zeros((traj_for_viz.shape[0], 1), device=best_traj.device) # add the joint for the screwdriver cap
             traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
             # traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof] = axis_angle_to_euler(traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof])
@@ -712,11 +698,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             print(action[:, :4 * num_fingers_to_plan].reshape(num_fingers_to_plan, 4))
         # print(action)
         action = action[:, :4 * num_fingers_to_plan]
-        if params['exclude_index']:
-            action = start.unsqueeze(0)[:, 4:4 * num_fingers].to(action.device) + action
-            action = torch.cat((start.unsqueeze(0)[:, :4], action), dim=1) # add the index finger back
-        else:
-            action = action + start.unsqueeze(0)[:, :4 * num_fingers].to(action.device) # NOTE: this is required since we define action as delta action
+        action = action + start.unsqueeze(0)[:, :4 * num_fingers].to(action.device) # NOTE: this is required since we define action as delta action
         if params['mode'] == 'hardware':
             set_state = env.get_state()['all_state'].to(device=env.device)
             set_state = torch.cat((set_state, torch.zeros(1).float().to(env.device)), dim=0)
