@@ -4,7 +4,7 @@ receding_horizon: False
 num_steps: 12
 num_trials: 20
 visualize: True
-experiment_name: 'allegro_screwdriver_paper_computation_time'
+experiment_name: 'allegro_screwdriver_w_arm'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -12,9 +12,11 @@ object_type: 'screwdriver'
 sim_device: 'cpu'
 friction_coefficient: 0.95
 kp: 3.0
-visualize_plan: False
+visualize_plan: True
 optimize_force: True
 force_balance: False  # in addition to the torque balance, do we also need force balance, just for the screwdriver turning experiment w\o slot. 
+use_arm: True
+gravity: False  # whether to use gravity in the simulation NOTE: this is set to be False for debugging
 controllers:
   csvgd:
     # N: 16

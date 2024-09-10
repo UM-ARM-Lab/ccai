@@ -11,7 +11,7 @@ from scipy.spatial.transform import Rotation as R
 full_finger_list = ['index', 'middle', 'ring', 'thumb']
 
 
-def partial_to_full_state(partial, fingers):
+def partial_to_full_state(partial, fingers, use_arm=False):
     """
     fingers: which fingers are in the partial state
     :params partial: B x 8 joint configurations for index and thumb
@@ -19,10 +19,17 @@ def partial_to_full_state(partial, fingers):
 
     # assume that default is zeros, but could change
     """
+    if use_arm:
+        arm_q = partial[..., :7]
+        partial_fingers = partial[..., 7:]
+    else:
+        partial_fingers = partial
     num_fingers = len(fingers)
-    partial_fingers = torch.chunk(partial, chunks=num_fingers, dim=-1)
+    partial_fingers = torch.chunk(partial_fingers, chunks=num_fingers, dim=-1)
     partial_dict = dict(zip(fingers, partial_fingers))
     full = []
+    if use_arm:
+        full.append(arm_q)
     for i, finger in enumerate(full_finger_list):
         if finger in fingers:
             full.append(partial_dict[finger])
@@ -32,16 +39,21 @@ def partial_to_full_state(partial, fingers):
     return full
 
 
-def full_to_partial_state(full, fingers):
+def full_to_partial_state(full, fingers, use_arm=False):
     """
     :params partial: B x 8 joint configurations for index and thumb
     :return full: B x 16 joint configuration for full hand
 
     # assume that default is zeros, but could change
     """
-    index, mid, ring, thumb = torch.chunk(full, chunks=4, dim=-1)
+    if use_arm:
+        arm_q = full[..., :7]
+        full_finger = full[..., 7:]
+    index, mid, ring, thumb = torch.chunk(full_finger, chunks=4, dim=-1)
     full_dict = dict(zip(full_finger_list, [index, mid, ring, thumb]))
     partial = []
+    if use_arm:
+        partial.append(arm_q)
     for finger in fingers:
         partial.append(full_dict[finger])
     partial = torch.cat(partial, dim=-1)
@@ -122,7 +134,7 @@ def state2ee_pos(state, finger_name, fingers, chain, frame_indices, world_trans)
     return ee_p
 
 
-def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headless=False):
+def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, use_arm=False, headless=False):
     num_fingers = len(fingers)
     # for a single trajectory
     T, dxu = trajectory.shape
@@ -131,17 +143,22 @@ def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headl
     vis.create_window(width=int(800), height=int(600), visible=not headless)
     # update camera
     vis.get_render_option().mesh_show_wireframe = True
+    if use_arm:
+        robot_dof = 7 + 4 * num_fingers
+    else:
+        robot_dof = 4 * num_fingers
     for t in range(T):
         vis.clear_geometries()
-        q = trajectory[t, : 4 * num_fingers]
-        theta = trajectory[t, 4 * num_fingers: 4 * num_fingers + obj_dof]
-        meshes = scene.get_visualization_meshes(partial_to_full_state(q.unsqueeze(0), fingers).to(device=scene.device),
+        q = trajectory[t, : robot_dof]
+        theta = trajectory[t, robot_dof: robot_dof + obj_dof]
+        meshes = scene.get_visualization_meshes(partial_to_full_state(q.unsqueeze(0), fingers, use_arm=use_arm).to(device=scene.device),
                                                 theta.unsqueeze(0).to(device=scene.device))
         for mesh in meshes:
             vis.add_geometry(mesh)
         ctr = vis.get_view_control()
         # parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-04-03-13-14-26.json")
-        parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_screwdriver_translation.json")
+        # parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_screwdriver_translation.json")
+        parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_screwdriver_w_arm.json")
         ctr.convert_from_pinhole_camera_parameters(parameters)
         vis.poll_events()
         vis.update_renderer()
