@@ -57,16 +57,6 @@ class ALlegroScrewdriverContact(AllegroContactProblem):
                                                         object_asset_pos, fingers, obj_dof_code, obj_joint_dim,
                                                         fixed_obj, collision_checking, device)
         self.default_index_ee_loc_in_screwdriver = torch.tensor([0.0087, -0.02, 0.1293], device=device).unsqueeze(0)
-    # def _cost(self, xu, start, goal):
-    #     loss = super(ALlegroScrewdriverContact, self)._cost(xu, start, goal)
-    #     state = xu[:, :self.dx]  # state dim = 9
-    #     state = torch.cat((start.reshape(1, self.dx), state), dim=0)  #
-    #     state = torch.cat((state, self.start_obj_pose.unsqueeze(0).repeat((self.T + 1, 1))), dim=1)
-    #     index_ee_locs = self._ee_locations_in_screwdriver(partial_to_full_state(state[:, :4*self.num_fingers], fingers=self.fingers),
-    #                                                 state[:, 4*self.num_fingers: 4*self.num_fingers + self.obj_dof],
-    #                                                 queried_fingers=['index'])
-    #     index_pos_loss = 100000 * torch.sum((index_ee_locs[:,0] - self.default_index_ee_loc_in_screwdriver.unsqueeze(0)) ** 2)
-    #     return loss + index_pos_loss
 class AllegroScrewdriver(AllegroValveTurning):
     def get_constraint_dim(self, T):
         self.friction_polytope_k = 4
