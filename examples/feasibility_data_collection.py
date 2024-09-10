@@ -523,9 +523,6 @@ class AllegroScrewdriver(AllegroValveTurning):
             return h, grad_h, hess_h
         return h, grad_h, None
     
-  
-    
-    
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     "only turn the screwdriver once"
     screwdriver_goal = params['screwdriver_goal'].cpu()
@@ -659,6 +656,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     validity_flag = True
     warmup_time = 0
 
+    # list of planned trajectories for feasibility dataset
+    planned_traj_list = []
+
     for k in range(params['num_steps']):
         state = env.get_state()
         start = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
@@ -679,6 +679,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         else:
             duration += solve_time
         planned_theta_traj = best_traj[:, 4 * num_fingers_to_plan: 4 * num_fingers_to_plan + obj_dof].detach().cpu().numpy()
+        
         print(f"current theta: {state['q'][0, -(obj_dof+1): -1].detach().cpu().numpy()}")
         print(f"planned theta: {planned_theta_traj}")
         # add trajectory lines to sim
@@ -709,6 +710,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         
         x = best_traj[0, :turn_problem.dx+turn_problem.du]
         x = x.reshape(1, turn_problem.dx+turn_problem.du)
+
+        # record planned trajectory for feasibility dataset
+        planned_traj_list.append(x.detach().cpu().numpy())
+
         turn_problem._preprocess(best_traj.unsqueeze(0))
         equality_constr_dict = turn_problem._con_eq(best_traj.unsqueeze(0), compute_grads=False, compute_hess=False, verbose=True)
         inequality_constr_dict = turn_problem._con_ineq(best_traj.unsqueeze(0), compute_grads=False, compute_hess=False, verbose=True)
@@ -787,8 +792,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     plt.close()
     # plt.show()
 
-
-
     state = env.get_state()
     state = state['q'].reshape(4 * num_fingers + obj_dof + 1).to(device=params['sim_device'])
     actual_trajectory.append(state.clone()[:4 * num_fingers + obj_dof])
@@ -814,7 +817,20 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     'final_distance_to_goal': final_distance_to_goal, 
     'validity_flag': validity_flag,
     'avg_online_time': duration / (params["num_steps"] - 1)}
+
+
+    traj = actual_trajectory.cpu().numpy()
+    plans = planned_traj_list
+    contact_mode = "rolling"
+    final_cost = 0
+
+    data['traj'].append(traj)
+    data['plans'].append(plans)
+    data['contact_mode'].append(contact_mode)
+    data['final_cost'].append(final_cost)
+
     return ret
+    
 
 if __name__ == "__main__":
     # get config
@@ -827,83 +843,22 @@ if __name__ == "__main__":
     sim_env = None
     ros_copy_node = None
 
-    if config['mode'] == 'hardware':
-        from hardware.hardware_env import HardwareEnv
-        # TODO, think about how to read that in simulator
-        # default_dof_pos = torch.cat((torch.tensor([[0., 0.5, 0.7, 0.7]]).float(),
-        #                             torch.tensor([[0., 0.5, 0.7, 0.7]]).float(),
-        #                             torch.tensor([[0., 0.5, 0.0, 0.7]]).float(),
-        #                             torch.tensor([[1.3, 0.3, 0.2, 1.1]]).float()),
-        #                             dim=1)
-        default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
-                                    torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float(),
-                                    torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
-                                    torch.tensor([[1.2, 0.3, 0.3, 1.2]]).float()),
-                                    dim=1)
-        env = HardwareEnv(default_dof_pos[:, :16], 
-                          finger_list=config['fingers'], 
-                          kp=config['kp'], 
-                          obj='screwdriver',
-                          mode='relative',
-                          gradual_control=True,
-                          num_repeat=10)
-        root_coor, root_ori = env.obj_reader.get_state()
-        root_coor = root_coor / 1000 # convert to meters
-        # robot_p = np.array([-0.025, -0.1, 1.33])
-        robot_p = np.array([0, -0.095, 1.33])
-        root_coor = root_coor + robot_p
-        sim_env = RosAllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
-                                 use_cartesian_controller=False,
-                                 viewer=True,
-                                 steps_per_action=60,
-                                 friction_coefficient=1.0,
-                                 device=config['sim_device'],
-                                 valve=config['object_type'],
-                                 video_save_path=img_save_dir,
-                                 joint_stiffness=config['kp'],
-                                 fingers=config['fingers'],
-                                 table_pose=root_coor,
-                                 )
-        sim, gym, viewer = sim_env.get_sim()
-        assert (np.array(sim_env.robot_p) == robot_p).all()
-        assert (sim_env.default_dof_pos[:, :16] == default_dof_pos.to(config['sim_device'])).all()
-        env.world_trans = sim_env.world_trans
-        env.joint_stiffness = sim_env.joint_stiffness
-        env.device = sim_env.device
-        env.table_pose = sim_env.table_pose
-    else:
-        env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
-                                    use_cartesian_controller=False,
-                                    viewer=True,
-                                    steps_per_action=60,
-                                    friction_coefficient=1.0,
-                                    device=config['sim_device'],
-                                    video_save_path=img_save_dir,
-                                    joint_stiffness=config['kp'],
-                                    fingers=config['fingers'],
-                                    gradual_control=True,
-                                    )
-        # env_world_trans = env.world_trans.to(device=algorithm_device)
-        sim, gym, viewer = env.get_sim()
-    if config['mode'] == 'hardware_copy':
-        from hardware.hardware_env import RosNode
-        ros_copy_node = RosNode()
-        
 
-    
-
-    
-
+    env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
+                                use_cartesian_controller=False,
+                                viewer=True,
+                                steps_per_action=60,
+                                friction_coefficient=1.0,
+                                device=config['sim_device'],
+                                video_save_path=img_save_dir,
+                                joint_stiffness=config['kp'],
+                                fingers=config['fingers'],
+                                gradual_control=True,
+                                )
+    # env_world_trans = env.world_trans.to(device=algorithm_device)
+    sim, gym, viewer = env.get_sim()
 
     state = env.get_state()
-    # try:
-    #     while True:
-    #         start = env.get_state()['q'][:, :-1]
-    #         env.step(start)
-    #         print('waiting for you to finish camera adjustment, ctrl-c when done')
-    #         time.sleep(0.1)
-    # except KeyboardInterrupt:
-    #     pass
 
     results = {}
 
@@ -937,13 +892,16 @@ if __name__ == "__main__":
         results[controller]['validity_flag'] = []
         results[controller]['avg_online_time'] = []
 
+    # initialization of data dict for feasibility dataset. populated inside do_trial
+    data = {'traj': [], 'plans': [], 'contact_mode': [], 'final_cost': []}
+
     for i in tqdm(range(config['num_trials'])):
         goal = - 90 / 180 * torch.tensor([0, 0, np.pi])
         # goal = goal + 0.025 * torch.randn(1) + 0.2
         for controller in config['controllers'].keys():
             validity = False
             env.reset()
-            fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_{i + 1}')
+            fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}')
             pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
             # set up params
             params = config.copy()
@@ -959,6 +917,11 @@ if __name__ == "__main__":
             results[controller]['dist2goal'].append(ret['final_distance_to_goal'])
             results[controller]['validity_flag'].append(ret['validity_flag'])
             results[controller]['avg_online_time'].append(ret['avg_online_time'])
+
+            # save feasibility dataset
+            with open(f'{fpath.resolve()}/feasibility_data.pkl', 'wb') as f:
+                pkl.dump(data, f)
+            
         print(results)
 
     for key in results[controller].keys():
