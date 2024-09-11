@@ -75,37 +75,45 @@ if __name__ == "__main__":
     default_poses = list(fk.values())
     
 
+    cylinder_center = np.array([[0,0,0]])
+    cylinder_radius = 0.0
+    cylinder_height = 0.0
+
+    def get_circle_xy(radius, theta_0, theta_1):
+        theta = np.random.rand(1) * (theta_1 - theta_0) + theta_0
+        x = radius * np.cos(theta)
+        y = radius * np.sin(theta)
+        return x.item(), y.item()
+
     def get_index_goal(delta = 0):
-        goal = default_poses[0].clone()
-        index_radius = 0.00
-        index_origin = goal.get_matrix().cpu().numpy()[:, :3, 3] 
-        circle_y = float(np.random.rand(1)) * index_radius
-        if np.random.rand(1) > 0.5:
-            circle_y = -circle_y
-        circle_x = float(np.sqrt(index_radius**2 - circle_y**2))
-        if np.random.rand(1) > 0.5:
-            circle_x = -circle_x
-        index_pos = index_origin + np.array([[circle_x - delta, circle_y , 0]])
-        index_pos = torch.tensor(index_pos).to(device)
-        goal._matrix[:, :3, 3] = index_pos.clone()
-        return goal
-    
+        goal_index = default_poses[0].clone()
+
+        circle_x, circle_y = get_circle_xy(cylinder_radius, 0, 3.14)
+
+        pos_index = cylinder_center + np.array([[circle_x - delta, circle_y, cylinder_height/2]])
+        pos_index = torch.tensor(pos_index).to(device)
+        goal_index._matrix[:, :3, 3] = pos_index.clone()
+        return goal_index
+
     def get_middle_goal(delta = 0):
         goal_middle = default_poses[1].clone()
-        origin_middle = goal_middle.get_matrix().cpu().numpy()[:, :3, 3]  
         
         z_offset_range = 0.012
         z_offset = float(np.random.rand(1)) * 2*z_offset_range - z_offset_range
-        pos_middle =origin_middle + np.array([[0,0,z_offset]])
+        circle_x, circle_y = get_circle_xy(cylinder_radius, 0, 3.14)
+
+        pos_middle = cylinder_center + np.array([[circle_x - delta, circle_y, z_offset]])
         pos_middle = torch.tensor(pos_middle).to(device)
         goal_middle._matrix[:, :3, 3] = pos_middle
         return goal_middle
     
     def get_thumb_goal(delta = 0):
         goal_thumb = default_poses[2].clone()
-        origin_thumb = goal_thumb.get_matrix().cpu().numpy()[:, :3, 3]  
-        
-        pos_thumb =origin_thumb + np.array([[0,0,delta]])
+        z_offset_range = 0.012
+        z_offset = float(np.random.rand(1)) * 2*z_offset_range - z_offset_range
+        circle_x, circle_y = get_circle_xy(cylinder_radius, 0, 3.14)
+
+        pos_thumb = cylinder_center + np.array([[circle_x - delta, circle_y, z_offset]])
         pos_thumb = torch.tensor(pos_thumb).to(device)
         goal_thumb._matrix[:, :3, 3] = pos_thumb
         return goal_thumb
@@ -128,7 +136,7 @@ if __name__ == "__main__":
         #goal_poses = default_poses.copy()
         goal_poses = [get_index_goal(delta_0), get_middle_goal(delta_1), get_thumb_goal(delta_2)]
         #delta_1 -= 0.003
-        print(delta_1)
+        #print(delta_1)
 
         print(goal_poses[0].get_matrix().cpu().numpy()[:, :3, 3])
         
