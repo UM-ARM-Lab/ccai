@@ -121,20 +121,20 @@ def contact_finger_constraints(func):
     return wrapper
 
 
-def state2ee_pos(state, finger_name, fingers, chain, frame_indices, world_trans):
+def state2ee_pos(state, finger_name, fingers, chain, frame_indices, world_trans, use_arm=False):
     """
     :params state: B x 8 joint configuration for full hand
     :return ee_pos: B x 3 position of ee
 
     """
-    fk_dict = chain.forward_kinematics(partial_to_full_state(state, fingers), frame_indices=frame_indices)
+    fk_dict = chain.forward_kinematics(partial_to_full_state(state, fingers, use_arm=use_arm), frame_indices=frame_indices)
     m = world_trans.compose(fk_dict[finger_name]).to(state.device)
     points_finger_frame = torch.tensor([0.00, 0.03, 0.00], device=state.device).unsqueeze(0)
     ee_p = m.transform_points(points_finger_frame).squeeze(-2)
     return ee_p
 
 
-def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, use_arm=False, headless=False):
+def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, camera_params=None, use_arm=False, headless=False):
     num_fingers = len(fingers)
     # for a single trajectory
     T, dxu = trajectory.shape
@@ -158,7 +158,10 @@ def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, use_a
         ctr = vis.get_view_control()
         # parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-04-03-13-14-26.json")
         # parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_screwdriver_translation.json")
-        parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_screwdriver_w_arm.json")
+        if camera_params == "screwdriver_w_arm":
+            parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_screwdriver_w_arm.json")
+        elif camera_params == "screwdriver":
+            parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_screwdriver_translation.json")
         ctr.convert_from_pinhole_camera_parameters(parameters)
         vis.poll_events()
         vis.update_renderer()

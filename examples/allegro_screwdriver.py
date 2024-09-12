@@ -528,7 +528,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         force_balance=params['force_balance'],
         collision_checking=params['collision_checking'],
         obj_gravity=params['obj_gravity'],
-        contact_region=params['contact_region']
+        contact_region=params['contact_region'],
         static_init=params['static_init'],
     )
     turn_planner = PositionControlConstrainedSVGDMPC(turn_problem, params)
