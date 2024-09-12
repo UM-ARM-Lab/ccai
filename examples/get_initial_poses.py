@@ -70,14 +70,17 @@ if __name__ == "__main__":
 
     fk = forward_kinematics(dof_pos[:,:16])
 
-
     # list of poses for each of the three fingers, each pose is a Transform3d object
     default_poses = list(fk.values())
     
-
-    cylinder_center = np.array([[0,0,0]])
-    cylinder_radius = 0.0
-    cylinder_height = 0.0
+    world_trans = env.world_trans
+    def world_to_robot_frame(point):
+        tform = world_trans.inverse()
+        return tform.transform_points(point.reshape(1, 3)) - tform.get_matrix()[:, :3, 3]
+    
+    cylinder_center = np.array([[0.08439247, 0.05959691, 0.05529295]])
+    cylinder_radius = 0.01
+    cylinder_height = 0.03
 
     def get_circle_xy(radius, theta_0, theta_1):
         theta = np.random.rand(1) * (theta_1 - theta_0) + theta_0
@@ -89,8 +92,12 @@ if __name__ == "__main__":
         goal_index = default_poses[0].clone()
 
         circle_x, circle_y = get_circle_xy(cylinder_radius, 0, 3.14)
+        z_offset = cylinder_height/2
 
-        pos_index = cylinder_center + np.array([[circle_x - delta, circle_y, cylinder_height/2]])
+        offset_world_frame = torch.tensor([[circle_x - delta, circle_y, z_offset]]).to(device)
+        offset_robot_frame = world_to_robot_frame(offset_world_frame).cpu().numpy()
+
+        pos_index = cylinder_center + offset_robot_frame
         pos_index = torch.tensor(pos_index).to(device)
         goal_index._matrix[:, :3, 3] = pos_index.clone()
         return goal_index
@@ -102,7 +109,10 @@ if __name__ == "__main__":
         z_offset = float(np.random.rand(1)) * 2*z_offset_range - z_offset_range
         circle_x, circle_y = get_circle_xy(cylinder_radius, 0, 3.14)
 
-        pos_middle = cylinder_center + np.array([[circle_x - delta, circle_y, z_offset]])
+        offset_world_frame = torch.tensor([[circle_x - delta, circle_y, z_offset]]).to(device)
+        offset_robot_frame = world_to_robot_frame(offset_world_frame).cpu().numpy()
+
+        pos_middle = cylinder_center + offset_robot_frame
         pos_middle = torch.tensor(pos_middle).to(device)
         goal_middle._matrix[:, :3, 3] = pos_middle
         return goal_middle
@@ -113,7 +123,13 @@ if __name__ == "__main__":
         z_offset = float(np.random.rand(1)) * 2*z_offset_range - z_offset_range
         circle_x, circle_y = get_circle_xy(cylinder_radius, 0, 3.14)
 
-        pos_thumb = cylinder_center + np.array([[circle_x - delta, circle_y, z_offset]])
+        offset_world_frame = torch.tensor([[circle_x - delta, circle_y, z_offset]]).to(device)
+        offset_robot_frame = torch.tensor([[0,0,delta]])
+        offset_robot_frame = world_to_robot_frame(offset_world_frame).cpu().numpy()
+        
+        og = default_poses.copy()[2].get_matrix().cpu().numpy()[:, :3, 3]
+        #pos_thumb = cylinder_center + offset_robot_frame
+        pos_thumb = og + offset_robot_frame
         pos_thumb = torch.tensor(pos_thumb).to(device)
         goal_thumb._matrix[:, :3, 3] = pos_thumb
         return goal_thumb
@@ -130,15 +146,21 @@ if __name__ == "__main__":
     # thumb z +- 0.012
     initial_poses = []
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
+
+    #print(default_poses[0].get_matrix().cpu().numpy()[:, :3, 3])
+
     for i in range(1000):
         # time.sleep(1)
         # env.reset(dof_pos)
         #goal_poses = default_poses.copy()
-        goal_poses = [get_index_goal(delta_0), get_middle_goal(delta_1), get_thumb_goal(delta_2)]
-        #delta_1 -= 0.003
+
+        #goal_poses = [get_index_goal(delta_0), get_middle_goal(delta_1), get_thumb_goal(delta_2)]
+        goal_poses = default_poses.copy()
+        goal_poses[2] = get_thumb_goal(delta_2)
+        delta_2 += 0.002
         #print(delta_1)
 
-        print(goal_poses[0].get_matrix().cpu().numpy()[:, :3, 3])
+        #print(goal_poses[0].get_matrix().cpu().numpy()[:, :3, 3])
         
         sol = ik.do_IK(goal_poses, ignore_dims=[3,4,5], current= partial_default_dof_pos.copy()).view(1, 12)
         solved_pos = torch.cat((sol.clone()[:,:8], 
