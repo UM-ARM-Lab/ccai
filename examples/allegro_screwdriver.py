@@ -107,6 +107,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                  optimize_force=False,
                  turn=False,
                  obj_gravity=False,
+                 min_force_dict=None,
                  device='cuda:0', **kwargs):
         self.obj_mass = 0.1
         self.obj_dof_type = None
@@ -127,7 +128,8 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                                                  obj_dof=obj_dof,
                                                  obj_ori_rep=obj_ori_rep, obj_joint_dim=1,
                                                  optimize_force=optimize_force, device=device,
-                                                 turn=turn, obj_gravity=obj_gravity)
+                                                 turn=turn, obj_gravity=obj_gravity,
+                                                 min_force_dict=min_force_dict, **kwargs)
         self.friction_coefficient = friction_coefficient
 
     def _cost(self, xu, start, goal):
@@ -139,17 +141,6 @@ class AllegroScrewdriver(AllegroManipulationProblem):
         upright_cost = 500 * torch.sum(
             (state[:, -self.obj_dof:-1]) ** 2)  # the screwdriver should only rotate in z direction
         return smoothness_cost + upright_cost + super()._cost(xu, start, goal)
-    
-    
-
-
-# class IpoptScrewdriver(AllegroScrewdriver, IpoptProblem):
-
-#     def __init__(self, *args, **kwargs):
-#         device = kwargs.get('device', None)
-#         if device is not None:
-#             kwargs.pop('device')
-#         super().__init__(*args, **kwargs, N=1, device='cpu')
 
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noise=None, noise_noise=None, sim=None, seed=None):
     "only turn the valve once"
@@ -172,6 +163,18 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         else:
             fingers = ['index'] + params['fingers']
 
+        # if params['mode'] == 'hardware':
+        min_force_dict = {
+            'thumb': 1.,
+            'middle': 1.,
+            'index': .0,
+        }
+
+        # min_force_dict = {
+        #     'thumb': 0,
+        #     'middle': 0,
+        #     'index': 0,
+        # }
         # initial grasp
         pregrasp_params = copy.deepcopy(params)
         pregrasp_params['warmup_iters'] = 80
@@ -211,6 +214,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             optimize_force=params['optimize_force'],
             default_dof_pos=env.default_dof_pos[:, :16],
             obj_gravity=params.get('obj_gravity', False),
+            min_force_dict=min_force_dict
         )
         thumb_and_middle_regrasp_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
@@ -229,6 +233,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             optimize_force=params['optimize_force'],
             default_dof_pos=env.default_dof_pos[:, :16],
             obj_gravity=params.get('obj_gravity', False),
+            min_force_dict=min_force_dict
         )
         turn_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
@@ -247,6 +252,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             default_dof_pos=env.default_dof_pos[:, :16],
             turn=True,
             obj_gravity=params.get('obj_gravity', False),
+            min_force_dict=min_force_dict
         )
         pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
         index_regrasp_planner = PositionControlConstrainedSVGDMPC(index_regrasp_problem, params)
@@ -636,9 +642,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             #     sim_rollout = rollout_trajectory_in_sim(env_sim_rollout, initial_samples[i])
             #     sim_rollouts[i] = sim_rollout
         if initial_samples is not None:
-            if params['mode'] == 'hardware' and mode == 'turn':
-                initial_samples[..., 30:] = 1.5 * torch.randn(params['N'], params['T']+1, 6, device=initial_samples.device)
-            
+            # if params['mode'] == 'hardware' and mode == 'turn':
+            #     initial_samples[..., 30:] = 1.5 * torch.randn(params['N'], params['T']+1, 6, device=initial_samples.device)
+                # initial_samples[..., 30:] *= 2
             initial_samples = _full_to_partial(initial_samples, mode)
             initial_x = initial_samples[:, 1:, :planner.problem.dx]
             initial_u = initial_samples[:, :-1, -planner.problem.du:]
@@ -724,9 +730,24 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             # execute the action
             state = env.get_state()
             state = state['q'].reshape(-1).to(device=params['device'])
-            yaw = state[:15][-1]
-            print('Current yaw:', yaw)
+            ori = state[:15][-3:]
+            print('Current ori:', ori)
             # record the actual trajectory
+            if mode == 'turn':
+                index_force = torch.norm(best_traj[..., 27:30], dim=-1)
+                middle_force = torch.norm(best_traj[..., 30:33], dim=-1)
+                thumb_force = torch.norm(best_traj[..., 33:36], dim=-1)
+                print('Middle force:', middle_force)
+                print('Thumb force:', thumb_force)
+                print('Index force:', index_force)
+            elif mode == 'index':
+                middle_force = torch.norm(best_traj[..., 27:30], dim=-1)
+                thumb_force = torch.norm(best_traj[..., 30:33], dim=-1)
+                print('Middle force:', middle_force)
+                print('Thumb force:', thumb_force)
+            elif mode == 'thumb_middle':
+                index_force = torch.norm(best_traj[..., 27:30], dim=-1)
+                print('Index force:', index_force)
             if params['controller'] != 'diffusion_policy':
                 action = best_traj[0, planner.problem.dx:planner.problem.dx + planner.problem.du]
                 x = best_traj[0, :planner.problem.dx + planner.problem.du]
@@ -749,6 +770,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 # print(set_state.shape)
                 sim_viz_env.set_pose(set_state)
                 # sim_viz_env.step(action)
+                # for _ in range(3):
+                #     sim_viz_env.step(action)
+                state = sim_viz_env.get_state()['q'].reshape(-1).to(device=params['device'])
+                print(state[:15][-3:])
             elif params['mode'] == 'hardware_copy':
                 ros_copy_node.apply_action(partial_to_full_state(action[0], params['fingers']))
 
@@ -899,6 +924,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         closed_set = contact_sequence_sampler.closed_set
         if contact_node_sequence is not None:
             contact_node_sequence = list(contact_node_sequence)
+        pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
+
         with open(f"{fpath}/contact_planning_{stage}.pkl", "wb") as f:
             pkl.dump((contact_node_sequence, closed_set, planning_time, contact_sequence_sampler.iter), f)
         if contact_node_sequence is None:
@@ -956,7 +983,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     sample_contact = params.get('sample_contact', False)
     num_stages = 2 + 3 * (params['num_turns'] - 1)
     if not sample_contact:
-        contact_sequence = ['turn']
+        contact_sequence = ['index', 'turn']
         for k in range(params['num_turns'] - 1):
             contact_options = ['index', 'thumb_middle']
             perm = np.random.permutation(2)
@@ -979,8 +1006,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     for stage in range(num_stages):
         state = env.get_state()
         state = state['q'].reshape(-1)[:15].to(device=params['device'])
-        yaw = state[-1]
-        print('Current yaw:', yaw)
+        ori = state[:15][-3:]
+        yaw = ori[-1]
+        print('Current yaw:', ori)
         # valve_goal = torch.tensor([0, 0, state[-1]]).to(device=params['device'])
 
         # if sample_contact:
@@ -1048,7 +1076,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 if params['mode'] == 'hardware':
                     set_state = env.get_state()['q'].to(device=env.device)
                     # print(set_state.shape)
-                    sim_viz_env.set_pose(set_state)            
+                    sim_viz_env.set_pose(set_state)  
+                    # for i in range(3):
+                    #     sim_viz_env.step(action)
+                    state = sim_viz_env.get_state()['q'].reshape(-1).to(device=params['device'])
+                    print(state[:15][-3:])
             if params['mode'] == 'hardware':
                 input("Pregrasp complete. Ready to execute. Press <ENTER> to continue.")
             continue
@@ -1146,6 +1178,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 data_save[t]['contact_state'] = torch.stack(data_save[t]['contact_state']).cpu().numpy()
             except:
                 pass
+        
+        pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
         pickle.dump(data_save, open(f"{fpath}/traj_data.p", "wb"))
         del data_save
         state = env.get_state()
@@ -1176,9 +1210,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 if __name__ == "__main__":
     # get config
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_diff_sine_cosine_only.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_hardware.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_planned_replanned_hardware.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_sine_cosine_min_force_mag.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_hardware.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_planned_replanned_hardware.yaml').read_text())
     from tqdm import tqdm
 
     sim_env = None
@@ -1199,7 +1233,8 @@ if __name__ == "__main__":
                           gradual_control=True,
                           num_repeat=10)
         env.get_state()
-        root_coor, root_ori = env.obj_reader.get_state()
+        for _ in range(5):
+            root_coor, root_ori = env.obj_reader.get_state()
         print('Root coor:', root_coor)
         print('Root ori:', root_ori)
         root_coor = root_coor / 1000 # convert to meters
@@ -1217,10 +1252,18 @@ if __name__ == "__main__":
                                  joint_stiffness=config['kp'],
                                  fingers=config['fingers'],
                                  table_pose=root_coor,
+                                 gravity=False
                                  )
+        
         sim, gym, viewer = sim_env.get_sim()
         assert (np.array(sim_env.robot_p) == robot_p).all()
         assert (sim_env.default_dof_pos[:, :16] == default_dof_pos.to(config['sim_device'])).all()
+        # for _ in range(1):
+        #     sim_env.step(default_dof_pos[:, :16])
+            # state = sim_env.get_state()
+            # state = state['q'].reshape(-1)[:15]
+
+
         env.world_trans = sim_env.world_trans
         env.joint_stiffness = sim_env.joint_stiffness
         env.device = sim_env.device
@@ -1300,7 +1343,7 @@ if __name__ == "__main__":
         now = datetime.datetime.now().strftime("%m.%d.%y:%I:%M:%S")
     else:
         now = ''
-    start_ind = 0 if config['experiment_name'] == 'allegro_screwdriver_csvto_diff_sine_cosine_eps_.015_2.5_damping_pi_6' else 0
+    start_ind = 0# if config['experiment_name'] == 'allegro_screwdriver_csvto_diff_sine_cosine_eps_.015_2.5_damping_pi_6' else 0
     for i in tqdm(range(start_ind, config['num_trials'])):
     # for i in tqdm([1, 2, 4, 7]):
         if config['mode'] != 'hardware':
@@ -1312,7 +1355,8 @@ if __name__ == "__main__":
         for controller in config['controllers'].keys():
             env.reset()
             fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}.{now}/{controller}/trial_{i + 1}')
-            pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
+            if config['mode'] != 'hardware':
+                pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
             # set up params
             params = config.copy()
             params.pop('controllers')

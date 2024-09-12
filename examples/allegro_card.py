@@ -4,10 +4,11 @@ from isaac_victor_envs.tasks.allegro import AllegroCardSlidingEnv
 
 import numpy as np
 import pickle as pkl
-
+import pickle
 import torch
 import time
 import copy
+from copy import deepcopy
 import yaml
 import pathlib
 from functools import partial
@@ -568,15 +569,17 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None, s
             optimizer_paths.append(copy.deepcopy(planner.path))
             N, T, _ = plans.shape
 
-            contact_distance[T] = torch.stack((planner.problem.data['index']['sdf'].reshape(N, T + 1),
-                                               planner.problem.data['middle']['sdf'].reshape(N, T + 1)),
-                                            #    planner.problem.data['thumb']['sdf'].reshape(N, T + 1)),
-                                              dim=1).detach().cpu()
+            if planner.problem.data is not None:
 
-            contact_points[T] = torch.stack((planner.problem.data['index']['closest_pt_world'].reshape(N, T + 1, 3),
-                                             planner.problem.data['middle']['closest_pt_world'].reshape(N, T + 1, 3)),
-                                            #  planner.problem.data['thumb']['closest_pt_world'].reshape(N, T + 1, 3)),
-                                            dim=2).detach().cpu()
+                contact_distance[T] = torch.stack((planner.problem.data['index']['sdf'].reshape(N, T + 1),
+                                                planner.problem.data['middle']['sdf'].reshape(N, T + 1)),
+                                                #    planner.problem.data['thumb']['sdf'].reshape(N, T + 1)),
+                                                dim=1).detach().cpu()
+
+                contact_points[T] = torch.stack((planner.problem.data['index']['closest_pt_world'].reshape(N, T + 1, 3),
+                                                planner.problem.data['middle']['closest_pt_world'].reshape(N, T + 1, 3)),
+                                                #  planner.problem.data['thumb']['closest_pt_world'].reshape(N, T + 1, 3)),
+                                                dim=2).detach().cpu()
 
             # execute the action
             # action = best_traj[0, planner.problem.dx:planner.problem.dx + planner.problem.du]
@@ -623,7 +626,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None, s
                 visualize_trajectory(traj_for_viz, index_middle_problem.contact_scenes, viz_fpath,
                                      index_middle_problem.fingers, 6, task='card')
 
-            action = action + state[:4 * num_fingers].unsqueeze(0).to(env.device)
+            action = action.to(device=env.device) + state[:4 * num_fingers].unsqueeze(0).to(env.device)
 
             env.step(action.to(device=env.device))
 
@@ -676,9 +679,12 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None, s
             data[t]['init_sim_rollouts'].append(init_sim_rollouts)
             data[t]['optimizer_paths'].append([i.cpu().numpy() for i in optimizer_paths])
             data[t]['starts'].append(traj[i].reshape(1, -1).repeat(plan.shape[0], 1))
-            data[t]['contact_points'].append(contact_points[t])
-            data[t]['contact_distance'].append(contact_distance[t])
-            data[t]['contact_state'].append(contact_state)
+            try:
+                data[t]['contact_points'].append(contact_points[t])
+                data[t]['contact_distance'].append(contact_distance[t])
+                data[t]['contact_state'].append(contact_state)
+            except:
+                pass
 
     def visualize_trajectory_wrapper(traj, contact_scenes, fname, plan_or_init, index, fingers, obj_dof, k):
         viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/{plan_or_init}/{index}/timestep_{k}")
@@ -842,6 +848,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None, s
         #         action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
         #         env.step(action)
         #         continue
+        initial_samples = None
         if params['controller'] == 'diffusion_policy':
             _goal = torch.tensor([0, -0.02 + state[-2], 0]).to(device=params['device'])
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
@@ -850,8 +857,34 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None, s
             _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance,
                             contact_state=torch.tensor([0.0, 0.0]))
             actual_trajectory.append(traj)
+            data_save = deepcopy(data)
+            for t in range(1, 1 + params['T']):
+                try:
+                    data_save[t]['plans'] = torch.stack(data_save[t]['plans']).cpu().numpy()
+                    data_save[t]['starts'] = torch.stack(data_save[t]['starts']).cpu().numpy()
+                    data_save[t]['contact_points'] = torch.stack(data_save[t]['contact_points']).cpu().numpy()
+                    data_save[t]['contact_distance'] = torch.stack(data_save[t]['contact_distance']).cpu().numpy()
+                    data_save[t]['contact_state'] = torch.stack(data_save[t]['contact_state']).cpu().numpy()
+                except:
+                    pass
+            pickle.dump(data_save, open(f"{fpath}/traj_data.p", "wb"))
+            del data_save
+            state = env.get_state()
+            state = state['q'].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
+            actual_trajectory_save = deepcopy(actual_trajectory)
+            actual_trajectory_save.append(state.clone()[: 4 * num_fingers + obj_dof])
+            # actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
+            # turn_problem.T = actual_trajectory.shape[0]
+            # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
+            # final_distance_to_goal = (state.clone()[:, -obj_dof:] - params['valve_goal']).abs()
+
+            # print(f'Controller: {params["controller"]} Final distance to goal: {torch.min(final_distance_to_goal)}')
+            # print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
+
+            with open(f'{fpath.resolve()}/trajectory.pkl', 'wb') as f:
+                pickle.dump([i.cpu().numpy() for i in actual_trajectory_save], f)
+            del actual_trajectory_save
             continue
-        initial_samples = None
         if sample_contact and (stage == 0 or params['replan']):
             if params['replan']:
                 params['goal'] = max(y + float(params['goal_update']), -.06)
@@ -962,13 +995,15 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None, s
             actual_trajectory.append(traj)
     # change to numpy and save data
     for t in range(1, 1 + params['T']):
-        data[t]['plans'] = torch.stack(data[t]['plans']).cpu().numpy()
-        data[t]['starts'] = torch.stack(data[t]['starts']).cpu().numpy()
-        data[t]['contact_points'] = torch.stack(data[t]['contact_points']).cpu().numpy()
-        data[t]['contact_distance'] = torch.stack(data[t]['contact_distance']).cpu().numpy()
-        data[t]['contact_state'] = torch.stack(data[t]['contact_state']).cpu().numpy()
+        try:
+            data[t]['plans'] = torch.stack(data[t]['plans']).cpu().numpy()
+            data[t]['starts'] = torch.stack(data[t]['starts']).cpu().numpy()
+            data[t]['contact_points'] = torch.stack(data[t]['contact_points']).cpu().numpy()
+            data[t]['contact_distance'] = torch.stack(data[t]['contact_distance']).cpu().numpy()
+            data[t]['contact_state'] = torch.stack(data[t]['contact_state']).cpu().numpy()
+        except:
+            pass
 
-    import pickle
     pickle.dump(data, open(f"{fpath}/traj_data.p", "wb"))
     state = env.get_state()
     state = state['q'].reshape(4 * num_fingers + obj_dof).to(device=params['device'])

@@ -1,0 +1,485 @@
+Importing module 'gym_38' (/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.0+cu121
+Device count 1
+/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinav/Documents/ccai
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+Current y: tensor(0.0003, device='cuda:0')
+Solve time for step 1.1431057453155518
+Solve time for step 1.056851863861084
+Solve time for step 1.0776071548461914
+Solve time for step 1.0762207508087158
+Solve time for step 1.0618162155151367
+Solve time for step 1.0606064796447754
+Solve time for step 1.0357437133789062
+Solve time for step 1.05777907371521
+Current y: tensor(-0.0083, device='cuda:0')
+Solve time for step 1.0540828704833984
+Solve time for step 1.034229040145874
+Solve time for step 1.0478734970092773
+Solve time for step 1.0589280128479004
+Solve time for step 1.0450243949890137
+Solve time for step 1.0423340797424316
+Solve time for step 1.0870888233184814
+Solve time for step 1.0729918479919434
+Current y: tensor(-0.0068, device='cuda:0')
+Solve time for step 1.106811761856079
+Solve time for step 1.057960033416748
+Solve time for step 1.037933349609375
+Solve time for step 1.0757944583892822
+Solve time for step 1.0659279823303223
+Solve time for step 1.0713214874267578
+Solve time for step 1.04823899269104
+Solve time for step 1.033754587173462
+Current y: tensor(-0.0140, device='cuda:0')
+Solve time for step 1.0603549480438232
+Solve time for step 1.0628535747528076
+Solve time for step 1.0619182586669922
+Solve time for step 1.052116870880127
+Solve time for step 1.0499670505523682
+Solve time for step 1.0424416065216064
+Solve time for step 1.034118890762329
+Solve time for step 1.0261297225952148
+Current y: tensor(-0.0159, device='cuda:0')
+Solve time for step 1.0278747081756592
+Solve time for step 1.023940086364746
+Solve time for step 1.0110929012298584
+Solve time for step 1.0243778228759766
+Solve time for step 1.0299046039581299
+Solve time for step 1.0354583263397217
+Solve time for step 1.0329320430755615
+Solve time for step 1.0385115146636963
+diffusion_policy, Average time per step: 0.0
+{}
+Current y: tensor(0.0003, device='cuda:0')
+Solve time for step 1.088170051574707
+Solve time for step 1.0521254539489746
+Solve time for step 1.0223252773284912
+Solve time for step 1.027968168258667
+Solve time for step 1.0382559299468994
+Solve time for step 1.0601253509521484
+Solve time for step 1.0387747287750244
+Solve time for step 1.070115089416504
+Current y: tensor(-0.0082, device='cuda:0')
+Solve time for step 1.0677850246429443
+Solve time for step 1.0589044094085693
+Solve time for step 1.0728614330291748
+Solve time for step 1.0374627113342285
+Solve time for step 1.0638444423675537
+Solve time for step 1.0283517837524414
+Solve time for step 1.1225833892822266
+Solve time for step 1.0355298519134521
+Current y: tensor(-0.0080, device='cuda:0')
+Solve time for step 1.058957576751709
+Solve time for step 1.0391733646392822
+Solve time for step 1.042733907699585
+Solve time for step 1.094890832901001
+Solve time for step 1.0829474925994873
+Solve time for step 1.0591294765472412
+Solve time for step 1.069378137588501
+Solve time for step 1.0217249393463135
+Current y: tensor(-0.0196, device='cuda:0')
+Solve time for step 1.0428617000579834
+Solve time for step 1.0451433658599854
+Solve time for step 1.0441815853118896
+Solve time for step 1.057783842086792
+Solve time for step 1.050011396408081
+Solve time for step 1.0225458145141602
+Solve time for step 1.0169599056243896
+Solve time for step 1.0374171733856201
+Current y: tensor(-0.0247, device='cuda:0')
+Solve time for step 1.0177619457244873
+Solve time for step 1.0268325805664062
+Solve time for step 1.0252225399017334
+Solve time for step 1.0265355110168457
+Solve time for step 1.0419609546661377
+Solve time for step 1.017575740814209
+Solve time for step 1.053609848022461
+Solve time for step 1.034001350402832
+diffusion_policy, Average time per step: 0.0
+{}
+Current y: tensor(0.0003, device='cuda:0')
+Solve time for step 1.0434176921844482
+Solve time for step 1.0420715808868408
+Solve time for step 1.0366294384002686
+Solve time for step 1.039813756942749
+Solve time for step 1.074265480041504
+Solve time for step 1.0768799781799316
+Solve time for step 1.0349977016448975
+Solve time for step 1.0542128086090088
+Current y: tensor(-0.0085, device='cuda:0')
+Solve time for step 1.062258005142212
+Solve time for step 1.0739824771881104
+Solve time for step 1.062201976776123
+Solve time for step 1.0710294246673584
+Solve time for step 1.0590007305145264
+Solve time for step 1.021482229232788
+Solve time for step 1.0367417335510254
+Solve time for step 1.0164999961853027
+Current y: tensor(-0.0063, device='cuda:0')
+Solve time for step 1.0348000526428223
+Solve time for step 1.0630512237548828
+Solve time for step 1.026141881942749
+Solve time for step 1.0505740642547607
+Solve time for step 1.066556692123413
+Solve time for step 1.0685155391693115
+Solve time for step 1.0749928951263428
+Solve time for step 1.0807883739471436
+Current y: tensor(-0.0127, device='cuda:0')
+Solve time for step 1.0967955589294434
+Solve time for step 1.0775840282440186
+Solve time for step 1.0428364276885986
+Solve time for step 1.0735342502593994
+Solve time for step 1.0734741687774658
+Solve time for step 1.066192865371704
+Solve time for step 1.0475900173187256
+Solve time for step 1.0383479595184326
+Current y: tensor(-0.0154, device='cuda:0')
+Solve time for step 1.0333921909332275
+Solve time for step 1.0489420890808105
+Solve time for step 1.0579915046691895
+Solve time for step 1.039858102798462
+Solve time for step 1.0521247386932373
+Solve time for step 1.0218241214752197
+Solve time for step 1.0537829399108887
+Solve time for step 1.0436549186706543
+diffusion_policy, Average time per step: 0.0
+{}
+Current y: tensor(0.0003, device='cuda:0')
+Solve time for step 1.06162428855896
+Solve time for step 1.0682482719421387
+Solve time for step 1.0290977954864502
+Solve time for step 1.0595767498016357
+Solve time for step 1.0420496463775635
+Solve time for step 1.0367867946624756
+Solve time for step 1.0625107288360596
+Solve time for step 1.046208143234253
+Current y: tensor(-0.0079, device='cuda:0')
+Solve time for step 1.0451178550720215
+Solve time for step 1.0979053974151611
+Solve time for step 1.0568053722381592
+Solve time for step 1.0255131721496582
+Solve time for step 1.0253355503082275
+Solve time for step 1.1000654697418213
+Solve time for step 1.0645208358764648
+Solve time for step 1.0254836082458496
+Current y: tensor(-0.0063, device='cuda:0')
+Solve time for step 1.0463142395019531
+Solve time for step 1.0667970180511475
+Solve time for step 1.0581481456756592
+Solve time for step 1.0534772872924805
+Solve time for step 1.0404040813446045
+Solve time for step 1.0420596599578857
+Solve time for step 1.0426068305969238
+Solve time for step 1.0278418064117432
+Current y: tensor(-0.0127, device='cuda:0')
+Solve time for step 1.0537140369415283
+Solve time for step 1.0893528461456299
+Solve time for step 1.047330617904663
+Solve time for step 1.0462279319763184
+Solve time for step 1.0490565299987793
+Solve time for step 1.0408756732940674
+Solve time for step 1.062837839126587
+Solve time for step 1.039590835571289
+Current y: tensor(-0.0157, device='cuda:0')
+Solve time for step 1.0580463409423828
+Solve time for step 1.040466547012329
+Solve time for step 1.097839117050171
+Solve time for step 1.1012837886810303
+Solve time for step 1.0220065116882324
+Solve time for step 1.038252592086792
+Solve time for step 1.09409499168396
+Solve time for step 1.071850299835205
+diffusion_policy, Average time per step: 0.0
+{}
+Current y: tensor(0.0003, device='cuda:0')
+Solve time for step 1.0655920505523682
+Solve time for step 1.0603256225585938
+Solve time for step 1.0398523807525635
+Solve time for step 1.0491163730621338
+Solve time for step 1.0655386447906494
+Solve time for step 1.0916507244110107
+Solve time for step 1.0417828559875488
+Solve time for step 1.0684142112731934
+Current y: tensor(-0.0084, device='cuda:0')
+Solve time for step 1.1653616428375244
+Solve time for step 1.1319999694824219
+Solve time for step 1.101731300354004
+Solve time for step 1.0609283447265625
+Solve time for step 1.064260721206665
+Solve time for step 1.0600357055664062
+Solve time for step 1.0759718418121338
+Solve time for step 1.0393314361572266
+Current y: tensor(-0.0061, device='cuda:0')
+Solve time for step 1.0555243492126465
+Solve time for step 1.0637102127075195
+Solve time for step 1.0622472763061523
+Solve time for step 1.0426664352416992
+Solve time for step 1.0570638179779053
+Solve time for step 1.132209300994873
+Solve time for step 1.0560126304626465
+Solve time for step 1.0742709636688232
+Current y: tensor(-0.0134, device='cuda:0')
+Solve time for step 1.0580615997314453
+Solve time for step 1.0783905982971191
+Solve time for step 1.069413185119629
+Solve time for step 1.04044771194458
+Solve time for step 1.0517234802246094
+Solve time for step 1.0645270347595215
+Solve time for step 1.077289342880249
+Solve time for step 1.100529670715332
+Current y: tensor(-0.0157, device='cuda:0')
+Solve time for step 1.0571694374084473
+Solve time for step 1.0667760372161865
+Solve time for step 1.096620798110962
+Solve time for step 1.0430035591125488
+Solve time for step 1.0385546684265137
+Solve time for step 1.149289608001709
+Solve time for step 1.0360379219055176
+Solve time for step 1.028353214263916
+diffusion_policy, Average time per step: 0.0
+{}
+Current y: tensor(0.0003, device='cuda:0')
+Solve time for step 1.059063196182251
+Solve time for step 1.0983452796936035
+Solve time for step 1.0788724422454834
+Solve time for step 1.0850961208343506
+Solve time for step 1.062859058380127
+Solve time for step 1.0471951961517334
+Solve time for step 1.0423178672790527
+Solve time for step 1.103365421295166
+Current y: tensor(-0.0083, device='cuda:0')
+Solve time for step 1.1421079635620117
+Solve time for step 1.0478813648223877
+Solve time for step 1.058760404586792
+Solve time for step 1.0681178569793701
+Solve time for step 1.1331024169921875
+Solve time for step 1.0645782947540283
+Solve time for step 1.0205352306365967
+Solve time for step 1.0437438488006592
+Current y: tensor(-0.0070, device='cuda:0')
+Solve time for step 1.0611984729766846
+Solve time for step 1.0602209568023682
+Solve time for step 1.0665268898010254
+Solve time for step 1.0578594207763672
+Solve time for step 1.0522148609161377
+Solve time for step 1.0439393520355225
+Solve time for step 1.0559446811676025
+Solve time for step 1.054229974746704
+Current y: tensor(-0.0143, device='cuda:0')
+Solve time for step 1.0471184253692627
+Solve time for step 1.0505797863006592
+Solve time for step 1.039872646331787
+Solve time for step 1.0429940223693848
+Solve time for step 1.0531692504882812
+Solve time for step 1.0391643047332764
+Solve time for step 1.0302684307098389
+Solve time for step 1.0408494472503662
+Current y: tensor(-0.0163, device='cuda:0')
+Solve time for step 1.0329809188842773
+Solve time for step 1.0345845222473145
+Solve time for step 1.0182557106018066
+Solve time for step 1.03511381149292
+Solve time for step 1.0422883033752441
+Solve time for step 1.0585854053497314
+Solve time for step 1.0621981620788574
+Solve time for step 1.0239250659942627
+diffusion_policy, Average time per step: 0.0
+{}
+Current y: tensor(0.0003, device='cuda:0')
+Solve time for step 1.0210700035095215
+Solve time for step 1.029240608215332
+Solve time for step 1.0508441925048828
+Solve time for step 1.0498192310333252
+Solve time for step 1.0439238548278809
+Solve time for step 1.0533990859985352
+Solve time for step 1.0377740859985352
+Solve time for step 1.048628807067871
+Current y: tensor(-0.0076, device='cuda:0')
+Solve time for step 1.0643236637115479
+Solve time for step 1.0448355674743652
+Solve time for step 1.0285871028900146
+Solve time for step 1.030566692352295
+Solve time for step 1.05607271194458
+Solve time for step 1.0398693084716797
+Solve time for step 1.0173189640045166
+Solve time for step 1.0527100563049316
+Current y: tensor(-0.0060, device='cuda:0')
+Solve time for step 1.0515663623809814
+Solve time for step 1.0526838302612305
+Solve time for step 1.0744869709014893
+Solve time for step 1.0648729801177979
+Solve time for step 1.0744869709014893
+Solve time for step 1.0711760520935059
+Solve time for step 1.056067705154419
+Solve time for step 1.062676191329956
+Current y: tensor(-0.0132, device='cuda:0')
+Solve time for step 1.036473274230957
+Solve time for step 1.0379977226257324
+Solve time for step 1.052520990371704
+Solve time for step 1.0442476272583008
+Solve time for step 1.0207171440124512
+Solve time for step 1.0578291416168213
+Solve time for step 1.0644474029541016
+Solve time for step 1.0679118633270264
+Current y: tensor(-0.0158, device='cuda:0')
+Solve time for step 1.0469765663146973
+Solve time for step 1.054137945175171
+Solve time for step 1.0491149425506592
+Solve time for step 1.0470302104949951
+Solve time for step 1.0320758819580078
+Solve time for step 1.0438311100006104
+Solve time for step 1.037482500076294
+Solve time for step 1.075974702835083
+diffusion_policy, Average time per step: 0.0
+{}
+Current y: tensor(0.0003, device='cuda:0')
+Solve time for step 1.036224603652954
+Solve time for step 1.0487971305847168
+Solve time for step 1.0705220699310303
+Solve time for step 1.0414421558380127
+Solve time for step 1.0444066524505615
+Solve time for step 1.0548529624938965
+Solve time for step 1.0632877349853516
+Solve time for step 1.0407569408416748
+Current y: tensor(-0.0090, device='cuda:0')
+Solve time for step 1.0267858505249023
+Solve time for step 1.0452728271484375
+Solve time for step 1.0272586345672607
+Solve time for step 1.064629316329956
+Solve time for step 1.04099440574646
+Solve time for step 1.0579659938812256
+Solve time for step 1.0548458099365234
+Solve time for step 1.078592300415039
+Current y: tensor(-0.0191, device='cuda:0')
+Solve time for step 1.030057668685913
+Solve time for step 1.0299174785614014
+Solve time for step 1.0509319305419922
+Solve time for step 1.0384023189544678
+Solve time for step 1.0394127368927002
+Solve time for step 1.0208523273468018
+Solve time for step 1.0437166690826416
+Solve time for step 1.0445890426635742
+Current y: tensor(-0.0223, device='cuda:0')
+Solve time for step 1.055586576461792
+Solve time for step 1.0388610363006592
+Solve time for step 1.074662685394287
+Solve time for step 1.0780994892120361
+Solve time for step 1.0492651462554932
+Solve time for step 1.0499069690704346
+Solve time for step 1.0282979011535645
+Solve time for step 1.022737741470337
+Current y: tensor(-0.0228, device='cuda:0')
+Solve time for step 1.047959804534912
+Solve time for step 1.0416958332061768
+Solve time for step 1.0447955131530762
+Solve time for step 1.0603108406066895
+Solve time for step 1.0664172172546387
+Solve time for step 1.065739393234253
+Solve time for step 1.0385169982910156
+Solve time for step 1.0480942726135254
+diffusion_policy, Average time per step: 0.0
+{}
+Current y: tensor(0.0003, device='cuda:0')
+Solve time for step 1.040541648864746
+Solve time for step 1.0777981281280518
+Solve time for step 1.0288589000701904
+Solve time for step 1.0916569232940674
+Solve time for step 1.0197224617004395
+Solve time for step 1.0465807914733887
+Solve time for step 1.0435810089111328
+Solve time for step 1.0454809665679932
+Current y: tensor(-0.0082, device='cuda:0')
+Solve time for step 1.0634913444519043
+Solve time for step 1.0697343349456787
+Solve time for step 1.04124116897583
+Solve time for step 1.0250492095947266
+Solve time for step 1.0335533618927002
+Solve time for step 1.0388147830963135
+Solve time for step 1.0200634002685547
+Solve time for step 1.0309576988220215
+Current y: tensor(-0.0065, device='cuda:0')
+Solve time for step 1.0643630027770996
+Solve time for step 1.075263500213623
+Solve time for step 1.0279555320739746
+Solve time for step 1.015488862991333
+Solve time for step 1.0559113025665283
+Solve time for step 1.0490140914916992
+Solve time for step 1.0445630550384521
+Solve time for step 1.0475122928619385
+Current y: tensor(-0.0144, device='cuda:0')
+Solve time for step 1.0601370334625244
+Solve time for step 1.076939344406128
+Solve time for step 1.0700483322143555
+Solve time for step 1.0371849536895752
+Solve time for step 1.0532052516937256
+Solve time for step 1.0490221977233887
+Solve time for step 1.0596086978912354
+Solve time for step 1.0469694137573242
+Current y: tensor(-0.0172, device='cuda:0')
+Solve time for step 1.0248808860778809
+Solve time for step 1.0269033908843994
+Solve time for step 1.0530002117156982
+Solve time for step 1.0554771423339844
+Solve time for step 1.0549452304840088
+Solve time for step 1.0691022872924805
+Solve time for step 1.0806219577789307
+Solve time for step 1.0371286869049072
+diffusion_policy, Average time per step: 0.0
+{}
+Current y: tensor(0.0003, device='cuda:0')
+Solve time for step 1.036196231842041
+Solve time for step 1.041994571685791
+Solve time for step 1.0579004287719727
+Solve time for step 1.0495450496673584
+Solve time for step 1.0589110851287842
+Solve time for step 1.0611674785614014
+Solve time for step 1.0793216228485107
+Solve time for step 1.0776739120483398
+Current y: tensor(-0.0100, device='cuda:0')
+Solve time for step 1.0731475353240967
+Solve time for step 1.0746889114379883
+Solve time for step 1.0389573574066162
+Solve time for step 1.0462019443511963
+Solve time for step 1.0407445430755615
+Solve time for step 1.0399246215820312
+Solve time for step 1.0317738056182861
+Solve time for step 1.0241031646728516
+Current y: tensor(-0.0193, device='cuda:0')
+Solve time for step 1.048555612564087
+Solve time for step 1.0598382949829102
+Solve time for step 1.0763084888458252
+Solve time for step 1.0586843490600586
+Solve time for step 1.0535786151885986
+Solve time for step 1.0267384052276611
+Solve time for step 1.03462553024292
+Solve time for step 1.0440685749053955
+Current y: tensor(-0.0202, device='cuda:0')
+Solve time for step 1.032952070236206
+Solve time for step 1.0350446701049805
+Solve time for step 1.0529375076293945
+Solve time for step 1.0593111515045166
+Solve time for step 1.0591108798980713
+Solve time for step 1.0775964260101318
+Solve time for step 1.0651452541351318
+Solve time for step 1.0398228168487549
+Current y: tensor(-0.0207, device='cuda:0')
+Solve time for step 1.0338609218597412
+Solve time for step 1.0402865409851074
+Solve time for step 1.0485141277313232
+Solve time for step 1.0557608604431152
+Solve time for step 1.0650215148925781
+Solve time for step 1.0481629371643066
+Solve time for step 1.064850091934204
+Solve time for step 1.0455513000488281
+diffusion_policy, Average time per step: 0.0
+{}

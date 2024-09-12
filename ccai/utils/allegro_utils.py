@@ -141,11 +141,14 @@ def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headl
             vis.add_geometry(mesh)
         ctr = vis.get_view_control()
         if task == 'screwdriver':
-            parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-06-27-13-07-52.json")
+            import os
+            #Get current working directory
+            cwd = os.getcwd()
+
+            parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-09-10-09-05-47.json")
         elif task == 'card':
             parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_card.json")
-        #parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-04-05-13-17-03.json")
-        ctr.convert_from_pinhole_camera_parameters(parameters)
+        ctr.convert_from_pinhole_camera_parameters(parameters, allow_arbitrary=True)
         vis.poll_events()
         vis.update_renderer()
         img = vis.capture_screen_float_buffer(False)

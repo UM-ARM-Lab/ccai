@@ -15,16 +15,33 @@ class ObjectPoseReader:
         # [  0.,           0. ,          1.,        ]])
         # self.__dist = np.array([[0.07583722,  0.00042308, -0.00245659 , 0.00797877 , 0.01058895]])
         
-        self.__intrinsic = np.array([[620.01947778,   0.,         634.39543476],
-        [  0.,         621.01114219, 373.00241614],
-        [  0.,           0. ,          1.,        ]])
-        self.__dist = np.array([[0.10693622,  -0.11111605, 0.00523414 , -0.00723972 , 0.0405243]])
+        # self.__intrinsic = np.array([[620.01947778,   0.,         634.39543476],
+        # [  0.,         621.01114219, 373.00241614],
+        # [  0.,           0. ,          1.,        ]])
+        # self.__dist = np.array([[0.10693622,  -0.11111605, 0.00523414 , -0.00723972 , 0.0405243]])
+
+        # self.__intrinsic = np.array([[627.356434,     0.     ,    648.64167401],
+        # [  0.,         626.97086464 ,353.32197956],
+        # [  0.     ,      0.   ,        1.        ]])
+        # self.__dist = np.array([[0.11001195, -0.10927342, -0.0065648,   0.00226242 , 0.0547425]])
+
+        # self.__intrinsic = np.array([[628.31507209 ,  0.        , 637.88670275],
+        # [  0.    ,     628.08092551, 351.3041728 ],
+        # [  0.     ,      0.         ,  1.        ]])
+        # self.__dist = np.array([[ 0.10698373, -0.08771528, -0.00798322, -0.00410741,  0.04082028]])
+
+        self.__intrinsic = np.array(    [[631.51928386 ,  0.   ,      631.83484949],
+            [  0.    ,     632.21401224, 345.20179321],
+            [  0.   ,        0. ,          1.        ]])
+        self.__dist = np.array([[ 0.12413314, -0.11324339 ,-0.01188807 ,-0.00755358 , 0.05668905]])
+
 
         
         aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
         aruco_params = cv2.aruco.DetectorParameters()
         self.__detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
         self.__cap = cv2.VideoCapture(0)
+
         if self.obj == 'valve':
             self.__objp = np.array([[0., 0., 0.],
                                 [1., 0., 0.],
@@ -79,10 +96,46 @@ class ObjectPoseReader:
                 #                                     [0, 1, 0, 50],
                 #                                     [-0.7071068, 0, 0.7071068, -91.92387911],
                 #                                     [0, 0, 0, 1]])
-                while True:
-                    flag = self.get_robot_frame()
-                    if flag:
-                        break
+                # while True:
+                #     flag = self.get_robot_frame()
+                #     if flag:
+                #         break
+
+                
+                # self.__cam2world = np.array(
+                #     [[-9.55239386e-01, -5.31440129e-02 ,-2.91021263e-01 , 2.74029745e+01],
+                #     [ 2.91324818e-01 , 2.11427720e-03, -9.56621858e-01,  4.25566549e+02],
+                #     [ 5.14540240e-02 ,-9.98584594e-01,  1.34625290e-02, -4.58435857e+01],
+                #     [ 0.00000000e+00,  0.00000000e+00 , 0.00000000e+00 , 1.00000000e+00]]
+                #  )
+
+
+                # self.__cam2world = np.array(
+                #     [[-9.46183190e-01 ,-4.59892001e-02, -3.20347173e-01 , 4.20749042e+01],
+                #     [ 3.21853710e-01, -3.01083015e-02, -9.46310562e-01,  4.13520006e+02],
+                #     [ 3.38749565e-02, -9.98488072e-01,  4.32897635e-02 ,-5.99224171e+01],
+                #     [ 0.00000000e+00,  0.00000000e+00 , 0.00000000e+00 , 1.00000000e+00]]
+                #  )
+                   
+                # self.__cam2world = np.array(
+                #     [[-9.60303369e-01 ,-5.40745965e-02, -2.73666446e-01 , 3.25387834e+00],
+                #     [ 2.74022475e-01 , 8.61456392e-04, -9.61722902e-01 , 4.32167441e+02],
+                #     [ 5.22405296e-02, -9.98536500e-01,  1.39903953e-02 ,-4.82987398e+01],
+                #     [ 0.00000000e+00,  0.00000000e+00 , 0.00000000e+00 , 1.00000000e+00]]
+                #  )
+
+                self.__cam2world = np.array(
+                    [[-9.51957181e-01, -5.66268316e-02 ,-3.00949954e-01 , 8.34654917e+00],
+                    [ 3.01873872e-01 ,-8.33467526e-03 ,-9.53311439e-01,  3.93356872e+02],
+                    [ 5.14746861e-02, -9.98360597e-01,  2.50284148e-02 ,-5.18497540e+01],
+                    [ 0.00000000e+00,  0.00000000e+00 , 0.00000000e+00 , 1.00000000e+00]]
+                )
+
+
+
+
+
+
             else:
                 raise NotImplementedError
 
@@ -133,6 +186,13 @@ class ObjectPoseReader:
         root_coors = []
         screwdriver_ori_eulers = []
         ctr = 0
+
+        # while True:
+        #     flag = self.get_robot_frame()
+        #     if flag:
+        #         break
+        # print(self.__cam2world)
+
         while True:
             ret, frame = self.__cap.read()
             ctr += 1
@@ -140,8 +200,9 @@ class ObjectPoseReader:
                 break
         markerCorners, markerIds, rejectedCandidates = self.__detector.detectMarkers(frame)
         if len(markerCorners) > 0 and markerIds.max() <= 4:
-            # cv2.aruco.drawDetectedMarkers(frame, markerCorners, markerIds)
+            cv2.aruco.drawDetectedMarkers(frame, markerCorners, markerIds)
             areas = []
+                
             for marker_corner, marker_id in zip(markerCorners, markerIds):
                 if marker_id.item() >= 4:
                     continue
@@ -151,7 +212,7 @@ class ObjectPoseReader:
                 area = polygon.area
                 areas.append(area)
                 ret, rvecs, tvecs = cv2.solvePnP(self.__objp, marker_corner, self.__intrinsic, self.__dist) 
-                # cv2.drawFrameAxes(frame, self.__intrinsic, self.__dist, rvecs, tvecs, 35 / 2) # debug
+                cv2.drawFrameAxes(frame, self.__intrinsic, self.__dist, rvecs, tvecs, 35 / 2) # debug
                 rotation = R.from_rotvec(rvecs[:,0])
                 rotation_mat = rotation.as_matrix()
                 translation = tvecs
@@ -176,15 +237,18 @@ class ObjectPoseReader:
             # root_coor is weighted average of the root coor of the screwdriver
             root_coor = (np.array(root_coors) * areas).sum(axis=0)
 
-            root_coor += np.array([-4, 0, 5])
-            # root_coor += np.array([-4, -4, 6])
-            # root_coor += np.array([-8, 8, 6])
+            # root_coor += np.array([-5, -15, 0])
+            # root_coor += np.array([-5, -15, 2])
+
+            root_coor += np.array([-10, -10, 5])
 
             screwdriver_ori_euler = (np.array(screwdriver_ori_eulers) * areas).sum(axis=0)
             screwdriver_ori_euler = screwdriver_ori_euler / 180 * np.pi # change to radian
-            # cv2.imshow('frame', frame) # debug
+            cv2.imshow('frame', frame) # debug
             return root_coor, screwdriver_ori_euler
         else:
+            if markerCorners is None or markerIds is None:
+                return None, None
             print(f"No readings from camera, {len(markerCorners), markerIds.max()}.")
             return None, None
     def get_robot_frame(self):
@@ -197,6 +261,7 @@ class ObjectPoseReader:
                 break
         palm_marker_flag = False
         markerCorners, markerIds, rejectedCandidates = self.__detector.detectMarkers(frame)
+
         if len(markerCorners) > 0 and markerIds.max() <= 4:
             # cv2.aruco.drawDetectedMarkers(frame, markerCorners, markerIds)
             for marker_corner, marker_id in zip(markerCorners, markerIds):

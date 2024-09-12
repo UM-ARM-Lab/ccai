@@ -1,0 +1,209 @@
+Importing module 'gym_38' (/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.0+cu121
+Device count 1
+/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinav/Documents/ccai
+joint command publisher initialized.
+ros listner initialized.
+Root coor: [   2.26792898   92.03453239 -130.77473689]
+Root ori: [-0.07427616  0.00563249 -0.07563393]
+joint command publisher initialized.
+joint state subscriber initialized.
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current yaw: tensor([-0.0221,  0.0058, -0.1346], device='cuda:0')
+tensor([-0.0064,  0.0179, -0.0958], device='cuda:0')
+tensor([ 0.0095,  0.0065, -0.1717], device='cuda:0')
+Pregrasp complete. Ready to execute. Press <ENTER> to continue.Current yaw: tensor([-0.0095,  0.0084, -0.1155], device='cuda:0')
+Adjusting goal to tensor(-1.1627, device='cuda:0')
+1 () -0.11552178114652634
+2 () -0.11552178114652634
+3 ((1.0, 1.0, 1.0),) -1.0270553827285767
+4 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.4027584791183472
+Contact sequence search time: 7.74347351599863
+['turn', 'thumb_middle']
+1 turn
+Solve time for step 1 97.14071846008301
+Current ori: tensor([-0.0095,  0.0084, -0.1155], device='cuda:0')
+tensor([ 0.0166,  0.0099, -0.1134], device='cuda:0')
+Solve time for step 2 17.972840547561646
+Current ori: tensor([-0.0342,  0.0138, -0.2020], device='cuda:0')
+tensor([ 0.0032,  0.0062, -0.2342], device='cuda:0')
+Solve time for step 3 16.05011248588562
+Current ori: tensor([ 0.0007,  0.0058, -0.3018], device='cuda:0')
+tensor([ 0.0007,  0.0058, -0.3018], device='cuda:0')
+Solve time for step 4 14.583040714263916
+Current ori: tensor([-0.0256,  0.0130, -0.3206], device='cuda:0')
+tensor([ 0.0052, -0.0006, -0.3040], device='cuda:0')
+Solve time for step 5 13.551425218582153
+Current ori: tensor([-0.0084,  0.0015, -0.3434], device='cuda:0')
+tensor([-0.0084,  0.0015, -0.3434], device='cuda:0')
+Solve time for step 6 12.349522113800049
+Current ori: tensor([-0.0048,  0.0047, -0.3753], device='cuda:0')
+tensor([-0.0187,  0.0046, -0.3571], device='cuda:0')
+Solve time for step 7 11.44231653213501
+Current ori: tensor([ 0.0075, -0.0012, -0.3589], device='cuda:0')
+tensor([ 5.1748e-03,  1.2641e-04, -3.5780e-01], device='cuda:0')
+Solve time for step 8 10.828553915023804
+Current ori: tensor([ 0.0046, -0.0067, -0.4228], device='cuda:0')
+tensor([ 0.0020, -0.0049, -0.4200], device='cuda:0')
+Solve time for step 9 10.345487833023071
+Current ori: tensor([ 2.7012e-03,  1.4299e-04, -4.5137e-01], device='cuda:0')
+tensor([ 2.7012e-03,  1.4299e-04, -4.5137e-01], device='cuda:0')
+Solve time for step 10 9.7478928565979
+Current ori: tensor([-0.0079,  0.0046, -0.4591], device='cuda:0')
+tensor([-0.0079,  0.0046, -0.4591], device='cuda:0')
+Solve time for step 11 9.433744430541992
+Current ori: tensor([ 0.0008, -0.0064, -0.4534], device='cuda:0')
+tensor([ 0.0071, -0.0089, -0.4626], device='cuda:0')
+Solve time for step 12 9.01768946647644
+Current ori: tensor([ 0.0091, -0.0047, -0.4870], device='cuda:0')
+tensor([ 0.0091, -0.0047, -0.4870], device='cuda:0')
+Current yaw: tensor([ 0.0101, -0.0066, -0.4895], device='cuda:0')
+Adjusting goal to tensor(-1.5367, device='cuda:0')
+1 ((1.0, 1.0, 1.0),) -0.4895387887954712
+2 ((1.0, 1.0, 1.0),) -0.4895387887954712
+3 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.3128491640090942
+4 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.923787236213684
+Contact sequence search time: 7.6762763380029355
+['thumb_middle', 'turn']
+2 thumb_middle
+Solve time for step 1 58.76370024681091
+Current ori: tensor([ 0.0101, -0.0066, -0.4895], device='cuda:0')
+tensor([ 0.0061, -0.0061, -0.4879], device='cuda:0')
+Solve time for step 2 11.501272678375244
+Current ori: tensor([ 0.0020, -0.0015, -0.4499], device='cuda:0')
+tensor([ 0.0020, -0.0015, -0.4499], device='cuda:0')
+Solve time for step 3 10.787808179855347
+Current ori: tensor([ 0.0020, -0.0015, -0.4499], device='cuda:0')
+tensor([ 0.0020, -0.0015, -0.4499], device='cuda:0')
+Solve time for step 4 10.348155975341797
+Current ori: tensor([ 3.4362e-04, -1.2426e-03, -4.4913e-01], device='cuda:0')
+tensor([-0.0040,  0.0026, -0.4387], device='cuda:0')
+Solve time for step 5 9.919569969177246
+Current ori: tensor([ 0.0020, -0.0015, -0.4499], device='cuda:0')
+tensor([ 3.4362e-04, -1.2426e-03, -4.4913e-01], device='cuda:0')
+Solve time for step 6 9.646916389465332
+Current ori: tensor([ 0.0020, -0.0015, -0.4499], device='cuda:0')
+tensor([ 3.4362e-04, -1.2426e-03, -4.4913e-01], device='cuda:0')
+Solve time for step 7 9.138624668121338
+Current ori: tensor([-0.0080,  0.0046, -0.4620], device='cuda:0')
+tensor([-0.0080,  0.0046, -0.4620], device='cuda:0')
+Solve time for step 8 8.807408332824707
+Current ori: tensor([ 0.0137, -0.0051, -0.4399], device='cuda:0')
+tensor([ 0.0131, -0.0066, -0.4380], device='cuda:0')
+Solve time for step 9 8.657424449920654
+Current ori: tensor([ 8.1210e-04,  4.1084e-04, -4.5030e-01], device='cuda:0')
+tensor([ 8.1210e-04,  4.1084e-04, -4.5030e-01], device='cuda:0')
+Solve time for step 10 8.46875
+Current ori: tensor([-0.0009,  0.0006, -0.4496], device='cuda:0')
+tensor([ 8.1210e-04,  4.1084e-04, -4.5030e-01], device='cuda:0')
+Solve time for step 11 8.145854949951172
+Current ori: tensor([-0.0116,  0.0005, -0.4360], device='cuda:0')
+tensor([-0.0116,  0.0005, -0.4360], device='cuda:0')
+Solve time for step 12 7.97658634185791
+Current ori: tensor([ 0.0191, -0.0011, -0.4622], device='cuda:0')
+tensor([ 0.0191, -0.0011, -0.4622], device='cuda:0')
+Current yaw: tensor([ 0.0195,  0.0125, -0.4406], device='cuda:0')
+Adjusting goal to tensor(-1.4878, device='cuda:0')
+1 ((1.0, -1.0, -1.0),) -0.4406459927558899
+2 ((1.0, -1.0, -1.0),) -0.4406459927558899
+3 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.1442762613296509
+4 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.8108289241790771
+Contact sequence search time: 7.808736945000419
+['turn', 'turn']
+3 turn
+Solve time for step 1 97.34772491455078
+Current ori: tensor([ 0.0201,  0.0140, -0.4454], device='cuda:0')
+tensor([ 0.0201,  0.0140, -0.4454], device='cuda:0')
+Solve time for step 2 18.06023597717285
+Current ori: tensor([ 0.0132,  0.0122, -0.5397], device='cuda:0')
+tensor([ 0.0132,  0.0122, -0.5397], device='cuda:0')
+Solve time for step 3 16.300994157791138
+Current ori: tensor([ 0.0123,  0.0080, -0.6026], device='cuda:0')
+tensor([ 0.0097,  0.0128, -0.6002], device='cuda:0')
+Solve time for step 4 14.715509176254272
+Current ori: tensor([ 0.0170,  0.0064, -0.6158], device='cuda:0')
+tensor([ 0.0170,  0.0064, -0.6158], device='cuda:0')
+Solve time for step 5 13.543756008148193
+Current ori: tensor([ 0.0075, -0.0065, -0.6661], device='cuda:0')
+tensor([ 0.0095, -0.0040, -0.6632], device='cuda:0')
+Solve time for step 6 12.514445304870605
+Current ori: tensor([ 0.0072, -0.0061, -0.7187], device='cuda:0')
+tensor([ 0.0052, -0.0087, -0.7157], device='cuda:0')
+Solve time for step 7 11.64484429359436
+Current ori: tensor([ 0.0100, -0.0089, -0.7359], device='cuda:0')
+tensor([ 0.0027, -0.0126, -0.7404], device='cuda:0')
+Solve time for step 8 10.882885217666626
+Current ori: tensor([ 0.0121, -0.0165, -0.7048], device='cuda:0')
+tensor([ 0.0109, -0.0098, -0.7155], device='cuda:0')
+Solve time for step 9 10.311853408813477
+Current ori: tensor([ 0.0110, -0.0165, -0.7225], device='cuda:0')
+tensor([ 0.0110, -0.0165, -0.7225], device='cuda:0')
+Solve time for step 10 9.885862827301025
+Current ori: tensor([ 0.0110, -0.0165, -0.7225], device='cuda:0')
+tensor([ 0.0110, -0.0165, -0.7225], device='cuda:0')
+Solve time for step 11 9.597426414489746
+Current ori: tensor([ 0.0094, -0.0221, -0.7351], device='cuda:0')
+tensor([ 0.0094, -0.0221, -0.7351], device='cuda:0')
+Solve time for step 12 9.247107744216919
+Current ori: tensor([ 0.0113, -0.0196, -0.7382], device='cuda:0')
+tensor([ 0.0113, -0.0196, -0.7382], device='cuda:0')
+Current yaw: tensor([ 0.0172, -0.0167, -0.7179], device='cuda:0')
+Adjusting goal to tensor(-1.7651, device='cuda:0')
+1 ((1.0, 1.0, 1.0),) -0.7178871631622314
+2 ((1.0, 1.0, 1.0),) -0.7178871631622314
+3 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.7349624633789062
+4 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.7829959392547607
+Contact sequence search time: 7.975406910998572
+['turn', 'thumb_middle']
+4 turn
+Solve time for step 1 97.24510383605957
+Current ori: tensor([ 0.0172, -0.0167, -0.7179], device='cuda:0')
+tensor([ 0.0172, -0.0167, -0.7179], device='cuda:0')
+Solve time for step 2 18.101000785827637
+Current ori: tensor([ 0.0101, -0.0164, -0.7389], device='cuda:0')
+tensor([ 0.0101, -0.0164, -0.7389], device='cuda:0')
+Solve time for step 3 16.283238649368286
+Current ori: tensor([ 0.0101, -0.0164, -0.7389], device='cuda:0')
+tensor([ 0.0101, -0.0164, -0.7389], device='cuda:0')
+Solve time for step 4 14.878693342208862
+Current ori: tensor([ 0.0069, -0.0191, -0.7518], device='cuda:0')
+tensor([ 0.0105, -0.0196, -0.7545], device='cuda:0')
+Solve time for step 5 13.567598819732666
+Current ori: tensor([ 0.0200, -0.0231, -0.7474], device='cuda:0')
+tensor([ 0.0123, -0.0133, -0.7391], device='cuda:0')
+Solve time for step 6 12.51239800453186
+Current ori: tensor([ 0.0189, -0.0229, -0.7647], device='cuda:0')
+tensor([ 0.0174, -0.0260, -0.7598], device='cuda:0')
+Solve time for step 7 11.54068922996521
+Current ori: tensor([ 0.0182, -0.0261, -0.7659], device='cuda:0')
+tensor([ 0.0182, -0.0261, -0.7659], device='cuda:0')
+Solve time for step 8 10.96279239654541
+Current ori: tensor([ 0.0160, -0.0191, -0.7699], device='cuda:0')
+tensor([ 0.0217, -0.0193, -0.7674], device='cuda:0')
+Solve time for step 9 10.376614332199097
+Current ori: tensor([ 0.0174, -0.0256, -0.7559], device='cuda:0')
+tensor([ 0.0174, -0.0260, -0.7598], device='cuda:0')
+Solve time for step 10 9.934085607528687
+Current ori: tensor([ 0.0207, -0.0227, -0.7589], device='cuda:0')
+tensor([ 0.0161, -0.0229, -0.7540], device='cuda:0')
+Solve time for step 11 9.66754674911499
+Current ori: tensor([ 0.0245, -0.0199, -0.7451], device='cuda:0')
+tensor([ 0.0176, -0.0230, -0.7366], device='cuda:0')
+Solve time for step 12 9.222959518432617
+Current ori: tensor([ 0.0222, -0.0168, -0.7318], device='cuda:0')
+tensor([ 0.0197, -0.0202, -0.7399], device='cuda:0')
+Ready to regrasp. Press <ENTER> to continue.

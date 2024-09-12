@@ -133,6 +133,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                  obj_joint_dim=0,
                  optimize_force=False,
                  device='cuda:0', **kwargs):
+        self.obj_link_name = 'screwdriver_body'
         super(AllegroScrewdriver, self).__init__(start=start, goal=goal, T=T, chain=chain,
                                                  object_location=object_location,
                                                  object_type=object_type, world_trans=world_trans,
@@ -738,77 +739,84 @@ def do_trial(trial_ind, env, data_saved, params, fpath, sim_viz_env=None, ros_co
             perm = [0, 1]
             contact_sequence += [contact_options[perm[0]], contact_options[perm[1]], 'turn']
     else:
-        with open(f'{fpath}/contact_planning_4.pkl', 'rb') as f:
-            contact_node_sequence, _, _, _ = pkl.load(f)
-        last_node = contact_node_sequence[-1]
+        for c_plan_ind in range(4):
+            with open(f'{fpath}/contact_planning_{c_plan_ind+1}.pkl', 'rb') as f:
+                contact_node_sequence, closed_set, _, _ = pkl.load(f)
+            last_node = contact_node_sequence[-1]
 
-        contact_sequence = np.array(last_node.contact_sequence)
-        contact_sequence = (contact_sequence + 1)/2
-        contact_sequence = [contact_vec_to_label[int(contact_sequence[i].sum())] for i in range(contact_sequence.shape[0])]
-        print(contact_sequence)
-        print(last_node.trajectory.shape)
-        for particle in range(last_node.trajectory.shape[0]):
-            traj = convert_sine_cosine_to_yaw(last_node.trajectory)[particle].reshape(len(contact_sequence)-1, -1, 36)
-            for stage in range(1, len(contact_sequence)):
-                contact = -torch.ones(params['N'], 3).to(device=params['device'])
-                mode = contact_sequence[stage]
-                if mode == 'thumb_middle':
-                    contact[:, 0] = 1
-                    inds = torch.arange(30)
-                    inds_plans = inds
-                    planner = thumb_and_middle_regrasp_planner
-                    fname = f'thumb_middle_regrasp_{stage}'
-                elif mode == 'index':
-                    contact[:, 1] = 1
-                    contact[:, 2] = 1
-                    inds = torch.arange(33)
-                    inds_plans = torch.cat((torch.arange(27), torch.arange(30, 36)))
-                    planner = index_regrasp_planner
-                    fname = f'index_regrasp_{stage}'
-                elif mode == 'turn':
-                    contact[:, :] = 1
-                    inds = torch.arange(36)
-                    inds_plans = inds
-                    planner = turn_planner
-                    fname = f'turn_{stage}'
-                elif mode == 'pregrasp':
-                    inds = torch.arange(27)
-                    inds_plans = inds
-                    planner = pregrasp_planner
-                    fname = f'pregrasp_{stage}'
-                    continue
+            contact_sequence = np.array(last_node.contact_sequence)
+            contact_sequence = (contact_sequence + 1)/2
+            contact_sequence = [contact_vec_to_label[int(contact_sequence[i].sum())] for i in range(contact_sequence.shape[0])]
+            print(contact_sequence)
+            print(last_node.trajectory.shape)
 
-                init_traj_for_viz = traj[stage-1, :, :16]
+            init_plan = c_plan_ind == 0
+            for particle in range(last_node.trajectory.shape[0]):
+                traj = convert_sine_cosine_to_yaw(last_node.trajectory)[particle]#.reshape(len(contact_sequence)-1, -1, 36)
+                for stage in range(0 if init_plan else 1, len(contact_sequence)):
+                    contact = -torch.ones(params['N'], 3).to(device=params['device'])
+                    mode = contact_sequence[stage]
+                    if mode == 'thumb_middle':
+                        contact[:, 0] = 1
+                        inds = torch.arange(30)
+                        inds_plans = inds
+                        planner = thumb_and_middle_regrasp_planner
+                        fname = f'thumb_middle_regrasp_{c_plan_ind}_{stage}'
+                    elif mode == 'index':
+                        contact[:, 1] = 1
+                        contact[:, 2] = 1
+                        inds = torch.arange(33)
+                        inds_plans = torch.cat((torch.arange(27), torch.arange(30, 36)))
+                        planner = index_regrasp_planner
+                        fname = f'index_regrasp_{c_plan_ind}_{stage}'
+                    elif mode == 'turn':
+                        contact[:, :] = 1
+                        inds = torch.arange(36)
+                        inds_plans = inds
+                        planner = turn_planner
+                        fname = f'turn_{c_plan_ind}_{stage}'
+                    elif mode == 'pregrasp':
+                        inds = torch.arange(27)
+                        inds_plans = inds
+                        planner = pregrasp_planner
+                        fname = f'pregrasp_{c_plan_ind}_{stage}'
+                        continue
 
-                cosine = init_traj_for_viz[..., 14]
-                sine = init_traj_for_viz[..., 15]
-                init_traj_for_viz = torch.cat((init_traj_for_viz[..., :14], torch.atan2(sine, cosine).unsqueeze(-1)), dim=-1)
+                    print(traj.shape)
 
-                tmp = torch.zeros((init_traj_for_viz.shape[0], 1),
-                                    device=init_traj_for_viz.device)  # add the joint for the screwdriver cap
-                init_traj_for_viz = torch.cat((init_traj_for_viz, tmp), dim=1)
+                    stage_for_traj = stage + 1 if init_plan else stage
+                    init_traj_for_viz = traj[(stage_for_traj-1)*13:(stage_for_traj)*13, :15]
+                    # print(init_traj_for_viz.shape)
 
-                visualize_trajectory_wrapper(init_traj_for_viz, turn_problem.contact_scenes, fname,
-                                                'planned_init', particle, turn_problem.fingers, turn_problem.obj_dof, 0)
+                    # cosine = init_traj_for_viz[..., 14]
+                    # sine = init_traj_for_viz[..., 15]
+                    # init_traj_for_viz = torch.cat((init_traj_for_viz[..., :14], torch.atan2(sine, cosine).unsqueeze(-1)), dim=-1)
 
-                contact = contact_sequence[stage]
-                print(stage, contact)
-                if contact == 'pregrasp':
-                    _, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
-                        pregrasp_planner, data_saved, stage, mode='pregrasp', fname=f'pregrasp_{stage}')
+                    tmp = torch.zeros((init_traj_for_viz.shape[0], 1),
+                                        device=init_traj_for_viz.device)  # add the joint for the screwdriver cap
+                    init_traj_for_viz = torch.cat((init_traj_for_viz, tmp), dim=1)
 
-                elif contact == 'index':
-                    _, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
-                        index_regrasp_planner, data_saved, stage, mode='index', goal=None, fname=f'index_regrasp_{stage}')
+                    visualize_trajectory_wrapper(init_traj_for_viz, turn_problem.contact_scenes, fname,
+                                                    'planned_init', particle, turn_problem.fingers, turn_problem.obj_dof, 0)
 
-                elif contact == 'thumb_middle':
-                    _, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
-                        thumb_and_middle_regrasp_planner, data_saved, stage, mode='thumb_middle',
-                        goal=None, fname=f'thumb_middle_regrasp_{stage}')
+                    contact = contact_sequence[stage]
+                    print(stage, contact)
+                    if contact == 'pregrasp':
+                        _, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
+                            pregrasp_planner, data_saved, stage, mode='pregrasp', fname=f'pregrasp_{stage}')
 
-                elif contact == 'turn':
-                    _, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
-                        turn_planner, data_saved, stage, mode='turn', goal=None, fname=f'turn_{stage}')
+                    elif contact == 'index':
+                        _, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
+                            index_regrasp_planner, data_saved, stage, mode='index', goal=None, fname=f'index_regrasp_{stage}')
+
+                    elif contact == 'thumb_middle':
+                        _, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
+                            thumb_and_middle_regrasp_planner, data_saved, stage, mode='thumb_middle',
+                            goal=None, fname=f'thumb_middle_regrasp_{stage}')
+
+                    elif contact == 'turn':
+                        _, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
+                            turn_planner, data_saved, stage, mode='turn', goal=None, fname=f'turn_{stage}')
 
 
 
@@ -865,9 +873,9 @@ def do_trial(trial_ind, env, data_saved, params, fpath, sim_viz_env=None, ros_co
 
 if __name__ == "__main__":
     # get config
-    file_name = sys.argv[1]
+    # file_name = sys.argv[1]
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_diff_init_csvto.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_planned_replanned_hardware_viz.yaml').read_text())
     from tqdm import tqdm
 
     if config['mode'] == 'hardware':
@@ -956,8 +964,6 @@ if __name__ == "__main__":
     if config['use_saved_noise']:
         inits_noise, noise_noise = torch.load(f'{CCAI_PATH}/examples/saved_noise.pt')
     start_ind = 0
-    if file_name == 'allegro_screwdriver_diff_init_guided':
-        start_ind = 3
     for i in tqdm(range(0, config['num_trials'])):
         # fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/csvgd/trial_{i + 1}')
         

@@ -226,7 +226,7 @@ class GraphSearch(ContactSampler, AStar):
             J, _, _ = problem._objective(sample_range_mask)
 
             likelihood_this_c = likelihood[sample_range] * self.discount ** (len(cur_seq) - 1 * self.initial_run)
-
+            print('likelihood', c_state, likelihood[sample_range])
             # Add node's likelihood to likelihood_this_c
             if node.likelihoods is not None:
                 likelihood_this_c += node.likelihoods.repeat(self.num_samples_multi).to(likelihood_this_c.device)
