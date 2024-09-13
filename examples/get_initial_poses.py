@@ -78,9 +78,12 @@ if __name__ == "__main__":
         tform = world_trans.inverse()
         return tform.transform_points(point.reshape(1, 3)) - tform.get_matrix()[:, :3, 3]
     
-    cylinder_center = np.array([[0.08439247, 0.05959691, 0.05529295]])
-    cylinder_radius = 0.01
-    cylinder_height = 0.03
+    cylinder_center_world = torch.tensor([[0, 0, -0.02+0.1+0.05]])
+    cylinder_center = world_to_robot_frame(cylinder_center_world)
+    #cylinder_center = np.array([[0.08439247, 0.05959691, 0.05529295]])
+    cylinder_center = np.array([])
+    cylinder_radius = 0.02
+    cylinder_height = 0.1
 
     def get_circle_xy(radius, theta_0, theta_1):
         theta = np.random.rand(1) * (theta_1 - theta_0) + theta_0
@@ -149,17 +152,15 @@ if __name__ == "__main__":
 
     #print(default_poses[0].get_matrix().cpu().numpy()[:, :3, 3])
 
-    for i in range(1000):
-        # time.sleep(1)
-        # env.reset(dof_pos)
-        #goal_poses = default_poses.copy()
+    env.reset(dof_pos)
+    for i in range(200):
+        print("iteration: ", i)
 
         #goal_poses = [get_index_goal(delta_0), get_middle_goal(delta_1), get_thumb_goal(delta_2)]
         goal_poses = default_poses.copy()
         goal_poses[2] = get_thumb_goal(delta_2)
-        delta_2 += 0.002
+        delta_2 = 0#np.random.rand(1).item() * 0.015 - 0.015/2
         #print(delta_1)
-
         #print(goal_poses[0].get_matrix().cpu().numpy()[:, :3, 3])
         
         sol = ik.do_IK(goal_poses, ignore_dims=[3,4,5], current= partial_default_dof_pos.copy()).view(1, 12)
@@ -168,11 +169,9 @@ if __name__ == "__main__":
                     sol.clone()[:,8:], 
                     torch.zeros((1,4)).float().to(device=device)), 
                     dim=1).to(device)
-
         env.reset(solved_pos)
 
         initial_poses.append(solved_pos.cpu())
-    
 
     with open(f'{fpath.resolve()}/initial_poses.pkl', 'wb') as f:
         pkl.dump(initial_poses, f)

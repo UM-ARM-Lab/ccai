@@ -34,7 +34,7 @@ class IKSolver:
         _lambda = 1e-6
         eye = torch.eye(6, device=self.device)
         ret = torch.zeros(16)
-        num_iter = 2000
+        num_iter = 5000#2000
         for i, finger in enumerate(self.fingers):
             tmp_target_pose = target_pose[i].get_matrix()
             tmp_target_position = tmp_target_pose[:, :3, 3]
@@ -84,7 +84,7 @@ class IKSolver:
                     break
                 if j == num_iter - 1:
                     print(f'{finger} Failed to converge')
-                    print(error[torch.argmin(torch.linalg.norm(error, dim=-1))])
+                    #print(error[torch.argmin(torch.linalg.norm(error, dim=-1))])
                     ret[self.finger2index[finger]] = q[torch.argmin(torch.linalg.norm(error, dim=-1))][self.finger2index[finger]]
 
         ret = full_to_partial_state(ret, fingers=self.fingers)
