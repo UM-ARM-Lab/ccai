@@ -1127,6 +1127,9 @@ class AllegroValveTurning(AllegroContactProblem):
             finger_torque = self.finger_stiffness * delta_q
             finger_torque[:7] = 0
             g_force_torque_balance = sum_reactional_torque + arm_torque + finger_torque
+
+            # NOTE: assume quasistatic, the arm does not contribute to any forces at the end effector. 
+            # g_force_torque_balance = g_force_torque_balance[7:]
         else:
             g_force_torque_balance = (sum_reactional_torque + self.finger_stiffness * delta_q)
         # print(g_force_torque_balance.max(), torque_list.max())
@@ -1245,12 +1248,14 @@ class AllegroValveTurning(AllegroContactProblem):
         R = self.get_rotation_from_normal(contact_normal.reshape(-1, 3)).reshape(3, 3).detach().transpose(1,0)
         R = R[:2]
         # compute contact v tangential to surface
-        contact_point_v_tan = contact_point_v - (normal_projection @ contact_point_v.unsqueeze(-1)).squeeze(-1)
-        object_contact_point_v_tan = object_contact_point_v - (normal_projection @ object_contact_point_v.unsqueeze(-1)).squeeze(-1)
+        # contact_point_v_tan = contact_point_v - (normal_projection @ contact_point_v.unsqueeze(-1)).squeeze(-1)
+        # object_contact_point_v_tan = object_contact_point_v - (normal_projection @ object_contact_point_v.unsqueeze(-1)).squeeze(-1)
 
         # we actually ended up computing T+1 contact constraints, but start state is fixed so we throw that away
         # g = (contact_point_v - object_contact_point_v).reshape(N, -1) # DEBUG ONLY
-        g = (R @ (contact_point_v_tan - object_contact_point_v_tan).unsqueeze(-1)).squeeze(-1)
+        # g = (R @ (contact_point_v_tan - object_contact_point_v_tan).unsqueeze(-1)).squeeze(-1)
+        g = (R @ (contact_point_v - object_contact_point_v).unsqueeze(-1)).squeeze(-1)
+        # g = contact_point_v - object_contact_point_v
 
         return g
 
@@ -1581,10 +1586,10 @@ class AllegroValveTurning(AllegroContactProblem):
 
         # u is the delta q commanded
         # retrieved cached values
-        contact_jac = self.data[finger_name]['contact_jacobian'].reshape(N, T + 1, 3, self.robot_dof)[:, :-1]
-        contact_normal = self.data[finger_name]['contact_normal'].reshape(N, T + 1, 3)[:, :-1] # contact normal is pointing out 
-        dnormal_dq = self.data[finger_name]['dnormal_dq'].reshape(N, T + 1, 3, self.robot_dof)[:, :-1]
-        dnormal_dtheta = self.data[finger_name]['dnormal_denv_q'].reshape(N, T + 1, 3, self.obj_dof)[:, :-1]
+        contact_jac = self.data[finger_name]['contact_jacobian'].reshape(N, T + 1, 3, self.robot_dof)[:, 1:]
+        contact_normal = self.data[finger_name]['contact_normal'].reshape(N, T + 1, 3)[:, 1:] # contact normal is pointing out 
+        dnormal_dq = self.data[finger_name]['dnormal_dq'].reshape(N, T + 1, 3, self.robot_dof)[:, 1:]
+        dnormal_dtheta = self.data[finger_name]['dnormal_denv_q'].reshape(N, T + 1, 3, self.obj_dof)[:, 1:]
 
         # compute constraint value
         h = self.friction_constr(u,
@@ -1597,7 +1602,7 @@ class AllegroValveTurning(AllegroContactProblem):
                                                                    contact_normal.reshape(-1, 3),
                                                                    contact_jac.reshape(-1, 3, self.robot_dof))
 
-            djac_dq = self.data[finger_name]['dJ_dq'].reshape(N, T + 1, 3, self.robot_dof, self.robot_dof)[:, :-1]
+            djac_dq = self.data[finger_name]['dJ_dq'].reshape(N, T + 1, 3, self.robot_dof, self.robot_dof)[:, 1:]
 
             dh = dh_dnormal.shape[1]
             dh_dq = dh_dnormal.reshape(N, T, dh, -1) @ dnormal_dq
@@ -1607,8 +1612,10 @@ class AllegroValveTurning(AllegroContactProblem):
             T_range = torch.arange(T, device=self.device)
             T_range_minus = torch.arange(T - 1, device=self.device)
             T_range_plus = torch.arange(1, T, device=self.device)
-            grad_h[:, :, T_range_plus, T_range_minus, :self.robot_dof] = dh_dq[:, 1:].transpose(1, 2)
-            grad_h[:, :, T_range_plus, T_range_minus, self.robot_dof: self.robot_dof + self.obj_dof] = dh_dtheta[:, 1:].transpose(1, 2)
+            # grad_h[:, :, T_range_plus, T_range_minus, :self.robot_dof] = dh_dq[:, 1:].transpose(1, 2)
+            # grad_h[:, :, T_range_plus, T_range_minus, self.robot_dof: self.robot_dof + self.obj_dof] = dh_dtheta[:, 1:].transpose(1, 2)
+            grad_h[:, :, T_range, T_range, :self.robot_dof] = dh_dq[:, :].transpose(1, 2)
+            grad_h[:, :, T_range, T_range, self.robot_dof: self.robot_dof + self.obj_dof] = dh_dtheta[:, :].transpose(1, 2)
             if self.optimize_force:
                 grad_h[:, :, T_range, T_range, self.dx + self.robot_dof + force_index[0]: self.dx + self.robot_dof + force_index[-1] + 1] = dh_du.reshape(N, T, dh, 3).transpose(1, 2)
             else:
@@ -2046,13 +2053,17 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             # tmp = torch.zeros((traj_for_viz.shape[0], 1), device=best_traj.device) # add the joint for the screwdriver cap
             # traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
             # traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + turn_problem.obj_dof] = axis_angle_to_euler(traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + turn_problem.obj_dof])
-        
+            if params['use_arm']:
+                camera_params = "screwdriver_w_arm"
+            else:
+                camera_params = "screwdriver"
             viz_fpath = pathlib.PurePath.joinpath(fpath, f"timestep_{k}")
             img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
             gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
             pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
             pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-            visualize_trajectory(traj_for_viz, turn_problem.contact_scenes['index'], viz_fpath, turn_problem.fingers, turn_problem.obj_dof+1)
+            visualize_trajectory(traj_for_viz, turn_problem.contact_scenes['index'], viz_fpath, 
+                                 turn_problem.fingers, turn_problem.obj_dof+1, use_arm=params['use_arm'], camera_params=camera_params)
 
 
         # process the action
