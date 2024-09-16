@@ -15,6 +15,7 @@ from torch.func import vmap, jacrev, hessian, jacfwd
 import matplotlib.pyplot as plt
 from utils.allegro_utils import *
 from allegro_valve_roll import AllegroValveTurning, AllegroContactProblem, PositionControlConstrainedSVGDMPC, add_trajectories, add_trajectories_hardware
+from allegro_screwdriver import ALlegroScrewdriverContact
 from scipy.spatial.transform import Rotation as R
 from baselines.planning.ik import IKSolver
 
@@ -25,6 +26,8 @@ if __name__ == "__main__":
     fingers=['index', 'middle', 'thumb']
 
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver.yaml').read_text())
+
+    params = config.copy()
     env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
                                 use_cartesian_controller=False,
                                 viewer=True,
@@ -40,6 +43,7 @@ if __name__ == "__main__":
     sim, gym, viewer = env.get_sim()
     state = env.get_state()
     device = config['sim_device']
+    params['device'] = device
 
     dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float().to(device=device),
                         torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float().to(device=device),
@@ -58,13 +62,22 @@ if __name__ == "__main__":
             'ring': 'allegro_hand_kusuri_finger_finger_2_aftc_base_link',
             'thumb': 'allegro_hand_oya_finger_3_aftc_base_link',
             }
+    params['ee_names'] = ee_names
+    params['obj_dof_code'] = [0, 0, 0, 1, 1, 1]
+    params['obj_dof'] = np.sum(params['obj_dof_code'])
+
     screwdriver_asset = f'{get_assets_dir()}/screwdriver/screwdriver.urdf'
     screwdriver_chain = pk.build_chain_from_urdf(open(screwdriver_asset).read())
     
     chain = pk.build_chain_from_urdf(open(asset).read())
+    params['chain'] = chain.to(device=device)
     frame_indices = [chain.frame_to_idx[ee_names[finger]] for finger in fingers]    # combined chain
     frame_indices = torch.tensor(frame_indices)
     state2ee_pos = partial(state2ee_pos, fingers=fingers, chain=chain, frame_indices=frame_indices, world_trans=env.world_trans)
+    
+    object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
+    params['object_location'] = object_location
+    params.update(config['controllers']['csvgd'])
     
     forward_kinematics = partial(chain.forward_kinematics, frame_indices=frame_indices)
 
@@ -74,11 +87,11 @@ if __name__ == "__main__":
     default_poses = list(fk.values())
     
     world_trans = env.world_trans
+
     def world_to_robot_frame(point):
         tform = world_trans.inverse()
         return tform.transform_points(point.reshape(1, 3)) #- tform.get_matrix()[:, :3, 3]
     
-
     def screwdriver_to_world_tform(r=0, p=0):
         Rx = np.array([
             [1, 0, 0, 0],
@@ -108,12 +121,8 @@ if __name__ == "__main__":
         world = np.dot(sd_to_world, p)
         return np.dot(world_to_robot, world)[:,:3]
     
-    #print(screwdriver_to_robot_frame([0,0,0]))
     cylinder_center_world = torch.tensor([[0, 0, 0.330]])
     cylinder_center = world_to_robot_frame(cylinder_center_world)
-    #print(cylinder_center)
-    #cylinder_center = np.array([[0.08439247, 0.05959691, 0.05529295]])
-    #exit()
     cylinder_radius = 0.0#0.02
     cylinder_height = 0.1
 
@@ -123,87 +132,102 @@ if __name__ == "__main__":
         y = radius * np.sin(theta)
         return x.item(), y.item()
 
-    def get_index_goal(delta = 0):
-        goal_index = default_poses[0].clone()
+    def get_index_goal():
 
         circle_x, circle_y = get_circle_xy(cylinder_radius, 0, 3.14)
         z_offset = cylinder_height/2
 
-        offset_screwdriver_frame = torch.tensor([circle_x, circle_y, z_offset]).to(device)
-        offset_robot_frame = screwdriver_to_robot_frame(offset_screwdriver_frame).reshape(1,3)
+        goal_screwdriver_frame = torch.tensor([circle_x, circle_y, z_offset]).to(device)
+        goal_robot_frame = screwdriver_to_robot_frame(goal_screwdriver_frame).reshape(1,3)
 
-        pos_index = cylinder_center + offset_robot_frame
-        pos_index = torch.tensor(pos_index).to(device)
-        goal_index._matrix[:, :3, 3] = pos_index.clone()
-        return goal_index
+        #goal_robot_frame = default_poses[2].clone()
+        return goal_robot_frame
 
     def get_middle_goal(delta = 0):
-        goal_middle = default_poses[1].clone()
         
-        z_offset_range = 0.012
-        z_offset = 0#float(np.random.rand(1)) * 2*z_offset_range - z_offset_range
         circle_x, circle_y = get_circle_xy(cylinder_radius, 0, 3.14)
+        z_offset = 0#float(np.random.rand(1)) * 2*z_offset_range - z_offset_range
 
-        offset_world_frame = torch.tensor([[circle_x, circle_y, z_offset]]).to(device)
-        offset_robot_frame = world_to_robot_frame(offset_world_frame).cpu().numpy()
+        goal_screwdriver_frame = torch.tensor([circle_x, circle_y, z_offset]).to(device)
+        goal_robot_frame = screwdriver_to_robot_frame(goal_screwdriver_frame).reshape(1,3)
 
-        pos_middle = cylinder_center + offset_robot_frame
-        pos_middle = torch.tensor(pos_middle).to(device)
-        goal_middle._matrix[:, :3, 3] = pos_middle
-        return goal_middle
+        #goal_robot_frame = default_poses[2].clone()
+        return goal_robot_frame
+    
     
     def get_thumb_goal(delta = 0):
-        goal_thumb = default_poses[2].clone()
-        z_offset_range = 0.012
-        z_offset = 0#float(np.random.rand(1)) * 2*z_offset_range - z_offset_range
+
         circle_x, circle_y = get_circle_xy(cylinder_radius, 0, 3.14)
+        z_offset = 0#float(np.random.rand(1)) * 2*z_offset_range - z_offset_range
 
-        offset_world_frame = torch.tensor([[circle_x, circle_y, z_offset]]).to(device)
-        offset_robot_frame = torch.tensor([[0,0,delta]])
-        offset_robot_frame = world_to_robot_frame(offset_world_frame).cpu().numpy()
-        
-        og = default_poses.copy()[2].get_matrix().cpu().numpy()[:, :3, 3]
-        #pos_thumb = cylinder_center + offset_robot_frame
-        pos_thumb = og + offset_robot_frame
-        pos_thumb = torch.tensor(pos_thumb).to(device)
-        goal_thumb._matrix[:, :3, 3] = pos_thumb
-        return goal_thumb
+        goal_screwdriver_frame = torch.tensor([circle_x, circle_y, z_offset]).to(device)
+        goal_robot_frame = screwdriver_to_robot_frame(goal_screwdriver_frame).reshape(1,3)
 
-    lim = torch.tensor(chain.get_joint_limits(), device=device)
-    
-    ik = IKSolver(chain, fingers, device)
-    #sol = ik.do_IK(default_poses, ignore_dims=[3,4,5]).view(1, 12)
+        #goal_robot_frame = default_poses[2].clone()
+        return goal_robot_frame
 
-    delta_0 = 0.0
-    delta_1 = 0.0
-    delta_2 = 0.0#15
-
-    # thumb z +- 0.012
     initial_poses = []
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
-
-    #print(default_poses[0].get_matrix().cpu().numpy()[:, :3, 3])
 
     env.reset(dof_pos)
     for i in range(200):
         print("iteration: ", i)
 
-        #goal_poses = [get_index_goal(delta_0), get_middle_goal(delta_1), get_thumb_goal(delta_2)]
-        goal_poses = default_poses.copy()
-        goal_poses[0] = get_index_goal(delta_0)
-        delta_2 = 0
-        #print(delta_1)
-        #print(goal_poses[0].get_matrix().cpu().numpy()[:, :3, 3])
-        
-        sol = ik.do_IK(goal_poses, ignore_dims=[3,4,5], current= partial_default_dof_pos.copy()).view(1, 12)
-        solved_pos = torch.cat((sol.clone()[:,:8], 
-                    torch.tensor([[0., 0.5, 0.65, 0.65]]).to(device=device), 
-                    sol.clone()[:,8:], 
-                    torch.zeros((1,4)).float().to(device=device)), 
-                    dim=1).to(device)
-        env.reset(solved_pos)
+        #goal_poses = default_poses.copy()
+        goal_poses = torch.tensor([get_index_goal(), get_middle_goal(), get_thumb_goal()]).to(device)
 
-        initial_poses.append(solved_pos.cpu())
+        obj_dof = 3
+        num_fingers = len(params['fingers'])
+        start = state['q'].reshape(4 * num_fingers + 4).to(device=device)
+        if 'index' in params['fingers']:
+            contact_fingers = params['fingers']
+        else:
+            contact_fingers = ['index'] + params['fingers']    
+        pregrasp_problem = ALlegroScrewdriverContact(
+            dx=4 * num_fingers,
+            du=4 * num_fingers,
+            start=start[:4 * num_fingers + obj_dof],
+            goal=None,
+            T=4,
+            chain=params['chain'],
+            device=device,
+            object_asset_pos=env.table_pose,
+            object_location=params['object_location'],
+            object_type=params['object_type'],
+            world_trans=env.world_trans,
+            fingers=contact_fingers,
+            obj_dof_code=params['obj_dof_code'],
+            obj_joint_dim=1,
+            fixed_obj=True,
+            goal_poses=goal_poses,
+        )
+        pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
+        pregrasp_planner.warmup_iters = 50
+
+        start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=device)
+        best_traj, _ = pregrasp_planner.step(start[:4 * num_fingers])
+
+        if params['visualize_plan']:
+            traj_for_viz = best_traj[:, :pregrasp_problem.dx]
+            tmp = start[4 * num_fingers:].unsqueeze(0).repeat(traj_for_viz.shape[0], 1)
+            traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)    
+            viz_fpath = pathlib.PurePath.joinpath(fpath, "pregrasp")
+            img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
+            gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
+            pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
+            pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
+            visualize_trajectory(traj_for_viz, pregrasp_problem.viz_contact_scenes, viz_fpath, pregrasp_problem.fingers, pregrasp_problem.obj_dof+1)
+
+
+        for x in best_traj[:, :4 * num_fingers]:
+            action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
+            env.step(action)
+            #action_list.append(action)
+
+
+        #solved_pos = 0
+        #env.reset(solved_pos)
+        #initial_poses.append(solved_pos.cpu())
 
     with open(f'{fpath.resolve()}/initial_poses.pkl', 'wb') as f:
         pkl.dump(initial_poses, f)
