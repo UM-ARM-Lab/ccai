@@ -14,8 +14,7 @@ friction_coefficient: 0.95
 kp: 3.0
 visualize_plan: False
 optimize_force: True
-exclude_index: False
-controllers:
+use_arm: Falsecontrollers:
   csvgd:
     # N: 16
     N: 4
