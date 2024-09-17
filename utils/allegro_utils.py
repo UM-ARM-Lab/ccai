@@ -11,7 +11,7 @@ from scipy.spatial.transform import Rotation as R
 full_finger_list = ['index', 'middle', 'ring', 'thumb']
 
 
-def partial_to_full_state(partial, fingers, use_arm=False):
+def partial_to_full_state(partial, fingers, arm_dof=0):
     """
     fingers: which fingers are in the partial state
     :params partial: B x 8 joint configurations for index and thumb
@@ -19,16 +19,16 @@ def partial_to_full_state(partial, fingers, use_arm=False):
 
     # assume that default is zeros, but could change
     """
-    if use_arm:
-        arm_q = partial[..., :7]
-        partial_fingers = partial[..., 7:]
+    if arm_dof > 0:
+        arm_q = partial[..., :arm_dof]
+        partial_fingers = partial[..., arm_dof:]
     else:
         partial_fingers = partial
     num_fingers = len(fingers)
     partial_fingers = torch.chunk(partial_fingers, chunks=num_fingers, dim=-1)
     partial_dict = dict(zip(fingers, partial_fingers))
     full = []
-    if use_arm:
+    if arm_dof > 0:
         full.append(arm_q)
     for i, finger in enumerate(full_finger_list):
         if finger in fingers:
@@ -39,20 +39,20 @@ def partial_to_full_state(partial, fingers, use_arm=False):
     return full
 
 
-def full_to_partial_state(full, fingers, use_arm=False):
+def full_to_partial_state(full, fingers, arm_dof=0):
     """
     :params partial: B x 8 joint configurations for index and thumb
     :return full: B x 16 joint configuration for full hand
 
     # assume that default is zeros, but could change
     """
-    if use_arm:
-        arm_q = full[..., :7]
-        full_finger = full[..., 7:]
+    if arm_dof > 0:
+        arm_q = full[..., :arm_dof]
+        full_finger = full[..., arm_dof:]
     index, mid, ring, thumb = torch.chunk(full_finger, chunks=4, dim=-1)
     full_dict = dict(zip(full_finger_list, [index, mid, ring, thumb]))
     partial = []
-    if use_arm:
+    if arm_dof > 0:
         partial.append(arm_q)
     for finger in fingers:
         partial.append(full_dict[finger])
@@ -121,20 +121,20 @@ def contact_finger_constraints(func):
     return wrapper
 
 
-def state2ee_pos(state, finger_name, fingers, chain, frame_indices, world_trans, use_arm=False):
+def state2ee_pos(state, finger_name, fingers, chain, frame_indices, world_trans, arm_dof=0):
     """
     :params state: B x 8 joint configuration for full hand
     :return ee_pos: B x 3 position of ee
 
     """
-    fk_dict = chain.forward_kinematics(partial_to_full_state(state, fingers, use_arm=use_arm), frame_indices=frame_indices)
+    fk_dict = chain.forward_kinematics(partial_to_full_state(state, fingers, arm_dof=arm_dof), frame_indices=frame_indices)
     m = world_trans.compose(fk_dict[finger_name]).to(state.device)
     points_finger_frame = torch.tensor([0.00, 0.03, 0.00], device=state.device).unsqueeze(0)
     ee_p = m.transform_points(points_finger_frame).squeeze(-2)
     return ee_p
 
 
-def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, camera_params=None, use_arm=False, headless=False):
+def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, camera_params=None, arm_dof=0, headless=False):
     num_fingers = len(fingers)
     # for a single trajectory
     T, dxu = trajectory.shape
@@ -143,15 +143,12 @@ def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, camer
     vis.create_window(width=int(800), height=int(600), visible=not headless)
     # update camera
     vis.get_render_option().mesh_show_wireframe = True
-    if use_arm:
-        robot_dof = 7 + 4 * num_fingers
-    else:
-        robot_dof = 4 * num_fingers
+    robot_dof = arm_dof + 4 * num_fingers
     for t in range(T):
         vis.clear_geometries()
         q = trajectory[t, : robot_dof]
         theta = trajectory[t, robot_dof: robot_dof + obj_dof]
-        meshes = scene.get_visualization_meshes(partial_to_full_state(q.unsqueeze(0), fingers, use_arm=use_arm).to(device=scene.device),
+        meshes = scene.get_visualization_meshes(partial_to_full_state(q.unsqueeze(0), fingers, arm_dof=arm_dof).to(device=scene.device),
                                                 theta.unsqueeze(0).to(device=scene.device))
         for mesh in meshes:
             vis.add_geometry(mesh)
