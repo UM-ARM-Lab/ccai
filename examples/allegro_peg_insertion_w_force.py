@@ -67,6 +67,9 @@ class AllegroPegInsertion(AllegroValveTurning):
                  optimize_force=False,
                  obj_dof_code=[1, 1, 1, 1, 1, 1],
                  obj_gravity=False,
+                 use_arm=False,
+                 arm_stiffness=None,
+                 finger_stiffness=None,
                  device='cuda:0', **kwargs):
         self.num_fingers = len(fingers)
         self.optimize_force = optimize_force
@@ -77,13 +80,18 @@ class AllegroPegInsertion(AllegroValveTurning):
                                         device=device).float(), device=device)
         self.wall_asset_pos = wall_asset_pos
         self.wall_dims = wall_dims.astype('float32')
-        du = (4 + 3) * self.num_fingers + 3 
+        if use_arm:
+            robot_dof = 4 * self.fingers + 7
+        else:
+            robot_dof = 4 * self.fingers
+        du = robot_dof + 3 * self.num_fingers + 3 
         self.obj_mass = 0.01
 
         super(AllegroPegInsertion, self).__init__(start=start, goal=goal, T=T, chain=chain, object_location=object_location,
                                                  object_type=object_type, world_trans=world_trans, object_asset_pos=peg_asset_pos,
                                                  fingers=fingers, friction_coefficient=friction_coefficient, obj_dof_code=obj_dof_code, 
-                                                 obj_joint_dim=0, optimize_force=optimize_force, du=du, obj_gravity=obj_gravity, device=device)
+                                                 obj_joint_dim=0, optimize_force=optimize_force, du=du, obj_gravity=obj_gravity, 
+                                                 use_arm=use_arm, arm_stiffness=arm_stiffness, finger_stiffness=finger_stiffness, device=device)
         self.friction_coefficient = friction_coefficient
         self.force_equlibrium_constr = vmap(self._force_equlibrium_constr_w_force)
         self.grad_force_equlibrium_constr = vmap(jacrev(self._force_equlibrium_constr_w_force, argnums=(0, 1, 2, 3, 4, 5, 6)))
@@ -241,6 +249,9 @@ class AllegroPegInsertion(AllegroValveTurning):
 
         # u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
         u = 0.025 * torch.randn(N, self.T, 4 * self.num_fingers, device=self.device)
+        if self.use_arm:
+            arm_u = 0.002 * torch.randn(N, self.T, 7, device=self.device)
+            u = torch.cat((arm_u, u), dim=-1)
         force = 0.015 * torch.randn(N, self.T, 3 * (self.num_fingers + 1), device=self.device)
         force[:, :, -3:] = force[:, :, -3:] * 0.1
         u = torch.cat((u, force), dim=-1)
@@ -691,10 +702,14 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         state = env.step(action)
 
     num_fingers = len(params['fingers'])
+    if params['use_arm']:
+        robot_dof = 4 * num_fingers + 7
+    else:
+        robot_dof = 4 * num_fingers
     state = env.get_state()
     action_list = []
 
-    start = state['q'].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
+    start = state['q'].reshape(robot_dof + obj_dof).to(device=params['device'])
 
     if params['controller'] == 'csvgd':
         # index finger is used for stability
@@ -703,9 +718,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         else:
             contact_fingers = ['index'] + params['fingers']        
         pregrasp_problem = AllegroContactProblem(
-            dx=4 * num_fingers,
-            du=4 * num_fingers,
-            start=start[:4 * num_fingers + obj_dof],
+            dx=robot_dof,
+            du=robot_dof,
+            start=start[:robot_dof + obj_dof],
             goal=None,
             T=4,
             chain=params['chain'],
@@ -725,38 +740,44 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         raise ValueError('Invalid controller')
     
     
-    start = env.get_state()['q'].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
-    best_traj, _ = pregrasp_planner.step(start[:4 * num_fingers])
+    start = env.get_state()['q'].reshape(robot_dof + obj_dof).to(device=params['device'])
+    best_traj, _ = pregrasp_planner.step(start[:robot_dof])
 
     if params['visualize_plan']:
+        if params['use_arm']:
+            camera_params = "screwdriver_w_arm"
+        else:
+            camera_params = "screwdriver"
         traj_for_viz = best_traj[:, :pregrasp_problem.dx]
-        tmp = start[4 * num_fingers:].unsqueeze(0).repeat(traj_for_viz.shape[0], 1)
+        tmp = start[robot_dof:].unsqueeze(0).repeat(traj_for_viz.shape[0], 1)
         traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)    
         viz_fpath = pathlib.PurePath.joinpath(fpath, "pregrasp")
         img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
         gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
         pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
         pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-        visualize_trajectory(traj_for_viz, pregrasp_problem.contact_scenes, viz_fpath, pregrasp_problem.fingers, pregrasp_problem.obj_dof+1)
+        visualize_trajectory(traj_for_viz, pregrasp_problem.contact_scenes, viz_fpath, 
+                             pregrasp_problem.fingers, pregrasp_problem.obj_dof+1,
+                             use_arm=params['use_arm'], camera_params=camera_params)
 
-    for x in best_traj[:, :4 * num_fingers]:
-        action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
+    for x in best_traj[:, :robot_dof]:
+        action = x.reshape(-1, robot_dof).to(device=env.device) # move the rest fingers
         if params['mode'] == 'hardware':
             sim_viz_env.set_pose(env.get_state()['all_state'].to(device=env.device))
             sim_viz_env.step(action)
         env.step(action)
         action_list.append(action)
         if params['mode'] == 'hardware_copy':
-            ros_copy_node.apply_action(partial_to_full_state(x.reshape(-1, 4 * num_fingers)[0], params['fingers']))
+            ros_copy_node.apply_action(partial_to_full_state(x.reshape(-1, robot_dof)[0], params['fingers']))
 
     desired_table_pose = torch.tensor([0, 0, -1.0, 0, 0, 0, 1]).float().to(env.device)
     env.set_table_pose(env.handles['table'][0], desired_table_pose)
 
     state = env.get_state()
-    state = env.step(state['q'][:, :4 * num_fingers])
-    start = state['q'].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
+    state = env.step(state['q'][:, :robot_dof])
+    start = state['q'].reshape(robot_dof + obj_dof).to(device=params['device'])
     turn_problem_fingers = params['fingers']
-    turn_problem_start = start[:4 * num_fingers + obj_dof]
+    turn_problem_start = start[:robot_dof + obj_dof]
     turn_problem = AllegroPegInsertion(
         start=turn_problem_start,
         goal=params['object_goal'],
@@ -796,7 +817,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
 
     for finger in params['fingers']:
-        ee = state2ee_pos(start[:4 * num_fingers], turn_problem.ee_names[finger])
+        ee = state2ee_pos(start[:robot_dof], turn_problem.ee_names[finger])
         finger_traj_history[finger].append(ee.detach().cpu().numpy())
 
     num_fingers_to_plan = num_fingers
@@ -808,12 +829,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
     for k in range(params['num_steps']):
         state = env.get_state()
-        start = state['q'].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
+        start = state['q'].reshape(robot_dof + obj_dof).to(device=params['device'])
 
-        actual_trajectory.append(state['q'][:, :4 * num_fingers + obj_dof].squeeze(0).clone())
+        actual_trajectory.append(state['q'][:, :robot_dof + obj_dof].squeeze(0).clone())
         start_time = time.time()
 
-        best_traj, trajectories = turn_planner.step(start[:4 * num_fingers + obj_dof])
+        best_traj, trajectories = turn_planner.step(start[:robot_dof + obj_dof])
 
         solve_time = time.time() - start_time
         if k == 0:
@@ -821,7 +842,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         else:
             duration += solve_time
         print(f"solve time: {solve_time}")
-        planned_theta_traj = best_traj[:, 4 * num_fingers_to_plan: 4 * num_fingers_to_plan + obj_dof].detach().cpu().numpy()
+        planned_theta_traj = best_traj[:, robot_dof: robot_dof + obj_dof].detach().cpu().numpy()
         print(f"current theta: {state['q'][0, -obj_dof:].detach().cpu().numpy()}")
         print(f"planned theta: {planned_theta_traj}")
         # add trajectory lines to sim
@@ -843,13 +864,14 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
             pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
             pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-            visualize_trajectory(traj_for_viz, turn_problem.robot_peg_scenes, viz_fpath, turn_problem.fingers, turn_problem.obj_dof)
+            visualize_trajectory(traj_for_viz, turn_problem.robot_peg_scenes, viz_fpath, turn_problem.fingers, 
+                                 turn_problem.obj_dof, use_arm=params['use_arm'], camera_params=camera_params)
             
             img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img_obj')
             gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif_obj')
             pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
             pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-            visualize_obj_trajectory(traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof], turn_problem.peg_wall_scenes, viz_fpath)
+            visualize_obj_trajectory(traj_for_viz[:, robot_dof: robot_dof + obj_dof], turn_problem.peg_wall_scenes, viz_fpath)
         
         x = best_traj[0, :turn_problem.dx+turn_problem.du]
         x = x.reshape(1, turn_problem.dx+turn_problem.du)
@@ -861,10 +883,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         action = x[:, turn_problem.dx:turn_problem.dx+turn_problem.du].to(device=env.device)
         if params['optimize_force']:
             print("planned force")
-            print(action[:, 4 * num_fingers_to_plan:].reshape(num_fingers_to_plan + 1, 3)) # print out the action for debugging
+            print(action[:, robot_dof:].reshape(num_fingers_to_plan + 1, 3)) # print out the action for debugging
 
-        action = action[:, :4 * num_fingers_to_plan]
-        action = action + start.unsqueeze(0)[:, :4 * num_fingers].to(action.device) # NOTE: this is required since we define action as delta action
+        action = action[:, :robot_dof]
+        action = action + start.unsqueeze(0)[:, :robot_dof].to(action.device) # NOTE: this is required since we define action as delta action
         if params['mode'] == 'hardware':
             sim_viz_env.set_pose(env.get_state()['all_state'].to(device=env.device))
             sim_viz_env.step(action)
@@ -904,9 +926,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
         gym.clear_lines(viewer)
         state = env.get_state()
-        start = state['q'][:,:4 * num_fingers + obj_dof].squeeze(0).to(device=params['device'])
+        start = state['q'][:,:robot_dof + obj_dof].squeeze(0).to(device=params['device'])
         for finger in params['fingers']:
-            ee = state2ee_pos(start[:4 * num_fingers], turn_problem.ee_names[finger])
+            ee = state2ee_pos(start[:robot_dof], turn_problem.ee_names[finger])
             finger_traj_history[finger].append(ee.detach().cpu().numpy())
         for finger in params['fingers']:
             traj_history = finger_traj_history[finger]
@@ -935,9 +957,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
 
     state = env.get_state()
-    state = state['q'].reshape(4 * num_fingers + obj_dof).to(device=params['sim_device'])
-    actual_trajectory.append(state.clone()[: 4 * num_fingers + obj_dof])
-    actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
+    state = state['q'].reshape(robot_dof + obj_dof).to(device=params['sim_device'])
+    actual_trajectory.append(state.clone()[: robot_dof + obj_dof])
+    actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, robot_dof + obj_dof)
     turn_problem.T = actual_trajectory.shape[0]
     # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
     final_distance_to_goal_pos = distance2goal_pos.item()
@@ -997,7 +1019,10 @@ if __name__ == "__main__":
     results = {}
 
     # set up the kinematic chain
-    asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
+    if config['use_arm']:
+        asset = f'{get_assets_dir()}/xela_models/victor_allegro.urdf'
+    else:
+        asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
     ee_names = {
             'index': 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
             'middle': 'allegro_hand_naka_finger_finger_1_aftc_base_link',
@@ -1014,7 +1039,7 @@ if __name__ == "__main__":
     # screwdriver_chain = pk.build_chain_from_urdf(open(screwdriver_asset).read())
     frame_indices = [chain.frame_to_idx[ee_names[finger]] for finger in config['fingers']]    # combined chain
     frame_indices = torch.tensor(frame_indices)
-    state2ee_pos = partial(state2ee_pos, fingers=config['fingers'], chain=chain, frame_indices=frame_indices, world_trans=env.world_trans)
+    state2ee_pos = partial(state2ee_pos, fingers=config['fingers'], chain=chain, frame_indices=frame_indices, world_trans=env.world_trans, use_arm=config['use_arm'])
     
     forward_kinematics = partial(chain.forward_kinematics, frame_indices=frame_indices) # full_to= _partial_state = partial(full_to_partial_state, fingers=config['fingers'])
     # partial_to_full_state = partial(partial_to_full_state, fingers=config['fingers'])
