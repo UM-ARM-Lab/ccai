@@ -5,3 +5,4 @@ venv/
 ccai.egg-info/
 data/
 script/gif_only.py
+ccai.code-workspace
