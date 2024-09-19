@@ -550,7 +550,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         """
 
         u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
-        u[:, :, :self.arm_dof] = u[:, :, :self.arm_dof] * 00.1
+        u[:, :, :self.arm_dof] = u[:, :, :self.arm_dof] * 0.1
 
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
         for t in range(self.T):

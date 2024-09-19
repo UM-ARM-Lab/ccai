@@ -1,10 +1,10 @@
 ---
-T: 8
+T: 12
 receding_horizon: False
-num_steps: 8
+num_steps: 12
 num_trials: 20
 visualize: True
-experiment_name: 'allegro_screwdriver_w_arm_test'
+experiment_name: 'allegro_screwdriver_arm_test'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
