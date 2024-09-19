@@ -145,7 +145,7 @@ def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headl
             #Get current working directory
             cwd = os.getcwd()
 
-            parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-09-10-09-05-47.json")
+            parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-08-07-10-49-00.json")
         elif task == 'card':
             parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_card.json")
         ctr.convert_from_pinhole_camera_parameters(parameters, allow_arbitrary=True)

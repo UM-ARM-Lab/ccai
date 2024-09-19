@@ -164,11 +164,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             fingers = ['index'] + params['fingers']
 
         # if params['mode'] == 'hardware':
-        min_force_dict = {
-            'thumb': 1.,
-            'middle': 1.,
-            'index': .0,
-        }
+        #     min_force_dict = {
+        #         'thumb': 1,
+        #         'middle': 1,
+        #         'index': .0,
+        #     }
+        # else:
+        min_force_dict = None
 
         # min_force_dict = {
         #     'thumb': 0,
@@ -617,7 +619,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         # generate initial samples with diffusion model
         sim_rollouts = None
-        if initial_samples is None and trajectory_sampler is not None and params.get('diff_init', True):
+        if trajectory_sampler is not None and params.get('diff_init', True):
             with torch.no_grad():
                 start = state.clone()
                 # if state[-1] < -1.0:
@@ -642,9 +644,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             #     sim_rollout = rollout_trajectory_in_sim(env_sim_rollout, initial_samples[i])
             #     sim_rollouts[i] = sim_rollout
         if initial_samples is not None:
-            # if params['mode'] == 'hardware' and mode == 'turn':
-            #     initial_samples[..., 30:] = 1.5 * torch.randn(params['N'], params['T']+1, 6, device=initial_samples.device)
-                # initial_samples[..., 30:] *= 2
+            if params['mode'] == 'hardware' and mode == 'turn':
+                initial_samples[..., 30:] = 1.5 * torch.randn(params['N'], params['T']+1, 6, device=initial_samples.device)
+
             initial_samples = _full_to_partial(initial_samples, mode)
             initial_x = initial_samples[:, 1:, :planner.problem.dx]
             initial_u = initial_samples[:, :-1, -planner.problem.du:]
@@ -955,16 +957,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         contact_sequence = contact_sequence[offset:] 
 
         initial_samples = None
-        if params['multi_particle_search'] and last_node.trajectory is not None and last_node.trajectory.shape[0] >= params['N']:
-            traj = last_node.trajectory
-            initial_samples = traj[:, :params['T'] + 1].to(device=params['device'])
-            if params['sine_cosine']:
-                initial_samples = convert_sine_cosine_to_yaw(initial_samples)
 
-            # Pick the top params['N'] trajectories from initial_samples based on likelihood
-            likelihoods = last_node.likelihoods
-            top_indices = torch.argsort(likelihoods, descending=True)[:params['N']]
-            initial_samples = initial_samples[top_indices]
         torch.cuda.empty_cache()
         return contact_sequence, next_node, initial_samples
 
@@ -983,7 +976,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     sample_contact = params.get('sample_contact', False)
     num_stages = 2 + 3 * (params['num_turns'] - 1)
     if not sample_contact:
-        contact_sequence = ['index', 'turn']
+        contact_sequence = ['turn']
         for k in range(params['num_turns'] - 1):
             contact_options = ['index', 'thumb_middle']
             perm = np.random.permutation(2)
@@ -1209,10 +1202,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_sine_cosine_min_force_mag.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_hardware.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_planned_replanned_hardware.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+
     from tqdm import tqdm
 
     sim_env = None

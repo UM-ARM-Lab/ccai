@@ -1784,12 +1784,18 @@ class AllegroContactProblem(AllegroObjectProblem):
                 compute_grads=compute_grads,
                 compute_hess=compute_hess,
                 projected_diffusion=projected_diffusion)
-            h_min, grad_h_min, hess_h_min = self._min_force_constraints(
-                q, force, compute_grads=compute_grads, compute_hess=compute_hess,
-                projected_diffusion=projected_diffusion)
-            h = torch.cat((h, h2, h_min), dim=1)
+            h = torch.cat((h, h2), dim=1)
             if grad_h is not None:
-                grad_h = torch.cat((grad_h, grad_h2, grad_h_min), dim=1)
+                grad_h = torch.cat((grad_h, grad_h2), dim=1)
+            if self.min_force_dict is not None:
+                h_min, grad_h_min, hess_h_min = self._min_force_constraints(
+                    q, force, compute_grads=compute_grads, compute_hess=compute_hess,
+                    projected_diffusion=projected_diffusion)
+                h = torch.cat((h, h_min), dim=1)
+                if grad_h is not None and grad_h_min is not None:
+                    grad_h = torch.cat((grad_h, grad_h_min), dim=1)
+            # if grad_h is not None:
+            #     grad_h = torch.cat((grad_h, grad_h2, grad_h_min), dim=1)
             if hess_h is not None:
                 hess_h = torch.cat((hess_h, hess_h2, hess_h_min), dim=1)
         # print("friction", h.max())

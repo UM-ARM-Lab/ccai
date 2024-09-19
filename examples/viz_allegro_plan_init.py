@@ -1,8 +1,8 @@
 from isaac_victor_envs.utils import get_assets_dir
 from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
 # from isaac_victor_envs.tasks.allegro_ros import RosAllegroValveTurningEnv
+from ccai.utils.allegro_utils import *
 
-import numpy as np
 import pickle as pkl
 
 import torch
@@ -20,7 +20,7 @@ from torch.func import vmap, jacrev, hessian, jacfwd
 # import pytorch3d.transforms as tf
 
 import matplotlib.pyplot as plt
-from ccai.utils.allegro_utils import *
+import numpy as np
 # from allegro_valve_roll import AllegroValveTurning, AllegroContactProblem, PositionControlConstrainedSVGDMPC, \
 #    add_trajectories, add_trajectories_hardware
 
@@ -964,7 +964,8 @@ if __name__ == "__main__":
     if config['use_saved_noise']:
         inits_noise, noise_noise = torch.load(f'{CCAI_PATH}/examples/saved_noise.pt')
     start_ind = 0
-    for i in tqdm(range(0, config['num_trials'])):
+    for i in tqdm(range(8, config['num_trials'])):
+    # for i in tqdm(range(7, config['num_trials'])):
         # fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/csvgd/trial_{i + 1}')
         
         # data_saved = pkl.load(open(f"{fpath}/traj_data.p", "rb"))
