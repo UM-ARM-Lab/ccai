@@ -79,12 +79,19 @@ if __name__ == "__main__":
     with open(f'{fpath.resolve()}/initial_poses.pkl', 'rb') as file:
         initial_poses  = pkl.load(file)
     
-    print(initial_poses)
 
-    for i in range(len(initial_poses)):
-        env.reset(initial_poses[i])
-        time.sleep(1)
+    with open(f'{fpath.resolve()}/contact_points.pkl', 'rb') as file:
+        contact_points  = pkl.load(file)
     
+    print(contact_points)
+
+    #print(initial_poses)
+
+    while True:
+        for i in range(len(initial_poses)):
+            env.reset(initial_poses[i])
+            time.sleep(1)
+        exit()
 
 
     gym.destroy_viewer(viewer)

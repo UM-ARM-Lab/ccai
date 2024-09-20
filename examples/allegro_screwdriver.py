@@ -63,7 +63,7 @@ class ALlegroScrewdriverContact(AllegroContactProblem):
         self.desired_ee_locs = goal_poses
         
     
-    def _ee_locations_in_screwdriver(self, q_rob, q_env):
+    def _ee_locations_in_robot_frame(self, q_rob, q_env):
 
         assert q_rob.shape[-1] == 16
         assert q_env.shape[-1] == self.obj_dof
@@ -81,15 +81,15 @@ class ALlegroScrewdriverContact(AllegroContactProblem):
 
         ee_locs = torch.stack(ee_locs, dim=1)
 
-        # convert to scene base frame
-        ee_locs = self.contact_scenes.scene_transform.inverse().transform_points(ee_locs)
+        # # convert to scene base frame
+        # ee_locs = self.contact_scenes.scene_transform.inverse().transform_points(ee_locs)
 
-        # convert to scene ee frame
-        object_trans = self.contact_scenes.scene_sdf.chain.forward_kinematics(
-            _q_env.reshape(-1, _q_env.shape[-1]))
+        # # convert to scene ee frame
+        # object_trans = self.contact_scenes.scene_sdf.chain.forward_kinematics(
+        #     _q_env.reshape(-1, _q_env.shape[-1]))
 
-        object_link_name = 'screwdriver_body'
-        ee_locs = object_trans[object_link_name].inverse().transform_points(ee_locs)
+        # object_link_name = 'screwdriver_body'
+        # ee_locs = object_trans[object_link_name].inverse().transform_points(ee_locs)
 
         num_regrasps = len(regrasp_fingers)
         return ee_locs.reshape(q_rob.shape[:-1] + (num_regrasps, 3))
@@ -120,11 +120,20 @@ class ALlegroScrewdriverContact(AllegroContactProblem):
 
         q = partial_to_full_state(xu[:, :self.num_fingers * 4], self.fingers)
         theta = xu[:, self.num_fingers * 4:self.num_fingers * 4 + self.obj_dof]
-        print(((self._ee_locations_in_screwdriver(q, theta)) ** 2).shape)
-        print(self.desired_ee_locs.shape)
-        exit()
-        desired_contact_cost = 1000 * torch.sum((self.desired_ee_locs - self._ee_locations_in_screwdriver(q, theta)) ** 2)
+        #print(self._ee_locations_in_screwdriver(q, theta)[0,:,:].shape)
+        #print(self.desired_ee_locs.shape)
+        #exit()
+        current_ee_locs = self._ee_locations_in_robot_frame(q, theta)[-1,:,:]
+        desired_contact_cost = 1000 * torch.sum((self.desired_ee_locs - current_ee_locs) ** 2)
+        # print("target points: ", self.desired_ee_locs)
+        # print("current points: ", current_ee_locs)
+        #exit()
+
+        # [[ 0.0825,  0.0581,  0.0858],
+        # [ 0.0833, -0.0092,  0.0724],
+        # [ 0.1031,  0.0468, -0.0321]],
         
+
         return desired_contact_cost
         #return smoothness_cost + action_cost + goal_cost
 
