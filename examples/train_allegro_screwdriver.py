@@ -73,7 +73,7 @@ def train_model(trajectory_sampler, train_loader, config):
     for epoch in pbar:
         train_loss = 0.0
         trajectory_sampler.train()
-        for trajectories, traj_class, masks in train_loader:
+        for trajectories, traj_class, masks in tqdm.tqdm(train_loader):
             trajectories = trajectories.to(device=config['device'])
             masks = masks.to(device=config['device'])
             B, T, dxu = trajectories.shape
@@ -422,7 +422,7 @@ if __name__ == "__main__":
                                               cosine_sine=config['sine_cosine'],
                                               states_only=config['du'] == 0,
                                               skip_pregrasp=config['skip_pregrasp'])
-
+    train_dataset.update_masks(p1=1, p2=1)
     if config['normalize_data']:
         # normalize data
         train_dataset.compute_norm_constants()

@@ -1,12 +1,12 @@
-model_name: 'allegro_cnf'
+model_name: 'allegro_cnf_low_sigma'
 T: 13
 dx: 15
 du: 21
 skip_pregrasp: True
 load_checkpoint: False
-load_model: True
-train_diffusion: False
-train_classifier: True
+load_model: False
+train_diffusion: True
+train_classifier: False
 eval_classifier: False
 plot: False
 vis_dataset: False
@@ -17,8 +17,8 @@ lr: 1.0e-4
 model_type: 'cnf'
 discriminator_guidance: True
 inverse_dynamics: False
-data_directory: 'allegro_screwdriver_high_force_gravity'
-device: 'cuda:0'
+data_directory: 'allegro_high_force_high_eps_pi_6'
+device: 'cuda:1'
 test_every: 10001
 save_every: 10
 normalize_data: True

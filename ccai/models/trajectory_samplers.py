@@ -279,12 +279,14 @@ class TrajectorySampler(nn.Module):
 
     def __init__(self, T, dx, du, context_dim, type='nf', dynamics=None, problem=None, timesteps=50, hidden_dim=64,
                  constrain=False, unconditional=False, generate_context=False, score_model='conv_unet',
-                 latent_diffusion=False, vae=None, inits_noise=None, noise_noise=None, guided=False):
+                 latent_diffusion=False, vae=None, inits_noise=None, noise_noise=None, guided=False, discriminator_guidance=False,
+                 learn_inverse_dynamics=False):
         super().__init__()
         self.T = T
         self.dx = dx
         self.du = du
         self.context_dim = context_dim
+        self.inverse_dynamics = None
         self.type = type
         assert type in ['nf', 'latent_diffusion', 'diffusion', 'cnf']
         if type == 'nf':

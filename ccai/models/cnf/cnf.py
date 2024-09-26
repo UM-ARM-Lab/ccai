@@ -21,12 +21,7 @@ import time
 
 fpath = os.path.dirname(os.path.realpath(__file__))
 
-argparser = argparse.ArgumentParser()
 
-argparser.add_argument('--noise', type=float, default=0.0)
-argparser.add_argument('--train', action='store_true')
-argparser.add_argument('--project', action='store_true')
-args = argparser.parse_args()
 class Residual(nn.Module):
     def __init__(self, fn):
         super().__init__()
@@ -122,7 +117,7 @@ class TrajectoryCNF(nn.Module):
         # self.loss_type = 'ot'
         self.loss_type = 'conditional_ot_sb'
 
-        sigma = 1.0
+        sigma = .1
         self.FM = SchrodingerBridgeConditionalFlowMatcher(sigma=sigma)
 
 
@@ -193,9 +188,9 @@ class TrajectoryCNF(nn.Module):
         
     def conditional_flow_matching_loss_ot_sb(self, xu, context, mask=None):
         x0 = torch.randn_like(xu)
-        t, xut, truevt = FM.sample_location_and_conditional_flow(x0, xb)
+        t, xut, truevt = self.FM.sample_location_and_conditional_flow(x0, xu)
 
-        vt, _ = model.model.compiled_conditional_train(t.reshape(-1), xut, context)
+        vt, _ = self.model.compiled_conditional_train(t.reshape(-1), xut, context)
 
         return mse_loss(vt, truevt)
 
@@ -280,7 +275,12 @@ class TrajectoryCNF(nn.Module):
 import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
+    argparser = argparse.ArgumentParser()
 
+    argparser.add_argument('--noise', type=float, default=0.0)
+    argparser.add_argument('--train', action='store_true')
+    argparser.add_argument('--project', action='store_true')
+    args = argparser.parse_args()
     # let's try a test dataset first
     N = 10000
     device = 'cuda:0'
