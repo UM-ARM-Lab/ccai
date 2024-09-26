@@ -218,11 +218,11 @@ class TemporalUnet(nn.Module):
         x = x[:, :H]
         return x, latent
 
-    # @torch.compile(mode='max-autotune')
+    @torch.compile(mode='max-autotune')
     def compiled_conditional_test(self, t, x, context):
         return self(t, x, context, dropout=False)
 
-    # @torch.compile(mode='max-autotune')
+    @torch.compile(mode='max-autotune')
     def compiled_unconditional_test(self, t, x):
         return self(t, x, context=None, dropout=False)
 

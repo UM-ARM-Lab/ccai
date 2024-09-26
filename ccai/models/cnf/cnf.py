@@ -1,96 +1,82 @@
 """ CNF trained using Flow Matching """
 
 import torch
+torch.set_float32_matmul_precision('high')
 import torch.nn as nn
 from torch.nn.functional import mse_loss
 
 from ccai.models.temporal import TemporalUnet
 
 from ccai.models.cnf.ffjord.layers import CNF, ODEfunc
-
+from torchcfm.conditional_flow_matching import SchrodingerBridgeConditionalFlowMatcher
 from ccai.models.helpers import SinusoidalPosEmb
 # import ot
 import numpy as np
+from tqdm import tqdm
+
+import os
+import argparse
+import pickle
+import time
+
+fpath = os.path.dirname(os.path.realpath(__file__))
+
+argparser = argparse.ArgumentParser()
+
+argparser.add_argument('--noise', type=float, default=0.0)
+argparser.add_argument('--train', action='store_true')
+argparser.add_argument('--project', action='store_true')
+args = argparser.parse_args()
+class Residual(nn.Module):
+    def __init__(self, fn):
+        super().__init__()
+        self.fn = fn
+
+    def forward(self, x, t, *args, **kwargs):
+        return self.fn(x, t, *args, **kwargs) + x
 
 
 class MLP(nn.Module):
-    def __init__(self, x_dim, context_dim, hidden_dim, num_layers=4):
+    def __init__(self, input_dim, output_dim, hidden_size=64, num_layers=2):
         super().__init__()
-        self.time_embedding = SinusoidalPosEmb(32)
-        self.input_dim = x_dim + context_dim + 32
-        self.hidden_dim = hidden_dim
-        self.output_dim = x_dim
-        self.num_layers = num_layers
 
-        self.layers = nn.ModuleList([nn.Linear(self.input_dim, hidden_dim)])
-        for _ in range(num_layers - 2):
-            self.layers.append(nn.Linear(hidden_dim, hidden_dim))
-            # self.layers.append(nn.BatchNorm1d(hidden_dim))
-            self.layers.append(nn.Tanh())
-        self.layers.append(nn.Linear(hidden_dim, x_dim))
+        layers = [nn.Linear(input_dim, hidden_size), nn.ReLU()]
+        for _ in range(num_layers - 1):
+            layers.append(nn.Linear(hidden_size, hidden_size))
+            layers.append(nn.ReLU())
+        layers.append(nn.Linear(hidden_size, output_dim))
+        self.net = nn.Sequential(*layers)
 
-    def vmapped_fwd(self, t, x, context=None):
-        return self(t.reshape(1), x.unsqueeze(0), context.unsqueeze(0)).squeeze(0)
+    def forward(self, x, t, context):
+        B = x.shape[0]
+        t = t.reshape(B, 1)
+        xtc = torch.cat([x, t, context], dim=-1)
+        return self.net(xtc)
 
-    def forward(self, t, x, context=None):
-        # ensure t is a batched tensor
-        B, T, d = x.shape
-        t = t.reshape(-1)
-        if t.shape[0] == 1:
-            t = t.repeat(B)
-        t = self.time_embedding(t)
 
-        # TODO make this a resnet? Skip connections?
-        # x = torch.cat((x.reshape(B, -1), t.reshape(B, -1)), dim=1)
-        x = torch.cat((x.reshape(B, -1), context.reshape(B, -1), t.reshape(B, -1)), dim=1)
-        for layer in self.layers:
-            x = layer(x)
+def ResNetBlock(input_dim, context_dim, hidden_size, num_layers):
+    return Residual(MLP(input_dim + 1 + context_dim, input_dim, hidden_size, num_layers))
 
-        return x.reshape(B, T, d)
+
+class ResNet(nn.Module):
+    def __init__(self, input_dim, context_dim, hidden_size, num_layers, num_blocks):
+        super().__init__()
+        self.blocks = [ResNetBlock(input_dim, context_dim, hidden_size, num_layers) for _ in range(num_blocks)]
+        self.blocks = nn.ModuleList(self.blocks)
+
+    def forward(self, x, t, context):
+        for block in self.blocks:
+            x = block(x, t, context)
+        return x
+
+
+def extract(a, t, x_shape):
+    b, *_ = t.shape
+    out = a.gather(-1, t)
+    return out.reshape(b, *((1,) * (len(x_shape) - 1)))
 
 
 from ccai.models.temporal import ResidualTemporalBlock
-
-import einops
-
-
-class TrajectoryConvNet(nn.Module):
-
-    def __init__(self, xu_dim, context_dim):
-        super().__init__()
-        kernel_size = 3
-
-        self.time_embedding = SinusoidalPosEmb(32)
-        self.context_mlp = nn.Sequential(
-            nn.Linear(context_dim + 32, 128),
-            nn.Tanh(),
-            nn.Linear(128, 128),
-        )
-
-        self.net = ResidualTemporalBlock(xu_dim, xu_dim, embed_dim=128, kernel_size=3)
-
-    def vmapped_fwd(self, t, x, context=None):
-        return self(t.reshape(1), x.unsqueeze(0), context.unsqueeze(0)).squeeze(0)
-
-    def forward(self, t, x, context):
-        '''
-            x : [ batch_size x inp_channels x horizon ]
-            t : [ batch_size x embed_dim ]
-            returns:
-            out : [ batch_size x out_channels x horizon ]
-        '''
-        B, T, d = x.shape
-        t = t.reshape(-1)
-        if t.shape[0] == 1:
-            t = t.repeat(B)
-        t_embed = self.time_embedding(t)
-        context_t = torch.cat([context, t_embed], dim=-1)
-        embed = self.context_mlp(context_t)
-        x = einops.rearrange(x, 'b h t -> b t h')
-        out = self.net(x, embed)
-        out = einops.rearrange(out, 'b t h -> b h t')
-        return out
-
 
 def set_cnf_options(solver, model):
     def _set(module):
@@ -115,8 +101,6 @@ def set_cnf_options(solver, model):
             module.residual = False
 
     model.apply(_set)
-
-
 class TrajectoryCNF(nn.Module):
 
     def __init__(
@@ -135,7 +119,12 @@ class TrajectoryCNF(nn.Module):
         self.du = u_dim
         self.xu_dim = x_dim + u_dim
         self.context_dim = context_dim
-        self.loss_type = 'ot'
+        # self.loss_type = 'ot'
+        self.loss_type = 'conditional_ot_sb'
+
+        sigma = 1.0
+        self.FM = SchrodingerBridgeConditionalFlowMatcher(sigma=sigma)
+
 
         self.model = TemporalUnet(self.horizon, self.xu_dim,
                                   cond_dim=context_dim,
@@ -172,15 +161,15 @@ class TrajectoryCNF(nn.Module):
         mask = torch.ones(1, self.horizon, self.xu_dim)
         #self.register_buffer('_grad_mask', mask)
         self.register_buffer('start_mask', mask[0])
-        self._grad_mask = mask
+        self._grad_mask = mask.cuda()
 
-    def masked_grad(self, t, x, context):
+    def masked_grad(self, t, x, context=None):
         dx, _ = self.model(t, x, context)
 
         if len(self._grad_mask.shape) == 4:
             num_samples, num_sub_trajs = self._grad_mask.shape[:2]
 
-            dx = dx.reshape(num_samples, num_sub_trajs, self.horizon, self.xu_dim)
+            dx = dx.reshape(-1, num_sub_trajs, self.horizon, self.xu_dim)
             for i in range(num_sub_trajs - 1):
                 tmp = dx[:, i, -1, :self.dx].clone()
                 dx[:, i, -1, :self.dx] = (tmp + dx[:, i + 1, 0, :self.dx]) / 2
@@ -188,7 +177,7 @@ class TrajectoryCNF(nn.Module):
 
             dx = dx.reshape(-1, self.horizon, self.xu_dim)
 
-        return dx * self._grad_mask.reshape(-1, self.horizon, self.xu_dim)
+        return dx# * self._grad_mask.reshape(-1, self.horizon, self.xu_dim)
 
     def flow_matching_loss(self, xu, context, mask=None):
         if self.loss_type == 'diffusion':
@@ -199,140 +188,18 @@ class TrajectoryCNF(nn.Module):
             return self.conditional_flow_matching_loss_ot(xu, context, mask)
         elif self.loss_type == 'conditional_sb':
             return self.conditional_flow_matching_loss_sb(xu, context, mask)
-
-    def flow_matching_loss_ot(self, xu, context, mask=None):
-
-        # Using OT flow matching from https://arxiv.org/pdf/2210.02747.pdf
-        B, T, _ = xu.shape
-
-        # Inflate xu with noise
-        xu = xu + self.inflation_noise * torch.randn_like(xu)
-
-        # sample t from [0, 1]
-        t = torch.rand(B, 1, 1, device=xu.device) * (1 - 1.0e-5)
-
-        mu_t = t * xu
-        sigma_t = 1 - (1 - self.sigma_min) * t * torch.ones_like(xu)
-
-        # sample initial noise
+        elif self.loss_type == 'conditional_ot_sb':
+            return self.conditional_flow_matching_loss_ot_sb(xu, context, mask)
+        
+    def conditional_flow_matching_loss_ot_sb(self, xu, context, mask=None):
         x0 = torch.randn_like(xu)
+        t, xut, truevt = FM.sample_location_and_conditional_flow(x0, xb)
 
-        # Re-parameterize to xt
-        xut = mu_t + sigma_t * x0
+        vt, _ = model.model.compiled_conditional_train(t.reshape(-1), xut, context)
 
-        # get GT velocity
-        ut = (xu - (1 - self.sigma_min) * x0)
+        return mse_loss(vt, truevt)
 
-        # include masking to allow inpainting
-        # when in-painting, gradient should be zero of in-painted values, and model recieve non-noisy input
-        if mask is not None:
-            masked_idx = (mask == 0).nonzero()
-            xut[masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]] = xu[
-                masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]]
-
-            ut[masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]] = torch.zeros_like(
-                xu[masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]])
-
-        # ut = (xu - (1 - self.sigma_min) * xut) / (1 - t * (1 - self.sigma_min))
-
-        # faster for training
-        vt, _ = self.model.compiled_conditional_train(t.reshape(-1), xut, context)
-
-        # compute loss
-        return mse_loss(ut, vt)
-
-    def conditional_flow_matching_loss_ot(self, xu, context):
-        # Using OT flow matching from https://arxiv.org/pdf/2210.02747.pdf
-        B, T, _ = xu.shape
-
-        # Inflate xu with noise
-        xu = xu + self.inflation_noise * torch.randn_like(xu)
-        # sample initial noise
-        x0 = torch.randn_like(xu)
-
-        # solve OT problem between x0 and xu
-        x0_flatten = x0.reshape(B, -1)
-        xu_flatten = xu.reshape(B, -1)
-        M = torch.cdist(x0_flatten,
-                        xu_flatten) ** 2  # in principle we can use a different distance specific to trajectories
-        M = M / M.max()
-        a, b = ot.unif(x0.size()[0]), ot.unif(xu.size()[0])
-        pi = ot.emd(a, b, M.detach().cpu().numpy())
-        # Sample random interpolations on pi
-        p = pi.flatten()
-        p = p / p.sum()
-        choices = np.random.choice(pi.shape[0] * pi.shape[1], p=p, size=B)
-        i, j = np.divmod(choices, pi.shape[1])
-        x0 = x0[i]
-        xu = xu[j]
-
-        # sample t from [0, 1]
-        t = torch.rand(B, 1, 1, device=xu.device)  # * (1 - 1.0e-5)
-        sigma = 0.1
-        mu_t = t * xu + (1 - t) * x0
-        # sample
-        xut = mu_t + sigma * torch.randn_like(xu)
-        # get GT velocity
-        ut = (xu - x0)
-
-        # faster for training
-        vt = self.model.compiled_conditional_train(t.reshape(-1), xut, context)
-
-        # compute loss
-        return mse_loss(ut, vt)
-
-    def rectified_flow_matching_loss(self, xu, context):
-        # Using OT flow matching from https://arxiv.org/pdf/2210.02747.pdf
-        B, T, _ = xu.shape
-
-        # Inflate xu with noise
-        xu = xu + self.inflation_noise * torch.randn_like(xu)
-        # sample initial noise
-        x0 = torch.randn_like(xu)
-
-        # sample t from [0, 1]
-        t = torch.rand(B, 1, 1, device=xu.device)  # * (1 - 1.0e-5)
-        xut = t * xu + (1 - t) * x0
-        # get GT velocity
-        ut = (xu - x0)
-
-        # faster for training
-        vt = self.model.compiled_conditional_train(t.reshape(-1), xut, context)
-
-        # compute loss
-        return mse_loss(ut, vt)
-
-    def conditional_flow_matching_loss_sb(self, xu, context):
-        sigma = 1
-        B = xu.shape[0]
-        # Inflate xu with noise
-        xu = xu + self.inflation_noise * torch.randn_like(xu)
-        # sample initial noise
-        x0 = torch.randn_like(xu)
-        t = torch.rand(B, 1, 1, device=xu.device)  # * (1 - 1.0e-5)
-
-        a, b = ot.unif(x0.size()[0]), ot.unif(xu.size()[0])
-        M = torch.cdist(x0.reshape(B, -1), xu.reshape(B, -1)) ** 2
-        pi = ot.sinkhorn(a, b, M.detach().cpu().numpy(), reg=2 * (sigma ** 2))
-        # Sample random interpolations on pi
-        p = pi.flatten()
-        p = p / p.sum()
-        choices = np.random.choice(pi.shape[0] * pi.shape[1], p=p, size=B)
-        i, j = np.divmod(choices, pi.shape[1])
-        x0 = x0[i]
-        xu = xu[j]
-        # calculate regression loss
-        mu_t = t * xu + (1 - t) * x0
-        sigma_t = sigma * torch.sqrt(t - t ** 2)
-        xut = mu_t + sigma_t * torch.randn_like(x0)
-        sigma_t_prime_over_sigma_t = (1 - 2 * t) / (2 * t * (1 - t))
-        ut = sigma_t_prime_over_sigma_t * (xut - mu_t) + xu - x0
-        # faster for training
-        vt = self.model.compiled_fwd(t.reshape(-1), xut, context)
-        # compute loss
-        return mse_loss(ut, vt)
-
-    def _sample(self, context=None, condition=None, mask=None, H=None):
+    def _sample(self, context=None, condition=None, mask=None, H=None, noise=None):
         N = context.shape[0]
         if H is None:
             H = self.horizon
@@ -341,8 +208,9 @@ class TrajectoryCNF(nn.Module):
         sample_shape = torch.Size([N, num_sub_trajectories])
         assert context.shape[1] == num_sub_trajectories
 
-        prior = torch.distributions.Normal(self.prior_mu, self.prior_sigma)
-        noise = prior.sample(sample_shape=sample_shape).to(context)
+        if noise is None:
+            prior = torch.distributions.Normal(self.prior_mu, self.prior_sigma)
+            noise = prior.sample(sample_shape=sample_shape).to(dtype=context, device=context.device)
 
         # if longer horizon, set noise of starts / ends to be same value
         for i in range(num_sub_trajectories - 1):
@@ -379,10 +247,11 @@ class TrajectoryCNF(nn.Module):
             x[:, t:t + h, start_idx:start_idx + d] = val.clone()
         return x
 
-    def log_prob(self, xu, context):
+    def log_prob(self, xu, context, noise=False):
         # inflate with noise
         B, T, _ = xu.shape
-        xu = xu + self.inflation_noise * torch.randn_like(xu)
+        if noise:
+            xu = xu + self.inflation_noise * torch.randn_like(xu)
         log_prob = torch.zeros(B, device=xu.device)
         out = self.flow(xu, logpx=log_prob, context=context, reverse=True)
         z = out[0]
@@ -397,37 +266,6 @@ class TrajectoryCNF(nn.Module):
         Ts = t * beta_min + t ** 2 * (beta_max - beta_min) / 2
         grad_Ts = beta_min + t * (beta_max - beta_min)
         return Ts, grad_Ts
-
-    def flow_matching_loss_diffusion(self, xu, context):
-        B, T, _ = xu.shape
-
-        # Inflate xu with noise
-        xu = xu + self.inflation_noise * torch.randn_like(xu)
-
-        # sample t from [0, 1]
-        t = torch.rand(B, 1, 1, device=xu.device) * (1 - 1.0e-5)
-
-        Ts, grad_Ts = self._get_Ts(1 - t)
-
-        alpha_1_minus_t = torch.exp(-Ts / 2)
-
-        mu_t = alpha_1_minus_t * xu
-        sigma_t = torch.sqrt(1 - alpha_1_minus_t ** 2) * torch.ones_like(xu)
-
-        # sample initial noise
-        x0 = torch.randn_like(xu)
-
-        # Re-parameterize to xt
-        xut = mu_t + sigma_t * x0
-
-        # get GT velocity
-        tmp = torch.exp(-Ts)
-        ut = -grad_Ts * (tmp * xut - alpha_1_minus_t * xu) / (2 * (1 - tmp))
-        # faster for training
-        vt = self.model.compiled_fwd(t.reshape(-1), xut, context)
-
-        # compute loss
-        return mse_loss(ut, vt)
 
     def diffusion_grad_wrapper(self, t, xu, context):
         s = self.model(t, xu, context)
@@ -458,86 +296,184 @@ if __name__ == "__main__":
 
     x = z @ A.T  # N x 2 data
     # what if we inflate the data slightly?
-    x = x + torch.randn_like(x) * 0.01
+    # x = x + torch.randn_like(x) * 0.01
     # x = 0.25 * torch.randn(N, 2, device=device)
     # reshape so horizon is 1
     x = x.reshape(N, 1, 2)
 
-    plt.scatter(x[:, 0, 0].cpu(), x[:, 0, 1].cpu())
+    plt.scatter(np.array(x[:, 0, 0].cpu().tolist()), np.array(x[:, 0, 1].cpu().tolist()))
     plt.xlim([-3, 3])
     plt.ylim([-3, 3])
     plt.show()
 
     # let's say no context
-    model = TrajectoryCNF(horizon=1, xu_dim=2, context_dim=0, inflation_noise=0.0).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-    for i in range(2001):
-        # shuffle x
-        x = x[torch.randperm(len(x))]
-        x_batch = x.reshape(-1, 250, 1, 2)
-        total_loss = 0
-        model.train()
-        for xb in x_batch:
-            loss = model.flow_matching_loss(xb, None)
-            # loss, _ = model.log_prob(xb, None)
-            # loss = -loss.mean()
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
-            total_loss += loss.item()
-        model.eval()
-        if i % 100 == 0:
-            total_ll = 0
-            all_z = []
+    model = TrajectoryCNF(horizon=1, x_dim=2, u_dim=0, context_dim=0, inflation_noise=args.noise).to(device)
+
+    if args.train:
+        sigma=1.0
+        FM = SchrodingerBridgeConditionalFlowMatcher(sigma=sigma)
+        optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+        for i in tqdm(range(2001)):
+            # shuffle x
+            x = x[torch.randperm(len(x))]
+            x_batch = x.reshape(-1, 250, 1, 2)
+            total_loss = 0
+            model.train()
             for xb in x_batch:
-                ll, z = model.log_prob(xb, None)
-                ll = ll.mean()
-                all_z.append(z)
-                total_ll += ll.item()
-            print(f'iter {i}, loss {total_loss / len(x_batch)}, ll {total_ll / len(x_batch)}')
-            all_z = torch.stack(all_z, dim=0).reshape(-1, 2).detach().cpu().numpy()
-            # Now let's sample from the model and see how things look
-            x_hat = model._sample(1000, None)
-            x_hat = x_hat.reshape(-1, 2).detach().cpu().numpy()
-            x_plot = x.reshape(-1, 2).detach().cpu().numpy()
+                # loss = model.flow_matching_loss(xb, None)
+                # loss, _ = model.log_prob(xb, None)
+                # loss = -loss.mean()
+                x0 = torch.randn_like(xb)
+                t, xut, truet = FM.sample_location_and_conditional_flow(x0, xb + torch.randn_like(xb) * args.noise)
 
-            lims = [-3, 3]
-            fig, axes = plt.subplots(2, 2, figsize=(10, 5))
+                vt = model.model.compiled_conditional_test(t.reshape(-1), xut, None)[0]
+                # vt = model.model(t.reshape(-1), xut, None)[0]
 
-            axes[0, 0].scatter(x_plot[:, 0], x_plot[:, 1], label='data', alpha=0.25)
-            axes[0, 0].scatter(x_hat[:, 0], x_hat[:, 1], label='model', alpha=0.1)
-            axes[0, 0].legend()
-            axes[0, 0].set_xlim(*lims)
-            axes[0, 0].set_ylim(*lims)
-            import numpy as np
+                loss = torch.mean((vt - truet) ** 2)
+                loss.backward()
+                optimizer.step()
+                optimizer.zero_grad()
+                total_loss += loss.item()
+            model.eval()
+            if i % 100 == 0:
+                total_ll = 0
+                all_z = []
+                for xb in x_batch:
+                    ll, z = model.log_prob(xb, None, noise=True)
+                    ll = ll.mean()
+                    all_z.append(z)
+                    total_ll += ll.item()
+                print(f'iter {i}, loss {total_loss / len(x_batch)}, ll {total_ll / len(x_batch)}')
+                all_z = torch.stack(all_z, dim=0).reshape(-1, 2).detach().cpu().numpy()
+                # Now let's sample from the model and see how things look
+                x_hat, log_prob = model._sample(None)
+                x_hat = x_hat.reshape(-1, 2).detach().cpu().numpy()
+                x_plot = x.reshape(-1, 2).detach().cpu().numpy()
 
-            noise = np.random.randn(1000, 2)
-            axes[0, 1].scatter(all_z[:1000, 0], all_z[:1000, 1], alpha=0.25, label='data')
-            axes[0, 1].scatter(noise[:, 0], noise[:, 1], alpha=0.25, label='base dist')
+                lims = [-3, 3]
+                fig, axes = plt.subplots(2, 2, figsize=(10, 10))
 
-            axes[0, 1].set_title('Latent space')
-            axes[0, 1].set_xlim(*lims)
-            axes[0, 1].set_ylim(*lims)
-            # now let's try and plot the density
-            Nplot = 500
-            x1 = torch.linspace(*lims, Nplot)
-            x2 = torch.linspace(*lims, Nplot)
+                axes[0, 0].scatter(x_plot[:, 0], x_plot[:, 1], label='data', alpha=0.25)
+                axes[0, 0].scatter(x_hat[:, 0], x_hat[:, 1], label='model', alpha=.75)
+                axes[0, 0].legend()
+                axes[0, 0].set_xlim(*lims)
+                axes[0, 0].set_ylim(*lims)
+                import numpy as np
 
-            X1, X2 = torch.meshgrid(x1, x2)
-            X = torch.stack([X1, X2], dim=-1).reshape(-1, 2).to(device=device)
-            log_prob, _ = model.log_prob(X.reshape(-1, 1, 2), None)
+                noise = np.random.randn(1000, 2)
+                axes[0, 1].scatter(all_z[:1000, 0], all_z[:1000, 1], alpha=0.25, label='data')
+                axes[0, 1].scatter(noise[:, 0], noise[:, 1], alpha=0.25, label='base dist')
 
-            density = torch.exp(log_prob)
-            # clip density
-            # density = torch.clamp(density, min=None, max=1000)
-            density = density.reshape(Nplot, Nplot).detach().cpu().numpy()
-            print(density.max(), density.min())
-            axes[1, 0].imshow(density.T, extent=[*lims, *lims], origin='lower')
-            axes[1, 0].set_title('density')
-            log_prob = log_prob.reshape(Nplot, Nplot).detach().cpu().numpy()
-            # scale log prob to be between 0 and 1
-            axes[1, 1].contourf(X1, X2, log_prob, levels=20)
-            # axes[1, 1].imshow(log_prob.T, extent=[*lims, *lims], origin='lower')
-            axes[1, 1].set_title('log prob')
-            plt.savefig(f'test_two_gaussians_inflated_{i}.png')
-            plt.close()
+                axes[0, 1].set_title('Latent space')
+                axes[0, 1].set_xlim(*lims)
+                axes[0, 1].set_ylim(*lims)
+                # now let's try and plot the density
+                Nplot = 125
+                x1 = torch.linspace(*lims, Nplot)
+                x2 = torch.linspace(*lims, Nplot)
+
+                X1, X2 = torch.meshgrid(x1, x2)
+                X = torch.stack([X1, X2], dim=-1).reshape(-1, 2).to(device=device)
+                log_prob, _ = model.log_prob(X.reshape(-1, 1, 2), None)
+
+                density = torch.exp(log_prob)
+                # clip density
+                # density = torch.clamp(density, min=None, max=1000)
+                density = density.reshape(Nplot, Nplot).detach().cpu().numpy()
+                print(density.max(), density.min())
+                axes[1, 0].imshow(density.T, extent=[*lims, *lims], origin='lower')
+                axes[1, 0].set_title('density')
+                log_prob = log_prob.reshape(Nplot, Nplot).detach().cpu().numpy()
+                # scale log prob to be between 0 and 1
+                axes[1, 1].contourf(X1, X2, log_prob, levels=20)
+                # axes[1, 1].imshow(log_prob.T, extent=[*lims, *lims], origin='lower')
+                axes[1, 1].set_title('log prob')
+                plt.savefig(f'{fpath}/plots/test_gaussian_inflate_{args.noise}_{i}.png')
+                plt.close()
+
+                # Save model
+                torch.save(model.state_dict(), f'{fpath}/models/test_gaussian_inflate_{args.noise}_{i}.pt')
+
+    args.project = True
+    if args.project:
+        plt.clf()
+
+        # Set dpi
+        plt.rcParams['figure.dpi'] = 300
+        # Load model
+        model.load_state_dict(torch.load(f'{fpath}/models/test_gaussian_inflate_{args.noise}_2000.pt'))
+            
+        # Intentionally generate OOD data
+
+        N_OOD = 100
+        x_ood = (torch.randn(N_OOD, 1, 2) * 3).to(device)
+        x_ood_hat, log_prob_ood = model._sample(noise=x_ood)
+
+        x_ood_hat_orig = x_ood_hat.clone()
+
+        # Copy the data from x_ood_hat into a new tensor with requires_grad=True
+        x_ood_hat = x_ood_hat.detach().requires_grad_(True)
+        
+        project_iters = 25
+        projection_path = [x_ood_hat.clone().detach().cpu().numpy()]
+        times = []
+        for i in tqdm(range(project_iters)):
+            a = time.perf_counter()
+            log_prob, _ = model.log_prob(x_ood_hat, None)
+            loss = -log_prob.mean()
+            loss.backward()
+            x_ood_hat.data = x_ood_hat.data - 1 * x_ood_hat.grad
+            b = time.perf_counter()
+            x_ood_hat.grad.zero_()
+            projection_path.append(x_ood_hat.clone().detach().cpu().numpy())
+            times.append(b - a)
+        print(f'Average time per iteration: {np.mean(times)}')
+        
+        with open(f'{fpath}/data/test_gaussian_inflate_{args.noise}_OOD_proj.pkl', 'wb') as f:
+            pickle.dump((projection_path, times), f)
+        x_ood_hat = x_ood_hat.detach().cpu().numpy()
+        x_ood_hat_orig = x_ood_hat_orig.detach().cpu().numpy()
+
+        # Plot the original data
+        plt.scatter(np.array(x[:, 0, 0].cpu().tolist()), np.array(x[:, 0, 1].cpu().tolist()), label='ID data', alpha=1)
+
+        x_ood_hat = x_ood_hat.reshape(-1, 2)
+        x_ood_hat_orig = x_ood_hat_orig.reshape(-1, 2)
+
+        for t in range(len(projection_path)):
+            this_project_step = projection_path[t]
+            this_project_step = this_project_step.reshape(-1, 2)
+            if t > 0:
+                last_project_step = projection_path[t - 1]
+                last_project_step = last_project_step.reshape(-1, 2)
+            if t == 0:
+                # Plot the orig OOD data
+                plt.scatter(this_project_step[:, 0], this_project_step[:, 1], label='OOD gen data', c='r', alpha=.5)
+            elif t > 0:
+                # Plot a grey line connecting this step to the previous step
+                plt.plot([last_project_step[:, 0], this_project_step[:, 0]], [last_project_step[:, 1], this_project_step[:, 1]], c='grey', alpha=0.5)
+            if t == len(projection_path) - 1:
+                # Plot the OOD data after optimization
+                plt.scatter(this_project_step[:, 0], this_project_step[:, 1], label='ID Proj gen data', c='g', alpha=.5)
+
+            # Draw an arrow from the original data to the optimized data
+            # for i in range(N_OOD):
+            #     plt.arrow(x_ood_hat_orig[i, 0], x_ood_hat_orig[i, 1], x_ood_hat[i, 0] - x_ood_hat_orig[i, 0], x_ood_hat[i, 1] - x_ood_hat_orig[i, 1], head_width=0.05, head_length=0.1, fc='k', ec='k')
+
+        x_lim_min = min(x_ood_hat_orig[:, 0].min(), x_ood_hat[:, 0].min()) - .25
+        x_lim_max = max(x_ood_hat_orig[:, 0].max(), x_ood_hat[:, 0].max()) + .25
+        y_lim_min = min(x_ood_hat_orig[:, 1].min(), x_ood_hat[:, 1].min()) - .25
+        y_lim_max = max(x_ood_hat_orig[:, 1].max(), x_ood_hat[:, 1].max()) + .25
+
+        square_min = min(x_lim_min, y_lim_min)
+        square_max = max(x_lim_max, y_lim_max)
+
+        square_bound = max(abs(square_min), abs(square_max))
+
+        plt.xlim([-square_bound, square_bound])
+        plt.ylim([-square_bound, square_bound])
+
+        plt.legend()
+
+        plt.savefig(f'{fpath}/plots/test_gaussian_inflate_{args.noise}_OOD_proj.png')
+        plt.close()
