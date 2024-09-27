@@ -601,8 +601,8 @@ class GaussianDiffusion(nn.Module):
         # N = 100
         # we could randomly choose timesteps, or do all of them. For now let's randomly generatre
         # t = torch.randint(1, self.num_timesteps, (N,), device=device).long()
-        # t = torch.arange(1, self.num_timesteps, device=device).long()
-        t = torch.arange(1, self.num_timesteps, 8, device=device).long()
+        t = torch.arange(1, self.num_timesteps, device=device).long()
+        # t = torch.arange(1, self.num_timesteps, 8, device=device).long()
         # t = torch.arange(5, 30, 2, device=device).long()
 
         N = t.shape[0]
@@ -1012,7 +1012,14 @@ class JointDiffusion(GaussianDiffusion):
         q_next_c = self.q_posterior(x_start=c_0, x_t=c_t, t=t)
 
         # Compute our diffusing step from t to t-1
-        p_next = self.p_mean_variance(x=x_t, t=t, context=c_t)
+
+        batch_size = 64
+        all_p_next = []
+        for i in range(0, B * N, batch_size):
+            p_next = self.p_mean_variance(x=x_t[i:i + batch_size], t=t[i:i + batch_size], context=c_t[i:i + batch_size])
+            all_p_next.append(p_next)
+
+        p_next = {k: torch.cat([p[k] for p in all_p_next], dim=0) for k in all_p_next[0].keys()}
 
         if forward_kl:
             kl_x = self._gaussian_kl(p_next['x']['mean'].squeeze(1), p_next['x']['var'].squeeze(1), q_next_x[0],
