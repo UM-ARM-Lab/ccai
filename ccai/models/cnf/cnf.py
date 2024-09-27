@@ -8,7 +8,7 @@ from torch.nn.functional import mse_loss
 from ccai.models.temporal import TemporalUnet
 
 from ccai.models.cnf.ffjord.layers import CNF, ODEfunc
-from torchcfm.conditional_flow_matching import SchrodingerBridgeConditionalFlowMatcher
+from torchcfm.conditional_flow_matching import SchrodingerBridgeConditionalFlowMatcher, ExactOptimalTransportConditionalFlowMatcher
 from ccai.models.helpers import SinusoidalPosEmb
 # import ot
 import numpy as np
@@ -310,8 +310,9 @@ if __name__ == "__main__":
     model = TrajectoryCNF(horizon=1, x_dim=2, u_dim=0, context_dim=0, inflation_noise=args.noise).to(device)
 
     if args.train:
-        sigma=1.0
+        sigma=.01
         FM = SchrodingerBridgeConditionalFlowMatcher(sigma=sigma)
+        # FM = s_.1OptimalTransportConditionalFlowMatcher()
         optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
         for i in tqdm(range(2001)):
             # shuffle x
@@ -388,11 +389,11 @@ if __name__ == "__main__":
                 axes[1, 1].contourf(X1, X2, log_prob, levels=20)
                 # axes[1, 1].imshow(log_prob.T, extent=[*lims, *lims], origin='lower')
                 axes[1, 1].set_title('log prob')
-                plt.savefig(f'{fpath}/plots/test_gaussian_inflate_{args.noise}_{i}.png')
+                plt.savefig(f'{fpath}/plots/test_gaussian_inflate_{args.noise}_{i}_s_.01.png')
                 plt.close()
 
                 # Save model
-                torch.save(model.state_dict(), f'{fpath}/models/test_gaussian_inflate_{args.noise}_{i}.pt')
+                torch.save(model.state_dict(), f'{fpath}/models/test_gaussian_inflate_{args.noise}_{i}_s_.01.pt')
 
     args.project = True
     if args.project:
@@ -401,7 +402,7 @@ if __name__ == "__main__":
         # Set dpi
         plt.rcParams['figure.dpi'] = 300
         # Load model
-        model.load_state_dict(torch.load(f'{fpath}/models/test_gaussian_inflate_{args.noise}_2000.pt'))
+        model.load_state_dict(torch.load(f'{fpath}/models/test_gaussian_inflate_{args.noise}_2000_s_.01.pt'))
             
         # Intentionally generate OOD data
 
@@ -429,7 +430,7 @@ if __name__ == "__main__":
             times.append(b - a)
         print(f'Average time per iteration: {np.mean(times)}')
         
-        with open(f'{fpath}/data/test_gaussian_inflate_{args.noise}_OOD_proj.pkl', 'wb') as f:
+        with open(f'{fpath}/data/test_gaussian_inflate_{args.noise}_OOD_proj_s_.01.pkl', 'wb') as f:
             pickle.dump((projection_path, times), f)
         x_ood_hat = x_ood_hat.detach().cpu().numpy()
         x_ood_hat_orig = x_ood_hat_orig.detach().cpu().numpy()
@@ -475,5 +476,5 @@ if __name__ == "__main__":
 
         plt.legend()
 
-        plt.savefig(f'{fpath}/plots/test_gaussian_inflate_{args.noise}_OOD_proj.png')
+        plt.savefig(f'{fpath}/plots/test_gaussian_inflate_{args.noise}_OOD_proj_s_.01.png')
         plt.close()
