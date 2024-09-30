@@ -59,53 +59,53 @@ class ALlegroScrewdriverContact(AllegroContactProblem):
                                                         chain, object_type, world_trans,
                                                         object_asset_pos, fingers, obj_dof_code, obj_joint_dim,
                                                         fixed_obj, collision_checking, device)
-        self.default_index_ee_loc_in_screwdriver = torch.tensor([0.0087, -0.02, 0.1293], device=device).unsqueeze(0)
-        self.desired_ee_locs = goal_poses
+        # self.default_index_ee_loc_in_screwdriver = torch.tensor([0.0087, -0.02, 0.1293], device=device).unsqueeze(0)
+        # self.desired_ee_locs = goal_poses
         
     
-    def _ee_locations_in_robot_frame(self, q_rob, q_env):
+    # def _ee_locations_in_robot_frame(self, q_rob, q_env):
 
-        assert q_rob.shape[-1] == 16
-        assert q_env.shape[-1] == self.obj_dof
+    #     assert q_rob.shape[-1] == 16
+    #     assert q_env.shape[-1] == self.obj_dof
 
-        _q_env = q_env.clone()
-        if self.obj_dof == 3:
-            _q_env = torch.cat((q_env, torch.zeros_like(q_env[..., :1])), dim=-1)
+    #     _q_env = q_env.clone()
+    #     if self.obj_dof == 3:
+    #         _q_env = torch.cat((q_env, torch.zeros_like(q_env[..., :1])), dim=-1)
 
-        robot_trans = self.contact_scenes.robot_sdf.chain.forward_kinematics(q_rob.reshape(-1, 16))
-        ee_locs = []
+    #     robot_trans = self.contact_scenes.robot_sdf.chain.forward_kinematics(q_rob.reshape(-1, 16))
+    #     ee_locs = []
 
-        regrasp_fingers=['index', 'middle', 'thumb']
-        for finger in regrasp_fingers:
-            ee_locs.append(robot_trans[self.ee_names[finger]].get_matrix()[:, :3, -1])
+    #     regrasp_fingers=['index', 'middle', 'thumb']
+    #     for finger in regrasp_fingers:
+    #         ee_locs.append(robot_trans[self.ee_names[finger]].get_matrix()[:, :3, -1])
 
-        ee_locs = torch.stack(ee_locs, dim=1)
+    #     ee_locs = torch.stack(ee_locs, dim=1)
 
-        num_regrasps = len(regrasp_fingers)
-        return ee_locs.reshape(q_rob.shape[:-1] + (num_regrasps, 3))
+    #     num_regrasps = len(regrasp_fingers)
+    #     return ee_locs.reshape(q_rob.shape[:-1] + (num_regrasps, 3))
 
 
     # cost that incorporates desired contact points
-    def _cost(self, xu, start, goal):
-        total_cost = 0
+    # def _cost(self, xu, start, goal):
+    #     total_cost = 0
 
-        # state = xu[:, :self.dx]
-        # state = torch.cat((start.reshape(1, self.dx), state), dim=0)  # combine the first time step into it
-        # action = xu[:, self.dx:]
-        # action_cost = torch.sum(action ** 2)
-        # smoothness_cost = 10 * torch.sum((state[1:] - state[:-1]) ** 2)
-        # total_cost = smoothness_cost + 10 * action_cost
+    #     # state = xu[:, :self.dx]
+    #     # state = torch.cat((start.reshape(1, self.dx), state), dim=0)  # combine the first time step into it
+    #     # action = xu[:, self.dx:]
+    #     # action_cost = torch.sum(action ** 2)
+    #     # smoothness_cost = 10 * torch.sum((state[1:] - state[:-1]) ** 2)
+    #     # total_cost = smoothness_cost + 10 * action_cost
 
-        #if self.desired_ee_locs is not None:
-        q = partial_to_full_state(xu[:, :self.num_fingers * 4], self.fingers)
-        theta = xu[:, self.num_fingers * 4:self.num_fingers * 4 + self.obj_dof]
-        current_ee_locs = self._ee_locations_in_robot_frame(q, theta)[-1,:,:]
-        desired_contact_cost = 100 * torch.sum((self.desired_ee_locs - current_ee_locs) ** 2)
-        total_cost += desired_contact_cost
+    #     #if self.desired_ee_locs is not None:
+    #     q = partial_to_full_state(xu[:, :self.num_fingers * 4], self.fingers)
+    #     theta = xu[:, self.num_fingers * 4:self.num_fingers * 4 + self.obj_dof]
+    #     current_ee_locs = self._ee_locations_in_robot_frame(q, theta)[-1,:,:]
+    #     desired_contact_cost = 100 * torch.sum((self.desired_ee_locs - current_ee_locs) ** 2)
+    #     total_cost += desired_contact_cost
 
-        #print(total_cost)
+    #     #print(total_cost)
 
-        return total_cost
+    #     return total_cost
         #return torch.tensor(100.0)
         
 
@@ -143,7 +143,7 @@ class AllegroScrewdriver(AllegroValveTurning):
                                                  collision_checking=collision_checking, obj_gravity=obj_gravity,
                                                  contact_region=contact_region, device=device)
         self.friction_coefficient = friction_coefficient
-        self.default_index_ee_loc_in_screwdriver = torch.tensor([0.0087, -0.016, 0.1293], device=device).unsqueeze(0)
+        # self.default_index_ee_loc_in_screwdriver = torch.tensor([0.0087, -0.016, 0.1293], device=device).unsqueeze(0)
         self.friction_vel_constr = vmap(self._friction_vel_constr, randomness='same')
         self.grad_friction_vel_constr = vmap(jacrev(self._friction_vel_constr, argnums=(0, 1, 2)))
         if contact_region:
