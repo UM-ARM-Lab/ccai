@@ -1,5 +1,5 @@
 # from isaac_victor_envs.tasks.allegro import AllegroValveTurningEnv
-from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
+# from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
 
 import yaml
 import copy
@@ -20,6 +20,8 @@ from torch.utils.data import DataLoader, RandomSampler
 from ccai.models.trajectory_samplers import TrajectorySampler
 from ccai.utils.allegro_utils import partial_to_full_state, visualize_trajectory
 
+import wandb
+
 TORCH_LOGS = "+dynamo"
 TORCHDYNAMO_VERBOSE = 1
 fingers = ['index', 'middle', 'thumb']
@@ -27,7 +29,7 @@ fingers = ['index', 'middle', 'thumb']
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion.yaml')
+    parser.add_argument('--config', type=str, default='allegro_screwdriver_cnf_state_only.yaml')
     return parser.parse_args()
 
 
@@ -50,6 +52,7 @@ def visualize_trajectories(trajectories, scene, fpath, headless=False):
 def train_model(trajectory_sampler, train_loader, config):
     fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}'
     pathlib.Path.mkdir(pathlib.Path(fpath), parents=True, exist_ok=True)
+    run = wandb.init(project='ccai-screwdriver', entity='abhinavk99', config=config)
 
     if config['use_ema']:
         ema = EMA(beta=config['ema_decay'])
@@ -84,6 +87,7 @@ def train_model(trajectory_sampler, train_loader, config):
             sampler_loss = trajectory_sampler.loss(trajectories, mask=masks, constraints=traj_class)
             loss = sampler_loss
             loss.backward()
+            # wandb.log({'train_loss': loss.item()})
             # torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
             # for param in trajectory_sampler.parameters():
             #    print(param.grad)
@@ -98,6 +102,7 @@ def train_model(trajectory_sampler, train_loader, config):
         train_loss /= len(train_loader)
         pbar.set_description(
             f'Train loss {train_loss:.3f}')
+        wandb.log({'train_loss_epoch': train_loss})
 
         # generate samples and plot them
         if (epoch + 1) % config['test_every'] == 0:
@@ -125,15 +130,93 @@ def train_model(trajectory_sampler, train_loader, config):
 
         if (epoch + 1) % config['save_every'] == 0:
             if config['use_ema']:
-                torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
+                torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}_{epoch+1}_{train_loss:.4f}.pt')
             else:
                 torch.save(model.state_dict(),
-                           f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
+                           f'{fpath}/allegro_screwdriver_{config["model_type"]}_{epoch+1}_{train_loss:.4f}.pt')
     if config['use_ema']:
-        torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
+        torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}_{epoch+1}_{train_loss:.4f}.pt')
     else:
         torch.save(model.state_dict(),
-                   f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
+                   f'{fpath}/allegro_screwdriver_{config["model_type"]}_{epoch+1}_{train_loss:.4f}.pt')
+
+def train_model_state_only(trajectory_sampler, train_loader, config):
+    fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}'
+    pathlib.Path.mkdir(pathlib.Path(fpath), parents=True, exist_ok=True)
+    run = wandb.init(project='ccai-screwdriver', entity='abhinavk99', config=config)
+
+    if config['use_ema']:
+        ema = EMA(beta=config['ema_decay'])
+        ema_model = copy.deepcopy(trajectory_sampler)
+
+    def reset_parameters():
+        ema_model.load_state_dict(trajectory_sampler.state_dict())
+
+    def update_ema(model):
+        if step < config['ema_warmup_steps']:
+            reset_parameters()
+        else:
+            ema.update_model_average(ema_model, model)
+
+    optimizer = torch.optim.Adam(trajectory_sampler.parameters(), lr=config['lr'])
+
+    step = 0
+
+    epochs = config['epochs']
+    pbar = tqdm.tqdm(range(epochs))
+    for epoch in pbar:
+        train_loss = 0.0
+        flow_loss = 0.0
+        action_loss = 0.0
+        trajectory_sampler.train()
+        for trajectories, traj_class, masks in train_loader:
+            trajectories = trajectories.to(device=config['device'])
+            masks = masks.to(device=config['device'])
+
+            if config['use_class']:
+                traj_class = traj_class.to(device=config['device']).float()
+            else:
+                traj_class = None
+            sampler_loss = trajectory_sampler.loss(trajectories, mask=masks, constraints=traj_class)
+            loss = sampler_loss['loss']
+            loss.backward()
+            # wandb.log({'train_loss': loss.item()})
+            # torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
+            # for param in trajectory_sampler.parameters():
+            #    print(param.grad)
+            optimizer.step()
+            optimizer.zero_grad()
+            train_loss += loss.item()
+            flow_loss += sampler_loss['flow_loss'].item()
+            action_loss += sampler_loss['action_loss'].item()
+            step += 1
+            if config['use_ema']:
+                if step % 10 == 0:
+                    update_ema(trajectory_sampler)
+
+        train_loss /= len(train_loader)
+        flow_loss /= len(train_loader)
+        action_loss /= len(train_loader)
+        pbar.set_description(
+            f'Train loss {train_loss:.3f}')
+        wandb.log({
+                'train_loss_epoch': train_loss,
+                'flow_loss_epoch': flow_loss,
+                'action_loss_epoch': action_loss
+            })
+
+        if (epoch + 1) % config['save_every'] == 0:
+            if config['use_ema']:
+                torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}_state_only_{epoch+1}_{train_loss:.4f}.pt')
+            else:
+                torch.save(model.state_dict(),
+                           f'{fpath}/allegro_screwdriver_{config["model_type"]}_state_only_{epoch+1}_{train_loss:.4f}.pt')
+    if config['use_ema']:
+        torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}_state_only_{epoch+1}_{train_loss:.4f}.pt')
+    else:
+        torch.save(model.state_dict(),
+                   f'{fpath}/allegro_screwdriver_{config["model_type"]}_state_only_{epoch+1}_{train_loss:.4f}.pt')
+
 
 
 def plot_long_horizon(test_model, loader, config, name):
@@ -217,8 +300,6 @@ def rollout_trajectory_in_sim(trajectory, env):
     actual_trajectory[-1, :15] = env.get_state()['q'].reshape(1, -1)[:, :12]
     return actual_trajectory
         
-
-
 def visualize_trajectory_in_sim(trajectory, env, fpath):
     # reset environment
     env.frame_fpath = f'{fpath}/img'
@@ -414,7 +495,8 @@ if __name__ == "__main__":
                               hidden_dim=config['hidden_dim'], timesteps=config['timesteps'],
                               generate_context=config['diffuse_class'],
                               discriminator_guidance=config['discriminator_guidance'],
-                              learn_inverse_dynamics=config['inverse_dynamics'])
+                              learn_inverse_dynamics=config['inverse_dynamics'],
+                              state_only=config['state_only'], state_control_only=config['state_control_only'],)
 
     data_path = pathlib.Path(f'{CCAI_PATH}/data/training_data/{config["data_directory"]}')
     train_dataset = AllegroScrewDriverDataset([p for p in data_path.glob('*train_data*')],
@@ -438,47 +520,51 @@ if __name__ == "__main__":
 
     model = model.to(device=config['device'])
 
-    # set up pytorch volumetric for rendering
-    asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
-    index_ee_name = 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link'
-    thumb_ee_name = 'allegro_hand_oya_finger_3_aftc_base_link'
-    # combined chain
-    chain = pk.build_chain_from_urdf(open(asset).read())
-    # TODO currently hardcoded relative pose
-    p = [0.0, -0.1, 1.33]
-    # r = [0.6645, 0.2418, 0.2418, 0.6645]
-    r = [0.2418448, 0.2418448, 0.664463, 0.664463]
+    # # set up pytorch volumetric for rendering
+    # asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
+    # index_ee_name = 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link'
+    # thumb_ee_name = 'allegro_hand_oya_finger_3_aftc_base_link'
+    # # combined chain
+    # chain = pk.build_chain_from_urdf(open(asset).read())
+    # # TODO currently hardcoded relative pose
+    # p = [0.0, -0.1, 1.33]
+    # # r = [0.6645, 0.2418, 0.2418, 0.6645]
+    # r = [0.2418448, 0.2418448, 0.664463, 0.664463]
 
-    object_pos = np.array([0., 0, 1.205])
+    # object_pos = np.array([0., 0, 1.205])
 
-    world_trans = tf.Transform3d(pos=torch.tensor(p, device=config['device']),
-                                 rot=torch.tensor([r[3], r[0], r[1], r[2]], device=config['device']),
-                                 device=config['device'])
+    # world_trans = tf.Transform3d(pos=torch.tensor(p, device=config['device']),
+    #                              rot=torch.tensor([r[3], r[0], r[1], r[2]], device=config['device']),
+    #                              device=config['device'])
 
-    asset_object = get_assets_dir() + '/screwdriver/screwdriver.urdf'
-    chain_object = pk.build_chain_from_urdf(open(asset_object).read())
-    chain = chain.to(device=config['device'])
-    chain_object = chain_object.to(device=config['device'])
-    object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver',
-                             use_collision_geometry=False)
-    robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models')
-    scene_trans = world_trans.inverse().compose(
-        pk.Transform3d(device=config['device']).translate(object_pos[0], object_pos[1], object_pos[2]))
-    contact_links = ['allegro_hand_oya_finger_3_aftc_base_link',
-                     'allegro_hand_naka_finger_finger_1_aftc_base_link',
-                     'allegro_hand_hitosashi_finger_finger_0_aftc_base_link']
-    scene = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
-                          collision_check_links=contact_links,
-                          softmin_temp=100.0)
+    # asset_object = get_assets_dir() + '/screwdriver/screwdriver.urdf'
+    # chain_object = pk.build_chain_from_urdf(open(asset_object).read())
+    # chain = chain.to(device=config['device'])
+    # chain_object = chain_object.to(device=config['device'])
+    # object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver',
+    #                          use_collision_geometry=False)
+    # robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models')
+    # scene_trans = world_trans.inverse().compose(
+    #     pk.Transform3d(device=config['device']).translate(object_pos[0], object_pos[1], object_pos[2]))
+    # contact_links = ['allegro_hand_oya_finger_3_aftc_base_link',
+    #                  'allegro_hand_naka_finger_finger_1_aftc_base_link',
+    #                  'allegro_hand_hitosashi_finger_finger_0_aftc_base_link']
+    # scene = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
+    #                       collision_check_links=contact_links,
+    #                       softmin_temp=100.0)
 
-    i = np.random.randint(low=0, high=len(train_dataset))
+    # i = np.random.randint(low=0, high=len(train_dataset))
     # visualize_trajectory(train_dataset[i] * train_dataset.std + train_dataset.mean,
     #                     scene, scene_fpath=f'{CCAI_PATH}/examples', headless=False)
+
+    scene = None
     config['scene'] = scene
     config['env'] = env
 
-    if config['train_diffusion']:
+    if config['train_diffusion'] and not (config['state_only'] or config['state_control_only']):
         train_model(model, train_loader, config)
+    elif config['train_diffusion'] and (config['state_only'] or config['state_control_only']):
+        train_model_state_only(model, train_loader, config)
 
     if config['vis_dataset']:
         vis_dataset(train_loader, config, N=8)

@@ -5,7 +5,7 @@ torch.set_float32_matmul_precision('high')
 import torch.nn as nn
 from torch.nn.functional import mse_loss
 
-from ccai.models.temporal import TemporalUnet
+from ccai.models.temporal import TemporalUnet, TemporalUnetDynamics, TemporalUnetStateAction
 
 from ccai.models.cnf.ffjord.layers import CNF, ODEfunc
 from torchcfm.conditional_flow_matching import SchrodingerBridgeConditionalFlowMatcher, ExactOptimalTransportConditionalFlowMatcher
@@ -105,7 +105,9 @@ class TrajectoryCNF(nn.Module):
             u_dim,
             context_dim,
             hidden_dim=32,
-            inflation_noise=0.0
+            inflation_noise=0.0,
+            state_only=False,
+            state_control_only=False
     ):
         super().__init__()
 
@@ -115,16 +117,29 @@ class TrajectoryCNF(nn.Module):
         self.xu_dim = x_dim + u_dim
         self.context_dim = context_dim
         # self.loss_type = 'ot'
-        self.loss_type = 'conditional_ot_sb'
+        # self.loss_type = 'conditional_ot_sb'
+        if state_only:
+            self.loss_type = 'state_only'
+            self.model = TemporalUnetDynamics(self.horizon, self.dx+1,
+                                    cond_dim=context_dim,
+                                    dim=hidden_dim, dim_mults=(1, 2, 4, 8),
+                                    attention=False)
+        elif state_control_only:
+            self.loss_type = 'state_control_only'
+            self.model = TemporalUnetStateAction(self.horizon, self.xu_dim,
+                                    cond_dim=context_dim,
+                                    dim=hidden_dim, dim_mults=(1, 2, 4, 8),
+                                    attention=False)
+        else:
+            self.loss_type = 'conditional_ot_sb'
+            # sigma = .025 ** .5
+            sigma = .2
+            self.FM = SchrodingerBridgeConditionalFlowMatcher(sigma=sigma)
 
-        sigma = .1
-        self.FM = SchrodingerBridgeConditionalFlowMatcher(sigma=sigma)
-
-
-        self.model = TemporalUnet(self.horizon, self.xu_dim,
-                                  cond_dim=context_dim,
-                                  dim=hidden_dim, dim_mults=(1, 2, 4, 8),
-                                  attention=False)
+            self.model = TemporalUnet(self.horizon, self.xu_dim,
+                                    cond_dim=context_dim,
+                                    dim=hidden_dim, dim_mults=(1, 2, 4, 8),
+                                    attention=False)
         # self.model = MLP(horizon * xu_dim, context_dim, 256, num_layers=4)
         # self.model = TrajectoryConvNet(xu_dim, context_dim)
 
@@ -185,6 +200,10 @@ class TrajectoryCNF(nn.Module):
             return self.conditional_flow_matching_loss_sb(xu, context, mask)
         elif self.loss_type == 'conditional_ot_sb':
             return self.conditional_flow_matching_loss_ot_sb(xu, context, mask)
+        elif self.loss_type == 'state_only':
+            return self.flow_matching_loss_state_only(xu, context, mask)
+        elif self.loss_type == 'state_control_only':
+            return self.flow_matching_loss_state_control_only(xu, context, mask)
         
     def conditional_flow_matching_loss_ot_sb(self, xu, context, mask=None):
         x0 = torch.randn_like(xu)
@@ -193,7 +212,79 @@ class TrajectoryCNF(nn.Module):
         vt, _ = self.model.compiled_conditional_train(t.reshape(-1), xut, context)
 
         return mse_loss(vt, truevt)
+    
+    def flow_matching_loss_state_only(self, xu, context, mask=None):
+        r = torch.randn(xu.shape[0], 1, device=xu.device)
+        t = torch.rand(xu.shape[0], 1, device=xu.device)
+        # t *= 0
+        # t += .99
+        t_ind = (t * (self.horizon-1)).long()
+        t_ind.clamp_(0, self.horizon-2)
+        t_ind_for_gather = t_ind.reshape(xu.shape[0], 1, 1).repeat(1, 1, self.xu_dim)
+        t_ind_for_gather_1 = t_ind_for_gather + 1
+        if t_ind_for_gather_1.max() >= self.horizon:
+            print('t_ind_for_gather_1', t_ind_for_gather_1.max())
+        x0 = torch.gather(xu, 1, t_ind_for_gather).squeeze()
+        x1 = torch.gather(xu, 1, t_ind_for_gather_1).squeeze()
+        x0 = x0[..., :self.dx]
+        x1 = x1[..., :self.dx]
+        truevt = (x1 - x0) * (self.horizon - 1)
+        # t_ind_for_gather_u = t_ind.reshape(xu.shape[0], 1, 1).repeat(1, 1, self.xu_dim)
+        # true_u = torch.gather(xu, 1, t_ind_for_gather).squeeze()
+        true_u = x0[..., self.dx:]
+        xut = x1 * (t*(self.horizon-1) - t_ind) + x0 * (t_ind + 1 - t*(self.horizon-1))
+        xut = torch.cat((xut, r), dim=-1)
+        vt, _, u_hat = self.model.compiled_conditional_train(t.reshape(-1), xut, context)
+        flow_loss = mse_loss(vt[..., :-1], truevt)
+        action_loss = mse_loss(u_hat, true_u)
 
+        return {
+            'loss': flow_loss + action_loss,
+            'flow_loss': flow_loss,
+            'action_loss': action_loss
+        }
+    
+    def flow_matching_loss_state_control_only(self, xu, context, mask=None):
+
+        t0 = torch.rand(xu.shape[0], 1, device=xu.device) # initial time (for receding horizon)
+        t = torch.rand(xu.shape[0], 1, device=xu.device) * (1-t0) # t offset (for vector field prediction)
+
+        t_ind = ((t + t0) * (self.horizon-1)).long() # Get global time index for trajectory
+        t0_ind = (t0 * (self.horizon-1)).long() # Get local time index for vector field prediction
+        t_ind.clamp_(0, self.horizon-2)
+        t0_ind.clamp_(0, self.horizon-2)
+        t_ind_for_gather = t_ind.reshape(xu.shape[0], 1, 1).repeat(1, 1, self.xu_dim)
+        t_ind_for_gather_1 = t_ind_for_gather + 1
+        t_ind_for_gather_m1 = t_ind_for_gather - 1
+        t_ind_for_gather_m1.clamp_(0, self.horizon-1)
+        if t_ind_for_gather_1.max() >= self.horizon:
+            print('t_ind_for_gather_1', t_ind_for_gather_1.max())
+        x0 = torch.gather(xu, 1, t_ind_for_gather).squeeze()
+        x1 = torch.gather(xu, 1, t_ind_for_gather_1).squeeze()
+        xm1 = torch.gather(xu, 1, t_ind_for_gather_m1).squeeze()
+
+        truevt = (x1 - x0) #* (self.horizon - 1)
+        # xut = x0 + (t * self.horizon - t_ind.float()) * truevt/(self.horizon-1)
+        # xut = x1 * (t*(self.horizon-1) - t_ind) + x0 * (t_ind + 1 - t*(self.horizon-1))
+        xt = x1 * (t + t0) + x0 * (1 - (t + t0))
+
+        u0 = xm1[..., self.dx:]
+        u0[((t_ind - t0_ind) == 0).flatten()] = torch.randn_like(u0[((t_ind - t0_ind) == 0).flatten()])
+        u1 = x0[..., self.dx:]
+        true_u = u1 - u0
+        ut = u1 * (t + t0) + u0 * (1 - (t + t0))
+        xut = torch.cat((xt[..., :self.dx], ut), dim=-1)
+        truevt[..., self.dx:] = true_u
+        # xut = torch.cat((xut, r), dim=-1)
+        vt, _ = self.model.compiled_conditional_train(t.reshape(-1), xut, context)
+        flow_loss = mse_loss(vt, truevt)
+
+        return {
+            'loss': flow_loss,
+            'flow_loss': flow_loss,
+            'action_loss': torch.tensor(0.0)
+        }
+    
     def _sample(self, context=None, condition=None, mask=None, H=None, noise=None):
         N = context.shape[0]
         if H is None:

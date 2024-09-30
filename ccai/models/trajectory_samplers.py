@@ -230,8 +230,9 @@ class TrajectoryDiffusionModel(nn.Module):
 
 class TrajectoryCNFModel(TrajectoryCNF):
 
-    def __init__(self, horizon, dx, du, context_dim, hidden_dim=32):
-        super().__init__(horizon, dx, du, context_dim, hidden_dim=hidden_dim)
+    def __init__(self, horizon, dx, du, context_dim, hidden_dim=32, state_only=False, state_control_only=False):
+        super().__init__(horizon, dx, du, context_dim, hidden_dim=hidden_dim, state_only=state_only,
+                         state_control_only=state_control_only)
 
     def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None):
         # B, N, _ = constraints.shape
@@ -280,7 +281,7 @@ class TrajectorySampler(nn.Module):
     def __init__(self, T, dx, du, context_dim, type='nf', dynamics=None, problem=None, timesteps=50, hidden_dim=64,
                  constrain=False, unconditional=False, generate_context=False, score_model='conv_unet',
                  latent_diffusion=False, vae=None, inits_noise=None, noise_noise=None, guided=False, discriminator_guidance=False,
-                 learn_inverse_dynamics=False):
+                 learn_inverse_dynamics=False, state_only=False, state_control_only=False):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -292,7 +293,8 @@ class TrajectorySampler(nn.Module):
         if type == 'nf':
             self.model = TrajectoryFlowModel(T, dx, du, context_dim, dynamics)
         elif type == 'cnf':
-            self.model = TrajectoryCNFModel(T, dx, du, context_dim, hidden_dim=hidden_dim)
+            self.model = TrajectoryCNFModel(T, dx, du, context_dim, hidden_dim=hidden_dim, 
+                                            state_only=state_only, state_control_only=state_control_only)
         elif type == 'latent_diffusion':
             self.model = TrajectoryDiffusionModel(T, dx, du, context_dim, problem, timesteps, hidden_dim, constrain,
                                                   unconditional, generate_context=generate_context, score_model=score_model,

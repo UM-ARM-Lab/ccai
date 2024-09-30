@@ -362,6 +362,43 @@ class AllegroScrewDriverDataset(Dataset):
     def get_norm_constants(self):
         return self.mean, self.std
 
+    def compute_norm_constants(self):
+        # compute norm constants not including the zero padding
+        x = self.trajectories.clone()
+        # x[:, :, 8] += 2 * np.pi * (torch.rand(x.shape[0], 1) - 0.5)
+        x = x.reshape(-1, x.shape[-1])
+
+        mask = self.masks[:, :, 0].reshape(-1)
+        mean = x.sum(dim=0) / mask.sum()
+        std = np.sqrt(np.average((x - mean) ** 2, weights=mask, axis=0))
+
+        if self.states_only:
+            dim = 15
+        else:
+            dim = 15 + 12 + 9
+
+        # for angle we force to be between [-1, 1]
+        if self.cosine_sine:
+            self.mean = torch.zeros(dim + 1)
+            self.std = torch.ones(dim + 1)
+            self.mean[:14] = mean[:14]
+            self.std[:14] = torch.from_numpy(std[:14]).float()
+            self.mean[16:] = mean[15:]
+            self.std[16:] = torch.from_numpy(std[15:]).float()
+        else:
+            # mean[12:15] = 0
+            # std[12:15] = np.pi
+            # mean[14] = 0
+            # std[14] = np.pi
+            self.mean = mean
+            self.std = torch.from_numpy(std).float()
+
+    def set_norm_constants(self, mean, std):
+        self.mean = mean
+        self.std = std
+
+    def get_norm_constants(self):
+        return self.mean, self.std
 class AllegroScrewDriverTransitionDataset(AllegroScrewDriverDataset):
 
     def __init__(self, folders, cosine_sine=False, states_only=False):

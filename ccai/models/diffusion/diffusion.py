@@ -616,7 +616,13 @@ class GaussianDiffusion(nn.Module):
         q_next_x = self.q_posterior(x_start=x_0, x_t=x_t, t=t)
 
         # Compute our diffusing step from t to t-1
-        p_next_x = self.p_mean_variance(x=x_t, t=t, context=context)
+        # p_next_x = self.p_mean_variance(x=x_t, t=t, context=context)
+        batch_size = 128
+        all_p_next_x = []
+        for i in range(0, B * N, batch_size):
+            p_next_x = self.p_mean_variance(x=x_t[i:i + batch_size], t=t[i:i + batch_size], context=context[i:i + batch_size])
+            all_p_next_x.append(p_next_x)
+        p_next_x = {k: torch.cat([p[k] for p in p_next_x], dim=0) for k in all_p_next_x[0].keys()}
 
         if forward_kl:
             kl_x = self._gaussian_kl(p_next_x[0], p_next_x[1], q_next_x[0], q_next_x[1])

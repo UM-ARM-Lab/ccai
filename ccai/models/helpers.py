@@ -68,7 +68,6 @@ class Upsample1d(nn.Module):
     def forward(self, x):
         return self.conv(x)
 
-
 class Conv1dBlock(nn.Module):
     '''
         Conv1d --> GroupNorm --> Mish
@@ -82,6 +81,23 @@ class Conv1dBlock(nn.Module):
             Rearrange('batch channels horizon -> batch channels 1 horizon'),
             nn.GroupNorm(n_groups, out_channels),
             Rearrange('batch channels 1 horizon -> batch channels horizon'),
+            Mish(),
+        )
+
+    def forward(self, x):
+        return self.block(x)
+
+class MLPBlock(nn.Module):
+    '''
+        MLP --> GroupNorm --> Mish
+    '''
+
+    def __init__(self, inp_channels, out_channels):
+        super().__init__()
+
+        self.block = nn.Sequential(
+            nn.Linear(inp_channels, out_channels),
+            nn.BatchNorm1d(out_channels),
             Mish(),
         )
 
