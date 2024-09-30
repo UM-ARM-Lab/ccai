@@ -39,6 +39,7 @@ if __name__ == "__main__":
                                 fingers=config['fingers'],
                                 gradual_control=True,
                                 randomize_obj_start = True,
+                                gravity= False
                                 )
 
     sim, gym, viewer = env.get_sim()
@@ -79,61 +80,22 @@ if __name__ == "__main__":
     object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
     params['object_location'] = object_location
     params.update(config['controllers']['csvgd'])
-    
-    forward_kinematics = partial(chain.forward_kinematics, frame_indices=frame_indices)
-
-    # fk = forward_kinematics(dof_pos[:,:16])
-
-    # list of poses for each of the three fingers, each pose is a Transform3d object
-    # default_poses = list(fk.values())
-    
-    world_trans = env.world_trans
-
-    def world_to_robot_frame(point):
-        tform = world_trans.inverse()
-        return tform.transform_points(point.reshape(1, 3))
-    
-    def screwdriver_to_world_tform(r=0, p=0):
-        Rx = np.array([
-            [1, 0, 0, 0],
-            [0, np.cos(r), -np.sin(r), 0],
-            [0, np.sin(r), np.cos(r), 0],
-            [0, 0, 0, 1]
-        ])
-        Ry = np.array([
-            [np.cos(p), 0, np.sin(p), 0],
-            [0, 1, 0, 0],
-            [-np.sin(p), 0, np.cos(p), 0],
-            [0, 0, 0, 1]
-        ])
-        Tz = np.array([
-            [1, 0, 0, 0],
-            [0, 1, 0, 0],
-            [0, 0, 1, 1.360],
-            [0, 0, 0, 1]
-        ])
-        T = np.dot(Tz, np.dot(Ry, Rx))
-        return T
-    
-    def screwdriver_to_robot_frame(p, roll = 0, pitch = 0):
-        world_to_robot = world_trans.inverse().get_matrix()
-        sd_to_world = screwdriver_to_world_tform(roll, pitch)
-        p = np.array([p[0], p[1], p[2], 1])
-        world = np.dot(sd_to_world, p)
-        return np.dot(world_to_robot, world)[:,:3]
-    
 
     initial_poses = []
-    contact_points = []
-    costs = []
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
-    for i in range(50):
+    for i in range(100):
+        env.reset(deterministic=False)
         print("iteration: ", i)
 
         obj_dof = 3
         num_fingers = len(params['fingers'])
-        start = state['q'].reshape(4 * num_fingers + 4).to(device=device)
+        start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=device)
+
+        screwdriver = start.clone()[-4:-1]
+        print("solution screwdriver: ", screwdriver)
+        screwdriver = torch.cat((screwdriver, torch.tensor([0])),dim=0).reshape(1,4)
+
         if 'index' in params['fingers']:
             contact_fingers = params['fingers']
         else:
@@ -176,34 +138,23 @@ if __name__ == "__main__":
 
         #for x in best_traj[:, :4 * num_fingers]:
         x = best_traj[-1, :4 * num_fingers]
-
-        cost = 0
         action = x.reshape(-1, 4 * num_fingers).to(device=env.device) 
-        print(action)
-        solved_pos = torch.cat((action.clone()[:,:8], 
+        solved_pos = torch.cat((
+                action.clone()[:, :8], 
                 torch.tensor([[0., 0.5, 0.65, 0.65]]).to(device=device), 
-                action.clone()[:,8:], 
-                torch.zeros((1,4)).float().to(device=device)), 
-                dim=1).to(device)
-        env.reset(solved_pos)
-        #env.step(action)
-        #action_list.append(action)
-
-        #solved_pos = 0
-        #env.reset(solved_pos)
+                action.clone()[:, 8:], 
+                screwdriver.to(device=device)
+                ), dim=1).to(device)
+        env.reset(dof_pos = solved_pos, deterministic=True)
         initial_poses.append(solved_pos.cpu())
-        #contact_points.append(goal_poses.clone().cpu().numpy())
-        #costs.append(cost)
-
         env.gym.write_viewer_image_to_file(env.viewer, f'{fpath.resolve()}/initial_pose_frames.pkl/frame_{i}.png')
+        time.sleep(1)
 
 
-    with open(f'{fpath.resolve()}/initial_poses_free.pkl', 'wb') as f:
+    with open(f'{fpath.resolve()}/initial_poses.pkl', 'wb') as f:
         pkl.dump(initial_poses, f)
-    # with open(f'{fpath.resolve()}/contact_points_free.pkl', 'wb') as f:
-    #     pkl.dump(contact_points, f)
-    # with open(f'{fpath.resolve()}/costs.pkl', 'wb') as f:
-    #     pkl.dump(costs, f)
+    # with open(f'{fpath.resolve()}/screwdriver_poses.pkl', 'wb') as f:
+        #  pkl.dump(screwdriver_poses, f)
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)

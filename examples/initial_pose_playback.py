@@ -80,16 +80,16 @@ if __name__ == "__main__":
         initial_poses  = pkl.load(file)
     
 
-    with open(f'{fpath.resolve()}/contact_points.pkl', 'rb') as file:
-        contact_points  = pkl.load(file)
+    # with open(f'{fpath.resolve()}/screwdriver_poses.pkl', 'rb') as file:
+        # screwdriver_poses  = pkl.load(file)
     
-    print(contact_points)
+    # print(contact_points)
 
     #print(initial_poses)
 
     while True:
         for i in range(len(initial_poses)):
-            env.reset(initial_poses[i])
+            env.reset(initial_poses[i], deterministic=True)
             time.sleep(1)
         exit()
 
