@@ -122,7 +122,7 @@ def state2ee_pos(state, finger_name, fingers, chain, frame_indices, world_trans)
     return ee_p
 
 
-def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headless=False):
+def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, points = None, headless=False):
     num_fingers = len(fingers)
     # for a single trajectory
     T, dxu = trajectory.shape
@@ -139,9 +139,18 @@ def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headl
                                                 theta.unsqueeze(0).to(device=scene.device))
         for mesh in meshes:
             vis.add_geometry(mesh)
+
+        if points is not None:
+            for point in points:
+                sphere = o3d.geometry.TriangleMesh.create_sphere(radius=0.01)
+                sphere.translate(np.asarray(point, dtype=np.float64).reshape(3, 1))
+                sphere.paint_uniform_color([0.0, 1.0, 0.0])  # Make the sphere green
+                vis.add_geometry(sphere)
+
+
         ctr = vis.get_view_control()
-        # parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-04-03-13-14-26.json")
-        parameters = o3d.io.read_pinhole_camera_parameters("better_camera_view.json")
+        #parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-04-03-13-14-26.json")
+        parameters = o3d.io.read_pinhole_camera_parameters("/home/newuser/Desktop/Honda/ccai/utils/better_camera_view.json")
         ctr.convert_from_pinhole_camera_parameters(parameters, allow_arbitrary=True)
         vis.poll_events()
         vis.update_renderer()

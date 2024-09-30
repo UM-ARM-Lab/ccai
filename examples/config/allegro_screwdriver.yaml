@@ -20,7 +20,7 @@ controllers:
   csvgd:
     # N: 16
     N: 4
-    alpha_J: 5.0e-3
+    alpha_J: 5.0e-3 #5.0e-3
     # alpha_J: 1.0e-3 # DEBUG ONLY
     alpha_C: 1
     step_size: 0.1

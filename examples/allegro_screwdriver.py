@@ -81,61 +81,34 @@ class ALlegroScrewdriverContact(AllegroContactProblem):
 
         ee_locs = torch.stack(ee_locs, dim=1)
 
-        # # convert to scene base frame
-        # ee_locs = self.contact_scenes.scene_transform.inverse().transform_points(ee_locs)
-
-        # # convert to scene ee frame
-        # object_trans = self.contact_scenes.scene_sdf.chain.forward_kinematics(
-        #     _q_env.reshape(-1, _q_env.shape[-1]))
-
-        # object_link_name = 'screwdriver_body'
-        # ee_locs = object_trans[object_link_name].inverse().transform_points(ee_locs)
-
         num_regrasps = len(regrasp_fingers)
         return ee_locs.reshape(q_rob.shape[:-1] + (num_regrasps, 3))
-    
+
+
     # cost that incorporates desired contact points
     def _cost(self, xu, start, goal):
-        # cost function for valve turning task
-        # TODO: check if the addtional term of the smoothness cost and running goal cost is necessary
+        total_cost = 0
 
-        # state = xu[:, :self.dx]  # state dim = 9
+        # state = xu[:, :self.dx]
         # state = torch.cat((start.reshape(1, self.dx), state), dim=0)  # combine the first time step into it
-        
-        # action = xu[:, self.dx:self.dx + 4 * self.num_fingers]  # action dim = 8
-        # next_q = state[:-1, :-1] + action
-        # action_cost = 1 * torch.sum((state[1:, :-1] - next_q) ** 2)
-        # if self.optimize_force:
-        #     action_cost += 0.1 * torch.sum(xu[:, self.dx + 4 * self.num_fingers:] ** 2)
-        # # action_cost += 0.1 * torch.sum(action ** 2)
-        # # action_cost = action_cost
+        # action = xu[:, self.dx:]
+        # action_cost = torch.sum(action ** 2)
+        # smoothness_cost = 10 * torch.sum((state[1:] - state[:-1]) ** 2)
+        # total_cost = smoothness_cost + 10 * action_cost
 
-        # smoothness_cost = 1 * torch.sum((state[1:] - state[:-1]) ** 2)
-        # # smoothness_cost += 50 * torch.sum((state[1:, -1] - state[:-1, -1]) ** 2)
-        # smoothness_cost += 10 * torch.sum((state[1:, -1] - state[:-1, -1]) ** 2)
-
-        # goal_cost = (10 * (state[-1, -1] - goal) ** 2).reshape(-1)
-        # # add a running cost
-        # goal_cost += torch.sum((3 * (state[:, -1] - goal) ** 2), dim=0)
-
+        #if self.desired_ee_locs is not None:
         q = partial_to_full_state(xu[:, :self.num_fingers * 4], self.fingers)
         theta = xu[:, self.num_fingers * 4:self.num_fingers * 4 + self.obj_dof]
-        #print(self._ee_locations_in_screwdriver(q, theta)[0,:,:].shape)
-        #print(self.desired_ee_locs.shape)
-        #exit()
         current_ee_locs = self._ee_locations_in_robot_frame(q, theta)[-1,:,:]
-        desired_contact_cost = 1000 * torch.sum((self.desired_ee_locs - current_ee_locs) ** 2)
-        # print("target points: ", self.desired_ee_locs)
-        # print("current points: ", current_ee_locs)
-        #exit()
+        desired_contact_cost = 100 * torch.sum((self.desired_ee_locs - current_ee_locs) ** 2)
+        total_cost += desired_contact_cost
 
-        # [[ 0.0825,  0.0581,  0.0858],
-        # [ 0.0833, -0.0092,  0.0724],
-        # [ 0.1031,  0.0468, -0.0321]],
+        #print(total_cost)
+
+        return total_cost
+        #return torch.tensor(100.0)
         
 
-        return desired_contact_cost
-        #return smoothness_cost + action_cost + goal_cost
 
 class AllegroScrewdriver(AllegroValveTurning):
     def __init__(self,
