@@ -38,8 +38,8 @@ if __name__ == "__main__":
                                 joint_stiffness=config['kp'],
                                 fingers=config['fingers'],
                                 gradual_control=True,
-                                randomize_obj_start = True,
-                                gravity= False
+                                randomize_obj_start=True,
+                                gravity=False
                                 )
 
     sim, gym, viewer = env.get_sim()
@@ -83,13 +83,22 @@ if __name__ == "__main__":
 
     initial_poses = []
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
+    obj_dof = 3
+    num_fingers = len(params['fingers'])
 
+
+    default_dof_pos = torch.cat((torch.tensor([[0., 0.5, 0.7, 0.7]]).float().to(device=device),
+                                torch.tensor([[0., 0.5, 0.7, 0.7]]).float().to(device=device),
+                                torch.tensor([[0., 0.5, 0.7, 0.7]]).float().to(device=device),
+                                torch.tensor([[1.3, 0.3, 0.2, 1.1]]).float().to(device=device),
+                                torch.tensor([[0.0, 0.0, 0.0, 0.0]]).float().to(device=device)),
+                                dim=1).to(device)
+    
     for i in range(100):
-        env.reset(deterministic=False)
-        print("iteration: ", i)
 
-        obj_dof = 3
-        num_fingers = len(params['fingers'])
+        #print("iteration: ", i)
+        env.reset(dof_pos= default_dof_pos, deterministic=False)
+
         start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=device)
 
         screwdriver = start.clone()[-4:-1]
@@ -118,9 +127,9 @@ if __name__ == "__main__":
             fixed_obj=True,
         )
         pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
-        pregrasp_planner.warmup_iters = 500#500 #50
+        pregrasp_planner.warmup_iters = 1#500 #50
 
-        start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=device)
+        #start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=device)
         best_traj, _ = pregrasp_planner.step(start[:4 * num_fingers])
 
         # traj_for_viz = best_traj[:, :pregrasp_problem.dx]
@@ -144,6 +153,7 @@ if __name__ == "__main__":
                 torch.tensor([[0., 0.5, 0.65, 0.65]]).to(device=device), 
                 action.clone()[:, 8:], 
                 screwdriver.to(device=device)
+                #torch.zeros(1,4).to(device=device)
                 ), dim=1).to(device)
         env.reset(dof_pos = solved_pos, deterministic=True)
         initial_poses.append(solved_pos.cpu())
