@@ -622,8 +622,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         if trajectory_sampler is not None and params.get('diff_init', True):
             with torch.no_grad():
                 start = state.clone()
-
-                # start = 
                 # if state[-1] < -1.0:
                 #     start[-1] += 0.75
                 a = time.perf_counter()
@@ -634,8 +632,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     start_for_diff = start
                 initial_samples, _, _, initial_samples_0 = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
                                                                   H=params['T'] + 1,
-                                                                  constraints=contact,
-                                                                  project=params['project_state'],)
+                                                                  constraints=contact)
                 if params['sine_cosine']:
                     initial_samples = convert_sine_cosine_to_yaw(initial_samples)
                     initial_samples_0 = convert_sine_cosine_to_yaw(initial_samples_0)

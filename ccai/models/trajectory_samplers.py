@@ -150,8 +150,7 @@ class TrajectoryDiffusionModel(nn.Module):
                                                             unconditional=unconditional,
                                                             model_type=score_model)
 
-    def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None):
-        # B, N, _ = constraints.shape
+    def construct_context(self, constraints=None):
         if constraints is not None:
             constraints = constraints.reshape(constraints.shape[0], -1, constraints.shape[-1])
             context = constraints
@@ -160,6 +159,10 @@ class TrajectoryDiffusionModel(nn.Module):
             #                     constraints), dim=-1)
         else:
             context = None
+
+        return context
+
+    def construct_condition(self, H=None, start=None, goal=None, past=None):
         condition = {}
         time_index = 0
         if past is not None:
@@ -172,10 +175,20 @@ class TrajectoryDiffusionModel(nn.Module):
             condition[H - 1] = [14, g]
         if condition == {}:
             condition = None
+        return condition
+    
+    def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None, project=False):
+        # B, N, _ = constraints.shape
+        context = self.construct_context(constraints)
 
-        samples = self.diffusion_model.sample(N=N, H=H, context=context, condition=condition)  # .reshape(-1, H#,
+        condition = self.construct_condition(H, start, goal, past)
+
+        if project:
+            samples, samples_0 = self.diffusion_model.project(N=N, H=H, context=context, condition=condition)
+        else:
+            samples = self.diffusion_model.sample(N=N, H=H, context=context, condition=condition)  # .reshape(-1, H#,
         #         self.dx + self.du)
-        return samples
+        return samples, samples_0
 
     def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
         B = trajectories.shape[0]
@@ -234,7 +247,7 @@ class TrajectoryCNFModel(TrajectoryCNF):
         super().__init__(horizon, dx, du, context_dim, hidden_dim=hidden_dim, state_only=state_only,
                          state_control_only=state_control_only)
 
-    def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None):
+    def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None, project=False):
         # B, N, _ = constraints.shape
         if constraints is not None:
             constraints = constraints.reshape(constraints.shape[0], -1, constraints.shape[-1])
@@ -260,7 +273,7 @@ class TrajectoryCNFModel(TrajectoryCNF):
         # I guess just a case of intervening on the required gradient?
         # initialize trajectory to right amount, set gradient of components to be zero
         trajectories, likelihood = self._sample(context=context, condition=condition, mask=mask, H=H)
-        return trajectories, context, likelihood
+        return (trajectories, context, likelihood), trajectories
 
 
     def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
@@ -315,7 +328,7 @@ class TrajectorySampler(nn.Module):
     def send_norm_constants_to_submodels(self):
         self.model.set_norm_constants(self.x_mean, self.x_std)
 
-    def sample(self, N, H=10, start=None, goal=None, constraints=None, past=None):
+    def sample(self, N, H=10, start=None, goal=None, constraints=None, past=None, project=False):
         norm_start = None
         norm_past = None
         if start is not None and self.type != 'latent_diffusion':
@@ -327,7 +340,7 @@ class TrajectorySampler(nn.Module):
         else:
             norm_past = past
 
-        samples = self.model.sample(N, H, norm_start, goal, constraints, norm_past)
+        samples, samples_0 = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project)
         # if len(samples) == N:
         #     x = samples
         #     c = None
@@ -340,7 +353,7 @@ class TrajectorySampler(nn.Module):
             x, c, likelihood = samples
             
         if self.type != 'latent_diffusion':
-            return x * self.x_std + self.x_mean, c, likelihood
+            return x * self.x_std + self.x_mean, c, likelihood, samples_0 * self.x_std + self.x_mean
         else:
             return x, c, likelihood
 
