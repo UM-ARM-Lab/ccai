@@ -356,6 +356,7 @@ class GaussianDiffusion(nn.Module):
             img = trajectory
         if start_timestep is None:
             start_timestep = self.num_timesteps
+        # img.requires_grad = condition[0][1].requires_grad
         img = self._apply_conditioning(img, condition)
         imgs = [img]
         for t in reversed(range(0, start_timestep)):
@@ -470,10 +471,11 @@ class GaussianDiffusion(nn.Module):
 
             # context = context.reshape(B, 1, num_constraints, dc).repeat(1, N, 1, 1).reshape(B * N, num_constraints, -1)
 
-        if no_grad:
-            sample_fn = self.p_sample_loop if not self.is_ddim_sampling else self.ddim_sample
-        else:
-            sample_fn = self.p_sample_loop_grad if not self.is_ddim_sampling else self.ddim_sample
+        sample_fn = self.p_sample_loop if not self.is_ddim_sampling else self.ddim_sample
+        # if no_grad:
+        #     sample_fn = self.p_sample_loop if not self.is_ddim_sampling else self.ddim_sample
+        # else:
+        #     sample_fn = self.p_sample_loop_grad if not self.is_ddim_sampling else self.ddim_sample
         if H > self.horizon:
             # get closest multiple of horizon
             factor = math.ceil(H / self.horizon)
@@ -512,7 +514,9 @@ class GaussianDiffusion(nn.Module):
             )
         else:
             # return sample, None
-            likelihood = self.approximate_likelihood(sample.reshape(-1, self.horizon, self.xu_dim))
+            if not no_grad:
+                sample.requires_grad = True
+            likelihood = self.approximate_likelihood(sample.reshape(-1, self.horizon, self.xu_dim), context=context.reshape(-1, self.context_dim))
 
         return sample, likelihood
 
@@ -626,14 +630,17 @@ class GaussianDiffusion(nn.Module):
         # compute the posterior q(t-1 | t, 0)
         q_next_x = self.q_posterior(x_start=x_0, x_t=x_t, t=t)
 
+        context = context.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
+
         # Compute our diffusing step from t to t-1
         # p_next_x = self.p_mean_variance(x=x_t, t=t, context=context)
-        batch_size = 128
+        batch_size = 256
         all_p_next_x = []
         for i in range(0, B * N, batch_size):
             p_next_x = self.p_mean_variance(x=x_t[i:i + batch_size], t=t[i:i + batch_size], context=context[i:i + batch_size])
             all_p_next_x.append(p_next_x)
-        p_next_x = {k: torch.cat([p[k] for p in p_next_x], dim=0) for k in all_p_next_x[0].keys()}
+        # p_next_x = {k: torch.cat([p[k] for p in p_next_x], dim=0) for k in all_p_next_x[0].keys()}
+        p_next_x = [torch.cat([p[k] for p in all_p_next_x], dim=0) for k in range(2)]
 
         if forward_kl:
             kl_x = self._gaussian_kl(p_next_x[0], p_next_x[1], q_next_x[0], q_next_x[1])
@@ -644,21 +651,38 @@ class GaussianDiffusion(nn.Module):
     
     def project(self, N, H=None, condition=None, context=None):
         x = condition[0][1]
-        optimizer = torch.optim.SGD([x], lr=1e-2)
-        for proj_t in tqdm(range(10)):
+        x.requires_grad = True
+        optimizer = torch.optim.SGD([x], lr=3.5, momentum=0.5)
+        all_samples = []
+        all_losses = []
+        all_likelihoods = []
+        for proj_t in tqdm(range(25)):
             optimizer.zero_grad()
             # Sample N trajectories
             samples, likelihoods = self.sample(N, H, condition=condition, context=context, no_grad=False)
+            all_samples.append(samples.clone().detach())
+            all_likelihoods.append(likelihoods.clone().detach())
             if proj_t == 0:
-                samples_0 = samples.clone()
-            likelihoods_loss = -likelihoods.mean(0)
+                samples_0 = samples.clone().detach()
+            likelihoods_loss = -likelihoods.mean()
+            all_losses.append(likelihoods_loss.item())
             print(f'Projection step: {proj_t}, Loss: {likelihoods_loss.item()}')
             likelihoods_loss.backward()
+            x.grad = samples.grad[:, 0, :self.dx].mean(0).reshape(x.shape)
+            print(x.grad)
+            # x.grad[:, -2:] = 0.0
+
             optimizer.step()
         samples, likelihoods = self.sample(N, H, condition=condition, context=context, no_grad=False)
+        all_samples.append(samples.clone().detach())
+        all_likelihoods.append(likelihoods.clone().detach())
         likelihoods_loss = -likelihoods.mean(0)
-        print(f'Projection step: {proj_t}, Loss: {likelihoods_loss.item()}')
-        return (samples, likelihoods), samples_0
+        all_losses.append(likelihoods_loss.item())
+        print(f'Projection step: {proj_t+1}, Loss: {likelihoods_loss.item()}')
+        likelihoods_loss.backward()
+        best_sample = all_samples[np.argmin(all_losses)]
+        best_likelihood = all_likelihoods[np.argmin(all_losses)]
+        return (best_sample, best_likelihood), samples_0, (all_losses, all_samples, all_likelihoods)
 
     @staticmethod
     def _gaussian_kl(mu_1, var_1, mu_2, var_2):

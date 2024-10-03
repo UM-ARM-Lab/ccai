@@ -184,11 +184,11 @@ class TrajectoryDiffusionModel(nn.Module):
         condition = self.construct_condition(H, start, goal, past)
 
         if project:
-            samples, samples_0 = self.diffusion_model.project(N=N, H=H, context=context, condition=condition)
+            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.diffusion_model.project(N=N, H=H, context=context, condition=condition)
         else:
             samples = self.diffusion_model.sample(N=N, H=H, context=context, condition=condition)  # .reshape(-1, H#,
         #         self.dx + self.du)
-        return samples, samples_0
+        return samples, samples_0, (all_losses, all_samples, all_likelihoods)
 
     def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
         B = trajectories.shape[0]
@@ -201,7 +201,6 @@ class TrajectoryDiffusionModel(nn.Module):
 
     def classifier_loss(self, trajectories, mask=None, context=None, label=None):
         return self.diffusion_model.classifier_loss(trajectories, context=context, mask=mask, label=label)
-
 
     def set_norm_constants(self, x_mu, x_std):
         self.diffusion_model.set_norm_constants(x_mu, x_std)
@@ -272,8 +271,15 @@ class TrajectoryCNFModel(TrajectoryCNF):
         # TODO: in-painting for sample generation with CNF
         # I guess just a case of intervening on the required gradient?
         # initialize trajectory to right amount, set gradient of components to be zero
-        trajectories, likelihood = self._sample(context=context, condition=condition, mask=mask, H=H)
-        return (trajectories, context, likelihood), trajectories
+        # trajectories, likelihood = self._sample(context=context, condition=condition, mask=mask, H=H)
+        # return (trajectories, context, likelihood), trajectories
+
+        if project:
+            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.project(H=H, context=context, condition=condition)
+        else:
+            samples = self._sample(H=H, context=context, condition=condition)  # .reshape(-1, H#,
+        #         self.dx + self.du)
+        return samples, samples_0, (all_losses, all_samples, all_likelihoods)
 
 
     def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
@@ -340,7 +346,7 @@ class TrajectorySampler(nn.Module):
         else:
             norm_past = past
 
-        samples, samples_0 = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project)
+        samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project)
         # if len(samples) == N:
         #     x = samples
         #     c = None
@@ -353,7 +359,7 @@ class TrajectorySampler(nn.Module):
             x, c, likelihood = samples
             
         if self.type != 'latent_diffusion':
-            return x * self.x_std + self.x_mean, c, likelihood, samples_0 * self.x_std + self.x_mean
+            return x * self.x_std + self.x_mean, c, likelihood, samples_0 * self.x_std + self.x_mean, (all_losses, all_samples, all_likelihoods)
         else:
             return x, c, likelihood
 

@@ -506,6 +506,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         trajectory_sampler.load_state_dict(torch.load(f'{CCAI_PATH}/{model_path}', map_location=torch.device(params['device'])), strict=True)
         trajectory_sampler.to(device=params['device'])
         trajectory_sampler.send_norm_constants_to_submodels()
+        if params['project_state']:
+            trajectory_sampler.model.diffusion_model.classifier=None
         print('Loaded trajectory sampler')
 
     # start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
@@ -620,49 +622,59 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # generate initial samples with diffusion model
         sim_rollouts = None
         if trajectory_sampler is not None and params.get('diff_init', True):
-            with torch.no_grad():
-                start = state.clone()
+            # with torch.no_grad():
+            # start = state.clone()
 
-                # start = 
-                # if state[-1] < -1.0:
-                #     start[-1] += 0.75
-                a = time.perf_counter()
-                # start_for_diff = start#convert_yaw_to_sine_cosine(start)
-                if params['sine_cosine']:
-                    start_for_diff = convert_yaw_to_sine_cosine(start)
-                else:
-                    start_for_diff = start
-                initial_samples, _, _, initial_samples_0 = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
-                                                                  H=params['T'] + 1,
-                                                                  constraints=contact,
-                                                                  project=params['project_state'],)
-                if params['sine_cosine']:
-                    initial_samples = convert_sine_cosine_to_yaw(initial_samples)
-                    initial_samples_0 = convert_sine_cosine_to_yaw(initial_samples_0)
-                print('Sampling time', time.perf_counter() - a)
-                # if state[-1] < -1.0:
-                #     initial_samples[:, :, -1] -= 0.75
-                if params['visualize_plan']:
-                    for (name, traj_set) in [('initial_samples_project', initial_samples), ('initial_samples_0', initial_samples_0)]:
-                        for k in range(params['N']):
-                            traj_for_viz = traj_set[k, :, :planner.problem.dx]
-                            if params['exclude_index']:
-                                traj_for_viz = torch.cat((state[4:4 + planner.problem.dx].unsqueeze(0), traj_for_viz), dim=0)
-                            else:
-                                traj_for_viz = torch.cat((state[:planner.problem.dx].unsqueeze(0), traj_for_viz), dim=0)
-                            tmp = torch.zeros((traj_for_viz.shape[0], 1),
-                                            device=best_traj.device)  # add the joint for the screwdriver cap
-                            traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
-                            # traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof] = axis_angle_to_euler(traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof])
+            start = torch.tensor([
+                -0.00866661,  0.5414786 ,  0.5291143 ,  0.602711  , -0.02442463,
+                0.39878428,  0.95840853,  0.9327192 ,  1.2067503 ,  0.34080115,
+                0.33771813,  1.253074  ,  0.09828146,  0.01678719, -1.2030787
+            ], device=params['device'])
+            # if state[-1] < -1.0:
+            #     start[-1] += 0.75
+            a = time.perf_counter()
+            # start_for_diff = start#convert_yaw_to_sine_cosine(start)
+            if params['sine_cosine']:
+                start_for_diff = convert_yaw_to_sine_cosine(start)
+            else:
+                start_for_diff = start
+            initial_samples, _, _, initial_samples_0, (all_losses, all_samples, all_likelihoods) = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
+                                                                H=params['T'] + 1,
+                                                                constraints=contact,
+                                                                project=params['project_state'],)
+            mode_fpath = f'{fpath}/{fname}'
+            pathlib.Path.mkdir(pathlib.Path(mode_fpath), parents=True, exist_ok=True)
+            with open(mode_fpath+ '/projection_results.pkl', 'wb') as f:
+                pickle.dump((initial_samples, initial_samples_0, all_losses, all_samples, all_likelihoods), f)
+            if params['sine_cosine']:
+                initial_samples = convert_sine_cosine_to_yaw(initial_samples)
+                initial_samples_0 = convert_sine_cosine_to_yaw(initial_samples_0)
+            print('Sampling time', time.perf_counter() - a)
+            # if state[-1] < -1.0:
+            #     initial_samples[:, :, -1] -= 0.75
+            if params['visualize_plan']:
+                for (name, traj_set) in [('initial_samples_project', initial_samples), ('initial_samples_0', initial_samples_0)]:
+                    for k in range(params['N']):
+                        traj_for_viz = traj_set[k, :, :planner.problem.dx]
+                        # if params['exclude_index']:
+                        #     traj_for_viz = torch.cat((state[4:4 + planner.problem.dx].unsqueeze(0), traj_for_viz), dim=0)
+                        # else:
+                        #     traj_for_viz = torch.cat((state[:planner.problem.dx].unsqueeze(0), traj_for_viz), dim=0)
+                        tmp = torch.zeros((traj_for_viz.shape[0], 1),
+                                        device=traj_for_viz.device)  # add the joint for the screwdriver cap
+                        traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
+                        # traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof] = axis_angle_to_euler(traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof])
 
-                            viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/{name}/{k}")
-                            img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
-                            gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
-                            pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
-                            pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-                            visualize_trajectory(traj_for_viz, turn_problem.contact_scenes, viz_fpath,
-                                                turn_problem.fingers, turn_problem.obj_dof + 1)
+                        viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/{name}/{k}")
+                        img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
+                        gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
+                        pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
+                        pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
+                        visualize_trajectory(traj_for_viz, turn_problem.contact_scenes, viz_fpath,
+                                            turn_problem.fingers, turn_problem.obj_dof + 1)
             sim_rollouts = torch.zeros_like(initial_samples)
+            torch.cuda.empty_cache()
+
             # for i in range(params['N']):
             #     sim_rollout = rollout_trajectory_in_sim(env_sim_rollout, initial_samples[i])
             #     sim_rollouts[i] = sim_rollout
@@ -1225,7 +1237,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_project_state.yaml').read_text())
 
     from tqdm import tqdm
 
