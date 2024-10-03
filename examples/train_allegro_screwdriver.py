@@ -20,6 +20,9 @@ from torch.utils.data import DataLoader, RandomSampler
 from ccai.models.trajectory_samplers import TrajectorySampler
 from ccai.utils.allegro_utils import partial_to_full_state, visualize_trajectory
 
+import datetime
+import time
+
 import wandb
 
 TORCH_LOGS = "+dynamo"
@@ -102,8 +105,11 @@ def train_model(trajectory_sampler, train_loader, config):
         train_loss /= len(train_loader)
         pbar.set_description(
             f'Train loss {train_loss:.3f}')
-        wandb.log({'train_loss_epoch': train_loss})
-
+        try:
+            wandb.log({'train_loss_epoch': train_loss})
+        except:
+            print('Could not log to wandb')
+            print({'train_loss_epoch': train_loss})
         # generate samples and plot them
         if (epoch + 1) % config['test_every'] == 0:
 
@@ -143,7 +149,9 @@ def train_model(trajectory_sampler, train_loader, config):
 def train_model_state_only(trajectory_sampler, train_loader, config):
     fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}'
     pathlib.Path.mkdir(pathlib.Path(fpath), parents=True, exist_ok=True)
-    run = wandb.init(project='ccai-screwdriver', entity='abhinavk99', config=config)
+    dt = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    run = wandb.init(project='ccai-screwdriver', entity='abhinavk99', config=config,
+                     name=f'{config["model_name"]}_{config["model_type"]}_{dt}_sigma_.1')
 
     if config['use_ema']:
         ema = EMA(beta=config['ema_decay'])
@@ -199,10 +207,20 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
         action_loss /= len(train_loader)
         pbar.set_description(
             f'Train loss {train_loss:.3f}')
-        wandb.log({
-                'train_loss_epoch': train_loss,
-                'flow_loss_epoch': flow_loss,
-                'action_loss_epoch': action_loss
+        try:
+            wandb.log({
+                    'train_loss_epoch': train_loss,
+                    'flow_loss_epoch': flow_loss,
+                    'action_loss_epoch': action_loss,
+                    'time': time.time()
+                })
+        except:
+            print('Could not log to wandb')
+            print({
+                    'train_loss_epoch': train_loss,
+                    'flow_loss_epoch': flow_loss,
+                    'action_loss_epoch': action_loss,
+                    'time': time.time()
             })
 
         if (epoch + 1) % config['save_every'] == 0:

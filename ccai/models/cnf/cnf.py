@@ -153,7 +153,7 @@ class TrajectoryCNF(nn.Module):
         noise_dist = torch.distributions.Normal(self.prior_mu, self.prior_sigma)
 
         odefunc = ODEfunc(
-            diffeq=self.masked_grad,
+            diffeq=self.masked_grad if self.loss_type == 'conditional_ot_sb' else self.state_control_only_forward,
             divergence_fn='approximate',
             residual=False,
             rademacher=False,
@@ -172,6 +172,10 @@ class TrajectoryCNF(nn.Module):
         #self.register_buffer('_grad_mask', mask)
         self.register_buffer('start_mask', mask[0])
         self._grad_mask = mask.cuda()
+
+    def state_control_only_forward(self, t, x, context=None):
+        dx, _ = self.model(t, x, context)
+        return dx * (self.horizon-1)
 
     def masked_grad(self, t, x, context=None):
         dx, _ = self.model(t, x, context)
@@ -268,6 +272,8 @@ class TrajectoryCNF(nn.Module):
         # xut = x1 * (t*(self.horizon-1) - t_ind) + x0 * (t_ind + 1 - t*(self.horizon-1))
         xt = x1 * (t + t0) + x0 * (1 - (t + t0))
 
+        xt += torch.randn_like(xt) * .1
+
         u0 = xm1[..., self.dx:]
         u0[((t_ind - t0_ind) == 0).flatten()] = torch.randn_like(u0[((t_ind - t0_ind) == 0).flatten()])
         u1 = x0[..., self.dx:]
@@ -284,7 +290,7 @@ class TrajectoryCNF(nn.Module):
             'flow_loss': flow_loss,
             'action_loss': torch.tensor(0.0)
         }
-    
+
     def _sample(self, context=None, condition=None, mask=None, H=None, noise=None):
         N = context.shape[0]
         if H is None:
@@ -317,7 +323,8 @@ class TrajectoryCNF(nn.Module):
         out = self.flow(noise.reshape(-1, self.horizon, self.xu_dim),
                         logpx=log_prob,
                         context=context.reshape(-1, context.shape[-1]),
-                        reverse=False)
+                        reverse=False,
+                        integration_times=torch.linspace(0, 1, self.horizon, device=noise.device))
 
         trajectories, log_prob = out[:2]
 
