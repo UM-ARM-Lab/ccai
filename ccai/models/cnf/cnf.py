@@ -323,6 +323,40 @@ class TrajectoryCNF(nn.Module):
 
         return trajectories.reshape(N, -1, self.xu_dim), log_prob.reshape(N, -1).sum(dim=1)
 
+    def project(self, H=None, condition=None, context=None):
+        N = context.shape[0]
+        x = condition[0][1]
+        x.requires_grad = True
+        optimizer = torch.optim.SGD([x], lr=3e-2, momentum=0.9)
+        all_samples = []
+        all_losses = []
+        all_likelihoods = []
+        for proj_t in tqdm(range(10)):
+            optimizer.zero_grad()
+            # Sample N trajectories
+            samples, likelihoods = self._sample(H, condition=condition, context=context)
+            all_samples.append(samples.clone().detach())
+            all_likelihoods.append(likelihoods.clone().detach())
+            if proj_t == 0:
+                samples_0 = samples.clone().detach()
+            likelihoods_loss = -likelihoods.mean()
+            all_losses.append(likelihoods_loss.item())
+            print(f'Projection step: {proj_t}, Loss: {likelihoods_loss.item()}')
+            likelihoods_loss.backward()
+            # x.grad[:, -2:] = 0.0
+
+            optimizer.step()
+        samples, likelihoods = self.sample(N, H, condition=condition, context=context, no_grad=False)
+        all_samples.append(samples.clone().detach())
+        all_likelihoods.append(likelihoods.clone().detach())
+        likelihoods_loss = -likelihoods.mean(0)
+        all_losses.append(likelihoods_loss.item())
+        print(f'Projection step: {proj_t+1}, Loss: {likelihoods_loss.item()}')
+        likelihoods_loss.backward()
+        best_sample = all_samples[np.argmin(all_losses)]
+        best_likelihood = all_likelihoods[np.argmin(all_losses)]
+        return (best_sample, best_likelihood), samples_0, (all_losses, all_samples, all_likelihoods)
+
     def _apply_conditioning(self, x, condition=None):
         if condition is None:
             return x
