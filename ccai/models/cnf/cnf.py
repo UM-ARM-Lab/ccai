@@ -5,10 +5,10 @@ torch.set_float32_matmul_precision('high')
 import torch.nn as nn
 from torch.nn.functional import mse_loss
 
-from ccai.models.temporal import TemporalUnet
+from ccai.models.temporal import TemporalUnet, TemporalUnetStateAction
 
 from ccai.models.cnf.ffjord.layers import CNF, ODEfunc
-from torchcfm.conditional_flow_matching import SchrodingerBridgeConditionalFlowMatcher
+from torchcfm.conditional_flow_matching import SchrodingerBridgeConditionalFlowMatcher, ExactOptimalTransportConditionalFlowMatcher
 from ccai.models.helpers import SinusoidalPosEmb
 # import ot
 import numpy as np
@@ -18,6 +18,8 @@ import os
 import argparse
 import pickle
 import time
+
+import wandb
 
 fpath = os.path.dirname(os.path.realpath(__file__))
 
@@ -81,10 +83,12 @@ def set_cnf_options(solver, model):
             module.atol = 1e-5
             module.rtol = 1e-5
 
+            module.solver_options['first_step'] = 0.2
             # If using fixed-grid adams, restrict order to not be too high.
             if solver in ['fixed_adams', 'explicit_adams']:
                 module.solver_options['max_order'] = 4
-            module.solver_options['first_step'] = 0.2
+            if solver == 'rk4':
+                module.solver_options['step_size'] = .1
 
             # Set the test settings
             module.test_solver = solver
@@ -118,13 +122,19 @@ class TrajectoryCNF(nn.Module):
         self.loss_type = 'conditional_ot_sb'
 
         sigma = .1
-        self.FM = SchrodingerBridgeConditionalFlowMatcher(sigma=sigma)
+        # self.FM = SchrodingerBridgeConditionalFlowMatcher(sigma=sigma)
+        self.FM = ExactOptimalTransportConditionalFlowMatcher(sigma=sigma)
 
 
-        self.model = TemporalUnet(self.horizon, self.xu_dim,
-                                  cond_dim=context_dim,
-                                  dim=hidden_dim, dim_mults=(1, 2, 4, 8),
-                                  attention=False)
+        # self.model = TemporalUnet(self.horizon, self.xu_dim,
+        #                           cond_dim=context_dim,
+        #                           dim=hidden_dim, dim_mults=(1, 2, 4),
+        #                           attention=False)
+        
+        self.model = TemporalUnetStateAction(self.horizon, self.xu_dim,
+                                    cond_dim=context_dim,
+                                    dim=hidden_dim, dim_mults=(1, 2, 4, 8),
+                                    attention=False)
         # self.model = MLP(horizon * xu_dim, context_dim, 256, num_layers=4)
         # self.model = TrajectoryConvNet(xu_dim, context_dim)
 
@@ -159,18 +169,31 @@ class TrajectoryCNF(nn.Module):
         self._grad_mask = mask.cuda()
 
     def masked_grad(self, t, x, context=None):
-        dx, _ = self.model(t, x, context)
 
-        if len(self._grad_mask.shape) == 4:
-            num_samples, num_sub_trajs = self._grad_mask.shape[:2]
+        # x = self._apply_conditioning(x, t, self.condition)
 
-            dx = dx.reshape(-1, num_sub_trajs, self.horizon, self.xu_dim)
-            for i in range(num_sub_trajs - 1):
-                tmp = dx[:, i, -1, :self.dx].clone()
-                dx[:, i, -1, :self.dx] = (tmp + dx[:, i + 1, 0, :self.dx]) / 2
-                dx[:, i + 1, 0, :self.dx] = dx[:, i, -1, :self.dx]
+        dx_null_context, _ = self.model.compiled_unconditional_test(t, x)
+        if context is not None:
+            w_total = 1
+            dx_context, _ = self.model.compiled_conditional_test(t, x, context)
+            dx = dx_null_context  + w_total * (dx_context - dx_null_context)
+        else:
+            dx = dx_null_context
 
-            dx = dx.reshape(-1, self.horizon, self.xu_dim)
+        # dx *= (self.horizon-1)
+        # dx = self._apply_conditioning(dx, t, self.condition, dx=True)
+        # dx = self._apply_conditioning(dx, t, self.condition)
+
+        # if len(self._grad_mask.shape) == 4:
+        #     num_samples, num_sub_trajs = self._grad_mask.shape[:2]
+
+        #     dx = dx.reshape(-1, num_sub_trajs, self.horizon, self.xu_dim)
+        #     for i in range(num_sub_trajs - 1):
+        #         tmp = dx[:, i, -1, :self.dx].clone()
+        #         dx[:, i, -1, :self.dx] = (tmp + dx[:, i + 1, 0, :self.dx]) / 2
+        #         dx[:, i + 1, 0, :self.dx] = dx[:, i, -1, :self.dx]
+
+        #     dx = dx.reshape(-1, self.horizon, self.xu_dim)
 
         return dx# * self._grad_mask.reshape(-1, self.horizon, self.xu_dim)
 
@@ -199,48 +222,69 @@ class TrajectoryCNF(nn.Module):
         if H is None:
             H = self.horizon
 
+        sigma_save = self.FM.sigma
+        self.FM.sigma = 0
         num_sub_trajectories = H // self.horizon
         sample_shape = torch.Size([N, num_sub_trajectories])
         assert context.shape[1] == num_sub_trajectories
 
-        if noise is None:
-            prior = torch.distributions.Normal(self.prior_mu, self.prior_sigma)
-            noise = prior.sample(sample_shape=sample_shape).to(dtype=context, device=context.device)
+        # if noise is None:
+        #     prior = torch.distributions.Normal(self.prior_mu, self.prior_sigma)
+        #     noise = prior.sample(sample_shape=sample_shape).to(dtype=context.dtype, device=context.device)
 
-        # if longer horizon, set noise of starts / ends to be same value
-        for i in range(num_sub_trajectories - 1):
-            noise[:, i, -1] = noise[:, i + 1, 0]
+        # # if longer horizon, set noise of starts / ends to be same value
+        # for i in range(num_sub_trajectories - 1):
+        #     noise[:, i, -1] = noise[:, i + 1, 0]
 
+        self.noise = condition[0][1].clone()
+        self.noise = self.noise.reshape(1, -1).repeat(N, 1)
+        self.noise = torch.cat((self.noise, torch.randn(N, self.du, device=self.noise.device)), dim=-1)
         # manually set the conditions
         if condition is not None:
-            noise[:, 0] = self._apply_conditioning(noise[:, 0], condition)
-            self._grad_mask = mask
-            if num_sub_trajectories > 1:
-                self._grad_mask = torch.cat((self._grad_mask[:, None],
-                                             torch.ones(N, num_sub_trajectories - 1,
-                                                        self.horizon, self.xu_dim, device=mask.device)), dim=1)
+            self.condition = condition
+            # noise[:, 0] = self._apply_conditioning(noise[:, 0], condition)
+            # self._grad_mask = mask
+            # if num_sub_trajectories > 1:
+                # self._grad_mask = torch.cat((self._grad_mask[:, None],
+                #                              torch.ones(N, num_sub_trajectories - 1,
+                #                                         self.horizon, self.xu_dim, device=mask.device)), dim=1)
         else:
-            self._grad_mask = torch.ones_like(noise)
-        self._grad_mask = self._grad_mask.to(device=noise.device)
-        log_prob = torch.zeros(N * num_sub_trajectories, device=noise.device)
-        out = self.flow(noise.reshape(-1, self.horizon, self.xu_dim),
+            self.condition = None
+            # self._grad_mask = torch.ones_like(noise)
+        # self._grad_mask = self._grad_mask.to(device=self.noise.device)
+        # self.noise = self._apply_conditioning(self.noise, None, condition=condition)
+        log_prob = torch.zeros(N * num_sub_trajectories, device=self.noise.device)
+
+        out = self.flow(self.noise,
                         logpx=log_prob,
                         context=context.reshape(-1, context.shape[-1]),
-                        reverse=False)
+                        reverse=False,
+                        integration_times=torch.linspace(0, 1, self.horizon, device=self.noise.device))
 
         trajectories, log_prob = out[:2]
-
+        trajectories = trajectories.permute(1, 0, 2)
+        self.FM.sigma = sigma_save
         return trajectories.reshape(N, -1, self.xu_dim), log_prob.reshape(N, -1).sum(dim=1)
 
-    def _apply_conditioning(self, x, condition=None):
+    def _apply_conditioning(self, x, t, condition=None, dx=False):
+        ret_x = x.clone()
         if condition is None:
             return x
-
-        for t, (start_idx, val) in condition.items():
+        # t = t.reshape(-1).repeat(x.shape[0])
+        for t_, (start_idx, val) in condition.items():
             val = val.reshape(val.shape[0], -1, val.shape[-1])
             n, h, d = val.shape
-            x[:, t:t + h, start_idx:start_idx + d] = val.clone()
-        return x
+            # x0 = self.noise[:, t_:t_ + h, start_idx:start_idx + d]
+            # xt = t * val + (1 - t) * x0
+            # if dx:
+            #     xt = self.FM.compute_conditional_flow(x0, val, t, xt)
+            # ret_x[:, t_:t_ + h, start_idx:start_idx + d] = xt.clone()
+
+            ret_x[:, t_:t_ + h, start_idx:start_idx + d] = val.clone()
+            if dx:
+                ret_x[:, t_:t_ + h, start_idx:start_idx + d] = 0
+
+        return ret_x
 
     def log_prob(self, xu, context, noise=False):
         # inflate with noise
@@ -270,6 +314,57 @@ class TrajectoryCNF(nn.Module):
         alpha_1_minus_t = torch.exp(-Ts / 2)
         sigma_t = torch.sqrt(1 - alpha_1_minus_t ** 2) * torch.ones_like(xu)
         return s / sigma_t
+
+    def project(self, H=None, condition=None, context=None):
+        N = context.shape[0]
+        x = condition[0][1]
+        x.requires_grad = True
+        optimizer = torch.optim.SGD([x], lr=3, momentum=0.5)
+        all_samples = []
+        all_losses = []
+        all_likelihoods = []
+        proj_t = -1
+        samples_0 = None
+        for proj_t in tqdm(range(25)):
+            optimizer.zero_grad()
+            # Sample N trajectories
+            with torch.no_grad():
+                samples, _ = self._sample(H=H, condition=condition, context=context)
+            samples.requires_grad = True
+            likelihoods, _ = self.log_prob(samples, context, None)
+            all_samples.append(samples.clone().detach())
+            all_likelihoods.append(likelihoods.clone().detach())
+            if proj_t == 0:
+                samples_0 = samples.clone().detach()
+            likelihoods_loss = -likelihoods.mean()
+            all_losses.append(likelihoods_loss.item())
+            print(f'Projection step: {proj_t}, Loss: {likelihoods_loss.item()}')
+            likelihoods_loss.backward()
+
+            x.grad = samples.grad[:, 0, :self.dx].mean(0).reshape(x.shape)
+
+            optimizer.step()
+        self.flow.solver = 'dopri5'
+        if 'step_size' in self.flow.solver_options:
+            del self.flow.solver_options['step_size']
+
+        with torch.no_grad():
+            samples, _ = self._sample(H=H, condition=condition, context=context)
+        samples.requires_grad = True
+        likelihoods, _ = self.log_prob(samples, None)
+        all_samples.append(samples.clone().detach())
+        all_likelihoods.append(likelihoods.clone().detach())
+        likelihoods_loss = -likelihoods.mean(0)
+        # all_losses.append(likelihoods_loss.item())
+        print(f'Projection step: {proj_t+1}, Loss: {likelihoods_loss.item()}')
+        likelihoods_loss.backward()
+        best_sample = all_samples[np.argmin(all_losses)]
+        best_likelihood = all_likelihoods[np.argmin(all_losses)]
+        set_cnf_options('rk4', self.flow)
+
+        if samples_0 is None:
+            samples_0 = best_sample
+        return (best_sample, best_likelihood), samples_0, (all_losses, all_samples, all_likelihoods)
 
 
 import matplotlib.pyplot as plt

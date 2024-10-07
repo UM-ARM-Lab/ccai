@@ -1,0 +1,33 @@
+Importing module 'gym_38' (/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.0+cu121
+Device count 2
+/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinav/Documents/ccai
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current yaw: tensor([ 1.8865e-05,  1.2382e-02, -5.1842e-02], device='cuda:0')
+Current yaw: tensor([-0.0048,  0.0114, -0.1221], device='cuda:0')
+1 turn
+Projection step: 0, Loss: 786.0319213867188
+Projection step: 1, Loss: 726.7490234375
+Projection step: 2, Loss: 678.0825805664062
+Projection step: 3, Loss: 689.981201171875
+Projection step: 4, Loss: 757.2618408203125
+Projection step: 5, Loss: 796.1407470703125
+Projection step: 6, Loss: 760.6768798828125
+Projection step: 7, Loss: 686.5831298828125
+Projection step: 8, Loss: 677.27392578125
+Projection step: 9, Loss: 714.137939453125
+Projection step: 10, Loss: 763.1215209960938
+Projection step: 11, Loss: 770.6871948242188
+Projection step: 12, Loss: 727.99853515625
