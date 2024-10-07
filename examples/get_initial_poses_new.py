@@ -95,7 +95,7 @@ if __name__ == "__main__":
                                 torch.tensor([[0.0, 0.0, 0.0, 0.0]]).float().to(device=device)),
                                 dim=1).to(device)
     
-    for i in tqdm(range(10000)):
+    for i in tqdm(range(10)):
 
         print("iteration: ", i)
         env.reset(dof_pos= default_dof_pos, deterministic=False)
@@ -127,7 +127,8 @@ if __name__ == "__main__":
             fixed_obj=True,
         )
         pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
-        pregrasp_planner.warmup_iters = 200#500 #50
+        pregrasp_planner.warmup_iters = 80#500 #50
+        # 200 -> 20 seconds / grasp
 
         #start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=device)
         best_traj, _ = pregrasp_planner.step(start[:4 * num_fingers])
