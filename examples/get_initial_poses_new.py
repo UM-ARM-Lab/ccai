@@ -18,6 +18,7 @@ from allegro_valve_roll import AllegroValveTurning, AllegroContactProblem, Posit
 from allegro_screwdriver import ALlegroScrewdriverContact
 from scipy.spatial.transform import Rotation as R
 from baselines.planning.ik import IKSolver
+from tqdm import tqdm
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
@@ -94,15 +95,14 @@ if __name__ == "__main__":
                                 torch.tensor([[0.0, 0.0, 0.0, 0.0]]).float().to(device=device)),
                                 dim=1).to(device)
     
-    for i in range(100):
+    for i in tqdm(range(10000)):
 
-        #print("iteration: ", i)
+        print("iteration: ", i)
         env.reset(dof_pos= default_dof_pos, deterministic=False)
-
         start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=device)
 
         screwdriver = start.clone()[-4:-1]
-        print("solution screwdriver: ", screwdriver)
+        #print("start screwdriver: ", screwdriver)
         screwdriver = torch.cat((screwdriver, torch.tensor([0])),dim=0).reshape(1,4)
 
         if 'index' in params['fingers']:
@@ -127,7 +127,7 @@ if __name__ == "__main__":
             fixed_obj=True,
         )
         pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
-        pregrasp_planner.warmup_iters = 1#500 #50
+        pregrasp_planner.warmup_iters = 200#500 #50
 
         #start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=device)
         best_traj, _ = pregrasp_planner.step(start[:4 * num_fingers])
@@ -155,10 +155,11 @@ if __name__ == "__main__":
                 screwdriver.to(device=device)
                 #torch.zeros(1,4).to(device=device)
                 ), dim=1).to(device)
+        #print("solution screwdriver: ", solved_pos[:, 16:16+2])
         env.reset(dof_pos = solved_pos, deterministic=True)
         initial_poses.append(solved_pos.cpu())
-        env.gym.write_viewer_image_to_file(env.viewer, f'{fpath.resolve()}/initial_pose_frames.pkl/frame_{i}.png')
-        time.sleep(1)
+        #env.gym.write_viewer_image_to_file(env.viewer, f'{fpath.resolve()}/initial_pose_frames.pkl/frame_{i}.png')
+        #time.sleep(1)
 
 
     with open(f'{fpath.resolve()}/initial_poses.pkl', 'wb') as f:

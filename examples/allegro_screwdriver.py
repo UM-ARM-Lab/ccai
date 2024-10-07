@@ -207,6 +207,8 @@ class AllegroScrewdriver(AllegroValveTurning):
         return xu
 
     def _cost(self, xu, start, goal):
+        goal = goal.to(device='cuda:0')
+        xu = xu.to(device='cuda:0')
         state = xu[:, :self.dx]  # state dim = 9
         state = torch.cat((start.reshape(1, self.dx), state), dim=0)  # combine the first time step into it
         
@@ -226,35 +228,6 @@ class AllegroScrewdriver(AllegroValveTurning):
         # add a running cost
         goal_cost += torch.sum((1 * (state[:, -self.obj_dof:] - goal.unsqueeze(0)) ** 2))
 
-        # obj_orientation = state[:, -self.obj_dof+self.obj_translational_dim:]
-        # obj_orientation = tf.euler_angles_to_matrix(obj_orientation, convention='XYZ')
-        # # obj_orientation = tf.matrix_to_rotation_6d(obj_orientation)
-        # goal_orientation = tf.euler_angles_to_matrix(goal[-self.obj_rotational_dim:], convention='XYZ')
-        # # goal_orientation = tf.matrix_to_rotation_6d(goal_orientation) # convert to 6d representation  
-        # cos_angle = tf.so3_relative_angle(obj_orientation, goal_orientation.unsqueeze(0), cos_angle=True)
-        # # terminal cost
-        # goal_cost = torch.sum((1000 * (1 - cos_angle[-1]) ** 2))
-        # # running cost 
-        # goal_cost = goal_cost + 10*torch.sum((1 * (1 - cos_angle) ** 2))
-
-        # # terminal cost
-        # goal_cost = torch.sum((100 * (obj_orientation[-1] - goal_orientation) ** 2))
-        # # running cost 
-        # goal_cost = goal_cost + torch.sum((3 * (obj_orientation - goal_orientation) ** 2))
-
-        # if self.optimize_force:
-        #     force = xu[:, self.dx + 4 * self.num_fingers: self.dx + (4 + 3) * self.num_fingers]
-        #     force = force.reshape(force.shape[0], self.num_fingers, 3)
-        #     force_norm = torch.norm(force, dim=-1)
-        #     force_norm = force_norm - 2 # desired maginitute
-        #     force_cost = 1 * torch.sum(((force_norm < 0) * force_norm) ** 2)
-        #     action_cost += force_cost
-
-        # index_ee_locs = self._ee_locations_in_screwdriver(partial_to_full_state(state[:, :4*self.num_fingers], fingers=self.fingers),
-        #                                             state[:, 4*self.num_fingers: 4*self.num_fingers + self.obj_dof],
-        #                                             queried_fingers=['index'])
-        # index_pos_loss = 1000 * torch.sum((index_ee_locs[:,0] - self.default_index_ee_loc_in_screwdriver.unsqueeze(0)) ** 2)
-        # return smoothness_cost + action_cost + goal_cost + upright_cost + index_pos_loss
         return smoothness_cost + action_cost + goal_cost + upright_cost
     def _index_repulsive(self, xu, link_name, compute_grads=True, compute_hess=False):
         """
@@ -632,9 +605,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             if params['mode'] == 'hardware':
                 pass # debug TODO: fix it
                 # add_trajectories_hardware(trajectories, best_traj, axes, env, config=params, state2ee_pos_func=state2ee_pos)
-            else:
-                add_trajectories(trajectories, best_traj, axes, env, sim=sim, gym=gym, viewer=viewer,
-                                config=params, state2ee_pos_func=state2ee_pos)
+            # else:
+            #     add_trajectories(trajectories, best_traj, axes, env, sim=sim, gym=gym, viewer=viewer,
+            #                     config=params, state2ee_pos_func=state2ee_pos)
 
         if params['visualize_plan']:
             traj_for_viz = best_traj[:, :turn_problem.dx]
@@ -665,7 +638,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             print(action[:, :4 * num_fingers_to_plan].reshape(num_fingers_to_plan, 4))
         # print(action)
         action = action[:, :4 * num_fingers_to_plan]
-        action = action + start.unsqueeze(0)[:, :4 * num_fingers] # NOTE: this is required since we define action as delta action
+        #action = action + start.unsqueeze(0)[:, :4 * num_fingers] # NOTE: this is required since we define action as delta action
+        action = action + start.unsqueeze(0)[:, :4 * num_fingers].to(env.device)
+
         if params['mode'] == 'hardware':
             set_state = env.get_state()['all_state'].to(device=env.device)
             set_state = torch.cat((set_state, torch.zeros(1).float().to(env.device)), dim=0)
@@ -737,6 +712,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     state = env.get_state()
     state = state['q'].reshape(4 * num_fingers + obj_dof + 1).to(device=params['device'])
     actual_trajectory.append(state.clone()[:4 * num_fingers + obj_dof])
+    actual_trajectory = [tensor.to(device=params['device']) for tensor in actual_trajectory]
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
     turn_problem.T = actual_trajectory.shape[0]
     # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)

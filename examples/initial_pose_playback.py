@@ -90,7 +90,7 @@ if __name__ == "__main__":
     while True:
         for i in range(len(initial_poses)):
             env.reset(initial_poses[i], deterministic=True)
-            time.sleep(1)
+            time.sleep(0.1)
         exit()
 
 

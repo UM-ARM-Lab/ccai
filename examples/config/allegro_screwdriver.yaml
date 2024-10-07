@@ -1,10 +1,11 @@
 ---
 T: 12
+use_arm: False
 receding_horizon: False
 num_steps: 12
-num_trials: 1
+num_trials: 20
 visualize: True
-experiment_name: 'feasibility_dataset'
+experiment_name: 'allegro_screwdriver_arm_test'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -12,22 +13,24 @@ object_type: 'screwdriver'
 sim_device: 'cpu'
 friction_coefficient: 0.95
 kp: 3.0
-visualize_plan: False
+visualize_plan: True
 optimize_force: True
-exclude_index: False
 force_balance: False  # in addition to the torque balance, do we also need force balance, just for the screwdriver turning experiment w\o slot. 
+arm_type: 'robot' # choose between 'None', 'robot', 'floating_3d'
+gravity: False  # whether to use gravity in the simulation NOTE: this is set to be False for debugging
 controllers:
   csvgd:
     # N: 16
     N: 4
-    alpha_J: 5.0e-3 #5.0e-3
-    # alpha_J: 1.0e-3 # DEBUG ONLY
+    alpha_J: 5.0e-3
+    # alpha_J: 1.0e-2
+    # alpha_C: 1
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
     device: 'cuda:0'
-    online_iters: 50 #500 #50
-    warmup_iters: 300
+    online_iters: 50
+    warmup_iters: 200
     resample_steps: 1
     resample_sigma: 0.01
     resample_temperature: 0.1
@@ -35,5 +38,6 @@ controllers:
     collision_checking: False
     joint_friction: 0.0
     random_init_every_iter: False
-    obj_gravity: True # whether to conside the object gravity in our optimization
-    contact_region: True # whether to consider the contact region of the index finegr in our optimization
+    obj_gravity: False # whether to conside the object gravity in our optimization
+    contact_region: False # whether to consider the contact region of the index finegr in our optimization
+    static_init: False # whether to use the static initialization for the optimization
