@@ -401,11 +401,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
     if model_path is not None:
         problem_for_sampler = None
-        if params['projected'] or params['sample_contact']:
+        if params['projected'] or params['sample_contact'] or params['type'] == 'cnf':
             pregrasp_problem_diff = AllegroScrewdriverDiff(
                 start=start[:4 * num_fingers + obj_dof],
                 goal=params['valve_goal'],
-                T=params['T'],
+                T=1,
                 chain=params['chain'],
                 device=params['device'],
                 object_asset_pos=env.table_pose,
@@ -422,7 +422,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             index_regrasp_problem_diff = AllegroScrewdriverDiff(
                 start=start[:4 * num_fingers + obj_dof],
                 goal=params['valve_goal'],
-                T=params['T'],
+                T=1,
                 chain=params['chain'],
                 device=params['device'],
                 object_asset_pos=env.table_pose,
@@ -439,7 +439,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             thumb_and_middle_regrasp_problem_diff = AllegroScrewdriverDiff(
                 start=start[:4 * num_fingers + obj_dof],
                 goal=params['valve_goal'],
-                T=params['T'],
+                T=1,
                 chain=params['chain'],
                 device=params['device'],
                 object_asset_pos=env.table_pose,
@@ -456,7 +456,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             turn_problem_diff = AllegroScrewdriverDiff(
                 start=start[:4 * num_fingers + obj_dof],
                 goal=params['valve_goal'],
-                T=params['T'],
+                T=1,
                 chain=params['chain'],
                 device=params['device'],
                 object_asset_pos=env.table_pose,
@@ -502,6 +502,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                                                problem=problem_for_sampler,
                                                inits_noise=inits_noise, noise_noise=noise_noise,
                                                guided=params['use_guidance'],
+                                               state_control_only=params.get('state_control_only', False),
                                                vae=vae)
         trajectory_sampler.load_state_dict(torch.load(f'{CCAI_PATH}/{model_path}', map_location=torch.device(params['device'])), strict=True)
         trajectory_sampler.to(device=params['device'])

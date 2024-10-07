@@ -19,6 +19,7 @@ from isaac_victor_envs.utils import get_assets_dir
 from torch.utils.data import DataLoader, RandomSampler
 from ccai.models.trajectory_samplers import TrajectorySampler
 from ccai.utils.allegro_utils import partial_to_full_state, visualize_trajectory
+from ccai.allegro_screwdriver_problem_diffusion import AllegroScrewdriverDiff
 
 import datetime
 import time
@@ -32,7 +33,7 @@ fingers = ['index', 'middle', 'thumb']
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='allegro_screwdriver_cnf_state_only.yaml')
+    parser.add_argument('--config', type=str, default='allegro_screwdriver_cnf_state_control_only.yaml')
     return parser.parse_args()
 
 
@@ -151,7 +152,8 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
     pathlib.Path.mkdir(pathlib.Path(fpath), parents=True, exist_ok=True)
     dt = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     run = wandb.init(project='ccai-screwdriver', entity='abhinavk99', config=config,
-                     name=f'{config["model_name"]}_{config["model_type"]}_{dt}_sigma_.1')
+                     name=f'{config["model_name"]}_{config["model_type"]}_{dt}')
+
 
     if config['use_ema']:
         ema = EMA(beta=config['ema_decay'])
@@ -177,7 +179,7 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
         flow_loss = 0.0
         action_loss = 0.0
         trajectory_sampler.train()
-        for trajectories, traj_class, masks in train_loader:
+        for trajectories, traj_class, masks in tqdm.tqdm(train_loader):
             trajectories = trajectories.to(device=config['device'])
             masks = masks.to(device=config['device'])
 
@@ -508,20 +510,142 @@ if __name__ == "__main__":
     #         time.sleep(0.1)
     # except KeyboardInterrupt:
     #     pass
+    if config['train_diffusion'] and config['state_control_only']:
+        # set up pytorch volumetric for rendering
+        asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
+        index_ee_name = 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link'
+        thumb_ee_name = 'allegro_hand_oya_finger_3_aftc_base_link'
+        # combined chain
+        chain = pk.build_chain_from_urdf(open(asset).read())
+        # TODO currently hardcoded relative pose
+        p = [0.0, -0.1, 1.33]
+        # r = [0.6645, 0.2418, 0.2418, 0.6645]
+        r = [0.2418448, 0.2418448, 0.664463, 0.664463]
+
+        object_pos = np.array([0., 0, 1.205])
+
+        world_trans = tf.Transform3d(pos=torch.tensor(p, device=config['device']),
+                                     rot=torch.tensor([r[3], r[0], r[1], r[2]], device=config['device']),
+                                     device=config['device'])
+
+        asset_object = get_assets_dir() + '/screwdriver/screwdriver.urdf'
+        chain_object = pk.build_chain_from_urdf(open(asset_object).read())
+        chain = chain.to(device=config['device'])
+        chain_object = chain_object.to(device=config['device'])
+        object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver',
+                                 use_collision_geometry=False)
+        robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models')
+        scene_trans = world_trans.inverse().compose(
+            pk.Transform3d(device=config['device']).translate(object_pos[0], object_pos[1], object_pos[2]))
+        contact_links = ['allegro_hand_oya_finger_3_aftc_base_link',
+                         'allegro_hand_naka_finger_finger_1_aftc_base_link',
+                         'allegro_hand_hitosashi_finger_finger_0_aftc_base_link']
+        scene = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
+                              collision_check_links=contact_links,
+                              softmin_temp=100.0)
+        obj_dof = 3
+        object_location = torch.tensor([0, 0, 1.205]).to(
+                        config['device'])
+        config['object_location'] = object_location
+        table_pose = torch.tensor([0, 0, 1.205]).to(
+                        config['device'])
+        p = [0, -0.095, 1.33]
+        r = [0.2418448, 0.2418448, 0.664463, 0.664463]
+        world_trans = tf.Transform3d(pos=torch.tensor(p, device=config['device']),
+                                    rot=torch.tensor(
+                                        [r[3], r[0], r[1], r[2]],
+                                        device=config['device']), device=config['device'])
+        dummy_start = torch.rand(16 if config['sine_cosine'] else 15).to(device=config['device'])
+        pregrasp_problem_diff = AllegroScrewdriverDiff(
+            start=dummy_start,
+            goal=None,
+            T=1,
+            chain=chain,
+            device=config['device'],
+            object_asset_pos=table_pose,
+            object_location=config['object_location'],
+            object_type='screwdriver',
+            world_trans=world_trans,
+            regrasp_fingers=fingers,
+            contact_fingers=[],
+            obj_dof=obj_dof,
+            obj_joint_dim=1,
+            optimize_force=True,
+        )
+        # finger gate index
+        index_regrasp_problem_diff = AllegroScrewdriverDiff(
+            start=dummy_start,
+            goal=None,
+            T=1,
+            chain=chain,
+            device=config['device'],
+            object_asset_pos=table_pose,
+            object_location=config['object_location'],
+            object_type='screwdriver',
+            world_trans=world_trans,
+            regrasp_fingers=['index'],
+            contact_fingers=['middle', 'thumb'],
+            obj_dof=obj_dof,
+            obj_joint_dim=1,
+            optimize_force=True,
+            default_dof_pos=None
+        )
+        thumb_and_middle_regrasp_problem_diff = AllegroScrewdriverDiff(
+            start=dummy_start,
+            goal=None,
+            T=1,
+            chain=chain,
+            device=config['device'],
+            object_asset_pos=table_pose,
+            object_location=config['object_location'],
+            object_type='screwdriver',
+            world_trans=world_trans,
+            contact_fingers=['index'],
+            regrasp_fingers=['middle', 'thumb'],
+            obj_dof=obj_dof,
+            obj_joint_dim=1,
+            optimize_force=True,
+            default_dof_pos=None
+        )
+        turn_problem_diff = AllegroScrewdriverDiff(
+            start=dummy_start,
+            goal=None,
+            T=1,
+            chain=chain,
+            device=config['device'],
+            object_asset_pos=table_pose,
+            object_location=config['object_location'],
+            object_type='screwdriver',
+            world_trans=world_trans,
+            contact_fingers=['index', 'middle', 'thumb'],
+            obj_dof=obj_dof,
+            obj_joint_dim=1,
+            optimize_force=True,
+            default_dof_pos=None
+        )
+
+        problem_for_sampler = {
+            (-1, -1, -1): pregrasp_problem_diff,
+            (-1, 1, 1): index_regrasp_problem_diff,
+            (1, -1, -1): thumb_and_middle_regrasp_problem_diff,
+            (1, 1, 1): turn_problem_diff
+        }
 
     model = TrajectorySampler(T=config['T'], dx=dx, du=config['du'], context_dim=dcontext, type=config['model_type'],
                               hidden_dim=config['hidden_dim'], timesteps=config['timesteps'],
                               generate_context=config['diffuse_class'],
                               discriminator_guidance=config['discriminator_guidance'],
                               learn_inverse_dynamics=config['inverse_dynamics'],
-                              state_only=config['state_only'], state_control_only=config['state_control_only'],)
+                              state_only=config['state_only'], state_control_only=config['state_control_only'],
+                              problem=problem_for_sampler if config['state_control_only'] else None,)
 
     data_path = pathlib.Path(f'{CCAI_PATH}/data/training_data/{config["data_directory"]}')
     train_dataset = AllegroScrewDriverDataset([p for p in data_path.glob('*train_data*')],
                                               config['T']-1,
                                               cosine_sine=config['sine_cosine'],
                                               states_only=config['du'] == 0,
-                                              skip_pregrasp=config['skip_pregrasp'])
+                                              skip_pregrasp=config['skip_pregrasp'],
+                                              type=config['model_type'],)
     train_dataset.update_masks(p1=1, p2=1)
     if config['normalize_data']:
         # normalize data
@@ -538,38 +662,8 @@ if __name__ == "__main__":
 
     model = model.to(device=config['device'])
 
-    # # set up pytorch volumetric for rendering
-    # asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
-    # index_ee_name = 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link'
-    # thumb_ee_name = 'allegro_hand_oya_finger_3_aftc_base_link'
-    # # combined chain
-    # chain = pk.build_chain_from_urdf(open(asset).read())
-    # # TODO currently hardcoded relative pose
-    # p = [0.0, -0.1, 1.33]
-    # # r = [0.6645, 0.2418, 0.2418, 0.6645]
-    # r = [0.2418448, 0.2418448, 0.664463, 0.664463]
-
-    # object_pos = np.array([0., 0, 1.205])
-
-    # world_trans = tf.Transform3d(pos=torch.tensor(p, device=config['device']),
-    #                              rot=torch.tensor([r[3], r[0], r[1], r[2]], device=config['device']),
-    #                              device=config['device'])
-
-    # asset_object = get_assets_dir() + '/screwdriver/screwdriver.urdf'
-    # chain_object = pk.build_chain_from_urdf(open(asset_object).read())
-    # chain = chain.to(device=config['device'])
-    # chain_object = chain_object.to(device=config['device'])
-    # object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver',
-    #                          use_collision_geometry=False)
-    # robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models')
-    # scene_trans = world_trans.inverse().compose(
-    #     pk.Transform3d(device=config['device']).translate(object_pos[0], object_pos[1], object_pos[2]))
-    # contact_links = ['allegro_hand_oya_finger_3_aftc_base_link',
-    #                  'allegro_hand_naka_finger_finger_1_aftc_base_link',
-    #                  'allegro_hand_hitosashi_finger_finger_0_aftc_base_link']
-    # scene = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
-    #                       collision_check_links=contact_links,
-    #                       softmin_temp=100.0)
+    if config['normalize_data']:
+        model.send_norm_constants_to_submodels()
 
     # i = np.random.randint(low=0, high=len(train_dataset))
     # visualize_trajectory(train_dataset[i] * train_dataset.std + train_dataset.mean,
@@ -578,6 +672,7 @@ if __name__ == "__main__":
     scene = None
     config['scene'] = scene
     config['env'] = env
+
 
     if config['train_diffusion'] and not (config['state_only'] or config['state_control_only']):
         train_model(model, train_loader, config)

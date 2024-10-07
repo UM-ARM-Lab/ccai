@@ -210,7 +210,8 @@ class AllegroValveDataset(Dataset):
 
 class AllegroScrewDriverDataset(Dataset):
 
-    def __init__(self, folders, max_T, cosine_sine=False, states_only=False, skip_pregrasp=False):
+    def __init__(self, folders, max_T, cosine_sine=False, states_only=False, 
+                 skip_pregrasp=False, type='diffusion'):
         super().__init__()
         self.cosine_sine = cosine_sine
         self.skip_pregrasp = skip_pregrasp
@@ -246,9 +247,12 @@ class AllegroScrewDriverDataset(Dataset):
                             mask[:, :, :t + 1] = 1
                             masks.append(mask)
 
-                        # duplicated first control, rearrange so that it is (x_0, u_0, x_1, u_1, ..., x_{T-1}, u_{T-1}, x_T, 0)
-                        traj[:, :, :-1, 15:] = traj[:, :, 1:, 15:]
-                        traj[:, :, -1, 15:] = 0
+                        if type == 'diffusion':
+                            # duplicated first control, rearrange so that it is (x_0, u_0, x_1, u_1, ..., x_{T-1}, u_{T-1}, x_T, 0)
+                            traj[:, :, :-1, 15:] = traj[:, :, 1:, 15:]
+                            traj[:, :, -1, 15:] = 0
+                        elif type == 'cnf':
+                            traj[:, :, 0, 15:] = 0
                         trajectories.append(traj)
 
         self.trajectories = np.concatenate(trajectories, axis=0)

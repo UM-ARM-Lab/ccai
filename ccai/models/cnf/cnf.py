@@ -5,7 +5,7 @@ torch.set_float32_matmul_precision('high')
 import torch.nn as nn
 from torch.nn.functional import mse_loss
 
-from ccai.models.temporal import TemporalUnet, TemporalUnetDynamics, TemporalUnetStateAction
+from ccai.models.temporal import TemporalUnet, TemporalUnetDynamics, TemporalUnetStateAction, StateActionMLP
 
 from ccai.models.cnf.ffjord.layers import CNF, ODEfunc
 from torchcfm.conditional_flow_matching import SchrodingerBridgeConditionalFlowMatcher, ExactOptimalTransportConditionalFlowMatcher
@@ -104,6 +104,7 @@ class TrajectoryCNF(nn.Module):
             x_dim,
             u_dim,
             context_dim,
+            opt_problem=None,
             hidden_dim=32,
             inflation_noise=0.0,
             state_only=False,
@@ -116,6 +117,7 @@ class TrajectoryCNF(nn.Module):
         self.du = u_dim
         self.xu_dim = x_dim + u_dim
         self.context_dim = context_dim
+        self.problem_dict = opt_problem
         # self.loss_type = 'ot'
         # self.loss_type = 'conditional_ot_sb'
         if state_only:
@@ -129,7 +131,13 @@ class TrajectoryCNF(nn.Module):
             self.model = TemporalUnetStateAction(self.horizon, self.xu_dim,
                                     cond_dim=context_dim,
                                     dim=hidden_dim, dim_mults=(1, 2, 4, 8),
-                                    attention=False)
+                                    attention=False,
+                                    problem_dict=self.problem_dict)
+            # self.model = StateActionMLP(self.horizon, self.xu_dim,
+            #                         cond_dim=context_dim,
+            #                         dim=hidden_dim, dim_mults=(1, 2, 4, 8),
+            #                         attention=False)
+            self.FM = ExactOptimalTransportConditionalFlowMatcher(sigma=.01)
         else:
             self.loss_type = 'conditional_ot_sb'
             # sigma = .025 ** .5
@@ -172,6 +180,12 @@ class TrajectoryCNF(nn.Module):
         #self.register_buffer('_grad_mask', mask)
         self.register_buffer('start_mask', mask[0])
         self._grad_mask = mask.cuda()
+
+        self.all_contexts = [
+            (-1., 1, 1),
+            (1, -1, -1),
+            (1, 1, 1)
+        ]
 
     def state_control_only_forward(self, t, x, context=None):
         dx, _ = self.model(t, x, context)
@@ -250,22 +264,25 @@ class TrajectoryCNF(nn.Module):
     
     def flow_matching_loss_state_control_only(self, xu, context, mask=None):
 
-        t0 = torch.rand(xu.shape[0], 1, device=xu.device) # initial time (for receding horizon)
-        t = torch.rand(xu.shape[0], 1, device=xu.device) * (1-t0) # t offset (for vector field prediction)
+        # t0 = torch.rand(xu.shape[0], 1, device=xu.device) # initial time (for receding horizon)
+        # t = torch.rand(xu.shape[0], 1, device=xu.device) * (1-t0) # t offset (for vector field prediction)
 
-        t_ind = ((t + t0) * (self.horizon-1)).long() # Get global time index for trajectory
+        t = torch.rand(xu.shape[0], 1, device=xu.device) # initial time (for receding horizon)
+        t0 = t-t
+
+        t_ind = ((t-t + t0) * (self.horizon-1)).long() # Get global time index for trajectory
+        # t_ind = ((t + t0) * (self.horizon-1)).long() # Get global time index for trajectory
         t0_ind = (t0 * (self.horizon-1)).long() # Get local time index for vector field prediction
         t_ind.clamp_(0, self.horizon-2)
         t0_ind.clamp_(0, self.horizon-2)
         t_ind_for_gather = t_ind.reshape(xu.shape[0], 1, 1).repeat(1, 1, self.xu_dim)
-        t_ind_for_gather_1 = t_ind_for_gather + 1
-        t_ind_for_gather_m1 = t_ind_for_gather - 1
-        t_ind_for_gather_m1.clamp_(0, self.horizon-1)
+        # t_ind_for_gather_1 = t_ind_for_gather + 1
+        t_ind_for_gather_1 = t_ind_for_gather + self.horizon - 1
+
         if t_ind_for_gather_1.max() >= self.horizon:
             print('t_ind_for_gather_1', t_ind_for_gather_1.max())
         x0 = torch.gather(xu, 1, t_ind_for_gather).squeeze()
         x1 = torch.gather(xu, 1, t_ind_for_gather_1).squeeze()
-        xm1 = torch.gather(xu, 1, t_ind_for_gather_m1).squeeze()
 
         truevt = (x1 - x0) #* (self.horizon - 1)
         # xut = x0 + (t * self.horizon - t_ind.float()) * truevt/(self.horizon-1)
@@ -274,16 +291,30 @@ class TrajectoryCNF(nn.Module):
 
         xt += torch.randn_like(xt) * .1
 
-        u0 = xm1[..., self.dx:]
-        u0[((t_ind - t0_ind) == 0).flatten()] = torch.randn_like(u0[((t_ind - t0_ind) == 0).flatten()])
-        u1 = x0[..., self.dx:]
-        true_u = u1 - u0
-        ut = u1 * (t + t0) + u0 * (1 - (t + t0))
+        u0 = x0[..., self.dx:]
+        # u0[((t_ind - t0_ind) == 0).flatten()] = torch.randn_like(u0[((t_ind - t0_ind) == 0).flatten()])
+        t_ind_flat = t_ind.flatten()
+        rand_for_u0 = torch.randn_like(u0[t_ind_flat == 0])
+        goal_u0 = x1[t_ind_flat == 0, self.dx:]
+        arange0 = torch.arange(rand_for_u0.shape[0], device=xu.device)
+        arange1 = torch.arange(goal_u0.shape[0], device=xu.device)
+        a = time.perf_counter()
+        t, ut, true_uv, arange0, arange1 = self.FM.guided_sample_location_and_conditional_flow(rand_for_u0, goal_u0, y0=arange0, y1=arange1, t=t)
+        # Rearrange ut, true_uv using arange
+        ut = ut[arange1]
+        true_uv = true_uv[arange1]
+        # u1 = x0[..., self.dx:]
+        # true_u = u1 - u0
+        # ut = u1 * (t + t0) + u0 * (1 - (t + t0))
         xut = torch.cat((xt[..., :self.dx], ut), dim=-1)
-        truevt[..., self.dx:] = true_u
+        truevt[..., self.dx:] = true_uv
         # xut = torch.cat((xut, r), dim=-1)
+        a = time.perf_counter()
         vt, _ = self.model.compiled_conditional_train(t.reshape(-1), xut, context)
         flow_loss = mse_loss(vt, truevt)
+
+        # for key in self.problem_dict:
+
 
         return {
             'loss': flow_loss,
@@ -324,7 +355,7 @@ class TrajectoryCNF(nn.Module):
                         logpx=log_prob,
                         context=context.reshape(-1, context.shape[-1]),
                         reverse=False,
-                        integration_times=torch.linspace(0, 1, self.horizon, device=noise.device))
+                        integration_times=torch.linspace(0, 1, self.horizon, device=noise.device) if self.loss_type=='state_control_only' else None)
 
         trajectories, log_prob = out[:2]
 
