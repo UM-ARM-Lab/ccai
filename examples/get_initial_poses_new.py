@@ -194,7 +194,8 @@ if __name__ == "__main__":
             #env.gym.write_viewer_image_to_file(env.viewer, f'{fpath.resolve()}/initial_pose_frames.pkl/frame_{i}.png')
             #time.sleep(1)
     except KeyboardInterrupt:
-        print("Interrupted")
+        print("Interrupted, not saving")
+        exit()
         pass
 
 

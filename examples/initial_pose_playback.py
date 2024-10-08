@@ -76,7 +76,7 @@ if __name__ == "__main__":
     ik = IKSolver(chain, fingers, device)
 
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
-    with open(f'{fpath.resolve()}/initial_poses.pkl', 'rb') as file:
+    with open(f'{fpath.resolve()}/initial_poses_10k.pkl', 'rb') as file:
         initial_poses  = pkl.load(file)
     
 
