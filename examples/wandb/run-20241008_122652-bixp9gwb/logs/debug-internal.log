@@ -1,0 +1,18 @@
+{"time":"2024-10-08T12:26:52.165174259-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-08T12:26:52.165185179-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/examples/wandb/run-20241008_122652-bixp9gwb/logs/debug-core.log"}
+{"time":"2024-10-08T12:26:52.172036714-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-08T12:26:52.178862476-04:00","level":"INFO","msg":"created new stream","id":"bixp9gwb"}
+{"time":"2024-10-08T12:26:52.178895681-04:00","level":"INFO","msg":"stream: started","id":"bixp9gwb"}
+{"time":"2024-10-08T12:26:52.178922423-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"bixp9gwb"}}
+{"time":"2024-10-08T12:26:52.178969443-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"bixp9gwb"}}
+{"time":"2024-10-08T12:26:52.178967988-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"bixp9gwb"}}
+{"time":"2024-10-08T12:26:52.362358966-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-08T12:26:52.364003136-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-08T12:27:46.261458453-04:00","level":"INFO","msg":"stream: closing","id":"bixp9gwb"}
+{"time":"2024-10-08T12:27:46.261477442-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-08T12:27:46.26551429-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-08T12:27:47.309120923-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-08T12:27:47.422275699-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"bixp9gwb"}}
+{"time":"2024-10-08T12:27:47.422322919-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"bixp9gwb"}}
+{"time":"2024-10-08T12:27:47.422354962-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"bixp9gwb"}}
+{"time":"2024-10-08T12:27:47.422383532-04:00","level":"INFO","msg":"stream: closed","id":"bixp9gwb"}

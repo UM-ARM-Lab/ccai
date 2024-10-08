@@ -1,0 +1,19 @@
+{"time":"2024-10-08T12:45:31.941136903-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-08T12:45:31.941146084-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/examples/wandb/run-20241008_124531-ljs4t0x2/logs/debug-core.log"}
+{"time":"2024-10-08T12:45:31.943108261-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-08T12:45:31.947640733-04:00","level":"INFO","msg":"created new stream","id":"ljs4t0x2"}
+{"time":"2024-10-08T12:45:31.947669237-04:00","level":"INFO","msg":"stream: started","id":"ljs4t0x2"}
+{"time":"2024-10-08T12:45:31.94768105-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"ljs4t0x2"}}
+{"time":"2024-10-08T12:45:31.947726042-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"ljs4t0x2"}}
+{"time":"2024-10-08T12:45:31.947695494-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"ljs4t0x2"}}
+{"time":"2024-10-08T12:45:32.146290215-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-08T12:45:32.146757718-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-08T12:45:35.750852149-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-08T12:45:35.754329787-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-08T12:45:36.34861605-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-08T12:45:37.462698286-04:00","level":"INFO","msg":"stream: closing","id":"ljs4t0x2"}
+{"time":"2024-10-08T12:45:37.462716295-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"ljs4t0x2"}}
+{"time":"2024-10-08T12:45:37.462736708-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"ljs4t0x2"}}
+{"time":"2024-10-08T12:45:37.462788899-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"ljs4t0x2"}}
+{"time":"2024-10-08T12:45:37.462819927-04:00","level":"INFO","msg":"stream: closed","id":"ljs4t0x2"}
+{"time":"2024-10-08T12:45:40.754267437-04:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

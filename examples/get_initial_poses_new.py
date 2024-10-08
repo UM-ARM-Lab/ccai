@@ -20,6 +20,37 @@ from scipy.spatial.transform import Rotation as R
 from baselines.planning.ik import IKSolver
 from tqdm import tqdm
 
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
+class emailer():
+    def __init__(self):
+        self.sender_email = "eburner813@gmail.com"
+        self.receiver_email = "adamhung@umich.edu"  # You can send it to yourself
+        self.password = "yhpffhhnwbhpluty"
+    def send(self, *args, **kwargs):
+        msg = MIMEMultipart()
+        msg['From'] = self.sender_email
+        msg['To'] = self.receiver_email
+        msg['Subject'] = "program finished"
+        body = "program finished"
+        msg.attach(MIMEText(body, 'plain'))
+        smtp_server = "smtp.gmail.com"
+        smtp_port = 587
+        try:
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            server.starttls()
+            server.login(self.sender_email, self.password)
+            text = msg.as_string()
+            server.sendmail(self.sender_email, self.receiver_email, text)
+            print("Email sent")
+        except Exception as e:
+            print(f"Error: {e}")
+        finally:
+            server.quit()
+
+
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
 
@@ -95,78 +126,83 @@ if __name__ == "__main__":
                                 torch.tensor([[0.0, 0.0, 0.0, 0.0]]).float().to(device=device)),
                                 dim=1).to(device)
     
-    for i in tqdm(range(10)):
+    try:
+        for i in tqdm(range(10000)):
 
-        print("iteration: ", i)
-        env.reset(dof_pos= default_dof_pos, deterministic=False)
-        start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=device)
+            #print("iteration: ", i)
+            env.reset(dof_pos= default_dof_pos, deterministic=False)
+            start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=device)
 
-        screwdriver = start.clone()[-4:-1]
-        #print("start screwdriver: ", screwdriver)
-        screwdriver = torch.cat((screwdriver, torch.tensor([0])),dim=0).reshape(1,4)
+            screwdriver = start.clone()[-4:-1]
+            #print("start screwdriver: ", screwdriver)
+            screwdriver = torch.cat((screwdriver, torch.tensor([0])),dim=0).reshape(1,4)
 
-        if 'index' in params['fingers']:
-            contact_fingers = params['fingers']
-        else:
-            contact_fingers = ['index'] + params['fingers']    
-        pregrasp_problem = ALlegroScrewdriverContact(
-            dx=4 * num_fingers,
-            du=4 * num_fingers,
-            start=start[:4 * num_fingers + obj_dof],
-            goal=None,
-            T=2,
-            chain=params['chain'],
-            device=device,
-            object_asset_pos=env.table_pose,
-            object_location=params['object_location'],
-            object_type=params['object_type'],
-            world_trans=env.world_trans,
-            fingers=contact_fingers,
-            obj_dof_code=params['obj_dof_code'],
-            obj_joint_dim=1,
-            fixed_obj=True,
-        )
-        pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
-        pregrasp_planner.warmup_iters = 80#500 #50
-        # 200 -> 20 seconds / grasp
+            if 'index' in params['fingers']:
+                contact_fingers = params['fingers']
+            else:
+                contact_fingers = ['index'] + params['fingers']    
+            pregrasp_problem = ALlegroScrewdriverContact(
+                dx=4 * num_fingers,
+                du=4 * num_fingers,
+                start=start[:4 * num_fingers + obj_dof],
+                goal=None,
+                T=2,
+                chain=params['chain'],
+                device=device,
+                object_asset_pos=env.table_pose,
+                object_location=params['object_location'],
+                object_type=params['object_type'],
+                world_trans=env.world_trans,
+                fingers=contact_fingers,
+                obj_dof_code=params['obj_dof_code'],
+                obj_joint_dim=1,
+                fixed_obj=True,
+            )
+            pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
+            pregrasp_planner.warmup_iters = 80#500 #50
+            # 200 -> 20 seconds / grasp
 
-        #start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=device)
-        best_traj, _ = pregrasp_planner.step(start[:4 * num_fingers])
+            #start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=device)
+            best_traj, _ = pregrasp_planner.step(start[:4 * num_fingers])
 
-        # traj_for_viz = best_traj[:, :pregrasp_problem.dx]
-        # tmp = start[4 * num_fingers:].unsqueeze(0).repeat(traj_for_viz.shape[0], 1)
-        # traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)    
-        # viz_fpath = pathlib.PurePath.joinpath(fpath, "pregrasp")
-        # img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
-        # gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
-        # pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
-        # pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-        # visualize_trajectory(traj_for_viz, pregrasp_problem.viz_contact_scenes, viz_fpath, 
-        #                      pregrasp_problem.fingers, pregrasp_problem.obj_dof+1,
-        #                      #points = goal_poses.cpu().numpy(),
-        #                      )
+            # traj_for_viz = best_traj[:, :pregrasp_problem.dx]
+            # tmp = start[4 * num_fingers:].unsqueeze(0).repeat(traj_for_viz.shape[0], 1)
+            # traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)    
+            # viz_fpath = pathlib.PurePath.joinpath(fpath, "pregrasp")
+            # img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
+            # gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
+            # pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
+            # pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
+            # visualize_trajectory(traj_for_viz, pregrasp_problem.viz_contact_scenes, viz_fpath, 
+            #                      pregrasp_problem.fingers, pregrasp_problem.obj_dof+1,
+            #                      #points = goal_poses.cpu().numpy(),
+            #                      )
 
-        #for x in best_traj[:, :4 * num_fingers]:
-        x = best_traj[-1, :4 * num_fingers]
-        action = x.reshape(-1, 4 * num_fingers).to(device=env.device) 
-        solved_pos = torch.cat((
-                action.clone()[:, :8], 
-                torch.tensor([[0., 0.5, 0.65, 0.65]]).to(device=device), 
-                action.clone()[:, 8:], 
-                screwdriver.to(device=device)
-                #torch.zeros(1,4).to(device=device)
-                ), dim=1).to(device)
-        #print("solution screwdriver: ", solved_pos[:, 16:16+2])
-        env.reset(dof_pos = solved_pos, deterministic=True)
-        initial_poses.append(solved_pos.cpu())
-        #env.gym.write_viewer_image_to_file(env.viewer, f'{fpath.resolve()}/initial_pose_frames.pkl/frame_{i}.png')
-        #time.sleep(1)
+            #for x in best_traj[:, :4 * num_fingers]:
+            x = best_traj[-1, :4 * num_fingers]
+            action = x.reshape(-1, 4 * num_fingers).to(device=env.device) 
+            solved_pos = torch.cat((
+                    action.clone()[:, :8], 
+                    torch.tensor([[0., 0.5, 0.65, 0.65]]).to(device=device), 
+                    action.clone()[:, 8:], 
+                    screwdriver.to(device=device)
+                    #torch.zeros(1,4).to(device=device)
+                    ), dim=1).to(device)
+            #print("solution screwdriver: ", solved_pos[:, 16:16+2])
+            env.reset(dof_pos = solved_pos, deterministic=True)
+            initial_poses.append(solved_pos.cpu())
+            #env.gym.write_viewer_image_to_file(env.viewer, f'{fpath.resolve()}/initial_pose_frames.pkl/frame_{i}.png')
+            #time.sleep(1)
+    except KeyboardInterrupt:
+        print("Interrupted")
+        pass
 
 
     with open(f'{fpath.resolve()}/initial_poses.pkl', 'wb') as f:
         pkl.dump(initial_poses, f)
     # with open(f'{fpath.resolve()}/screwdriver_poses.pkl', 'wb') as f:
         #  pkl.dump(screwdriver_poses, f)
-
+    print("Saved poses")
+    emailer().send()
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)

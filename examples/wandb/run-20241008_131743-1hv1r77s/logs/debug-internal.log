@@ -1,0 +1,19 @@
+{"time":"2024-10-08T13:17:43.147434948-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-08T13:17:43.14744521-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/examples/wandb/run-20241008_131743-1hv1r77s/logs/debug-core.log"}
+{"time":"2024-10-08T13:17:43.149258136-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-08T13:17:43.154573796-04:00","level":"INFO","msg":"created new stream","id":"1hv1r77s"}
+{"time":"2024-10-08T13:17:43.154605914-04:00","level":"INFO","msg":"stream: started","id":"1hv1r77s"}
+{"time":"2024-10-08T13:17:43.154629746-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"1hv1r77s"}}
+{"time":"2024-10-08T13:17:43.154750511-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"1hv1r77s"}}
+{"time":"2024-10-08T13:17:43.154957814-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"1hv1r77s"}}
+{"time":"2024-10-08T13:17:43.305679641-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-08T13:17:43.306143012-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-08T13:17:46.450751812-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-08T13:17:46.45431551-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-08T13:17:46.762062028-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-08T13:17:47.902438399-04:00","level":"INFO","msg":"stream: closing","id":"1hv1r77s"}
+{"time":"2024-10-08T13:17:47.902454555-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"1hv1r77s"}}
+{"time":"2024-10-08T13:17:47.902483361-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"1hv1r77s"}}
+{"time":"2024-10-08T13:17:47.902480163-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"1hv1r77s"}}
+{"time":"2024-10-08T13:17:47.902545325-04:00","level":"INFO","msg":"stream: closed","id":"1hv1r77s"}
+{"time":"2024-10-08T13:17:51.452698203-04:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

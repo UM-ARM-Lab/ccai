@@ -1,0 +1,18 @@
+{"time":"2024-10-08T12:25:48.777170491-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-08T12:25:48.777180677-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/examples/wandb/run-20241008_122548-zr19dtqc/logs/debug-core.log"}
+{"time":"2024-10-08T12:25:48.781196736-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-08T12:25:48.785532216-04:00","level":"INFO","msg":"created new stream","id":"zr19dtqc"}
+{"time":"2024-10-08T12:25:48.785555124-04:00","level":"INFO","msg":"stream: started","id":"zr19dtqc"}
+{"time":"2024-10-08T12:25:48.785567923-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"zr19dtqc"}}
+{"time":"2024-10-08T12:25:48.785564319-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"zr19dtqc"}}
+{"time":"2024-10-08T12:25:48.785590623-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"zr19dtqc"}}
+{"time":"2024-10-08T12:25:48.990395104-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-08T12:25:48.990941345-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-08T12:25:49.147461922-04:00","level":"INFO","msg":"stream: closing","id":"zr19dtqc"}
+{"time":"2024-10-08T12:25:49.147485218-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-08T12:25:49.151858859-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-08T12:25:50.219047469-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-08T12:25:50.32249268-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"zr19dtqc"}}
+{"time":"2024-10-08T12:25:50.322523665-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"zr19dtqc"}}
+{"time":"2024-10-08T12:25:50.322534505-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"zr19dtqc"}}
+{"time":"2024-10-08T12:25:50.322571979-04:00","level":"INFO","msg":"stream: closed","id":"zr19dtqc"}

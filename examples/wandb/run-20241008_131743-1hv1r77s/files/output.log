@@ -1,0 +1,10 @@
+Epoch [100/1000], Training Loss: 0.94616899, Test Loss: 0.12135287, Unnormalized Train Loss: 277148948.27479112
+Epoch [200/1000], Training Loss: 0.74937861, Test Loss: 0.10053337, Unnormalized Train Loss: 219505706.83168325
+Epoch [300/1000], Training Loss: 0.35062335, Test Loss: 0.09148405, Unnormalized Train Loss: 102703528.67698513
+Epoch [400/1000], Training Loss: 0.13941650, Test Loss: 0.07326684, Unnormalized Train Loss: 40837457.72594833
+Epoch [500/1000], Training Loss: 0.09802756, Test Loss: 0.05333906, Unnormalized Train Loss: 28713935.57784775
+Epoch [600/1000], Training Loss: 0.03511002, Test Loss: 0.04154444, Unnormalized Train Loss: 10284321.60100012
+Epoch [700/1000], Training Loss: 0.02165913, Test Loss: 0.03774353, Unnormalized Train Loss: 6344325.86540662
+Epoch [800/1000], Training Loss: 0.01196171, Test Loss: 0.03688843, Unnormalized Train Loss: 3503787.42672788
+Epoch [900/1000], Training Loss: 0.00517334, Test Loss: 0.03619846, Unnormalized Train Loss: 1515358.29205798
+Epoch [1000/1000], Training Loss: 0.00293522, Test Loss: 0.03640487, Unnormalized Train Loss: 859776.96691464

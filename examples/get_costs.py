@@ -18,6 +18,7 @@ from utils.allegro_utils import partial_to_full_state, full_to_partial_state, st
 from allegro_valve_roll import AllegroValveTurning, AllegroContactProblem, PositionControlConstrainedSVGDMPC, add_trajectories, add_trajectories_hardware
 from scipy.spatial.transform import Rotation as R
 from allegro_screwdriver import ALlegroScrewdriverContact, AllegroScrewdriver
+from get_initial_poses_new import emailer
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
 obj_dof = 3
@@ -31,7 +32,7 @@ fpath = pathlib.Path(f'{CCAI_PATH}/data')
 with open(f'{fpath.resolve()}/initial_poses.pkl', 'rb') as file:
     initial_poses  = pkl.load(file)
 
-def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
+def do_trial(env, params, fpath, initial_pose_idx = None, sim_viz_env=None, ros_copy_node=None):
     "only turn the screwdriver once"
     screwdriver_goal = params['screwdriver_goal'].cpu()
     screwdriver_goal_mat = R.from_euler('xyz', screwdriver_goal).as_matrix()
@@ -46,7 +47,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         env.frame_id = None
 
     # sample initial state from dataset
-    idx = np.random.randint(0, len(initial_poses))
+    if initial_pose_idx is None:
+        idx = np.random.randint(0, len(initial_poses))
+    else:
+        idx = initial_pose_idx
+
     initial_pose = initial_poses[idx]
     env.reset(dof_pos = initial_pose, deterministic=False)
 
@@ -271,7 +276,9 @@ if __name__ == "__main__":
     forward_kinematics = partial(chain.forward_kinematics, frame_indices=frame_indices) 
 
     pose_cost_tuples = []
-    for i in tqdm(range(100)):
+    n_poses = len(initial_poses)
+
+    for i in tqdm(range(1000)):
         goal = - 90 / 180 * torch.tensor([0, 0, np.pi])
         # goal = goal + 0.025 * torch.randn(1) + 0.2
         for controller in config['controllers'].keys():
@@ -290,7 +297,7 @@ if __name__ == "__main__":
             object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
             params['object_location'] = object_location
 
-            final_distance_to_goal,final_cost,initial_pose_index = do_trial(env, params, fpath, sim_env, ros_copy_node)
+            final_distance_to_goal,final_cost,initial_pose_index = do_trial(env, params, fpath, i, sim_env, ros_copy_node)
             pose_cost_tuples.append((initial_poses[initial_pose_index], final_cost))
             
             if final_distance_to_goal < 30 / 180 * np.pi:
@@ -313,7 +320,9 @@ if __name__ == "__main__":
     gym.destroy_sim(sim)
 
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
-    with open(f'{fpath.resolve()}/final_costs.pkl', 'wb') as f:
+    savepath = f'{fpath.resolve()}/value_dataset.pkl'
+    with open(savepath, 'wb') as f:
         pkl.dump(pose_cost_tuples, f)
 
-    print(f'saved to {fpath.resolve()}/final_costs.pkl')
+    print(f'saved to {savepath}')
+    emailer().send()

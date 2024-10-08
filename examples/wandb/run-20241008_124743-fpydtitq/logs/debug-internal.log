@@ -1,0 +1,19 @@
+{"time":"2024-10-08T12:47:43.551808694-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-08T12:47:43.551820095-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/examples/wandb/run-20241008_124743-fpydtitq/logs/debug-core.log"}
+{"time":"2024-10-08T12:47:43.554063736-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-08T12:47:43.559256545-04:00","level":"INFO","msg":"created new stream","id":"fpydtitq"}
+{"time":"2024-10-08T12:47:43.55928547-04:00","level":"INFO","msg":"stream: started","id":"fpydtitq"}
+{"time":"2024-10-08T12:47:43.55931633-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"fpydtitq"}}
+{"time":"2024-10-08T12:47:43.559315067-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"fpydtitq"}}
+{"time":"2024-10-08T12:47:43.559304685-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"fpydtitq"}}
+{"time":"2024-10-08T12:47:43.702967005-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-08T12:47:43.703567229-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-08T12:47:46.792221955-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-08T12:47:46.795699778-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-08T12:47:47.099656566-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-08T12:47:48.211617776-04:00","level":"INFO","msg":"stream: closing","id":"fpydtitq"}
+{"time":"2024-10-08T12:47:48.211648247-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"fpydtitq"}}
+{"time":"2024-10-08T12:47:48.211683276-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"fpydtitq"}}
+{"time":"2024-10-08T12:47:48.211741139-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"fpydtitq"}}
+{"time":"2024-10-08T12:47:48.211777205-04:00","level":"INFO","msg":"stream: closed","id":"fpydtitq"}
+{"time":"2024-10-08T12:47:51.795784481-04:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

@@ -1,0 +1,19 @@
+{"time":"2024-10-08T12:44:19.32848062-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-08T12:44:19.328489969-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/examples/wandb/run-20241008_124419-8i68dxvk/logs/debug-core.log"}
+{"time":"2024-10-08T12:44:19.332983367-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-08T12:44:19.338881754-04:00","level":"INFO","msg":"created new stream","id":"8i68dxvk"}
+{"time":"2024-10-08T12:44:19.338915442-04:00","level":"INFO","msg":"stream: started","id":"8i68dxvk"}
+{"time":"2024-10-08T12:44:19.338943043-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"8i68dxvk"}}
+{"time":"2024-10-08T12:44:19.338922213-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"8i68dxvk"}}
+{"time":"2024-10-08T12:44:19.338933624-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"8i68dxvk"}}
+{"time":"2024-10-08T12:44:19.555550847-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-08T12:44:19.556492115-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-08T12:44:22.819357264-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-08T12:44:22.823230426-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-08T12:44:23.131879656-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-08T12:44:24.227136347-04:00","level":"INFO","msg":"stream: closing","id":"8i68dxvk"}
+{"time":"2024-10-08T12:44:24.227152653-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"8i68dxvk"}}
+{"time":"2024-10-08T12:44:24.227177896-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"8i68dxvk"}}
+{"time":"2024-10-08T12:44:24.227190174-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"8i68dxvk"}}
+{"time":"2024-10-08T12:44:24.227230154-04:00","level":"INFO","msg":"stream: closed","id":"8i68dxvk"}
+{"time":"2024-10-08T12:44:27.820926761-04:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

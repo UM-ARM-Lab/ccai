@@ -1,0 +1,19 @@
+{"time":"2024-10-08T13:54:28.572559767-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-08T13:54:28.572571186-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/examples/wandb/run-20241008_135428-rz2th9qs/logs/debug-core.log"}
+{"time":"2024-10-08T13:54:28.576927709-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-08T13:54:28.581947495-04:00","level":"INFO","msg":"created new stream","id":"rz2th9qs"}
+{"time":"2024-10-08T13:54:28.581994532-04:00","level":"INFO","msg":"stream: started","id":"rz2th9qs"}
+{"time":"2024-10-08T13:54:28.582001855-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"rz2th9qs"}}
+{"time":"2024-10-08T13:54:28.582027928-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"rz2th9qs"}}
+{"time":"2024-10-08T13:54:28.582014319-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"rz2th9qs"}}
+{"time":"2024-10-08T13:54:28.750643973-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-08T13:54:28.751133846-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-08T13:54:32.073778893-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-08T13:54:32.077714606-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-08T13:54:32.564131417-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-08T13:54:33.669836125-04:00","level":"INFO","msg":"stream: closing","id":"rz2th9qs"}
+{"time":"2024-10-08T13:54:33.66985369-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"rz2th9qs"}}
+{"time":"2024-10-08T13:54:33.669867174-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"rz2th9qs"}}
+{"time":"2024-10-08T13:54:33.669871717-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"rz2th9qs"}}
+{"time":"2024-10-08T13:54:33.669916631-04:00","level":"INFO","msg":"stream: closed","id":"rz2th9qs"}
+{"time":"2024-10-08T13:54:37.077938291-04:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

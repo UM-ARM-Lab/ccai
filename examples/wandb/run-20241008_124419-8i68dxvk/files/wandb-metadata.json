@@ -1,0 +1,43 @@
+{
+  "os":  "Linux-5.15.0-117-generic-x86_64-with-glibc2.10",
+  "python":  "3.8.0",
+  "startedAt":  "2024-10-08T16:44:19.327733Z",
+  "program":  "train_value_function.py",
+  "codePath":  "examples/train_value_function.py",
+  "git":  {
+    "remote":  "https://github.com/UM-ARM-Lab/ccai.git",
+    "commit":  "f6fd9c2f100d82908ff3b12fbd1c5e5dd36d722d"
+  },
+  "email":  "adamhung@umich.edu",
+  "root":  "/home/newuser/Desktop/Honda/ccai/examples",
+  "host":  "armrest",
+  "username":  "newuser",
+  "executable":  "/home/newuser/miniconda3/envs/honda/bin/python3",
+  "codePathLocal":  "train_value_function.py",
+  "cpu_count":  6,
+  "cpu_count_logical":  12,
+  "gpu":  "[NVIDIA GeForce RTX 2080 Ti]",
+  "gpu_count":  1,
+  "disk":  {
+    "/":  {
+      "total":  "772937539584",
+      "used":  "608623648768"
+    }
+  },
+  "memory":  {
+    "total":  "33504309248"
+  },
+  "cpu":  {
+    "count":  6,
+    "countLogical":  12
+  },
+  "gpu_nvidia":  [
+    {
+      "name":  "NVIDIA GeForce RTX 2080 Ti",
+      "memoryTotal":  "11811160064",
+      "cudaCores":  4352,
+      "architecture":  "Turing"
+    }
+  ],
+  "cudaVersion":  "12.5"
+}

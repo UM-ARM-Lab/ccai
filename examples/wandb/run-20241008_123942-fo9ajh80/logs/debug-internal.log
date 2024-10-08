@@ -1,0 +1,18 @@
+{"time":"2024-10-08T12:39:42.595810997-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-08T12:39:42.595822367-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/examples/wandb/run-20241008_123942-fo9ajh80/logs/debug-core.log"}
+{"time":"2024-10-08T12:39:42.600144172-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-08T12:39:42.606826681-04:00","level":"INFO","msg":"created new stream","id":"fo9ajh80"}
+{"time":"2024-10-08T12:39:42.606859981-04:00","level":"INFO","msg":"stream: started","id":"fo9ajh80"}
+{"time":"2024-10-08T12:39:42.606930766-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"fo9ajh80"}}
+{"time":"2024-10-08T12:39:42.607047391-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"fo9ajh80"}}
+{"time":"2024-10-08T12:39:42.607198263-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"fo9ajh80"}}
+{"time":"2024-10-08T12:39:42.771322276-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-08T12:39:42.771870817-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-08T12:39:42.935316058-04:00","level":"INFO","msg":"stream: closing","id":"fo9ajh80"}
+{"time":"2024-10-08T12:39:42.935342151-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-08T12:39:42.940027544-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-08T12:39:43.438001023-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-08T12:39:43.546351004-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"fo9ajh80"}}
+{"time":"2024-10-08T12:39:43.546375175-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"fo9ajh80"}}
+{"time":"2024-10-08T12:39:43.546384723-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"fo9ajh80"}}
+{"time":"2024-10-08T12:39:43.546426558-04:00","level":"INFO","msg":"stream: closed","id":"fo9ajh80"}

@@ -1,0 +1,18 @@
+{"time":"2024-10-08T13:15:50.467144987-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-08T13:15:50.467155514-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/examples/wandb/run-20241008_131550-r7x14b1v/logs/debug-core.log"}
+{"time":"2024-10-08T13:15:50.473875007-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-08T13:15:50.479462204-04:00","level":"INFO","msg":"created new stream","id":"r7x14b1v"}
+{"time":"2024-10-08T13:15:50.479496082-04:00","level":"INFO","msg":"stream: started","id":"r7x14b1v"}
+{"time":"2024-10-08T13:15:50.479519717-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"r7x14b1v"}}
+{"time":"2024-10-08T13:15:50.47955554-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"r7x14b1v"}}
+{"time":"2024-10-08T13:15:50.479566557-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"r7x14b1v"}}
+{"time":"2024-10-08T13:15:51.03070946-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-08T13:15:51.031194526-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-08T13:15:51.17939474-04:00","level":"INFO","msg":"stream: closing","id":"r7x14b1v"}
+{"time":"2024-10-08T13:15:51.17942169-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-08T13:15:51.18378835-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-08T13:15:51.702109227-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-08T13:15:52.110918893-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"r7x14b1v"}}
+{"time":"2024-10-08T13:15:52.111000843-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"r7x14b1v"}}
+{"time":"2024-10-08T13:15:52.110986546-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"r7x14b1v"}}
+{"time":"2024-10-08T13:15:52.111083916-04:00","level":"INFO","msg":"stream: closed","id":"r7x14b1v"}
