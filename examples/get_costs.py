@@ -29,7 +29,7 @@ def vector_cos(a, b):
 
 
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
-with open(f'{fpath.resolve()}/initial_poses.pkl', 'rb') as file:
+with open(f'{fpath.resolve()}/initial_poses_10k.pkl', 'rb') as file:
     initial_poses  = pkl.load(file)
 
 def do_trial(env, params, fpath, initial_pose_idx = None, sim_viz_env=None, ros_copy_node=None):
@@ -237,7 +237,7 @@ if __name__ == "__main__":
 
     env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
                                 use_cartesian_controller=False,
-                                viewer=True,
+                                viewer=False,
                                 steps_per_action=60,
                                 friction_coefficient=1.0,
                                 device=config['sim_device'],
@@ -297,7 +297,8 @@ if __name__ == "__main__":
             object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
             params['object_location'] = object_location
 
-            final_distance_to_goal,final_cost,initial_pose_index = do_trial(env, params, fpath, i, sim_env, ros_copy_node)
+            idx = i + 1000*7
+            final_distance_to_goal,final_cost,initial_pose_index = do_trial(env, params, fpath, idx, sim_env, ros_copy_node)
             pose_cost_tuples.append((initial_poses[initial_pose_index], final_cost))
             
             if final_distance_to_goal < 30 / 180 * np.pi:
@@ -320,7 +321,7 @@ if __name__ == "__main__":
     gym.destroy_sim(sim)
 
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
-    savepath = f'{fpath.resolve()}/value_dataset.pkl'
+    savepath = f'{fpath.resolve()}/value_dataset_odin_7.pkl'
     with open(savepath, 'wb') as f:
         pkl.dump(pose_cost_tuples, f)
 
