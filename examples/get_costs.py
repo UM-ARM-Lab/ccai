@@ -119,10 +119,10 @@ def do_trial(env, params, fpath, initial_pose_idx = None, sim_viz_env=None, ros_
         #debug only
         # turn_problem.save_history(f'{fpath.resolve()}/op_traj.pkl')
 
-        print(f"solve time: {time.time() - start_time}")
+        #print(f"solve time: {time.time() - start_time}")
         planned_theta_traj = best_traj[:, 4 * num_fingers_to_plan: 4 * num_fingers_to_plan + obj_dof].detach().cpu().numpy()
-        print(f"current theta: {state['q'][0, -(obj_dof+1): -1].detach().cpu().numpy()}")
-        print(f"planned theta: {planned_theta_traj}")
+        #print(f"current theta: {state['q'][0, -(obj_dof+1): -1].detach().cpu().numpy()}")
+        #print(f"planned theta: {planned_theta_traj}")
 
         # if params['visualize_plan']:
         #     traj_for_viz = best_traj[:, :turn_problem.dx]
@@ -143,14 +143,15 @@ def do_trial(env, params, fpath, initial_pose_idx = None, sim_viz_env=None, ros_
         turn_problem._preprocess(best_traj.unsqueeze(0))
         equality_constr_dict = turn_problem._con_eq(best_traj.unsqueeze(0), compute_grads=False, compute_hess=False, verbose=True)
         inequality_constr_dict = turn_problem._con_ineq(best_traj.unsqueeze(0), compute_grads=False, compute_hess=False, verbose=True)
-        print("--------------------------------------")
+        #print("--------------------------------------")
 
         action = x[:, turn_problem.dx:turn_problem.dx+turn_problem.du].to(device=env.device)
         if params['optimize_force']:
-            print("planned force")
-            print(action[:, 4 * num_fingers_to_plan:].reshape(num_fingers_to_plan, 3)) # print out the action for debugging
-            print("delta action")
-            print(action[:, :4 * num_fingers_to_plan].reshape(num_fingers_to_plan, 4))
+            #print("planned force")
+            #print(action[:, 4 * num_fingers_to_plan:].reshape(num_fingers_to_plan, 3)) # print out the action for debugging
+            #print("delta action")
+            #print(action[:, :4 * num_fingers_to_plan].reshape(num_fingers_to_plan, 4))
+            pass
         # print(action)
         action = action[:, :4 * num_fingers_to_plan]
         action = action + start.unsqueeze(0)[:, :4 * num_fingers].to(env.device) # NOTE: this is required since we define action as delta action
@@ -168,10 +169,10 @@ def do_trial(env, params, fpath, initial_pose_idx = None, sim_viz_env=None, ros_
         if torch.isnan(distance2goal).item():
             env.reset()
             break
-        print(distance2goal)
+        #print(distance2goal)
         if torch.isnan(distance2goal).any().item():
             env.reset()
-            print("NAN")
+            #print("NAN")
             break
         info = {**equality_constr_dict, **inequality_constr_dict, **{'distance2goal': distance2goal}}
         info_list.append(info)
@@ -217,10 +218,10 @@ def do_trial(env, params, fpath, initial_pose_idx = None, sim_viz_env=None, ros_
 
     final_distance_to_goal = torch.min(distance2goal.abs())
     final_cost = turn_problem._cost(state.reshape(1,-1), start, goal).detach().cpu().item()
-    print("final cost: ", final_cost)
+    #print("final cost: ", final_cost)
 
-    print(f'Controller: {params["controller"]} Final distance to goal: {final_distance_to_goal}')
-    print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
+    #print(f'Controller: {params["controller"]} Final distance to goal: {final_distance_to_goal}')
+    #print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
 
     np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
             #  constr=constraint_val.cpu().numpy(),
