@@ -3,4 +3,4 @@ __pycache__/
 *.pkl
 venv/
 ccai.egg-info/
-data/
+#data/
