@@ -7,7 +7,8 @@ num_trials: 10
 visualize: True
 # experiment_name: 'allegro_screwdriver_csvto_cnf_ot_sigma_.01_orig_inpaint_dopri5_in_first'
 # experiment_name: 'allegro_screwdriver_cnf_project'
-experiment_name: 'allegro_screwdriver_cnf_ot_sigma_.1_orig_inpaint_rk4_project_lr_2_m_.99'
+# experiment_name: 'allegro_screwdriver_cnf_ot_sigma_.1_orig_inpaint_rk4_project_lr_2_m_.99'
+experiment_name: 'allegro_cnf_state_control_only_s0_st_sigma_.1_alpha_C_.1_projected_training_C_.1_eval'
 type: 'cnf'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
@@ -32,9 +33,9 @@ use_saved_noise: False
 use_guidance: False
 sample_contact: False
 use_partial_constraint: True
-sine_cosine: True
+sine_cosine: False
 project_state: True
-model_path: 'data/training/allegro_screwdriver/allegro_cnf_exact_ot_.1_cnf/allegro_screwdriver_cnf.pt'
+model_path: 'data/training/allegro_screwdriver/allegro_cnf_state_control_only_s0_st_sigma_.1_alpha_C_.1_projected_training_cnf/allegro_screwdriver_cnf.pt'
 # model_path: 'data/training/allegro_screwdriver/allegro_cnf_exact_ot_cnf/allegro_screwdriver_cnf.pt'
 controllers:
   csvgd:

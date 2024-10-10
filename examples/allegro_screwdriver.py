@@ -1,6 +1,6 @@
 from isaac_victor_envs.utils import get_assets_dir
 from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
-from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
+# from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
 
 import numpy as np
 import pickle as pkl
@@ -30,7 +30,7 @@ from ccai.utils.allegro_utils import *
 from ccai.allegro_contact import AllegroManipulationProblem, PositionControlConstrainedSVGDMPC, add_trajectories, \
     add_trajectories_hardware
 from ccai.allegro_screwdriver_problem_diffusion import AllegroScrewdriverDiff
-from ccai.mpc.diffusion_policy import Diffusion_Policy, DummyProblem
+# from ccai.mpc.diffusion_policy import Diffusion_Policy, DummyProblem
 from train_allegro_screwdriver import rollout_trajectory_in_sim
 from scipy.spatial.transform import Rotation as R
 
@@ -401,73 +401,74 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
     if model_path is not None:
         problem_for_sampler = None
-        if params['projected'] or params['sample_contact']:
+        if params['projected'] or params['sample_contact'] or params['type'] == 'cnf':
+            dummy_start = torch.rand(16 if params['sine_cosine'] else 15).to(device=params['device'])
             pregrasp_problem_diff = AllegroScrewdriverDiff(
-                start=start[:4 * num_fingers + obj_dof],
-                goal=params['valve_goal'],
-                T=params['T'],
-                chain=params['chain'],
+                start=dummy_start,
+                goal=None,
+                T=1,
+                chain=chain,
                 device=params['device'],
                 object_asset_pos=env.table_pose,
                 object_location=params['object_location'],
-                object_type=params['object_type'],
+                object_type='screwdriver',
                 world_trans=env.world_trans,
                 regrasp_fingers=fingers,
                 contact_fingers=[],
                 obj_dof=obj_dof,
                 obj_joint_dim=1,
-                optimize_force=params['optimize_force'],
+                optimize_force=True,
             )
             # finger gate index
             index_regrasp_problem_diff = AllegroScrewdriverDiff(
-                start=start[:4 * num_fingers + obj_dof],
-                goal=params['valve_goal'],
-                T=params['T'],
-                chain=params['chain'],
+                start=dummy_start,
+                goal=None,
+                T=1,
+                chain=chain,
                 device=params['device'],
                 object_asset_pos=env.table_pose,
                 object_location=params['object_location'],
-                object_type=params['object_type'],
+                object_type='screwdriver',
                 world_trans=env.world_trans,
                 regrasp_fingers=['index'],
                 contact_fingers=['middle', 'thumb'],
                 obj_dof=obj_dof,
                 obj_joint_dim=1,
-                optimize_force=params['optimize_force'],
-                default_dof_pos=env.default_dof_pos[:, :16]
+                optimize_force=True,
+                default_dof_pos=None
             )
             thumb_and_middle_regrasp_problem_diff = AllegroScrewdriverDiff(
-                start=start[:4 * num_fingers + obj_dof],
-                goal=params['valve_goal'],
-                T=params['T'],
-                chain=params['chain'],
+                start=dummy_start,
+                goal=None,
+                T=1,
+                chain=chain,
                 device=params['device'],
                 object_asset_pos=env.table_pose,
                 object_location=params['object_location'],
-                object_type=params['object_type'],
+                object_type='screwdriver',
                 world_trans=env.world_trans,
                 contact_fingers=['index'],
                 regrasp_fingers=['middle', 'thumb'],
                 obj_dof=obj_dof,
                 obj_joint_dim=1,
-                optimize_force=params['optimize_force'],
-                default_dof_pos=env.default_dof_pos[:, :16]
+                optimize_force=True,
+                default_dof_pos=None
             )
             turn_problem_diff = AllegroScrewdriverDiff(
-                start=start[:4 * num_fingers + obj_dof],
-                goal=params['valve_goal'],
-                T=params['T'],
-                chain=params['chain'],
+                start=dummy_start,
+                goal=None,
+                T=1,
+                chain=chain,
                 device=params['device'],
                 object_asset_pos=env.table_pose,
                 object_location=params['object_location'],
-                object_type=params['object_type'],
+                object_type='screwdriver',
                 world_trans=env.world_trans,
                 contact_fingers=['index', 'middle', 'thumb'],
                 obj_dof=obj_dof,
                 obj_joint_dim=1,
-                optimize_force=params['optimize_force'],
-                default_dof_pos=env.default_dof_pos[:, :16]
+                optimize_force=True,
+                default_dof_pos=None
             )
 
             if params['use_partial_constraint']:
@@ -638,7 +639,26 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 print('Sampling time', time.perf_counter() - a)
                 # if state[-1] < -1.0:
                 #     initial_samples[:, :, -1] -= 0.75
-            
+                if params['visualize_plan']:
+                    for (name, traj_set) in [('initial_samples', initial_samples)]:
+                        for k in range(params['N']):
+                            traj_for_viz = traj_set[k, :, :planner.problem.dx]
+                            # if params['exclude_index']:
+                            #     traj_for_viz = torch.cat((state[4:4 + planner.problem.dx].unsqueeze(0), traj_for_viz), dim=0)
+                            # else:
+                            #     traj_for_viz = torch.cat((state[:planner.problem.dx].unsqueeze(0), traj_for_viz), dim=0)
+                            tmp = torch.zeros((traj_for_viz.shape[0], 1),
+                                            device=traj_for_viz.device)  # add the joint for the screwdriver cap
+                            traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
+                            # traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof] = axis_angle_to_euler(traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof])
+
+                            viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/{name}/{k}")
+                            img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
+                            gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
+                            pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
+                            pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
+                            visualize_trajectory(traj_for_viz, turn_problem.contact_scenes, viz_fpath,
+                                                turn_problem.fingers, turn_problem.obj_dof + 1)
             sim_rollouts = torch.zeros_like(initial_samples)
             # for i in range(params['N']):
             #     sim_rollout = rollout_trajectory_in_sim(env_sim_rollout, initial_samples[i])
@@ -1202,7 +1222,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_cnf_only.yaml').read_text())
 
     from tqdm import tqdm
 

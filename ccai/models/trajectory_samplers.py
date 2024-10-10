@@ -230,8 +230,8 @@ class TrajectoryDiffusionModel(nn.Module):
 
 class TrajectoryCNFModel(TrajectoryCNF):
 
-    def __init__(self, horizon, dx, du, context_dim, hidden_dim=32):
-        super().__init__(horizon, dx, du, context_dim, hidden_dim=hidden_dim)
+    def __init__(self, horizon, dx, du, context_dim, problem, hidden_dim=32):
+        super().__init__(horizon, dx, du, context_dim, problem, hidden_dim=hidden_dim)
 
     def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None):
         # B, N, _ = constraints.shape
@@ -275,6 +275,9 @@ class TrajectoryCNFModel(TrajectoryCNF):
         self.x_std.data = x_std.to(device=self.x_std.device, dtype=self.x_std.dtype)
 
 
+        self.model.x_mean = self.x_mean
+        self.model.x_std = self.x_std
+
 class TrajectorySampler(nn.Module):
 
     def __init__(self, T, dx, du, context_dim, type='nf', dynamics=None, problem=None, timesteps=50, hidden_dim=64,
@@ -292,7 +295,7 @@ class TrajectorySampler(nn.Module):
         if type == 'nf':
             self.model = TrajectoryFlowModel(T, dx, du, context_dim, dynamics)
         elif type == 'cnf':
-            self.model = TrajectoryCNFModel(T, dx, du, context_dim, hidden_dim=hidden_dim)
+            self.model = TrajectoryCNFModel(T, dx, du, context_dim, problem, hidden_dim=hidden_dim)
         elif type == 'latent_diffusion':
             self.model = TrajectoryDiffusionModel(T, dx, du, context_dim, problem, timesteps, hidden_dim, constrain,
                                                   unconditional, generate_context=generate_context, score_model=score_model,

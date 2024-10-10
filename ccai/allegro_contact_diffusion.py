@@ -234,11 +234,11 @@ class AllegroObjectProblemDiff(ConstrainedSVGDProblem):
             pass
         else:
             raise NotImplementedError
-        self._preprocess_fingers(q, theta, self.contact_scenes)
+        self._preprocess_fingers(q, theta, self.contact_scenes, projected_diffusion=projected_diffusion)
 
-    def _preprocess_fingers(self, q, theta, finger_ee_link):
+    def _preprocess_fingers(self, q, theta, finger_ee_link, projected_diffusion=False):
         N, _, _ = q.shape
-
+        T_offset = 0 if projected_diffusion else 1
         # reshape to batch across time
         q_b = q.reshape(-1, 4 * self.num_fingers)
         theta_b = theta.reshape(-1, self.obj_dof)
@@ -253,30 +253,30 @@ class AllegroObjectProblemDiff(ConstrainedSVGDProblem):
                                                               compute_hessian=False)
         for i, finger in enumerate(self.fingers):
             self.data[finger] = {}
-            self.data[finger]['sdf'] = ret_scene['sdf'][:, i].reshape(N, self.T + 1)
+            self.data[finger]['sdf'] = ret_scene['sdf'][:, i].reshape(N, self.T + T_offset)
             # reshape and throw away data for unused fingers
             grad_g_q = ret_scene.get('grad_sdf', None)
-            self.data[finger]['grad_sdf'] = grad_g_q[:, i].reshape(N, self.T + 1, 16)
+            self.data[finger]['grad_sdf'] = grad_g_q[:, i].reshape(N, self.T + T_offset, 16)
 
             # contact jacobian
             contact_jacobian = ret_scene.get('contact_jacobian', None)
-            self.data[finger]['contact_jacobian'] = contact_jacobian[:, i].reshape(N, self.T + 1, 3, 16)
+            self.data[finger]['contact_jacobian'] = contact_jacobian[:, i].reshape(N, self.T + T_offset, 3, 16)
 
             # contact hessian
             contact_hessian = ret_scene.get('contact_hessian', None)
-            contact_hessian = contact_hessian[:, i].reshape(N, self.T + 1, 3, 16, 16)  # [:, :, :, self.all_joint_index]
+            contact_hessian = contact_hessian[:, i].reshape(N, self.T + T_offset, 3, 16, 16)  # [:, :, :, self.all_joint_index]
             # contact_hessian = contact_hessian[:, :, :, :, self.all_joint_index]  # shape (N, T+1, 3, 8, 8)
 
             # gradient of contact point
             d_contact_loc_dq = ret_scene.get('closest_pt_q_grad', None)
-            d_contact_loc_dq = d_contact_loc_dq[:, i].reshape(N, self.T + 1, 3, 16)  # [:, :, :, self.all_joint_index]
+            d_contact_loc_dq = d_contact_loc_dq[:, i].reshape(N, self.T + T_offset, 3, 16)  # [:, :, :, self.all_joint_index]
             self.data[finger]['closest_pt_q_grad'] = d_contact_loc_dq
             self.data[finger]['contact_hessian'] = contact_hessian
             self.data[finger]['closest_pt_world'] = ret_scene['closest_pt_world'][:, i]
             self.data[finger]['contact_normal'] = ret_scene['contact_normal'][:, i]
 
             # gradient of contact normal
-            self.data[finger]['dnormal_dq'] = ret_scene['dnormal_dq'][:, i].reshape(N, self.T + 1, 3, 16)  # [:, :, :,
+            self.data[finger]['dnormal_dq'] = ret_scene['dnormal_dq'][:, i].reshape(N, self.T + T_offset, 3, 16)  # [:, :, :,
             # self.all_joint_index]
 
             self.data[finger]['dnormal_denv_q'] = ret_scene['dnormal_denv_q'][:, i, :, :self.obj_dof]

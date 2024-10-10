@@ -88,7 +88,7 @@ def set_cnf_options(solver, model):
             if solver in ['fixed_adams', 'explicit_adams']:
                 module.solver_options['max_order'] = 4
             if solver == 'rk4':
-                module.solver_options['step_size'] = .1
+                module.solver_options['step_size'] = .03
 
             # Set the test settings
             module.test_solver = solver
@@ -108,6 +108,7 @@ class TrajectoryCNF(nn.Module):
             x_dim,
             u_dim,
             context_dim,
+            opt_problem=None,
             hidden_dim=32,
             inflation_noise=0.0
     ):
@@ -118,6 +119,7 @@ class TrajectoryCNF(nn.Module):
         self.du = u_dim
         self.xu_dim = x_dim + u_dim
         self.context_dim = context_dim
+        self.problem_dict = opt_problem
         # self.loss_type = 'ot'
         self.loss_type = 'conditional_ot_sb'
 
@@ -134,7 +136,8 @@ class TrajectoryCNF(nn.Module):
         self.model = TemporalUnetStateAction(self.horizon, self.xu_dim,
                                     cond_dim=context_dim,
                                     dim=hidden_dim, dim_mults=(1, 2, 4, 8),
-                                    attention=False)
+                                    attention=False,
+                                    problem_dict=self.problem_dict)
         # self.model = MLP(horizon * xu_dim, context_dim, 256, num_layers=4)
         # self.model = TrajectoryConvNet(xu_dim, context_dim)
 
@@ -154,7 +157,8 @@ class TrajectoryCNF(nn.Module):
             rademacher=False,
         )
 
-        solver = 'dopri5'
+        # solver = 'dopri5'
+        solver = 'fehlberg2'
         self.flow = CNF(odefunc=odefunc,
                         T=1.0,
                         train_T=False,
@@ -169,16 +173,19 @@ class TrajectoryCNF(nn.Module):
         self._grad_mask = mask.cuda()
 
     def masked_grad(self, t, x, context=None):
-
+        print(f'step {self.step_id}')
+        self.step_id += 1
         # x = self._apply_conditioning(x, t, self.condition)
 
-        dx_null_context, _ = self.model.compiled_unconditional_test(t, x)
-        if context is not None:
-            w_total = 1
-            dx_context, _ = self.model.compiled_conditional_test(t, x, context)
-            dx = dx_null_context  + w_total * (dx_context - dx_null_context)
-        else:
-            dx = dx_null_context
+        # dx_null_context, _ = self.model.compiled_unconditional_test(t, x)
+        # if context is not None:
+            # w_total = 1
+        #     dx_context, _ = self.model.compiled_conditional_test(t, x, context)
+        #     dx = dx_null_context  + w_total * (dx_context - dx_null_context)
+        # else:
+        #     dx = dx_null_context
+            
+        dx, _ = self.model.compiled_conditional_test(t, x, context)
 
         # dx *= (self.horizon-1)
         # dx = self._apply_conditioning(dx, t, self.condition, dx=True)
@@ -255,11 +262,13 @@ class TrajectoryCNF(nn.Module):
         # self.noise = self._apply_conditioning(self.noise, None, condition=condition)
         log_prob = torch.zeros(N * num_sub_trajectories, device=self.noise.device)
 
-        out = self.flow(self.noise,
-                        logpx=log_prob,
-                        context=context.reshape(-1, context.shape[-1]),
-                        reverse=False,
-                        integration_times=torch.linspace(0, 1, self.horizon, device=self.noise.device))
+        self.step_id = 0
+        with torch.no_grad():
+            out = self.flow(self.noise,
+                            logpx=log_prob,
+                            context=context.reshape(-1, context.shape[-1]),
+                            reverse=False,
+                            integration_times=torch.linspace(0, 1, self.horizon, device=self.noise.device))
 
         trajectories, log_prob = out[:2]
         trajectories = trajectories.permute(1, 0, 2)
