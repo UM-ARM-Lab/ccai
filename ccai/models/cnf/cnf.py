@@ -310,7 +310,9 @@ class TrajectoryCNF(nn.Module):
         truevt[..., self.dx:] = true_uv
         # xut = torch.cat((xut, r), dim=-1)
         a = time.perf_counter()
-        vt, _ = self.model.compiled_conditional_train(t.reshape(-1), xut, context)
+        vt, p_matrix, xi_C = self.model.compiled_conditional_train(t.reshape(-1), xut, context)
+
+        truevt, _, _ = self.model.project(xut, truevt, context, p_matrix=p_matrix, xi_C=xi_C)
         flow_loss = mse_loss(vt, truevt)
 
         # for key in self.problem_dict:

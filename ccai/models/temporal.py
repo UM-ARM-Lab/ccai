@@ -639,7 +639,7 @@ class TemporalUnetStateAction(nn.Module):
             mask_no_z[-z_dim:] = False
         return c_state, mask, mask_no_z
 
-    def project(self, x_orig, x, context):
+    def project(self, x_orig, x, context, p_matrix=None, xi_C=None):
         if self.problem_dict is not None:
             for problem_idx in self.problem_dict:
                 problem = self.problem_dict[problem_idx]
@@ -651,38 +651,44 @@ class TemporalUnetStateAction(nn.Module):
                 grad_x_this_problem = x[context.sum(-1) == p_idx][:, None] * self.x_std
                 b = x_this_problem.shape[0]
 
-
+                dtype = torch.float64
+                z_dim = problem.dz
+                update_this_c = torch.cat((grad_x_this_problem[:, :, mask], torch.zeros((b, 1, z_dim), device=x.device, dtype=dtype)), dim=-1)
                 
                 if x_this_problem.shape[0] == 0:
                     continue
 
-                problem._preprocess(x_this_problem[:, :, mask_no_z], projected_diffusion=True)
-                z_dim = problem.dz
-                C, dC, _ = problem.combined_constraints(x_this_problem[:, :, mask], compute_hess=False, projected_diffusion=True)
+                if p_matrix is None:
 
-                dtype = torch.float64
-                C = C.to(dtype=dtype).squeeze()
-                dC = dC.to(dtype=dtype).squeeze()
+                    problem._preprocess(x_this_problem[:, :, mask_no_z], projected_diffusion=True)
+                    C, dC, _ = problem.combined_constraints(x_this_problem[:, :, mask], compute_hess=False, projected_diffusion=True)
 
-                update_this_c = torch.cat((grad_x_this_problem[:, :, mask], torch.zeros((b, 1, z_dim), device=x.device, dtype=dtype)), dim=-1)
-                eye = torch.eye(C.shape[1]).repeat(b, 1, 1).to(device=C.device, dtype=dtype)
-                
-                try:
-                    dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1) +
-                                                1e-6 * eye
-                                                , eye)
-                except Exception as e:
-                    dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1) * 1e-6 * eye)
-                projection = dC.permute(0, 2, 1) @ dCdCT_inv @ dC
-                eye2 = torch.eye(x_this_problem.shape[-2] * num_dim, device=x.device, dtype=dtype).unsqueeze(0)
-                update_this_c = (eye2 - projection) @ update_this_c.reshape(b, -1, 1)
+                    C = C.to(dtype=dtype).squeeze()
+                    dC = dC.to(dtype=dtype).squeeze()
+
+                    eye = torch.eye(C.shape[1]).repeat(b, 1, 1).to(device=C.device, dtype=dtype)
+                    
+                    try:
+                        dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1) +
+                                                    1e-6 * eye
+                                                    , eye)
+                    except Exception as e:
+                        dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1) * 1e-6 * eye)
+                    projection = dC.permute(0, 2, 1) @ dCdCT_inv @ dC
+                    eye2 = torch.eye(x_this_problem.shape[-2] * num_dim, device=x.device, dtype=dtype).unsqueeze(0)
+
+                    p_matrix = (eye2 - projection)
+                update_this_c = p_matrix @ update_this_c.reshape(b, -1, 1)
                 update_this_c = update_this_c.squeeze(-1)
 
-                # Update to decrease constraint violation
-                xi_C = dCdCT_inv @ C.unsqueeze(-1)
-                xi_C = (dC.permute(0, 2, 1) @ xi_C).squeeze(-1)
 
-                update_this_c -= .1 * xi_C
+                xi_C = None
+                # if xi_C is None:
+                #     # Update to decrease constraint violation
+                #     xi_C = dCdCT_inv @ C.unsqueeze(-1)
+                #     xi_C = (dC.permute(0, 2, 1) @ xi_C).squeeze(-1)
+
+                # update_this_c -= .1 * xi_C
 
                 if problem.dz > 0:
                     update_this_c = update_this_c[:, : :-problem.dz]
@@ -699,7 +705,7 @@ class TemporalUnetStateAction(nn.Module):
                 x[full_mask] = update_this_c.flatten()
                 x[full_mask_inv_m] = 0
 
-        return x, x
+        return x, p_matrix, xi_C
 
     @torch.compile(mode='max-autotune')
     def compiled_conditional_test_fwd(self, t, x, context):
@@ -723,8 +729,8 @@ class TemporalUnetStateAction(nn.Module):
     
     def compiled_conditional_train(self, t, x, context):
         x_orig, x = self.compiled_conditional_train_fwd(t, x, context)
-        x, x = self.project(x_orig, x, context)
-        return x, x
+        x, p_matrix, xi_C = self.project(x_orig, x, context)
+        return x, p_matrix, xi_C
 
 class StateActionMLP(nn.Module):
 

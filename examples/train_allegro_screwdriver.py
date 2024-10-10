@@ -625,9 +625,9 @@ if __name__ == "__main__":
         )
 
         problem_for_sampler = {
-            (-1, -1, -1): pregrasp_problem_diff,
-            (-1, 1, 1): index_regrasp_problem_diff,
-            (1, -1, -1): thumb_and_middle_regrasp_problem_diff,
+            # (-1, -1, -1): pregrasp_problem_diff,
+            # (-1, 1, 1): index_regrasp_problem_diff,
+            # (1, -1, -1): thumb_and_middle_regrasp_problem_diff,
             (1, 1, 1): turn_problem_diff
         }
 
