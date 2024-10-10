@@ -137,7 +137,7 @@ class TrajectoryCNF(nn.Module):
             #                         cond_dim=context_dim,
             #                         dim=hidden_dim, dim_mults=(1, 2, 4, 8),
             #                         attention=False)
-            self.FM = ExactOptimalTransportConditionalFlowMatcher(sigma=.01)
+            self.FM = ExactOptimalTransportConditionalFlowMatcher(sigma=.1)
         else:
             self.loss_type = 'conditional_ot_sb'
             # sigma = .025 ** .5
@@ -301,8 +301,9 @@ class TrajectoryCNF(nn.Module):
         a = time.perf_counter()
         t, ut, true_uv, arange0, arange1 = self.FM.guided_sample_location_and_conditional_flow(rand_for_u0, goal_u0, y0=arange0, y1=arange1, t=t)
         # Rearrange ut, true_uv using arange
-        ut = ut[arange1]
-        true_uv = true_uv[arange1]
+        inds = torch.sort(arange1).indices
+        ut = ut[inds]
+        true_uv = true_uv[inds]
         # u1 = x0[..., self.dx:]
         # true_u = u1 - u0
         # ut = u1 * (t + t0) + u0 * (1 - (t + t0))

@@ -682,13 +682,13 @@ class TemporalUnetStateAction(nn.Module):
                 update_this_c = update_this_c.squeeze(-1)
 
 
-                xi_C = None
-                # if xi_C is None:
-                #     # Update to decrease constraint violation
-                #     xi_C = dCdCT_inv @ C.unsqueeze(-1)
-                #     xi_C = (dC.permute(0, 2, 1) @ xi_C).squeeze(-1)
+                # xi_C = None
+                if xi_C is None:
+                    # Update to decrease constraint violation
+                    xi_C = dCdCT_inv @ C.unsqueeze(-1)
+                    xi_C = (dC.permute(0, 2, 1) @ xi_C).squeeze(-1)
 
-                # update_this_c -= .1 * xi_C
+                update_this_c -= .1 * xi_C
 
                 if problem.dz > 0:
                     update_this_c = update_this_c[:, : :-problem.dz]
