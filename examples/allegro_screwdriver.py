@@ -27,8 +27,6 @@ from scipy.spatial.transform import Rotation as R
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
-
-
 # device = 'cuda:0'
 # torch.cuda.set_device(1)
 obj_dof = 3
@@ -210,8 +208,8 @@ class AllegroScrewdriver(AllegroValveTurning):
         return xu
 
     def _cost(self, xu, start, goal):
-        goal = goal.to(device='cuda:0')
-        xu = xu.to(device='cuda:0')
+        goal = goal.to(device=self.device)
+        xu = xu.to(device=self.device)
         state = xu[:, :self.dx]  # state dim = 9
         state = torch.cat((start.reshape(1, self.dx), state), dim=0)  # combine the first time step into it
         
