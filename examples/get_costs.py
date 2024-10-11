@@ -147,10 +147,10 @@ def do_trial(env, params, fpath, initial_pose_idx = None, sim_viz_env=None, ros_
 
         action = x[:, turn_problem.dx:turn_problem.dx+turn_problem.du].to(device=env.device)
         if params['optimize_force']:
-            #print("planned force")
-            #print(action[:, 4 * num_fingers_to_plan:].reshape(num_fingers_to_plan, 3)) # print out the action for debugging
-            #print("delta action")
-            #print(action[:, :4 * num_fingers_to_plan].reshape(num_fingers_to_plan, 4))
+            # print("planned force")
+            # print(action[:, 4 * num_fingers_to_plan:].reshape(num_fingers_to_plan, 3)) # print out the action for debugging
+            # print("delta action")
+            # print(action[:, :4 * num_fingers_to_plan].reshape(num_fingers_to_plan, 4))
             pass
         # print(action)
         action = action[:, :4 * num_fingers_to_plan]
@@ -220,6 +220,22 @@ def do_trial(env, params, fpath, initial_pose_idx = None, sim_viz_env=None, ros_
     final_cost = turn_problem._cost(state.reshape(1,-1), start, goal).detach().cpu().item()
     #print("final cost: ", final_cost)
 
+    env.reset()
+    state = env.get_state()['q']
+    final_state = torch.cat((
+                    state.clone()[:, :8], 
+                    torch.tensor([[0., 0.5, 0.65, 0.65]]), 
+                    state.clone()[:, 8:], 
+                    ), dim=1).detach().cpu().numpy()
+    
+    default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
+                    torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float(),
+                    torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
+                    torch.tensor([[1.2, 0.3, 0.3, 1.2]]).float()),
+                    dim=1)
+    
+    exit()
+
     #print(f'Controller: {params["controller"]} Final distance to goal: {final_distance_to_goal}')
     #print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
 
@@ -228,7 +244,7 @@ def do_trial(env, params, fpath, initial_pose_idx = None, sim_viz_env=None, ros_
              d2goal=final_distance_to_goal.cpu().numpy())
     env.reset()
     initial_pose_index = idx
-    return final_distance_to_goal.cpu().detach().item(), final_cost, initial_pose_index
+    return final_distance_to_goal.cpu().detach().item(), final_cost, final_state, initial_pose_index
 
 if __name__ == "__main__":
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver.yaml').read_text())
@@ -277,6 +293,7 @@ if __name__ == "__main__":
     forward_kinematics = partial(chain.forward_kinematics, frame_indices=frame_indices) 
 
     pose_cost_tuples = []
+    final_states = []
     n_poses = len(initial_poses)
 
     for i in tqdm(range(1000)):
@@ -298,9 +315,10 @@ if __name__ == "__main__":
             object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
             params['object_location'] = object_location
 
-            idx = i + 1000*7
-            final_distance_to_goal,final_cost,initial_pose_index = do_trial(env, params, fpath, idx, sim_env, ros_copy_node)
+            idx = i + params['start_idx']
+            final_distance_to_goal,final_cost,final_state, initial_pose_index = do_trial(env, params, fpath, idx, sim_env, ros_copy_node)
             pose_cost_tuples.append((initial_poses[initial_pose_index], final_cost))
+            final_states.append(final_state)
             
             if final_distance_to_goal < 30 / 180 * np.pi:
                 succ = True
@@ -322,9 +340,14 @@ if __name__ == "__main__":
     gym.destroy_sim(sim)
 
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
-    savepath = f'{fpath.resolve()}/value_dataset_odin_7.pkl'
+    start_idx = params['start_idx']
+    savepath = f'{fpath.resolve()}/value_dataset_odin_{start_idx}.pkl'
     with open(savepath, 'wb') as f:
         pkl.dump(pose_cost_tuples, f)
+
+    savepath_states = f'{fpath.resolve()}/final_states.pkl'
+    with open(savepath_states, 'wb') as f:
+        pkl.dump(final_states, f)
 
     print(f'saved to {savepath}')
     emailer().send()

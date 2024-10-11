@@ -8,36 +8,25 @@ from torch.utils.data import random_split, DataLoader
 import wandb
 import matplotlib.pyplot as plt
 
-class Net(nn.Module):
-    def __init__(self, dim_in, dim_out):
-        super(Net, self).__init__()
-        self.fc1 = nn.Linear(dim_in, 64)
-        self.fc2 = nn.Linear(64, 64)
-        self.fc3 = nn.Linear(64, dim_out)
-
-    def forward(self, input):
-        f1 = F.relu(self.fc1(input))
-        f2 = F.relu(self.fc2(f1))
-        output = self.fc3(f2)
-        return output
-    
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
+fpath = pathlib.Path(f'{CCAI_PATH}/data')
+shape = (20,1)
 
-if __name__ == "__main__":
-    
-    # Initialize W&B
-    wandb.init(project="value-function-training", config={
-        "epochs": 1000,
-        "batch_size": 64,
-        "learning_rate": 0.0001
-    })
+def load_data():
+    filenames = [
+        'value_dataset_100_random.pkl',
+        'value_dataset_9500.pkl'
+    ]
     validation_proportion = 0.1
+    poses = []
+    costs = []
+    for filename in filenames:
+        with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
+            pose_cost_tuples  = pkl.load(file)
+            new_poses, new_costs = zip(*pose_cost_tuples)
+            poses.extend(new_poses)
+            costs.extend(new_costs)
     
-    fpath = pathlib.Path(f'{CCAI_PATH}/data')
-    with open(f'{fpath.resolve()}/value_dataset_100.pkl', 'rb') as file:
-        pose_cost_tuples  = pkl.load(file)
-
-    poses, costs = zip(*pose_cost_tuples)
     num_samples = len(poses)
     split_idx = int(num_samples * (1 - validation_proportion))
 
@@ -49,11 +38,11 @@ if __name__ == "__main__":
     cost_mean, cost_std = np.mean(costs[:split_idx]), np.std(costs[:split_idx])
     costs_norm = (costs - cost_mean) / cost_std
 
-    # Convert to PyTorch tensors
+    # Convert to tensors
     poses_tensor = torch.from_numpy(poses_norm).float()
     costs_tensor = torch.from_numpy(costs_norm).float()
 
-    # Split the dataset into training and test sets (90% training, 10% testing)
+    # Split the dataset into training and test sets
     dataset = torch.utils.data.TensorDataset(poses_tensor, costs_tensor)
     train_size = int((1-validation_proportion) * len(dataset))
     test_size = len(dataset) - train_size
@@ -63,7 +52,36 @@ if __name__ == "__main__":
     train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 
-    model = Net(poses_tensor.shape[1], 1)  # Instantiate the neural network model
+    return train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std
+
+class Net(nn.Module):
+    def __init__(self, dim_in, dim_out):
+        super(Net, self).__init__()
+        self.fc1 = nn.Linear(dim_in, 32)
+        self.fc2 = nn.Linear(32, 32)
+        self.fc3 = nn.Linear(32, dim_out)
+
+    def forward(self, input):
+        f1 = F.relu(self.fc1(input))
+        f2 = F.relu(self.fc2(f1))
+        output = self.fc3(f2)
+        return output
+    
+
+def train():
+
+    model_name = "2"#input("Enter model name: ")
+    
+    # Initialize W&B
+    wandb.init(project="value-function-training", config={
+        "epochs": 1000,
+        "batch_size": 64,
+        "learning_rate": 0.0001,
+    })
+    
+    train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std = load_data()
+
+    model = Net(shape[0], shape[1])  # Instantiate the neural network model
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001) 
     criterion = nn.MSELoss()
 
@@ -85,9 +103,6 @@ if __name__ == "__main__":
 
             running_loss += loss.item()
 
-        # get average loss per prediction
-        avg_train_loss = running_loss / len(train_loader)
-
         # Eval
         if (epoch + 1) % 100 == 0:
             model.eval()
@@ -98,21 +113,20 @@ if __name__ == "__main__":
                     loss = criterion(predicted_costs, labels)
                     test_loss += loss.item()
 
-            avg_test_loss = test_loss / len(test_loader)
 
-            # Print training loss, test loss, and unnormalized loss
-            unnormalized_loss = avg_train_loss * (cost_std**2)  # Scale the loss back to original cost scale
-            print(f"Epoch [{epoch+1}/{num_epochs}], Training Loss: {avg_train_loss:.8f}, Test Loss: {avg_test_loss:.8f}, Unnormalized Train Loss: {unnormalized_loss:.8f}")
+            # Print and log losses
+            train_loss = running_loss
+            unnormalized_loss = train_loss * (cost_std**2)  # Scale the loss back to original cost scale
+            print(f"Epoch [{epoch+1}/{num_epochs}], Training Loss: {train_loss:.8f}, Test Loss: {test_loss:.8f}, Unnormalized Train Loss: {unnormalized_loss:.8f}")
 
-            # Log metrics to W&B
             wandb.log({
                 "epoch": epoch + 1,
-                "train_loss": avg_train_loss,
-                "test_loss": avg_test_loss,
+                "train_loss": train_loss,
+                "test_loss": test_loss,
                 "unnormalized_train_loss": unnormalized_loss
             })
 
-    # Save the model
+    # save
     save_model = {
         'model_state': model.state_dict(),
         'poses_mean': poses_mean,
@@ -120,39 +134,59 @@ if __name__ == "__main__":
         'cost_mean': cost_mean,
         'cost_std': cost_std,
     }
-
-    torch.save(save_model, f'{fpath.resolve()}/value_function.pkl')
-    
-    # Mark the run as complete in W&B
+    torch.save(save_model, f'{fpath.resolve()}/value_function_{model_name}.pkl')
     wandb.finish()
+
+def eval():
+    model_name = "2"
+    #model_name = input("Enter model name: ")
+
+    train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std = load_data()
+    model = Net(shape[0], shape[1])
+    checkpoint = torch.load(f'{fpath.resolve()}/value_function_{model_name}.pkl')
+    model.load_state_dict(checkpoint['model_state'])
 
     # plot some predictions
     model.eval()
-    with torch.no_grad():
-        actual_values = []
-        predicted_values = []
-        
-        for inputs, labels in test_loader:
-            predictions = model(inputs)
-            predicted_values.append(predictions.numpy())
-            actual_values.append(labels.numpy())
-            break
+    
+    def plot_loader(loader, title = ''):
+        with torch.no_grad():
+            actual_values = []
+            predicted_values = []
+            
 
-    actual_values = np.concatenate(actual_values).flatten()
-    predicted_values = np.concatenate(predicted_values).flatten()
-    actual_values = actual_values * cost_std + cost_mean
-    predicted_values = predicted_values * cost_std + cost_mean
+            for inputs, labels in loader:
+                predictions = model(inputs)
+                predicted_values.append(predictions.numpy())
+                actual_values.append(labels.numpy())
+                break
 
-    num_samples = len(actual_values)
-    plt.figure(figsize=(10, 6))
-    plt.scatter(range(num_samples), actual_values, label='Actual Values', color='green')
-    plt.scatter(range(num_samples), predicted_values, label='Predicted Values', color='blue')
-    # Draw lines between corresponding actual and predicted values
-    for i in range(num_samples):
-        plt.plot([i, i], [actual_values[i], predicted_values[i]], color='red', linestyle='--', linewidth=0.8)
+        actual_values = np.concatenate(actual_values).flatten()
+        predicted_values = np.concatenate(predicted_values).flatten()
+        actual_values = actual_values * cost_std + cost_mean
+        predicted_values = predicted_values * cost_std + cost_mean
 
-    plt.xlabel('Sample Index')
-    plt.ylabel('Cost Value')
-    plt.title('Actual vs Predicted Values with Error Lines')
-    plt.legend()
-    plt.show()
+        print(f'Actual values: {[f"{val:.4f}" for val in actual_values[:10]]}')
+        print(f'Predicted values: {[f"{val:.4f}" for val in predicted_values[:10]]}')
+
+        num_samples = len(actual_values)
+        plt.figure(figsize=(10, 6))
+        plt.scatter(range(num_samples), actual_values, label='Actual Values', color='green')
+        plt.scatter(range(num_samples), predicted_values, label='Predicted Values', color='blue')
+        # Draw lines between corresponding actual and predicted values
+        for i in range(num_samples):
+            plt.plot([i, i], [actual_values[i], predicted_values[i]], color='red', linestyle='--', linewidth=0.8)
+
+        plt.xlabel('Sample Index')
+        plt.ylabel('Cost Value')
+        plt.title('Actual vs Predicted Values with Error Lines, '+title)
+        plt.legend()
+        plt.show()
+    
+    plot_loader(train_loader, 'Training Set')
+    plot_loader(test_loader, 'Test Set')
+
+if __name__ == "__main__":
+    torch.manual_seed(42)
+    train()
+    eval() 
