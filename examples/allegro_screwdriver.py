@@ -17,14 +17,17 @@ import pytorch_volumetric as pv
 import pytorch_kinematics as pk
 import pytorch_kinematics.transforms as tf
 from torch.func import vmap, jacrev, hessian, jacfwd
-
+import sys
 import matplotlib.pyplot as plt
 from utils.allegro_utils import partial_to_full_state, full_to_partial_state, state2ee_pos, visualize_trajectory, all_finger_constraints
 # from utils.allegro_utils import partial_to_full_state, full_to_partial_state, combine_finger_constraints, state2ee_pos, visualize_trajectory, all_finger_constraints
-from allegro_valve_roll import AllegroValveTurning, AllegroContactProblem, PositionControlConstrainedSVGDMPC, add_trajectories, add_trajectories_hardware
+#sys.path.append(str(pathlib.Path(__file__).resolve().parents[0]))
+from examples.allegro_valve_roll import AllegroValveTurning, AllegroContactProblem, PositionControlConstrainedSVGDMPC, add_trajectories, add_trajectories_hardware
 from scipy.spatial.transform import Rotation as R
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
+
+
 
 # device = 'cuda:0'
 # torch.cuda.set_device(1)
