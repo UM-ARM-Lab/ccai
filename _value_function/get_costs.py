@@ -217,7 +217,7 @@ def do_trial(env, params, fpath, initial_pose_idx = None, sim_viz_env=None, ros_
         torch.tensor(screwdriver_goal_mat).unsqueeze(0).repeat(screwdriver_mat.shape[0],1,1), cos_angle=False).detach().cpu()
 
     final_distance_to_goal = torch.min(distance2goal.abs())
-    final_cost = turn_problem._cost(state.reshape(1,-1), start, goal).detach().cpu().item()
+    #final_cost = turn_problem._cost(state.reshape(1,-1), start, goal).detach().cpu().item()
     #print("final cost: ", final_cost)
 
     state = env.get_state()['q']
@@ -230,7 +230,7 @@ def do_trial(env, params, fpath, initial_pose_idx = None, sim_viz_env=None, ros_
     #print(f'Controller: {params["controller"]} Final distance to goal: {final_distance_to_goal}')
     #print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
     # env.reset()
-    return final_distance_to_goal.cpu().detach().item(), final_cost, final_state, idx
+    return final_distance_to_goal.cpu().detach().item(), final_state, idx #final_cost, 
 
 if __name__ == "__main__":
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver.yaml').read_text())
@@ -278,11 +278,11 @@ if __name__ == "__main__":
     
     forward_kinematics = partial(chain.forward_kinematics, frame_indices=frame_indices) 
 
-    pose_cost_tuples = []
+    pose_tuples = []
     final_states = []
     n_poses = len(initial_poses)
 
-    for i in tqdm(range(1000)):
+    for i in tqdm(range(200)):
         goal = - 90 / 180 * torch.tensor([0, 0, np.pi])
         # goal = goal + 0.025 * torch.randn(1) + 0.2
         for controller in config['controllers'].keys():
@@ -302,9 +302,8 @@ if __name__ == "__main__":
             params['object_location'] = object_location
 
             idx = i + params['start_idx']
-            final_distance_to_goal,final_cost,final_state, initial_pose_index = do_trial(env, params, fpath, idx, sim_env, ros_copy_node)
-            pose_cost_tuples.append((initial_poses[initial_pose_index], final_cost))
-            final_states.append(final_state)
+            final_distance_to_goal,final_pose, initial_pose_index = do_trial(env, params, fpath, idx, sim_env, ros_copy_node)
+            pose_tuples.append((initial_poses[initial_pose_index], final_pose))
             
             if final_distance_to_goal < 30 / 180 * np.pi:
                 succ = True
@@ -329,11 +328,11 @@ if __name__ == "__main__":
     start_idx = params['start_idx']
     savepath = f'{fpath.resolve()}/value_dataset_odin_{start_idx}.pkl'
     with open(savepath, 'wb') as f:
-        pkl.dump(pose_cost_tuples, f)
+        pkl.dump(pose_tuples, f)
 
-    savepath_states = f'{fpath.resolve()}/final_states.pkl'
-    with open(savepath_states, 'wb') as f:
-        pkl.dump(final_states, f)
+    # savepath_states = f'{fpath.resolve()}/final_states.pkl'
+    # with open(savepath_states, 'wb') as f:
+    #     pkl.dump(final_states, f)
 
     print(f'saved to {savepath}')
     emailer().send()
