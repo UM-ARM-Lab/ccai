@@ -277,7 +277,7 @@ if __name__ == "__main__":
     final_states = []
     n_poses = len(initial_poses)
 
-    for i in tqdm(range(20)):
+    for i in tqdm(range(500)):
         #change goal depending on initial screwdriver pose
         params = config.copy()
         controller = 'csvgd'
