@@ -1,0 +1,19 @@
+{"time":"2024-10-12T13:10:34.840025075-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-12T13:10:34.84007233-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/wandb/run-20241012_131034-yvwk8yor/logs/debug-core.log"}
+{"time":"2024-10-12T13:10:34.846415203-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-12T13:10:34.860956106-04:00","level":"INFO","msg":"created new stream","id":"yvwk8yor"}
+{"time":"2024-10-12T13:10:34.861095069-04:00","level":"INFO","msg":"stream: started","id":"yvwk8yor"}
+{"time":"2024-10-12T13:10:34.861160957-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"yvwk8yor"}}
+{"time":"2024-10-12T13:10:34.861136065-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"yvwk8yor"}}
+{"time":"2024-10-12T13:10:34.861150441-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"yvwk8yor"}}
+{"time":"2024-10-12T13:10:35.089048876-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-12T13:10:35.089878901-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-12T13:10:46.479135235-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-12T13:10:46.483169886-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-12T13:10:46.744951344-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-12T13:10:47.898185688-04:00","level":"INFO","msg":"stream: closing","id":"yvwk8yor"}
+{"time":"2024-10-12T13:10:47.898229374-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"yvwk8yor"}}
+{"time":"2024-10-12T13:10:47.898315054-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"yvwk8yor"}}
+{"time":"2024-10-12T13:10:47.898367629-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"yvwk8yor"}}
+{"time":"2024-10-12T13:10:47.898465269-04:00","level":"INFO","msg":"stream: closed","id":"yvwk8yor"}
+{"time":"2024-10-12T13:10:51.48037434-04:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

@@ -1,0 +1,22 @@
+Epoch [1/1000], Training Loss: 1.01003958, Test Loss: 0.85495466, Unnormalized Train Loss: 2525.78440101
+Epoch [100/1000], Training Loss: 0.88212141, Test Loss: 0.82665381, Unnormalized Train Loss: 2205.90216798
+Traceback (most recent call last):
+  File "/home/newuser/Desktop/Honda/ccai/_value_function/train_value_function.py", line 187, in <module>
+    train()
+  File "/home/newuser/Desktop/Honda/ccai/_value_function/train_value_function.py", line 90, in train
+    for inputs, labels in train_loader:
+  File "/home/newuser/miniconda3/envs/honda/lib/python3.8/site-packages/torch/utils/data/dataloader.py", line 630, in __next__
+    data = self._next_data()
+  File "/home/newuser/miniconda3/envs/honda/lib/python3.8/site-packages/torch/utils/data/dataloader.py", line 673, in _next_data
+    data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
+  File "/home/newuser/miniconda3/envs/honda/lib/python3.8/site-packages/torch/utils/data/_utils/fetch.py", line 50, in fetch
+    data = self.dataset.__getitems__(possibly_batched_index)
+  File "/home/newuser/miniconda3/envs/honda/lib/python3.8/site-packages/torch/utils/data/dataset.py", line 420, in __getitems__
+    return [self.dataset[self.indices[idx]] for idx in indices]
+  File "/home/newuser/miniconda3/envs/honda/lib/python3.8/site-packages/torch/utils/data/dataset.py", line 420, in <listcomp>
+    return [self.dataset[self.indices[idx]] for idx in indices]
+  File "/home/newuser/miniconda3/envs/honda/lib/python3.8/site-packages/torch/utils/data/dataset.py", line 211, in __getitem__
+    return tuple(tensor[index] for tensor in self.tensors)
+  File "/home/newuser/miniconda3/envs/honda/lib/python3.8/site-packages/torch/utils/data/dataset.py", line 211, in <genexpr>
+    return tuple(tensor[index] for tensor in self.tensors)
+KeyboardInterrupt

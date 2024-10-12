@@ -1,0 +1,18 @@
+{"time":"2024-10-12T12:50:15.646240432-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-12T12:50:15.646254228-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/wandb/run-20241012_125015-iaoch818/logs/debug-core.log"}
+{"time":"2024-10-12T12:50:15.64878481-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-12T12:50:15.653089076-04:00","level":"INFO","msg":"created new stream","id":"iaoch818"}
+{"time":"2024-10-12T12:50:15.653109313-04:00","level":"INFO","msg":"stream: started","id":"iaoch818"}
+{"time":"2024-10-12T12:50:15.653113541-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"iaoch818"}}
+{"time":"2024-10-12T12:50:15.65313413-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"iaoch818"}}
+{"time":"2024-10-12T12:50:15.653143099-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"iaoch818"}}
+{"time":"2024-10-12T12:50:15.829428995-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-12T12:50:15.829925806-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-12T12:50:15.971221993-04:00","level":"INFO","msg":"stream: closing","id":"iaoch818"}
+{"time":"2024-10-12T12:50:15.971263475-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-12T12:50:15.975298147-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-12T12:50:16.427671637-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-12T12:50:16.576365021-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"iaoch818"}}
+{"time":"2024-10-12T12:50:16.576417697-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"iaoch818"}}
+{"time":"2024-10-12T12:50:16.576481231-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"iaoch818"}}
+{"time":"2024-10-12T12:50:16.576666288-04:00","level":"INFO","msg":"stream: closed","id":"iaoch818"}
