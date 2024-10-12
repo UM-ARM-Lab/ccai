@@ -25,10 +25,6 @@ from examples.allegro_screwdriver import AllegroScrewdriver
 obj_dof = 3
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 
-def vector_cos(a, b):
-    return torch.dot(a.reshape(-1), b.reshape(-1)) / (torch.norm(a.reshape(-1)) * torch.norm(b.reshape(-1)))
-
-
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 with open(f'{fpath.resolve()}/initial_poses_10k.pkl', 'rb') as file:
     initial_poses  = pkl.load(file)
@@ -82,7 +78,6 @@ def do_trial(env, params, fpath, initial_pose_idx = None, sim_viz_env=None, ros_
     turn_planner = PositionControlConstrainedSVGDMPC(turn_problem, params)
 
     actual_trajectory = []
-    duration = 0
 
     fig = plt.figure()
     axes = {params['fingers'][i]: fig.add_subplot(int(f'1{num_fingers}{i+1}'), projection='3d') for i in range(num_fingers)}
@@ -282,38 +277,44 @@ if __name__ == "__main__":
     final_states = []
     n_poses = len(initial_poses)
 
-    for i in tqdm(range(200)):
-        goal = - 90 / 180 * torch.tensor([0, 0, np.pi])
+    for i in tqdm(range(20)):
+        #change goal depending on initial screwdriver pose
+        params = config.copy()
+        controller = 'csvgd'
+        succ = False
+        #env.reset()
+        fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_{i + 1}')
+        pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
+        # set up params
+        params.pop('controllers')
+        params.update(config['controllers'][controller])
+        params['controller'] = controller
+
+        #goal = - 90 / 180 * torch.tensor([0, 0, np.pi])
         # goal = goal + 0.025 * torch.randn(1) + 0.2
-        for controller in config['controllers'].keys():
-            succ = False
-            env.reset()
-            fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_{i + 1}')
-            pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
-            # set up params
-            params = config.copy()
+        idx = i + params['start_idx']
+        initial_pose = initial_poses[idx]
+        screwdriver_pose = initial_pose[0,-4:-1]
+        goal = torch.tensor([0, 0, np.pi/2]) + screwdriver_pose.clone()
+        #print(goal)
 
-            params.pop('controllers')
-            params.update(config['controllers'][controller])
-            params['controller'] = controller
-            params['screwdriver_goal'] = goal.to(device=params['device'])
-            params['chain'] = chain.to(device=params['device'])
-            object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
-            params['object_location'] = object_location
+        params['screwdriver_goal'] = goal.to(device=params['device'])
+        params['chain'] = chain.to(device=params['device'])
+        object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
+        params['object_location'] = object_location
 
-            idx = i + params['start_idx']
-            final_distance_to_goal,final_pose, initial_pose_index = do_trial(env, params, fpath, idx, sim_env, ros_copy_node)
-            pose_tuples.append((initial_poses[initial_pose_index], final_pose))
-            
-            if final_distance_to_goal < 30 / 180 * np.pi:
-                succ = True
+        final_distance_to_goal,final_pose, initial_pose_index = do_trial(env, params, fpath, idx, sim_env, ros_copy_node)
+        pose_tuples.append((initial_poses[initial_pose_index], final_pose))
+        
+        if final_distance_to_goal < 30 / 180 * np.pi:
+            succ = True
 
-            if controller not in results.keys():
-                results[controller] = [final_distance_to_goal]
-                succ_rate[controller] = [succ]
-            else:
-                results[controller].append(final_distance_to_goal)
-                succ_rate[controller].append(succ)
+        if controller not in results.keys():
+            results[controller] = [final_distance_to_goal]
+            succ_rate[controller] = [succ]
+        else:
+            results[controller].append(final_distance_to_goal)
+            succ_rate[controller].append(succ)
         # print(results)
         # print(succ_rate)
     
@@ -326,7 +327,7 @@ if __name__ == "__main__":
 
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
     start_idx = params['start_idx']
-    savepath = f'{fpath.resolve()}/value_dataset_odin_{start_idx}.pkl'
+    savepath = f'{fpath.resolve()}/value_dataset_{start_idx}.pkl'
     with open(savepath, 'wb') as f:
         pkl.dump(pose_tuples, f)
 

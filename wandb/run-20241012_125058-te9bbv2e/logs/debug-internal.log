@@ -1,0 +1,19 @@
+{"time":"2024-10-12T12:50:58.807058559-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-12T12:50:58.807111971-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/wandb/run-20241012_125058-te9bbv2e/logs/debug-core.log"}
+{"time":"2024-10-12T12:50:58.810808491-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-12T12:50:58.824123864-04:00","level":"INFO","msg":"created new stream","id":"te9bbv2e"}
+{"time":"2024-10-12T12:50:58.824183108-04:00","level":"INFO","msg":"stream: started","id":"te9bbv2e"}
+{"time":"2024-10-12T12:50:58.824228775-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"te9bbv2e"}}
+{"time":"2024-10-12T12:50:58.824242998-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"te9bbv2e"}}
+{"time":"2024-10-12T12:50:58.824206966-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"te9bbv2e"}}
+{"time":"2024-10-12T12:50:59.002014601-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-12T12:50:59.003056363-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-12T12:51:10.901745948-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-12T12:51:10.905417316-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-12T12:51:11.887396921-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-12T12:51:13.017102245-04:00","level":"INFO","msg":"stream: closing","id":"te9bbv2e"}
+{"time":"2024-10-12T12:51:13.017189441-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"te9bbv2e"}}
+{"time":"2024-10-12T12:51:13.01730078-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"te9bbv2e"}}
+{"time":"2024-10-12T12:51:13.017297915-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"te9bbv2e"}}
+{"time":"2024-10-12T12:51:13.017496506-04:00","level":"INFO","msg":"stream: closed","id":"te9bbv2e"}
+{"time":"2024-10-12T12:51:15.903890509-04:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

@@ -13,28 +13,21 @@ fpath = pathlib.Path(f'{CCAI_PATH}/data')
 shape = (20,1)
 
 def load_data():
-    filenames = [
-        'value_dataset_100_random.pkl',
-        'value_dataset_9500.pkl'
-    ]
+    filename = 'combined_value_dataset.pkl'
     validation_proportion = 0.1
-    poses = []
-    costs = []
-    for filename in filenames:
-        with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
-            pose_cost_tuples  = pkl.load(file)
-            new_poses, new_costs = zip(*pose_cost_tuples)
-            poses.extend(new_poses)
-            costs.extend(new_costs)
     
+    with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
+        pose_cost_tuples  = pkl.load(file)
+        poses, costs = zip(*pose_cost_tuples)
+
     num_samples = len(poses)
     split_idx = int(num_samples * (1 - validation_proportion))
 
-    poses = np.array([t.numpy() for t in poses]).reshape(-1,20)
+    poses = np.array(poses).reshape(-1,20)
     poses_mean, poses_std = np.mean(poses[:split_idx], axis=0), np.std(poses[:split_idx], axis=0)
     poses_norm = (poses - poses_mean) / (poses_std + 0.000001)
 
-    costs = np.array(costs).reshape(-1,1)
+    costs = np.array(costs).flatten()
     cost_mean, cost_std = np.mean(costs[:split_idx]), np.std(costs[:split_idx])
     costs_norm = (costs - cost_mean) / cost_std
 
@@ -57,9 +50,10 @@ def load_data():
 class Net(nn.Module):
     def __init__(self, dim_in, dim_out):
         super(Net, self).__init__()
-        self.fc1 = nn.Linear(dim_in, 32)
-        self.fc2 = nn.Linear(32, 32)
-        self.fc3 = nn.Linear(32, dim_out)
+        neurons = 64
+        self.fc1 = nn.Linear(dim_in, neurons)
+        self.fc2 = nn.Linear(neurons, neurons)
+        self.fc3 = nn.Linear(neurons, dim_out)
 
     def forward(self, input):
         f1 = F.relu(self.fc1(input))
@@ -80,6 +74,9 @@ def train():
     })
     
     train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std = load_data()
+    # print(cost_std)
+    # print(cost_mean)
+    # exit()
 
     model = Net(shape[0], shape[1])  # Instantiate the neural network model
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001) 
@@ -104,7 +101,7 @@ def train():
             running_loss += loss.item()
 
         # Eval
-        if (epoch + 1) % 100 == 0:
+        if epoch == 0 or (epoch+1) % 100 == 0:
             model.eval()
             test_loss = 0.0
             with torch.no_grad():
@@ -112,10 +109,10 @@ def train():
                     predicted_costs = model(inputs)
                     loss = criterion(predicted_costs, labels)
                     test_loss += loss.item()
-
+            test_loss /= len(test_loader)
 
             # Print and log losses
-            train_loss = running_loss
+            train_loss = running_loss / len(train_loader)
             unnormalized_loss = train_loss * (cost_std**2)  # Scale the loss back to original cost scale
             print(f"Epoch [{epoch+1}/{num_epochs}], Training Loss: {train_loss:.8f}, Test Loss: {test_loss:.8f}, Unnormalized Train Loss: {unnormalized_loss:.8f}")
 

@@ -1,0 +1,18 @@
+/home/newuser/miniconda3/envs/honda/lib/python3.8/site-packages/torch/nn/modules/loss.py:538: UserWarning: Using a target size (torch.Size([64])) that is different to the input size (torch.Size([64, 1])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  return F.mse_loss(input, target, reduction=self.reduction)
+/home/newuser/miniconda3/envs/honda/lib/python3.8/site-packages/torch/nn/modules/loss.py:538: UserWarning: Using a target size (torch.Size([16])) that is different to the input size (torch.Size([16, 1])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
+  return F.mse_loss(input, target, reduction=self.reduction)
+Epoch [1/1000], Training Loss: 0.95834037, Test Loss: 0.75314873, Unnormalized Train Loss: 648.18532852
+Epoch [100/1000], Training Loss: 0.95827227, Test Loss: 0.75097517, Unnormalized Train Loss: 648.13926603
+Traceback (most recent call last):
+  File "/home/newuser/Desktop/Honda/ccai/_value_function/train_value_function.py", line 188, in <module>
+    train()
+  File "/home/newuser/Desktop/Honda/ccai/_value_function/train_value_function.py", line 91, in train
+    for inputs, labels in train_loader:
+  File "/home/newuser/miniconda3/envs/honda/lib/python3.8/site-packages/torch/utils/data/dataloader.py", line 626, in __next__
+    with torch.autograd.profiler.record_function(self._profile_name):
+  File "/home/newuser/miniconda3/envs/honda/lib/python3.8/site-packages/torch/autograd/profiler.py", line 688, in __enter__
+    self.record = torch.ops.profiler._record_function_enter_new(
+  File "/home/newuser/miniconda3/envs/honda/lib/python3.8/site-packages/torch/_ops.py", line 1061, in __call__
+    return self_._op(*args, **(kwargs or {}))
+KeyboardInterrupt

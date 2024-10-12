@@ -1,0 +1,18 @@
+{"time":"2024-10-12T12:54:08.23682383-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-12T12:54:08.236832146-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/wandb/run-20241012_125408-zck29h7f/logs/debug-core.log"}
+{"time":"2024-10-12T12:54:08.241670475-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-12T12:54:08.245922207-04:00","level":"INFO","msg":"created new stream","id":"zck29h7f"}
+{"time":"2024-10-12T12:54:08.245941416-04:00","level":"INFO","msg":"stream: started","id":"zck29h7f"}
+{"time":"2024-10-12T12:54:08.245957191-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"zck29h7f"}}
+{"time":"2024-10-12T12:54:08.245950834-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"zck29h7f"}}
+{"time":"2024-10-12T12:54:08.245959407-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"zck29h7f"}}
+{"time":"2024-10-12T12:54:08.449720558-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-12T12:54:08.450684364-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-12T12:54:10.644720693-04:00","level":"INFO","msg":"stream: closing","id":"zck29h7f"}
+{"time":"2024-10-12T12:54:10.644739674-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-12T12:54:10.648207461-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-12T12:54:11.182899411-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-12T12:54:11.28891569-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"zck29h7f"}}
+{"time":"2024-10-12T12:54:11.288975965-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"zck29h7f"}}
+{"time":"2024-10-12T12:54:11.288970968-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"zck29h7f"}}
+{"time":"2024-10-12T12:54:11.28906295-04:00","level":"INFO","msg":"stream: closed","id":"zck29h7f"}

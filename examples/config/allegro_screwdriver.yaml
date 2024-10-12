@@ -4,7 +4,7 @@ use_arm: False
 receding_horizon: False
 num_steps: 12
 num_trials: 20
-visualize: True
+visualize: False
 experiment_name: 'allegro_screwdriver_arm_test'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
@@ -13,7 +13,7 @@ object_type: 'screwdriver'
 sim_device: 'cpu'
 friction_coefficient: 0.95
 kp: 3.0
-visualize_plan: True
+visualize_plan: False
 optimize_force: True
 force_balance: False  # in addition to the torque balance, do we also need force balance, just for the screwdriver turning experiment w\o slot. 
 arm_type: 'robot' # choose between 'None', 'robot', 'floating_3d'
@@ -28,8 +28,8 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:1'
-    start_idx: 400
+    device: 'cuda:0'
+    start_idx: 0
     online_iters: 50
     warmup_iters: 200
     resample_steps: 1
