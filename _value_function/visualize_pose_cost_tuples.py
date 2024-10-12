@@ -35,8 +35,8 @@ costs = np.array(costs).flatten()
 
 
 #print(costs)
-high_cost = np.argsort(costs)[-10:][::-1]
-low_cost = np.argsort(costs)[:10]
+high_cost = np.argsort(costs)[-100:][::-1]
+low_cost = np.argsort(costs)[:100]
 print("high costs: ", costs[high_cost])
 print("low costs: ", costs[low_cost])
 
@@ -99,14 +99,14 @@ if __name__ == "__main__":
     
     forward_kinematics = partial(chain.forward_kinematics, frame_indices=frame_indices) 
 
-    for i in range(10):
+    for i in range(100):
         #env.reset(dof_pos = torch.tensor(high_initial_poses[i]).to(device=config['sim_device']).float(), deterministic=True)
         env.reset(dof_pos = torch.tensor(low_initial_poses[i]).to(device=config['sim_device']).float(), deterministic=True)
         time.sleep(1)
         #env.reset(dof_pos = torch.tensor(high_final_poses[i]).to(device=config['sim_device']).float(), deterministic=True)
         env.reset(dof_pos = torch.tensor(low_final_poses[i]).to(device=config['sim_device']).float(), deterministic=True)
         sd = low_final_poses[i][:, -4:-1]
-        time.sleep(1)
+        time.sleep(0.5)
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)
