@@ -26,7 +26,7 @@ obj_dof = 3
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
-with open(f'{fpath.resolve()}/initial_poses_10k.pkl', 'rb') as file:
+with open(f'{fpath.resolve()}/initial_poses/initial_poses_10k.pkl', 'rb') as file:
     initial_poses  = pkl.load(file)
 
 def do_trial(env, params, fpath, initial_pose_idx = None, sim_viz_env=None, ros_copy_node=None):
@@ -170,8 +170,8 @@ def do_trial(env, params, fpath, initial_pose_idx = None, sim_viz_env=None, ros_
             env.reset()
             #print("NAN")
             break
-        # info = {**equality_constr_dict, **inequality_constr_dict, **{'distance2goal': distance2goal}}
-        # info_list.append(info)
+        info = {**equality_constr_dict, **inequality_constr_dict, **{'distance2goal': distance2goal}}
+        info_list.append(info)
 
         gym.clear_lines(viewer)
         state = env.get_state()
@@ -185,8 +185,8 @@ def do_trial(env, params, fpath, initial_pose_idx = None, sim_viz_env=None, ros_
             if k >= 2:
                 axes[finger].plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray', label='actual')
 
-    # with open(f'{fpath.resolve()}/info.pkl', 'wb') as f:
-        # pkl.dump(info_list, f)
+    #with open(f'{fpath.resolve()}/info.pkl', 'wb') as f:
+    #    pkl.dump(info_list, f)
     # handles, labels = plt.gca().get_legend_handles_labels()
     # newLabels, newHandles = [], []
     # for handle, label in zip(handles, labels):
@@ -214,6 +214,8 @@ def do_trial(env, params, fpath, initial_pose_idx = None, sim_viz_env=None, ros_
     final_distance_to_goal = torch.min(distance2goal.abs())
     #final_cost = turn_problem._cost(state.reshape(1,-1), start, goal).detach().cpu().item()
     #print("final cost: ", final_cost)
+    np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
+        d2goal=final_distance_to_goal.cpu().numpy())
 
     state = env.get_state()['q']
     final_state = torch.cat((
@@ -277,7 +279,7 @@ if __name__ == "__main__":
     final_states = []
     n_poses = len(initial_poses)
 
-    for i in tqdm(range(100)):
+    for i in tqdm(range(60)):
         #change goal depending on initial screwdriver pose
         params = config.copy()
         controller = 'csvgd'
@@ -295,7 +297,7 @@ if __name__ == "__main__":
         idx = i + params['start_idx']
         initial_pose = initial_poses[idx]
         screwdriver_pose = initial_pose[0,-4:-1]
-        goal = torch.tensor([0, 0, np.pi/2]) + screwdriver_pose.clone()
+        goal = torch.tensor([0, 0, -np.pi/2]) + screwdriver_pose.clone()
         #print(goal)
 
         params['screwdriver_goal'] = goal.to(device=params['device'])

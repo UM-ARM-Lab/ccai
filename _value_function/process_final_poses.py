@@ -9,13 +9,13 @@ import wandb
 import matplotlib.pyplot as plt
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
-fpath = pathlib.Path(f'{CCAI_PATH}/data')
+fpath = pathlib.Path(f'{CCAI_PATH}/data/value_datasets')
 
 
 filenames = []
 #for i in range(10000/200):
-for i in [0,1,4,5]:
-    filename = f'value_dataset_odin_{i*200}.pkl'
+for i in [6]:
+    filename = f'value_dataset_{i*500}.pkl'
     filenames.append(filename)
 
 def calculate_cost(final_pose):

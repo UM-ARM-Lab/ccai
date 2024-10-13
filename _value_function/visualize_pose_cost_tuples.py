@@ -24,7 +24,7 @@ from examples.allegro_screwdriver import AllegroScrewdriver
 obj_dof = 3
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 
-fpath = pathlib.Path(f'{CCAI_PATH}/data')
+fpath = pathlib.Path(f'{CCAI_PATH}/data/value_datasets')
 
 filename = 'combined_value_dataset.pkl'
 with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
@@ -35,8 +35,8 @@ costs = np.array(costs).flatten()
 
 
 #print(costs)
-high_cost = np.argsort(costs)[-100:][::-1]
-low_cost = np.argsort(costs)[:100]
+high_cost = np.argsort(costs)[-10:][::-1]
+low_cost = np.argsort(costs)[:10]
 print("high costs: ", costs[high_cost])
 print("low costs: ", costs[low_cost])
 
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     
     forward_kinematics = partial(chain.forward_kinematics, frame_indices=frame_indices) 
 
-    for i in range(100):
+    for i in range(10):
         #env.reset(dof_pos = torch.tensor(high_initial_poses[i]).to(device=config['sim_device']).float(), deterministic=True)
         env.reset(dof_pos = torch.tensor(low_initial_poses[i]).to(device=config['sim_device']).float(), deterministic=True)
         time.sleep(1)
