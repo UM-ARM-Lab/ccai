@@ -28,8 +28,8 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:0'
-    start_idx: 3000
+    device: 'cuda:3'
+    start_idx: 5500
     online_iters: 50
     warmup_iters: 200
     resample_steps: 1

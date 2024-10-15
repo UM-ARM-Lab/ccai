@@ -279,7 +279,8 @@ if __name__ == "__main__":
     final_states = []
     n_poses = len(initial_poses)
 
-    for i in tqdm(range(60)):
+    for i in tqdm(range(500)):
+
         #change goal depending on initial screwdriver pose
         params = config.copy()
         controller = 'csvgd'
@@ -295,6 +296,10 @@ if __name__ == "__main__":
         #goal = - 90 / 180 * torch.tensor([0, 0, np.pi])
         # goal = goal + 0.025 * torch.randn(1) + 0.2
         idx = i + params['start_idx']
+        print("RUNNING TRIAL: ", idx)
+        print("RUNNING TRIAL: ", idx)
+        print("RUNNING TRIAL: ", idx)
+        print("RUNNING TRIAL: ", idx)
         initial_pose = initial_poses[idx]
         screwdriver_pose = initial_pose[0,-4:-1]
         goal = torch.tensor([0, 0, -np.pi/2]) + screwdriver_pose.clone()
