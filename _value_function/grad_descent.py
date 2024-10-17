@@ -62,7 +62,7 @@ def grad_descent():
     # Dump initial and optimized poses as tuples into a pkl file
     tuples = [(initial, optimized) for initial, optimized in zip(poses.numpy(), optimized_poses)]
     
-    output_filename = f'{fpath.resolve()}/eval/optimized_poses.pkl'
+    output_filename = f'{fpath.resolve()}/eval/initial_and_optimized_poses.pkl'
     with open(output_filename, 'wb') as f:
         pkl.dump(tuples, f)
 

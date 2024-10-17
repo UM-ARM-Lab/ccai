@@ -26,9 +26,13 @@ obj_dof = 3
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
-with open(f'{fpath.resolve()}/initial_poses/initial_poses_10k.pkl', 'rb') as file:
+with open(f'{fpath.resolve()}/eval/initial_and_optimized_poses.pkl', 'rb') as file:
     tuples = pkl.load(file)
     initial_poses, optimized_poses = zip(*tuples)
+    initial_poses = np.array(initial_poses).reshape(-1,20)
+    optimized_poses = np.array(optimized_poses).reshape(-1,20)
+    initial_poses = torch.from_numpy(initial_poses).float()
+    optimized_poses = torch.from_numpy(optimized_poses).float()
 
 def do_trial(env, params, fpath, initial_pose, sim_viz_env=None, ros_copy_node=None):
 
@@ -230,7 +234,7 @@ if __name__ == "__main__":
 
         idx = i
         print("RUNNING TRIAL: ", idx)
-        initial_pose = initial_poses[idx]
+        initial_pose = initial_poses[idx].reshape(1,20)
         screwdriver_pose = initial_pose[0,-4:-1]
         goal = torch.tensor([0, 0, -np.pi/2]) + screwdriver_pose.clone()
 
@@ -254,7 +258,7 @@ if __name__ == "__main__":
 
         idx = i
         print("RUNNING TRIAL: ", idx)
-        initial_pose = optimized_poses[idx]
+        initial_pose = optimized_poses[idx].reshape(1,20)
         screwdriver_pose = initial_pose[0,-4:-1]
         goal = torch.tensor([0, 0, -np.pi/2]) + screwdriver_pose.clone()
 
@@ -274,9 +278,9 @@ if __name__ == "__main__":
 
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
     start_idx = params['start_idx']
-    savepath = f'{fpath.resolve()}/value_dataset_{start_idx}.pkl'
+    savepath = f'{fpath.resolve()}/eval/final_pose_comparisons_{0}.pkl'
     with open(savepath, 'wb') as f:
-        pkl.dump(pose_tuples, f)
+        pkl.dump(final_pose_tuples, f)
 
     print(f'saved to {savepath}')
-    emailer().send()
+    #emailer().send()
