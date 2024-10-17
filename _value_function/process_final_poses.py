@@ -14,7 +14,7 @@ fpath = pathlib.Path(f'{CCAI_PATH}/data/value_datasets')
 
 filenames = []
 #for i in range(10000/200):
-for i in [6]:
+for i in [1,2,3,4,5,7,8,9,10,11]:
     filename = f'value_dataset_{i*500}.pkl'
     filenames.append(filename)
 

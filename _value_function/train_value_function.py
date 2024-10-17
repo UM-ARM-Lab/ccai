@@ -13,7 +13,7 @@ fpath = pathlib.Path(f'{CCAI_PATH}/data')
 shape = (20,1)
 
 def load_data():
-    filename = 'combined_value_dataset.pkl'
+    filename = '/value_datasets/combined_value_dataset.pkl'
     validation_proportion = 0.1
     
     with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
@@ -59,7 +59,7 @@ class Net(nn.Module):
         f1 = F.relu(self.fc1(input))
         f2 = F.relu(self.fc2(f1))
         output = self.fc3(f2)
-        return output
+        return output.squeeze()
     
 
 def train():
@@ -68,7 +68,7 @@ def train():
     
     # Initialize W&B
     wandb.init(project="value-function-training", config={
-        "epochs": 1000,
+        "epochs": 500,
         "batch_size": 64,
         "learning_rate": 0.0001,
     })
@@ -131,7 +131,7 @@ def train():
         'cost_mean': cost_mean,
         'cost_std': cost_std,
     }
-    torch.save(save_model, f'{fpath.resolve()}/value_function_{model_name}.pkl')
+    torch.save(save_model, f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
     wandb.finish()
 
 def eval():
@@ -140,7 +140,7 @@ def eval():
 
     train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std = load_data()
     model = Net(shape[0], shape[1])
-    checkpoint = torch.load(f'{fpath.resolve()}/value_function_{model_name}.pkl')
+    checkpoint = torch.load(f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
     model.load_state_dict(checkpoint['model_state'])
 
     # plot some predictions
@@ -185,5 +185,5 @@ def eval():
 
 if __name__ == "__main__":
     torch.manual_seed(42)
-    train()
+    #Qtrain()
     eval() 

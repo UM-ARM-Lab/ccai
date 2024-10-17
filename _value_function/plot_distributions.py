@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     # Apply color mapping based on cost values
     scatter = ax.scatter(data_pca[:, 0], data_pca[:, 1], data_pca[:, 2], 
-                         c=costs, cmap='coolwarm', marker='o', s=50, norm=norm)
+                         c=costs, cmap='coolwarm', marker='o', s=5, norm=norm)
 
     # Add a color bar
     cbar = fig.colorbar(scatter, ax=ax)
