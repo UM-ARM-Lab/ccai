@@ -26,8 +26,9 @@ if __name__ == "__main__":
     costs = np.array(costs).reshape(-1,1)
 
     # Step 1: Standardize the data
-    scaler = StandardScaler()
-    data_scaled = scaler.fit_transform(poses)
+    #scaler = StandardScaler()
+    #data_scaled = scaler.fit_transform(poses)
+    data_scaled = poses
 
     # Step 2: Apply PCA to reduce to 3 dimensions
     pca = PCA(n_components=3)

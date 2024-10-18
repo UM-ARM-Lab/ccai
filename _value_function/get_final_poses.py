@@ -29,7 +29,7 @@ fpath = pathlib.Path(f'{CCAI_PATH}/data')
 with open(f'{fpath.resolve()}/initial_poses/initial_poses_10k.pkl', 'rb') as file:
     initial_poses  = pkl.load(file)
 
-def do_trial(env, params, fpath, initial_pose_idx = None, sim_viz_env=None, ros_copy_node=None):
+def do_trial(env, params, fpath, initial_pose = None, sim_viz_env=None, ros_copy_node=None):
 
     "only turn the screwdriver once"
     screwdriver_goal = params['screwdriver_goal'].cpu()
@@ -44,12 +44,10 @@ def do_trial(env, params, fpath, initial_pose_idx = None, sim_viz_env=None, ros_
         env.frame_id = None
 
     # sample initial state from dataset
-    if initial_pose_idx is None:
+    if initial_pose is None:
         idx = np.random.randint(0, len(initial_poses))
-    else:
-        idx = initial_pose_idx
+        initial_pose = initial_poses[idx]
 
-    initial_pose = initial_poses[idx]
     env.reset(dof_pos = initial_pose, deterministic=False)
 
     state = env.get_state()
@@ -227,7 +225,7 @@ def do_trial(env, params, fpath, initial_pose_idx = None, sim_viz_env=None, ros_
     #print(f'Controller: {params["controller"]} Final distance to goal: {final_distance_to_goal}')
     #print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
     # env.reset()
-    return final_distance_to_goal.cpu().detach().item(), final_state, idx #final_cost, 
+    return final_distance_to_goal.cpu().detach().item(), final_state #final_cost, 
 
 if __name__ == "__main__":
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver.yaml').read_text())
@@ -310,8 +308,8 @@ if __name__ == "__main__":
         object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
         params['object_location'] = object_location
 
-        final_distance_to_goal,final_pose, initial_pose_index = do_trial(env, params, fpath, idx, sim_env, ros_copy_node)
-        pose_tuples.append((initial_poses[initial_pose_index], final_pose))
+        final_distance_to_goal,final_pose = do_trial(env, params, fpath, initial_pose, sim_env, ros_copy_node)
+        pose_tuples.append((initial_pose, final_pose))
         
         if final_distance_to_goal < 30 / 180 * np.pi:
             succ = True

@@ -21,26 +21,17 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 sys.path.append(str(CCAI_PATH))
 from examples.allegro_valve_roll import PositionControlConstrainedSVGDMPC
 from examples.allegro_screwdriver import AllegroScrewdriver
+from tqdm import tqdm
 
-obj_dof = 3
-img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 
-fpath = pathlib.Path(f'{CCAI_PATH}/data')
-with open(f'{fpath.resolve()}/eval/initial_and_optimized_poses.pkl', 'rb') as file:
-    tuples = pkl.load(file)
-    initial_poses, optimized_poses = zip(*tuples)
 
-    initial_poses = np.array(initial_poses).reshape(-1,20)
-    initial_poses = torch.from_numpy(initial_poses).float()
 
-    optimized_poses = np.array(optimized_poses).reshape(-1,20)
-    optimized_poses = torch.from_numpy(optimized_poses).float()
+def solve_turn(env, params, fpath, initial_pose, sim_viz_env=None, ros_copy_node=None):
 
-    # print(initial_poses[0])
-    # print(optimized_poses[0])
-    # exit()
-
-def do_trial(env, params, fpath, initial_pose, sim_viz_env=None, ros_copy_node=None):
+    obj_dof = 3
+    CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
+    img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
+    fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
     "only turn the screwdriver once"
     screwdriver_goal = params['screwdriver_goal'].cpu()
@@ -99,10 +90,11 @@ def do_trial(env, params, fpath, initial_pose, sim_viz_env=None, ros_copy_node=N
         finger_traj_history[finger] = []
 
     for finger in params['fingers']:
-        ee = state2ee_pos(start[:4 * num_fingers], turn_problem.ee_names[finger])
+        ee = state2ee_pos_partial(start[:4 * num_fingers], turn_problem.ee_names[finger])
         finger_traj_history[finger].append(ee.detach().cpu().numpy())
 
     num_fingers_to_plan = num_fingers
+    info_list = []
 
     for k in range(params['num_steps']):
         state = env.get_state()
@@ -115,6 +107,8 @@ def do_trial(env, params, fpath, initial_pose, sim_viz_env=None, ros_copy_node=N
         if torch.isnan(best_traj).any().item():
             env.reset()
             break
+        #debug only
+        # turn_problem.save_history(f'{fpath.resolve()}/op_traj.pkl')
 
         x = best_traj[0, :turn_problem.dx+turn_problem.du]
         x = x.reshape(1, turn_problem.dx+turn_problem.du)
@@ -145,12 +139,14 @@ def do_trial(env, params, fpath, initial_pose, sim_viz_env=None, ros_copy_node=N
             env.reset()
             #print("NAN")
             break
+        info = {**equality_constr_dict, **inequality_constr_dict, **{'distance2goal': distance2goal}}
+        info_list.append(info)
 
         gym.clear_lines(viewer)
         state = env.get_state()
         start = state['q'][:,:4 * num_fingers + obj_dof].squeeze(0).to(device=params['device'])
         for finger in params['fingers']:
-            ee = state2ee_pos(start[:4 * num_fingers], turn_problem.ee_names[finger])
+            ee = state2ee_pos_partial(start[:4 * num_fingers], turn_problem.ee_names[finger])
             finger_traj_history[finger].append(ee.detach().cpu().numpy())
         for finger in params['fingers']:
             traj_history = finger_traj_history[finger]
@@ -164,10 +160,15 @@ def do_trial(env, params, fpath, initial_pose, sim_viz_env=None, ros_copy_node=N
     actual_trajectory = [tensor.to(device=params['device']) for tensor in actual_trajectory]
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
     turn_problem.T = actual_trajectory.shape[0]
+    # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
     screwdriver_state = actual_trajectory[:, -obj_dof:].cpu()
     screwdriver_mat = R.from_euler('xyz', screwdriver_state).as_matrix()
     distance2goal = tf.so3_relative_angle(torch.tensor(screwdriver_mat), \
         torch.tensor(screwdriver_goal_mat).unsqueeze(0).repeat(screwdriver_mat.shape[0],1,1), cos_angle=False).detach().cpu()
+
+    final_distance_to_goal = torch.min(distance2goal.abs())
+    np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
+        d2goal=final_distance_to_goal.cpu().numpy())
 
     state = env.get_state()['q']
     final_state = torch.cat((
@@ -176,17 +177,17 @@ def do_trial(env, params, fpath, initial_pose, sim_viz_env=None, ros_copy_node=N
                     state.clone()[:, 8:], 
                     ), dim=1).detach().cpu().numpy()
     
-    return final_state #final_cost, 
+    return final_distance_to_goal.cpu().detach().item(), final_state #final_cost, 
 
-if __name__ == "__main__":
+def init_env(visualize=False):
+    CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
+    img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver.yaml').read_text())
-    from tqdm import tqdm
     sim_env = None
     ros_copy_node = None
-
     env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
                                 use_cartesian_controller=False,
-                                viewer=False,
+                                viewer=visualize,
                                 steps_per_action=60,
                                 friction_coefficient=1.0,
                                 device=config['sim_device'],
@@ -197,11 +198,8 @@ if __name__ == "__main__":
                                 gravity=True,
                                 )
     sim, gym, viewer = env.get_sim()
-
-    state = env.get_state()
     results = {}
     succ_rate = {}
-
     # set up the kinematic chain
     asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
     ee_names = {
@@ -214,79 +212,52 @@ if __name__ == "__main__":
     config['obj_dof_code'] = [0, 0, 0, 1, 1, 1]
     config['obj_dof'] = np.sum(config['obj_dof_code'])
 
-    screwdriver_asset = f'{get_assets_dir()}/screwdriver/screwdriver.urdf'
-
     chain = pk.build_chain_from_urdf(open(asset).read())
-    screwdriver_chain = pk.build_chain_from_urdf(open(screwdriver_asset).read())
     frame_indices = [chain.frame_to_idx[ee_names[finger]] for finger in config['fingers']]    # combined chain
     frame_indices = torch.tensor(frame_indices)
-    state2ee_pos = partial(state2ee_pos, fingers=config['fingers'], chain=chain, frame_indices=frame_indices, world_trans=env.world_trans)
+    state2ee_pos_partial = partial(state2ee_pos, fingers=config['fingers'], chain=chain, frame_indices=frame_indices, world_trans=env.world_trans)
+
+    return config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial
+
+def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, trial_num=0):
     
-    forward_kinematics = partial(chain.forward_kinematics, frame_indices=frame_indices) 
+    params = config.copy()
+    controller = 'csvgd'
+    succ = False
+    fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_{trial_num}')
+    pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
+    # set up params
+    params.pop('controllers')
+    params.update(config['controllers'][controller])
+    params['controller'] = controller
+    #change goal depending on initial screwdriver pose
+    screwdriver_pose = initial_pose[0,-4:-1]
+    goal = torch.tensor([0, 0, -np.pi/2]) + screwdriver_pose.clone()
 
-    final_pose_tuples = []
+    params['screwdriver_goal'] = goal.to(device=params['device'])
+    params['chain'] = chain.to(device=params['device'])
+    object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
+    params['object_location'] = object_location
 
-    for i in tqdm(range(len(initial_poses))):
-
-        #change goal depending on initial screwdriver pose
-        params = config.copy()
-        controller = 'csvgd'
-        succ = False
-        fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_{i + 1}')
-        pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
-        params.pop('controllers')
-        params.update(config['controllers'][controller])
-        params['controller'] = controller
-
-        idx = i
-        print("RUNNING TRIAL: ", idx)
-        initial_pose = initial_poses[idx].reshape(1,20)
-        screwdriver_pose = initial_pose[0,-4:-1]
-        goal = torch.tensor([0, 0, -np.pi/2]) + screwdriver_pose.clone()
-
-        params['screwdriver_goal'] = goal.to(device=params['device'])
-        params['chain'] = chain.to(device=params['device'])
-        object_location = torch.tensor(env.table_pose).to(params['device']).float()
-        params['object_location'] = object_location
-
-        initial_final_pose = do_trial(env, params, fpath, initial_pose, sim_env, ros_copy_node)
-        
-        ############################################################################
-        
-        params = config.copy()
-        controller = 'csvgd'
-        succ = False
-        fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_{i + 1}')
-        pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
-        params.pop('controllers')
-        params.update(config['controllers'][controller])
-        params['controller'] = controller
-
-        idx = i
-        print("RUNNING TRIAL: ", idx)
-        initial_pose = optimized_poses[idx].reshape(1,20)
-        screwdriver_pose = initial_pose[0,-4:-1]
-        goal = torch.tensor([0, 0, -np.pi/2]) + screwdriver_pose.clone()
-
-        params['screwdriver_goal'] = goal.to(device=params['device'])
-        params['chain'] = chain.to(device=params['device'])
-        object_location = torch.tensor(env.table_pose).to(params['device']).float()
-        params['object_location'] = object_location
-
-        optimized_final_pose = do_trial(env, params, fpath, initial_pose, sim_env, ros_copy_node)
-
-        ############################################################################
-
-        final_pose_tuples.append((initial_final_pose, optimized_final_pose))
+    final_distance_to_goal,final_pose = solve_turn(env, params, fpath, initial_pose, sim_env, ros_copy_node)
+    
+    if final_distance_to_goal < 30 / 180 * np.pi:
+        succ = True
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)
 
-    fpath = pathlib.Path(f'{CCAI_PATH}/data')
-    start_idx = params['start_idx']
-    savepath = f'{fpath.resolve()}/eval/final_pose_comparisons_{0}.pkl'
-    with open(savepath, 'wb') as f:
-        pkl.dump(final_pose_tuples, f)
+    return initial_pose, final_pose
 
-    print(f'saved to {savepath}')
-    #emailer().send()
+def show_state(env, state, t=1):
+    env.reset(dof_pos=state)
+    time.sleep(t)
+
+if __name__ == "__main__":
+
+    fpath = pathlib.Path(f'{CCAI_PATH}/data')
+    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
+    initial_poses = pkl.load(open(f'{fpath.resolve()}/initial_poses/initial_poses_10k.pkl', 'rb'))
+    show_state(env, initial_poses[0], t=2)
+    show_state(env, initial_poses[1], t=2)
+    #initial_pose, final_pose = do_turn(initial_poses[0], config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)

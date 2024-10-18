@@ -34,15 +34,17 @@ def grad_descent():
     poses = get_inputs()
     poses_norm = (poses - poses_mean) / (poses_std + 0.000001)
     poses_norm = poses_norm.float()
-    #print("Initial poses:", poses_norm)
+    original_costs = model(poses_norm).detach().cpu().numpy()
+
+    # Enable gradient computation
     poses_norm.requires_grad_(True)
-    
+
     optimizer = optim.Adam([poses_norm], lr=1e-2)
     loss_fn = nn.MSELoss()
     model.eval()
 
     # gradient descent
-    num_iterations = 500
+    num_iterations = 50
     target_value = torch.tensor([0.0], dtype=torch.float32)
 
     for i in range(num_iterations):
@@ -50,21 +52,25 @@ def grad_descent():
         predictions = model(poses_norm)
         loss = loss_fn(predictions, target_value)
         loss.backward()
+
+        # Set gradients of the last four values of each pose to 0
+        poses_norm.grad[:, -4:] = 0
+
         optimizer.step()
 
         if i % 10 == 0:
             print(f"Iteration {i}: Loss = {loss.item()}")
 
-    # Detach poses_norm to avoid further gradient tracking after optimization
     optimized_poses = poses_norm.detach().cpu().numpy()
-    #print("Optimized poses:", optimized_poses)
+    optimized_costs = model(poses_norm).detach().cpu().numpy()
+    optimized_poses = optimized_poses * poses_std + poses_mean
 
-    # Dump initial and optimized poses as tuples into a pkl file
-    tuples = [(initial, optimized) for initial, optimized in zip(poses.numpy(), optimized_poses)]
-    
+    initial_pose_tuples = [(initial, optimized) for initial, optimized in zip(poses.numpy(), optimized_poses)]
+    predicted_cost_tuples = [(initial, optimized) for initial, optimized in zip(original_costs, optimized_costs)]
+
     output_filename = f'{fpath.resolve()}/eval/initial_and_optimized_poses.pkl'
     with open(output_filename, 'wb') as f:
-        pkl.dump(tuples, f)
+        pkl.dump(initial_pose_tuples, f)
 
 
 if __name__ == "__main__":
