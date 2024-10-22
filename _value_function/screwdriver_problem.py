@@ -26,7 +26,7 @@ from tqdm import tqdm
 
 
 
-def solve_turn(env, params, fpath, initial_pose, sim_viz_env=None, ros_copy_node=None):
+def solve_turn(env, gym, viewer, params, fpath, initial_pose, state2ee_pos_partial, sim_viz_env=None, ros_copy_node=None):
 
     obj_dof = 3
     CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
@@ -239,15 +239,12 @@ def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym,
     object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
     params['object_location'] = object_location
 
-    final_distance_to_goal,final_pose = solve_turn(env, params, fpath, initial_pose, sim_env, ros_copy_node)
+    final_distance_to_goal,final_pose = solve_turn(env, gym, viewer, params, fpath, initial_pose, state2ee_pos_partial, sim_env, ros_copy_node)
     
     if final_distance_to_goal < 30 / 180 * np.pi:
         succ = True
 
-    gym.destroy_viewer(viewer)
-    gym.destroy_sim(sim)
-
-    return initial_pose, final_pose
+    return initial_pose, final_pose, succ
 
 def show_state(env, state, t=1):
     env.reset(dof_pos=state)
@@ -260,4 +257,5 @@ if __name__ == "__main__":
     initial_poses = pkl.load(open(f'{fpath.resolve()}/initial_poses/initial_poses_10k.pkl', 'rb'))
     show_state(env, initial_poses[0], t=2)
     show_state(env, initial_poses[1], t=2)
-    #initial_pose, final_pose = do_turn(initial_poses[0], config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
+    initial_pose, final_pose, succ = do_turn(initial_poses[0], config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
+    
