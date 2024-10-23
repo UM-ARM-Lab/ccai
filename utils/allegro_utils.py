@@ -10,7 +10,18 @@ from scipy.spatial.transform import Rotation as R
 
 full_finger_list = ['index', 'middle', 'ring', 'thumb']
 
-
+def get_arm_dof(arm_type):
+    if arm_type == 'robot':
+        arm_dof = 7
+    elif arm_type == 'floating_3d':
+        arm_dof = 3
+    elif arm_type == 'floating_6d':
+        arm_dof = 6
+    elif arm_type == 'None':
+        arm_dof = 0
+    else:
+        raise ValueError('Invalid arm type')
+    return arm_dof
 def partial_to_full_state(partial, fingers, arm_dof=0):
     """
     fingers: which fingers are in the partial state
@@ -158,7 +169,7 @@ def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, camer
         if camera_params == "screwdriver_w_arm":
             parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_screwdriver_w_arm.json")
         elif camera_params == "screwdriver":
-            parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_screwdriver_translation.json")
+            parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_screwdriver.json")
         ctr.convert_from_pinhole_camera_parameters(parameters)
         vis.poll_events()
         vis.update_renderer()

@@ -1,7 +1,7 @@
-from isaac_victor_envs.utils import get_assets_dir
-from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
-# from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
 
+# from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
+# from isaacsim_hand_envs.allegro import AllegroScrewdriverEnv # it needs to be imported before numpy and torch
+from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
 import numpy as np
 import pickle as pkl
 
@@ -18,12 +18,12 @@ import pytorch_kinematics as pk
 import pytorch_kinematics.transforms as tf
 from torch.func import vmap, jacrev, hessian, jacfwd
 
-import matplotlib.pyplot as plt
-from utils.allegro_utils import *
-# from utils.allegro_utils import partial_to_full_state, full_to_partial_state, combine_finger_constraints, state2ee_pos, visualize_trajectory, all_finger_constraints
+import matplotlib.pyplot as plt# from utils.allegro_utils import partial_to_full_state, full_to_partial_state, combine_finger_constraints, state2ee_pos, visualize_trajectory, all_finger_constraints
 from allegro_valve_roll import AllegroValveTurning, AllegroContactProblem, PositionControlConstrainedSVGDMPC, add_trajectories, add_trajectories_hardware
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
+
+from utils.allegro_utils import *
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
@@ -32,7 +32,7 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 obj_dof = 3
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
-nominal_screwdriver_top = np.array([0, 0, 1.405])
+
 
 class ALlegroScrewdriverContact(AllegroContactProblem):
     def __init__(self, 
@@ -60,7 +60,7 @@ class ALlegroScrewdriverContact(AllegroContactProblem):
         self.default_index_ee_loc_in_screwdriver = torch.tensor([0.0087, -0.02, 0.1293], device=device).unsqueeze(0)
 class AllegroScrewdriver(AllegroValveTurning):
     def get_constraint_dim(self, T):
-        self.friction_polytope_k = 8
+        self.friction_polytope_k = 4
         wrench_dim = 0
         if self.obj_translational_dim > 0:
             wrench_dim += 3
@@ -85,7 +85,7 @@ class AllegroScrewdriver(AllegroValveTurning):
                  goal,
                  T,
                  chain,
-                 object_location,
+                 object_location, # the position of the root joint used to compute the torque balance, it's not necessarily the asset root pose. 
                  object_type,
                  world_trans,
                  object_asset_pos,
@@ -113,6 +113,8 @@ class AllegroScrewdriver(AllegroValveTurning):
             self.arm_dof = 7
         elif self.arm_type == 'floating_3d':
             self.arm_dof = 3
+        elif self.arm_type == 'floating_6d':
+            self.arm_dof = 6
         else:
             raise ValueError('Invalid arm type')
         self.robot_dof = self.arm_dof + 4 * self.num_fingers
@@ -137,6 +139,9 @@ class AllegroScrewdriver(AllegroValveTurning):
         self.x_max = torch.cat((self.x_max, max_f))
         self.x_min = torch.cat((self.x_min, min_f))
 
+        # for validity checking
+        self.nominal_screwdriver_top = np.array([0, 0, 1.405]) # in the world frame
+
     def get_initial_xu(self, N):
         # TODO: fix the initialization, for 6D movement, the angle is not supposed to be the linear interpolation of the euler angle. 
         """
@@ -151,9 +156,11 @@ class AllegroScrewdriver(AllegroValveTurning):
             arm_u = 0.000001 * torch.randn(N, self.T, self.arm_dof, device=self.device)
             u = torch.cat((arm_u, u), dim=-1)
         force = 1.5 * torch.randn(N, self.T, 3 * self.num_fingers + 3, device=self.device)
-        # force = 0.025 * torch.randn(N, self.T, 3 * self.num_fingers + 3, device=self.device)
         force[:, :, :3] = force[:, :, :3] * 0.01 # NOTE: scale down the index finger force, might not apply to situations other than screwdriver
-        force[:, :, -3:] = force[:, :, -3:] * 0.01
+        force[:, :, -3:] = force[:, :, -3:] * 0.01 # expect the environment force to be small
+        force[:, :, 2] = -1 # index force pointing down
+        force[:, :, -1] = 1 # ground force pointing up
+        # force = 0.025 * torch.randn(N, self.T, 3 * self.num_fingers + 3, device=self.device)
         u = torch.cat((u, force), dim=-1)
 
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
@@ -202,18 +209,31 @@ class AllegroScrewdriver(AllegroValveTurning):
         action = xu[:, self.dx:self.dx + self.robot_dof]  # action dim = 8
         next_q = state[:-1, :-self.obj_dof] + action
         action_cost = 0
-        # action_cost = torch.sum((state[1:, :-self.obj_dof] - next_q) ** 2)
+        # action_cost += 500 * torch.sum((action[1:, :self.arm_dof]) ** 2)
+        # action_cost += torch.sum((state[1:, :-self.obj_dof] - next_q) ** 2)
 
-        smoothness_cost = 10 * torch.sum((state[1:] - state[:-1]) ** 2)
+        smoothness_cost = 1 * torch.sum((state[1:, self.arm_dof:] - state[:-1, self.arm_dof:]) ** 2)
         smoothness_cost += 50 * torch.sum((state[1:, -self.obj_dof:] - state[:-1, -self.obj_dof:]) ** 2)
         if self.arm_type == 'robot':
             ee_pose = self.chain.forward_kinematics(partial_to_full_state(state[:, :self.robot_dof], fingers=self.fingers, arm_dof=self.arm_dof))['allegro_hand_base_link']
             ee_positions = ee_pose.get_matrix()[:, :3, 3]
             ee_orn = ee_pose.get_matrix()[:, :3, :3]
             ee_orn_6d = tf.matrix_to_rotation_6d(ee_orn)
-            smoothness_cost += 10000 * torch.sum((ee_positions[1:] - ee_positions[:-1]) ** 2)
-            smoothness_cost += 100 * torch.sum((ee_orn_6d[1:] - ee_orn_6d[:-1]) ** 2)
-            smoothness_cost += 100 *  torch.sum((state[1:, :self.arm_dof] - state[:-1, :self.arm_dof]) ** 2) # penalize the arm movement
+            smoothness_cost += 3000 * torch.sum((ee_positions[1:] - ee_positions[:-1]) ** 2)
+            smoothness_cost += 3000 * torch.sum((ee_orn_6d[1:] - ee_orn_6d[:-1]) ** 2)
+            smoothness_cost += 3000 *  torch.sum((state[1:, :self.arm_dof] - state[:-1, :self.arm_dof]) ** 2) # penalize the arm movement
+            action_cost += 3000 * torch.sum((action[:, :self.arm_dof]) ** 2)
+            smoothness_cost += 500 * torch.sum((state[1:, -self.obj_dof:] - state[:-1, -self.obj_dof:]) ** 2)
+            # smoothness_cost += 500 * torch.sum((ee_positions[1:] - ee_positions[:-1]) ** 2)
+            # smoothness_cost += 5 * torch.sum((ee_orn_6d[1:] - ee_orn_6d[:-1]) ** 2)
+            # smoothness_cost += 1 *  torch.sum((state[1:, :self.arm_dof] - state[:-1, :self.arm_dof]) ** 2) # penalize the arm movement
+        elif self.arm_type == 'floating_3d':
+            smoothness_cost += 20 * torch.sum((state[1:, :3] - state[:-1, :3]) ** 2)
+        elif self.arm_type == 'floating_6d':
+            # smoothness_cost += 20 * torch.sum((state[1:, :6] - state[:-1, :6]) ** 2)
+            smoothness_cost += 500 * torch.sum((state[1:, :3] - state[:-1, :3]) ** 2)
+            smoothness_cost += 50 * torch.sum((state[1:, 3:6] - state[:-1, 3:6]) ** 2)
+
         upright_cost = 10000 * torch.sum((state[:, -self.obj_dof:-1]) ** 2) # the screwdriver should only rotate in z direction
 
         goal_cost = torch.sum((500 * (state[-1, -self.obj_dof:] - goal) ** 2)).reshape(-1)
@@ -456,7 +476,6 @@ class AllegroScrewdriver(AllegroValveTurning):
         return h, grad_h, None
     
     def _con_ineq(self, xu, compute_grads=True, compute_hess=False, verbose=False):
-        # return None, None, None
         N = xu.shape[0]
         T = xu.shape[1]
         h, grad_h, hess_h = self._friction_constraint(
@@ -543,11 +562,21 @@ class AllegroScrewdriver(AllegroValveTurning):
             return h, grad_h, hess_h
         return h, grad_h, None
     
-  
+    def check_validity(self, state):
+        screwdriver_state = state[-self.obj_dof:]
+        screwdriver_top_pos = get_screwdriver_top_in_world(screwdriver_state, self.object_chain, self.world_trans, self.object_asset_pos)
+        screwdriver_top_pos = screwdriver_top_pos.detach().cpu().numpy()
+        distance2nominal = np.linalg.norm(screwdriver_top_pos - self.nominal_screwdriver_top)
+        if distance2nominal > 0.02:
+            validity_flag = False
+        else:
+            validity_flag = True
+        return validity_flag
     
     
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     "only turn the screwdriver once"
+    env.reset()
     screwdriver_goal = params['screwdriver_goal'].cpu()
     screwdriver_goal_mat = R.from_euler('xyz', screwdriver_goal).as_matrix()
     num_fingers = len(params['fingers'])
@@ -564,12 +593,19 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         arm_dof = 7
     elif params['arm_type'] == 'floating_3d':
         arm_dof = 3
+    elif params['arm_type'] == 'floating_6d':
+        arm_dof = 6
     elif params['arm_type'] == 'None':
         arm_dof = 0
+    else:
+        raise ValueError('Invalid arm type')
 
     robot_dof = 4 * num_fingers + arm_dof
 
-    start = state['q'].reshape(robot_dof + obj_dof + 1).to(device=params['device'])
+    if params['simulator'] == 'isaac_gym':
+        start = state['q'].reshape(robot_dof + obj_dof + 1).to(device=params['device'])
+    elif params['simulator'] == 'isaac_sim':
+        start = state.reshape(robot_dof + obj_dof).to(device=params['device'])        
 
     if params['controller'] == 'csvgd':
         pregrasp_dx = pregrasp_du = robot_dof
@@ -581,7 +617,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             T=4,
             chain=params['chain'],
             device=params['device'],
-            object_asset_pos=env.table_pose,
+            object_asset_pos=env.obj_pose,
             object_type=params['object_type'],
             world_trans=env.world_trans,
             fingers=params['fingers'],
@@ -596,25 +632,28 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     else:
         raise ValueError('Invalid controller')
     
-    
-    start = env.get_state()['q'].reshape(pregrasp_dx + 4).to(device=params['device'])
+    if params['simulator'] == 'isaac_gym':
+        start = env.get_state()['q'].reshape(pregrasp_dx + 4).to(device=params['device'])
+    elif params['simulator'] == 'isaac_sim':
+        start = env.get_state().reshape(pregrasp_dx + 3).to(device=params['device'])
     start_time = time.time()
     best_traj, _ = pregrasp_planner.step(start[:pregrasp_dx])
     print(f"pregrasp solve time: {time.time() - start_time}")
 
     if params['visualize_plan']:
+        if params['arm_type'] == 'robot':
+            camera_params = "screwdriver_w_arm"
+        elif params['arm_type'] == 'None' or params['arm_type'] == 'floating_3d' or params['arm_type'] == 'floating_6d':
+            camera_params = "screwdriver"
         traj_for_viz = best_traj[:, :pregrasp_problem.dx]
-        tmp = start[pregrasp_dx:].unsqueeze(0).repeat(traj_for_viz.shape[0], 1)
-        traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)    
+        tmp = start[pregrasp_dx:pregrasp_dx+obj_dof].unsqueeze(0).repeat(traj_for_viz.shape[0], 1)
+        tmp_2 = torch.zeros((traj_for_viz.shape[0], 1)).to(traj_for_viz.device) # the top jint
+        traj_for_viz = torch.cat((traj_for_viz, tmp, tmp_2), dim=1)    
         viz_fpath = pathlib.PurePath.joinpath(fpath, "pregrasp")
         img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
         gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
         pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
         pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-        if params['arm_type'] == 'robot':
-            camera_params = "screwdriver_w_arm"
-        elif params['arm_type'] == 'None' or params['arm_type'] == 'floating_3d':
-            camera_params = "screwdriver"
         visualize_trajectory(traj_for_viz, pregrasp_problem.viz_contact_scenes, viz_fpath, pregrasp_problem.fingers, pregrasp_problem.obj_dof + 1,
                              camera_params=camera_params, arm_dof=arm_dof)
 
@@ -632,7 +671,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             ros_copy_node.apply_action(partial_to_full_state(x.reshape(-1, pregrasp_dx)[0], params['fingers']))
 
     state = env.get_state()
-    start = state['q'].reshape(robot_dof + 4).to(device=params['device'])
+    if params['simulator'] == 'isaac_gym':
+        start = state['q'].reshape(robot_dof + 4).to(device=params['device'])
+    elif params['simulator'] == 'isaac_sim':
+        start = state.reshape(robot_dof + 3).to(device=params['device'])
     turn_problem_fingers = params['fingers']
     turn_problem_start = start[:robot_dof + obj_dof]
     turn_problem = AllegroScrewdriver(
@@ -641,7 +683,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         T=params['T'],
         chain=params['chain'],
         device=params['device'],
-        object_asset_pos=env.table_pose,
+        object_asset_pos=env.obj_pose,
         object_location=params['object_location'],
         object_type=params['object_type'],
         friction_coefficient=params['friction_coefficient'],
@@ -687,9 +729,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
     for k in range(params['num_steps']):
         state = env.get_state()
-        start = state['q'].reshape(robot_dof + 4).to(device=params['device'])
-
-        actual_trajectory.append(state['q'][:, :robot_dof + obj_dof].squeeze(0).clone())
+        if params['simulator'] == 'isaac_gym':
+            start = state['q'].reshape(robot_dof + 4).to(device=params['device'])
+            current_theta = state['q'][0, -(obj_dof+1): -1].detach().cpu().numpy()
+        elif params['simulator'] == 'isaac_sim':
+            start = state.reshape(robot_dof + 3).to(device=params['device'])
+            current_theta = state[:, -obj_dof:].detach().cpu().numpy()
+        actual_trajectory.append(start[:robot_dof + obj_dof].clone())
         start_time = time.time()
         best_traj, trajectories = turn_planner.step(start[:robot_dof + obj_dof])
         
@@ -702,7 +748,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         else:
             duration += solve_time
         planned_theta_traj = best_traj[:, robot_dof: robot_dof + obj_dof].detach().cpu().numpy()
-        print(f"current theta: {state['q'][0, -(obj_dof+1): -1].detach().cpu().numpy()}")
+        print(f"current theta: {current_theta}")
         print(f"planned theta: {planned_theta_traj}")
         # add trajectory lines to sim
         # if k < params['num_steps'] - 1:
@@ -765,24 +811,27 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         # print(turn_problem.thumb_contact_scene.scene_collision_check(partial_to_full_state(x[:, :8]), x[:, 8],
         #                                                         compute_gradient=False, compute_hessian=False))
         # distance2surface = torch.sqrt((best_traj_ee[:, 2] - object_location[2].unsqueeze(0)) ** 2 + (best_traj_ee[:, 0] - object_location[0].unsqueeze(0))**2)
-        screwdriver_state = env.get_state()['q'][:, -obj_dof-1: -1].cpu()
+        if params['simulator'] == 'isaac_gym':
+            screwdriver_state = env.get_state()['q'][:, -obj_dof-1: -1].cpu()
+        elif params['simulator'] == 'isaac_sim':
+            screwdriver_state = env.get_state()[:, -obj_dof:].cpu()
         screwdriver_mat = R.from_euler('xyz', screwdriver_state).as_matrix()
         distance2goal = tf.so3_relative_angle(torch.tensor(screwdriver_mat), \
             torch.tensor(screwdriver_goal_mat).unsqueeze(0), cos_angle=False).detach().cpu().abs()
         
-        screwdriver_top_pos = get_screwdriver_top_in_world(screwdriver_state[0], turn_problem.object_chain, env.world_trans, turn_problem.object_asset_pos)
-        screwdriver_top_pos = screwdriver_top_pos.detach().cpu().numpy()
-        distance2nominal = np.linalg.norm(screwdriver_top_pos - nominal_screwdriver_top)
-        if distance2nominal > 0.02:
-            validity_flag = False
+        validity_flag = turn_problem.check_validity(env.get_state().cpu()[0])
         # distance2goal = (screwdriver_goal - screwdriver_state)).detach().cpu()
         print(distance2goal, validity_flag)
         info = {**equality_constr_dict, **inequality_constr_dict, **{'distance2goal': distance2goal, 'validity_flag': validity_flag, 'distance2nominal': distance2nominal}}
         info_list.append(info)
 
-        gym.clear_lines(viewer)
+        if params['simulator'] == 'isaac_gym':
+            gym.clear_lines(viewer)
         state = env.get_state()
-        start = state['q'][:,:robot_dof + obj_dof].squeeze(0).to(device=params['device'])
+        if params['simulator'] == 'isaac_gym':
+            start = state['q'][:,:robot_dof + obj_dof].squeeze(0).to(device=params['device'])
+        elif params['simulator'] == 'isaac_sim':
+            start = state.squeeze(0).to(device=params['device'])
         for finger in params['fingers']:
             ee = state2ee_pos(start[:robot_dof], turn_problem.ee_names[finger])
             finger_traj_history[finger].append(ee.detach().cpu().numpy())
@@ -793,9 +842,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                 axes[finger].plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray', label='actual')
     with open(f'{fpath.resolve()}/info.pkl', 'wb') as f:
         pkl.dump(info_list, f)
-    # action_list = torch.concat(action_list, dim=0)
-    # with open(f'{fpath.resolve()}/action.pkl', 'wb') as f:
-    #     pkl.dump(action_list, f)
+    action_list = torch.concat(action_list, dim=0)
+    with open(f'{fpath.resolve()}/action.pkl', 'wb') as f:
+        pkl.dump(action_list, f)
     handles, labels = plt.gca().get_legend_handles_labels()
     newLabels, newHandles = [], []
     for handle, label in zip(handles, labels):
@@ -811,7 +860,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
 
     state = env.get_state()
-    state = state['q'].reshape(robot_dof + obj_dof + 1).to(device=params['sim_device'])
+    if params['simulator'] == 'isaac_gym':
+        state = state['q'].reshape(robot_dof + obj_dof + 1).to(device=params['device'])
+    elif params['simulator'] == 'isaac_sim':
+        state = state.reshape(robot_dof + obj_dof).to(device=params['device'])
     actual_trajectory.append(state.clone()[:robot_dof + obj_dof])
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, robot_dof + obj_dof)
     turn_problem.T = actual_trajectory.shape[0]
@@ -840,9 +892,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 if __name__ == "__main__":
     # get config
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver.yaml').read_text())
-    for controller in config['controllers']:
-        algorithm_device = config['controllers'][controller]['device']
-        break
     from tqdm import tqdm
 
     sim_env = None
@@ -866,7 +915,7 @@ if __name__ == "__main__":
                           kp=config['kp'], 
                           obj='screwdriver',
                           mode='relative',
-                          gradual_control=True,
+                          gradual_control=config['gradual_control'],
                           num_repeat=10)
         root_coor, root_ori = env.obj_reader.get_state()
         root_coor = root_coor / 1000 # convert to meters
@@ -883,7 +932,7 @@ if __name__ == "__main__":
                                  video_save_path=img_save_dir,
                                  joint_stiffness=config['kp'],
                                  fingers=config['fingers'],
-                                 table_pose=root_coor,
+                                 obj_pose=root_coor,
                                  )
         sim, gym, viewer = sim_env.get_sim()
         assert (np.array(sim_env.robot_p) == robot_p).all()
@@ -891,29 +940,41 @@ if __name__ == "__main__":
         env.world_trans = sim_env.world_trans
         env.joint_stiffness = sim_env.joint_stiffness
         env.device = sim_env.device
-        env.table_pose = sim_env.table_pose
+        env.obj_pose = sim_env.obj_pose
     else:
-        env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
-                                    use_cartesian_controller=False,
-                                    viewer=True,
-                                    steps_per_action=60,
-                                    friction_coefficient=1.0,
-                                    device=config['sim_device'],
-                                    video_save_path=img_save_dir,
-                                    joint_stiffness=config['kp'],
-                                    fingers=config['fingers'],
-                                    gradual_control=True,
-                                    arm_type=config['arm_type'],
-                                    gravity=config['gravity'],
-                                    )
-        # env_world_trans = env.world_trans.to(device=algorithm_device)
-        sim, gym, viewer = env.get_sim()
+        if config['simulator'] == 'isaac_gym':
+            from isaac_victor_envs.utils import get_assets_dir
+            env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
+                                        use_cartesian_controller=False,
+                                        viewer=True,
+                                        steps_per_action=60,
+                                        friction_coefficient=1.0,
+                                        device=config['sim_device'],
+                                        video_save_path=img_save_dir,
+                                        joint_stiffness=config['kp'],
+                                        fingers=config['fingers'],
+                                        gradual_control=config['gradual_control'],
+                                        arm_type=config['arm_type'],
+                                        gravity=config['gravity'],
+                                        )
+            sim, gym, viewer = env.get_sim()
+        elif config['simulator'] == 'isaac_sim':
+            from isaacsim_hand_envs.utils import get_assets_dir
+            env = AllegroScrewdriverEnv(friction_coefficient=1.0,
+                                        device=config['sim_device'],
+                                        video_save_path=img_save_dir,
+                                        joint_stiffness=config['kp'],
+                                        fingers=config['fingers'],
+                                        arm_type=config['arm_type'],
+                                        gravity=config['gravity'],
+                                        )
+            gym, viewer = None, None
+
     if config['mode'] == 'hardware_copy':
         from hardware.hardware_env import RosNode
         ros_copy_node = RosNode()
         
 
-    state = env.get_state()
     # try:
     #     while True:
     #         start = env.get_state()['q'][:, :-1]
@@ -932,6 +993,9 @@ if __name__ == "__main__":
     elif config['arm_type'] == 'floating_3d':
         asset = f'{get_assets_dir()}/xela_models/allegro_hand_right_floating_3d.urdf'
         arm_dof = 3
+    elif config['arm_type'] == 'floating_6d':
+        asset = f'{get_assets_dir()}/xela_models/allegro_hand_right_floating_6d.urdf'
+        arm_dof = 6
     elif config['arm_type'] == 'None':
         asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
         arm_dof = 0
@@ -964,6 +1028,7 @@ if __name__ == "__main__":
 
     for i in tqdm(range(config['num_trials'])):
         goal = - 90 / 180 * torch.tensor([0, 0, np.pi])
+        # goal = - 60 / 180 * torch.tensor([0, 0, np.pi])
         for controller in config['controllers'].keys():
             validity = False
             env.reset()
@@ -976,7 +1041,7 @@ if __name__ == "__main__":
             params['controller'] = controller
             params['screwdriver_goal'] = goal.to(device=params['device'])
             params['chain'] = chain.to(device=params['device'])
-            object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
+            object_location = torch.tensor(env.obj_pose).to(params['device']).float() # TODO: confirm if this is the correct location
             params['object_location'] = object_location
             ret = do_trial(env, params, fpath, sim_env, ros_copy_node)
             results[controller]['warmup_time'].append(ret['warmup_time'])
@@ -987,8 +1052,9 @@ if __name__ == "__main__":
 
     for key in results[controller].keys():
         print(f"{controller} {key}: avg: {np.array(results[controller][key]).mean()}, std: {np.array(results[controller][key]).std()}")
-
-    gym.destroy_viewer(viewer)
-    gym.destroy_sim(sim)
-
+    if config['simulator'] == 'isaac_gym':
+        gym.destroy_viewer(viewer)
+        gym.destroy_sim(sim)
+    elif config['simulator'] == 'isaac_sim':
+        env.env.close()
 

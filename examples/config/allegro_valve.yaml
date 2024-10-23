@@ -6,15 +6,19 @@ num_trials: 5
 visualize: True
 experiment_name: 'allegro_valve'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
-fingers: ['index', 'thumb']
+fingers: ['index', 'middle', 'thumb']
+simulator: "isaac_gym" # choose from 'isaac_sim', 'isaac_gym'
 # fingers: ['index', 'middle', 'thumb', 'ring']
-object_type: 'cylinder_valve'
+object_type: 'cross_valve'
 sim_device: 'cuda:0'
+device: 'cuda:0'
+arm_type: "None"
 friction_coefficient: 0.9
 kp: 3.0
-visualize_plan: False
+visualize_plan: True
 random_robot_pose: False
 optimize_force: True
+goal: [-1.5707]
 controllers:
   csvgd:
     # N: 16
@@ -23,7 +27,6 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:0'
     online_iters: 30
     warmup_iters: 100
     resample_steps: 1

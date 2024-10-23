@@ -1,6 +1,7 @@
-from isaac_victor_envs.utils import get_assets_dir
-from isaac_victor_envs.tasks.allegro import AllegroValveTurningEnv
 # from isaac_victor_envs.tasks.allegro_ros import RosAllegroValveTurningEnv
+from isaac_victor_envs.tasks.allegro import AllegroValveTurningEnv
+# from isaacsim_hand_envs.allegro import AllegroValve # it needs to be imported before numpy and torch
+from isaac_victor_envs.utils import get_assets_dir
 
 import numpy as np
 import pickle as pkl
@@ -167,6 +168,8 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.arm_dof = 7
         elif self.arm_type == 'floating_3d':
             self.arm_dof = 3
+        elif self.arm_type == 'floating_6d':
+            self.arm_dof = 6
         else:
             raise ValueError('Invalid arm type')
         self.robot_dof = self.arm_dof + 4 * self.num_fingers
@@ -188,6 +191,8 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.all_joint_index = [0, 1, 2, 3, 4, 5, 6] + self.all_joint_index
         elif arm_type == 'floating_3d':
             self.all_joint_index = [0, 1, 2] + self.all_joint_index
+        elif arm_type == 'floating_6d':
+            self.all_joint_index = [0, 1, 2, 3, 4, 5] + self.all_joint_index
         self.ee_names = {
             'index': 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
             'middle': 'allegro_hand_naka_finger_finger_1_aftc_base_link',
@@ -221,6 +226,9 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                 arm_x_min = -arm_x_max
             elif arm_type == 'floating_3d':
                 arm_x_max = torch.tensor([0.5, 0.5, 0.5])
+                arm_x_min = -arm_x_max
+            elif arm_type == 'floating_6d':
+                arm_x_max = torch.tensor([0.5, 0.5, 0.5, np.pi, np.pi, np.pi])
                 arm_x_min = -arm_x_max
             self.x_max = torch.cat((arm_x_max, self.x_max))
             self.x_min = torch.cat((arm_x_min, self.x_min))
@@ -566,6 +574,8 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
         xu = torch.cat((x, u), dim=2)
         return xu
+    def check_validity(self, state):
+        return True
 
 
 
@@ -625,6 +635,8 @@ class AllegroContactProblem(AllegroObjectProblem):
             asset_object = get_assets_dir() + '/valve/valve_cuboid.urdf'
         elif object_type == 'cylinder_valve':
             asset_object = get_assets_dir() + '/valve/valve_cylinder.urdf'
+        elif object_type == 'cross_valve':
+            asset_object = get_assets_dir() + '/valve/valve_cross.urdf'
         elif object_type == 'screwdriver':
             asset_object = get_assets_dir() + '/screwdriver/screwdriver.urdf'
         elif object_type == 'screwdriver_6d':
@@ -691,6 +703,7 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         # Ignore first value, as it is the start state
         g = g[:, 1:].reshape(N, -1)
+        # g = g + 4e-3
 
         # If terminal, only consider last state
         if terminal:
@@ -723,7 +736,8 @@ class AllegroContactProblem(AllegroObjectProblem):
         action = xu[:, self.dx:]
         action_cost = torch.sum(action ** 2)
         smoothness_cost = 10 * torch.sum((state[1:] - state[:-1]) ** 2)
-        smoothness_cost += 1000 *  torch.sum((state[1:, :self.arm_dof] - state[:-1, :self.arm_dof]) ** 2) # penalize the arm movement
+        # smoothness_cost += 1000 *  torch.sum((state[1:, :self.arm_dof] - state[:-1, :self.arm_dof]) ** 2) # penalize the arm movement
+        smoothness_cost += 100 *  torch.sum((state[1:, :self.arm_dof] - state[:-1, :self.arm_dof]) ** 2) # penalize the arm movement
         return smoothness_cost + 10 * action_cost
     
     def _con_eq(self, xu, compute_grads=True, compute_hess=False):
@@ -799,12 +813,14 @@ class AllegroValveTurning(AllegroContactProblem):
         self.finger_stiffness = finger_stiffness
         self.arm_stiffness = arm_stiffness
         obj_dof = np.sum(obj_dof_code)
-        if self.arm_type == 'None':
+        if arm_type == 'None':
             self.arm_dof = 0
-        elif self.arm_type == 'robot':
+        elif arm_type == 'robot':
             self.arm_dof = 7
-        elif self.arm_type == 'floating_3d':
+        elif arm_type == 'floating_3d':
             self.arm_dof = 3
+        elif arm_type == 'floating_6d':
+            self.arm_dof = 6
         else:
             raise ValueError('Invalid arm type')
         self.robot_dof = self.arm_dof + 4 * self.num_fingers
@@ -860,7 +876,7 @@ class AllegroValveTurning(AllegroContactProblem):
             if self.arm_type != 'None':
                 arm_u = 0.002 * torch.randn(N, self.T, self.arm_dof, device=self.device)
                 u = torch.cat((arm_u, u), dim=-1)
-            force = 1.5 * torch.randn(N, self.T, 3 * self.num_fingers, device=self.device)
+            force = 0.15 * torch.randn(N, self.T, 3 * self.num_fingers, device=self.device)
             # force[:, :, :3] = force[:, :, :3] * 0.01 # NOTE: scale down the index finger force, might not apply to situations other than screwdriver
             # force = 0.025 * torch.randn(N, self.T, 3 * self.num_fingers, device=self.device)
             u = torch.cat((u, force), dim=-1)
@@ -899,7 +915,7 @@ class AllegroValveTurning(AllegroContactProblem):
 
             # DEBUG ONLY, use initial state as the initialization
             # theta = self.start[-self.obj_dof:].unsqueeze(0).repeat((N, self.T, 1))
-            # theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
+            theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
             x = torch.cat((x, theta), dim=-1)
 
         xu = torch.cat((x, u), dim=2)
@@ -913,15 +929,16 @@ class AllegroValveTurning(AllegroContactProblem):
         
         action = xu[:, self.dx:self.dx + self.robot_dof]  # action dim = 8
         next_q = state[:-1, :-1] + action
-        action_cost = 1 * torch.sum((state[1:, :-1] - next_q) ** 2)
-        if self.optimize_force:
-            action_cost += 0.1 * torch.sum(xu[:, self.dx + self.robot_dof:] ** 2)
+        # action_cost = 1 * torch.sum((state[1:, :-1] - next_q) ** 2)
+        # if self.optimize_force:
+        #     action_cost += 0.1 * torch.sum(xu[:, self.dx + self.robot_dof:] ** 2)
+        action_cost = 0
         # action_cost += 0.1 * torch.sum(action ** 2)
         # action_cost = action_cost
 
         smoothness_cost = 1 * torch.sum((state[1:] - state[:-1]) ** 2)
         # smoothness_cost += 50 * torch.sum((state[1:, -1] - state[:-1, -1]) ** 2)
-        smoothness_cost += 10 * torch.sum((state[1:, -1] - state[:-1, -1]) ** 2)
+        smoothness_cost += 50 * torch.sum((state[1:, -1] - state[:-1, -1]) ** 2)
 
         goal_cost = (10 * (state[-1, -1] - goal) ** 2).reshape(-1)
         # add a running cost
@@ -1134,8 +1151,10 @@ class AllegroValveTurning(AllegroContactProblem):
             finger_torque[:self.arm_dof] = 0
             g_force_torque_balance = sum_reactional_torque + arm_torque + finger_torque
 
-            # NOTE: assume quasistatic, the arm does not contribute to any forces at the end effector. 
-            # g_force_torque_balance = g_force_torque_balance[7:]
+            # NOTE: assume quasistatic, the arm does not contribute to any forces at the end effector.
+            # Thus, instead of penalizing the arm force, we penalize the arm movement 
+            g_force_torque_balance = g_force_torque_balance[self.arm_dof:]
+            g_force_torque_balance = torch.cat((delta_q[:self.arm_dof] * 100, g_force_torque_balance))
         else:
             g_force_torque_balance = (sum_reactional_torque + self.finger_stiffness * delta_q)
         # print(g_force_torque_balance.max(), torque_list.max())
@@ -1663,7 +1682,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         arm_dof = 7
     elif params['arm_type'] == 'floating_3d':
         arm_dof = 3
-    elif params['arm_type'] is None:
+    elif params['arm_type']  == 'floating_6d':
+        arm_dof = 6
+    elif params['arm_type'] == 'None':
         arm_dof = 0
 
     start = state['q'].reshape(4 * num_fingers + 1).to(device=params['device'])
@@ -1677,7 +1698,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             T=4,
             chain=params['chain'],
             device=params['device'],
-            object_asset_pos=env.valve_pose,
+            object_asset_pos=env.obj_pose,
             object_type=params['object_type'],
             world_trans=env.world_trans,
             fingers=params['fingers'],
@@ -1730,7 +1751,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             T=params['T'],
             chain=params['chain'],
             device=params['device'],
-            object_asset_pos=env.valve_pose,
+            object_asset_pos=env.obj_pose,
             object_location=params['object_location'],
             object_type=params['object_type'],
             friction_coefficient=params['friction_coefficient'],
@@ -1776,7 +1797,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             # traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + turn_problem.obj_dof] = axis_angle_to_euler(traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + turn_problem.obj_dof])
             if params['arm_type'] == 'robot':
                 camera_params = "screwdriver_w_arm"
-            elif params['arm_type'] == 'floating_3d' or params['arm_type'] is None:
+            elif params['arm_type'] == 'floating_3d' or params['arm_type'] == 'floating_6d' or params['arm_type'] is None:
                 camera_params = "screwdriver"
             viz_fpath = pathlib.PurePath.joinpath(fpath, f"timestep_{k}")
             img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
@@ -1973,6 +1994,8 @@ if __name__ == "__main__":
         valve_type = 'cuboid'
     elif config['object_type'] == 'cylinder_valve':
         valve_type = 'cylinder'
+    elif config['object_type'] == 'cross_valve':
+        valve_type = 'cross'
     config['obj_dof_code'] = [0, 0, 0, 0, 1, 0] # x y z, euler x, euler y euler z
     config['obj_dof'] = np.sum(config['obj_dof_code'])
 
@@ -1995,7 +2018,7 @@ if __name__ == "__main__":
                                     steps_per_action=60,
                                     friction_coefficient=1.0,
                                     device=config['sim_device'],
-                                    valve=valve_type,
+                                    valve_type=valve_type,
                                     video_save_path=img_save_dir,
                                     joint_stiffness=config['kp'],
                                     fingers=config['fingers'],
@@ -2024,7 +2047,7 @@ if __name__ == "__main__":
         env.world_trans = sim_env.world_trans
         env.joint_stiffness = sim_env.joint_stiffness
         env.device = sim_env.device
-        env.valve_pose = sim_env.valve_pose
+        env.obj_pose = sim_env.obj_pose
     elif config['mode'] == 'hardware_copy':
         from hardware.hardware_env import RosNode
         ros_copy_node = RosNode()
@@ -2066,7 +2089,7 @@ if __name__ == "__main__":
             params['controller'] = controller
             params['valve_goal'] = goal.to(device=params['device'])
             params['chain'] = chain.to(device=params['device'])
-            object_location = torch.tensor([0.85, 0.70, 1.405]).to(params['device']) # the root of the valve
+            object_location = torch.tensor(env.obj_pose).to(params['device']) # the root of the valve
             params['object_location'] = object_location
             final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node)
             # final_distance_to_goal = turn(env, params, fpath)
