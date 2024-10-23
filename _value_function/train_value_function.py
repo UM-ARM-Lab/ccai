@@ -185,5 +185,5 @@ def eval():
 
 if __name__ == "__main__":
     torch.manual_seed(42)
-    #Qtrain()
+    train()
     eval() 

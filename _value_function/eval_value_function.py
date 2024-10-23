@@ -1,13 +1,14 @@
 import numpy as np
 import pickle as pkl
-import torch
 import pathlib
 import sys
-from get_initial_poses import emailer
+from tqdm import tqdm
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 sys.path.append(str(CCAI_PATH))
-from tqdm import tqdm
+from get_initial_poses import emailer
 from screwdriver_problem import init_env, do_turn
+import torch
+
 
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 with open(f'{fpath.resolve()}/eval/initial_and_optimized_poses.pkl', 'rb') as file:
@@ -26,7 +27,7 @@ if __name__ == "__main__":
     final_pose_tuples = []
 
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
-    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
+    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
 
     for i in tqdm(range(len(initial_poses))):
 
@@ -42,7 +43,7 @@ if __name__ == "__main__":
     
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
     start_idx = config['start_idx']
-    savepath = f'{fpath.resolve()}/eval/final_pose_comparisons_{0}.pkl'
+    savepath = f'{fpath.resolve()}/eval/final_pose_comparisons_{1}.pkl'
     with open(savepath, 'wb') as f:
         pkl.dump(final_pose_tuples, f)
 
