@@ -1,6 +1,5 @@
 from isaac_victor_envs.utils import get_assets_dir
 from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
-from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
 
 import numpy as np
 import pickle as pkl
@@ -30,7 +29,6 @@ from ccai.utils.allegro_utils import *
 from ccai.allegro_contact import AllegroManipulationProblem, PositionControlConstrainedSVGDMPC, add_trajectories, \
     add_trajectories_hardware
 from ccai.allegro_screwdriver_problem_diffusion import AllegroScrewdriverDiff
-from ccai.mpc.diffusion_policy import Diffusion_Policy, DummyProblem
 from train_allegro_screwdriver import rollout_trajectory_in_sim
 from scipy.spatial.transform import Rotation as R
 
@@ -345,6 +343,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     #     raise ValueError('Invalid controller')
 
     elif params['controller'] == 'diffusion_policy':
+        from ccai.mpc.diffusion_policy import Diffusion_Policy, DummyProblem
         if 'index' in params['fingers']:
             fingers = params['fingers']
         else:
@@ -402,7 +401,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     if model_path is not None:
         problem_for_sampler = None
         if params['projected'] or params['sample_contact'] or params['type'] == 'cnf':
-            pregrasp_problem_diff = AllegroScrewdriverDiff(
+            pregrasp_problem_diff = AllegroScrewdriver(
                 start=start[:4 * num_fingers + obj_dof],
                 goal=params['valve_goal'],
                 T=1,
@@ -419,7 +418,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 optimize_force=params['optimize_force'],
             )
             # finger gate index
-            index_regrasp_problem_diff = AllegroScrewdriverDiff(
+            index_regrasp_problem_diff = AllegroScrewdriver(
                 start=start[:4 * num_fingers + obj_dof],
                 goal=params['valve_goal'],
                 T=1,
@@ -436,7 +435,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 optimize_force=params['optimize_force'],
                 default_dof_pos=env.default_dof_pos[:, :16]
             )
-            thumb_and_middle_regrasp_problem_diff = AllegroScrewdriverDiff(
+            thumb_and_middle_regrasp_problem_diff = AllegroScrewdriver(
                 start=start[:4 * num_fingers + obj_dof],
                 goal=params['valve_goal'],
                 T=1,
@@ -453,7 +452,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 optimize_force=params['optimize_force'],
                 default_dof_pos=env.default_dof_pos[:, :16]
             )
-            turn_problem_diff = AllegroScrewdriverDiff(
+            turn_problem_diff = AllegroScrewdriver(
                 start=start[:4 * num_fingers + obj_dof],
                 goal=params['valve_goal'],
                 T=1,
@@ -509,6 +508,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         trajectory_sampler.send_norm_constants_to_submodels()
         if params['project_state']:
             trajectory_sampler.model.diffusion_model.classifier=None
+        # trajectory_sampler.eval()
         print('Loaded trajectory sampler')
 
     # start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
@@ -624,13 +624,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         sim_rollouts = None
         if trajectory_sampler is not None and params.get('diff_init', True):
             # with torch.no_grad():
-            # start = state.clone()
+            start = state.clone()
 
-            start = torch.tensor([
-                -0.00866661,  0.5414786 ,  0.5291143 ,  0.602711  , -0.02442463,
-                0.39878428,  0.95840853,  0.9327192 ,  1.2067503 ,  0.34080115,
-                0.33771813,  1.253074  ,  0.09828146,  0.01678719, -1.2030787
-            ], device=params['device'])
+            # start = torch.tensor([
+            #     -0.00866661,  0.5414786 ,  0.5291143 ,  0.602711  , -0.02442463,
+            #     0.39878428,  0.95840853,  0.9327192 ,  1.2067503 ,  0.34080115,
+            #     0.33771813,  1.253074  ,  0.09828146,  0.01678719, -1.2030787
+            # ], device=params['device'])
             # if state[-1] < -1.0:
             #     start[-1] += 0.75
             a = time.perf_counter()
@@ -639,22 +639,34 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 start_for_diff = convert_yaw_to_sine_cosine(start)
             else:
                 start_for_diff = start
-            initial_samples, _, _, initial_samples_0, (all_losses, all_samples, all_likelihoods) = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
-                                                                H=params['T'] + 1,
-                                                                constraints=contact,
-                                                                project=params['project_state'],)
+            if params['project_state']:
+                initial_samples, _, _, initial_samples_0, (all_losses, all_samples, all_likelihoods) = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
+                                                                    H=params['T'] + 1,
+                                                                    constraints=contact,
+                                                                    project=params['project_state'],)
+            else:
+                initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
+                                                                    H=params['T'] + 1,
+                                                                    constraints=contact,
+                                                                    project=params['project_state'],)
             mode_fpath = f'{fpath}/{fname}'
             pathlib.Path.mkdir(pathlib.Path(mode_fpath), parents=True, exist_ok=True)
-            with open(mode_fpath+ '/projection_results.pkl', 'wb') as f:
-                pickle.dump((initial_samples, initial_samples_0, all_losses, all_samples, all_likelihoods), f)
+            if params['project_state']:    
+                with open(mode_fpath+ '/projection_results.pkl', 'wb') as f:
+                    pickle.dump((initial_samples, initial_samples_0, all_losses, all_samples, all_likelihoods), f)
             if params['sine_cosine']:
                 initial_samples = convert_sine_cosine_to_yaw(initial_samples)
-                initial_samples_0 = convert_sine_cosine_to_yaw(initial_samples_0)
+                if params['project_state']:
+                    initial_samples_0 = convert_sine_cosine_to_yaw(initial_samples_0)
             print('Sampling time', time.perf_counter() - a)
             # if state[-1] < -1.0:
             #     initial_samples[:, :, -1] -= 0.75
             if params['visualize_plan']:
-                for (name, traj_set) in [('initial_samples_project', initial_samples), ('initial_samples_0', initial_samples_0)]:
+                if params['project_state']:
+                    iter_set = [('initial_samples_project', initial_samples), ('initial_samples_0', initial_samples_0)]
+                else:
+                    iter_set = [('initial_samples', initial_samples)]
+                for (name, traj_set) in iter_set:
                     for k in range(params['N']):
                         traj_for_viz = traj_set[k, :, :planner.problem.dx]
                         # if params['exclude_index']:
@@ -1239,7 +1251,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 if __name__ == "__main__":
     # get config
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_project_state.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_cnf_only.yaml').read_text())
 
     from tqdm import tqdm
 
@@ -1247,6 +1259,8 @@ if __name__ == "__main__":
     ros_copy_node = None
 
     if config['mode'] == 'hardware':
+        from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
+
         from hardware.hardware_env import HardwareEnv
         default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
                                     torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float(),
@@ -1371,7 +1385,7 @@ if __name__ == "__main__":
         now = datetime.datetime.now().strftime("%m.%d.%y:%I:%M:%S")
     else:
         now = ''
-    start_ind = 0# if config['experiment_name'] == 'allegro_screwdriver_csvto_diff_sine_cosine_eps_.015_2.5_damping_pi_6' else 0
+    start_ind = 6# if config['experiment_name'] == 'allegro_screwdriver_csvto_diff_sine_cosine_eps_.015_2.5_damping_pi_6' else 0
     for i in tqdm(range(start_ind, config['num_trials'])):
     # for i in tqdm([1, 2, 4, 7]):
         if config['mode'] != 'hardware':

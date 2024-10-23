@@ -555,6 +555,8 @@ class TemporalUnetStateAction(nn.Module):
         self.problem_dict = problem_dict
         self.transition_dim = transition_dim
 
+        self.reset_z()
+
     def vmapped_fwd(self, t, x, context=None):
         return self(t.reshape(1), x.unsqueeze(0), context.unsqueeze(0)).squeeze(0)
 
@@ -625,7 +627,8 @@ class TemporalUnetStateAction(nn.Module):
     def c_state_mask(self, context, x):
         c_state = context
         z_dim = self.problem_dict[c_state].dz
-        mask = torch.ones((self.transition_dim + z_dim), device=x.device).bool()
+        # mask = torch.ones((self.transition_dim + z_dim), device=x.device).bool()
+        mask = torch.ones((self.transition_dim), device=x.device).bool()
         if c_state == (-1, -1, -1):
             mask[27:36] = False
         elif c_state == (-1 , 1, 1):
@@ -633,40 +636,58 @@ class TemporalUnetStateAction(nn.Module):
         elif c_state == (1, -1, -1):
             mask[30:36] = False
         # Concat False to mask to match the size of x
-        mask = torch.cat((mask, torch.zeros(self.transition_dim + z_dim -x.shape[-1], device=x.device).bool()))
+        # mask = torch.cat((mask, torch.zeros(self.transition_dim + z_dim -x.shape[-1], device=x.device).bool()))
         mask_no_z = mask.clone()
-        if z_dim > 0:
-            mask_no_z[-z_dim:] = False
+        # if z_dim > 0:
+        #     mask_no_z[-z_dim:] = False
         return c_state, mask, mask_no_z
+
+    def init_z(self, x, problem_idx, mask):
+        x_mask = x[:, :, mask]
+        self.z_dict[problem_idx] = self.problem_dict[problem_idx].get_initial_z(x_mask, projected_diffusion=True)
+
+    def reset_z(self):
+        self.z_dict = {k:None for k in self.problem_dict}
 
     def project(self, x_orig, x, context, p_matrix=None, xi_C=None):
         if self.problem_dict is not None:
             for problem_idx in self.problem_dict:
-                problem = self.problem_dict[problem_idx]
+
                 p_idx = sum(problem_idx)
-                c_state, mask, mask_no_z = self.c_state_mask(problem_idx, x)
-                num_dim = mask.long().sum()
 
                 x_this_problem = x_orig[context.sum(-1) == p_idx][:, None] * self.x_std + self.x_mean
+                if x_this_problem.shape[0] == 0:
+                    continue
                 grad_x_this_problem = x[context.sum(-1) == p_idx][:, None] * self.x_std
                 b = x_this_problem.shape[0]
 
+                c_state, mask, mask_no_z = self.c_state_mask(problem_idx, x)
+                # if self.z_dict[problem_idx] is None:
+                # self.init_z(x_this_problem, problem_idx, mask)
+                # z_this_problem = self.z_dict[problem_idx]
+                problem = self.problem_dict[problem_idx]
+                z_this_problem = torch.zeros((x_this_problem.shape[0], 1, problem.dz), device=x.device, dtype=x.dtype)
+
                 dtype = torch.float64
                 z_dim = problem.dz
-                update_this_c = torch.cat((grad_x_this_problem[:, :, mask], torch.zeros((b, 1, z_dim), device=x.device, dtype=dtype)), dim=-1)
+                # update_this_c = torch.cat((grad_x_this_problem[:, :, mask], torch.zeros((b, 1, z_dim), device=x.device, dtype=dtype)), dim=-1)
+                update_this_c = grad_x_this_problem[:, :, mask].to(dtype)
                 
-                if x_this_problem.shape[0] == 0:
-                    continue
-
                 if p_matrix is None:
 
-                    problem._preprocess(x_this_problem[:, :, mask_no_z], projected_diffusion=True)
-                    C, dC, _ = problem.combined_constraints(x_this_problem[:, :, mask], compute_hess=False, projected_diffusion=True)
+                    problem._preprocess(x_this_problem[:, :, mask_no_z], dxu=grad_x_this_problem, projected_diffusion=True)
+                    x_this_problem_for_cnstrt = torch.cat((x_this_problem, z_this_problem), dim=-1)
+                    # x_this_problem_for_cnstrt = x_this_problem
+                    # num_dim = x_this_problem_for_cnstrt.shape[-1]
+                    num_dim = x_this_problem.shape[-1]
+                    C, dC, _ = problem.combined_constraints(x_this_problem_for_cnstrt, 
+                                                            compute_hess=False, projected_diffusion=True,
+                                                            include_slack=True)
 
                     C = C.to(dtype=dtype).squeeze()
                     dC = dC.to(dtype=dtype).squeeze()
 
-                    eye = torch.eye(C.shape[1]).repeat(b, 1, 1).to(device=C.device, dtype=dtype)
+                    eye = torch.eye(dC.shape[1]).repeat(b, 1, 1).to(device=C.device, dtype=dtype)
                     
                     try:
                         dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1) +
@@ -678,6 +699,7 @@ class TemporalUnetStateAction(nn.Module):
                     eye2 = torch.eye(x_this_problem.shape[-2] * num_dim, device=x.device, dtype=dtype).unsqueeze(0)
 
                     p_matrix = (eye2 - projection)
+                    # p_matrix = p_matrix[:, :-z_dim, :-z_dim]
                 update_this_c = p_matrix @ update_this_c.reshape(b, -1, 1)
                 update_this_c = update_this_c.squeeze(-1)
 
@@ -687,11 +709,12 @@ class TemporalUnetStateAction(nn.Module):
                     # Update to decrease constraint violation
                     xi_C = dCdCT_inv @ C.unsqueeze(-1)
                     xi_C = (dC.permute(0, 2, 1) @ xi_C).squeeze(-1)
+                    # xi_C = xi_C[:, :-z_dim]
 
-                update_this_c -= .1 * xi_C
+                update_this_c -= 10 * xi_C
 
-                if problem.dz > 0:
-                    update_this_c = update_this_c[:, : :-problem.dz]
+                # if problem.dz > 0:
+                #     update_this_c = update_this_c[:, : :-problem.dz]
 
                 update_this_c = (update_this_c) / self.x_std[mask]
 
@@ -707,15 +730,15 @@ class TemporalUnetStateAction(nn.Module):
 
         return x, p_matrix, xi_C
 
-    @torch.compile(mode='max-autotune')
+    # @torch.compile(mode='max-autotune')
     def compiled_conditional_test_fwd(self, t, x, context):
         x_orig, x = self(t, x, context, dropout=False)
         return x_orig, x
 
     def compiled_conditional_test(self, t, x, context):
         x_orig, x = self.compiled_conditional_test_fwd(t, x, context)
-        x, x = self.project(x_orig, x, context)
-        return x, x
+        x, p_matrix, xi_C = self.project(x_orig, x, context)
+        return x, p_matrix, xi_C
 
     @torch.compile(mode='max-autotune')
     def compiled_unconditional_test(self, t, x):

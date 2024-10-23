@@ -29,7 +29,7 @@ def add_text_to_imgs(imgs, labels):
 
 for trial_num in range(0, config['num_trials']):
 # for trial_num in [4, 9]:
-    fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/csvgd/trial_{trial_num + 1}')
+    fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}./csvgd/trial_{trial_num + 1}')
 
 
     isaac_imgs = [fpath / img for img in sorted(os.listdir(fpath)) if img[-3:] == 'png'][6:]

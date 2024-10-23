@@ -315,7 +315,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         self.grad_singularity_constr = vmap(jacrev(self._singularity_constr))
         self.grad_euler_to_angular_velocity = jacrev(euler_to_angular_velocity, argnums=(0, 1))
 
-    def _preprocess(self, xu, projected_diffusion=False):
+    def _preprocess(self, xu, dxu=None, projected_diffusion=False):
         N = xu.shape[0]
         if not projected_diffusion:
             xu = xu.reshape(N, self.T, -1)
@@ -332,10 +332,28 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             pass
         else:
             raise NotImplementedError
-        self._preprocess_fingers(q, theta)
+        if dxu is not None:
+            delta_q = dxu[:, :, :4 * self.num_fingers]
+            delta_theta = dxu[:, :, 4 * self.num_fingers: 4 * self.num_fingers + self.obj_dof]
+            if self.obj_ori_rep == 'axis_angle':
+                delta_theta = axis_angle_to_euler(delta_theta).float()
+            elif self.obj_ori_rep == 'euler':
+                pass
+            else:
+                raise NotImplementedError
+            delta_theta = delta_theta.float()
+            delta_delta_q = dxu[:, :, 4 * self.num_fingers + self.obj_dof: 4 * self.num_fingers + self.obj_dof + 4 * self.num_fingers]
+            delta_f = dxu[:, :, 4 * self.num_fingers + self.obj_dof + 4 * self.num_fingers:]
 
-    def _preprocess_fingers(self, q, theta):
+            self.data['delta_q'] = delta_q.float()
+            self.data['delta_theta'] = delta_theta.float()
+            self.data['delta_delta_q'] = delta_delta_q.float()
+            self.data['delta_f'] = delta_f.float()
+        self._preprocess_fingers(q, theta, projected_diffusion=projected_diffusion)
+
+    def _preprocess_fingers(self, q, theta, projected_diffusion=False):
         N, _, _ = q.shape
+        T_offset = 0 if projected_diffusion else 1
         obj_dof = theta.shape[-1]
 
         # reshape to batch across time
@@ -352,30 +370,30 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                                                               compute_hessian=False)
         for i, finger in enumerate(self.fingers):
             self.data[finger] = {}
-            self.data[finger]['sdf'] = ret_scene['sdf'][:, i].reshape(N, self.T + 1)
+            self.data[finger]['sdf'] = ret_scene['sdf'][:, i].reshape(N, self.T + T_offset)
             # reshape and throw away data for unused fingers
             grad_g_q = ret_scene.get('grad_sdf', None)
-            self.data[finger]['grad_sdf'] = grad_g_q[:, i].reshape(N, self.T + 1, 16)
+            self.data[finger]['grad_sdf'] = grad_g_q[:, i].reshape(N, self.T + T_offset, 16)
 
             # contact jacobian
             contact_jacobian = ret_scene.get('contact_jacobian', None)
-            self.data[finger]['contact_jacobian'] = contact_jacobian[:, i].reshape(N, self.T + 1, 3, 16)
+            self.data[finger]['contact_jacobian'] = contact_jacobian[:, i].reshape(N, self.T + T_offset, 3, 16)
 
             # contact hessian
             contact_hessian = ret_scene.get('contact_hessian', None)
-            contact_hessian = contact_hessian[:, i].reshape(N, self.T + 1, 3, 16, 16)  # [:, :, :, self.all_joint_index]
+            contact_hessian = contact_hessian[:, i].reshape(N, self.T + T_offset, 3, 16, 16)  # [:, :, :, self.all_joint_index]
             # contact_hessian = contact_hessian[:, :, :, :, self.all_joint_index]  # shape (N, T+1, 3, 8, 8)
 
             # gradient of contact point
             d_contact_loc_dq = ret_scene.get('closest_pt_q_grad', None)
-            d_contact_loc_dq = d_contact_loc_dq[:, i].reshape(N, self.T + 1, 3, 16)  # [:, :, :, self.all_joint_index]
+            d_contact_loc_dq = d_contact_loc_dq[:, i].reshape(N, self.T + T_offset, 3, 16)  # [:, :, :, self.all_joint_index]
             self.data[finger]['closest_pt_q_grad'] = d_contact_loc_dq
             self.data[finger]['contact_hessian'] = contact_hessian
             self.data[finger]['closest_pt_world'] = ret_scene['closest_pt_world'][:, i]
             self.data[finger]['contact_normal'] = ret_scene['contact_normal'][:, i]
 
             # gradient of contact normal
-            self.data[finger]['dnormal_dq'] = ret_scene['dnormal_dq'][:, i].reshape(N, self.T + 1, 3, 16)  # [:, :, :,
+            self.data[finger]['dnormal_dq'] = ret_scene['dnormal_dq'][:, i].reshape(N, self.T + T_offset, 3, 16)  # [:, :, :,
             # self.all_joint_index]
 
             self.data[finger]['dnormal_denv_q'] = ret_scene['dnormal_denv_q'][:, i, :, :obj_dof]
@@ -1226,13 +1244,17 @@ class AllegroContactProblem(AllegroObjectProblem):
             return h.reshape(N, -1), grad_h, hess_h
         return h.reshape(N, -1), grad_h, None
                 
-    def _force_equlibrium_constr_w_force(self, q, u, next_q, force_list, contact_jac_list, contact_point_list):
+    def _force_equlibrium_constr_w_force(self, q, u, next_q, force_list, contact_jac_list, contact_point_list,
+                           delta_q=None):
         # NOTE: the constriant is defined in the robot frame
         # NOTE: the constriant is defined in the robot frame
         # the contact jac an contact points are all in the robot frame
         # this will be vmapped, so takes in a 3 vector and a [num_finger x 3 x 8] jacobian and a dq vector
         obj_robot_frame = self.world_trans.inverse().transform_points(self.object_location.reshape(1, 3))
-        delta_q = q + u - next_q
+        if delta_q is None:
+            delta_q = q + u - next_q
+        else:
+            delta_q = -delta_q * self.dt + u
         torque_list = []
         reactional_torque_list = []
         for i, finger_name in enumerate(self.contact_fingers):
@@ -1293,21 +1315,40 @@ class AllegroContactProblem(AllegroObjectProblem):
             num_forces = self.num_contacts + 1
         else:
             num_forces = self.num_contacts
-        g = self.force_equlibrium_constr(q.reshape(-1, 4 * self.num_contacts),
-                                         u.reshape(-1, 4 * self.num_contacts),
-                                         next_q.reshape(-1, 4 * self.num_contacts),
-                                         force_list.reshape(-1, num_forces, 3),
-                                         contact_jac_list,
-                                         contact_point_list).reshape(N, T, -1)
+
+        if 'delta_q' in self.data:
+            g = self.force_equlibrium_constr(q.reshape(-1, 4 * self.num_contacts),
+                                            u.reshape(-1, 4 * self.num_contacts),
+                                            next_q.reshape(-1, 4 * self.num_contacts),
+                                            force_list.reshape(-1, num_forces, 3),
+                                            contact_jac_list,
+                                            contact_point_list, self.data['delta_q']).reshape(N, T, -1)
+        else:
+            g = self.force_equlibrium_constr(q.reshape(-1, 4 * self.num_contacts),
+                                            u.reshape(-1, 4 * self.num_contacts),
+                                            next_q.reshape(-1, 4 * self.num_contacts),
+                                            force_list.reshape(-1, num_forces, 3),
+                                            contact_jac_list,
+                                            contact_point_list).reshape(N, T, -1)
 
         if compute_grads:
-            dg_dq, dg_du, dg_dnext_q, dg_dforce, dg_djac, dg_dcontact = self.grad_force_equlibrium_constr(
-                q.reshape(-1, 4 * self.num_contacts),
-                u.reshape(-1, 4 * self.num_contacts),
-                next_q.reshape(-1, 4 * self.num_contacts),
-                force_list.reshape(-1, num_forces, 3),
-                contact_jac_list,
-                contact_point_list)
+            if 'delta_q' in self.data:
+                dg_dq, dg_du, dg_dnext_q, dg_dforce, dg_djac, dg_dcontact = self.grad_force_equlibrium_constr(
+                    q.reshape(-1, 4 * self.num_contacts),
+                    u.reshape(-1, 4 * self.num_contacts),
+                    next_q.reshape(-1, 4 * self.num_contacts),
+                    force_list.reshape(-1, num_forces, 3),
+                    contact_jac_list,
+                    contact_point_list, self.data['delta_q'])
+            else:
+                dg_dq, dg_du, dg_dnext_q, dg_dforce, dg_djac, dg_dcontact = self.grad_force_equlibrium_constr(
+                    q.reshape(-1, 4 * self.num_contacts),
+                    u.reshape(-1, 4 * self.num_contacts),
+                    next_q.reshape(-1, 4 * self.num_contacts),
+                    force_list.reshape(-1, num_forces, 3),
+                    contact_jac_list,
+                    contact_point_list)
+
             dg_dforce = dg_dforce.reshape(dg_dforce.shape[0], dg_dforce.shape[1], num_forces* 3)
 
             T_range = torch.arange(T, device=device)
@@ -1373,11 +1414,16 @@ class AllegroContactProblem(AllegroObjectProblem):
                            next_theta,
                            contact_jac,
                            contact_loc,
-                           contact_normal):
+                           contact_normal,
+                           dq=None,
+                           obj_omega=None):
         # N, _, _ = current_q.shape
         # T = self.T
         # approximate q dot and theta dot
-        dq = next_q - current_q
+        if dq is None:
+            dq = next_q - current_q
+        else:
+            dq *= self.dt
         if self.obj_dof == 3:
             if self.obj_dof_type == 'x_y_theta':
                 d_omega = next_theta[-1:] - current_theta[-1:]
@@ -1388,7 +1434,8 @@ class AllegroContactProblem(AllegroObjectProblem):
                 tmp = torch.zeros_like(obj_v[-1:])
                 obj_v = torch.cat((obj_v, tmp), -1)
             else:
-                obj_omega = euler_to_angular_velocity(current_theta, next_theta)
+                if obj_omega is None:
+                    obj_omega = euler_to_angular_velocity(current_theta, next_theta)
                 obj_v = torch.zeros_like(obj_omega)
         elif self.obj_dof == 1:
             dtheta = next_theta - current_theta
@@ -1464,12 +1511,21 @@ class AllegroContactProblem(AllegroObjectProblem):
         current_theta = theta[:, :-1]
         next_theta = theta[:, 1:]
         
-        g = self.kinematics_constr(current_q,
-                                   next_q,
-                                   current_theta,
-                                   next_theta,
-                                   contact_jacobian, contact_loc,
-                                   contact_normal).reshape(N, -1)
+        if 'delta_q' in self.data:
+            g = self.kinematics_constr(current_q,
+                                    next_q,
+                                    current_theta,
+                                    next_theta,
+                                    contact_jacobian, contact_loc,
+                                    contact_normal, self.data['delta_q'],
+                                    self.data['delta_theta']).reshape(N, -1)
+        else:
+            g = self.kinematics_constr(current_q,
+                                    next_q,
+                                    current_theta,
+                                    next_theta,
+                                    contact_jacobian, contact_loc,
+                                    contact_normal).reshape(N, -1)
         g_dim = g.reshape(N, T, -1).shape[-1]
 
         if compute_grads:
@@ -1477,9 +1533,16 @@ class AllegroContactProblem(AllegroObjectProblem):
             T_range_minus = torch.arange(T - 1, device=device)
             T_range_plus = torch.arange(1, T, device=device)
 
-            dg_d_current_q, dg_d_next_q, dg_d_current_theta, dg_d_next_theta, dg_d_contact_jac, dg_d_contact_loc, dg_d_normal \
-                = self.grad_kinematics_constr(current_q, next_q, current_theta, next_theta, contact_jacobian,
-                                              contact_loc, contact_normal)
+            if 'delta_q' in self.data:
+                dg_d_current_q, dg_d_next_q, dg_d_current_theta, dg_d_next_theta, dg_d_contact_jac, dg_d_contact_loc, dg_d_normal \
+                    = self.grad_kinematics_constr(current_q, next_q, current_theta, next_theta, contact_jacobian,
+                                                contact_loc, contact_normal, self.data['delta_q'],
+                                                self.data['delta_theta'])
+            else:
+                dg_d_current_q, dg_d_next_q, dg_d_current_theta, dg_d_next_theta, dg_d_contact_jac, dg_d_contact_loc, dg_d_normal \
+                    = self.grad_kinematics_constr(current_q, next_q, current_theta, next_theta, contact_jacobian,
+                                                contact_loc, contact_normal)
+
             with torch.no_grad():
                 dg_d_current_q = dg_d_current_q + dg_d_contact_jac.reshape(N, T, g_dim, -1) @ \
                                  dJ_dq.reshape(N, T, -1, 4 * self.num_contacts)
@@ -1810,7 +1873,7 @@ class AllegroContactProblem(AllegroObjectProblem):
             return result_dict
 
         if compute_grads:
-            grad_h = grad_h.reshape(N, -1, (self.T + 1 if projected_diffusion else self.T) * self.d)
+            grad_h = grad_h.reshape(N, -1, (self.T) * self.d)
         else:
             return h, None, None
         if compute_hess:

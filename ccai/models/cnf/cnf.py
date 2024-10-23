@@ -81,10 +81,12 @@ def set_cnf_options(solver, model):
             module.atol = 1e-5
             module.rtol = 1e-5
 
+            module.solver_options['first_step'] = 0.2
             # If using fixed-grid adams, restrict order to not be too high.
             if solver in ['fixed_adams', 'explicit_adams']:
                 module.solver_options['max_order'] = 4
-            module.solver_options['first_step'] = 0.2
+            if solver == 'rk4':
+                module.solver_options['step_size'] = .1
 
             # Set the test settings
             module.test_solver = solver
@@ -161,13 +163,15 @@ class TrajectoryCNF(nn.Module):
         noise_dist = torch.distributions.Normal(self.prior_mu, self.prior_sigma)
 
         odefunc = ODEfunc(
-            diffeq=self.masked_grad if self.loss_type == 'conditional_ot_sb' else self.state_control_only_forward,
+            diffeq=self.masked_grad,# if self.loss_type == 'conditional_ot_sb' else self.state_control_only_forward,
             divergence_fn='approximate',
             residual=False,
             rademacher=False,
         )
 
-        solver = 'dopri5'
+        # solver = 'dopri5'
+        # solver = 'fehlberg2'
+        solver = 'rk4'
         self.flow = CNF(odefunc=odefunc,
                         T=1.0,
                         train_T=False,
@@ -192,20 +196,12 @@ class TrajectoryCNF(nn.Module):
         return dx * (self.horizon-1)
 
     def masked_grad(self, t, x, context=None):
-        dx, _ = self.model(t, x, context)
+        print(f'step {self.step_id}')
+        self.step_id += 1
+            
+        dx, _, _ = self.model.compiled_conditional_test(t, x, context)
 
-        if len(self._grad_mask.shape) == 4:
-            num_samples, num_sub_trajs = self._grad_mask.shape[:2]
-
-            dx = dx.reshape(-1, num_sub_trajs, self.horizon, self.xu_dim)
-            for i in range(num_sub_trajs - 1):
-                tmp = dx[:, i, -1, :self.dx].clone()
-                dx[:, i, -1, :self.dx] = (tmp + dx[:, i + 1, 0, :self.dx]) / 2
-                dx[:, i + 1, 0, :self.dx] = dx[:, i, -1, :self.dx]
-
-            dx = dx.reshape(-1, self.horizon, self.xu_dim)
-
-        return dx# * self._grad_mask.reshape(-1, self.horizon, self.xu_dim)
+        return dx
 
     def flow_matching_loss(self, xu, context, mask=None):
         if self.loss_type == 'diffusion':
@@ -330,37 +326,53 @@ class TrajectoryCNF(nn.Module):
         if H is None:
             H = self.horizon
 
+        sigma_save = self.FM.sigma
+        self.FM.sigma = 0
         num_sub_trajectories = H // self.horizon
         sample_shape = torch.Size([N, num_sub_trajectories])
         assert context.shape[1] == num_sub_trajectories
 
-        if noise is None:
-            prior = torch.distributions.Normal(self.prior_mu, self.prior_sigma)
-            noise = prior.sample(sample_shape=sample_shape).to(dtype=context, device=context.device)
+        # if noise is None:
+        #     prior = torch.distributions.Normal(self.prior_mu, self.prior_sigma)
+        #     noise = prior.sample(sample_shape=sample_shape).to(dtype=context.dtype, device=context.device)
 
-        # if longer horizon, set noise of starts / ends to be same value
-        for i in range(num_sub_trajectories - 1):
-            noise[:, i, -1] = noise[:, i + 1, 0]
+        # # if longer horizon, set noise of starts / ends to be same value
+        # for i in range(num_sub_trajectories - 1):
+        #     noise[:, i, -1] = noise[:, i + 1, 0]
 
+        self.noise = condition[0][1].clone()
+        self.noise = self.noise.reshape(1, -1).repeat(N, 1)
+        self.noise = torch.cat((self.noise, torch.randn(N, self.du, device=self.noise.device)), dim=-1)
         # manually set the conditions
         if condition is not None:
-            noise[:, 0] = self._apply_conditioning(noise[:, 0], condition)
-            self._grad_mask = mask
-            if num_sub_trajectories > 1:
-                self._grad_mask = torch.cat((self._grad_mask[:, None],
-                                             torch.ones(N, num_sub_trajectories - 1,
-                                                        self.horizon, self.xu_dim, device=mask.device)), dim=1)
+            self.condition = condition
+            # noise[:, 0] = self._apply_conditioning(noise[:, 0], condition)
+            # self._grad_mask = mask
+            # if num_sub_trajectories > 1:
+                # self._grad_mask = torch.cat((self._grad_mask[:, None],
+                #                              torch.ones(N, num_sub_trajectories - 1,
+                #                                         self.horizon, self.xu_dim, device=mask.device)), dim=1)
         else:
-            self._grad_mask = torch.ones_like(noise)
-        self._grad_mask = self._grad_mask.to(device=noise.device)
-        log_prob = torch.zeros(N * num_sub_trajectories, device=noise.device)
-        out = self.flow(noise.reshape(-1, self.horizon, self.xu_dim),
-                        logpx=log_prob,
-                        context=context.reshape(-1, context.shape[-1]),
-                        reverse=False,
-                        integration_times=torch.linspace(0, 1, self.horizon, device=noise.device) if self.loss_type=='state_control_only' else None)
+            self.condition = None
+            # self._grad_mask = torch.ones_like(noise)
+        # self._grad_mask = self._grad_mask.to(device=self.noise.device)
+        # self.noise = self._apply_conditioning(self.noise, None, condition=condition)
+        log_prob = torch.zeros(N * num_sub_trajectories, device=self.noise.device)
+
+        self.step_id = 0
+        with torch.no_grad():
+            a = time.perf_counter()
+            self.model.reset_z()
+            out = self.flow(self.noise,
+                            logpx=log_prob,
+                            context=context.reshape(-1, context.shape[-1]),
+                            reverse=False,
+                            integration_times=torch.linspace(0, 1, self.horizon, device=self.noise.device))
+            print(f'Elapsed time: {time.perf_counter() - a}')
 
         trajectories, log_prob = out[:2]
+        trajectories = trajectories.permute(1, 0, 2)
+        self.FM.sigma = sigma_save
 
         return trajectories.reshape(N, -1, self.xu_dim), log_prob.reshape(N, -1).sum(dim=1)
 

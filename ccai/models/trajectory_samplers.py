@@ -276,10 +276,11 @@ class TrajectoryCNFModel(TrajectoryCNF):
 
         if project:
             samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.project(H=H, context=context, condition=condition)
+            return samples, samples_0, (all_losses, all_samples, all_likelihoods)
         else:
             samples = self._sample(H=H, context=context, condition=condition)  # .reshape(-1, H#,
         #         self.dx + self.du)
-        return samples, samples_0, (all_losses, all_samples, all_likelihoods)
+            return samples
 
 
     def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
@@ -348,7 +349,10 @@ class TrajectorySampler(nn.Module):
         else:
             norm_past = past
 
-        samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project)
+        if project:
+            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project)
+        else:
+            samples = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project)
         # if len(samples) == N:
         #     x = samples
         #     c = None
@@ -361,7 +365,10 @@ class TrajectorySampler(nn.Module):
             x, c, likelihood = samples
             
         if self.type != 'latent_diffusion':
-            return x * self.x_std + self.x_mean, c, likelihood, samples_0 * self.x_std + self.x_mean, (all_losses, all_samples, all_likelihoods)
+            if project:
+                return x * self.x_std + self.x_mean, c, likelihood, samples_0 * self.x_std + self.x_mean, (all_losses, all_samples, all_likelihoods)
+            else:
+                return x * self.x_std + self.x_mean, c, likelihood
         else:
             return x, c, likelihood
 
