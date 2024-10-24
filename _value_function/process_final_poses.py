@@ -18,7 +18,8 @@ fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
 filenames = []
 #for i in range(10000/200):
-for i in [1,2,3,4,5,7,8,9,10,11]:
+for i in [1,2,3,4,5,6,7,8,9,10,11,12,14,15,16,17,18,19]:
+#for i in range(19):
     filename = f'/value_datasets/value_dataset_{i*500}.pkl'
     filenames.append(filename)
 
@@ -46,11 +47,12 @@ def calculate_cost(initial_pose, final_pose):
     # final_pose: (N, 20)
     #state = np.concatenate((final_pose[:, :8], final_pose[:, 12:19]), axis=1)
     # we're only actually using the screwdriver values
-    state = screwdriver_pose
+    state = final_pose[-4:-1]
     upright_cost = 20 * np.sum((state[-3:-1]) ** 2) # the screwdriver should only rotate in z direction
     goal_cost = np.sum((1 * (state[-3:] - screwdriver_goal) ** 2)).reshape(-1)
+    total_cost = np.minimum(goal_cost + upright_cost, 10.0)
 
-    return goal_cost + upright_cost, succ
+    return total_cost, succ
 
 if __name__ == "__main__":
 
@@ -81,21 +83,25 @@ if __name__ == "__main__":
             combined_costs.extend(costs)
 
     combined_costs = np.array(combined_costs)
-    #print(np.mean(combined_costs))
+    print("success rate: ", len(succs) / (len(succs) + len(fails)))
 
-    # config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
-    # for idx in fails:#succs:
-    #     env.reset(torch.from_numpy(combined_initial_poses[idx]).reshape(1,20).float(), deterministic=True)
-    #     time.sleep(0.5)
-    #     env.reset(torch.from_numpy(combined_final_poses[idx]).reshape(1,20).float(), deterministic=True)
-    #     time.sleep(1.0)
+    vis = False
+    if vis:
+        config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
+        for idx in fails:
+            if combined_costs[idx] > 5.0:
+                env.reset(torch.from_numpy(combined_initial_poses[idx]).reshape(1,20).float(), deterministic=True)
+                time.sleep(0.5)
+                print("cost: ", combined_costs[idx])
+                env.reset(torch.from_numpy(combined_final_poses[idx]).reshape(1,20).float(), deterministic=True)
+                time.sleep(1.0)
 
     pose_cost_dataset = zip(combined_initial_poses, combined_costs)
-    pose_cost_savepath = f'{fpath.resolve()}//value_datasetscombined_value_dataset.pkl'
+    pose_cost_savepath = f'{fpath.resolve()}/value_datasets/combined_value_dataset.pkl'
     with open(pose_cost_savepath, 'wb') as f:
         pkl.dump(pose_cost_dataset, f)
 
-    final_poses_savepath = f'{fpath.resolve()}//value_datasetscombined_final_poses.pkl'
+    final_poses_savepath = f'{fpath.resolve()}/value_datasets/combined_final_poses.pkl'
     final_poses_dataset = combined_final_poses
     with open(final_poses_savepath, 'wb') as f:
         pkl.dump(final_poses_dataset, f)

@@ -68,7 +68,7 @@ def train():
     
     # Initialize W&B
     wandb.init(project="value-function-training", config={
-        "epochs": 500,
+        "epochs": 300,
         "batch_size": 64,
         "learning_rate": 0.0001,
     })

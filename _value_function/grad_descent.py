@@ -20,7 +20,7 @@ def get_data():
     with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
         poses  = pkl.load(file)
     inputs = np.array([t.numpy() for t in poses]).reshape(-1, 20)
-    inputs = torch.from_numpy(inputs)[100:120]
+    inputs = torch.from_numpy(inputs)[300:305]
     
     succ_filename = '/initial_poses/successful_initial_poses.pkl'
 
@@ -72,7 +72,7 @@ def grad_descent():
         #print("mean: ", mean_loss)
         #print("mse: ", mse)
 
-        loss = mse + 2.0 * mean_loss
+        loss = mse #+ 0.1 * mean_loss
         loss.backward()
 
         # Set gradients of the last four values of each pose to 0
@@ -95,12 +95,14 @@ def grad_descent():
     print(original_costs)
     print(optimized_costs)
 
-    # config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
-    # for initial, optimized in initial_pose_tuples:
-    #     env.reset(torch.from_numpy(initial).reshape(1,20), deterministic=True)
-    #     time.sleep(0.5)
-    #     env.reset(torch.from_numpy(optimized).reshape(1,20).float(), deterministic=True)
-    #     time.sleep(1.0)
+    vis = False
+    if vis:
+        config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
+        for initial, optimized in initial_pose_tuples:
+            env.reset(torch.from_numpy(initial).reshape(1,20), deterministic=True)
+            time.sleep(0.5)
+            env.reset(torch.from_numpy(optimized).reshape(1,20).float(), deterministic=True)
+            time.sleep(1.0)
 
 
     #print(predicted_cost_tuples)

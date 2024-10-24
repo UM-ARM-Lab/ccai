@@ -24,28 +24,28 @@ with open(f'{fpath.resolve()}/eval/initial_and_optimized_poses.pkl', 'rb') as fi
 
 if __name__ == "__main__":
 
-    final_pose_tuples = []
+    pose_tuples = []
 
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
 
     for i in tqdm(range(len(initial_poses))):
 
-        _, initial_final_pose, succ = do_turn(optimized_poses[i].reshape(1,20), 
+        _, initial_final_pose, succ = do_turn(initial_poses[i].reshape(1,20), 
                                               config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
  
         _, optimized_final_pose, succ = do_turn(optimized_poses[i].reshape(1,20), 
                                                 config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
 
 
-        final_pose_tuples.append((initial_final_pose, optimized_final_pose))
+        pose_tuples.append((initial_poses[i], initial_final_pose, optimized_final_pose))
 
     
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
     start_idx = config['start_idx']
-    savepath = f'{fpath.resolve()}/eval/final_pose_comparisons_{1}.pkl'
+    savepath = f'{fpath.resolve()}/eval/final_pose_comparisons_mse_5samples.pkl'
     with open(savepath, 'wb') as f:
-        pkl.dump(final_pose_tuples, f)
+        pkl.dump(pose_tuples, f)
 
     print(f'saved to {savepath}')
     #emailer().send()

@@ -1,3 +1,4 @@
+from process_final_poses import calculate_cost
 import pathlib
 import numpy as np
 import pickle as pkl
@@ -8,15 +9,14 @@ from torch.utils.data import random_split, DataLoader
 import wandb
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
-from process_final_poses import calculate_cost
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
 
-with open(f'{fpath.resolve()}/eval/final_pose_comparisons_0.pkl', 'rb') as file:
+with open(f'{fpath.resolve()}/eval/final_pose_comparisons_mse2.pkl', 'rb') as file:
     tuples = pkl.load(file)
-    initial_final_poses, optimized_final_poses = zip(*tuples)
+    initial_poses, initial_final_poses, optimized_final_poses = zip(*tuples)
     initial_final_poses = np.array(initial_final_poses).reshape(-1, 20)
     optimized_final_poses = np.array(optimized_final_poses).reshape(-1, 20)
 
@@ -27,8 +27,13 @@ with open(f'{fpath.resolve()}/initial_poses/initial_poses_10k.pkl', 'rb') as fil
 
 if __name__ == "__main__":
 
-    initial_costs = calculate_cost(initial_final_poses)
-    optimized_costs = calculate_cost(optimized_final_poses)
+    initial_costs = []
+    optimized_costs = []
+    for i in range(len(initial_poses)):
+        before, _ = calculate_cost(initial_poses[i].numpy(), initial_final_poses[i])
+        initial_costs.append(before)
+        after, _ = calculate_cost(initial_poses[i].numpy(), optimized_final_poses[i])
+        optimized_costs.append(after)
     
     plt.figure(figsize=(10, 6))
     # Scatter costs
@@ -45,27 +50,27 @@ if __name__ == "__main__":
     plt.grid(True)
     plt.show()
 
-    pca = PCA(n_components=3)
-    pca.fit(tenk_poses)
+    # pca = PCA(n_components=3)
+    # pca.fit(tenk_poses)
 
-    #initial_final_poses_pca = pca.transform(initial_final_poses)
-    initial_final_poses_pca = pca.transform(tenk_poses)
+    # #initial_final_poses_pca = pca.transform(initial_final_poses)
+    # initial_final_poses_pca = pca.transform(tenk_poses)
 
-    optimized_final_poses_pca = pca.transform(optimized_final_poses)
+    # optimized_final_poses_pca = pca.transform(optimized_final_poses)
 
-    fig = plt.figure(figsize=(10, 6))
-    ax = fig.add_subplot(111, projection='3d')
+    # fig = plt.figure(figsize=(10, 6))
+    # ax = fig.add_subplot(111, projection='3d')
 
-    # Initial poses
-    ax.scatter(initial_final_poses_pca[:, 0], initial_final_poses_pca[:, 1], initial_final_poses_pca[:, 2], color='blue', label='Initial Poses')
-    # Optimized poses
-    #ax.scatter(optimized_final_poses_pca[:, 0], optimized_final_poses_pca[:, 1], optimized_final_poses_pca[:, 2], color='red', label='Optimized Poses')
+    # # Initial poses
+    # ax.scatter(initial_final_poses_pca[:, 0], initial_final_poses_pca[:, 1], initial_final_poses_pca[:, 2], color='blue', label='Initial Poses')
+    # # Optimized poses
+    # #ax.scatter(optimized_final_poses_pca[:, 0], optimized_final_poses_pca[:, 1], optimized_final_poses_pca[:, 2], color='red', label='Optimized Poses')
 
-    # Labels and legend
-    ax.set_xlabel('PC1')
-    ax.set_ylabel('PC2')
-    ax.set_zlabel('PC3')
-    ax.set_title('PCA of Initial and Optimized Final Poses')
-    ax.legend()
+    # # Labels and legend
+    # ax.set_xlabel('PC1')
+    # ax.set_ylabel('PC2')
+    # ax.set_zlabel('PC3')
+    # ax.set_title('PCA of Initial and Optimized Final Poses')
+    # ax.legend()
 
-    plt.show()
+    # plt.show()
