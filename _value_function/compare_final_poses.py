@@ -1,3 +1,4 @@
+from screwdriver_problem import init_env
 from process_final_poses import calculate_cost
 import pathlib
 import numpy as np
@@ -9,14 +10,15 @@ from torch.utils.data import random_split, DataLoader
 import wandb
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
+import time
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
 
-with open(f'{fpath.resolve()}/eval/final_pose_comparisons_mse2.pkl', 'rb') as file:
+with open(f'{fpath.resolve()}/eval/final_pose_comparisons_mse_5samples.pkl', 'rb') as file:
     tuples = pkl.load(file)
-    initial_poses, initial_final_poses, optimized_final_poses = zip(*tuples)
+    initial_poses, optimized_poses, initial_final_poses, optimized_final_poses = zip(*tuples)
     initial_final_poses = np.array(initial_final_poses).reshape(-1, 20)
     optimized_final_poses = np.array(optimized_final_poses).reshape(-1, 20)
 
@@ -32,7 +34,7 @@ if __name__ == "__main__":
     for i in range(len(initial_poses)):
         before, _ = calculate_cost(initial_poses[i].numpy(), initial_final_poses[i])
         initial_costs.append(before)
-        after, _ = calculate_cost(initial_poses[i].numpy(), optimized_final_poses[i])
+        after, _ = calculate_cost(optimized_poses[i].numpy(), optimized_final_poses[i])
         optimized_costs.append(after)
     
     plt.figure(figsize=(10, 6))
@@ -49,6 +51,28 @@ if __name__ == "__main__":
     plt.legend()
     plt.grid(True)
     plt.show()
+
+    vis = True
+    if vis:
+        config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
+        for i in range(len(initial_poses)):
+
+            print("original turn")
+            print("cost: ", initial_costs[i])
+
+            env.reset(torch.from_numpy(initial_poses[i]).reshape(1,20).float(), deterministic=True)
+            time.sleep(0.5)
+            env.reset(torch.from_numpy(initial_final_poses[i]).reshape(1,20).float(), deterministic=True)
+            time.sleep(1.0)
+
+            print("optimized turn")
+            print("cost: ", optimized_costs[i])
+
+            env.reset(torch.from_numpy(optimized_poses[i]).reshape(1,20).float(), deterministic=True)
+            time.sleep(0.5)
+            env.reset(torch.from_numpy(optimized_final_poses[i]).reshape(1,20).float(), deterministic=True)
+            time.sleep(1.0)
+
 
     # pca = PCA(n_components=3)
     # pca.fit(tenk_poses)

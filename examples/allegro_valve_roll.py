@@ -243,8 +243,8 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             'kinematics_con_mean': self.kinematics_con_mean,
             'friction_con_mean': self.friction_con_mean
         }
-        with open(save_dir, 'wb') as f:
-            pkl.dump(result_dict, f)
+        #with open(save_dir, 'wb') as f:
+        #    pkl.dump(result_dict, f)
 
     def _preprocess(self, xu):
         N = xu.shape[0]
@@ -2076,8 +2076,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             temp_for_plot = np.stack(traj_history, axis=0)
             if k >= 2:
                 axes[finger].plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray', label='actual')
-    with open(f'{fpath.resolve()}/info.pkl', 'wb') as f:
-        pkl.dump(info_list, f)
+    #with open(f'{fpath.resolve()}/info.pkl', 'wb') as f:
+    #    pkl.dump(info_list, f)
     handles, labels = plt.gca().get_legend_handles_labels()
     newLabels, newHandles = [], []
     for handle, label in zip(handles, labels):

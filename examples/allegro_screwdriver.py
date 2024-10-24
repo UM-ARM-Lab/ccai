@@ -692,7 +692,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             if k >= 2:
                 axes[finger].plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray', label='actual')
     with open(f'{fpath.resolve()}/info.pkl', 'wb') as f:
-        pkl.dump(info_list, f)
+        #pkl.dump(info_list, f)
+        pass
     # action_list = torch.concat(action_list, dim=0)
     # with open(f'{fpath.resolve()}/action.pkl', 'wb') as f:
     #     pkl.dump(action_list, f)
@@ -727,9 +728,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     print(f'Controller: {params["controller"]} Final distance to goal: {final_distance_to_goal}')
     print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
 
-    np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
+    #np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
             #  constr=constraint_val.cpu().numpy(),
-             d2goal=final_distance_to_goal.cpu().numpy())
+    #         d2goal=final_distance_to_goal.cpu().numpy())
     env.reset()
     return final_distance_to_goal.cpu().detach().item()
 

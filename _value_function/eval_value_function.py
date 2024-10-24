@@ -38,7 +38,7 @@ if __name__ == "__main__":
                                                 config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
 
 
-        pose_tuples.append((initial_poses[i], initial_final_pose, optimized_final_pose))
+        pose_tuples.append((initial_poses[i], optimized_poses[i], initial_final_pose, optimized_final_pose))
 
     
     fpath = pathlib.Path(f'{CCAI_PATH}/data')

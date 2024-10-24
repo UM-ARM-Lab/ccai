@@ -20,7 +20,7 @@ def get_data():
     with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
         poses  = pkl.load(file)
     inputs = np.array([t.numpy() for t in poses]).reshape(-1, 20)
-    inputs = torch.from_numpy(inputs)[300:305]
+    inputs = torch.from_numpy(inputs)[400:405]
     
     succ_filename = '/initial_poses/successful_initial_poses.pkl'
 
