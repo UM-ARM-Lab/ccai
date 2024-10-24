@@ -30,9 +30,9 @@ with open(f'{fpath.resolve()}/initial_poses/initial_poses_10k.pkl', 'rb') as fil
 
 pose_tuples = []
 
-config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
+config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
 n_succ = 0
-n_trials = 5
+n_trials = 500
 for i in tqdm(range(n_trials)):
     
     idx = i + config['start_idx']
