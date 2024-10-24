@@ -56,22 +56,32 @@ if __name__ == "__main__":
     if vis:
         config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
         for i in range(len(initial_poses)):
+            i=2
+            while True:
+                print("original turn")
+                print("cost: ", initial_costs[i])
 
-            print("original turn")
-            print("cost: ", initial_costs[i])
+                env.reset(initial_poses[i].reshape(1,20).float(), deterministic=True)
+                time.sleep(0.5)
+                env.reset(torch.from_numpy(initial_final_poses[i]).reshape(1,20).float(), deterministic=True)
+                time.sleep(1.0)
 
-            env.reset(torch.from_numpy(initial_poses[i]).reshape(1,20).float(), deterministic=True)
-            time.sleep(0.5)
-            env.reset(torch.from_numpy(initial_final_poses[i]).reshape(1,20).float(), deterministic=True)
-            time.sleep(1.0)
+                print("optimized turn")
+                print("cost: ", optimized_costs[i])
 
-            print("optimized turn")
-            print("cost: ", optimized_costs[i])
+                env.reset(optimized_poses[i].reshape(1,20).float(), deterministic=True)
+                time.sleep(0.5)
+                env.reset(torch.from_numpy(optimized_final_poses[i]).reshape(1,20).float(), deterministic=True)
+                time.sleep(1.0)
 
-            env.reset(torch.from_numpy(optimized_poses[i]).reshape(1,20).float(), deterministic=True)
-            time.sleep(0.5)
-            env.reset(torch.from_numpy(optimized_final_poses[i]).reshape(1,20).float(), deterministic=True)
-            time.sleep(1.0)
+
+
+                # print("original pose")
+                # env.reset(initial_poses[i].reshape(1,20).float(), deterministic=True)
+                # time.sleep(0.5)
+                # print("optimized pose")
+                # env.reset(optimized_poses[i].reshape(1,20).float(), deterministic=True)
+                # time.sleep(1.0)
 
 
     # pca = PCA(n_components=3)
