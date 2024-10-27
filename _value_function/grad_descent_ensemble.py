@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.optim as optim
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
-from train_value_function import Net
+from train_value_function import Net, query_ensemble
 import time
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
@@ -24,15 +24,8 @@ def get_data():
     inputs = torch.from_numpy(total_poses)[0:50]
     return inputs
 
-def query_ensemble(poses, models):
-    costs = []
-    for model in models:
-        costs.append(model(poses))
-    costs = torch.stack(costs)
-    return costs
-
 def grad_descent():
-    checkpoints = torch.load(open(f'{fpath.resolve()}/value_functions/ensemble.pkl', 'rb'))
+    checkpoints = torch.load(open(f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl', 'rb'))
     models = []
     for checkpoint in checkpoints:
         model = Net(shape[0], shape[1])
@@ -60,7 +53,7 @@ def grad_descent():
     model.eval()
 
     # gradient descent
-    num_iterations = 1000
+    num_iterations = 10000
     target_value = torch.tensor([0.0], dtype=torch.float32)
 
     pose_optimization_trajectory = []
@@ -99,7 +92,7 @@ def grad_descent():
     predicted_cost_tuples = [(initial, optimized) for initial, optimized in zip(original_costs, optimized_costs)]
 
     # print(original_costs)
-    print("new predicted costs: ", optimized_costs)
+    print("mean of new predicted costs: ", optimized_costs.mean())
 
     vis = False
     if vis:

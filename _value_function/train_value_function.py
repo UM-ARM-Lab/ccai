@@ -137,26 +137,41 @@ def train():
 def save(model_to_save, path):
     torch.save(model_to_save, path)
 
-def eval(model_name):
+def query_ensemble(poses, models):
+    costs = []
+    for model in models:
+        costs.append(model(poses))
+    costs = torch.stack(costs)
+    return costs
+
+def eval(model_name, ensemble = False):
     shape = (20,1)
     
     #model_name = input("Enter model name: ")
     train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std = load_data()
-    model = Net(shape[0], shape[1])
-    checkpoint = torch.load(f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
-    model.load_state_dict(checkpoint['model_state'])
-
-    # plot some predictions
-    model.eval()
+    if not ensemble:
+        model = Net(shape[0], shape[1])
+        checkpoint = torch.load(f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
+        model.load_state_dict(checkpoint['model_state'])
+        model.eval()
+    else:
+        checkpoints = torch.load(f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
+        models = []
+        for checkpoint in checkpoints:
+            model = Net(shape[0], shape[1])
+            model.load_state_dict(checkpoint['model_state'])
+            models.append(model)
     
     def plot_loader(loader, title = ''):
         with torch.no_grad():
             actual_values = []
             predicted_values = []
-            
 
             for inputs, labels in loader:
-                predictions = model(inputs)
+                if not ensemble:
+                    predictions = model(inputs)
+                else:
+                    predictions = query_ensemble(inputs, models).mean(dim=0)
                 predicted_values.append(predictions.numpy())
                 actual_values.append(labels.numpy())
                 break
@@ -192,11 +207,13 @@ if __name__ == "__main__":
     # model_to_save = train()
     # save(model_to_save, f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
     # eval(model_name = "2") 
+    # exit()
 
 
     ensemble = []
     for i in range(8):
         net = train()
         ensemble.append(net)
-    torch.save(ensemble, f'{fpath.resolve()}/value_functions/ensemble.pkl')
+    torch.save(ensemble, f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl')
+    eval(model_name = "ensemble", ensemble = True)
 

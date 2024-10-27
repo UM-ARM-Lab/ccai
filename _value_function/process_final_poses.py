@@ -48,9 +48,11 @@ def calculate_cost(initial_pose, final_pose):
     #state = np.concatenate((final_pose[:, :8], final_pose[:, 12:19]), axis=1)
     # we're only actually using the screwdriver values
     state = final_pose[-4:-1]
-    upright_cost = 20 * np.sum((state[-3:-1]) ** 2) # the screwdriver should only rotate in z direction
+    
+    # upright_cost = 20 * np.sum((state[-3:-1]) ** 2) # the screwdriver should only rotate in z direction
     goal_cost = np.sum((1 * (state[-3:] - screwdriver_goal) ** 2)).reshape(-1)
-    total_cost = np.minimum(goal_cost + upright_cost, 10.0)
+    # total_cost = np.minimum(goal_cost + upright_cost, 10.0)
+    total_cost = np.minimum(goal_cost, 5.0)
 
     return total_cost, succ
 
@@ -83,7 +85,14 @@ if __name__ == "__main__":
             combined_costs.extend(costs)
 
     combined_costs = np.array(combined_costs)
-    print("success rate: ", len(succs) / (len(succs) + len(fails)))
+    # plot costs
+    # plt.figure(figsize=(10, 6))
+    # plt.hist(combined_costs.flatten(), bins=50, color='blue', label='Costs')
+    # plt.xlabel('Sample Index')
+    # plt.ylabel('Cost Value')
+    # plt.title('Costs')
+    # plt.grid(True)
+    # plt.show()
 
     vis = False
     if vis:

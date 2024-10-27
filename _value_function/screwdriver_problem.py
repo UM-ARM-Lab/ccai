@@ -167,8 +167,8 @@ def solve_turn(env, gym, viewer, params, fpath, initial_pose, state2ee_pos_parti
         torch.tensor(screwdriver_goal_mat).unsqueeze(0).repeat(screwdriver_mat.shape[0],1,1), cos_angle=False).detach().cpu()
 
     final_distance_to_goal = torch.min(distance2goal.abs())
-    np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
-        d2goal=final_distance_to_goal.cpu().numpy())
+    # np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
+    #     d2goal=final_distance_to_goal.cpu().numpy())
 
     state = env.get_state()['q']
     final_state = torch.cat((

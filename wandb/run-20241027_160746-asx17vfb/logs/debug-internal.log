@@ -1,0 +1,19 @@
+{"time":"2024-10-27T16:07:46.507479022-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-27T16:07:46.507487488-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/wandb/run-20241027_160746-asx17vfb/logs/debug-core.log"}
+{"time":"2024-10-27T16:07:46.517309242-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-27T16:07:46.523643163-04:00","level":"INFO","msg":"created new stream","id":"asx17vfb"}
+{"time":"2024-10-27T16:07:46.523664317-04:00","level":"INFO","msg":"stream: started","id":"asx17vfb"}
+{"time":"2024-10-27T16:07:46.523698761-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"asx17vfb"}}
+{"time":"2024-10-27T16:07:46.523703573-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"asx17vfb"}}
+{"time":"2024-10-27T16:07:46.523691733-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"asx17vfb"}}
+{"time":"2024-10-27T16:07:46.747660172-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-27T16:07:46.749067283-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-27T16:08:28.35114888-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-27T16:08:28.354072511-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-27T16:08:28.819587268-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-27T16:08:29.924264991-04:00","level":"INFO","msg":"stream: closing","id":"asx17vfb"}
+{"time":"2024-10-27T16:08:29.924279568-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"asx17vfb"}}
+{"time":"2024-10-27T16:08:29.924298368-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"asx17vfb"}}
+{"time":"2024-10-27T16:08:29.924338408-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"asx17vfb"}}
+{"time":"2024-10-27T16:08:29.924345461-04:00","level":"INFO","msg":"stream: closed","id":"asx17vfb"}
+{"time":"2024-10-27T16:08:33.353597542-04:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

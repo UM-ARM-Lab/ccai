@@ -1,0 +1,18 @@
+{"time":"2024-10-27T15:50:02.757769705-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-27T15:50:02.757782433-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/wandb/run-20241027_155002-yz18pai9/logs/debug-core.log"}
+{"time":"2024-10-27T15:50:02.757898605-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-27T15:50:02.760607482-04:00","level":"INFO","msg":"created new stream","id":"yz18pai9"}
+{"time":"2024-10-27T15:50:02.760621946-04:00","level":"INFO","msg":"stream: started","id":"yz18pai9"}
+{"time":"2024-10-27T15:50:02.76062945-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"yz18pai9"}}
+{"time":"2024-10-27T15:50:02.760651955-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"yz18pai9"}}
+{"time":"2024-10-27T15:50:02.760639789-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"yz18pai9"}}
+{"time":"2024-10-27T15:50:02.900059389-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-27T15:50:02.90030698-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-27T15:50:27.243743514-04:00","level":"INFO","msg":"stream: closing","id":"yz18pai9"}
+{"time":"2024-10-27T15:50:27.243761963-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-27T15:50:27.246007676-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-27T15:50:28.502408401-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-27T15:50:28.624100918-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"yz18pai9"}}
+{"time":"2024-10-27T15:50:28.624125531-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"yz18pai9"}}
+{"time":"2024-10-27T15:50:28.624140075-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"yz18pai9"}}
+{"time":"2024-10-27T15:50:28.624167233-04:00","level":"INFO","msg":"stream: closed","id":"yz18pai9"}

@@ -1,0 +1,19 @@
+{"time":"2024-10-27T16:09:12.194885337-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-27T16:09:12.194899109-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/wandb/run-20241027_160912-rwsbtp90/logs/debug-core.log"}
+{"time":"2024-10-27T16:09:12.195284322-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-27T16:09:12.199269751-04:00","level":"INFO","msg":"created new stream","id":"rwsbtp90"}
+{"time":"2024-10-27T16:09:12.199292372-04:00","level":"INFO","msg":"stream: started","id":"rwsbtp90"}
+{"time":"2024-10-27T16:09:12.199301415-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"rwsbtp90"}}
+{"time":"2024-10-27T16:09:12.199332238-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"rwsbtp90"}}
+{"time":"2024-10-27T16:09:12.199317239-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"rwsbtp90"}}
+{"time":"2024-10-27T16:09:12.361983555-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-27T16:09:12.362248089-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-27T16:09:52.554768951-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-27T16:09:52.556928334-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-27T16:09:52.991944844-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-27T16:09:54.104238907-04:00","level":"INFO","msg":"stream: closing","id":"rwsbtp90"}
+{"time":"2024-10-27T16:09:54.10425245-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"rwsbtp90"}}
+{"time":"2024-10-27T16:09:54.104266697-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"rwsbtp90"}}
+{"time":"2024-10-27T16:09:54.104265452-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"rwsbtp90"}}
+{"time":"2024-10-27T16:09:54.104308274-04:00","level":"INFO","msg":"stream: closed","id":"rwsbtp90"}
+{"time":"2024-10-27T16:09:57.557011391-04:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

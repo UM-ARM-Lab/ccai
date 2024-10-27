@@ -1,0 +1,19 @@
+{"time":"2024-10-27T16:08:29.995473897-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-27T16:08:29.995485146-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/wandb/run-20241027_160829-kf1vacex/logs/debug-core.log"}
+{"time":"2024-10-27T16:08:29.995589389-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-27T16:08:29.998667744-04:00","level":"INFO","msg":"created new stream","id":"kf1vacex"}
+{"time":"2024-10-27T16:08:29.998685455-04:00","level":"INFO","msg":"stream: started","id":"kf1vacex"}
+{"time":"2024-10-27T16:08:29.998692411-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"kf1vacex"}}
+{"time":"2024-10-27T16:08:29.998710048-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"kf1vacex"}}
+{"time":"2024-10-27T16:08:29.998698437-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"kf1vacex"}}
+{"time":"2024-10-27T16:08:30.143974218-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-27T16:08:30.144202863-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-27T16:09:10.702747055-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-27T16:09:10.704926952-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-27T16:09:11.045000182-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-27T16:09:12.15452665-04:00","level":"INFO","msg":"stream: closing","id":"kf1vacex"}
+{"time":"2024-10-27T16:09:12.154547026-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"kf1vacex"}}
+{"time":"2024-10-27T16:09:12.154558331-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"kf1vacex"}}
+{"time":"2024-10-27T16:09:12.154563117-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"kf1vacex"}}
+{"time":"2024-10-27T16:09:12.154598186-04:00","level":"INFO","msg":"stream: closed","id":"kf1vacex"}
+{"time":"2024-10-27T16:09:15.704421783-04:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}
