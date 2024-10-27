@@ -16,7 +16,7 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
 
-with open(f'{fpath.resolve()}/eval/final_pose_comparisons_mse_5samples.pkl', 'rb') as file:
+with open(f'{fpath.resolve()}/eval/final_pose_comparisons_mse_50samples.pkl', 'rb') as file:
     tuples = pkl.load(file)
     initial_poses, optimized_poses, initial_final_poses, optimized_final_poses = zip(*tuples)
     initial_final_poses = np.array(initial_final_poses).reshape(-1, 20)
@@ -36,6 +36,8 @@ if __name__ == "__main__":
         initial_costs.append(before)
         after, _ = calculate_cost(optimized_poses[i].numpy(), optimized_final_poses[i])
         optimized_costs.append(after)
+
+    print("Average decrease in cost: ", np.mean(np.array(initial_costs) - np.array(optimized_costs)))
     
     plt.figure(figsize=(10, 6))
     # Scatter costs

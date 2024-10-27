@@ -1,0 +1,18 @@
+{"time":"2024-10-27T13:52:21.990819321-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-27T13:52:21.990832782-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241027_135221-eftzt3vx/logs/debug-core.log"}
+{"time":"2024-10-27T13:52:21.990972966-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-27T13:52:21.995054382-04:00","level":"INFO","msg":"created new stream","id":"eftzt3vx"}
+{"time":"2024-10-27T13:52:21.995088947-04:00","level":"INFO","msg":"stream: started","id":"eftzt3vx"}
+{"time":"2024-10-27T13:52:21.995115961-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"eftzt3vx"}}
+{"time":"2024-10-27T13:52:21.995147412-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"eftzt3vx"}}
+{"time":"2024-10-27T13:52:21.995161899-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"eftzt3vx"}}
+{"time":"2024-10-27T13:52:22.161438016-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-27T13:52:22.161713584-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-27T13:52:57.72569159-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-27T13:52:57.729488849-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-27T13:52:58.651222523-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-27T13:52:59.748047972-04:00","level":"INFO","msg":"stream: closing","id":"eftzt3vx"}
+{"time":"2024-10-27T13:52:59.748063005-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"eftzt3vx"}}
+{"time":"2024-10-27T13:52:59.748077018-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"eftzt3vx"}}
+{"time":"2024-10-27T13:52:59.748076056-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"eftzt3vx"}}
+{"time":"2024-10-27T13:52:59.748124787-04:00","level":"INFO","msg":"stream: closed","id":"eftzt3vx"}

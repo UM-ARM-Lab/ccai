@@ -1,0 +1,19 @@
+{"time":"2024-10-27T13:49:16.730883965-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-27T13:49:16.730895989-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241027_134916-t13mx14x/logs/debug-core.log"}
+{"time":"2024-10-27T13:49:16.730978302-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-27T13:49:16.733782234-04:00","level":"INFO","msg":"created new stream","id":"t13mx14x"}
+{"time":"2024-10-27T13:49:16.733797226-04:00","level":"INFO","msg":"stream: started","id":"t13mx14x"}
+{"time":"2024-10-27T13:49:16.733806588-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"t13mx14x"}}
+{"time":"2024-10-27T13:49:16.733815855-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"t13mx14x"}}
+{"time":"2024-10-27T13:49:16.733818288-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"t13mx14x"}}
+{"time":"2024-10-27T13:49:16.929384249-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-27T13:49:16.929647128-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-27T13:49:52.764286482-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-27T13:49:52.768000921-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-27T13:49:53.097712465-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-27T13:49:54.211448684-04:00","level":"INFO","msg":"stream: closing","id":"t13mx14x"}
+{"time":"2024-10-27T13:49:54.211460682-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"t13mx14x"}}
+{"time":"2024-10-27T13:49:54.211471246-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"t13mx14x"}}
+{"time":"2024-10-27T13:49:54.21152363-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"t13mx14x"}}
+{"time":"2024-10-27T13:49:54.21153807-04:00","level":"INFO","msg":"stream: closed","id":"t13mx14x"}
+{"time":"2024-10-27T13:49:57.765483134-04:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

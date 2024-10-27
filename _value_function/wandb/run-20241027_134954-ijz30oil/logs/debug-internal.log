@@ -1,0 +1,19 @@
+{"time":"2024-10-27T13:49:54.256194767-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-27T13:49:54.256210748-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241027_134954-ijz30oil/logs/debug-core.log"}
+{"time":"2024-10-27T13:49:54.25634339-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-27T13:49:54.261834278-04:00","level":"INFO","msg":"created new stream","id":"ijz30oil"}
+{"time":"2024-10-27T13:49:54.261868295-04:00","level":"INFO","msg":"stream: started","id":"ijz30oil"}
+{"time":"2024-10-27T13:49:54.261907884-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"ijz30oil"}}
+{"time":"2024-10-27T13:49:54.261908458-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"ijz30oil"}}
+{"time":"2024-10-27T13:49:54.261948505-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"ijz30oil"}}
+{"time":"2024-10-27T13:49:54.432344381-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-27T13:49:54.432626987-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-27T13:50:29.856986214-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-27T13:50:29.860648343-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-27T13:50:30.197701625-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-27T13:50:31.333272334-04:00","level":"INFO","msg":"stream: closing","id":"ijz30oil"}
+{"time":"2024-10-27T13:50:31.333299313-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"ijz30oil"}}
+{"time":"2024-10-27T13:50:31.333322078-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"ijz30oil"}}
+{"time":"2024-10-27T13:50:31.333329644-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"ijz30oil"}}
+{"time":"2024-10-27T13:50:31.333404715-04:00","level":"INFO","msg":"stream: closed","id":"ijz30oil"}
+{"time":"2024-10-27T13:50:34.859246861-04:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

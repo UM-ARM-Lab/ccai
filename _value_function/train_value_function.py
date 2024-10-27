@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
-shape = (20,1)
+
 
 def load_data():
     filename = '/value_datasets/combined_value_dataset.pkl'
@@ -50,7 +50,7 @@ def load_data():
 class Net(nn.Module):
     def __init__(self, dim_in, dim_out):
         super(Net, self).__init__()
-        neurons = 64
+        neurons = 32
         self.fc1 = nn.Linear(dim_in, neurons)
         self.fc2 = nn.Linear(neurons, neurons)
         self.fc3 = nn.Linear(neurons, dim_out)
@@ -63,8 +63,7 @@ class Net(nn.Module):
     
 
 def train():
-
-    model_name = "2"#input("Enter model name: ")
+    shape = (20,1)
     
     # Initialize W&B
     wandb.init(project="value-function-training", config={
@@ -124,20 +123,24 @@ def train():
             })
 
     # save
-    save_model = {
+    wandb.finish()
+    model_to_save = {
         'model_state': model.state_dict(),
         'poses_mean': poses_mean,
         'poses_std': poses_std,
         'cost_mean': cost_mean,
         'cost_std': cost_std,
     }
-    torch.save(save_model, f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
-    wandb.finish()
+    return model_to_save
+    
 
-def eval():
-    model_name = "2"
+def save(model_to_save, path):
+    torch.save(model_to_save, path)
+
+def eval(model_name):
+    shape = (20,1)
+    
     #model_name = input("Enter model name: ")
-
     train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std = load_data()
     model = Net(shape[0], shape[1])
     checkpoint = torch.load(f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
@@ -184,6 +187,16 @@ def eval():
     plot_loader(test_loader, 'Test Set')
 
 if __name__ == "__main__":
-    torch.manual_seed(42)
-    train()
-    eval() 
+
+    # model_name = "2"#input("Enter model name: ")
+    # model_to_save = train()
+    # save(model_to_save, f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
+    # eval(model_name = "2") 
+
+
+    ensemble = []
+    for i in range(8):
+        net = train()
+        ensemble.append(net)
+    torch.save(ensemble, f'{fpath.resolve()}/value_functions/ensemble.pkl')
+

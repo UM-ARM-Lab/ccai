@@ -20,7 +20,7 @@ def get_data():
     with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
         poses  = pkl.load(file)
     inputs = np.array([t.numpy() for t in poses]).reshape(-1, 20)
-    inputs = torch.from_numpy(inputs)[400:405]
+    inputs = torch.from_numpy(inputs)[0:100]
     
     succ_filename = '/initial_poses/successful_initial_poses.pkl'
 
@@ -72,7 +72,7 @@ def grad_descent():
         #print("mean: ", mean_loss)
         #print("mse: ", mse)
 
-        loss = mse #+ 0.1 * mean_loss
+        loss = mse + 0.1 * mean_loss
         loss.backward()
 
         # Set gradients of the last four values of each pose to 0
@@ -80,8 +80,8 @@ def grad_descent():
 
         optimizer.step()
 
-        if i % 10 == 0:
-        #    print(f"Iteration {i}: Loss = {loss.item()}")
+        if i % 100 == 0:
+            print(f"Iteration {i}: Loss = {loss.item()}")
             pass
 
     optimized_poses_norm = poses_norm.detach().cpu().numpy()
@@ -92,8 +92,8 @@ def grad_descent():
     initial_pose_tuples = [(initial, optimized) for initial, optimized in zip(poses.numpy(), optimized_poses)]
     predicted_cost_tuples = [(initial, optimized) for initial, optimized in zip(original_costs, optimized_costs)]
 
-    print(original_costs)
-    print(optimized_costs)
+    # print(original_costs)
+    print("new predicted costs: ", optimized_costs)
 
     vis = False
     if vis:
@@ -101,12 +101,14 @@ def grad_descent():
         for initial, optimized in initial_pose_tuples:
             env.reset(torch.from_numpy(initial).reshape(1,20), deterministic=True)
             time.sleep(0.5)
+            input("Press Enter to continue...")
             env.reset(torch.from_numpy(optimized).reshape(1,20).float(), deterministic=True)
             time.sleep(1.0)
+            input("Press Enter to continue...")
 
 
     #print(predicted_cost_tuples)
-    print(np.mean(np.abs((poses.numpy() -  optimized_poses))))
+    # print(np.mean(np.abs((poses.numpy() -  optimized_poses))))
 
     output_filename = f'{fpath.resolve()}/eval/initial_and_optimized_poses.pkl'
     with open(output_filename, 'wb') as f:

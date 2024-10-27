@@ -1,0 +1,19 @@
+{"time":"2024-10-27T13:51:45.466729633-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-27T13:51:45.466738012-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241027_135145-xh47w09o/logs/debug-core.log"}
+{"time":"2024-10-27T13:51:45.466811685-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-27T13:51:45.469687468-04:00","level":"INFO","msg":"created new stream","id":"xh47w09o"}
+{"time":"2024-10-27T13:51:45.469700449-04:00","level":"INFO","msg":"stream: started","id":"xh47w09o"}
+{"time":"2024-10-27T13:51:45.469714501-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"xh47w09o"}}
+{"time":"2024-10-27T13:51:45.469732435-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"xh47w09o"}}
+{"time":"2024-10-27T13:51:45.469737048-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"xh47w09o"}}
+{"time":"2024-10-27T13:51:45.685301483-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-27T13:51:45.6857381-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-27T13:52:20.43878758-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-27T13:52:20.442581148-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-27T13:52:20.802810933-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-27T13:52:21.946163455-04:00","level":"INFO","msg":"stream: closing","id":"xh47w09o"}
+{"time":"2024-10-27T13:52:21.94619142-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"xh47w09o"}}
+{"time":"2024-10-27T13:52:21.946208231-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"xh47w09o"}}
+{"time":"2024-10-27T13:52:21.946213-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"xh47w09o"}}
+{"time":"2024-10-27T13:52:21.946241168-04:00","level":"INFO","msg":"stream: closed","id":"xh47w09o"}
+{"time":"2024-10-27T13:52:25.441141439-04:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}
