@@ -1,0 +1,49 @@
+---
+# model_name: 'allegro_variable_traj_start'
+model_name: 'allegro_high_force_high_eps_pi_6'
+T: 13
+dx: 15
+du: 21
+load_checkpoint: False
+load_model: True
+train_diffusion: False
+train_classifier: False
+eval_classifier: False
+plot: False
+vis_dataset: False
+eval_train_likelihood: False
+id_ood_states: False
+project_ood_states: True
+epochs: 10000
+classifier_epochs: 100
+batch_size: 12
+lr: 1.0e-4
+model_type: 'diffusion'
+discriminator_guidance: True
+inverse_dynamics: False
+data_directory: 'allegro_ood_gen'
+device: 'cuda:0'
+test_every: 10001
+save_every: 10
+normalize_data: False
+constraint_embedding_dim: 64
+constrained: False
+guided: False
+timesteps: 256
+hidden_dim: 128
+unconditional: True
+sine_cosine: True
+use_class: True
+diffuse_class: False
+state_only: False
+state_control_only: False
+skip_pregrasp: True
+# Only applies to using EMA for training
+use_ema: True
+ema_decay: 0.995
+ema_warmup_steps: 1000
+ema_update_every: 10
+
+test_directory: 'quadrotor_compose'
+test_samples: False
+test_name: None

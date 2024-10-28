@@ -680,6 +680,11 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         else:
             self.default_dof_pos = default_dof_pos.to(self.device)
 
+        if self.full_dof_goal:
+            self.default_dof_pos = self.goal[: self.num_fingers * 4]
+            # Pad to length 16
+            self.default_dof_pos = torch.cat((self.default_dof_pos, torch.tensor([1.2, 0.3, 0.2, 1.]).float().to(device=self.device)))
+
         self.desired_ee_in_world_frame = desired_ee_in_world_frame
         if self.num_regrasps > 0:
             if desired_ee_in_world_frame:
@@ -740,6 +745,8 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         return ee_locs.reshape(q_rob.shape[:-1] + (self.num_regrasps, 3))
 
     def _cost(self, xu, start, goal):
+        # if self.full_dof_goal:
+        #     return 0
         if self.num_regrasps == 0:
             return 0.0
         q = partial_to_full_state(xu[:, :self.num_fingers * 4], self.fingers)  # [:, self.regrasp_idx]
@@ -974,6 +981,78 @@ class AllegroContactProblem(AllegroObjectProblem):
         the actual dynamics model is not used
         """
 
+        proj_path = torch.tensor([[-0.2066,  0.4522,  0.4844,  0.9538,  0.0327,  0.4181,  1.0236,  0.9130,
+            1.3928,  0.1085,  0.3418,  0.5728, -0.0316, -0.0383,  0.8699],
+            [-0.2004,  0.4414,  0.4787,  0.9416,  0.0306,  0.4266,  1.0235,  0.9231,
+            1.4055,  0.1113,  0.3330,  0.5743, -0.0319, -0.0380,  0.8567],
+            [-0.1909,  0.4268,  0.4711,  0.9214,  0.0274,  0.4390,  1.0221,  0.9391,
+            1.4220,  0.1146,  0.3191,  0.5761, -0.0322, -0.0375,  0.8700],
+            [-0.1797,  0.4105,  0.4673,  0.9020,  0.0239,  0.4524,  1.0187,  0.9564,
+            1.4401,  0.1167,  0.3041,  0.5774, -0.0326, -0.0369,  0.8696],
+            [-0.1674,  0.3934,  0.4663,  0.8855,  0.0203,  0.4644,  1.0138,  0.9755,
+            1.4584,  0.1161,  0.2912,  0.5774, -0.0331, -0.0363,  0.8408],
+            [-0.1557,  0.3813,  0.4633,  0.8613,  0.0154,  0.4733,  0.9996,  0.9957,
+            1.4717,  0.1125,  0.2794,  0.5741, -0.0331, -0.0359,  0.8611],
+            [-0.1437,  0.3715,  0.4626,  0.8368,  0.0105,  0.4817,  0.9833,  1.0141,
+            1.4827,  0.1093,  0.2685,  0.5703, -0.0331, -0.0355,  0.9111],
+            [-0.1314,  0.3633,  0.4663,  0.8145,  0.0057,  0.4880,  0.9683,  1.0322,
+            1.4902,  0.1046,  0.2585,  0.5666, -0.0331, -0.0351,  0.9615],
+            [-1.1753e-01,  3.5453e-01,  4.7417e-01,  7.9926e-01,  1.4629e-03,
+            4.9397e-01,  9.5852e-01,  1.0486e+00,  1.4977e+00,  9.8562e-02,
+            2.5021e-01,  5.6340e-01, -3.3375e-02, -3.4531e-02,  9.8662e-01],
+            [-0.1033,  0.3473,  0.4831,  0.7889, -0.0027,  0.5012,  0.9535,  1.0643,
+            1.5034,  0.0920,  0.2457,  0.5608, -0.0337, -0.0339,  1.0007],
+            [-0.0901,  0.3449,  0.4881,  0.7815, -0.0066,  0.5072,  0.9499,  1.0815,
+            1.5093,  0.0837,  0.2382,  0.5580, -0.0340, -0.0332,  1.0283],
+            [-0.0766,  0.3429,  0.4957,  0.7751, -0.0099,  0.5139,  0.9469,  1.0957,
+            1.5136,  0.0746,  0.2366,  0.5560, -0.0342, -0.0325,  1.0339],
+            [-0.0645,  0.3445,  0.5024,  0.7686, -0.0124,  0.5197,  0.9422,  1.1031,
+            1.5169,  0.0687,  0.2339,  0.5525, -0.0343, -0.0318,  1.0437],
+            [-0.0527,  0.3484,  0.5074,  0.7590, -0.0149,  0.5244,  0.9395,  1.1111,
+            1.5195,  0.0632,  0.2301,  0.5493, -0.0345, -0.0312,  1.0827],
+            [-0.0409,  0.3538,  0.5109,  0.7522, -0.0179,  0.5288,  0.9423,  1.1169,
+            1.5229,  0.0572,  0.2256,  0.5474, -0.0346, -0.0304,  1.1113],
+            [-0.0296,  0.3597,  0.5165,  0.7474, -0.0203,  0.5318,  0.9391,  1.1226,
+            1.5253,  0.0499,  0.2197,  0.5462, -0.0345, -0.0296,  1.1208],
+            [-0.0192,  0.3663,  0.5234,  0.7443, -0.0225,  0.5343,  0.9337,  1.1275,
+            1.5272,  0.0425,  0.2133,  0.5455, -0.0345, -0.0288,  1.1051],
+            [-0.0106,  0.3746,  0.5321,  0.7368, -0.0251,  0.5365,  0.9277,  1.1342,
+            1.5285,  0.0374,  0.2055,  0.5415, -0.0344, -0.0281,  1.1116],
+            [-0.0031,  0.3839,  0.5413,  0.7307, -0.0279,  0.5380,  0.9189,  1.1392,
+            1.5289,  0.0359,  0.1974,  0.5383, -0.0343, -0.0273,  1.1357],
+            [ 0.0043,  0.3940,  0.5487,  0.7228, -0.0309,  0.5388,  0.9138,  1.1426,
+            1.5283,  0.0381,  0.1913,  0.5359, -0.0342, -0.0267,  1.1670],
+            [ 0.0113,  0.4046,  0.5563,  0.7165, -0.0340,  0.5402,  0.9080,  1.1457,
+            1.5276,  0.0396,  0.1894,  0.5351, -0.0340, -0.0259,  1.1876],
+            [ 0.0166,  0.4133,  0.5629,  0.7113, -0.0372,  0.5412,  0.9009,  1.1480,
+            1.5277,  0.0432,  0.1848,  0.5361, -0.0339, -0.0251,  1.2454],
+            [ 0.0227,  0.4220,  0.5726,  0.7091, -0.0398,  0.5415,  0.8925,  1.1524,
+            1.5236,  0.0427,  0.1835,  0.5421, -0.0338, -0.0245,  1.2532],
+            [ 0.0258,  0.4263,  0.5775,  0.7080, -0.0411,  0.5417,  0.8883,  1.1545,
+            1.5216,  0.0424,  0.1829,  0.5451, -0.0337, -0.0241,  1.2571],
+            [ 0.0274,  0.4285,  0.5799,  0.7075, -0.0418,  0.5418,  0.8863,  1.1556,
+            1.5206,  0.0422,  0.1825,  0.5466, -0.0337, -0.0239,  1.2591],
+            [ 0.0281,  0.4295,  0.5811,  0.7072, -0.0421,  0.5418,  0.8852,  1.1562,
+            1.5201,  0.0422,  0.1824,  0.5474, -0.0337, -0.0239,  1.2601]], device=self.device)
+
+        x_all = torch.nn.functional.interpolate(proj_path.unsqueeze(0).permute(0, 2, 1), size=self.T+1, mode='linear', align_corners=True).permute(0, 2, 1)
+
+        # u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
+        # if self.optimize_force and self.turn:
+        #     for i, finger in enumerate(self.contact_fingers):
+        #         idx = self.contact_force_indices_dict[finger]
+        #         if finger != 'index':
+        #             u[..., idx] = 1.5 * torch.randn(N, self.T, 3, device=self.device)
+        #         else:
+        #             u[..., idx] = 1.5 *.01 * torch.randn(N, self.T, 3, device=self.device)
+
+        # x = [self.start.reshape(1, self.dx).repeat(N, 1)]
+        # for t in range(self.T):
+        #     next_q = x[-1][:, :4 * self.num_fingers] + u[:, t, :4 * self.num_fingers]
+        #     x.append(next_q)
+
+        # x = torch.stack(x[1:], dim=1)
+
         u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
         if self.optimize_force and self.turn:
             for i, finger in enumerate(self.contact_fingers):
@@ -983,21 +1062,22 @@ class AllegroContactProblem(AllegroObjectProblem):
                 else:
                     u[..., idx] = 1.5 *.01 * torch.randn(N, self.T, 3, device=self.device)
 
-        x = [self.start.reshape(1, self.dx).repeat(N, 1)]
-        for t in range(self.T):
-            next_q = x[-1][:, :4 * self.num_fingers] + u[:, t, :4 * self.num_fingers]
-            x.append(next_q)
-
-        x = torch.stack(x[1:], dim=1)
+        jitter = 0.0 * torch.randn(N, self.T+1, self.num_fingers * 4, device=self.device)
+        jitter[:, 0] = 0
+        x = x_all.repeat(N, 1, 1)
+        x[:, :, :self.num_fingers * 4] += jitter
+        u_from_proj_path = x[:, 1:] - x[:, :-1]
+        x = x[:, 1:]
+        u[:, :, :self.num_fingers * 4] = u_from_proj_path[:, :, :self.num_fingers * 4]
 
         # if valve angle in state
-        if self.dx == (4 * self.num_fingers + self.obj_dof):
-            theta = np.linspace(self.start[-self.obj_dof:].cpu().numpy(), self.goal.cpu().numpy(), self.T + 1)[:-1]
-            theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
-            theta = theta.unsqueeze(0).repeat((N, 1, 1))
-            # theta = self.start[-self.obj_dof:].unsqueeze(0).repeat((N, self.T, 1))
-            theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
-            x = torch.cat((x, theta), dim=-1)
+        # if self.dx == (4 * self.num_fingers + self.obj_dof):
+        #     theta = np.linspace(self.start[-self.obj_dof:].cpu().numpy(), self.goal[-self.obj_dof:].cpu().numpy(), self.T + 1)[:-1]
+        #     theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
+        #     theta = theta.unsqueeze(0).repeat((N, 1, 1))
+        #     # theta = self.start[-self.obj_dof:].unsqueeze(0).repeat((N, self.T, 1))
+        #     theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
+        #     x = torch.cat((x, theta), dim=-1)
 
         xu = torch.cat((x, u), dim=2)
         return xu
@@ -1007,11 +1087,13 @@ class AllegroContactProblem(AllegroObjectProblem):
             return 0.0
         # cost function for valve turning task
         # separate out q, theta, delta_q, force
-        theta = xu[:, self.dx - self.obj_dof:self.dx]
+        cost = 0
+        if not self.full_dof_goal:
+            theta = xu[:, self.dx - self.obj_dof:self.dx]
 
-        # goal cost
-        cost = 10 * torch.sum((theta[-1] - goal) ** 2)
-        cost += torch.sum((3 * (theta[:-1] - goal) ** 2))
+            # goal cost
+            cost = 10 * torch.sum((theta[-1] - goal[-self.obj_dof:]) ** 2)
+            cost += torch.sum((3 * (theta[:-1] - goal[-self.obj_dof:]) ** 2))
 
         if self.optimize_force:
             force = xu[:, -self.num_contacts * 3:]
@@ -2156,7 +2238,8 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                  desired_ee_in_world_frame=False,
                  env_contact=False,
                  min_force_dict=None,
-                 device='cuda:0', **kwargs):
+                 device='cuda:0', 
+                 full_dof_goal=False, **kwargs):
 
         # super(AllegroManipulationProblem, self).__init__(start=start, goal=goal, T=T, chain=chain,
         #                                                  object_location=object_location, object_type=object_type,
@@ -2166,6 +2249,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
         #                                                  friction_coefficient=friction_coefficient, obj_dof=obj_dof,
         #                                                  obj_ori_rep=obj_ori_rep, obj_joint_dim=obj_joint_dim,
         #                                                  optimize_force=optimize_force, device=device, **kwargs)
+        self.full_dof_goal = full_dof_goal
         moveable_object = True if len(contact_fingers) > 0 else False
         AllegroContactProblem.__init__(self, start=start, goal=goal, T=T, chain=chain,
                                         object_location=object_location, object_type=object_type,
@@ -2206,9 +2290,19 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
         # self.dz += self._base_dz
         # self.dh += self._base_dz * T
 
+
     def _cost(self, xu, start, goal):
-        return AllegroContactProblem._cost(self, xu, start, goal) + \
+        cost = AllegroContactProblem._cost(self, xu, start, goal) + \
             AllegroObjectProblem._cost(self, xu, start, goal) + AllegroRegraspProblem._cost(self, xu, start, goal)
+
+        goal_cost = 0
+        if self.full_dof_goal:
+            x_last = xu[-1, :self.num_fingers * 4 + self.obj_dof-1]
+            goal_cost = 10 * (x_last - goal[:-1]).pow(2).sum(dim=-1)#.sum(dim=-1)
+            goal_cost += 3 * (xu[:-1, :self.num_fingers * 4 + self.obj_dof-1] - goal[:-1]).pow(2).sum(dim=-1).sum(dim=-1)
+
+        return cost + goal_cost
+
 
     def _con_eq(self, xu, compute_grads=True, compute_hess=False, verbose=False, projected_diffusion=False):
         N, T = xu.shape[:2]

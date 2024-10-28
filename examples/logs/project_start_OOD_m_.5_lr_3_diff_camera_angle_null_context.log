@@ -1,0 +1,34 @@
+Importing module 'gym_38' (/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.0+cu121
+Device count 1
+/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinav/Documents/ccai
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current yaw: tensor([-0.0005,  0.0155, -0.0151], device='cuda:0')
+Current yaw: tensor([-0.0046,  0.0152, -0.0330], device='cuda:0')
+1 turn
+Projection step: 0, Loss: 34.38913345336914
+tensor([[-0.1201, -0.0046,  0.0165, -0.0291, -0.0011, -0.0179, -0.0453, -0.0011,
+         -0.1266, -0.0202,  0.0263, -0.0093,  0.0850,  0.0272, -0.0181, -0.0361]],
+       device='cuda:0')
+Projection step: 1, Loss: 32.78837203979492
+tensor([[-0.0351, -0.0317,  0.0066, -0.0331,  0.0470, -0.0181,  0.0514, -0.0015,
+         -0.0103,  0.0555,  0.0599,  0.0279,  0.0735,  0.0684, -0.0582, -0.0258]],
+       device='cuda:0')
+Projection step: 2, Loss: 30.59939956665039
+tensor([[-0.0125,  0.0156, -0.0166,  0.0079,  0.0479, -0.0385,  0.0288,  0.0180,
+          0.0140,  0.0301,  0.0595, -0.0110,  0.1205,  0.0774, -0.0098, -0.0354]],
+       device='cuda:0')

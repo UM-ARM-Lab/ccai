@@ -171,6 +171,7 @@ class AllegroValveDataset(Dataset):
         print(traj)
         exit(0)
         return self.masks[idx] * (traj - self.mean) / self.std, self.trajectory_type[idx, None], mask
+        # return self.masks[idx] * (traj), self.trajectory_type[idx, None], mask
 
     def compute_norm_constants(self):
         # compute norm constants not including the zero padding
@@ -229,17 +230,22 @@ class AllegroScrewDriverDataset(Dataset):
             plans = []
             for p in path.rglob('*traj_data.p'):
                 with open(p, 'rb') as f:
-                    data = pickle.load(f)
+                    try:
+                        data = pickle.load(f)
+                    except:
+                        print('Fail')
+                        continue
                     actual_traj = []
                     for t in range(max_T, min_t - 1, -1):
                         actual_traj.append(data[t]['starts'][:, :, None, :])
                         traj = data[t]['plans']
+                        # print(traj.shape)
                         classes.append(data[t]['contact_state'][:, None, :].repeat(traj.shape[1], axis=1))
 
                         # combine traj and starts
                         if use_actual_traj:
-                            traj = np.concatenate(actual_traj + [traj], axis=2)
-                            masks.append(np.ones((traj.shape[0], traj.shape[1], traj.shape[2])))
+                            traj = np.concatenate(actual_traj + [traj], axis=2)[..., :1 , :,:]
+                            masks.append(np.ones((traj.shape[0], traj.shape[1], traj.shape[2]))[..., :1, :])
                         else:
                             zeros = [np.zeros_like(actual_traj[0])] * (len(actual_traj) - 1)
                             traj = np.concatenate([actual_traj[-1]] + [traj] + zeros, axis=2)
@@ -326,7 +332,8 @@ class AllegroScrewDriverDataset(Dataset):
             # randomly choose an index to un-mask
             mask[np.random.randint(0, final_idx)] = 1
         # print(mask)
-        return self.masks[idx] * (traj - self.mean) / self.std, self.trajectory_type[idx], mask
+        # return self.masks[idx] * (traj - self.mean) / self.std, self.trajectory_type[idx], mask
+        return self.masks[idx] * (traj), self.trajectory_type[idx], mask
 
     def compute_norm_constants(self):
         # compute norm constants not including the zero padding
@@ -403,6 +410,198 @@ class AllegroScrewDriverDataset(Dataset):
 
     def get_norm_constants(self):
         return self.mean, self.std
+class AllegroScrewDriverStateDataset(Dataset):
+
+    def __init__(self, folders, max_T, cosine_sine=False, states_only=False, 
+                 skip_pregrasp=False, type='diffusion'):
+        super().__init__()
+        self.cosine_sine = cosine_sine
+        self.skip_pregrasp = skip_pregrasp
+        # TODO: only using trajectories for now, also includes closest points and their sdf values
+        starts = []
+        trajectories = []
+        classes = []
+        masks = []
+
+        min_t = 1
+
+        use_actual_traj = True
+        for fpath in folders:
+            path = pathlib.Path(fpath)
+            plans = []
+            for p in path.rglob('*traj_data.p'):
+                with open(p, 'rb') as f:
+                    try:
+                        data = pickle.load(f)
+                    except:
+                        print('Fail')
+                        continue
+                    actual_traj = []
+                    for t in range(max_T, min_t - 1, -1):
+                        actual_traj.append(data[t]['starts'][:, :, None, :])
+                        traj = data[t]['plans']
+                        # print(traj.shape)
+                        classes.append(data[t]['contact_state'][:, None, :].repeat(traj.shape[1], axis=1))
+
+                    # combine traj and starts
+                    if use_actual_traj:
+                        traj = np.concatenate(actual_traj + [traj], axis=2)[..., :1 , :,:]
+                        masks.append(np.ones((traj.shape[0], traj.shape[1], traj.shape[2]))[..., :1, :])
+                    else:
+                        zeros = [np.zeros_like(actual_traj[0])] * (len(actual_traj) - 1)
+                        traj = np.concatenate([actual_traj[-1]] + [traj] + zeros, axis=2)
+                        mask = np.zeros((traj.shape[0], traj.shape[1], traj.shape[2]))
+                        mask[:, :, :t + 1] = 1
+                        masks.append(mask)
+
+                    if type == 'diffusion':
+                        # duplicated first control, rearrange so that it is (x_0, u_0, x_1, u_1, ..., x_{T-1}, u_{T-1}, x_T, 0)
+                        traj[:, :, :-1, 15:] = traj[:, :, 1:, 15:]
+                        traj[:, :, -1, 15:] = 0
+                    elif type == 'cnf':
+                        traj[:, :, 0, 15:] = 0
+                    trajectories.append(traj)
+
+        self.trajectories = np.concatenate(trajectories, axis=0)
+        self.trajectory_type = np.concatenate(classes, axis=0).reshape(-1, 3)
+
+        # self.trajectories = self.trajectories.reshape(-1, self.trajectories.shape[-2], self.trajectories.shape[-1])
+        self.traj_indices = np.arange(self.trajectories.shape[0]).reshape(-1, 1).repeat(self.trajectories.shape[2], axis=1).reshape(-1, 1)
+        self.trajectories = self.trajectories.reshape(-1, 1, self.trajectories.shape[-1])
+        
+        self.trajectories, self.unique_indices = np.unique(self.trajectories, return_index=True, axis=0)
+
+        self.trajectories = torch.from_numpy(self.trajectories).float()
+        self.unique_traj_indices = torch.from_numpy(self.traj_indices[self.unique_indices]).long()
+        
+        randperm = torch.randperm(self.unique_traj_indices.shape[0])
+        self.unique_traj_indices = self.unique_traj_indices[randperm]
+        self.trajectories = self.trajectories[randperm]
+        # self.unique_indices = torch.from_numpy(self.unique_indices).long()
+        
+        
+        if states_only:
+            self.trajectories = self.trajectories[:, :, :15]
+        self.trajectory_type = torch.from_numpy(self.trajectory_type)
+        self.trajectory_type = 2 * (self.trajectory_type - 0.5)  # scale to be [-1, 1]
+
+        print(self.trajectories.shape)
+        # TODO consider alternative SO3 representation that is better for learning
+        if self.cosine_sine:
+            dx = self.trajectories.shape[-1] + 1
+        else:
+            dx = self.trajectories.shape[-1]
+
+        self.mean = 0
+        self.std = 1
+
+        self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.75)
+        self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.5)
+        self.states_only = states_only
+
+    def update_masks(self, p1, p2):
+        self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=p2)
+        self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=p1)
+
+    def __len__(self):
+        return self.trajectories.shape[0]
+
+    def __getitem__(self, idx):
+        traj = self.trajectories[idx]
+        ind = self.unique_traj_indices[idx]
+
+        # TODO: figure out how to do data augmentation on screwdriver angle
+        # a little more complex due to rotation representation
+        dx = 15
+
+        ## randomly perturb angle of screwdriver
+        traj[:, dx-1] += 2 * np.pi * (np.random.rand() - 0.5)
+
+        if self.cosine_sine:
+                traj_q = traj[:, :14]
+                traj_theta = traj[:, 14][:, None]
+                traj_u = traj[:, 15:]
+                dx = dx + 1
+                traj = torch.cat((traj_q, torch.cos(traj_theta), torch.sin(traj_theta), traj_u), dim=1)
+
+        return traj, ind
+
+    def compute_norm_constants(self):
+        # compute norm constants not including the zero padding
+        x = self.trajectories.clone()
+        # x[:, :, 8] += 2 * np.pi * (torch.rand(x.shape[0], 1) - 0.5)
+        x = x.reshape(-1, x.shape[-1])
+
+        mask = self.masks[:, :, 0].reshape(-1)
+        mean = x.sum(dim=0) / mask.sum()
+        std = np.sqrt(np.average((x - mean) ** 2, weights=mask, axis=0))
+
+        if self.states_only:
+            dim = 15
+        else:
+            dim = 15 + 12 + 9
+
+        # for angle we force to be between [-1, 1]
+        if self.cosine_sine:
+            self.mean = torch.zeros(dim + 1)
+            self.std = torch.ones(dim + 1)
+            self.mean[:14] = mean[:14]
+            self.std[:14] = torch.from_numpy(std[:14]).float()
+            self.mean[16:] = mean[15:]
+            self.std[16:] = torch.from_numpy(std[15:]).float()
+        else:
+            # mean[12:15] = 0
+            # std[12:15] = np.pi
+            # mean[14] = 0
+            # std[14] = np.pi
+            self.mean = mean
+            self.std = torch.from_numpy(std).float()
+
+    def set_norm_constants(self, mean, std):
+        self.mean = mean
+        self.std = std
+
+    def get_norm_constants(self):
+        return self.mean, self.std
+
+    def compute_norm_constants(self):
+        # compute norm constants not including the zero padding
+        x = self.trajectories.clone()
+        # x[:, :, 8] += 2 * np.pi * (torch.rand(x.shape[0], 1) - 0.5)
+        x = x.reshape(-1, x.shape[-1])
+
+        mean = x.mean(dim=0)
+        # std = np.sqrt(np.average((x - mean) ** 2, weights=mask, axis=0))
+        std = x.std(dim=0)
+
+        if self.states_only:
+            dim = 15
+        else:
+            dim = 15 + 12 + 9
+
+        # for angle we force to be between [-1, 1]
+        if self.cosine_sine:
+            self.mean = torch.zeros(dim + 1)
+            self.std = torch.ones(dim + 1)
+            self.mean[:14] = mean[:14]
+            self.std[:14] = (std[:14]).float()
+            self.mean[16:] = mean[15:]
+            self.std[16:] = (std[15:]).float()
+        else:
+            # mean[12:15] = 0
+            # std[12:15] = np.pi
+            # mean[14] = 0
+            # std[14] = np.pi
+            self.mean = mean
+            self.std = torch.from_numpy(std).float()
+
+    def set_norm_constants(self, mean, std):
+        self.mean = mean
+        self.std = std
+
+    def get_norm_constants(self):
+        return self.mean, self.std
+
 class AllegroScrewDriverTransitionDataset(AllegroScrewDriverDataset):
 
     def __init__(self, folders, cosine_sine=False, states_only=False):

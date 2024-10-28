@@ -1,0 +1,9 @@
+/home/abhinav/Documents/ccai
+allegro_screwdriver_diffusion_project_ood_states.yaml
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Fail
+torch.Size([6336, 13, 36])
+Dset size 6336
+0

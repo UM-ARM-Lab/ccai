@@ -1,0 +1,2 @@
+python -u train_allegro_screwdriver.py --config allegro_screwdriver_diffusion_project_ood_states.yaml > ./logs/ood_projection_orig_model_viz.log
+python -u train_allegro_screwdriver.py --config allegro_screwdriver_diffusion_project_ood_states_var_start.yaml > ./logs/ood_projection_var_start_viz.log

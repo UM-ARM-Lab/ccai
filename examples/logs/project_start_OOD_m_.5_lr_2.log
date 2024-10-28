@@ -1,0 +1,125 @@
+Importing module 'gym_38' (/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.0+cu121
+Device count 1
+/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinav/Documents/ccai
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current yaw: tensor([-0.0005,  0.0155, -0.0151], device='cuda:0')
+Current yaw: tensor([ 0.0011,  0.0311, -0.0178], device='cuda:0')
+1 turn
+Projection step: 0, Loss: 34.38913345336914
+tensor([[-0.1201, -0.0046,  0.0165, -0.0291, -0.0011, -0.0179, -0.0453, -0.0011,
+         -0.1266, -0.0202,  0.0263, -0.0093,  0.0850,  0.0272, -0.0181, -0.0361]],
+       device='cuda:0')
+Projection step: 1, Loss: 32.36699676513672
+tensor([[-0.0742, -0.0088,  0.0019, -0.0377,  0.0479, -0.0082,  0.0147,  0.0005,
+         -0.0498,  0.0280,  0.0612,  0.0134,  0.0979,  0.0621, -0.0395, -0.0440]],
+       device='cuda:0')
+Projection step: 2, Loss: 32.629966735839844
+tensor([[-0.0420, -0.0219, -0.0082,  0.0152,  0.0189, -0.0107,  0.0197,  0.0100,
+         -0.0050,  0.0453,  0.0544, -0.0040,  0.0989,  0.0721, -0.0118, -0.0298]],
+       device='cuda:0')
+Projection step: 3, Loss: 32.14366149902344
+tensor([[-3.5594e-02, -3.6741e-02, -9.9487e-03, -7.8016e-03,  4.0982e-02,
+         -3.6436e-02,  2.2247e-02,  1.0240e-02, -1.2117e-02,  2.8786e-02,
+          5.5831e-02, -1.7333e-02,  8.9138e-02,  6.3368e-02,  8.5035e-03,
+         -8.9486e-06]], device='cuda:0')
+Projection step: 4, Loss: 28.012298583984375
+tensor([[-0.0237,  0.0087, -0.0118, -0.0028,  0.0452, -0.0539, -0.0004,  0.0011,
+         -0.0186,  0.0109,  0.0380,  0.0063,  0.1038,  0.0605, -0.0351, -0.0242]],
+       device='cuda:0')
+Projection step: 5, Loss: 25.65567398071289
+tensor([[-0.0257, -0.0010, -0.0184, -0.0097,  0.0190, -0.0382, -0.0034,  0.0142,
+         -0.0086, -0.0048,  0.0318,  0.0121,  0.1052,  0.0481,  0.0292,  0.0265]],
+       device='cuda:0')
+Projection step: 6, Loss: 26.482440948486328
+tensor([[-0.0159,  0.0100, -0.0119,  0.0283,  0.0095, -0.0191,  0.0054,  0.0072,
+         -0.0129, -0.0168,  0.0079,  0.0037,  0.1083,  0.0527,  0.0122, -0.0156]],
+       device='cuda:0')
+Projection step: 7, Loss: 25.177656173706055
+tensor([[-0.0239, -0.0139, -0.0071,  0.0318,  0.0242, -0.0321,  0.0172,  0.0009,
+          0.0039, -0.0011,  0.0158, -0.0016,  0.1168,  0.0571,  0.0282, -0.0080]],
+       device='cuda:0')
+Projection step: 8, Loss: 22.808551788330078
+tensor([[-0.0201,  0.0219, -0.0097, -0.0042,  0.0381, -0.0243,  0.0090, -0.0022,
+          0.0027,  0.0036,  0.0016,  0.0331,  0.1073,  0.0444, -0.0249,  0.0120]],
+       device='cuda:0')
+Projection step: 9, Loss: 22.415260314941406
+tensor([[-0.0207, -0.0022, -0.0341, -0.0025,  0.0164, -0.0160,  0.0147,  0.0072,
+          0.0059,  0.0016, -0.0180,  0.0083,  0.1109,  0.0389, -0.0120,  0.0026]],
+       device='cuda:0')
+Projection step: 10, Loss: 22.12420654296875
+tensor([[-0.0103, -0.0057, -0.0089,  0.0199, -0.0102, -0.0158,  0.0073,  0.0131,
+          0.0131,  0.0071,  0.0028, -0.0006,  0.1144,  0.0408,  0.0535,  0.0136]],
+       device='cuda:0')
+Projection step: 11, Loss: 20.7226619720459
+tensor([[ 0.0073, -0.0047, -0.0166,  0.0436, -0.0061, -0.0198,  0.0012,  0.0169,
+          0.0103,  0.0049, -0.0019,  0.0063,  0.1141,  0.0397,  0.0167,  0.0163]],
+       device='cuda:0')
+Projection step: 12, Loss: 20.137075424194336
+tensor([[ 0.0083, -0.0022, -0.0107,  0.0447, -0.0049, -0.0090, -0.0022, -0.0106,
+          0.0075,  0.0124, -0.0107,  0.0109,  0.1150,  0.0365,  0.0087, -0.0040]],
+       device='cuda:0')
+Projection step: 13, Loss: 18.030406951904297
+tensor([[ 0.0144,  0.0216, -0.0416,  0.0298,  0.0084, -0.0166,  0.0091,  0.0066,
+         -0.0039,  0.0050, -0.0161,  0.0031,  0.1165,  0.0188, -0.0181,  0.0164]],
+       device='cuda:0')
+Projection step: 14, Loss: 17.796640396118164
+tensor([[-0.0102,  0.0303,  0.0191, -0.0118, -0.0031,  0.0065,  0.0055,  0.0183,
+         -0.0084,  0.0081, -0.0074,  0.0357,  0.1212,  0.0113, -0.0514,  0.0050]],
+       device='cuda:0')
+Projection step: 15, Loss: 16.872268676757812
+tensor([[ 0.0067, -0.0046,  0.0128, -0.0239, -0.0353,  0.0047,  0.0369,  0.0367,
+         -0.0321,  0.0162,  0.0206,  0.0324,  0.1226, -0.0055, -0.0384,  0.0059]],
+       device='cuda:0')
+Projection step: 16, Loss: 16.625324249267578
+tensor([[ 0.0242, -0.0172,  0.0328, -0.0243, -0.0447,  0.0105,  0.0106,  0.0474,
+         -0.0160,  0.0229,  0.0324,  0.0220,  0.1333, -0.0054, -0.0425, -0.0575]],
+       device='cuda:0')
+Projection step: 17, Loss: 15.630268096923828
+tensor([[ 0.0284, -0.0331,  0.0236, -0.0096, -0.0436, -0.0111, -0.0067,  0.0302,
+         -0.0075,  0.0195,  0.0320, -0.0174,  0.1367, -0.0123,  0.0341, -0.0178]],
+       device='cuda:0')
+Projection step: 18, Loss: 14.180150985717773
+tensor([[ 0.0021,  0.0095, -0.0070,  0.0078,  0.0111, -0.0156, -0.0125, -0.0097,
+          0.0050,  0.0007,  0.0019, -0.0380,  0.1327, -0.0266, -0.0127, -0.0302]],
+       device='cuda:0')
+Projection step: 19, Loss: 12.863201141357422
+tensor([[ 0.0013,  0.0222,  0.0008,  0.0099,  0.0266,  0.0024,  0.0060, -0.0120,
+          0.0045, -0.0054, -0.0020, -0.0058,  0.1291, -0.0379, -0.0460, -0.0216]],
+       device='cuda:0')
+Projection step: 20, Loss: 11.807680130004883
+tensor([[ 0.0060,  0.0003, -0.0074,  0.0074,  0.0284,  0.0030,  0.0100, -0.0074,
+         -0.0013, -0.0123, -0.0044,  0.0147,  0.1212, -0.0502, -0.0331, -0.0554]],
+       device='cuda:0')
+Projection step: 21, Loss: 10.654316902160645
+tensor([[ 0.0125, -0.0194, -0.0021,  0.0050,  0.0112, -0.0015,  0.0084, -0.0048,
+         -0.0009, -0.0106, -0.0047,  0.0233,  0.1151, -0.0604,  0.0029, -0.0825]],
+       device='cuda:0')
+Projection step: 22, Loss: 9.646915435791016
+tensor([[ 0.0079, -0.0085,  0.0210,  0.0080, -0.0005,  0.0005,  0.0003, -0.0004,
+          0.0058, -0.0033, -0.0083,  0.0096,  0.1091, -0.0673,  0.0505, -0.0521]],
+       device='cuda:0')
+Projection step: 23, Loss: 8.59637451171875
+tensor([[ 0.0089, -0.0036,  0.0188, -0.0047, -0.0005,  0.0045, -0.0045,  0.0100,
+          0.0042, -0.0002, -0.0179, -0.0083,  0.1066, -0.0655,  0.0222, -0.0266]],
+       device='cuda:0')
+Projection step: 24, Loss: 7.53170919418335
+tensor([[ 0.0159, -0.0103,  0.0005,  0.0013,  0.0104, -0.0012, -0.0053,  0.0038,
+          0.0063, -0.0061, -0.0017,  0.0026,  0.1038, -0.0599,  0.0223, -0.0480]],
+       device='cuda:0')
+Projection step: 25, Loss: 6.648268699645996
+Sampling time 96.67709978999994

@@ -83,7 +83,7 @@ class ConstrainedSVGDProblem(Problem):
 
     def combined_constraints(self, augmented_x, compute_grads=True, compute_hess=True, projected_diffusion=False, include_slack=True):
         N = augmented_x.shape[0]
-        T_offset = 0 if projected_diffusion else 1
+        T_offset = 0 #if projected_diffusion else 1
         augmented_x = augmented_x.reshape(N, self.T + T_offset, self.dx + self.du + self.dz)
         xu = augmented_x[:, :, :(self.dx + self.du)]
         z = augmented_x[:, :, -self.dz:]
