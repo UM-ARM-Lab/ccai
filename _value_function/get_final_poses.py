@@ -50,7 +50,7 @@ gym.destroy_sim(sim)
 
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 start_idx = config['start_idx']
-savepath = f'{fpath.resolve()}/value_datasets_{start_idx}.pkl'
+savepath = f'{fpath.resolve()}/value_datasets/value_dataset_{start_idx}.pkl'
 with open(savepath, 'wb') as f:
     pkl.dump(pose_tuples, f)
 

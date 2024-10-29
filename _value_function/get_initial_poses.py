@@ -199,7 +199,7 @@ if __name__ == "__main__":
         pass
 
 
-    with open(f'{fpath.resolve()}/initial_poses.pkl', 'wb') as f:
+    with open(f'{fpath.resolve()}/initial_poses_0.pkl', 'wb') as f:
         pkl.dump(initial_poses, f)
     # with open(f'{fpath.resolve()}/screwdriver_poses.pkl', 'wb') as f:
         #  pkl.dump(screwdriver_poses, f)

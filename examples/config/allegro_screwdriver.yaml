@@ -20,7 +20,7 @@ arm_type: 'robot' # choose between 'None', 'robot', 'floating_3d'
 gravity: False  # whether to use gravity in the simulation NOTE: this is set to be False for debugging
 
 device: 'cuda:0'
-start_idx: 3000
+start_idx: 6500
 
 controllers:
   csvgd:
