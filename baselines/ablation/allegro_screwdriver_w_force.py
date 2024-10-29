@@ -31,38 +31,6 @@ obj_dof = 3
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 
-class ALlegroScrewdriverContact(AllegroContactProblem):
-    def __init__(self, 
-                 dx,
-                 du,
-                 start, 
-                 goal, 
-                 T, 
-                 chain, 
-                 object_location, 
-                 object_type,
-                 world_trans,
-                 object_asset_pos,
-                 fingers=['index', 'middle', 'ring', 'thumb'],
-                 obj_dof_code=[0, 0, 0, 0, 0, 0], 
-                 obj_joint_dim=0,
-                 fixed_obj=False,
-                 device='cuda:0'):
-        super(ALlegroScrewdriverContact, self).__init__(dx, du, start, goal, T, 
-                                                        chain, object_type, world_trans,
-                                                        object_asset_pos, fingers, obj_dof_code, obj_joint_dim,
-                                                        fixed_obj, False, device)
-        self.default_index_ee_loc_in_screwdriver = torch.tensor([0.0087, -0.02, 0.1293], device=device).unsqueeze(0)
-    # def _cost(self, xu, start, goal):
-    #     loss = super(ALlegroScrewdriverContact, self)._cost(xu, start, goal)
-    #     state = xu[:, :self.dx]  # state dim = 9
-    #     state = torch.cat((start.reshape(1, self.dx), state), dim=0)  #
-    #     state = torch.cat((state, self.start_obj_pose.unsqueeze(0).repeat((self.T + 1, 1))), dim=1)
-    #     index_ee_locs = self._ee_locations_in_screwdriver(partial_to_full_state(state[:, :4*self.num_fingers], fingers=self.fingers),
-    #                                                 state[:, 4*self.num_fingers: 4*self.num_fingers + self.obj_dof],
-    #                                                 queried_fingers=['index'])
-    #     index_pos_loss = 100000 * torch.sum((index_ee_locs[:,0] - self.default_index_ee_loc_in_screwdriver.unsqueeze(0)) ** 2)
-    #     return loss + index_pos_loss
 class AllegroScrewdriver(AllegroValveTurning):
     def get_constraint_dim(self, T):
         self.friction_polytope_k = 4
@@ -456,7 +424,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     start = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
     # start = torch.cat((state['q'].reshape(10), torch.zeros(1).to(state['q'].device))).to(device=params['device'])
     contact_fingers = params['fingers']
-    pregrasp_problem = ALlegroScrewdriverContact(
+    pregrasp_problem = AllegroContactProblem(
         dx=4 * num_fingers,
         du=4 * num_fingers,
         start=start[:4 * num_fingers + obj_dof],

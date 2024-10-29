@@ -18,7 +18,9 @@ kp: 3.0
 visualize_plan: True
 random_robot_pose: False
 optimize_force: True
+gravity: True  # whether to use gravity in the simulation
 goal: [-1.5707]
+method: 'csvgd'
 controllers:
   csvgd:
     # N: 16
