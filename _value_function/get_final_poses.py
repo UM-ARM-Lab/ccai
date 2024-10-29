@@ -24,34 +24,32 @@ from tqdm import tqdm
 from screwdriver_problem import init_env, do_turn, emailer
 
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
-with open(f'{fpath.resolve()}/initial_poses/initial_poses_10k.pkl', 'rb') as file:
+prog_idx = 0
+trials_per_save = 500
+source_filename = f'initial_poses/initial_poses_{prog_idx}.pkl'
+start_idx = prog_idx * trials_per_save
+
+with open(f'{fpath.resolve()}/{source_filename}', 'rb') as file:
     initial_poses  = pkl.load(file)
 
 pose_tuples = []
-
 config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
-n_succ = 0
-n_trials = 500
-for i in tqdm(range(n_trials)):
-    
-    idx = i + config['start_idx']
-    print("RUNNING TRIAL: ", idx)
-    initial_pose = initial_poses[idx]
-    _, final_pose, succ = do_turn(initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
-    pose_tuples.append((initial_pose, final_pose))
-    if succ:
-        n_succ += 1
 
-print(f'Success rate: {n_succ/n_trials}')
+for j in range(10000/trials_per_save):
+    for i in tqdm(range(trials_per_save)):
+        
+        idx = i + start_idx
+        print("RUNNING TRIAL: ", idx)
+        initial_pose = initial_poses[idx]
+        _, final_pose, succ = do_turn(initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
+        pose_tuples.append((initial_pose, final_pose))
+
+    savepath = f'{fpath.resolve()}/value_datasets/value_dataset_source_{prog_idx}_startid_{start_idx}.pkl'
+    with open(savepath, 'wb') as f:
+        pkl.dump(pose_tuples, f)
+
+    start_idx += trials_per_save
 
 gym.destroy_viewer(viewer)
 gym.destroy_sim(sim)
-
-fpath = pathlib.Path(f'{CCAI_PATH}/data')
-start_idx = config['start_idx']
-savepath = f'{fpath.resolve()}/value_datasets/value_dataset_{start_idx}.pkl'
-with open(savepath, 'wb') as f:
-    pkl.dump(pose_tuples, f)
-
-print(f'saved to {savepath}')
 emailer().send()

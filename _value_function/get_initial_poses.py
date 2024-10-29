@@ -20,7 +20,7 @@ if __name__ == "__main__":
         pose = pregrasp(env, params, chain)
         initial_poses.append(pose)
 
-    with open(f'{fpath.resolve()}/initial_poses_0.pkl', 'wb') as f:
+    with open(f'{fpath.resolve()}/initial_poses/initial_poses_1.pkl', 'wb') as f:
         pkl.dump(initial_poses, f)
 
     print("Saved poses")
