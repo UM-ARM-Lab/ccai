@@ -2190,7 +2190,7 @@ class AllegroContactWithEnvProblem(AllegroContactProblem):
             return result_dict
 
         if compute_grads:
-            grad_h = grad_h.reshape(N, -1, (self.T + 1 if projected_diffusion else self.T) * self.d)
+            grad_h = grad_h.reshape(N, -1, (self.T) * self.d)
         else:
             return h, None, None
         if compute_hess:

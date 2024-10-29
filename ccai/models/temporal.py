@@ -663,10 +663,10 @@ class TemporalUnetStateAction(nn.Module):
 
                 c_state, mask, mask_no_z = self.c_state_mask(problem_idx, x)
                 # if self.z_dict[problem_idx] is None:
-                # self.init_z(x_this_problem, problem_idx, mask)
-                # z_this_problem = self.z_dict[problem_idx]
+                self.init_z(x_this_problem, problem_idx, mask)
+                z_this_problem = self.z_dict[problem_idx]
                 problem = self.problem_dict[problem_idx]
-                z_this_problem = torch.zeros((x_this_problem.shape[0], 1, problem.dz), device=x.device, dtype=x.dtype)
+                # z_this_problem = torch.zeros((x_this_problem.shape[0], 1, problem.dz), device=x.device, dtype=x.dtype)
 
                 dtype = torch.float64
                 z_dim = problem.dz
@@ -705,13 +705,13 @@ class TemporalUnetStateAction(nn.Module):
 
 
                 # xi_C = None
-                if xi_C is None:
-                    # Update to decrease constraint violation
-                    xi_C = dCdCT_inv @ C.unsqueeze(-1)
-                    xi_C = (dC.permute(0, 2, 1) @ xi_C).squeeze(-1)
-                    # xi_C = xi_C[:, :-z_dim]
+                # if xi_C is None:
+                #     # Update to decrease constraint violation
+                #     xi_C = dCdCT_inv @ C.unsqueeze(-1)
+                #     xi_C = (dC.permute(0, 2, 1) @ xi_C).squeeze(-1)
+                #     # xi_C = xi_C[:, :-z_dim]
 
-                update_this_c -= 10 * xi_C
+                # update_this_c -= 10 * xi_C
 
                 # if problem.dz > 0:
                 #     update_this_c = update_this_c[:, : :-problem.dz]
