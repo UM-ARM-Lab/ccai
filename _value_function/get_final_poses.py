@@ -16,13 +16,12 @@ import matplotlib.pyplot as plt
 from utils.allegro_utils import state2ee_pos
 from scipy.spatial.transform import Rotation as R
 import sys
-from get_initial_poses import emailer
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 sys.path.append(str(CCAI_PATH))
 from examples.allegro_valve_roll import PositionControlConstrainedSVGDMPC
 from examples.allegro_screwdriver import AllegroScrewdriver
 from tqdm import tqdm
-from screwdriver_problem import init_env, do_turn
+from screwdriver_problem import init_env, do_turn, emailer
 
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 with open(f'{fpath.resolve()}/initial_poses/initial_poses_10k.pkl', 'rb') as file:
