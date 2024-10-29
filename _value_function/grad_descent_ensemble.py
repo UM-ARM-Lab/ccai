@@ -21,7 +21,7 @@ with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
 
 def get_data():
 
-    inputs = torch.from_numpy(total_poses)[0:50]
+    inputs = torch.from_numpy(total_poses)[0:5]
     return inputs
 
 def grad_descent():
@@ -31,6 +31,7 @@ def grad_descent():
         model = Net(shape[0], shape[1])
         model.load_state_dict(checkpoint['model_state'])
         models.append(model)
+        #break
 
     
     poses_mean = checkpoints[0]['poses_mean']
@@ -48,17 +49,17 @@ def grad_descent():
     # Enable gradient computation
     poses_norm.requires_grad_(True)
 
-    optimizer = optim.SGD([poses_norm], lr=.1)
-    mse_loss = nn.MSELoss()
+    optimizer = optim.SGD([poses_norm], lr=0.1)
+    #optimizer = optim.Adam([poses_norm], lr=0.01)
+
     model.eval()
 
     # gradient descent
-    num_iterations = 10000
+    num_iterations = 5000
     target_value = torch.tensor([0.0], dtype=torch.float32)
 
     pose_optimization_trajectory = []
     
-
     for i in range(num_iterations):
         optimizer.zero_grad()  
         ensemble_predictions = query_ensemble(poses_norm, models)
@@ -67,7 +68,7 @@ def grad_descent():
 
         mse = torch.mean((predictions - target_value) ** 2)
         mean_squared_variance = torch.mean((ensemble_predictions - predictions) ** 2)
-        loss = mse + mean_squared_variance
+        loss = mse #+ mean_squared_variance
         loss.backward()
 
         # Set gradients of the last four values of each pose to 0
@@ -100,10 +101,10 @@ def grad_descent():
         for initial, optimized in initial_pose_tuples:
             env.reset(torch.from_numpy(initial).reshape(1,20), deterministic=True)
             time.sleep(0.5)
-            input("Press Enter to continue...")
+            # input("Press Enter to continue...")
             env.reset(torch.from_numpy(optimized).reshape(1,20).float(), deterministic=True)
             time.sleep(1.0)
-            input("Press Enter to continue...")
+            # input("Press Enter to continue...")
 
 
     #print(predicted_cost_tuples)

@@ -20,7 +20,7 @@ def get_data():
     with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
         poses  = pkl.load(file)
     inputs = np.array([t.numpy() for t in poses]).reshape(-1, 20)
-    inputs = torch.from_numpy(inputs)[0:100]
+    inputs = torch.from_numpy(inputs)[0:5]
     
     succ_filename = '/initial_poses/successful_initial_poses.pkl'
 
@@ -58,7 +58,7 @@ def grad_descent():
     model.eval()
 
     # gradient descent
-    num_iterations = 500
+    num_iterations = 5000
     target_value = torch.tensor([0.0], dtype=torch.float32)
 
     for i in range(num_iterations):
@@ -72,7 +72,7 @@ def grad_descent():
         #print("mean: ", mean_loss)
         #print("mse: ", mse)
 
-        loss = mse + 0.1 * mean_loss
+        loss = mse #+ 0.1 * mean_loss
         loss.backward()
 
         # Set gradients of the last four values of each pose to 0

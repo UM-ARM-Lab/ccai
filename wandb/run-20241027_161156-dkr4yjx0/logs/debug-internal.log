@@ -8,3 +8,12 @@
 {"time":"2024-10-27T16:11:56.73127112-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"dkr4yjx0"}}
 {"time":"2024-10-27T16:11:58.185692963-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
 {"time":"2024-10-27T16:11:58.185889843-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-27T16:12:36.868390538-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-27T16:12:36.870485622-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-27T16:12:37.232250056-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-27T16:12:38.333674619-04:00","level":"INFO","msg":"stream: closing","id":"dkr4yjx0"}
+{"time":"2024-10-27T16:12:38.333686095-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"dkr4yjx0"}}
+{"time":"2024-10-27T16:12:38.33370954-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"dkr4yjx0"}}
+{"time":"2024-10-27T16:12:38.333713185-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"dkr4yjx0"}}
+{"time":"2024-10-27T16:12:38.333760335-04:00","level":"INFO","msg":"stream: closed","id":"dkr4yjx0"}
+{"time":"2024-10-27T16:12:41.870072834-04:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

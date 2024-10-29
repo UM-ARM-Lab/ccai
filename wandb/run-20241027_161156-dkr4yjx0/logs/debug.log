@@ -23,3 +23,10 @@ config: {'epochs': 300, 'batch_size': 64, 'learning_rate': 0.0001}
 2024-10-27 16:11:58,281 INFO    MainThread:1652588 [wandb_run.py:_redirect():2378] Wrapping output streams.
 2024-10-27 16:11:58,281 INFO    MainThread:1652588 [wandb_run.py:_redirect():2403] Redirects installed.
 2024-10-27 16:11:58,282 INFO    MainThread:1652588 [wandb_init.py:init():907] run started, returning control to user process
+2024-10-27 16:12:36,867 INFO    MainThread:1652588 [wandb_run.py:_finish():2164] finishing run adamhung00/value-function-training/dkr4yjx0
+2024-10-27 16:12:36,867 INFO    MainThread:1652588 [wandb_run.py:_atexit_cleanup():2428] got exitcode: 0
+2024-10-27 16:12:36,867 INFO    MainThread:1652588 [wandb_run.py:_restore():2410] restore
+2024-10-27 16:12:36,867 INFO    MainThread:1652588 [wandb_run.py:_restore():2416] restore done
+2024-10-27 16:12:38,329 INFO    MainThread:1652588 [wandb_run.py:_footer_history_summary_info():4049] rendering history
+2024-10-27 16:12:38,330 INFO    MainThread:1652588 [wandb_run.py:_footer_history_summary_info():4081] rendering summary
+2024-10-27 16:12:38,333 INFO    MainThread:1652588 [wandb_run.py:_footer_sync_info():4008] logging synced files

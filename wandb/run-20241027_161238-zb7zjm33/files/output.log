@@ -1,0 +1,4 @@
+Epoch [1/300], Training Loss: 0.97937592, Test Loss: 1.07311276, Unnormalized Train Loss: 1.30654531
+Epoch [100/300], Training Loss: 0.36784963, Test Loss: 0.37596766, Unnormalized Train Loss: 0.49073313
+Epoch [200/300], Training Loss: 0.29975781, Test Loss: 0.32199705, Unnormalized Train Loss: 0.39989462
+Epoch [300/300], Training Loss: 0.26570994, Test Loss: 0.28891033, Unnormalized Train Loss: 0.35447275

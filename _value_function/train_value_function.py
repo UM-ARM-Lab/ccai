@@ -203,11 +203,11 @@ def eval(model_name, ensemble = False):
 
 if __name__ == "__main__":
 
-    # model_name = "2"#input("Enter model name: ")
-    # model_to_save = train()
-    # save(model_to_save, f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
+    model_name = "2"#input("Enter model name: ")
+    model_to_save = train()
+    save(model_to_save, f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
     # eval(model_name = "2") 
-    # exit()
+    exit()
 
 
     ensemble = []

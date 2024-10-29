@@ -1,0 +1,19 @@
+{"time":"2024-10-27T16:12:38.378808573-04:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-10-27T16:12:38.378819112-04:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/wandb/run-20241027_161238-zb7zjm33/logs/debug-core.log"}
+{"time":"2024-10-27T16:12:38.378899362-04:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-10-27T16:12:38.381761078-04:00","level":"INFO","msg":"created new stream","id":"zb7zjm33"}
+{"time":"2024-10-27T16:12:38.38177682-04:00","level":"INFO","msg":"stream: started","id":"zb7zjm33"}
+{"time":"2024-10-27T16:12:38.381791413-04:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"zb7zjm33"}}
+{"time":"2024-10-27T16:12:38.381797749-04:00","level":"INFO","msg":"sender: started","stream_id":{"value":"zb7zjm33"}}
+{"time":"2024-10-27T16:12:38.381797803-04:00","level":"INFO","msg":"handler: started","stream_id":{"value":"zb7zjm33"}}
+{"time":"2024-10-27T16:12:38.540548926-04:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-10-27T16:12:38.540719786-04:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-10-27T16:13:18.302105115-04:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-10-27T16:13:18.304491569-04:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-10-27T16:13:19.56916775-04:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-10-27T16:13:20.697477362-04:00","level":"INFO","msg":"stream: closing","id":"zb7zjm33"}
+{"time":"2024-10-27T16:13:20.697489664-04:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"zb7zjm33"}}
+{"time":"2024-10-27T16:13:20.69751384-04:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"zb7zjm33"}}
+{"time":"2024-10-27T16:13:20.697568731-04:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"zb7zjm33"}}
+{"time":"2024-10-27T16:13:20.697585317-04:00","level":"INFO","msg":"stream: closed","id":"zb7zjm33"}
+{"time":"2024-10-27T16:13:23.303783246-04:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

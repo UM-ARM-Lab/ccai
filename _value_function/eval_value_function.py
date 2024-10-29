@@ -43,7 +43,7 @@ if __name__ == "__main__":
     
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
     start_idx = config['start_idx']
-    savepath = f'{fpath.resolve()}/eval/final_pose_comparisons_mse_50samples.pkl'
+    savepath = f'{fpath.resolve()}/eval/final_pose_comparisons_ablation_ensemble_ADAM_5k_iters.pkl'
     with open(savepath, 'wb') as f:
         pkl.dump(pose_tuples, f)
 
