@@ -56,7 +56,7 @@ if __name__ == "__main__":
 
     vis = True
     if vis:
-        config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
+        params, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
         for i in range(len(initial_poses)):
             print("original turn")
             print("cost: ", initial_costs[i])

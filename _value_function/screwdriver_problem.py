@@ -16,15 +16,83 @@ import matplotlib.pyplot as plt
 from utils.allegro_utils import state2ee_pos
 from scipy.spatial.transform import Rotation as R
 import sys
-from get_initial_poses import emailer
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 sys.path.append(str(CCAI_PATH))
 from examples.allegro_valve_roll import PositionControlConstrainedSVGDMPC
-from examples.allegro_screwdriver import AllegroScrewdriver
+from examples.allegro_screwdriver import AllegroScrewdriver, ALlegroScrewdriverContact
 from tqdm import tqdm
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
+def pregrasp(env, config, chain):
+    params = config.copy()
+    controller = 'csvgd'
+    params.pop('controllers')
+    params.update(config['controllers'][controller])
+    params['controller'] = controller
+    params['chain'] = chain.to(device=params['device'])
+    object_location = torch.tensor(env.table_pose).to(params['device']).float()
+    params['object_location'] = object_location
 
+    obj_dof = 3
+    num_fingers = len(params['fingers'])
+    device = params['device']
+    sim_device = params['sim_device']
+    default_dof_pos = torch.cat((torch.tensor([[0., 0.5, 0.7, 0.7]]).float().to(device=sim_device),
+                                torch.tensor([[0., 0.5, 0.7, 0.7]]).float().to(device=sim_device),
+                                torch.tensor([[0., 0.5, 0.7, 0.7]]).float().to(device=sim_device),
+                                torch.tensor([[1.3, 0.3, 0.2, 1.1]]).float().to(device=sim_device),
+                                torch.tensor([[0.0, 0.0, 0.0, 0.0]]).float().to(device=sim_device)),
+                                dim=1).to(sim_device)
 
+    env.reset(dof_pos= default_dof_pos, deterministic=False)
+    start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=device)
+
+    screwdriver = start.clone()[-4:-1]
+    #print("start screwdriver: ", screwdriver)
+    screwdriver = torch.cat((screwdriver, torch.tensor([0]).to(device=device)),dim=0).reshape(1,4)
+
+    if 'index' in params['fingers']:
+        contact_fingers = params['fingers']
+    else:
+        contact_fingers = ['index'] + params['fingers']    
+
+    pregrasp_problem = ALlegroScrewdriverContact(
+        dx=4 * num_fingers,
+        du=4 * num_fingers,
+        start=start[:4 * num_fingers + obj_dof],
+        goal=None,
+        T=2,
+        chain=params['chain'],
+        device=device,
+        object_asset_pos=env.table_pose,
+        object_location=params['object_location'],
+        object_type=params['object_type'],
+        world_trans=env.world_trans,
+        fingers=contact_fingers,
+        obj_dof_code=params['obj_dof_code'],
+        obj_joint_dim=1,
+        fixed_obj=True,
+    )
+    pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
+    pregrasp_planner.warmup_iters = 80#500 #50
+
+    best_traj, _ = pregrasp_planner.step(start[:4 * num_fingers])
+
+    x = best_traj[-1, :4 * num_fingers]
+    action = x.reshape(-1, 4 * num_fingers).to(device=device) 
+    solved_pos = torch.cat((
+            action.clone()[:, :8], 
+            torch.tensor([[0., 0.5, 0.65, 0.65]]).to(device=device), 
+            action.clone()[:, 8:], 
+            screwdriver.to(device=device)
+            #torch.zeros(1,4).to(device=device)
+            ), dim=1).to(device)
+
+    env.reset(dof_pos = solved_pos.to(device = sim_device), deterministic=True)
+
+    return solved_pos.cpu()
 
 def solve_turn(env, gym, viewer, params, fpath, initial_pose, state2ee_pos_partial, sim_viz_env=None, ros_copy_node=None):
 
@@ -196,6 +264,8 @@ def init_env(visualize=False):
                                 fingers=config['fingers'],
                                 gradual_control=True,
                                 gravity=True,
+                                randomize_obj_start= True
+                                #device = config['device'],
                                 )
     sim, gym, viewer = env.get_sim()
     results = {}
@@ -211,7 +281,7 @@ def init_env(visualize=False):
     config['ee_names'] = ee_names
     config['obj_dof_code'] = [0, 0, 0, 1, 1, 1]
     config['obj_dof'] = np.sum(config['obj_dof_code'])
-
+    
     chain = pk.build_chain_from_urdf(open(asset).read())
     frame_indices = [chain.frame_to_idx[ee_names[finger]] for finger in config['fingers']]    # combined chain
     frame_indices = torch.tensor(frame_indices)
@@ -219,13 +289,13 @@ def init_env(visualize=False):
 
     return config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial
 
-def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, trial_num=0):
-    
+def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial):
+
     params = config.copy()
     controller = 'csvgd'
     succ = False
-    fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_{trial_num}')
-    pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
+    # fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_{trial_num}')
+    # pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
     # set up params
     params.pop('controllers')
     params.update(config['controllers'][controller])
@@ -245,6 +315,32 @@ def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym,
         succ = True
 
     return initial_pose, final_pose, succ
+
+class emailer():
+    def __init__(self):
+        self.sender_email = "eburner813@gmail.com"
+        self.receiver_email = "adamhung@umich.edu"  # You can send it to yourself
+        self.password = "yhpffhhnwbhpluty"
+    def send(self, *args, **kwargs):
+        msg = MIMEMultipart()
+        msg['From'] = self.sender_email
+        msg['To'] = self.receiver_email
+        msg['Subject'] = "program finished"
+        body = "program finished"
+        msg.attach(MIMEText(body, 'plain'))
+        smtp_server = "smtp.gmail.com"
+        smtp_port = 587
+        try:
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            server.starttls()
+            server.login(self.sender_email, self.password)
+            text = msg.as_string()
+            server.sendmail(self.sender_email, self.receiver_email, text)
+            print("Email sent")
+        except Exception as e:
+            print(f"Error: {e}")
+        finally:
+            server.quit()
 
 def show_state(env, state, t=1):
     env.reset(dof_pos=state)

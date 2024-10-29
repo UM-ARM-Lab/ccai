@@ -5,8 +5,7 @@ import sys
 from tqdm import tqdm
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 sys.path.append(str(CCAI_PATH))
-from get_initial_poses import emailer
-from screwdriver_problem import init_env, do_turn
+from screwdriver_problem import init_env, do_turn, emailer
 import torch
 
 
