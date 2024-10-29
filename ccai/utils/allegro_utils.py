@@ -120,7 +120,7 @@ def state2ee_pos(state, finger_name, fingers, chain, frame_indices, world_trans)
     return ee_p
 
 
-def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headless=False, task='screwdriver'):
+def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headless=False, task='screwdriver', pcd=None):
     num_fingers = len(fingers)
     # for a single trajectory
     T, dxu = trajectory.shape
@@ -129,6 +129,7 @@ def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headl
     vis.create_window(width=int(800), height=int(600), visible=not headless)
     # update camera
     vis.get_render_option().mesh_show_wireframe = True
+    vis.get_render_option().point_show_normal = True
     for t in range(T):
         vis.clear_geometries()
         q = trajectory[t, : 4 * num_fingers]
@@ -136,7 +137,7 @@ def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headl
         # scene.visualize_robot(partial_to_full_state(q.unsqueeze(0), fingers).to(device=scene.device),
         #                      theta.unsqueeze(0).to(device=scene.device))
         meshes = scene.get_visualization_meshes(partial_to_full_state(q.unsqueeze(0), fingers).to(device=scene.device),
-                                                theta.unsqueeze(0).to(device=scene.device))
+                                                theta.unsqueeze(0).to(device=scene.device), pcd=pcd)
         for mesh in meshes:
             vis.add_geometry(mesh)
         ctr = vis.get_view_control()
@@ -146,6 +147,7 @@ def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headl
             cwd = os.getcwd()
 
             parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-10-02-14-35-33.json")
+            # parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-08-07-10-49-00.json")
         elif task == 'card':
             parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_card.json")
         ctr.convert_from_pinhole_camera_parameters(parameters, allow_arbitrary=True)
