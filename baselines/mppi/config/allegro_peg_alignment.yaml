@@ -10,8 +10,13 @@ mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 fingers: ['index', 'middle', 'thumb']
 object_type: 'peg'
 sim_device: 'cpu'
+device: 'cpu'
 include_velocity: False
 friction_coefficient: 0.95
+gradual_control: True
+arm_type: 'None' # choose between 'None', 'robot', 'floating_3d', 'floating_6d'
+gravity: True  # whether to use gravity in the simulation
+goal: [0, 0, 0, 0, 0, 0]
 kp: 3.0
 controllers:
   mppi:
@@ -19,7 +24,3 @@ controllers:
     N: 200
     lambda: 0.01
     variance: 0.005
-    step_size: 0.1
-    momentum: 0.
-    # device: 'cuda:0'
-    device: 'cpu'

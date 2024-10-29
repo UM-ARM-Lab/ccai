@@ -275,6 +275,7 @@ class AllegroScrewdriver(AllegroValveTurning):
             return g, grad_g, hess
 
         return g, grad_g, None
+    
     def _index_contact_region_constr(self, contact_pts, env_q):
         " contact pts are in the robot frame"
         " constraint specifying that the index finger only has contact with the top of the screwdriver"
@@ -300,6 +301,8 @@ class AllegroScrewdriver(AllegroValveTurning):
         next_env_q = x[:, 1:, self.robot_dof:self.robot_dof + self.obj_dof]
         u = xu[:, :, self.dx: self.dx + self.robot_dof]
         force = xu[:, :, self.dx + self.robot_dof: self.dx + self.robot_dof + 3 * self.num_fingers + 3]
+        # the contact point does not include the env contact point as this is the special case. We choose the reference point for torque
+        # right at the env contact points, thus we only need to reason about the force from env contacts
         force_list = force.reshape((force.shape[0], force.shape[1], self.num_fingers + 1, 3))
         # contact_jac_list = [self.data[finger_name]['contact_jacobian'].reshape(N, T + 1, 3, self.robot_dof)[:, :-1].reshape(-1, 3, self.robot_dof)\
         #                      for finger_name in self.fingers]

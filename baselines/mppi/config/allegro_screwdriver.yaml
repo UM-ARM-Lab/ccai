@@ -4,22 +4,23 @@ receding_horizon: False
 num_steps: 12
 num_trials: 10
 visualize: True
-experiment_name: 'allegro_screwdriver_paper_computation_time'
+experiment_name: 'allegro_screwdriver_test'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
-object_type: 'peg'
+object_type: 'screwdriver'
 sim_device: 'cpu'
+device: 'cpu'
 include_velocity: False
 friction_coefficient: 0.95
+gradual_control: True
+arm_type: 'None' # choose between 'None', 'robot', 'floating_3d', 'floating_6d'
+gravity: True  # whether to use gravity in the simulation
+goal: [0, 0, -1.5707]
 kp: 3.0
 controllers:
   mppi:
     # N: 16
-    N: 200
+    N: 500
     lambda: 0.3
-    variance: 0.01
-    step_size: 0.1
-    momentum: 0.
-    # device: 'cuda:0'
-    device: 'cpu'
+    variance: 0.005

@@ -645,6 +645,8 @@ class AllegroContactProblem(AllegroObjectProblem):
             asset_object = get_assets_dir() + '/screwdriver/screwdriver_translation.urdf'
         elif object_type == 'peg':
             asset_object = get_assets_dir() + '/peg_insertion/peg.urdf'
+        elif object_type == 'short_peg':
+            asset_object = get_assets_dir() + '/peg_insertion/short_peg.urdf'
         self.object_chain = pk.build_chain_from_urdf(open(asset_object).read()).to(device=self.device)
         self.object_asset_pos = torch.tensor(object_asset_pos).to(self.device).float()
 
@@ -1093,6 +1095,8 @@ class AllegroValveTurning(AllegroContactProblem):
 
     def _force_equlibrium_constr_w_force(self, q, u, next_q, force_list, contact_jac_list, contact_point_list, next_env_q):
         # NOTE: the constriant is defined in the robot frame
+        # NOTE: this only holds for quasi static system, as the reference point for the torque is essentially arbitrary
+        # in a more general case, it has to be the CoM
         # the contact jac an contact points are all in the robot frame
         # this will be vmapped, so takes in a 3 vector and a [num_finger x 3 x 8] jacobian and a dq vector
         obj_robot_frame = self.world_trans.inverse().transform_points(self.object_location.reshape(1, 3))

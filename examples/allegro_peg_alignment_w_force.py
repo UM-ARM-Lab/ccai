@@ -1,7 +1,7 @@
 "this formulation considers contact forces from the wall to the peg"
 from isaacgym import gymapi
 from isaac_victor_envs.utils import get_assets_dir
-from isaac_victor_envs.tasks.allegro import AllegroPegInsertionEnv
+from isaac_victor_envs.tasks.allegro import AllegroPegAlignmentEnv
 
 import numpy as np
 import pickle as pkl
@@ -34,7 +34,7 @@ obj_dof = 6
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 
-class AllegroPegInsertion(AllegroValveTurning):
+class AllegroPegAlignment(AllegroValveTurning):
     def get_constraint_dim(self, T):
         self.friction_polytope_k = 4
         wrench_dim = 0
@@ -67,10 +67,11 @@ class AllegroPegInsertion(AllegroValveTurning):
                  optimize_force=False,
                  obj_dof_code=[1, 1, 1, 1, 1, 1],
                  obj_gravity=False,
-                 use_arm=False,
+                 arm_type='None',
                  arm_stiffness=None,
                  finger_stiffness=None,
                  device='cuda:0', **kwargs):
+        self.fingers = fingers
         self.num_fingers = len(fingers)
         self.optimize_force = optimize_force
         self.peg_asset_pos = peg_asset_pos
@@ -80,18 +81,25 @@ class AllegroPegInsertion(AllegroValveTurning):
                                         device=device).float(), device=device)
         self.wall_asset_pos = wall_asset_pos
         self.wall_dims = wall_dims.astype('float32')
-        if use_arm:
-            robot_dof = 4 * self.fingers + 7
+        if arm_type == 'None':
+            self.arm_dof = 0
+        elif arm_type == 'robot':
+            self.arm_dof = 7
+        elif arm_type == 'floating_3d':
+            self.arm_dof = 3
+        elif arm_type == 'floating_6d':
+            self.arm_dof = 6
         else:
-            robot_dof = 4 * self.fingers
+            raise ValueError('Invalid arm type')
+        robot_dof = self.arm_dof + 4 * self.num_fingers
         du = robot_dof + 3 * self.num_fingers + 3 
         self.obj_mass = 0.01
 
-        super(AllegroPegInsertion, self).__init__(start=start, goal=goal, T=T, chain=chain, object_location=object_location,
+        super(AllegroPegAlignment, self).__init__(start=start, goal=goal, T=T, chain=chain, object_location=object_location,
                                                  object_type=object_type, world_trans=world_trans, object_asset_pos=peg_asset_pos,
                                                  fingers=fingers, friction_coefficient=friction_coefficient, obj_dof_code=obj_dof_code, 
                                                  obj_joint_dim=0, optimize_force=optimize_force, du=du, obj_gravity=obj_gravity, 
-                                                 use_arm=use_arm, arm_stiffness=arm_stiffness, finger_stiffness=finger_stiffness, device=device)
+                                                 arm_type=arm_type, arm_stiffness=arm_stiffness, finger_stiffness=finger_stiffness, device=device)
         self.friction_coefficient = friction_coefficient
         self.force_equlibrium_constr = vmap(self._force_equlibrium_constr_w_force)
         self.grad_force_equlibrium_constr = vmap(jacrev(self._force_equlibrium_constr_w_force, argnums=(0, 1, 2, 3, 4, 5, 6)))
@@ -249,7 +257,7 @@ class AllegroPegInsertion(AllegroValveTurning):
 
         # u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
         u = 0.025 * torch.randn(N, self.T, 4 * self.num_fingers, device=self.device)
-        if self.use_arm:
+        if self.arm_type == 'robot':
             arm_u = 0.002 * torch.randn(N, self.T, 7, device=self.device)
             u = torch.cat((arm_u, u), dim=-1)
         force = 0.015 * torch.randn(N, self.T, 3 * (self.num_fingers + 1), device=self.device)
@@ -371,7 +379,8 @@ class AllegroPegInsertion(AllegroValveTurning):
         g_valve, grad_g_valve, hess_g_valve = self._kinematics_constraints(
             xu=xu.reshape(N, T, self.dx + self.du),
             compute_grads=compute_grads,
-            compute_hess=compute_hess)
+            compute_hess=compute_hess,
+            projection=True)
         
 
         if verbose:
@@ -744,7 +753,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     best_traj, _ = pregrasp_planner.step(start[:robot_dof])
 
     if params['visualize_plan']:
-        if params['use_arm']:
+        if params['arm_type'] == 'robot':
             camera_params = "screwdriver_w_arm"
         else:
             camera_params = "screwdriver"
@@ -778,7 +787,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     start = state['q'].reshape(robot_dof + obj_dof).to(device=params['device'])
     turn_problem_fingers = params['fingers']
     turn_problem_start = start[:robot_dof + obj_dof]
-    turn_problem = AllegroPegInsertion(
+    turn_problem = AllegroPegAlignment(
         start=turn_problem_start,
         goal=params['object_goal'],
         T=params['T'],
@@ -990,7 +999,7 @@ if __name__ == "__main__":
     if config['mode'] == 'hardware':
         raise ValueError('Hardware mode is not supported for this task')
     else:
-        env = AllegroPegInsertionEnv(1, control_mode='joint_impedance',
+        env = AllegroPegAlignmentEnv(1, control_mode='joint_impedance',
                                     use_cartesian_controller=False,
                                     viewer=True,
                                     steps_per_action=60,
