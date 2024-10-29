@@ -694,7 +694,7 @@ class TemporalUnetStateAction(nn.Module):
                                                     1e-6 * eye
                                                     , eye)
                     except Exception as e:
-                        dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1) * 1e-6 * eye)
+                        dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1) + 1e-6 * eye)
                     projection = dC.permute(0, 2, 1) @ dCdCT_inv @ dC
                     eye2 = torch.eye(x_this_problem.shape[-2] * num_dim, device=x.device, dtype=dtype).unsqueeze(0)
 
