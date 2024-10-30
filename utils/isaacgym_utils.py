@@ -1,4 +1,4 @@
-from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv, AllegroValveTurningEnv, AllegroPegTurningEnv, AllegroPegAlignmentEnv
+from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv, AllegroValveTurningEnv, AllegroPegTurningEnv, AllegroPegAlignmentEnv, AllegroReorientationEnv
 
 def get_env(task, img_save_dir, config, num_envs=1):
     if task == 'screwdriver_turning':
@@ -30,6 +30,7 @@ def get_env(task, img_save_dir, config, num_envs=1):
                                 fingers=config['fingers'],
                                 gravity=config['gravity'],
                                 random_robot_pose=config['random_robot_pose'],
+                                gradual_control=config['gradual_control'],
                                 )
     elif task == 'peg_turning':
         env = AllegroPegTurningEnv(num_envs=num_envs,
@@ -43,7 +44,8 @@ def get_env(task, img_save_dir, config, num_envs=1):
                                 joint_stiffness=config['kp'],
                                 fingers=config['fingers'],
                                 gravity=config['gravity'],
-                                )
+                                gradual_control=config['gradual_control'],
+                            )
     elif task == 'peg_alignment':
         env = AllegroPegAlignmentEnv(num_envs=num_envs,
                                      control_mode='joint_impedance',
@@ -56,5 +58,20 @@ def get_env(task, img_save_dir, config, num_envs=1):
                                      joint_stiffness=config['kp'],
                                      fingers=config['fingers'],
                                      gravity=config['gravity'],
+                                    gradual_control=config['gradual_control'],
                                      )
+    elif task == 'reorientation':
+        env = AllegroReorientationEnv(num_envs=num_envs,
+                                control_mode='joint_impedance',
+                                use_cartesian_controller=False,
+                                viewer=True,
+                                steps_per_action=60,
+                                friction_coefficient=2.0,
+                                device=config['sim_device'],
+                                video_save_path=img_save_dir,
+                                joint_stiffness=config['kp'],
+                                fingers=config['fingers'],
+                                gravity=config['gravity'],
+                                gradual_control=config['gradual_control'],
+                                )
     return env

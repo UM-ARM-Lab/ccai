@@ -33,7 +33,7 @@ obj_dof = 6
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 
-class AllegroPegTurning(AllegroValveTurning):
+class AllegroReorientation(AllegroValveTurning):
     def get_constraint_dim(self, T):
         self.friction_polytope_k = 4
         wrench_dim = 0
@@ -68,9 +68,9 @@ class AllegroPegTurning(AllegroValveTurning):
         self.num_fingers = len(fingers)
         self.optimize_force = optimize_force
         self.object_asset_pos = object_asset_pos
-        self.obj_mass = 0.3
+        self.obj_mass = 0.022
 
-        super(AllegroPegTurning, self).__init__(start=start, goal=goal, T=T, chain=chain, object_location=object_location,
+        super(AllegroReorientation, self).__init__(start=start, goal=goal, T=T, chain=chain, object_location=object_location,
                                                  object_type=object_type, world_trans=world_trans, object_asset_pos=object_asset_pos,
                                                  fingers=fingers, friction_coefficient=friction_coefficient, obj_dof_code=obj_dof_code, 
                                                  obj_joint_dim=0, optimize_force=optimize_force, obj_gravity=obj_gravity, device=device)
@@ -83,15 +83,13 @@ class AllegroPegTurning(AllegroValveTurning):
         
         action = xu[:, self.dx:self.dx + 4 * self.num_fingers]  # action dim = 8
         next_q = state[:-1, :-self.obj_dof] + action
-        if self.optimize_force:
-            action_cost = 0
-        else:
-            action_cost = torch.sum((state[1:, :-self.obj_dof] - next_q) ** 2)
+        action_cost = 0
 
-        smoothness_cost = 1 * torch.sum((state[1:] - state[:-1]) ** 2)
+        smoothness_cost = 100 * torch.sum((state[1:] - state[:-1]) ** 2)
+        # smoothness_cost += 10 * torch.sum((state[1] - state[0]) ** 2) # penalize the 1st step smoothness
 
         obj_orientation = state[:, -self.obj_dof+self.obj_translational_dim:]
-        peg_upright_cost = torch.sum((obj_orientation[:, 0] ** 2)) + torch.sum((obj_orientation[:, 2] ** 2))
+        peg_upright_cost = torch.sum((obj_orientation[:, 0] ** 2)) + torch.sum((obj_orientation[:, 1] ** 2))
         smoothness_cost += 1000 * peg_upright_cost
         goal_cost = 0
         if self.obj_translational_dim:
@@ -110,7 +108,7 @@ class AllegroPegTurning(AllegroValveTurning):
             # terminal cost
             goal_cost = goal_cost + torch.sum((20 * (obj_orientation[-1] - goal_orientation) ** 2))
             # running cost 
-            goal_cost = goal_cost + torch.sum((5 * (obj_orientation - goal_orientation) ** 2))
+            goal_cost = goal_cost + torch.sum((0.1 * (obj_orientation - goal_orientation) ** 2))
             smoothness_cost = smoothness_cost + 50 * torch.sum((obj_orientation[1:] - obj_orientation[:-1]) ** 2)
         return smoothness_cost + action_cost + goal_cost 
 
@@ -125,13 +123,10 @@ class AllegroPegTurning(AllegroValveTurning):
         # u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
         u = 0.025 * torch.randn(N, self.T, 4 * self.num_fingers, device=self.device)
         force = 0.025 * torch.randn(N, self.T, 3 * self.num_fingers, device=self.device)
-        # force[:, :, 3:] *= 30 # the catching fingers use a larger force to maintain stability
-        force[:, :, 3] = 0
-        force[:, :, 4] += 0.5
-        force[:, :, 5] = 0
-        force[:, :, 6] = 0
-        force[:, :, 7] -= 0.5
-        force[:, :, 8] = 0
+        # force[:, :, 3:] *= 10 # the catching fingers use a larger force to maintain stability
+        force[:, :, 0] -= 0.2
+        # force[:, :, 3] -= 0.2
+        force[:, :, 6] += 0.2
         u = torch.cat((u, force), dim=-1)
 
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
@@ -170,5 +165,6 @@ class AllegroPegTurning(AllegroValveTurning):
             return False
         else:
             return True
+
 
  

@@ -647,6 +647,8 @@ class AllegroContactProblem(AllegroObjectProblem):
             asset_object = get_assets_dir() + '/peg_insertion/peg.urdf'
         elif object_type == 'short_peg':
             asset_object = get_assets_dir() + '/peg_insertion/short_peg.urdf'
+        elif object_type == 'batarang':
+            asset_object = get_assets_dir() + '/reorientation/batarang.urdf'
         self.object_chain = pk.build_chain_from_urdf(open(asset_object).read()).to(device=self.device)
         self.object_asset_pos = torch.tensor(object_asset_pos).to(self.device).float()
 
@@ -705,7 +707,7 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         # Ignore first value, as it is the start state
         g = g[:, 1:].reshape(N, -1)
-        # g = g + 4e-3
+        # g = g + 2e-3
 
         # If terminal, only consider last state
         if terminal:

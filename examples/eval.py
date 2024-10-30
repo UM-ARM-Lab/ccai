@@ -22,6 +22,7 @@ from allegro_valve_roll import AllegroValveTurning, AllegroContactProblem, Posit
 from allegro_screwdriver_w_force import AllegroScrewdriver
 from allegro_peg_turning import AllegroPegTurning
 from allegro_peg_alignment_w_force import AllegroPegAlignment
+from allegro_reorientation import AllegroReorientation
 from scipy.spatial.transform import Rotation as R
 
 from utils.allegro_utils import *
@@ -65,7 +66,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     start = state.reshape(robot_dof + obj_dof).to(device=params['device'])        
     
     # setup the pregrasp problem
-    if config['task'] == 'peg_turning':
+    if config['task'] == 'peg_turning' or config['task'] == 'reorientation':
         pass
         # action = torch.cat((env.default_dof_pos[:,:8], env.default_dof_pos[:, 12:16]), dim=-1)
         # env.step(action) # step one step to resolve penetration
@@ -209,6 +210,23 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                             obj_gravity = params['obj_gravity'],
                             arm_type = params['arm_type'],
                         )
+        elif config['task'] == 'reorientation':
+            manipulation_problem = AllegroReorientation(
+                start=start,
+                goal=params['goal'],
+                T=params['T'],
+                chain=params['chain'],
+                object_asset_pos=env.obj_pose,
+                world_trans=env.world_trans,
+                object_location=params['object_location'],
+                object_type=params['object_type'],
+                friction_coefficient=params['friction_coefficient'],
+                optimize_force=params['optimize_force'],
+                device=params['device'],
+                fingers=params['fingers'],
+                obj_dof_code=params['obj_dof_code'],
+                obj_gravity=params['obj_gravity'],
+            )
 
         manipulation_planner = PositionControlConstrainedSVGDMPC(manipulation_problem, params)
 
@@ -299,7 +317,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                 torch.tensor(screwdriver_goal_mat).unsqueeze(0), cos_angle=False).detach().cpu().abs()
         elif params['task'] == 'valve_turning':
             distance2goal = (obj_state[0] - goal).detach().item()
-        elif params['task'] == 'peg_turning' or params['task'] == 'peg_alignment':
+        elif params['task'] == 'peg_turning' or params['task'] == 'peg_alignment' or params['task'] == 'reorientation':
             peg_mat = R.from_euler('xyz', obj_state[:, -3:]).as_matrix() # TODO: fix it for different tasks
             peg_goal_mat = R.from_euler('xyz', goal[-3:]).as_matrix() # TODO: change it for different tasks
             distance2goal = tf.so3_relative_angle(torch.tensor(peg_mat), \
@@ -365,7 +383,8 @@ if __name__ == "__main__":
     # task = 'screwdriver_turning'
     # task = 'valve_turning'
     # task = 'peg_turning'
-    task = 'peg_alignment'
+    # task = 'peg_alignment'
+    task = 'reorientation'
     if task == 'screwdriver_turning':
         config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver.yaml').read_text())
         config['obj_dof_code'] = [0, 0, 0, 1, 1, 1]        
@@ -382,6 +401,11 @@ if __name__ == "__main__":
         config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_peg_alignment.yaml').read_text())
         config['obj_dof_code'] = [1, 1, 1, 1, 1, 1]
         config['num_env_force'] = 1
+    elif task == 'reorientation':
+        config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_reorientation.yaml').read_text())
+        config['obj_dof_code'] = [1, 1, 1, 1, 1, 1]
+        config['num_env_force'] = 0
+
     obj_dof = sum(config['obj_dof_code'])
     config['obj_dof'] = obj_dof
     config['task'] = task
@@ -504,8 +528,7 @@ if __name__ == "__main__":
                 for key in ret.keys():
                     if key not in results[controller]:
                         results[controller][key] = []
-                    else:
-                        results[controller][key].append(ret[key])
+                    results[controller][key].append(ret[key])
         print(results)
 
     for key in results[controller].keys():
