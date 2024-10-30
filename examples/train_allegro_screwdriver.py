@@ -37,7 +37,7 @@ fingers = ['index', 'middle', 'thumb']
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_project_ood_states.yaml')
+    parser.add_argument('--config', type=str, default='allegro_screwdriver_cnf_state_control_only.yaml')
     return parser.parse_args()
 
 
@@ -1018,7 +1018,7 @@ if __name__ == "__main__":
                               problem=problem_for_sampler if config['state_control_only'] else None,)
 
     data_path = pathlib.Path(f'{CCAI_PATH}/data/training_data/{config["data_directory"]}')
-    if config['eval_train_likelihood'] or config['id_ood_states']:
+    if config.get('eval_train_likelihood', False) or config.get('id_ood_states', False):
         train_dataset = AllegroScrewDriverStateDataset([p for p in data_path.glob('*train_data*')],
                                                 config['T']-1,
                                                 cosine_sine=config['sine_cosine'],

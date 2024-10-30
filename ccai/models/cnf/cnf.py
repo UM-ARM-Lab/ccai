@@ -4,6 +4,7 @@ import torch
 torch.set_float32_matmul_precision('high')
 import torch.nn as nn
 from torch.nn.functional import mse_loss
+from torch.func import jacrev, vmap
 
 from ccai.models.temporal import TemporalUnet, TemporalUnetDynamics, TemporalUnetStateAction, StateActionMLP
 
@@ -187,6 +188,10 @@ class TrajectoryCNF(nn.Module):
             (1, 1, 1)
         ]
 
+        self.interp = vmap(self._interp, randomness='same')
+        self.dinterp_dt = vmap(jacrev(self._interp, argnums=2), randomness='same')
+        # self.jac = jacrev(self.interp, argnums=)
+
     def state_control_only_forward(self, t, x, context=None):
         dx, _ = self.model(t, x, context)
         return dx * (self.horizon-1)
@@ -262,6 +267,42 @@ class TrajectoryCNF(nn.Module):
             'action_loss': action_loss
         }
     
+    def h_poly(self, t):
+        tt = t[None, :]**torch.arange(4, device=t.device)[:, None]
+        A = torch.tensor([
+            [1, 0, -3, 2],
+            [0, 1, -2, 1],
+            [0, 0, 3, -2],
+            [0, 0, -1, 1]
+        ], dtype=t.dtype, device=t.device)
+        return A @ tt
+
+    def _interp(self,x, y, xs):
+        x_ = x.reshape(-1, 1)
+        m = (y[1:] - y[:-1]) / (x_[1:] - x_[:-1])
+        m = torch.cat([m[[0]], (m[1:] + m[:-1]) / 2, m[[-1]]])
+
+        idxs = torch.searchsorted(x[1:], xs)
+        dx = (x[idxs + 1] - x[idxs])
+        hh = self.h_poly((xs - x[idxs]) / dx).unsqueeze(-1)#.unsqueeze(-1)
+        # ret = hh[0] * torch.gather(y, 1, idxs.reshape(-1, 1, 1).expand(-1, -1, y.shape[-1]))
+        ret = hh[0] * y[idxs]
+        dx = dx.unsqueeze(-1)#.unsqueeze(-1)
+
+        # ret += hh[1] * torch.gather(m, 1, idxs.reshape(-1, 1, 1).expand(-1, -1, y.shape[-1])) * dx
+        # ret += hh[2] * torch.gather(y, 1, 1+idxs.reshape(-1, 1, 1).expand(-1, -1, y.shape[-1]))
+        # ret += hh[3] * torch.gather(m, 1, 1+idxs.reshape(-1, 1, 1).expand(-1, -1, y.shape[-1])) * dx
+        
+        ret += hh[1] * m[idxs] * dx
+        ret += hh[2] * y[idxs+1]
+        ret += hh[3] * m[idxs+1] * dx
+
+        return ret.squeeze()
+
+    # xs = torch.tensor([0.1, 0.5, 1.5, 2.5, 2.75], requires_grad=True)
+
+    # interpolated = interp(torch.tensor([0, 1, 2., 3]), torch.tensor([1., 2.25, 3., 4.]), xs)
+
     def flow_matching_loss_state_control_only(self, xu, context, mask=None):
 
         # t0 = torch.rand(xu.shape[0], 1, device=xu.device) # initial time (for receding horizon)
@@ -270,14 +311,14 @@ class TrajectoryCNF(nn.Module):
         t = torch.rand(xu.shape[0], 1, device=xu.device) # initial time (for receding horizon)
         t0 = t-t
 
-        t_ind = ((t-t + t0) * (self.horizon-1)).long() # Get global time index for trajectory
-        # t_ind = ((t + t0) * (self.horizon-1)).long() # Get global time index for trajectory
+        # t_ind = ((t-t + t0) * (self.horizon-1)).long() # Get global time index for trajectory
+        t_ind = ((t + t0) * (self.horizon-1)).long() # Get global time index for trajectory
         t0_ind = (t0 * (self.horizon-1)).long() # Get local time index for vector field prediction
         t_ind.clamp_(0, self.horizon-2)
         t0_ind.clamp_(0, self.horizon-2)
         t_ind_for_gather = t_ind.reshape(xu.shape[0], 1, 1).repeat(1, 1, self.xu_dim)
-        # t_ind_for_gather_1 = t_ind_for_gather + 1
-        t_ind_for_gather_1 = t_ind_for_gather + self.horizon - 1
+        t_ind_for_gather_1 = t_ind_for_gather + 1
+        # t_ind_for_gather_1 = t_ind_for_gather + self.horizon - 1
 
         if t_ind_for_gather_1.max() >= self.horizon:
             print('t_ind_for_gather_1', t_ind_for_gather_1.max())
@@ -287,30 +328,39 @@ class TrajectoryCNF(nn.Module):
         truevt = (x1 - x0) #* (self.horizon - 1)
         # xut = x0 + (t * self.horizon - t_ind.float()) * truevt/(self.horizon-1)
         # xut = x1 * (t*(self.horizon-1) - t_ind) + x0 * (t_ind + 1 - t*(self.horizon-1))
-        xt = x1 * (t + t0) + x0 * (1 - (t + t0))
+        
+        x_arange = torch.linspace(0, 1, xu.shape[1], device=xu.device).expand(xu.shape[0], -1)
 
-        xt += torch.randn_like(xt) * .1
+        
+        # xt = x1 * (t + t0) + x0 * (1 - (t + t0))
+
 
         u0 = x0[..., self.dx:]
         # u0[((t_ind - t0_ind) == 0).flatten()] = torch.randn_like(u0[((t_ind - t0_ind) == 0).flatten()])
-        t_ind_flat = t_ind.flatten()
-        rand_for_u0 = torch.randn_like(u0[t_ind_flat == 0])
-        goal_u0 = x1[t_ind_flat == 0, self.dx:]
+        rand_for_u0 = torch.randn_like(u0)
+        goal_u0 = x1[:, self.dx:]
         arange0 = torch.arange(rand_for_u0.shape[0], device=xu.device)
         arange1 = torch.arange(goal_u0.shape[0], device=xu.device)
-        a = time.perf_counter()
-        t, ut, true_uv, arange0, arange1 = self.FM.guided_sample_location_and_conditional_flow(rand_for_u0, goal_u0, y0=arange0, y1=arange1, t=t)
+        # a = time.perf_counter()
+        rand_for_u0, goal_u0, arange0, arange1 = self.FM.ot_sampler.sample_plan_with_labels(rand_for_u0, goal_u0, y0=arange0, y1=arange1)#, replace=False)
+        # _, ut, _, arange0, arange1 = self.FM.guided_sample_location_and_conditional_flow(rand_for_u0, goal_u0, y0=arange0, y1=arange1, t=t)#, replace=False)
         # Rearrange ut, true_uv using arange
-        ut = ut[arange1]
-        true_uv = true_uv[arange1]
+        rand_for_u0 = rand_for_u0[arange1]
+        xu[:, 0, self.dx:] = rand_for_u0
+
+        xt = self.interp(x_arange, xu, t)
+        truevt = self.dinterp_dt(x_arange, xu, t).squeeze()
+
+        xt += torch.randn_like(xt) * .1
+
         # u1 = x0[..., self.dx:]
         # true_u = u1 - u0
         # ut = u1 * (t + t0) + u0 * (1 - (t + t0))
-        xut = torch.cat((xt[..., :self.dx], ut), dim=-1)
-        truevt[..., self.dx:] = true_uv
+        # xut = torch.cat((xt[..., :self.dx], ut), dim=-1)
+        # truevt[..., self.dx:] = true_uv
         # xut = torch.cat((xut, r), dim=-1)
-        a = time.perf_counter()
-        vt, _ = self.model.compiled_conditional_train(t.reshape(-1), xut, context)
+        # a = time.perf_counter()
+        vt, _ = self.model.compiled_conditional_train(t.reshape(-1), xt, context)
         flow_loss = mse_loss(vt, truevt)
 
         # for key in self.problem_dict:

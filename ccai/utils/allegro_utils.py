@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pathlib
 import pytorch_kinematics.transforms as tf
+import time
 
 full_finger_list = ['index', 'middle', 'ring', 'thumb']
 
@@ -120,12 +121,13 @@ def state2ee_pos(state, finger_name, fingers, chain, frame_indices, world_trans)
     return ee_p
 
 
+is_visible = False
 def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headless=False, task='screwdriver', pcd=None):
     num_fingers = len(fingers)
     # for a single trajectory
     T, dxu = trajectory.shape
     # set up visualizer
-    vis = o3d.visualization.Visualizer()
+    vis = o3d.visualization.VisualizerWithKeyCallback()
     vis.create_window(width=int(800), height=int(600), visible=not headless)
     # update camera
     vis.get_render_option().mesh_show_wireframe = True
@@ -136,18 +138,35 @@ def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headl
         theta = trajectory[t, 4 * num_fingers: 4 * num_fingers + obj_dof]
         # scene.visualize_robot(partial_to_full_state(q.unsqueeze(0), fingers).to(device=scene.device),
         #                      theta.unsqueeze(0).to(device=scene.device))
-        meshes = scene.get_visualization_meshes(partial_to_full_state(q.unsqueeze(0), fingers).to(device=scene.device),
+        rob_mesh, meshes = scene.get_visualization_meshes(partial_to_full_state(q.unsqueeze(0), fingers).to(device=scene.device),
                                                 theta.unsqueeze(0).to(device=scene.device), pcd=pcd)
+        # o3d.visualization.draw_geometries(meshes, mesh_show_wireframe=True, width=800, height=600)
+        def toggle_visibility(vis):
+            global is_visible
+            if is_visible:
+                for m in rob_mesh:
+                    vis.remove_geometry(m, reset_bounding_box=False)
+            else:
+                for m in rob_mesh:
+                    vis.add_geometry(m, reset_bounding_box=False)
+            
+            # Update visibility status
+            is_visible = not is_visible
+            vis.update_renderer()
         for mesh in meshes:
             vis.add_geometry(mesh)
+
+        vis.register_key_callback(ord('T'), toggle_visibility)
+        vis.run()
+
         ctr = vis.get_view_control()
         if task == 'screwdriver':
             import os
             #Get current working directory
             cwd = os.getcwd()
 
-            parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-10-02-14-35-33.json")
-            # parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-08-07-10-49-00.json")
+            # parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-10-02-14-35-33.json")
+            parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-08-07-10-49-00.json")
         elif task == 'card':
             parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_card.json")
         ctr.convert_from_pinhole_camera_parameters(parameters, allow_arbitrary=True)

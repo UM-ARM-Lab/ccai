@@ -631,6 +631,8 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                  default_dof_pos=None,
                  desired_ee_in_world_frame=False,
                  obj_dof_type=None,
+                 contact_points_object=None,
+                 contact_points_robot=None,
                  *args, **kwargs):
 
         # object_location is different from object_asset_pos. object_asset_pos is 
@@ -687,16 +689,26 @@ class AllegroRegraspProblem(AllegroObjectProblem):
 
         self.desired_ee_in_world_frame = desired_ee_in_world_frame
         if self.num_regrasps > 0:
-            if desired_ee_in_world_frame:
-                self.default_ee_locs = self._ee_locations_in_world(self.default_dof_pos)
+            if contact_points_object is not None and contact_points_robot is not None:
+                raise ValueError("Cannot specify contact points in both object and robot frame")
+            if contact_points_object is not None:
+                self.default_ee_locs = contact_points_object
+                self.default_ee_locs_constraint = True
+            elif contact_points_robot is not None:
+                self.default_ee_locs = contact_points_robot
+                self.default_ee_locs_constraint = True
             else:
-                self.default_ee_locs = self._ee_locations_in_screwdriver(self.default_dof_pos,
-                                                                     torch.zeros(self.obj_dof, device=self.device))
-
+                if desired_ee_in_world_frame:
+                    self.default_ee_locs = self._ee_locations_in_world(self.default_dof_pos)
+                else:
+                    self.default_ee_locs = self._ee_locations_in_screwdriver(self.default_dof_pos,
+                                                                        torch.zeros(self.obj_dof, device=self.device))
+                self.default_ee_locs_constraint = False
             # add a small amount of noise to ee loc default
             #self.default_ee_locs = self.default_ee_locs #+ 0.01 * torch.randn_like(self.default_ee_locs)
         else:
             self.default_ee_locs = None
+            self.default_ee_locs_constraint = False
         if self.obj_dof == 3:
             object_link_name = 'screwdriver_body'
         elif self.obj_dof == 1:
@@ -747,6 +759,8 @@ class AllegroRegraspProblem(AllegroObjectProblem):
     def _cost(self, xu, start, goal):
         # if self.full_dof_goal:
         #     return 0
+        if self.default_ee_locs_constraint:
+            return 0
         if self.num_regrasps == 0:
             return 0.0
         q = partial_to_full_state(xu[:, :self.num_fingers * 4], self.fingers)  # [:, self.regrasp_idx]
@@ -768,6 +782,21 @@ class AllegroRegraspProblem(AllegroObjectProblem):
 
         # dof_pos = self.default_dof_pos[None, self.regrasp_idx]
         # return 10 * torch.sum((q - dof_pos) ** 2)
+
+    
+    # @regrasp_finger_constraints
+    # def _contact_patch_constraint(self, xu, finger_name, compute_grads=True, compute_hess=False, projected_diffusion=False):
+    #     q = partial_to_full_state(xu[:, :self.num_fingers * 4], self.fingers)  # [:, self.regrasp_idx]
+    #     ee_loc = self._ee_locations_in_world(q)
+
+    #     dist = torch.norm(ee_loc - self.default_ee_locs, dim=-1)
+    #     h = dist - 0.01
+    #     if compute_grads:
+
+    #     else:
+    #         return h, None, None
+    #     return h, grad_h, None
+
 
     @regrasp_finger_constraints
     def _contact_avoidance(self, xu, finger_name, compute_grads=True, compute_hess=False, projected_diffusion=False):
