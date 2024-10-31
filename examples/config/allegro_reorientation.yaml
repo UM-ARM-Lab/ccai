@@ -20,7 +20,7 @@ gradual_control: True
 arm_type: 'None' # choose between 'None', 'robot', 'floating_3d', 'floating_6d'
 gravity: True  # whether to use gravity in the simulation
 goal: [0, 0, 0, 0, 0, -1.0472]
-method: 'csvgd'
+method: 'ablation'
 controllers:
   csvgd:
     N: 16
@@ -36,4 +36,19 @@ controllers:
     resample_temperature: 0.1
     penalty: 1000000
     random_init_every_iter: False
-    obj_gravity: False # whether to conside the object gravity in our optimization
+    obj_gravity: True # whether to conside the object gravity in our optimization
+  ablation:
+    N: 16
+    alpha_J: 5.0e-3
+    alpha_C: 1
+    step_size: 0.1
+    momentum: 0.
+    use_momentum: False
+    online_iters: 30
+    warmup_iters: 200
+    resample_steps: 1
+    resample_sigma: 0.01
+    resample_temperature: 0.1
+    penalty: 1000000
+    random_init_every_iter: False
+    obj_gravity: True # whether to conside the object gravity in our optimization

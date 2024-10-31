@@ -119,8 +119,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         env.frame_fpath = None
         env.frame_id = None
 
-    start = state['q'].reshape(4 * num_fingers + obj_dof + 1).to(device=params['device'])
-    # start = torch.cat((state['q'].reshape(10), torch.zeros(1).to(state['q'].device))).to(device=params['device'])
+    start = state.reshape(4 * num_fingers + obj_dof + 1).to(device=params['device'])
+    # start = torch.cat((state.reshape(10), torch.zeros(1).to(state.device))).to(device=params['device'])
     if params['controller'] == 'csvgd':
         # index finger is used for stability
         if 'index' in params['fingers']:
@@ -164,7 +164,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             ros_copy_node.apply_action(partial_to_full_state(x.reshape(-1, 4 * num_fingers)[0], params['fingers']))
 
     state = env.get_state()
-    start = state['q'].reshape(4 * num_fingers + obj_dof + 1).to(device=params['device'])
+    start = state.reshape(4 * num_fingers + obj_dof + 1).to(device=params['device'])
     if params['exclude_index']:
             turn_problem_fingers = copy.copy(params['fingers'])
             turn_problem_fingers.remove('index')
@@ -219,9 +219,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
     for k in range(params['num_steps']):
         state = env.get_state()
-        start = state['q'].reshape(4 * num_fingers + obj_dof + 1).to(device=params['device'])
+        start = state.reshape(4 * num_fingers + obj_dof + 1).to(device=params['device'])
 
-        actual_trajectory.append(state['q'][:, :4 * num_fingers + obj_dof].squeeze(0).clone())
+        actual_trajectory.append(state[:, :4 * num_fingers + obj_dof].squeeze(0).clone())
         start_time = time.time()
         if params['exclude_index']:
             best_traj, trajectories = turn_planner.step(start[4:4 * num_fingers + obj_dof])
@@ -230,7 +230,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
         print(f"solve time: {time.time() - start_time}")
         planned_theta_traj = best_traj[:, 4 * num_fingers_to_plan: 4 * num_fingers_to_plan + obj_dof].detach().cpu().numpy()
-        print(f"current theta: {state['q'][0, -(obj_dof+1): -1].detach().cpu().numpy()}")
+        print(f"current theta: {state[0, -(obj_dof+1): -1].detach().cpu().numpy()}")
         print(f"planned theta: {planned_theta_traj}")
         # add trajectory lines to sim
         if params['mode'] == 'hardware':
@@ -304,7 +304,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
         gym.clear_lines(viewer)
         state = env.get_state()
-        start = state['q'][:,:4 * num_fingers + obj_dof].squeeze(0).to(device=params['device'])
+        start = state[:,:4 * num_fingers + obj_dof].squeeze(0).to(device=params['device'])
         for finger in params['fingers']:
             ee = state2ee_pos(start[:4 * num_fingers], turn_problem.ee_names[finger])
             finger_traj_history[finger].append(ee.detach().cpu().numpy())
@@ -334,7 +334,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
     env.reset()
     state = env.get_state()
-    state = state['q'].reshape(4 * num_fingers + obj_dof + 1).to(device=params['device'])
+    state = state.reshape(4 * num_fingers + obj_dof + 1).to(device=params['device'])
     actual_trajectory.append(state.clone()[: 4 * num_fingers + obj_dof])
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
     turn_problem.T = actual_trajectory.shape[0]

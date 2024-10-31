@@ -55,7 +55,7 @@ def do_trial(env, params, fpath):
     state = env.get_state()
     action_list = []
 
-    start = state['q'][0, :4 * num_fingers + obj_dof].to(device=params['device'])
+    start = state[0, :4 * num_fingers + obj_dof].to(device=params['device'])
   
     pregrasp_problem = AllegroContactProblem(
         dx=4 * num_fingers,
@@ -90,7 +90,7 @@ def do_trial(env, params, fpath):
         action_list.append(action)
 
     state = env.get_state()
-    start = state['q'][0].reshape(1, 4 * num_fingers + obj_dof + 1)[:, :4 * num_fingers + obj_dof].to(device=params['device'])
+    start = state[0].reshape(1, 4 * num_fingers + obj_dof + 1)[:, :4 * num_fingers + obj_dof].to(device=params['device'])
 
     # get the end effector point in the peg frame
     fk_dict = forward_kinematics(partial_to_full_state(start[:, :12], fingers=params['fingers']))
@@ -118,9 +118,9 @@ def do_trial(env, params, fpath):
     with torch.no_grad():
         for k in range(params['num_steps']):
             state = env.get_state()
-            start = state['q'][0, :4 * num_fingers + obj_dof].to(device=params['device'])
+            start = state[0, :4 * num_fingers + obj_dof].to(device=params['device'])
 
-            actual_trajectory.append(state['q'][0, :4 * num_fingers + obj_dof].clone())
+            actual_trajectory.append(state[0, :4 * num_fingers + obj_dof].clone())
             start_time = time.time()
 
             action = planner.step(start[:4 * num_fingers + obj_dof]) # this call will modify the environment
@@ -130,9 +130,9 @@ def do_trial(env, params, fpath):
             state = env.step(action)
 
             print(f"solve time: {time.time() - start_time}")
-            print(f"current theta: {state['q'][0, -(obj_dof+1):-1].detach().cpu().numpy()}")
+            print(f"current theta: {state[0, -(obj_dof+1):-1].detach().cpu().numpy()}")
             # add trajectory lines to sim
-            screwdriver_top_pos = get_screwdriver_top_in_world(state['q'][0, -(obj_dof + 1): -1], object_chain, env.world_trans, env.table_pose)
+            screwdriver_top_pos = get_screwdriver_top_in_world(state[0, -(obj_dof + 1): -1], object_chain, env.world_trans, env.table_pose)
             screwdriver_top_pos = screwdriver_top_pos.detach().cpu().numpy()
             distance2nominal = np.linalg.norm(screwdriver_top_pos - nominal_screwdriver_top)
             if distance2nominal > 0.02:
@@ -151,7 +151,7 @@ def do_trial(env, params, fpath):
 
 
     state = env.get_state()
-    state = state['q'][0, :4 * num_fingers + obj_dof].to(device=params['device'])
+    state = state[0, :4 * num_fingers + obj_dof].to(device=params['device'])
     actual_trajectory.append(state.clone()[: 4 * num_fingers + obj_dof])
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
     # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)

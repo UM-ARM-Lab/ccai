@@ -31,6 +31,5 @@ controllers:
     resample_temperature: 0.1
     penalty: 1000000
     collision_checking: False
-    joint_friction: 0.0
     random_init_every_iter: False
     obj_gravity: True # whether to conside the obj gravity in our optimization

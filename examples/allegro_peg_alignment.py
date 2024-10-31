@@ -459,7 +459,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     state = env.get_state()
     action_list = []
 
-    start = state['q'].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
+    start = state.reshape(4 * num_fingers + obj_dof).to(device=params['device'])
 
     if params['controller'] == 'csvgd':
         # index finger is used for stability
@@ -518,8 +518,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     env.set_table_pose(env.handles['table'][0], desired_table_pose)
 
     state = env.get_state()
-    state = env.step(state['q'][:, :4 * num_fingers])
-    start = state['q'].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
+    state = env.step(state[:, :4 * num_fingers])
+    start = state.reshape(4 * num_fingers + obj_dof).to(device=params['device'])
     turn_problem_fingers = params['fingers']
     turn_problem_start = start[:4 * num_fingers + obj_dof]
     turn_problem = AllegroPegInsertion(
@@ -569,16 +569,16 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
     for k in range(params['num_steps']):
         state = env.get_state()
-        start = state['q'].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
+        start = state.reshape(4 * num_fingers + obj_dof).to(device=params['device'])
 
-        actual_trajectory.append(state['q'][:, :4 * num_fingers + obj_dof].squeeze(0).clone())
+        actual_trajectory.append(state[:, :4 * num_fingers + obj_dof].squeeze(0).clone())
         start_time = time.time()
 
         best_traj, trajectories = turn_planner.step(start[:4 * num_fingers + obj_dof])
 
         print(f"solve time: {time.time() - start_time}")
         planned_theta_traj = best_traj[:, 4 * num_fingers_to_plan: 4 * num_fingers_to_plan + obj_dof].detach().cpu().numpy()
-        print(f"current theta: {state['q'][0, -obj_dof:].detach().cpu().numpy()}")
+        print(f"current theta: {state[0, -obj_dof:].detach().cpu().numpy()}")
         print(f"planned theta: {planned_theta_traj}")
         # add trajectory lines to sim
         if k < params['num_steps'] - 1:
@@ -647,7 +647,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
         gym.clear_lines(viewer)
         state = env.get_state()
-        start = state['q'][:,:4 * num_fingers + obj_dof].squeeze(0).to(device=params['device'])
+        start = state[:,:4 * num_fingers + obj_dof].squeeze(0).to(device=params['device'])
         for finger in params['fingers']:
             ee = state2ee_pos(start[:4 * num_fingers], turn_problem.ee_names[finger])
             finger_traj_history[finger].append(ee.detach().cpu().numpy())
@@ -677,7 +677,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
     env.reset()
     state = env.get_state()
-    state = state['q'].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
+    state = state.reshape(4 * num_fingers + obj_dof).to(device=params['device'])
     actual_trajectory.append(state.clone()[: 4 * num_fingers + obj_dof])
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
     turn_problem.T = actual_trajectory.shape[0]

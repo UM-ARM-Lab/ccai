@@ -606,7 +606,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     robot_dof = 4 * num_fingers + arm_dof
 
     if params['simulator'] == 'isaac_gym':
-        start = state['q'].reshape(robot_dof + obj_dof + 1).to(device=params['device'])
+        start = state.reshape(robot_dof + obj_dof + 1).to(device=params['device'])
     elif params['simulator'] == 'isaac_sim':
         start = state.reshape(robot_dof + obj_dof).to(device=params['device'])        
 
@@ -675,7 +675,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
     state = env.get_state()
     if params['simulator'] == 'isaac_gym':
-        start = state['q'].reshape(robot_dof + 4).to(device=params['device'])
+        start = state.reshape(robot_dof + 4).to(device=params['device'])
     elif params['simulator'] == 'isaac_sim':
         start = state.reshape(robot_dof + 3).to(device=params['device'])
     turn_problem_fingers = params['fingers']
@@ -733,8 +733,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     for k in range(params['num_steps']):
         state = env.get_state()
         if params['simulator'] == 'isaac_gym':
-            start = state['q'].reshape(robot_dof + 4).to(device=params['device'])
-            current_theta = state['q'][0, -(obj_dof+1): -1].detach().cpu().numpy()
+            start = state.reshape(robot_dof + 4).to(device=params['device'])
+            current_theta = state[0, -(obj_dof+1): -1].detach().cpu().numpy()
         elif params['simulator'] == 'isaac_sim':
             start = state.reshape(robot_dof + 3).to(device=params['device'])
             current_theta = state[:, -obj_dof:].detach().cpu().numpy()
@@ -832,7 +832,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             gym.clear_lines(viewer)
         state = env.get_state()
         if params['simulator'] == 'isaac_gym':
-            start = state['q'][:,:robot_dof + obj_dof].squeeze(0).to(device=params['device'])
+            start = state[:,:robot_dof + obj_dof].squeeze(0).to(device=params['device'])
         elif params['simulator'] == 'isaac_sim':
             start = state.squeeze(0).to(device=params['device'])
         for finger in params['fingers']:
@@ -864,7 +864,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
     state = env.get_state()
     if params['simulator'] == 'isaac_gym':
-        state = state['q'].reshape(robot_dof + obj_dof + 1).to(device=params['device'])
+        state = state.reshape(robot_dof + obj_dof + 1).to(device=params['device'])
     elif params['simulator'] == 'isaac_sim':
         state = state.reshape(robot_dof + obj_dof).to(device=params['device'])
     actual_trajectory.append(state.clone()[:robot_dof + obj_dof])

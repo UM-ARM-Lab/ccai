@@ -125,8 +125,17 @@ class AllegroPegAlignment(AllegroValveTurning):
             pk.Transform3d(device=self.device).translate(self.peg_asset_pos[0], self.peg_asset_pos[1], self.peg_asset_pos[2]))
 
         # contact checking
-        collision_check_links = [self.ee_names[finger] for finger in self.fingers]
+        collision_check_links = [self.collision_checking_ee_names[finger] for finger in self.fingers]
         self.robot_peg_scenes = pv.RobotScene(robot_sdf, peg_sdf, robot2peg,
+                                            collision_check_links=collision_check_links,
+                                            softmin_temp=1.0e3,
+                                            points_per_link=1000,
+                                            partial_patch=False,
+                                            )
+        viz_peg_sdf = pv.RobotSDF(peg_chain, path_prefix=None, use_collision_geometry=False) # since we are using primitive shapes for the object, there's no need to define path for stl
+        viz_robot_sdf = pv.RobotSDF(self.chain, path_prefix=get_assets_dir() + '/xela_models', use_collision_geometry=False)
+
+        self.viz_contact_scenes = pv.RobotScene(viz_robot_sdf, viz_peg_sdf, robot2peg,
                                             collision_check_links=collision_check_links,
                                             softmin_temp=1.0e3,
                                             points_per_link=1000,
@@ -722,7 +731,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     state = env.get_state()
     action_list = []
 
-    start = state['q'].reshape(robot_dof + obj_dof).to(device=params['device'])
+    start = state.reshape(robot_dof + obj_dof).to(device=params['device'])
 
     if params['controller'] == 'csvgd':
         # index finger is used for stability
@@ -787,8 +796,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     env.set_table_pose(env.handles['table'][0], desired_table_pose)
 
     state = env.get_state()
-    state = env.step(state['q'][:, :robot_dof])
-    start = state['q'].reshape(robot_dof + obj_dof).to(device=params['device'])
+    state = env.step(state[:, :robot_dof])
+    start = state.reshape(robot_dof + obj_dof).to(device=params['device'])
     turn_problem_fingers = params['fingers']
     turn_problem_start = start[:robot_dof + obj_dof]
     turn_problem = AllegroPegAlignment(
@@ -842,9 +851,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
     for k in range(params['num_steps']):
         state = env.get_state()
-        start = state['q'].reshape(robot_dof + obj_dof).to(device=params['device'])
+        start = state.reshape(robot_dof + obj_dof).to(device=params['device'])
 
-        actual_trajectory.append(state['q'][:, :robot_dof + obj_dof].squeeze(0).clone())
+        actual_trajectory.append(state[:, :robot_dof + obj_dof].squeeze(0).clone())
         start_time = time.time()
 
         best_traj, trajectories = turn_planner.step(start[:robot_dof + obj_dof])
@@ -856,7 +865,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             duration += solve_time
         print(f"solve time: {solve_time}")
         planned_theta_traj = best_traj[:, robot_dof: robot_dof + obj_dof].detach().cpu().numpy()
-        print(f"current theta: {state['q'][0, -obj_dof:].detach().cpu().numpy()}")
+        print(f"current theta: {state[0, -obj_dof:].detach().cpu().numpy()}")
         print(f"planned theta: {planned_theta_traj}")
         # add trajectory lines to sim
         # if k <= params['num_steps'] - 1:
@@ -939,7 +948,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
         gym.clear_lines(viewer)
         state = env.get_state()
-        start = state['q'][:,:robot_dof + obj_dof].squeeze(0).to(device=params['device'])
+        start = state[:,:robot_dof + obj_dof].squeeze(0).to(device=params['device'])
         for finger in params['fingers']:
             ee = state2ee_pos(start[:robot_dof], turn_problem.ee_names[finger])
             finger_traj_history[finger].append(ee.detach().cpu().numpy())
@@ -970,7 +979,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
 
     state = env.get_state()
-    state = state['q'].reshape(robot_dof + obj_dof).to(device=params['sim_device'])
+    state = state.reshape(robot_dof + obj_dof).to(device=params['sim_device'])
     actual_trajectory.append(state.clone()[: robot_dof + obj_dof])
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, robot_dof + obj_dof)
     turn_problem.T = actual_trajectory.shape[0]

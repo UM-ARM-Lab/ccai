@@ -463,7 +463,7 @@ def do_trial(env, params, fpath):
 
     # ee_pos, ee_ori = state['ee_pos'], state['ee_ori']
     # start = torch.cat((ee_pos, ee_ori), dim=-1).reshape(7).to(device=params['device'])
-    start = state['q'].reshape(9).to(device=params['device'])
+    start = state.reshape(9).to(device=params['device'])
     chain = chain.to(device=params['device'])
 
     if params['controller'] == 'csvgd':
@@ -482,9 +482,9 @@ def do_trial(env, params, fpath):
     duration = 0
     for k in range(params['num_steps']):
         state = env.get_state()
-        start = state['q'].reshape(9).to(device=params['device'])
+        start = state.reshape(9).to(device=params['device'])
 
-        actual_trajectory.append(state['q'].reshape(9).clone())
+        actual_trajectory.append(state.reshape(9).clone())
         if k > 0:
             torch.cuda.synchronize()
             start_time = time.time()
@@ -508,7 +508,7 @@ def do_trial(env, params, fpath):
         gym.clear_lines(viewer)
 
     state = env.get_state()
-    state = state['q'].reshape(9).to(device=params['device'])
+    state = state.reshape(9).to(device=params['device'])
 
     # now weee want to turn it again!
 
@@ -543,7 +543,7 @@ def turn(env, params, fpath):
 
     # ee_pos, ee_ori = state['ee_pos'], state['ee_ori']
     # start = torch.cat((ee_pos, ee_ori), dim=-1).reshape(7).to(device=params['device'])
-    start = state['q'].reshape(9).to(device=params['device'])
+    start = state.reshape(9).to(device=params['device'])
     chain.to(device=params['device'])
     world_trans.to(device=params['device'])
 
@@ -562,7 +562,7 @@ def turn(env, params, fpath):
 
     # get start and initial
     state = env.get_state()
-    start = state['q'].reshape(9).to(device=params['device'])
+    start = state.reshape(9).to(device=params['device'])
     best_traj, _ = controller.step(start)
 
     # we will just execute this open loop
@@ -570,7 +570,7 @@ def turn(env, params, fpath):
         env.step(x.reshape(-1, 8).to(device=env.device))
 
     state = env.get_state()
-    start = state['q'].reshape(9).to(device=params['device'])
+    start = state.reshape(9).to(device=params['device'])
     # reset controller
     problem = AllegroValveProblem(start,
                                   params['goal'],
@@ -587,9 +587,9 @@ def turn(env, params, fpath):
     num_turns = 1
     for k in range(params['num_steps']):
         state = env.get_state()
-        start = state['q'].reshape(9).to(device=params['device'])
+        start = state.reshape(9).to(device=params['device'])
 
-        actual_trajectory.append(state['q'].reshape(9).clone())
+        actual_trajectory.append(state.reshape(9).clone())
         best_traj, trajectories = controller.step(start)
         x = best_traj[0, :9]
 
@@ -645,7 +645,7 @@ def turn(env, params, fpath):
 
     # get start and initial
     state = env.get_state()
-    start = state['q'].reshape(9).to(device=params['device'])
+    start = state.reshape(9).to(device=params['device'])
 
     # we will offset by 90 degrees
     start[-1] = +np.pi / 2
@@ -656,7 +656,7 @@ def turn(env, params, fpath):
         env.step(x.reshape(-1, 8).to(device=env.device))
 
     # now ready to do the second turn
-    start = state['q'].reshape(9).to(device=params['device'])
+    start = state.reshape(9).to(device=params['device'])
     # reset controller
     problem = AllegroValveProblem(start,
                                   params['goal'],
@@ -672,9 +672,9 @@ def turn(env, params, fpath):
     num_turns += 1
     for k in range(params['num_steps']):
         state = env.get_state()
-        start = state['q'].reshape(9).to(device=params['device'])
+        start = state.reshape(9).to(device=params['device'])
         start[-1] = +np.pi / 2
-        actual_trajectory.append(state['q'].reshape(9).clone())
+        actual_trajectory.append(state.reshape(9).clone())
         best_traj, trajectories = controller.step(start)
         x = best_traj[0, :9]
 
@@ -692,7 +692,7 @@ def turn(env, params, fpath):
     print(f'Final goal distance: {distance2goal}')
 
     state = env.get_state()
-    state = state['q'].reshape(9).to(device=params['device'])
+    state = state.reshape(9).to(device=params['device'])
     actual_trajectory.append(state.clone())
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 9)
     problem.T = actual_trajectory.shape[0]

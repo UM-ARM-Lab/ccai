@@ -24,6 +24,4 @@ class DynamicsModel:
             self.env.set_pose(state, semantic_order=True, zero_velocity=True)
             action = state[:, :4 * self.num_fingers] + action
             ret = self.env.step(action, ignore_img=True)
-            # if self.obj_joint_dim > 0:
-            #     ret = ret[:, :-self.obj_joint_dim]
         return ret

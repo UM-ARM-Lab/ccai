@@ -72,7 +72,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         # env.step(action) # step one step to resolve penetration
     
     else:
-        if params['controller'] == 'csvgd':
+        if params['controller'] == 'csvgd' or params['controller'] == 'ablation':
             pregrasp_dx = pregrasp_du = robot_dof
             pregrasp_problem = AllegroContactProblem(
                 dx=pregrasp_dx,
@@ -131,7 +131,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         env.set_table_pose(env.handles['table'][0], desired_table_pose)
         state = env.get_state()
         state = env.step(state[:, :robot_dof])
-
+        env.step(action)
     state = env.get_state()
     start = state.reshape(robot_dof + obj_dof).to(device=params['device'])
     if config['method'] == 'csvgd':
@@ -229,7 +229,121 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             )
 
         manipulation_planner = PositionControlConstrainedSVGDMPC(manipulation_problem, params)
-
+    elif config['method'] == 'ablation':
+        fk_dict = forward_kinematics(partial_to_full_state(start[:4*num_fingers], fingers=params['fingers']))
+        fks = [fk_dict[finger] for finger in fk_dict.keys()]
+        fk_world = [env.world_trans.to(fk.device).compose(fk) for fk in fks]
+        obj_state = start[-obj_dof:]
+        if config['task'] == 'valve_turning':
+            obj_state_3d = torch.tensor([0.0, obj_state[0], 0.0]).to(params['device'])
+            obj_quat = R.from_euler('XYZ', obj_state_3d.detach().cpu().numpy()).as_quat() # NOTE: assume obj base axis aligns with the world axis
+            # obj_quat = R.from_euler('XYZ', obj_state.detach().cpu().numpy()).as_quat()
+            obj_pos = torch.tensor(env.obj_pose).float().to(params['device'])
+        elif config['task'] == 'screwdriver_turning':
+            obj_quat = R.from_euler('XYZ', obj_state.detach().cpu().numpy()).as_quat() # NOTE: assume obj base axis aligns with the world axis
+            # obj_quat = R.from_euler('XYZ', obj_state.detach().cpu().numpy()).as_quat()
+            obj_pos = torch.tensor(env.obj_pose).float().to(params['device'])
+        elif config['task'] == 'peg_alignment' or config['task'] == 'peg_turning' or config['task'] == 'reorientation':
+            obj_quat = R.from_euler('XYZ', obj_state[-3:].detach().cpu().numpy()).as_quat()
+            obj_pos = torch.tensor(obj_state[:3] + torch.tensor(env.obj_pose).to(params['device'])).float().to(params['device'])
+        
+        obj_trans = tf.Transform3d(pos=obj_pos, 
+                                rot=torch.tensor(
+                                    [obj_quat[3], obj_quat[0], obj_quat[1], obj_quat[2]],
+                                    device=params['device']).float(), device=params['device'])
+        fk_obj_frame = [obj_trans.inverse().compose(fk) for fk in fk_world]
+        if config['task'] == 'valve_turning':
+            from baselines.ablation.allegro_valve_turning import AblationAllegroValveTurning
+            manipulation_problem = AblationAllegroValveTurning(
+            start=start,
+            goal=params['goal'],
+            T=params['T'],
+            chain=params['chain'],
+            device=params['device'],
+            object_asset_pos=env.obj_pose,
+            contact_obj_frame=fk_obj_frame,
+            object_location=params['object_location'],
+            object_type=params['object_type'],
+            friction_coefficient=params['friction_coefficient'],
+            world_trans=env.world_trans,
+            fingers=params['fingers'],
+            optimize_force=params['optimize_force'],
+            )
+        elif config['task'] == 'screwdriver_turning':
+            from baselines.ablation.allegro_screwdriver import AblationAllegroScrewdriver
+            manipulation_problem = AblationAllegroScrewdriver(
+                start=start,
+                goal=params['goal'],
+                T=params['T'],
+                chain=params['chain'],
+                device=params['device'],
+                object_asset_pos=env.obj_pose,
+                contact_obj_frame=fk_obj_frame,
+                object_location=params['object_location'],
+                object_type=params['object_type'],
+                friction_coefficient=params['friction_coefficient'],
+                world_trans=env.world_trans,
+                fingers=params['fingers'],
+                optimize_force=params['optimize_force'],
+                obj_gravity=params['obj_gravity'],
+            )
+        elif config['task'] == 'peg_alignment':
+            from baselines.ablation.allegro_peg_alignment import AblationAllegroPegAlignment
+            manipulation_problem = AblationAllegroPegAlignment(
+                start=start,
+                goal=params['goal'],
+                T=params['T'],
+                chain=params['chain'],
+                device=params['device'],
+                object_asset_pos=env.obj_pose,
+                wall_asset_pos=env.wall_pose,
+                wall_dims = env.wall_dims,
+                contact_obj_frame=fk_obj_frame,
+                object_location=params['object_location'],
+                object_type=params['object_type'],
+                friction_coefficient=params['friction_coefficient'],
+                world_trans=env.world_trans,
+                fingers=params['fingers'],
+                optimize_force=params['optimize_force'],
+                obj_gravity = params['obj_gravity'],
+            )
+        elif config['task'] == 'peg_turning':
+            from baselines.ablation.allegro_peg_turning import AblationAllegroPegTurning
+            manipulation_problem = AblationAllegroPegTurning(
+                start=start,
+                goal=params['goal'],
+                T=params['T'],
+                chain=params['chain'],
+                device=params['device'],
+                object_asset_pos=env.obj_pose,
+                contact_obj_frame=fk_obj_frame,
+                object_location=params['object_location'],
+                object_type=params['object_type'],
+                friction_coefficient=params['friction_coefficient'],
+                world_trans=env.world_trans,
+                fingers=params['fingers'],
+                optimize_force=params['optimize_force'],
+                obj_gravity = params['obj_gravity'],
+            )
+        elif config['task'] == 'reorientation':
+            from baselines.ablation.allegro_reorientation import AblationAllegroReorientation
+            manipulation_problem = AblationAllegroReorientation(
+                start=start,
+                goal=params['goal'],
+                T=params['T'],
+                chain=params['chain'],
+                device=params['device'],
+                object_asset_pos=env.obj_pose,
+                contact_obj_frame=fk_obj_frame,
+                object_location=params['object_location'],
+                object_type=params['object_type'],
+                friction_coefficient=params['friction_coefficient'],
+                world_trans=env.world_trans,
+                fingers=params['fingers'],
+                optimize_force=params['optimize_force'],
+                obj_gravity = params['obj_gravity'],
+            )
+        manipulation_planner = PositionControlConstrainedSVGDMPC(manipulation_problem, params)
     actual_trajectory = []
     duration = 0
 
@@ -267,8 +381,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             # manipulation_problem.viz_contact_scenes.visualize_robot(partial_to_full_state(start[:manipulation_problem.robot_dof], fingers=params['fingers'], arm_dof=arm_dof), start[robot_dof:robot_dof + obj_dof])
             traj_for_viz = best_traj[:, :manipulation_problem.dx]
             traj_for_viz = torch.cat((start[:manipulation_problem.dx].unsqueeze(0), traj_for_viz), dim=0)
-            tmp = torch.zeros((traj_for_viz.shape[0], 1), device=best_traj.device) # add the joint for the screwdriver cap
-            traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
+            if obj_joint_dim > 0:
+                tmp = torch.zeros((traj_for_viz.shape[0], obj_joint_dim), device=best_traj.device) # add the joint for the screwdriver cap
+                traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
             # traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof] = axis_angle_to_euler(traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof])
         
             viz_fpath = pathlib.PurePath.joinpath(fpath, f"timestep_{k}")
@@ -382,9 +497,9 @@ if __name__ == "__main__":
     # get config
     # task = 'screwdriver_turning'
     # task = 'valve_turning'
-    # task = 'peg_turning'
-    # task = 'peg_alignment'
     task = 'reorientation'
+    # task = 'peg_alignment'
+    # task = 'reorientation'
     if task == 'screwdriver_turning':
         config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver.yaml').read_text())
         config['obj_dof_code'] = [0, 0, 0, 1, 1, 1]        
@@ -490,11 +605,17 @@ if __name__ == "__main__":
     elif config['arm_type'] == 'None':
         asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
         arm_dof = 0
+    # ee_names = {
+    #         'index': 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
+    #         'middle': 'allegro_hand_naka_finger_finger_1_aftc_base_link',
+    #         'ring': 'allegro_hand_kusuri_finger_finger_2_aftc_base_link',
+    #         'thumb': 'allegro_hand_oya_finger_3_aftc_base_link',
+    #         }
     ee_names = {
-            'index': 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
-            'middle': 'allegro_hand_naka_finger_finger_1_aftc_base_link',
-            'ring': 'allegro_hand_kusuri_finger_finger_2_aftc_base_link',
-            'thumb': 'allegro_hand_oya_finger_3_aftc_base_link',
+            'index': 'hitosashi_ee',
+            'middle': 'naka_ee',
+            'ring': 'kusuri_ee',
+            'thumb': 'oya_ee',
             }
     config['ee_names'] = ee_names
 

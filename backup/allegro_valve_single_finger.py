@@ -452,7 +452,7 @@ def do_trial(env, params, fpath):
         index_start = state['index_q_valve'].reshape(5).to(device=params['device'])
         thumb_start = state['thumb_q_valve'].reshape(5).to(device=params['device'])
 
-        actual_trajectory.append(state['q'].reshape(9).clone())
+        actual_trajectory.append(state.reshape(9).clone())
         if k > 0:
             torch.cuda.synchronize()
             start_time = time.time()
@@ -516,7 +516,7 @@ def do_trial(env, params, fpath):
         gym.clear_lines(viewer)
 
     state = env.get_state()
-    state = state['q'].reshape(9).to(device=params['device'])
+    state = state.reshape(9).to(device=params['device'])
     actual_trajectory.append(state.clone())
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 9)
     index_problem.T = actual_trajectory.shape[0]

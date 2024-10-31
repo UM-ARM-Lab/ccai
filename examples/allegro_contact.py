@@ -1832,8 +1832,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         env.frame_fpath = None
         env.frame_id = None
 
-    start = state['q'].reshape(4 * num_contacts + 1).to(device=params['device'])
-    # start = torch.cat((state['q'].reshape(10), torch.zeros(1).to(state['q'].device))).to(device=params['device'])
+    start = state.reshape(4 * num_contacts + 1).to(device=params['device'])
+    # start = torch.cat((state.reshape(10), torch.zeros(1).to(state.device))).to(device=params['device'])
     if params['controller'] == 'csvgd':
         pregrasp_problem = AllegroManipulationProblem(
             start=start[:4 * num_contacts + 1],
@@ -1872,7 +1872,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         raise ValueError('Invalid controller')
 
     # first we move the hand to grasp the valve
-    start = state['q'].reshape(4 * num_contacts + 1).to(device=params['device'])
+    start = state.reshape(4 * num_contacts + 1).to(device=params['device'])
     best_traj, _ = pregrasp_planner.step(start[:4 * num_contacts + 1])
 
     # we will just execute this open loop
@@ -1904,7 +1904,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     for finger in params['fingers']:
         finger_traj_history[finger] = []
     state = env.get_state()
-    start = state['q'].reshape(4 * num_contacts + 1).to(device=params['device'])
+    start = state.reshape(4 * num_contacts + 1).to(device=params['device'])
     turn_problem = AllegroManipulationProblem(
         start=start,
         goal=params['valve_goal'],
@@ -1930,15 +1930,15 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
     for k in range(params['num_steps']):
         state = env.get_state()
-        start = state['q'].reshape(4 * num_contacts + 1).to(device=params['device'])
+        start = state.reshape(4 * num_contacts + 1).to(device=params['device'])
 
-        actual_trajectory.append(state['q'].reshape(4 * num_contacts + 1).clone())
+        actual_trajectory.append(state.reshape(4 * num_contacts + 1).clone())
         start_time = time.time()
         best_traj, trajectories = turn_planner.step(start)
 
         print(f"solve time: {time.time() - start_time}")
         planned_theta_traj = best_traj[:, 4 * num_contacts].detach().cpu().numpy()
-        print(f"current theta: {state['q'][0, -1].detach().cpu().numpy()}")
+        print(f"current theta: {state[0, -1].detach().cpu().numpy()}")
         print(f"planned theta: {planned_theta_traj}")
         # add trajectory lines to sim
         if params['mode'] == 'hardware':
@@ -2027,7 +2027,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         gym.clear_lines(viewer)
         # for debugging
         state = env.get_state()
-        start = state['q'].reshape(4 * num_contacts + 1).to(device=params['device'])
+        start = state.reshape(4 * num_contacts + 1).to(device=params['device'])
         for finger in params['fingers']:
             ee = state2ee_pos(start[:4 * num_contacts], turn_problem.ee_names[finger])
             finger_traj_history[finger].append(ee.detach().cpu().numpy())
@@ -2053,7 +2053,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
     env.reset()
     state = env.get_state()
-    state = state['q'].reshape(4 * num_contacts + 1).to(device=params['device'])
+    state = state.reshape(4 * num_contacts + 1).to(device=params['device'])
     actual_trajectory.append(state.clone())
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_contacts + 1)
     turn_problem.T = actual_trajectory.shape[0]

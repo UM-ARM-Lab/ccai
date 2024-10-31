@@ -565,7 +565,7 @@ def do_trial(env, params, fpath):
         gt = index_full_chain.forward_kinematics(state['victor_index_q'])
         index_ee_m = index_chain.forward_kinematics(state['index_q'], world=tf.Transform3d(matrix=victor_ee_m))
 
-        actual_trajectory.append(state['q'].reshape(9).clone())
+        actual_trajectory.append(state.reshape(9).clone())
         if k > 0:
             torch.cuda.synchronize()
             start_time = time.time()
@@ -626,7 +626,7 @@ def do_trial(env, params, fpath):
         gym.clear_lines(viewer)
 
     state = env.get_state()
-    state = state['q'].reshape(9).to(device=params['device'])
+    state = state.reshape(9).to(device=params['device'])
     actual_trajectory.append(state.clone())
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 9)
     index_problem.T = actual_trajectory.shape[0]

@@ -1,39 +1,14 @@
-from isaac_victor_envs.utils import get_assets_dir
-from isaac_victor_envs.tasks.allegro import AllegroPegAlignmentEnv
-
 import numpy as np
-import pickle as pkl
 
 import torch
-import time
-import copy
-import yaml
-import pathlib
-from functools import partial
 
-import time
-import pytorch_volumetric as pv
-import pytorch_kinematics as pk
-import pytorch_kinematics.transforms as tf
-from torch.func import vmap, jacrev, hessian, jacfwd
-# import pytorch3d.transforms as tf
-
-import matplotlib.pyplot as plt
 from utils.allegro_utils import *
-from allegro_valve_roll import AllegroValveTurning
+from baselines.ablation.allegro_valve_turning import AblationAllegroValveTurning
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
 
 
-
-CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
-
-device = 'cuda:0'
-obj_dof = 6
-# instantiate environment
-img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
-
-class AllegroPegTurning(AllegroValveTurning):
+class AblationAllegroPegTurning(AblationAllegroValveTurning):
     def get_constraint_dim(self, T):
         self.friction_polytope_k = 4
         wrench_dim = 0
@@ -41,10 +16,9 @@ class AllegroPegTurning(AllegroValveTurning):
             wrench_dim += 3
         if self.obj_rotational_dim > 0:
             wrench_dim += 3
-        if self.optimize_force:
-            self.dg_per_t = self.num_fingers * (1 + 2 + 4) + wrench_dim
-        else:
-            self.dg_per_t = self.num_fingers * (1 + 2) + wrench_dim
+        if self.screwdriver_force_balance:
+            wrench_dim += 2
+        self.dg_per_t = self.num_fingers * (1 + 4) + wrench_dim
         self.dg_constant = 0
         self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
         self.dz = (self.friction_polytope_k) * self.num_fingers # one friction constraints per finger
@@ -59,23 +33,24 @@ class AllegroPegTurning(AllegroValveTurning):
                  object_type,
                  world_trans,
                  object_asset_pos,
+                 contact_obj_frame,
                  fingers=['index', 'middle', 'ring', 'thumb'],
                  friction_coefficient=0.95,
                  optimize_force=False,
-                 obj_dof_code=[1, 1, 1, 1, 1, 1],
+                 device='cuda:0', 
                  obj_gravity=False,
-                 device='cuda:0', **kwargs):
+                 **kwargs):
         self.num_fingers = len(fingers)
-        self.optimize_force = optimize_force
-        self.object_asset_pos = object_asset_pos
+        self.obj_dof_code = [1, 1, 1, 1, 1, 1]
         self.obj_mass = 0.03
-
-        super(AllegroPegTurning, self).__init__(start=start, goal=goal, T=T, chain=chain, object_location=object_location,
+        super(AblationAllegroPegTurning, self).__init__(start=start, goal=goal, T=T, chain=chain, object_location=object_location,
                                                  object_type=object_type, world_trans=world_trans, object_asset_pos=object_asset_pos,
-                                                 fingers=fingers, friction_coefficient=friction_coefficient, obj_dof_code=obj_dof_code, 
-                                                 obj_joint_dim=0, optimize_force=optimize_force, obj_gravity=obj_gravity, device=device)
-        self.friction_coefficient = friction_coefficient
-    
+                                                 fingers=fingers, friction_coefficient=friction_coefficient, obj_dof_code=self.obj_dof_code, 
+                                                 obj_joint_dim=0, optimize_force=optimize_force, 
+                                                 screwdriver_force_balance=False,
+                                                 collision_checking=False, obj_gravity=obj_gravity,
+                                                 contact_region=False, du=None, contact_obj_frame=contact_obj_frame, device=device)
+
     def _cost(self, xu, start, goal):
         # TODO: consider using quaternion difference for the orientation.
         state = xu[:, :self.dx]  # state dim = 9
@@ -142,20 +117,20 @@ class AllegroPegTurning(AllegroValveTurning):
         x = torch.stack(x[1:], dim=1)
 
         # if valve angle in state
-        current_obj_position = self.start[4 * self.num_fingers: 4 * self.num_fingers + self.obj_translational_dim]
-        current_obj_orientation = self.start[4 * self.num_fingers + self.obj_translational_dim:4 * self.num_fingers + self.obj_dof]
-        current_obj_R = R.from_euler('XYZ', current_obj_orientation.cpu().numpy())
-        goal_obj_R = R.from_euler('XYZ', self.goal[self.obj_translational_dim:self.obj_translational_dim + self.obj_rotational_dim].cpu().numpy())
-        key_times = [0, self.T]
-        times = np.linspace(0, self.T, self.T + 1)
-        slerp = Slerp(key_times, R.concatenate([current_obj_R, goal_obj_R]))
-        interp_rots = slerp(times)
-        interp_rots = interp_rots.as_euler('XYZ')[1:]
+        # current_obj_position = self.start[4 * self.num_fingers: 4 * self.num_fingers + self.obj_translational_dim]
+        # current_obj_orientation = self.start[4 * self.num_fingers + self.obj_translational_dim:4 * self.num_fingers + self.obj_dof]
+        # current_obj_R = R.from_euler('XYZ', current_obj_orientation.cpu().numpy())
+        # goal_obj_R = R.from_euler('XYZ', self.goal[self.obj_translational_dim:self.obj_translational_dim + self.obj_rotational_dim].cpu().numpy())
+        # key_times = [0, self.T]
+        # times = np.linspace(0, self.T, self.T + 1)
+        # slerp = Slerp(key_times, R.concatenate([current_obj_R, goal_obj_R]))
+        # interp_rots = slerp(times)
+        # interp_rots = interp_rots.as_euler('XYZ')[1:]
 
-        theta_position = np.linspace(current_obj_position.cpu().numpy(), self.goal[:self.obj_translational_dim].cpu().numpy(), self.T + 1)[1:]
-        theta = np.concatenate((theta_position, interp_rots), axis=-1)
-        theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
-        theta = theta.unsqueeze(0).repeat((N,1,1))
+        # theta_position = np.linspace(current_obj_position.cpu().numpy(), self.goal[:self.obj_translational_dim].cpu().numpy(), self.T + 1)[1:]
+        # theta = np.concatenate((theta_position, interp_rots), axis=-1)
+        # theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
+        # theta = theta.unsqueeze(0).repeat((N,1,1))
 
         theta = self.start[-self.obj_dof:].reshape(1, 1, -1).repeat(N, self.T, 1)
 
@@ -170,5 +145,3 @@ class AllegroPegTurning(AllegroValveTurning):
             return False
         else:
             return True
-
- 

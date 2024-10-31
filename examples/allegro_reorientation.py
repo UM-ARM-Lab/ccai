@@ -106,7 +106,7 @@ class AllegroReorientation(AllegroValveTurning):
             goal_orientation = tf.euler_angles_to_matrix(goal[-self.obj_rotational_dim:], convention='XYZ')
             goal_orientation = tf.matrix_to_rotation_6d(goal_orientation)
             # terminal cost
-            goal_cost = goal_cost + torch.sum((20 * (obj_orientation[-1] - goal_orientation) ** 2))
+            goal_cost = goal_cost + torch.sum((100 * (obj_orientation[-1] - goal_orientation) ** 2))
             # running cost 
             goal_cost = goal_cost + torch.sum((0.1 * (obj_orientation - goal_orientation) ** 2))
             smoothness_cost = smoothness_cost + 50 * torch.sum((obj_orientation[1:] - obj_orientation[:-1]) ** 2)

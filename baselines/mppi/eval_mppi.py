@@ -101,7 +101,6 @@ def do_trial(env, params, fpath):
     actual_trajectory = []
     duration = 0
 
-    info_list = []
     dynamics = DynamicsModel(env, num_fingers=len(params['fingers']), include_velocity=params['include_velocity'], obj_joint_dim=obj_joint_dim)
     if config['task'] == 'screwdriver_turning':
         from baselines.mppi.allegro_screwdriver import RunningCost

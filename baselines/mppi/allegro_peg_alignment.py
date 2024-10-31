@@ -98,7 +98,7 @@ def do_trial(env, params, fpath):
     state = env.get_state()
     action_list = []
 
-    start = state['q'][0].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
+    start = state[0].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
   
     pregrasp_problem = AllegroContactProblem(
         dx=4 * num_fingers,
@@ -139,7 +139,7 @@ def do_trial(env, params, fpath):
     prime_dof_state = prime_dof_state.unsqueeze(0).repeat(params['N'], 1, 1)
     env.set_pose(prime_dof_state, semantic_order=False, zero_velocity=False)
     state = env.get_state()
-    start = state['q'][0].reshape(1, 4 * num_fingers + obj_dof).to(device=params['device'])
+    start = state[0].reshape(1, 4 * num_fingers + obj_dof).to(device=params['device'])
 
     
     
@@ -166,9 +166,9 @@ def do_trial(env, params, fpath):
     with torch.no_grad():
         for k in range(params['num_steps']):
             state = env.get_state()
-            start = state['q'][0].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
+            start = state[0].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
 
-            actual_trajectory.append(state['q'][0, :4 * num_fingers + obj_dof].clone())
+            actual_trajectory.append(state[0, :4 * num_fingers + obj_dof].clone())
             start_time = time.time()
 
             prime_dof_state = env.dof_states.clone()[0]
@@ -206,7 +206,7 @@ def do_trial(env, params, fpath):
 
             
             action_list.append(action)
-            peg_state = state['q'][0, -obj_dof:].cpu()
+            peg_state = state[0, -obj_dof:].cpu()
             peg_mat = R.from_euler('xyz', peg_state[-3:]).as_matrix()
             distance2goal_ori = tf.so3_relative_angle(torch.tensor(peg_mat).unsqueeze(0), \
             torch.tensor(peg_goal_mat).unsqueeze(0), cos_angle=False).detach().cpu().abs()
@@ -229,7 +229,7 @@ def do_trial(env, params, fpath):
 
 
     state = env.get_state()
-    state = state['q'][0].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
+    state = state[0].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
     actual_trajectory.append(state.clone()[: 4 * num_fingers + obj_dof])
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
     # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)

@@ -193,12 +193,18 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.all_joint_index = [0, 1, 2] + self.all_joint_index
         elif arm_type == 'floating_6d':
             self.all_joint_index = [0, 1, 2, 3, 4, 5] + self.all_joint_index
-        self.ee_names = {
+        self.collision_checking_ee_names = {
             'index': 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
             'middle': 'allegro_hand_naka_finger_finger_1_aftc_base_link',
             'ring': 'allegro_hand_kusuri_finger_finger_2_aftc_base_link',
             'thumb': 'allegro_hand_oya_finger_3_aftc_base_link',
         }
+        self.ee_names = {
+            'index': 'hitosashi_ee',
+            'middle': 'naka_ee',
+            'ring': 'kusuri_ee',
+            'thumb': 'oya_ee',
+            }
         self.ee_link_idx = {finger: chain.frame_to_idx[ee_name] for finger, ee_name in self.ee_names.items()}
         self.frame_indices = torch.tensor([self.ee_link_idx[finger] for finger in self.fingers])
 
@@ -263,7 +269,8 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         self.force_con_mean = []
         self.kinematics_con_mean = []
         self.friction_con_mean = []
-
+    def forward_kinematics(self, q):
+        return self.chain.forward_kinematics(partial_to_full_state(q[:, :4*self.num_fingers], fingers=self.fingers), frame_indices=self.frame_indices)
     def save_history(self, save_dir):
         result_dict = {
             'J': self.J_list,
@@ -669,7 +676,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         #                                            collision_check_links=collision_check_oya,
         #                                            softmin_temp=100.0)
         # contact checking
-        collision_check_links = [self.ee_names[finger] for finger in self.fingers]
+        collision_check_links = [self.collision_checking_ee_names[finger] for finger in self.fingers]
         if collision_checking:
             collision_check_links.append('allegro_hand_hitosashi_finger_finger_link_2')
             collision_check_links.append('allegro_hand_hitosashi_finger_finger_link_3')
@@ -682,7 +689,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         object_sdf = pv.RobotSDF(self.object_chain, path_prefix=None, use_collision_geometry=False) # since we are using primitive shapes for the object, there's no need to define path for stl
         robot_sdf = pv.RobotSDF(self.chain, path_prefix=get_assets_dir() + '/xela_models', use_collision_geometry=False)
         self.viz_contact_scenes = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
-                                            collision_check_links=[self.ee_names['thumb']],
+                                            collision_check_links=[self.collision_checking_ee_names['thumb']],
                                             softmin_temp=1.0e3,
                                             points_per_link=1000,
                                             partial_patch=False,
@@ -816,6 +823,7 @@ class AllegroValveTurning(AllegroContactProblem):
         self.contact_region = contact_region
         self.finger_stiffness = finger_stiffness
         self.arm_stiffness = arm_stiffness
+        self.obj_dof_code = obj_dof_code
         obj_dof = np.sum(obj_dof_code)
         if arm_type == 'None':
             self.arm_dof = 0
@@ -919,7 +927,7 @@ class AllegroValveTurning(AllegroContactProblem):
 
             # DEBUG ONLY, use initial state as the initialization
             # theta = self.start[-self.obj_dof:].unsqueeze(0).repeat((N, self.T, 1))
-            theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
+            # theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
             x = torch.cat((x, theta), dim=-1)
 
         xu = torch.cat((x, u), dim=2)
@@ -1693,8 +1701,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     elif params['arm_type'] == 'None':
         arm_dof = 0
 
-    start = state['q'].reshape(4 * num_fingers + 1).to(device=params['device'])
-    # start = torch.cat((state['q'].reshape(10), torch.zeros(1).to(state['q'].device))).to(device=params['device'])
+    start = state.reshape(4 * num_fingers + 1).to(device=params['device'])
+    # start = torch.cat((state.reshape(10), torch.zeros(1).to(state.device))).to(device=params['device'])
     if params['controller'] == 'csvgd':
         pregrasp_problem = AllegroContactProblem(
             dx=4 * num_fingers + 1,
@@ -1718,7 +1726,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         raise ValueError('Invalid controller')
     
     # first we move the hand to grasp the valve
-    start = state['q'].reshape(4 * num_fingers + 1).to(device=params['device'])
+    start = state.reshape(4 * num_fingers + 1).to(device=params['device'])
     best_traj, _ = pregrasp_planner.step(start[:4 * num_fingers + 1])
 
     # we will just execute this open loop
@@ -1750,7 +1758,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     for finger in params['fingers']:
         finger_traj_history[finger] = []
     state = env.get_state()
-    start = state['q'].reshape(4 * num_fingers + 1).to(device=params['device'])
+    start = state.reshape(4 * num_fingers + 1).to(device=params['device'])
     turn_problem = AllegroValveTurning(
             start=start,
             goal=params['valve_goal'],
@@ -1776,16 +1784,16 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
     for k in range(params['num_steps']):
         state = env.get_state()
-        start = state['q'].reshape(4 * num_fingers + 1).to(device=params['device'])
+        start = state.reshape(4 * num_fingers + 1).to(device=params['device'])
 
-        actual_trajectory.append(state['q'].reshape(4 * num_fingers + 1).clone())
+        actual_trajectory.append(state.reshape(4 * num_fingers + 1).clone())
         start_time = time.time()
         best_traj, trajectories = turn_planner.step(start)
 
 
         print(f"solve time: {time.time() - start_time}")
         planned_theta_traj = best_traj[:, 4 * num_fingers].detach().cpu().numpy()
-        print(f"current theta: {state['q'][0, -1].detach().cpu().numpy()}")
+        print(f"current theta: {state[0, -1].detach().cpu().numpy()}")
         print(f"planned theta: {planned_theta_traj}")
         # add trajectory lines to sim
         if params['mode'] == 'hardware':
@@ -1874,7 +1882,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         gym.clear_lines(viewer)
         # for debugging
         state = env.get_state()
-        start = state['q'].reshape(4 * num_fingers + 1).to(device=params['device'])
+        start = state.reshape(4 * num_fingers + 1).to(device=params['device'])
         for finger in params['fingers']:
             ee = state2ee_pos(start[:4 * num_fingers], turn_problem.ee_names[finger])
             finger_traj_history[finger].append(ee.detach().cpu().numpy())
@@ -1901,7 +1909,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
     env.reset()
     state = env.get_state()
-    state = state['q'].reshape(4 * num_fingers + 1).to(device=params['device'])
+    state = state.reshape(4 * num_fingers + 1).to(device=params['device'])
     actual_trajectory.append(state.clone())
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + 1)
     turn_problem.T = actual_trajectory.shape[0]

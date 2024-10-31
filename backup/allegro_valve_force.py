@@ -737,8 +737,8 @@ def do_trial(env, params, fpath):
         env.frame_fpath = None
         env.frame_id = None
 
-    start = state['q'].reshape(9).to(device=params['device'])
-    # start = torch.cat((state['q'].reshape(10), torch.zeros(1).to(state['q'].device))).to(device=params['device'])
+    start = state.reshape(9).to(device=params['device'])
+    # start = torch.cat((state.reshape(10), torch.zeros(1).to(state.device))).to(device=params['device'])
     chain.to(device=params['device'])
 
     if params['controller'] == 'csvgd':
@@ -769,7 +769,7 @@ def do_trial(env, params, fpath):
     thumb_traj_history = []
     index_traj_history = []
     state = env.get_state()
-    start = state['q'].reshape(9).to(device=params['device'])
+    start = state.reshape(9).to(device=params['device'])
     thumb_ee = state2ee_pos(start[:8], thumb_ee_name).squeeze(0)
     thumb_traj_history.append(thumb_ee.detach().cpu().numpy())
     index_ee = state2ee_pos(start[:8], index_ee_name).squeeze(0)
@@ -777,7 +777,7 @@ def do_trial(env, params, fpath):
 
     for k in range(params['num_steps']):
         state = env.get_state()
-        start = state['q'].reshape(9).to(device=params['device'])
+        start = state.reshape(9).to(device=params['device'])
         # for debugging
         current_theta = start[8]
         thumb_radial_vec = thumb_ee - valve_location # do not consider action at the final timestep
@@ -797,7 +797,7 @@ def do_trial(env, params, fpath):
         fk_start = chain.forward_kinematics(partial_to_full_state(start[:8]), frame_indices=frame_indices)
         # print(f"current theta: {current_theta}")
 
-        actual_trajectory.append(state['q'].reshape(9).clone())
+        actual_trajectory.append(state.reshape(9).clone())
         # if k > 0:
         #     torch.cuda.synchronize()
         #     start_time = time.time()
@@ -844,7 +844,7 @@ def do_trial(env, params, fpath):
         gym.clear_lines(viewer)
         # for debugging
         state = env.get_state()
-        start = state['q'].reshape(9).to(device=params['device'])
+        start = state.reshape(9).to(device=params['device'])
         thumb_ee = state2ee_pos(start[:8], thumb_ee_name).squeeze(0)
         thumb_traj_history.append(thumb_ee.detach().cpu().numpy())
         temp_for_plot = np.stack(thumb_traj_history, axis=0)
@@ -860,7 +860,7 @@ def do_trial(env, params, fpath):
 
 
     state = env.get_state()
-    state = state['q'].reshape(9).to(device=params['device'])
+    state = state.reshape(9).to(device=params['device'])
 
     # now weee want to turn it again!
 
