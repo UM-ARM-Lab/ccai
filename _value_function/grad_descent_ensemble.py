@@ -21,7 +21,7 @@ with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
 
 def get_data():
 
-    inputs = torch.from_numpy(total_poses)[0:5]
+    inputs = torch.from_numpy(total_poses)[100:120]
     return inputs
 
 def grad_descent():
@@ -30,15 +30,17 @@ def grad_descent():
     for checkpoint in checkpoints:
         model = Net(shape[0], shape[1])
         model.load_state_dict(checkpoint['model_state'])
-        models.append(model)
-        #break
 
+        # checkpoint = torch.load(f'{fpath.resolve()}/value_functions/value_function_{2}.pkl')
+        # model.load_state_dict(checkpoint['model_state'])
+    
+        models.append(model)
+        # break
     
     poses_mean = checkpoints[0]['poses_mean']
     poses_std = checkpoints[0]['poses_std']
     cost_mean = checkpoints[0]['cost_mean']
     cost_std = checkpoints[0]['cost_std']
-
     
     poses = get_data()
     poses_norm = (poses - poses_mean) / (poses_std + 0.000001)
@@ -50,12 +52,12 @@ def grad_descent():
     poses_norm.requires_grad_(True)
 
     optimizer = optim.SGD([poses_norm], lr=0.1)
-    #optimizer = optim.Adam([poses_norm], lr=0.01)
+    # optimizer = optim.Adam([poses_norm], lr=1e-2)
 
     model.eval()
 
     # gradient descent
-    num_iterations = 5000
+    num_iterations = 1000
     target_value = torch.tensor([0.0], dtype=torch.float32)
 
     pose_optimization_trajectory = []
@@ -68,7 +70,7 @@ def grad_descent():
 
         mse = torch.mean((predictions - target_value) ** 2)
         mean_squared_variance = torch.mean((ensemble_predictions - predictions) ** 2)
-        loss = mse #+ mean_squared_variance
+        loss = mse + mean_squared_variance
         loss.backward()
 
         # Set gradients of the last four values of each pose to 0
@@ -81,7 +83,8 @@ def grad_descent():
             print(f"Iteration {i}: mse = {mse.item()}, variance_loss = {mean_squared_variance.item()}")
             #print(f"Iteration {i}: Loss = {loss.item()}")
             pass
-        if i % int(num_iterations/5) == 0:
+        n_setpoints = 20
+        if i % int(num_iterations/n_setpoints) == 0:
             pose_optimization_trajectory.append(poses_norm.detach().cpu().numpy() * poses_std + poses_mean)
 
     optimized_poses_norm = poses_norm.detach().cpu().numpy()
@@ -110,7 +113,10 @@ def grad_descent():
     #print(predicted_cost_tuples)
     #print(np.mean(np.abs((poses.numpy() -  optimized_poses))))
 
-    output_filename = f'{fpath.resolve()}/eval/initial_and_optimized_poses.pkl'
+    # experiment_name = '_ensemble_SGD_100k_iters'
+    # experiment_name = '_ensemble_SGD_10k_iters'
+    experiment_name = '_ensemble_Adam_10k_iters'
+    output_filename = f'{fpath.resolve()}/eval/initial_and_optimized_poses{experiment_name}.pkl'
     with open(output_filename, 'wb') as f:
         pkl.dump(initial_pose_tuples, f)
 
@@ -121,6 +127,19 @@ if __name__ == "__main__":
 
     # Assuming grad_descent() is defined elsewhere and returns two arrays
     poses, optimized_poses,semi_optimized_poses = grad_descent()
+
+
+    semi_optimized_poses = np.array(semi_optimized_poses)
+    vis_so_poses = True
+    if vis_so_poses:
+        config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
+        for j in range(semi_optimized_poses.shape[1]):
+            for i in range(semi_optimized_poses.shape[0]):
+                env.reset(torch.from_numpy(semi_optimized_poses[i,j,:]).reshape(1,20).float(), deterministic=True)
+                print(f'Setpoint {i}')
+                time.sleep(0.01)
+
+
     
     poses = poses[:, :-4]
     optimized_poses = optimized_poses[:, :-4]
@@ -140,7 +159,7 @@ if __name__ == "__main__":
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
-    plot_intermediate = False
+    plot_intermediate = True
     for i in range(len(semi_optimized_poses_pca)):
         if i == 0:
             color = 'r'

@@ -294,7 +294,7 @@ def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym,
     params = config.copy()
     controller = 'csvgd'
     succ = False
-    # fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_{trial_num}')
+    fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_0')
     # pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
     # set up params
     params.pop('controllers')

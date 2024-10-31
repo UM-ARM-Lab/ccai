@@ -15,8 +15,18 @@ import time
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
+# experiment_name = '_single_SGD_10k_iters'
+# experiment_name = '_single_SGD_100k_iters'
+# experiment_name = '_single_Adam_10k_iters'
 
-with open(f'{fpath.resolve()}/eval/final_pose_comparisons_mse_50samples.pkl', 'rb') as file:
+experiment_name = '_ensemble_SGD_100k_iters'
+# experiment_name = '_ensemble_SGD_10k_iters'
+# experiment_name = '_ensemble_Adam_10k_iters'
+
+# experiment_name = '_mse_50samples'
+
+filename = f'final_pose_comparisons{experiment_name}.pkl'
+with open(f'{fpath.resolve()}/eval/{filename}', 'rb') as file:
     tuples = pkl.load(file)
     initial_poses, optimized_poses, initial_final_poses, optimized_final_poses = zip(*tuples)
     initial_final_poses = np.array(initial_final_poses).reshape(-1, 20)
@@ -61,20 +71,21 @@ if __name__ == "__main__":
             print("original turn")
             print("cost: ", initial_costs[i])
 
-            env.reset(initial_poses[i].reshape(1,20).float(), deterministic=True)
-            time.sleep(0.5)
-            env.reset(torch.from_numpy(initial_final_poses[i]).reshape(1,20).float(), deterministic=True)
-            time.sleep(1.0)
+            # env.reset(initial_poses[i].reshape(1,20).float(), deterministic=True)
+            # time.sleep(0.5)
+            # env.reset(torch.from_numpy(initial_final_poses[i]).reshape(1,20).float(), deterministic=True)
+            # time.sleep(1.0)
 
             print("optimized turn")
             print("cost: ", optimized_costs[i])
 
-            env.reset(optimized_poses[i].reshape(1,20).float(), deterministic=True)
-            time.sleep(0.5)
-            env.reset(torch.from_numpy(optimized_final_poses[i]).reshape(1,20).float(), deterministic=True)
-            time.sleep(1.0)
+            # if optimized_costs[i] > 3:
 
-            # input("Press Enter to continue...")
+            env.reset(optimized_poses[i].reshape(1,20).float(), deterministic=True)
+            time.sleep(.5)
+            # env.reset(torch.from_numpy(optimized_final_poses[i]).reshape(1,20).float(), deterministic=True)
+            # time.sleep(1.0)
+
 
 
                 # print("original pose")

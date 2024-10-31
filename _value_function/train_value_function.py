@@ -162,58 +162,74 @@ def eval(model_name, ensemble = False):
             model.load_state_dict(checkpoint['model_state'])
             models.append(model)
     
-    def plot_loader(loader, title = ''):
+    def plot_loader(loader, title=''):
         with torch.no_grad():
             actual_values = []
             predicted_values = []
+            prediction_stds = []  # For storing standard deviations of predictions if ensemble is True
 
             for inputs, labels in loader:
                 if not ensemble:
                     predictions = model(inputs)
                 else:
-                    predictions = query_ensemble(inputs, models).mean(dim=0)
+                    ensemble_predictions = query_ensemble(inputs, models)
+                    predictions = ensemble_predictions.mean(dim=0)
+                    prediction_std = ensemble_predictions.std(dim=0)  # Calculate standard deviation for error bars
+                    prediction_stds.append(prediction_std.numpy())
+
                 predicted_values.append(predictions.numpy())
                 actual_values.append(labels.numpy())
                 break
 
-        actual_values = np.concatenate(actual_values).flatten()
-        predicted_values = np.concatenate(predicted_values).flatten()
-        actual_values = actual_values * cost_std + cost_mean
-        predicted_values = predicted_values * cost_std + cost_mean
+            actual_values = np.concatenate(actual_values).flatten()
+            predicted_values = np.concatenate(predicted_values).flatten()
+            actual_values = actual_values * cost_std + cost_mean
+            predicted_values = predicted_values * cost_std + cost_mean
 
-        print(f'Actual values: {[f"{val:.4f}" for val in actual_values[:10]]}')
-        print(f'Predicted values: {[f"{val:.4f}" for val in predicted_values[:10]]}')
+            if ensemble:
+                prediction_stds = np.concatenate(prediction_stds).flatten() * cost_std  # Scale by cost_std
 
-        num_samples = len(actual_values)
-        plt.figure(figsize=(10, 6))
-        plt.scatter(range(num_samples), actual_values, label='Actual Values', color='green')
-        plt.scatter(range(num_samples), predicted_values, label='Predicted Values', color='blue')
-        # Draw lines between corresponding actual and predicted values
-        for i in range(num_samples):
-            plt.plot([i, i], [actual_values[i], predicted_values[i]], color='red', linestyle='--', linewidth=0.8)
+            print(f'Actual values: {[f"{val:.4f}" for val in actual_values[:10]]}')
+            print(f'Predicted values: {[f"{val:.4f}" for val in predicted_values[:10]]}')
 
-        plt.xlabel('Sample Index')
-        plt.ylabel('Cost Value')
-        plt.title('Actual vs Predicted Values with Error Lines, '+title)
-        plt.legend()
-        plt.show()
+            num_samples = len(actual_values)
+            plt.figure(figsize=(10, 6))
+
+            # Plot with error bars if ensemble is True
+            if ensemble:
+                plt.errorbar(range(num_samples), predicted_values, yerr=prediction_stds, fmt='o', 
+                            label='Predicted Values', color='blue', elinewidth=2, capsize=3)
+            else:
+                plt.scatter(range(num_samples), predicted_values, label='Predicted Values', color='blue')
+
+            plt.scatter(range(num_samples), actual_values, label='Actual Values', color='green')
+            
+            # Draw lines between corresponding actual and predicted values
+            for i in range(num_samples):
+                plt.plot([i, i], [actual_values[i], predicted_values[i]], color='red', linestyle='--', linewidth=0.8)
+
+            plt.xlabel('Sample Index')
+            plt.ylabel('Cost Value')
+            plt.title('Actual vs Predicted Costs')
+            plt.legend()
+            plt.show()
     
     plot_loader(train_loader, 'Training Set')
     plot_loader(test_loader, 'Test Set')
 
 if __name__ == "__main__":
 
-    model_name = "2"#input("Enter model name: ")
-    model_to_save = train()
-    save(model_to_save, f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
-    # eval(model_name = "2") 
-    exit()
+    # model_name = "2"#input("Enter model name: ")
+    # model_to_save = train()
+    # save(model_to_save, f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
+    # # eval(model_name = "2") 
+    # exit()
 
 
-    ensemble = []
-    for i in range(8):
-        net = train()
-        ensemble.append(net)
-    torch.save(ensemble, f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl')
+    # ensemble = []
+    # for i in range(8):
+    #     net = train()
+    #     ensemble.append(net)
+    # torch.save(ensemble, f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl')
     eval(model_name = "ensemble", ensemble = True)
 

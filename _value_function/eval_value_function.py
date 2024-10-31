@@ -9,8 +9,16 @@ from screwdriver_problem import init_env, do_turn, emailer
 import torch
 
 
+# experiment_name = '_single_SGD_10k_iters'
+# experiment_name = '_single_SGD_100k_iters'
+# experiment_name = '_single_Adam_10k_iters'
+
+# experiment_name = '_ensemble_SGD_100k_iters'
+# experiment_name = '_ensemble_SGD_10k_iters'
+experiment_name = '_ensemble_Adam_10k_iters'
+
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
-with open(f'{fpath.resolve()}/eval/initial_and_optimized_poses.pkl', 'rb') as file:
+with open(f'{fpath.resolve()}/eval/initial_and_optimized_poses{experiment_name}.pkl', 'rb') as file:
     tuples = pkl.load(file)
     initial_poses, optimized_poses = zip(*tuples)
 
@@ -40,9 +48,7 @@ if __name__ == "__main__":
         pose_tuples.append((initial_poses[i], optimized_poses[i], initial_final_pose, optimized_final_pose))
 
     
-    fpath = pathlib.Path(f'{CCAI_PATH}/data')
-    start_idx = config['start_idx']
-    savepath = f'{fpath.resolve()}/eval/final_pose_comparisons_ablation_ensemble_ADAM_5k_iters.pkl'
+    savepath = f'{fpath.resolve()}/eval/final_pose_comparisons{experiment_name}.pkl'
     with open(savepath, 'wb') as f:
         pkl.dump(pose_tuples, f)
 

@@ -20,21 +20,21 @@ def get_data():
     with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
         poses  = pkl.load(file)
     inputs = np.array([t.numpy() for t in poses]).reshape(-1, 20)
-    inputs = torch.from_numpy(inputs)[0:5]
+    inputs = torch.from_numpy(inputs)[100:120]
     
-    succ_filename = '/initial_poses/successful_initial_poses.pkl'
+    # succ_filename = '/initial_poses/successful_initial_poses.pkl'
 
-    with open(f'{fpath.resolve()}/{succ_filename}', 'rb') as file:
-        succ_poses = pkl.load(file)
+    # with open(f'{fpath.resolve()}/{succ_filename}', 'rb') as file:
+    #     succ_poses = pkl.load(file)
 
-    succs = np.array(succ_poses).reshape(-1,20)
-    succ_mean = np.mean(succs, axis=0)
-    succ_mean = torch.tensor(succ_mean, dtype=torch.float32)
+    # succs = np.array(succ_poses).reshape(-1,20)
+    # succ_mean = np.mean(succs, axis=0)
+    # succ_mean = torch.tensor(succ_mean, dtype=torch.float32)
 
-    return inputs, succ_mean
+    return inputs #, succ_mean
 
 def grad_descent():
-    torch.manual_seed(42)
+    # torch.manual_seed(42)
     model_name = "2"
     model = Net(shape[0], shape[1])
     checkpoint = torch.load(f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
@@ -44,7 +44,7 @@ def grad_descent():
     cost_mean = checkpoint['cost_mean']
     cost_std = checkpoint['cost_std']
     
-    poses, target_mean = get_data()
+    poses = get_data()
     poses_norm = (poses - poses_mean) / (poses_std + 0.000001)
     poses_norm = poses_norm.float()
     original_costs_norm = model(poses_norm).detach().cpu().numpy()
@@ -53,12 +53,13 @@ def grad_descent():
     # Enable gradient computation
     poses_norm.requires_grad_(True)
 
+    # optimizer = optim.SGD([poses_norm], lr=1e-1)
     optimizer = optim.Adam([poses_norm], lr=1e-2)
     mse_loss = nn.MSELoss()
     model.eval()
 
     # gradient descent
-    num_iterations = 5000
+    num_iterations = 500
     target_value = torch.tensor([0.0], dtype=torch.float32)
 
     for i in range(num_iterations):
@@ -67,8 +68,8 @@ def grad_descent():
         predictions = predictions * cost_std + cost_mean
 
         mse = mse_loss(predictions, target_value.expand_as(predictions))
-        mean_loss = torch.mean((poses_norm - target_mean.unsqueeze(0)) ** 2, dim=1)  
-        mean_loss = torch.mean(mean_loss)  # maybe this should relate to variance
+        # mean_loss = torch.mean((poses_norm - target_mean.unsqueeze(0)) ** 2, dim=1)  
+        # mean_loss = torch.mean(mean_loss)  # maybe this should relate to variance
         #print("mean: ", mean_loss)
         #print("mse: ", mse)
 
@@ -93,7 +94,8 @@ def grad_descent():
     predicted_cost_tuples = [(initial, optimized) for initial, optimized in zip(original_costs, optimized_costs)]
 
     # print(original_costs)
-    print("new predicted costs: ", optimized_costs)
+    # print("new predicted costs: ", optimized_costs)
+    print("mean of new predicted costs: ", optimized_costs.mean())
 
     vis = False
     if vis:
@@ -110,9 +112,13 @@ def grad_descent():
     #print(predicted_cost_tuples)
     # print(np.mean(np.abs((poses.numpy() -  optimized_poses))))
 
-    output_filename = f'{fpath.resolve()}/eval/initial_and_optimized_poses.pkl'
-    with open(output_filename, 'wb') as f:
-        pkl.dump(initial_pose_tuples, f)
+    experiment_name = '_single_SGD_10k_iters'
+    # experiment_name = '_single_SGD_100k_iters'
+    # experiment_name = '_single_Adam_10k_iters'
+
+    output_filename = f'{fpath.resolve()}/eval/initial_and_optimized_poses{experiment_name}.pkl'
+    # with open(output_filename, 'wb') as f:
+    #     pkl.dump(initial_pose_tuples, f)
 
     return poses.numpy(), optimized_poses
 
