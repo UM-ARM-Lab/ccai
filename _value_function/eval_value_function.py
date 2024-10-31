@@ -10,12 +10,12 @@ import torch
 
 
 # experiment_name = '_single_SGD_1k_iters'
-# experiment_name = '_single_SGD_10k_iters'
+experiment_name = '_single_SGD_10k_iters'
 # experiment_name = '_single_Adam_1k_iters'
 
 # experiment_name = '_ensemble_SGD_10k_iters'
 # experiment_name = '_ensemble_SGD_1k_iters'
-experiment_name = '_ensemble_Adam_1k_iters'
+# experiment_name = '_ensemble_Adam_1k_iters'
 
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 with open(f'{fpath.resolve()}/eval/initial_and_optimized_poses{experiment_name}.pkl', 'rb') as file:

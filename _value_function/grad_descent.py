@@ -53,9 +53,25 @@ def grad_descent():
     # Enable gradient computation
     poses_norm.requires_grad_(True)
 
-    # optimizer = optim.SGD([poses_norm], lr=1e-1)
-    optimizer = optim.Adam([poses_norm], lr=1e-2)
+    exp = 2
+    dump = True
+
+    if exp is 0:
+        experiment_name = '_single_SGD_10k_iters'
+        optimizer = optim.SGD([poses_norm], lr=0.1)
+        iterations = 10000
+    elif exp is 1:
+        experiment_name = '_single_SGD_1k_iters'
+        optimizer = optim.SGD([poses_norm], lr=0.1)
+        iterations = 1000
+    elif exp is 2:
+        experiment_name = '_single_Adam_1k_iters'
+        optimizer = optim.Adam([poses_norm], lr=1e-2)
+        iterations = 1000
+    
+    
     mse_loss = nn.MSELoss()
+
     model.eval()
 
     # gradient descent
@@ -112,13 +128,10 @@ def grad_descent():
     #print(predicted_cost_tuples)
     # print(np.mean(np.abs((poses.numpy() -  optimized_poses))))
 
-    experiment_name = '_single_SGD_10k_iters'
-    # experiment_name = '_single_SGD_100k_iters'
-    # experiment_name = '_single_Adam_10k_iters'
-
     output_filename = f'{fpath.resolve()}/eval/initial_and_optimized_poses{experiment_name}.pkl'
-    # with open(output_filename, 'wb') as f:
-    #     pkl.dump(initial_pose_tuples, f)
+    with open(output_filename, 'wb') as f:
+        if dump:
+            pkl.dump(initial_pose_tuples, f)
 
     return poses.numpy(), optimized_poses
 

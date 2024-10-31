@@ -113,7 +113,7 @@ def solve_turn(env, gym, viewer, params, fpath, initial_pose, state2ee_pos_parti
         env.frame_fpath = None
         env.frame_id = None
 
-    env.reset(dof_pos = initial_pose, deterministic=False)
+    env.reset(dof_pos = initial_pose, deterministic=True)
 
     state = env.get_state()
     start = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
