@@ -51,13 +51,25 @@ def grad_descent():
     # Enable gradient computation
     poses_norm.requires_grad_(True)
 
-    optimizer = optim.SGD([poses_norm], lr=0.1)
-    # optimizer = optim.Adam([poses_norm], lr=1e-2)
+    exp = 2
+    dump = True
+
+    if exp is 0:
+        experiment_name = '_ensemble_SGD_10k_iters'
+        optimizer = optim.SGD([poses_norm], lr=0.1)
+        iterations = 10000
+    elif exp is 1:
+        experiment_name = '_ensemble_SGD_1k_iters'
+        optimizer = optim.SGD([poses_norm], lr=0.1)
+        iterations = 1000
+    elif exp is 2:
+        experiment_name = '_ensemble_Adam_1k_iters'
+        optimizer = optim.Adam([poses_norm], lr=1e-2)
+        iterations = 1000
 
     model.eval()
-
     # gradient descent
-    num_iterations = 1000
+    num_iterations = iterations
     target_value = torch.tensor([0.0], dtype=torch.float32)
 
     pose_optimization_trajectory = []
@@ -113,12 +125,10 @@ def grad_descent():
     #print(predicted_cost_tuples)
     #print(np.mean(np.abs((poses.numpy() -  optimized_poses))))
 
-    # experiment_name = '_ensemble_SGD_100k_iters'
-    # experiment_name = '_ensemble_SGD_10k_iters'
-    experiment_name = '_ensemble_Adam_10k_iters'
     output_filename = f'{fpath.resolve()}/eval/initial_and_optimized_poses{experiment_name}.pkl'
     with open(output_filename, 'wb') as f:
-        pkl.dump(initial_pose_tuples, f)
+        if dump:
+            pkl.dump(initial_pose_tuples, f)
 
     return poses.numpy(), optimized_poses, pose_optimization_trajectory
 
@@ -130,7 +140,7 @@ if __name__ == "__main__":
 
 
     semi_optimized_poses = np.array(semi_optimized_poses)
-    vis_so_poses = True
+    vis_so_poses = False
     if vis_so_poses:
         config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
         for j in range(semi_optimized_poses.shape[1]):
