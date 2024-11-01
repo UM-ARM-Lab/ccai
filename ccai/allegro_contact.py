@@ -474,6 +474,45 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
         return h, grad_h, None
 
+    def _ee_locations_in_screwdriver(self, q_rob, q_env):
+
+        assert q_rob.shape[-1] == 16
+        assert q_env.shape[-1] == self.obj_dof
+
+        _q_env = q_env.clone()
+        if self.obj_dof == 3:
+            _q_env = torch.cat((q_env, torch.zeros_like(q_env[..., :1])), dim=-1)
+
+        robot_trans = self.contact_scenes.robot_sdf.chain.forward_kinematics(q_rob.reshape(-1, 16))
+        ee_locs = []
+
+        for finger in self.regrasp_fingers:
+            ee_locs.append(robot_trans[self.ee_names[finger]].get_matrix()[:, :3, -1])
+
+        ee_locs = torch.stack(ee_locs, dim=1)
+
+        # convert to scene base frame
+        ee_locs = self.contact_scenes.scene_transform.inverse().transform_points(ee_locs)
+
+        # convert to scene ee frame
+        object_trans = self.contact_scenes.scene_sdf.chain.forward_kinematics(
+            _q_env.reshape(-1, _q_env.shape[-1]))
+
+        ee_locs = object_trans[self.obj_link_name].inverse().transform_points(ee_locs)
+
+        return ee_locs.reshape(q_rob.shape[:-1] + (self.num_regrasps, 3))
+    
+    def _ee_locations_in_world(self, q_rob):
+        assert q_rob.shape[-1] == 16
+        robot_trans = self.contact_scenes.robot_sdf.chain.forward_kinematics(q_rob.reshape(-1, 16))
+        ee_locs = []
+
+        for finger in self.regrasp_fingers:
+            ee_locs.append(robot_trans[self.ee_names[finger]].get_matrix()[:, :3, -1])
+
+        ee_locs = torch.stack(ee_locs, dim=1)
+        return ee_locs.reshape(q_rob.shape[:-1] + (self.num_regrasps, 3))
+
     def _contact_constraints(self, q, finger_name, compute_grads=True, compute_hess=False, terminal=False, projected_diffusion=False):
         """
             Computes contact constraints
@@ -522,6 +561,38 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             return g, grad_g, hess
 
         return g, grad_g, None
+
+    # What is the structure for below? Is there an existing constraint I can copy? Maybe the contact constraint from AllegroContact?
+    def _contact_patch_constraint(self, xu, finger_name, compute_grads=True, compute_hess=False, projected_diffusion=False):
+        N, T, _ = xu.shape
+        T_offset = 0 if projected_diffusion else 1
+        d = self.d
+
+
+        # TODO: Get the below to work, then think about if we can make it faster by caching stuff in self.data
+        ee_loc_finger = self.data[finger_name]['closest_pt_world']
+        h = torch.norm(ee_loc_finger - self.contact_points[finger_name], dim=-1) - self.contact_patch_radius
+        h = h[:, -1].reshape(N, 1)
+        # print(g[:, -1])
+        if compute_grads:
+            T_range = torch.arange(T, device=xu.device)
+            # compute gradient of sdf
+            grad_h = torch.zeros(N, T, T, d, device=xu.device)
+            grad_ee_q = self.data[finger_name]['d_contact_loc_dq']
+            grad_h_q = (ee_loc_finger - self.contact_points[finger_name]).unsqueeze(1) @ grad_ee_q
+            grad_h[:, T_range, T_range, :16] = grad_h_q[:, T_offset:]
+            # grad_h[:, T_range, T_range, 16: 16 + self.obj_dof] = grad_h_theta.reshape(N, T + T_offset, self.obj_dof)[:, T_offset:]
+            grad_h = grad_h.reshape(N, -1, T, d)
+            grad_h = grad_h.reshape(N, -1, T * d)
+            grad_h = grad_h[:, -1].reshape(N, 1, T * d)
+        else:
+            return h, None, None
+
+        if compute_hess:
+            hess = torch.zeros(N, xu.shape[1], T * d, T * d, device=xu.device)
+            return h, grad_h, hess
+
+        return h, grad_h, None
 
     @staticmethod
     def get_rotation_from_normal(normal_vector):
@@ -717,45 +788,6 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             object_link_name = 'card'
         self.obj_link_name = object_link_name
 
-    def _ee_locations_in_screwdriver(self, q_rob, q_env):
-
-        assert q_rob.shape[-1] == 16
-        assert q_env.shape[-1] == self.obj_dof
-
-        _q_env = q_env.clone()
-        if self.obj_dof == 3:
-            _q_env = torch.cat((q_env, torch.zeros_like(q_env[..., :1])), dim=-1)
-
-        robot_trans = self.contact_scenes.robot_sdf.chain.forward_kinematics(q_rob.reshape(-1, 16))
-        ee_locs = []
-
-        for finger in self.regrasp_fingers:
-            ee_locs.append(robot_trans[self.ee_names[finger]].get_matrix()[:, :3, -1])
-
-        ee_locs = torch.stack(ee_locs, dim=1)
-
-        # convert to scene base frame
-        ee_locs = self.contact_scenes.scene_transform.inverse().transform_points(ee_locs)
-
-        # convert to scene ee frame
-        object_trans = self.contact_scenes.scene_sdf.chain.forward_kinematics(
-            _q_env.reshape(-1, _q_env.shape[-1]))
-
-        ee_locs = object_trans[self.obj_link_name].inverse().transform_points(ee_locs)
-
-        return ee_locs.reshape(q_rob.shape[:-1] + (self.num_regrasps, 3))
-    
-    def _ee_locations_in_world(self, q_rob):
-        assert q_rob.shape[-1] == 16
-        robot_trans = self.contact_scenes.robot_sdf.chain.forward_kinematics(q_rob.reshape(-1, 16))
-        ee_locs = []
-
-        for finger in self.regrasp_fingers:
-            ee_locs.append(robot_trans[self.ee_names[finger]].get_matrix()[:, :3, -1])
-
-        ee_locs = torch.stack(ee_locs, dim=1)
-        return ee_locs.reshape(q_rob.shape[:-1] + (self.num_regrasps, 3))
-
     def _cost(self, xu, start, goal):
         # if self.full_dof_goal:
         #     return 0
@@ -782,21 +814,6 @@ class AllegroRegraspProblem(AllegroObjectProblem):
 
         # dof_pos = self.default_dof_pos[None, self.regrasp_idx]
         # return 10 * torch.sum((q - dof_pos) ** 2)
-
-    
-    # @regrasp_finger_constraints
-    # def _contact_patch_constraint(self, xu, finger_name, compute_grads=True, compute_hess=False, projected_diffusion=False):
-    #     q = partial_to_full_state(xu[:, :self.num_fingers * 4], self.fingers)  # [:, self.regrasp_idx]
-    #     ee_loc = self._ee_locations_in_world(q)
-
-    #     dist = torch.norm(ee_loc - self.default_ee_locs, dim=-1)
-    #     h = dist - 0.01
-    #     if compute_grads:
-
-    #     else:
-    #         return h, None, None
-    #     return h, grad_h, None
-
 
     @regrasp_finger_constraints
     def _contact_avoidance(self, xu, finger_name, compute_grads=True, compute_hess=False, projected_diffusion=False):
@@ -901,9 +918,20 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                                                                             compute_grads=compute_grads,
                                                                             compute_hess=compute_hess,
                                                                             projected_diffusion=projected_diffusion)
+        
+        h_patch, grad_h_contact, hess_h_contact = self._contact_patch_constraint(xu=xu.reshape(N, T, -1)[:, :, :self.dx + self.du],
+                                                                            compute_grads=compute_grads,
+                                                                            compute_hess=compute_hess,
+                                                                            projected_diffusion=projected_diffusion)
+        h = torch.cat((h_contact, h_patch), dim=1)
+        grad_h = None
+        hess_h = None
+        if compute_grads:
+            grad_h = torch.cat((grad_h_contact, grad_h_contact), dim=1)
+        if compute_hess:
+            hess_h = torch.cat((hess_h_contact, hess_h_contact), dim=1)
+        return h, grad_h, hess_h
         # print("avoidance", h_contact.max())
-        return h_contact, grad_h_contact, hess_h_contact
-
 
 class AllegroContactProblem(AllegroObjectProblem):
 
