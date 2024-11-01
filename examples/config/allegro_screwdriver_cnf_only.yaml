@@ -10,7 +10,9 @@ visualize: True
 # experiment_name: 'allegro_screwdriver_cnf_ot_sigma_.1_orig_inpaint_rk4_project_lr_2_m_.99'
 # experiment_name: 'allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_no_project_training_project_inference_alpha_C_1'
 # experiment_name: 'allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_no_project_training_project_inference_alpha_C_.1_all_constraints'
-experiment_name: 'allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_project_training_C_0_project_inference_alpha_C_10_all_constraints'
+# experiment_name: 'allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_project_training_C_0_project_inference_alpha_C_10_all_constraints'
+# experiment_name: 'allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_project_inference_alpha_C_10_all_constraints'
+experiment_name: 'allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_all_knotpoints_no_train_projection_inf_projection_alpha_C_1'
 type: 'cnf'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
@@ -38,7 +40,9 @@ use_partial_constraint: True
 sine_cosine: False
 project_state: False
 state_control_only: True
-model_path: 'data/training/allegro_screwdriver/allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_projected_training_projected_target_alpha_C_0_cnf/allegro_screwdriver_cnf.pt'
+# model_path: 'data/training/allegro_screwdriver/allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_no_project_training_cnf/allegro_screwdriver_cnf.pt'
+# model_path: 'data/training/allegro_screwdriver/allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_projected_training_projected_target_alpha_C_0_cnf/allegro_screwdriver_cnf.pt'
+model_path: 'data/training/allegro_screwdriver/allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_all_knotpoints_cnf/allegro_screwdriver_cnf.pt'
 # model_path: 'data/training/allegro_screwdriver/allegro_cnf_exact_ot_cnf/allegro_screwdriver_cnf.pt'
 controllers:
   csvgd:

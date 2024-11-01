@@ -678,11 +678,12 @@ class TemporalUnetStateAction(nn.Module):
                     problem._preprocess(x_this_problem[:, :, mask_no_z], dxu=grad_x_this_problem, projected_diffusion=True)
                     x_this_problem_for_cnstrt = torch.cat((x_this_problem, z_this_problem), dim=-1)
                     # x_this_problem_for_cnstrt = x_this_problem
-                    # num_dim = x_this_problem_for_cnstrt.shape[-1]
                     num_dim = x_this_problem.shape[-1]
+                    # num_dim = x_this_problem_for_cnstrt.shape[-1]
                     C, dC, _ = problem.combined_constraints(x_this_problem_for_cnstrt, 
                                                             compute_hess=False, projected_diffusion=True,
-                                                            include_slack=True)
+                                                            include_slack=True,
+                                                            compute_inequality=False)
 
                     C = C.to(dtype=dtype).squeeze()
                     dC = dC.to(dtype=dtype).squeeze()
@@ -705,13 +706,13 @@ class TemporalUnetStateAction(nn.Module):
 
 
                 # xi_C = None
-                # if xi_C is None:
-                #     # Update to decrease constraint violation
-                #     xi_C = dCdCT_inv @ C.unsqueeze(-1)
-                #     xi_C = (dC.permute(0, 2, 1) @ xi_C).squeeze(-1)
-                #     # xi_C = xi_C[:, :-z_dim]
+                if xi_C is None:
+                    # Update to decrease constraint violation
+                    xi_C = dCdCT_inv @ C.unsqueeze(-1)
+                    xi_C = (dC.permute(0, 2, 1) @ xi_C).squeeze(-1)
+                    # xi_C = xi_C[:, :-z_dim]
 
-                # update_this_c -= 10 * xi_C
+                update_this_c -= 10 * xi_C
 
                 # if problem.dz > 0:
                 #     update_this_c = update_this_c[:, : :-problem.dz]
@@ -738,6 +739,7 @@ class TemporalUnetStateAction(nn.Module):
     def compiled_conditional_test(self, t, x, context):
         x_orig, x = self.compiled_conditional_test_fwd(t, x, context)
         x, p_matrix, xi_C = self.project(x_orig, x, context)
+        # return x, None, None
         return x, p_matrix, xi_C
 
     @torch.compile(mode='max-autotune')

@@ -81,7 +81,8 @@ class ConstrainedSVGDProblem(Problem):
     def eval(self, x):
         pass
 
-    def combined_constraints(self, augmented_x, compute_grads=True, compute_hess=True, projected_diffusion=False, include_slack=True):
+    def combined_constraints(self, augmented_x, compute_grads=True, compute_hess=True, projected_diffusion=False, include_slack=True,
+                             compute_inequality=True):
         N = augmented_x.shape[0]
         T_offset = 0
         augmented_x = augmented_x.reshape(N, self.T + T_offset, self.dx + self.du + self.dz)
@@ -89,10 +90,12 @@ class ConstrainedSVGDProblem(Problem):
         z = augmented_x[:, :, -self.dz:]
 
         g, grad_g, hess_g = self._con_eq(xu, compute_grads=compute_grads, compute_hess=compute_hess, projected_diffusion=projected_diffusion)
-        h, grad_h, hess_h = self._con_ineq(xu, compute_grads=compute_grads, compute_hess=compute_hess, projected_diffusion=projected_diffusion)
-        h = None
-        grad_h = None
-        hess_h = None
+        if compute_inequality:
+            h, grad_h, hess_h = self._con_ineq(xu, compute_grads=compute_grads, compute_hess=compute_hess, projected_diffusion=projected_diffusion)
+        else:
+            h = None
+            grad_h = None
+            hess_h = None
         # print(g.max(), g.min(), h.max(), h.min())
 
         if h is None:

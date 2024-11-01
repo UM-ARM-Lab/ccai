@@ -135,8 +135,9 @@ def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headl
         theta = trajectory[t, 4 * num_fingers: 4 * num_fingers + obj_dof]
         # scene.visualize_robot(partial_to_full_state(q.unsqueeze(0), fingers).to(device=scene.device),
         #                      theta.unsqueeze(0).to(device=scene.device))
-        meshes = scene.get_visualization_meshes(partial_to_full_state(q.unsqueeze(0), fingers).to(device=scene.device),
+        rob_mesh, meshes = scene.get_visualization_meshes(partial_to_full_state(q.unsqueeze(0), fingers).to(device=scene.device),
                                                 theta.unsqueeze(0).to(device=scene.device))
+        meshes += rob_mesh
         for mesh in meshes:
             vis.add_geometry(mesh)
         ctr = vis.get_view_control()

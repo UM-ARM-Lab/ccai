@@ -82,12 +82,12 @@ def set_cnf_options(solver, model):
             module.atol = 1e-5
             module.rtol = 1e-5
 
-            module.solver_options['first_step'] = 0.2
+            # module.solver_options['first_step'] = 0.2
             # If using fixed-grid adams, restrict order to not be too high.
             if solver in ['fixed_adams', 'explicit_adams']:
                 module.solver_options['max_order'] = 4
             if solver == 'rk4':
-                module.solver_options['step_size'] = .1
+                module.solver_options['step_size'] = .03
 
             # Set the test settings
             module.test_solver = solver

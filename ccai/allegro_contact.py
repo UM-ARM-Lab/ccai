@@ -163,7 +163,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         self.dg_per_t = 0
         self.dg_constant = 0
         self.device = device
-        self.dt = 0.1
+        self.dt = 0.03
         self.T = T
         self.start = start
         self.goal = goal
@@ -1424,6 +1424,8 @@ class AllegroContactProblem(AllegroObjectProblem):
             dq = next_q - current_q
         else:
             dq *= self.dt
+            obj_omega *= self.dt
+            
         if self.obj_dof == 3:
             if self.obj_dof_type == 'x_y_theta':
                 d_omega = next_theta[-1:] - current_theta[-1:]
@@ -1436,6 +1438,8 @@ class AllegroContactProblem(AllegroObjectProblem):
             else:
                 if obj_omega is None:
                     obj_omega = euler_to_angular_velocity(current_theta, next_theta)
+                else:
+                    obj_omega = euler_to_angular_velocity(next_theta, next_theta + obj_omega)
                 obj_v = torch.zeros_like(obj_omega)
         elif self.obj_dof == 1:
             dtheta = next_theta - current_theta

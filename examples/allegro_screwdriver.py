@@ -254,7 +254,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             obj_gravity=params.get('obj_gravity', False),
             min_force_dict=min_force_dict
         )
-        pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
+
+        pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, pregrasp_params)
         index_regrasp_planner = PositionControlConstrainedSVGDMPC(index_regrasp_problem, params)
         thumb_and_middle_regrasp_planner = PositionControlConstrainedSVGDMPC(thumb_and_middle_regrasp_problem, params)
         turn_planner = PositionControlConstrainedSVGDMPC(turn_problem, params)
@@ -370,7 +371,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             default_dof_pos=env.default_dof_pos[:, :16],
             obj_gravity=pregrasp_params.get('obj_gravity', False),
         )
-        pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
+        pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, pregrasp_params)
 
         turn_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
@@ -1044,6 +1045,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
     executed_contacts = []
     stages_since_plan = 0
+
     for stage in range(num_stages):
         state = env.get_state()
         state = state['q'].reshape(-1)[:15].to(device=params['device'])
@@ -1110,7 +1112,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         if stage == 0:
             contact = 'pregrasp'
             start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
+            a = time.perf_counter()
             best_traj, _ = pregrasp_planner.step(start[:pregrasp_planner.problem.dx])
+            print(f'Solve time for pregrasp', time.perf_counter() - a)
             for x in best_traj[:, :4 * num_fingers]:
                 action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
                 env.step(action)
@@ -1121,9 +1125,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     # for i in range(3):
                     #     sim_viz_env.step(action)
                     state = sim_viz_env.get_state()['q'].reshape(-1).to(device=params['device'])
-                    print(state[:15][-3:])
             if params['mode'] == 'hardware':
                 input("Pregrasp complete. Ready to execute. Press <ENTER> to continue.")
+            print('pregrasp complete:', state[:15][-3:])
             continue
         elif sample_contact and (stage == 1 or (params['replan'] and (stages_since_plan == 0 or len(contact_sequence) == 1))):
             # if yaw <= params['goal']:
@@ -1385,7 +1389,7 @@ if __name__ == "__main__":
         now = datetime.datetime.now().strftime("%m.%d.%y:%I:%M:%S")
     else:
         now = ''
-    start_ind = 6# if config['experiment_name'] == 'allegro_screwdriver_csvto_diff_sine_cosine_eps_.015_2.5_damping_pi_6' else 0
+    start_ind = 0# if config['experiment_name'] == 'allegro_screwdriver_csvto_diff_sine_cosine_eps_.015_2.5_damping_pi_6' else 0
     for i in tqdm(range(start_ind, config['num_trials'])):
     # for i in tqdm([1, 2, 4, 7]):
         if config['mode'] != 'hardware':
