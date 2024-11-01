@@ -21,7 +21,7 @@ with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
 
 def get_data():
 
-    inputs = torch.from_numpy(total_poses)[100:120]
+    inputs = torch.from_numpy(total_poses)[0:10]
     return inputs
 
 def grad_descent():
@@ -41,31 +41,29 @@ def grad_descent():
     poses_std = checkpoints[0]['poses_std']
     cost_mean = checkpoints[0]['cost_mean']
     cost_std = checkpoints[0]['cost_std']
+
+    min_std_threshold = 1e-5
+    poses_std = np.where(poses_std < min_std_threshold, min_std_threshold, poses_std)
     
     poses = get_data()
     poses_norm = (poses - poses_mean) / (poses_std + 0.000001)
     poses_norm = poses_norm.float()
     original_costs_norm = torch.mean(query_ensemble(poses_norm, models), dim=0).detach().cpu().numpy()
     original_costs = original_costs_norm * cost_std + cost_mean
+    # print(original_costs)
 
     # Enable gradient computation
     poses_norm.requires_grad_(True)
 
-    exp = 2
-    dump = True
+    exp = 0
+    dump = False
 
     if exp is 0:
-        experiment_name = '_ensemble_SGD_10k_iters'
-        optimizer = optim.SGD([poses_norm], lr=0.1)
-        iterations = 10000
-    elif exp is 1:
-        experiment_name = '_ensemble_SGD_1k_iters'
-        optimizer = optim.SGD([poses_norm], lr=0.1)
-        iterations = 1000
-    elif exp is 2:
         experiment_name = '_ensemble_Adam_1k_iters'
         optimizer = optim.Adam([poses_norm], lr=1e-2)
-        iterations = 1000
+        iterations = 100000
+    elif exp is 1:
+        pass
 
     model.eval()
     # gradient descent
@@ -86,16 +84,15 @@ def grad_descent():
         loss.backward()
 
         # Set gradients of the last four values of each pose to 0
-        poses_norm.grad[:, -4:] = 0
+        # poses_norm.grad[:, -4:] = 0
 
         optimizer.step()
 
         if i % 100 == 0:
-            
             print(f"Iteration {i}: mse = {mse.item()}, variance_loss = {mean_squared_variance.item()}")
             #print(f"Iteration {i}: Loss = {loss.item()}")
             pass
-        n_setpoints = 20
+        n_setpoints = 10
         if i % int(num_iterations/n_setpoints) == 0:
             pose_optimization_trajectory.append(poses_norm.detach().cpu().numpy() * poses_std + poses_mean)
 
@@ -107,7 +104,6 @@ def grad_descent():
     initial_pose_tuples = [(initial, optimized) for initial, optimized in zip(poses.numpy(), optimized_poses)]
     predicted_cost_tuples = [(initial, optimized) for initial, optimized in zip(original_costs, optimized_costs)]
 
-    # print(original_costs)
     print("mean of new predicted costs: ", optimized_costs.mean())
 
     vis = False
@@ -121,10 +117,6 @@ def grad_descent():
             time.sleep(1.0)
             # input("Press Enter to continue...")
 
-
-    #print(predicted_cost_tuples)
-    #print(np.mean(np.abs((poses.numpy() -  optimized_poses))))
-
     output_filename = f'{fpath.resolve()}/eval/initial_and_optimized_poses{experiment_name}.pkl'
     with open(output_filename, 'wb') as f:
         if dump:
@@ -135,9 +127,9 @@ def grad_descent():
 
 if __name__ == "__main__":
 
-    # Assuming grad_descent() is defined elsewhere and returns two arrays
     poses, optimized_poses,semi_optimized_poses = grad_descent()
-
+    og_poses= poses.copy()
+    og_optimized_poses = optimized_poses.copy()
 
     semi_optimized_poses = np.array(semi_optimized_poses)
     vis_so_poses = False
@@ -146,9 +138,10 @@ if __name__ == "__main__":
         for j in range(semi_optimized_poses.shape[1]):
             for i in range(semi_optimized_poses.shape[0]):
                 env.reset(torch.from_numpy(semi_optimized_poses[i,j,:]).reshape(1,20).float(), deterministic=True)
+                if i == 0:
+                    time.sleep(1.0)
                 print(f'Setpoint {i}')
                 time.sleep(0.01)
-
 
     
     poses = poses[:, :-4]
@@ -163,7 +156,7 @@ if __name__ == "__main__":
     optimized_poses_pca = pca.transform(optimized_poses)
 
     # Transform semi_optimized_poses based on the PCA axes
-    semi_optimized_poses_pca = [pca.transform(np.array(poses)[:, :-4]) for poses in semi_optimized_poses]
+    semi_optimized_poses_pca = [pca.transform(np.array(soposes)[:, :-4]) for soposes in semi_optimized_poses]
 
     # Create 3D plot
     fig = plt.figure()
@@ -208,7 +201,3 @@ if __name__ == "__main__":
     ax.legend()
 
     plt.show()
-
-
-
-

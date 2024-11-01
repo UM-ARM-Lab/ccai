@@ -20,7 +20,7 @@ def get_data():
     with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
         poses  = pkl.load(file)
     inputs = np.array([t.numpy() for t in poses]).reshape(-1, 20)
-    inputs = torch.from_numpy(inputs)[100:120]
+    inputs = torch.from_numpy(inputs)[100:110]
     
     # succ_filename = '/initial_poses/successful_initial_poses.pkl'
 
@@ -75,10 +75,9 @@ def grad_descent():
     model.eval()
 
     # gradient descent
-    num_iterations = 500
     target_value = torch.tensor([0.0], dtype=torch.float32)
 
-    for i in range(num_iterations):
+    for i in range(iterations):
         optimizer.zero_grad()  
         predictions = model(poses_norm)
         predictions = predictions * cost_std + cost_mean

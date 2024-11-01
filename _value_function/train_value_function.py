@@ -45,6 +45,9 @@ def load_data():
     train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 
+    min_std_threshold = 1e-5
+    poses_std = np.where(poses_std < min_std_threshold, min_std_threshold, poses_std)
+
     return train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std
 
 class Net(nn.Module):
@@ -73,9 +76,6 @@ def train():
     })
     
     train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std = load_data()
-    # print(cost_std)
-    # print(cost_mean)
-    # exit()
 
     model = Net(shape[0], shape[1])  # Instantiate the neural network model
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001) 
@@ -162,11 +162,11 @@ def eval(model_name, ensemble = False):
             model.load_state_dict(checkpoint['model_state'])
             models.append(model)
     
-    def plot_loader(loader, title=''):
+    def plot_loader(loader, n_samples, title=''):
         with torch.no_grad():
-            actual_values = []
+            prediction_stds = []
+            actual_values = [] 
             predicted_values = []
-            prediction_stds = []  # For storing standard deviations of predictions if ensemble is True
 
             for inputs, labels in loader:
                 if not ensemble:
@@ -179,15 +179,20 @@ def eval(model_name, ensemble = False):
 
                 predicted_values.append(predictions.numpy())
                 actual_values.append(labels.numpy())
-                break
 
             actual_values = np.concatenate(actual_values).flatten()
             predicted_values = np.concatenate(predicted_values).flatten()
             actual_values = actual_values * cost_std + cost_mean
             predicted_values = predicted_values * cost_std + cost_mean
 
+            # select n_samples random samples to plot
+            indices = np.random.choice(len(actual_values), n_samples, replace=False)
+            actual_values = actual_values[indices]
+            predicted_values = predicted_values[indices]
+
             if ensemble:
                 prediction_stds = np.concatenate(prediction_stds).flatten() * cost_std  # Scale by cost_std
+                prediction_stds = prediction_stds[indices]
 
             print(f'Actual values: {[f"{val:.4f}" for val in actual_values[:10]]}')
             print(f'Predicted values: {[f"{val:.4f}" for val in predicted_values[:10]]}')
@@ -214,22 +219,21 @@ def eval(model_name, ensemble = False):
             plt.legend()
             plt.show()
     
-    plot_loader(train_loader, 'Training Set')
-    plot_loader(test_loader, 'Test Set')
+    plot_loader(train_loader, 100, 'Training Set')
+    plot_loader(test_loader, 100, 'Test Set')
 
 if __name__ == "__main__":
 
     # model_name = "2"#input("Enter model name: ")
     # model_to_save = train()
     # save(model_to_save, f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
-    # # eval(model_name = "2") 
+    # eval(model_name = "2") 
     # exit()
 
-
-    # ensemble = []
-    # for i in range(8):
-    #     net = train()
-    #     ensemble.append(net)
-    # torch.save(ensemble, f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl')
+    ensemble = []
+    for i in range(16):
+        net = train()
+        ensemble.append(net)
+    torch.save(ensemble, f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl')
     eval(model_name = "ensemble", ensemble = True)
 
