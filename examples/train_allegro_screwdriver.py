@@ -137,15 +137,15 @@ def train_model(trajectory_sampler, train_loader, config):
 
         if (epoch + 1) % config['save_every'] == 0:
             if config['use_ema']:
-                torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}_{epoch+1}_{train_loss:.4f}.pt')
+                torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}_{train_loss:.4f}.pt')
             else:
                 torch.save(model.state_dict(),
-                           f'{fpath}/allegro_screwdriver_{config["model_type"]}_{epoch+1}_{train_loss:.4f}.pt')
+                           f'{fpath}/allegro_screwdriver_{config["model_type"]}_{train_loss:.4f}.pt')
     if config['use_ema']:
-        torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}_{epoch+1}_{train_loss:.4f}.pt')
+        torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}_{train_loss:.4f}.pt')
     else:
         torch.save(model.state_dict(),
-                   f'{fpath}/allegro_screwdriver_{config["model_type"]}_{epoch+1}_{train_loss:.4f}.pt')
+                   f'{fpath}/allegro_screwdriver_{config["model_type"]}_{train_loss:.4f}.pt')
 
 def train_model_state_only(trajectory_sampler, train_loader, config):
     fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}'

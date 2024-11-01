@@ -752,8 +752,8 @@ class TemporalUnetStateAction(nn.Module):
     
     def compiled_conditional_train(self, t, x, context):
         x_orig, x = self.compiled_conditional_train_fwd(t, x, context)
-        x, p_matrix, xi_C = self.project(x_orig, x, context)
-        return x, p_matrix, xi_C
+        # x, p_matrix, xi_C = self.project(x_orig, x, context)
+        return x, None, None
 
 class StateActionMLP(nn.Module):
 
