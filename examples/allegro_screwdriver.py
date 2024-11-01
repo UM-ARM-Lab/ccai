@@ -1,6 +1,6 @@
 from isaac_victor_envs.utils import get_assets_dir
 from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
-from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
+# from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
 
 import numpy as np
 import pickle as pkl
@@ -30,7 +30,7 @@ from ccai.utils.allegro_utils import *
 from ccai.allegro_contact import AllegroManipulationProblem, PositionControlConstrainedSVGDMPC, add_trajectories, \
     add_trajectories_hardware
 from ccai.allegro_screwdriver_problem_diffusion import AllegroScrewdriverDiff
-from ccai.mpc.diffusion_policy import Diffusion_Policy, DummyProblem
+# from ccai.mpc.diffusion_policy import Diffusion_Policy, DummyProblem
 from train_allegro_screwdriver import rollout_trajectory_in_sim
 from scipy.spatial.transform import Rotation as R
 

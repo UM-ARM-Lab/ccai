@@ -141,23 +141,27 @@ def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headl
         rob_mesh, meshes = scene.get_visualization_meshes(partial_to_full_state(q.unsqueeze(0), fingers).to(device=scene.device),
                                                 theta.unsqueeze(0).to(device=scene.device), pcd=pcd)
         # o3d.visualization.draw_geometries(meshes, mesh_show_wireframe=True, width=800, height=600)
-        def toggle_visibility(vis):
-            global is_visible
-            if is_visible:
-                for m in rob_mesh:
-                    vis.remove_geometry(m, reset_bounding_box=False)
-            else:
-                for m in rob_mesh:
-                    vis.add_geometry(m, reset_bounding_box=False)
-            
-            # Update visibility status
-            is_visible = not is_visible
-            vis.update_renderer()
+        meshes += rob_mesh
         for mesh in meshes:
             vis.add_geometry(mesh)
+        # vis.add_geometry(rob_mesh)
+        
+        # def toggle_visibility(vis):
+        #     global is_visible
+        #     if is_visible:
+        #         for m in rob_mesh:
+        #             vis.remove_geometry(m, reset_bounding_box=False)
+        #     else:
+        #         for m in rob_mesh:
+        #             vis.add_geometry(m, reset_bounding_box=False)
+            
+        #     # Update visibility status
+        #     is_visible = not is_visible
+        #     vis.update_renderer()
 
-        vis.register_key_callback(ord('T'), toggle_visibility)
-        vis.run()
+
+        # vis.register_key_callback(ord('T'), toggle_visibility)
+        # vis.run()
 
         ctr = vis.get_view_control()
         if task == 'screwdriver':

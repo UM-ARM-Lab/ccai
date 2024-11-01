@@ -246,16 +246,16 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         chain_object = chain_object.to(device=device)
         if 'valve' in object_type:
             object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/valve',
-                                     use_collision_geometry=True)
+                                     use_collision_geometry=False)
         elif 'screwdriver' in object_type:
             object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver',
-                                     use_collision_geometry=True)
+                                     use_collision_geometry=False)
         elif 'card' in object_type:
             object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/card',
-                                     use_collision_geometry=True)
+                                     use_collision_geometry=False)
         self.object_sdf = object_sdf
         robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models',
-                                use_collision_geometry=True)
+                                use_collision_geometry=False)
 
         scene_trans = world_trans.inverse().compose(
             pk.Transform3d(device=device).translate(object_asset_pos[0], object_asset_pos[1], object_asset_pos[2]))
@@ -562,38 +562,6 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
         return g, grad_g, None
 
-    # What is the structure for below? Is there an existing constraint I can copy? Maybe the contact constraint from AllegroContact?
-    def _contact_patch_constraint(self, xu, finger_name, compute_grads=True, compute_hess=False, projected_diffusion=False):
-        N, T, _ = xu.shape
-        T_offset = 0 if projected_diffusion else 1
-        d = self.d
-
-
-        # TODO: Get the below to work, then think about if we can make it faster by caching stuff in self.data
-        ee_loc_finger = self.data[finger_name]['closest_pt_world']
-        h = torch.norm(ee_loc_finger - self.contact_points[finger_name], dim=-1) - self.contact_patch_radius
-        h = h[:, -1].reshape(N, 1)
-        # print(g[:, -1])
-        if compute_grads:
-            T_range = torch.arange(T, device=xu.device)
-            # compute gradient of sdf
-            grad_h = torch.zeros(N, T, T, d, device=xu.device)
-            grad_ee_q = self.data[finger_name]['d_contact_loc_dq']
-            grad_h_q = (ee_loc_finger - self.contact_points[finger_name]).unsqueeze(1) @ grad_ee_q
-            grad_h[:, T_range, T_range, :16] = grad_h_q[:, T_offset:]
-            # grad_h[:, T_range, T_range, 16: 16 + self.obj_dof] = grad_h_theta.reshape(N, T + T_offset, self.obj_dof)[:, T_offset:]
-            grad_h = grad_h.reshape(N, -1, T, d)
-            grad_h = grad_h.reshape(N, -1, T * d)
-            grad_h = grad_h[:, -1].reshape(N, 1, T * d)
-        else:
-            return h, None, None
-
-        if compute_hess:
-            hess = torch.zeros(N, xu.shape[1], T * d, T * d, device=xu.device)
-            return h, grad_h, hess
-
-        return h, grad_h, None
-
     @staticmethod
     def get_rotation_from_normal(normal_vector):
         """
@@ -743,6 +711,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         self._regrasp_dg = self._regrasp_dg_per_t * T + self._regrasp_dg_constant
         self._regrasp_dz = self.num_regrasps  # one contact constraints per finger
         self._regrasp_dh = self._regrasp_dz * T  # inequality
+        self._regrasp_dh += self.num_regrasps
 
         if default_dof_pos is None:
             self.default_dof_pos = torch.cat((torch.tensor([[0.1, 0.5, 0.5, 0.5]]).float().to(device=self.device),
@@ -814,6 +783,46 @@ class AllegroRegraspProblem(AllegroObjectProblem):
 
         # dof_pos = self.default_dof_pos[None, self.regrasp_idx]
         # return 10 * torch.sum((q - dof_pos) ** 2)
+    # What is the structure for below? Is there an existing constraint I can copy? Maybe the contact constraint from AllegroContact?
+    @regrasp_finger_constraints
+    def _contact_patch_constraint(self, xu, finger_name, compute_grads=True, compute_hess=False, projected_diffusion=False):
+        N, T, _ = xu.shape
+        T_offset = 0 if projected_diffusion else 1
+        d = self.d
+
+        # TODO: Get the below to work, then think about if we can make it faster by caching stuff in self.data
+        ee_loc_finger = self.data[finger_name]['closest_pt_world'].reshape(N, T + T_offset, 3)[:, T_offset:]
+
+        self.contact_points = {
+            'index': torch.tensor([0.08698072, 0.04505315, 0.06566035], device=xu.device),
+            'middle': torch.tensor([0.09539521, 0.00712914, 0.04318945], device=xu.device),
+            'thumb': torch.tensor([0.10528128,  0.01956934, -0.00691413], device=xu.device),
+        }
+        self.contact_patch_radius = .02
+        norm = torch.norm(ee_loc_finger - self.contact_points[finger_name], dim=-1)
+        h = norm - self.contact_patch_radius
+        h[:, :-1] = 0
+        # h = h[:, -1].reshape(N, 1)
+        # print(g[:, -1])
+        if compute_grads:
+            T_range = torch.arange(T, device=xu.device)
+            # compute gradient of sdf
+            grad_h = torch.zeros(N, T, T, d, device=xu.device)
+            grad_ee_q = self.data[finger_name]['closest_pt_q_grad'][:, T_offset:]
+            grad_h_q = torch.einsum('abc, abcd -> abd', (ee_loc_finger - self.contact_points[finger_name])/norm.unsqueeze(-1), grad_ee_q)
+            grad_h[:, T_range, T_range, :16] = grad_h_q
+            # grad_h[:, T_range, T_range, 16: 16 + self.obj_dof] = grad_h_theta.reshape(N, T + T_offset, self.obj_dof)[:, T_offset:]
+            grad_h = grad_h.reshape(N, -1, T, d)
+            grad_h = grad_h.reshape(N, -1, T * d)
+            # grad_h = grad_h[:, -1].reshape(N, 1, T * d)
+        else:
+            return h, None, None
+
+        if compute_hess:
+            hess = torch.zeros(N, xu.shape[1], T * d, T * d, device=xu.device)
+            return h, grad_h, hess
+
+        return h, grad_h, None
 
     @regrasp_finger_constraints
     def _contact_avoidance(self, xu, finger_name, compute_grads=True, compute_hess=False, projected_diffusion=False):
@@ -834,6 +843,8 @@ class AllegroRegraspProblem(AllegroObjectProblem):
     @regrasp_finger_constraints
     def _terminal_contact_constraint(self, xu, finger_name, compute_grads=True, compute_hess=False, projected_diffusion=False):
         return self._contact_constraints(xu, finger_name, compute_grads, compute_hess, terminal=True, projected_diffusion=projected_diffusion)
+
+    # def _contact_patch_constraint
 
     @regrasp_finger_constraints
     def _free_dynamics_constraints(self, q, delta_q, finger_name, compute_grads=True, compute_hess=False):
