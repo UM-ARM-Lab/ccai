@@ -21,34 +21,42 @@ sys.path.append(str(CCAI_PATH))
 from examples.allegro_valve_roll import PositionControlConstrainedSVGDMPC
 from examples.allegro_screwdriver import AllegroScrewdriver
 from tqdm import tqdm
+from pathlib import Path
 from screwdriver_problem import init_env, do_turn, emailer
 
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
-prog_idx = 0
-trials_per_save = 500
-source_filename = f'initial_poses/initial_poses_{prog_idx}.pkl'
-start_idx = prog_idx * trials_per_save
 
-with open(f'{fpath.resolve()}/{source_filename}', 'rb') as file:
-    initial_poses  = pkl.load(file)
+def refresh_initial_poses():
+    all_poses = []
+    for file in Path(f'{fpath.resolve()}/initial_poses').glob("initial_poses_*.pkl"):
+        with open(file, 'rb') as f:
+            poses = pkl.load(f)
+            for pose in poses:
+                all_poses.append(pose)
 
-pose_tuples = []
-config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
+    print(f'Loaded {len(all_poses)} poses')
+    return all_poses
 
-for j in range(10000/trials_per_save):
-    for i in tqdm(range(trials_per_save)):
-        
-        idx = i + start_idx
-        print("RUNNING TRIAL: ", idx)
+while True:
+    initial_poses = refresh_initial_poses()
+    pose_tuples = []
+    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
+
+    prog_idx = 0
+    trials_per_save = 2
+
+    for _ in tqdm(range(trials_per_save)):
+        idx = np.random.randint(0, len(initial_poses))
         initial_pose = initial_poses[idx]
         _, final_pose, succ = do_turn(initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
         pose_tuples.append((initial_pose, final_pose))
 
-    savepath = f'{fpath.resolve()}/value_datasets/value_dataset_source_{prog_idx}_startid_{start_idx}.pkl'
+    savepath = f'{fpath.resolve()}/value_datasets/value_dataset_{prog_idx}.pkl'
     with open(savepath, 'wb') as f:
         pkl.dump(pose_tuples, f)
 
-    start_idx += trials_per_save
+    prog_idx += 1
+
 
 gym.destroy_viewer(viewer)
 gym.destroy_sim(sim)

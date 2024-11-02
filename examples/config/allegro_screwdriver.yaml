@@ -19,7 +19,7 @@ force_balance: False  # in addition to the torque balance, do we also need force
 arm_type: 'robot' # choose between 'None', 'robot', 'floating_3d'
 gravity: False  # whether to use gravity in the simulation NOTE: this is set to be False for debugging
 
-device: 'cuda:0'
+device: 'cuda:1'
 
 controllers:
   csvgd:

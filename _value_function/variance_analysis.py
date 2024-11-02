@@ -56,7 +56,7 @@ def get_data():
 
 if __name__ == "__main__":
     t0 = time.time()
-    get_data()
+    # get_data()
     with open(savepath, 'rb') as file:
         index_cost_tuples = pkl.load(file)
     print(index_cost_tuples)
