@@ -37,13 +37,13 @@ def refresh_initial_poses():
     print(f'Loaded {len(all_poses)} poses')
     return all_poses
 
+prog_idx = 0
+trials_per_save = 500
+
 while True:
     initial_poses = refresh_initial_poses()
     pose_tuples = []
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
-
-    prog_idx = 0
-    trials_per_save = 2
 
     for _ in tqdm(range(trials_per_save)):
         idx = np.random.randint(0, len(initial_poses))
@@ -51,13 +51,12 @@ while True:
         _, final_pose, succ = do_turn(initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
         pose_tuples.append((initial_pose, final_pose))
 
-    savepath = f'{fpath.resolve()}/value_datasets/value_dataset_{prog_idx}.pkl'
+    savepath = f'{fpath.resolve()}/value_datasets/value_dataset_b_{prog_idx}.pkl'
     with open(savepath, 'wb') as f:
         pkl.dump(pose_tuples, f)
 
     prog_idx += 1
+    gym.destroy_viewer(viewer)
+    gym.destroy_sim(sim)
 
-
-gym.destroy_viewer(viewer)
-gym.destroy_sim(sim)
 emailer().send()
