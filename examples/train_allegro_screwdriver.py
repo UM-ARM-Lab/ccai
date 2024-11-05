@@ -173,13 +173,15 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
     step = 0
 
     epochs = config['epochs']
-    pbar = tqdm.tqdm(range(epochs))
-    for epoch in pbar:
+    # pbar = tqdm.tqdm(range(epochs))
+    # for epoch in pbar:
+    for epoch in range(epochs):
         train_loss = 0.0
         flow_loss = 0.0
         action_loss = 0.0
         trajectory_sampler.train()
-        for trajectories, traj_class, masks in tqdm.tqdm(train_loader):
+        # for trajectories, traj_class, masks in tqdm.tqdm(train_loader):
+        for trajectories, traj_class, masks in (train_loader):
             trajectories = trajectories.to(device=config['device'])
             masks = masks.to(device=config['device'])
 
@@ -207,8 +209,8 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
         train_loss /= len(train_loader)
         flow_loss /= len(train_loader)
         action_loss /= len(train_loader)
-        pbar.set_description(
-            f'Train loss {train_loss:.3f}')
+        # pbar.set_description(
+        #     f'Train loss {train_loss:.3f}')
         try:
             wandb.log({
                     'train_loss_epoch': train_loss,
@@ -227,15 +229,15 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
 
         if (epoch + 1) % config['save_every'] == 0:
             if config['use_ema']:
-                torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}_state_only_{train_loss:.4f}.pt')
+                torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
             else:
                 torch.save(model.state_dict(),
                            f'{fpath}/allegro_screwdriver_{config["model_type"]}_state_only_{train_loss:.4f}.pt')
     if config['use_ema']:
-        torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}_state_only_{train_loss:.4f}.pt')
+        torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
     else:
         torch.save(model.state_dict(),
-                   f'{fpath}/allegro_screwdriver_{config["model_type"]}_state_only_{train_loss:.4f}.pt')
+                   f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
 
 
 
