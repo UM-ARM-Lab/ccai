@@ -26,7 +26,7 @@ constraint_embedding_dim: 64
 constrained: False
 guided: False
 timesteps: 256
-hidden_dim: 128
+hidden_dim: 256
 unconditional: True
 sine_cosine: False
 use_class: True

@@ -686,8 +686,12 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         self._regrasp_dg_per_t = self.num_regrasps * 4
         self._regrasp_dg_constant = self.num_regrasps
         self._regrasp_dg = self._regrasp_dg_per_t * T + self._regrasp_dg_constant
+        self._regrasp_dg = self._regrasp_dg_constant
         self._regrasp_dz = self.num_regrasps  # one contact constraints per finger
         self._regrasp_dh = self._regrasp_dz * T  # inequality
+
+        # self._regrasp_dz = 0
+        # self._regrasp_dh = 0
 
         if default_dof_pos is None:
             self.default_dof_pos = torch.cat((torch.tensor([[0.1, 0.5, 0.5, 0.5]]).float().to(device=self.device),
@@ -784,7 +788,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
     def _contact_avoidance(self, xu, finger_name, compute_grads=True, compute_hess=False, projected_diffusion=False):
         h, grad_h, hess_h = self._contact_constraints(xu, finger_name, compute_grads, compute_hess, terminal=False, projected_diffusion=projected_diffusion)
         eps = torch.zeros_like(h)
-        # eps[:, :-1] = 5e-3
+        eps[:, :-1] = 5e-3
         if self.obj_link_name == 'card':
             eps[:, :-1] = 1.5e-2
         else:
@@ -795,10 +799,49 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         if hess_h is not None:
             hess_h = -hess_h
         return h, grad_h, hess_h
+    
+    # @regrasp_finger_constraints
+    # def _contact_avoidance_anytime(self, xu, finger_name, compute_grads=True, compute_hess=False, projected_diffusion=False):
+    #     h, grad_h, hess_h = self._contact_constraints(xu, finger_name, compute_grads, compute_hess, terminal=False, projected_diffusion=projected_diffusion)
+    #     h = h.sum(dim=1).reshape(-1, 1)
+    #     if grad_h is not None:
+    #         grad_h = -grad_h
+    #     if hess_h is not None:
+    #         hess_h = -hess_h
+    #     return h, grad_h, hess_h
 
     @regrasp_finger_constraints
     def _terminal_contact_constraint(self, xu, finger_name, compute_grads=True, compute_hess=False, projected_diffusion=False):
         return self._contact_constraints(xu, finger_name, compute_grads, compute_hess, terminal=True, projected_diffusion=projected_diffusion)
+
+
+    # def _anytime_contact_constr(self, g):
+    #     return g.prod(dim=1).reshape(-1, 1)
+
+    @regrasp_finger_constraints
+    def _anytime_contact_constraint(self, xu, finger_name, compute_grads=True, compute_hess=False, projected_diffusion=False):
+        g, grad_g, hess_g = self._contact_constraints(xu, finger_name, compute_grads, compute_hess, terminal=False, projected_diffusion=projected_diffusion)
+        # g = g.prod(dim=1).reshape(-1, 1)
+        g *= 1e3
+        if grad_g is not None:
+            # grad_g = -grad_g
+            grad_g *= 1e3
+            d_g = grad_g.shape[-1]
+            grad_g_ = torch.zeros((grad_g.shape[0], 1, d_g), device=grad_g.device)
+            mask = torch.ones(grad_g.shape[1], device=grad_g.device).bool()
+            for t in range(g.shape[1]):
+                mask_ = mask.clone()
+                mask_[t] = False
+                grad_g_ += g[:, mask_].prod(dim=1).reshape(-1, 1, 1) * grad_g[:, t].reshape(-1, 1, d_g)
+            grad_g = grad_g_
+        g = g.prod(dim=1).reshape(-1, 1)
+        print(finger_name, g.min().item(), g.max().item(), g.abs().min().item(), g.abs().max().item())
+            # Fix grad calc
+
+        if hess_g is not None:
+            hess_g = hess_g.prod(dim=1).reshape(-1, 1, hess_g.shape[-1], hess_g.shape[-1])
+        
+        return g, grad_g, hess_g
 
     @regrasp_finger_constraints
     def _free_dynamics_constraints(self, q, delta_q, finger_name, compute_grads=True, compute_hess=False):
@@ -861,6 +904,11 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             compute_grads=compute_grads,
             compute_hess=compute_hess,
             projected_diffusion=projected_diffusion)
+        # g_contact, grad_g_contact, hess_g_contact = self._anytime_contact_constraint(
+        #     xu=xu.reshape(N, T, self.dx + self.du),
+        #     compute_grads=compute_grads,
+        #     compute_hess=compute_hess,
+        #     projected_diffusion=projected_diffusion)
 
         g_dynamics, grad_g_dynamics, hess_g_dynamics = self._free_dynamics_constraints(
             q=q,
@@ -869,15 +917,20 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             compute_hess=compute_hess)
 
         g = torch.cat((g_contact, g_dynamics), dim=1)
+        # g = g_contact
         grad_g, hess_g = None, None
         if compute_grads:
             grad_g = torch.cat((grad_g_contact, grad_g_dynamics), dim=1)
+            # grad_g = grad_g_contact
         if compute_hess:
             hess_g = torch.cat((hess_g_contact, hess_g_dynamics), dim=1)
+            # hess_g = hess_g_contact
 
         return g, grad_g, hess_g
 
     def _con_ineq(self, xu, compute_grads=True, compute_hess=False, projected_diffusion=False):
+        # return None, None, None
+    
         N, T = xu.shape[:2]
         h_contact, grad_h_contact, hess_h_contact = self._contact_avoidance(xu=xu.reshape(N, T, -1)[:, :, :self.dx + self.du],
                                                                             compute_grads=compute_grads,
@@ -2351,10 +2404,10 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
         # if h is None:
         #    h = torch.cat((h_regrasp, h_contact), dim=1)
 
-        if compute_grads:
+        if compute_grads and grad_h is not None:
             grad_h = grad_h.reshape(grad_h.shape[0], grad_h.shape[1], T, -1)[:, :, :, self.all_var_index]
             grad_h = grad_h.reshape(N, -1, T * (self.dx + self.du))
-        if compute_hess:
+        if compute_hess and hess_h is not None:
             hess_h = hess_h.reshape(hess_h.shape[0], hess_h.shape[1], T, self.d, T, self.d)[:, :, :,
                      self.all_var_index]
             hess_h = hess_h[:, :, :, :, self.all_var_index].reshape(N, -1,

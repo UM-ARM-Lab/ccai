@@ -1031,6 +1031,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             perm = np.random.permutation(2)
             # perm = [0, 1]
             contact_sequence += [contact_options[perm[0]], contact_options[perm[1]], 'turn']
+        # contact_sequence = ['thumb_middle']
     else:
         contact_sequence = None
 
@@ -1254,7 +1255,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.y/aml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_only.yaml').read_text())
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_cnf_only.yaml').read_text())
 
     from tqdm import tqdm

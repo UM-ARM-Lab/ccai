@@ -5,7 +5,8 @@ num_steps: 12
 num_turns: 3
 num_trials: 10
 visualize: True
-experiment_name: 'allegro_screwdriver_csvto_only_eps_.01_.5_damping_pi_6'
+# experiment_name: 'allegro_screwdriver_csvto_only_eps_.01_.5_damping_pi_6'
+experiment_name: 'allegro_screwdriver_csvto_only_anytime_regrasp_constraint_no_contact_avoidance'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
@@ -20,7 +21,7 @@ goal: -1.5
 prior: 1
 multi_particle_search: True
 replan: False
-visualize_plan: False
+visualize_plan: True
 optimize_force: True
 exclude_index: False
 projected: False

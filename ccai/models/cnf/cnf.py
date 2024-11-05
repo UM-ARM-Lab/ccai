@@ -5,6 +5,8 @@ torch.set_float32_matmul_precision('high')
 import torch.nn as nn
 from torch.nn.functional import mse_loss, huber_loss
 from torch.func import jacrev, vmap
+# from torchcubicspline import(natural_cubic_spline_coeffs, 
+#                              NaturalCubicSpline)
 
 from ccai.models.temporal import TemporalUnet, TemporalUnetDynamics, TemporalUnetStateAction, StateActionMLP
 
@@ -87,7 +89,7 @@ def set_cnf_options(solver, model):
             if solver in ['fixed_adams', 'explicit_adams']:
                 module.solver_options['max_order'] = 4
             if solver == 'rk4':
-                module.solver_options['step_size'] = .03
+                module.solver_options['step_size'] = .01
 
             # Set the test settings
             module.test_solver = solver
@@ -171,7 +173,7 @@ class TrajectoryCNF(nn.Module):
         )
 
         # solver = 'dopri5'
-        # solver = 'fehlberg2'
+        # solver = 'bosh3'
         solver = 'rk4'
         self.flow = CNF(odefunc=odefunc,
                         T=1.0,
@@ -200,10 +202,12 @@ class TrajectoryCNF(nn.Module):
         return dx * (self.horizon-1)
 
     def masked_grad(self, t, x, context=None):
-        print(f'step {self.step_id}')
+        # print(f'step {self.step_id}')
         self.step_id += 1
             
         dx, _, _ = self.model.compiled_conditional_test(t, x, context)
+
+        # dx *= self.horizon - 1
 
         return dx
 
@@ -272,6 +276,17 @@ class TrajectoryCNF(nn.Module):
         ], dtype=t.dtype, device=t.device)
         return A @ tt
 
+    def dh_poly(self, t):
+        tt = t[None, :]**torch.arange(4, device=t.device)[:, None]
+        A = torch.tensor([
+            [0, -6, 6, 0],
+            [1, -4, 3, 0],
+            [0, 6, -6, 0],
+            [0, -2, 3, 0]
+        ], dtype=t.dtype, device=t.device)
+        return A @ tt
+
+
     def _interp(self,x, y, xs):
         x_ = x.reshape(-1, 1)
         m = (y[1:] - y[:-1]) / (x_[1:] - x_[:-1])
@@ -279,9 +294,10 @@ class TrajectoryCNF(nn.Module):
 
         idxs = torch.searchsorted(x[1:], xs)
         dx = (x[idxs + 1] - x[idxs])
-        hh = self.h_poly((xs - x[idxs]) / dx).unsqueeze(-1)#.unsqueeze(-1)
-        # ret = hh[0] * torch.gather(y, 1, idxs.reshape(-1, 1, 1).expand(-1, -1, y.shape[-1]))
+        hh = self.dh_poly((xs - x[idxs]) / dx).unsqueeze(-1)
+        hh_deriv = self.h_poly((xs - x[idxs]) / dx).unsqueeze(-1)#.unsqueeze(-1)        # ret = hh[0] * torch.gather(y, 1, idxs.reshape(-1, 1, 1).expand(-1, -1, y.shape[-1]))
         ret = hh[0] * y[idxs]
+        ret_dh = hh_deriv[0] * y[idxs]
         dx = dx.unsqueeze(-1)#.unsqueeze(-1)
         # ret += hh[1] * torch.gather(m, 1, idxs.reshape(-1, 1, 1).expand(-1, -1, y.shape[-1])) * dx
         # ret += hh[2] * torch.gather(y, 1, 1+idxs.reshape(-1, 1, 1).expand(-1, -1, y.shape[-1]))
@@ -290,7 +306,11 @@ class TrajectoryCNF(nn.Module):
         ret += hh[1] * m[idxs] * dx
         ret += hh[2] * y[idxs+1]
         ret += hh[3] * m[idxs+1] * dx
-        return ret.squeeze()
+
+        ret_dh += hh_deriv[1] * m[idxs] * dx
+        ret_dh += hh_deriv[2] * y[idxs+1]
+        ret_dh += hh_deriv[3] * m[idxs+1] * dx
+        return ret.squeeze(), ret_dh.squeeze()
     
     def flow_matching_loss_state_control_only(self, xu, context, mask=None):
 
@@ -314,7 +334,8 @@ class TrajectoryCNF(nn.Module):
         x0 = torch.gather(xu, 1, t_ind_for_gather).squeeze()
         x1 = torch.gather(xu, 1, t_ind_for_gather_1).squeeze()
 
-        x_arange = torch.linspace(0, 1, xu.shape[1], device=xu.device).expand(xu.shape[0], -1)
+        # x_arange = torch.linspace(0, 1, xu.shape[1], device=xu.device).expand(xu.shape[0], -1)
+        x_arange = torch.linspace(0, self.horizon-1, xu.shape[1], device=xu.device).expand(xu.shape[0], -1)
 
         u0 = x0[..., self.dx:]
         rand_for_u0 = torch.randn_like(u0)
@@ -330,12 +351,13 @@ class TrajectoryCNF(nn.Module):
 
         xu[:, 0, self.dx:] = rand_for_u0
 
-        xt = self.interp(x_arange, xu, t)
-        truevt = self.dinterp_dt(x_arange, xu, t).squeeze()
+        xt, truevt = self.interp(x_arange, xu, t)
+        # truevt = self.dinterp_dt(x_arange, xu, t).squeeze()
+        truevt = truevt.squeeze()
         xt += torch.randn_like(xt) * .1
 
         vt, p_matrix, xi_C = self.model.compiled_conditional_train(t.reshape(-1), xt, context)
-        flow_loss = huber_loss(vt, truevt)
+        flow_loss = mse_loss(vt, truevt)
 
         return {
             'loss': flow_loss,

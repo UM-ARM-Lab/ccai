@@ -584,13 +584,14 @@ class TemporalUnetStateAction(nn.Module):
             # c = context
             # c = torch.cat((context, ctype_embed), dim=-1)
             # need to do dropout on context embedding to train unconditional model alongside conditional
-            if dropout:
-                mask_dist = Bernoulli(probs=1 - self.context_dropout_p)
-                mask = mask_dist.sample((B,))  # .to(device=context.device)
-                c = mask * c
-                t = torch.cat((t, c), dim=-1)
-            else:
-                t = torch.cat((t, c), dim=-1)
+            # if dropout:
+            #     mask_dist = Bernoulli(probs=1 - self.context_dropout_p)
+            #     mask = mask_dist.sample((B,))  # .to(device=context.device)
+            #     c = mask * c
+            #     t = torch.cat((t, c), dim=-1)
+            # else:
+            #     t = torch.cat((t, c), dim=-1)
+            t = torch.cat((t, c), dim=-1)
         else:
             t = torch.cat((t, torch.zeros(B, 32, device=t.device)), dim=-1)
         t = self.time_mlp(t)
@@ -738,8 +739,8 @@ class TemporalUnetStateAction(nn.Module):
 
     def compiled_conditional_test(self, t, x, context):
         x_orig, x = self.compiled_conditional_test_fwd(t, x, context)
-        x, p_matrix, xi_C = self.project(x_orig, x, context)
-        # return x, None, None
+        # x, p_matrix, xi_C = self.project(x_orig, x, context)
+        return x, None, None
         return x, p_matrix, xi_C
 
     @torch.compile(mode='max-autotune')
