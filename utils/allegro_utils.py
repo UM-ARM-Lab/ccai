@@ -60,6 +60,8 @@ def full_to_partial_state(full, fingers, arm_dof=0):
     if arm_dof > 0:
         arm_q = full[..., :arm_dof]
         full_finger = full[..., arm_dof:]
+    else:
+        full_finger = full
     index, mid, ring, thumb = torch.chunk(full_finger, chunks=4, dim=-1)
     full_dict = dict(zip(full_finger_list, [index, mid, ring, thumb]))
     partial = []

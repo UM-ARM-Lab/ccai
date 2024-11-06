@@ -1,8 +1,7 @@
 ---
-T: 12
 receding_horizon: False
-num_steps: 11
-num_trials: 5
+num_steps: 10
+num_trials: 20
 visualize: True
 experiment_name: 'allegro_valve'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
@@ -11,19 +10,19 @@ simulator: "isaac_gym" # choose from 'isaac_sim', 'isaac_gym'
 # fingers: ['index', 'middle', 'thumb', 'ring']
 object_type: 'cross_valve'
 # object_type: 'cylinder_valve'
-sim_device: 'cuda:0'
+sim_device: 'cpu'
 device: 'cuda:0'
 arm_type: "None"
 friction_coefficient: 0.9
 kp: 3.0
-visualize_plan: True
+visualize_plan: False
 random_robot_pose: False
 optimize_force: True
 gravity: True  # whether to use gravity in the simulation
 goal: [-1.5707]
-method: 'ablation'
 controllers:
   csvgd:
+    T: 10
     # N: 16
     N: 4
     alpha_J: 5.0e-3
@@ -39,6 +38,7 @@ controllers:
     collision_checking: False
     random_init_every_iter: False
   ablation:
+    T: 10
     # N: 16
     N: 4
     alpha_J: 5.0e-3
@@ -53,3 +53,12 @@ controllers:
     penalty: 1000000
     collision_checking: False
     random_init_every_iter: False
+  planning:
+    T: 10
+    N: 4  # for pregrasp
+    solve_iters: 1000 
+  mppi:
+    T: 4
+    N: 200
+    lambda: 0.3
+    variance: 0.005

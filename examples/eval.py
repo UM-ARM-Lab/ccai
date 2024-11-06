@@ -72,30 +72,30 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         # env.step(action) # step one step to resolve penetration
     
     else:
-        if params['controller'] == 'csvgd' or params['controller'] == 'ablation':
-            pregrasp_dx = pregrasp_du = robot_dof
-            pregrasp_problem = AllegroContactProblem(
-                dx=pregrasp_dx,
-                du=pregrasp_du,
-                start=start[:pregrasp_dx + obj_dof],
-                goal=None,
-                T=4,
-                chain=params['chain'],
-                device=params['device'],
-                object_asset_pos=env.obj_pose,
-                object_type=params['object_type'],
-                world_trans=env.world_trans,
-                fingers=params['fingers'],
-                obj_dof_code=params['obj_dof_code'],
-                obj_joint_dim=obj_joint_dim,
-                fixed_obj=True,
-                arm_type=params['arm_type'],
-            )
+        # if params['controller'] == 'csvgd' or params['controller'] == 'ablation' or params['controller'] == 'planning':
+        pregrasp_dx = pregrasp_du = robot_dof
+        pregrasp_problem = AllegroContactProblem(
+            dx=pregrasp_dx,
+            du=pregrasp_du,
+            start=start[:pregrasp_dx + obj_dof],
+            goal=None,
+            T=4,
+            chain=params['chain'],
+            device=params['device'],
+            object_asset_pos=env.obj_pose,
+            object_type=params['object_type'],
+            world_trans=env.world_trans,
+            fingers=params['fingers'],
+            obj_dof_code=params['obj_dof_code'],
+            obj_joint_dim=obj_joint_dim,
+            fixed_obj=True,
+            arm_type=params['arm_type'],
+        )
 
-            pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
-            pregrasp_planner.warmup_iters = 50 
-        else:
-            raise ValueError('Invalid controller')
+        pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
+        pregrasp_planner.warmup_iters = 50 
+        # else:
+        #     raise ValueError('Invalid controller')
         
         start_time = time.time()
         best_traj, _ = pregrasp_planner.step(start[:pregrasp_dx])
@@ -229,7 +229,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             )
 
         manipulation_planner = PositionControlConstrainedSVGDMPC(manipulation_problem, params)
-    elif config['method'] == 'ablation':
+    elif config['method'] == 'ablation' or config['method'] == 'planning':
         fk_dict = forward_kinematics(partial_to_full_state(start[:4*num_fingers], fingers=params['fingers']))
         fks = [fk_dict[finger] for finger in fk_dict.keys()]
         fk_world = [env.world_trans.to(fk.device).compose(fk) for fk in fks]
@@ -252,26 +252,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                                     [obj_quat[3], obj_quat[0], obj_quat[1], obj_quat[2]],
                                     device=params['device']).float(), device=params['device'])
         fk_obj_frame = [obj_trans.inverse().compose(fk) for fk in fk_world]
-        if config['task'] == 'valve_turning':
-            from baselines.ablation.allegro_valve_turning import AblationAllegroValveTurning
-            manipulation_problem = AblationAllegroValveTurning(
-            start=start,
-            goal=params['goal'],
-            T=params['T'],
-            chain=params['chain'],
-            device=params['device'],
-            object_asset_pos=env.obj_pose,
-            contact_obj_frame=fk_obj_frame,
-            object_location=params['object_location'],
-            object_type=params['object_type'],
-            friction_coefficient=params['friction_coefficient'],
-            world_trans=env.world_trans,
-            fingers=params['fingers'],
-            optimize_force=params['optimize_force'],
-            )
-        elif config['task'] == 'screwdriver_turning':
-            from baselines.ablation.allegro_screwdriver import AblationAllegroScrewdriver
-            manipulation_problem = AblationAllegroScrewdriver(
+        if config['method'] == 'ablation':
+            if config['task'] == 'valve_turning':
+                from baselines.ablation.allegro_valve_turning import AblationAllegroValveTurning
+                manipulation_problem = AblationAllegroValveTurning(
                 start=start,
                 goal=params['goal'],
                 T=params['T'],
@@ -285,65 +269,88 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                 world_trans=env.world_trans,
                 fingers=params['fingers'],
                 optimize_force=params['optimize_force'],
-                obj_gravity=params['obj_gravity'],
-            )
-        elif config['task'] == 'peg_alignment':
-            from baselines.ablation.allegro_peg_alignment import AblationAllegroPegAlignment
-            manipulation_problem = AblationAllegroPegAlignment(
-                start=start,
-                goal=params['goal'],
-                T=params['T'],
-                chain=params['chain'],
-                device=params['device'],
-                object_asset_pos=env.obj_pose,
-                wall_asset_pos=env.wall_pose,
-                wall_dims = env.wall_dims,
-                contact_obj_frame=fk_obj_frame,
-                object_location=params['object_location'],
-                object_type=params['object_type'],
-                friction_coefficient=params['friction_coefficient'],
-                world_trans=env.world_trans,
-                fingers=params['fingers'],
-                optimize_force=params['optimize_force'],
-                obj_gravity = params['obj_gravity'],
-            )
-        elif config['task'] == 'peg_turning':
-            from baselines.ablation.allegro_peg_turning import AblationAllegroPegTurning
-            manipulation_problem = AblationAllegroPegTurning(
-                start=start,
-                goal=params['goal'],
-                T=params['T'],
-                chain=params['chain'],
-                device=params['device'],
-                object_asset_pos=env.obj_pose,
-                contact_obj_frame=fk_obj_frame,
-                object_location=params['object_location'],
-                object_type=params['object_type'],
-                friction_coefficient=params['friction_coefficient'],
-                world_trans=env.world_trans,
-                fingers=params['fingers'],
-                optimize_force=params['optimize_force'],
-                obj_gravity = params['obj_gravity'],
-            )
-        elif config['task'] == 'reorientation':
-            from baselines.ablation.allegro_reorientation import AblationAllegroReorientation
-            manipulation_problem = AblationAllegroReorientation(
-                start=start,
-                goal=params['goal'],
-                T=params['T'],
-                chain=params['chain'],
-                device=params['device'],
-                object_asset_pos=env.obj_pose,
-                contact_obj_frame=fk_obj_frame,
-                object_location=params['object_location'],
-                object_type=params['object_type'],
-                friction_coefficient=params['friction_coefficient'],
-                world_trans=env.world_trans,
-                fingers=params['fingers'],
-                optimize_force=params['optimize_force'],
-                obj_gravity = params['obj_gravity'],
-            )
-        manipulation_planner = PositionControlConstrainedSVGDMPC(manipulation_problem, params)
+                )
+            elif config['task'] == 'screwdriver_turning':
+                from baselines.ablation.allegro_screwdriver import AblationAllegroScrewdriver
+                manipulation_problem = AblationAllegroScrewdriver(
+                    start=start,
+                    goal=params['goal'],
+                    T=params['T'],
+                    chain=params['chain'],
+                    device=params['device'],
+                    object_asset_pos=env.obj_pose,
+                    contact_obj_frame=fk_obj_frame,
+                    object_location=params['object_location'],
+                    object_type=params['object_type'],
+                    friction_coefficient=params['friction_coefficient'],
+                    world_trans=env.world_trans,
+                    fingers=params['fingers'],
+                    optimize_force=params['optimize_force'],
+                    obj_gravity=params['obj_gravity'],
+                )
+            elif config['task'] == 'peg_alignment':
+                from baselines.ablation.allegro_peg_alignment import AblationAllegroPegAlignment
+                manipulation_problem = AblationAllegroPegAlignment(
+                    start=start,
+                    goal=params['goal'],
+                    T=params['T'],
+                    chain=params['chain'],
+                    device=params['device'],
+                    object_asset_pos=env.obj_pose,
+                    wall_asset_pos=env.wall_pose,
+                    wall_dims = env.wall_dims,
+                    contact_obj_frame=fk_obj_frame,
+                    object_location=params['object_location'],
+                    object_type=params['object_type'],
+                    friction_coefficient=params['friction_coefficient'],
+                    world_trans=env.world_trans,
+                    fingers=params['fingers'],
+                    optimize_force=params['optimize_force'],
+                    obj_gravity = params['obj_gravity'],
+                )
+            elif config['task'] == 'peg_turning':
+                from baselines.ablation.allegro_peg_turning import AblationAllegroPegTurning
+                manipulation_problem = AblationAllegroPegTurning(
+                    start=start,
+                    goal=params['goal'],
+                    T=params['T'],
+                    chain=params['chain'],
+                    device=params['device'],
+                    object_asset_pos=env.obj_pose,
+                    contact_obj_frame=fk_obj_frame,
+                    object_location=params['object_location'],
+                    object_type=params['object_type'],
+                    friction_coefficient=params['friction_coefficient'],
+                    world_trans=env.world_trans,
+                    fingers=params['fingers'],
+                    optimize_force=params['optimize_force'],
+                    obj_gravity = params['obj_gravity'],
+                )
+            elif config['task'] == 'reorientation':
+                from baselines.ablation.allegro_reorientation import AblationAllegroReorientation
+                manipulation_problem = AblationAllegroReorientation(
+                    start=start,
+                    goal=params['goal'],
+                    T=params['T'],
+                    chain=params['chain'],
+                    device=params['device'],
+                    object_asset_pos=env.obj_pose,
+                    contact_obj_frame=fk_obj_frame,
+                    object_location=params['object_location'],
+                    object_type=params['object_type'],
+                    friction_coefficient=params['friction_coefficient'],
+                    world_trans=env.world_trans,
+                    fingers=params['fingers'],
+                    optimize_force=params['optimize_force'],
+                    obj_gravity = params['obj_gravity'],
+                )
+            manipulation_planner = PositionControlConstrainedSVGDMPC(manipulation_problem, params)
+        elif config['method'] == 'planning':
+            from baselines.planning.naive_planner import NaivePlanner
+            manipulation_planner = NaivePlanner(chain=params['chain'], fingers=params['fingers'], ee_peg_frame=fk_obj_frame, T=params['T'], 
+                           world2robot=env.world_trans.to(params['device']), goal=params['goal'],
+                            obj_dof_code=params['obj_dof_code'], device=params['device'], 
+                            solve_iters=params['solve_iters'], ee_names=params['ee_names'], obj_pos=env.obj_pose)
     actual_trajectory = []
     duration = 0
 
@@ -357,17 +364,24 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         current_theta = state[:, -obj_dof:].detach().cpu().numpy()
         actual_trajectory.append(start[:robot_dof + obj_dof].clone())
         start_time = time.time()
-        best_traj, trajectories = manipulation_planner.step(start[:robot_dof + obj_dof])
-        
-        solve_time = time.time() - start_time
-        print(f"solve time: {solve_time}")
-        if k == 0:
-            warmup_time = solve_time
+        if config['method'] == 'planning':
+            action = manipulation_planner.step(start[:robot_dof + obj_dof])
+            solve_time = time.time() - start_time
+            if k>= 1:
+                duration += solve_time
+            action = action.unsqueeze(0).to(env.device)
         else:
-            duration += solve_time
-        planned_theta_traj = best_traj[:, robot_dof: robot_dof + obj_dof].detach().cpu().numpy()
-        print(f"current theta: {current_theta}")
-        print(f"planned theta: {planned_theta_traj}")
+            best_traj, trajectories = manipulation_planner.step(start[:robot_dof + obj_dof])
+        
+            solve_time = time.time() - start_time
+            print(f"solve time: {solve_time}")
+            if k == 0:
+                warmup_time = solve_time
+            else:
+                duration += solve_time
+            planned_theta_traj = best_traj[:, robot_dof: robot_dof + obj_dof].detach().cpu().numpy()
+            print(f"current theta: {current_theta}")
+            print(f"planned theta: {planned_theta_traj}")
         # add trajectory lines to sim
         # if k < params['num_steps'] - 1:
         #     if params['mode'] == 'hardware':
@@ -377,52 +391,52 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         #         add_trajectories(trajectories, best_traj, axes, env, sim=sim, gym=gym, viewer=viewer,
         #                         config=params, state2ee_pos_func=state2ee_pos)
 
-        if params['visualize_plan']:
-            # manipulation_problem.viz_contact_scenes.visualize_robot(partial_to_full_state(start[:manipulation_problem.robot_dof], fingers=params['fingers'], arm_dof=arm_dof), start[robot_dof:robot_dof + obj_dof])
-            traj_for_viz = best_traj[:, :manipulation_problem.dx]
-            traj_for_viz = torch.cat((start[:manipulation_problem.dx].unsqueeze(0), traj_for_viz), dim=0)
-            if obj_joint_dim > 0:
-                tmp = torch.zeros((traj_for_viz.shape[0], obj_joint_dim), device=best_traj.device) # add the joint for the screwdriver cap
-                traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
-            # traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof] = axis_angle_to_euler(traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof])
-        
-            viz_fpath = pathlib.PurePath.joinpath(fpath, f"timestep_{k}")
-            img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
-            gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
-            pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
-            pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-            visualize_trajectory(traj_for_viz, manipulation_problem.viz_contact_scenes, viz_fpath, manipulation_problem.fingers, manipulation_problem.obj_dof + obj_joint_dim, 
-                                 camera_params=camera_params, arm_dof=arm_dof)
-        
-        x = best_traj[0, :manipulation_problem.dx+manipulation_problem.du]
-        x = x.reshape(1, manipulation_problem.dx+manipulation_problem.du)
-        manipulation_problem._preprocess(best_traj.unsqueeze(0))
-        equality_constr_dict = manipulation_problem._con_eq(best_traj.unsqueeze(0), compute_grads=False, compute_hess=False, verbose=True)
-        inequality_constr_dict = manipulation_problem._con_ineq(best_traj.unsqueeze(0), compute_grads=False, compute_hess=False, verbose=True)
-        print("--------------------------------------")
+            if params['visualize_plan']:
+                # manipulation_problem.viz_contact_scenes.visualize_robot(partial_to_full_state(start[:manipulation_problem.robot_dof], fingers=params['fingers'], arm_dof=arm_dof), start[robot_dof:robot_dof + obj_dof])
+                traj_for_viz = best_traj[:, :manipulation_problem.dx]
+                traj_for_viz = torch.cat((start[:manipulation_problem.dx].unsqueeze(0), traj_for_viz), dim=0)
+                if obj_joint_dim > 0:
+                    tmp = torch.zeros((traj_for_viz.shape[0], obj_joint_dim), device=best_traj.device) # add the joint for the screwdriver cap
+                    traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
+                # traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof] = axis_angle_to_euler(traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof])
+            
+                viz_fpath = pathlib.PurePath.joinpath(fpath, f"timestep_{k}")
+                img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
+                gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
+                pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
+                pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
+                visualize_trajectory(traj_for_viz, manipulation_problem.viz_contact_scenes, viz_fpath, manipulation_problem.fingers, manipulation_problem.obj_dof + obj_joint_dim, 
+                                    camera_params=camera_params, arm_dof=arm_dof)
+            
+            x = best_traj[0, :manipulation_problem.dx+manipulation_problem.du]
+            x = x.reshape(1, manipulation_problem.dx+manipulation_problem.du)
+            manipulation_problem._preprocess(best_traj.unsqueeze(0))
+            equality_constr_dict = manipulation_problem._con_eq(best_traj.unsqueeze(0), compute_grads=False, compute_hess=False, verbose=True)
+            inequality_constr_dict = manipulation_problem._con_ineq(best_traj.unsqueeze(0), compute_grads=False, compute_hess=False, verbose=True)
+            print("--------------------------------------")
 
-        action = x[:, manipulation_problem.dx:manipulation_problem.dx+manipulation_problem.du].to(device=env.device)
-        if params['optimize_force']:
-            print("planned force")
-            print(action[:, robot_dof:].reshape(num_fingers + params['num_env_force'], 3)) # print out the action for debugging
-            print("delta action")
-            if params['arm_type'] != 'None':
-                print(action[:, :arm_dof])
-                print(action[:, arm_dof:manipulation_problem.robot_dof].reshape(num_fingers, 4))
-            else:
-                print(action[:, :robot_dof].reshape(num_fingers, 4))
-        action = action[:, :robot_dof]
-        action = action + start.unsqueeze(0)[:, :robot_dof].to(action.device) # NOTE: this is required since we define action as delta action
-        if params['mode'] == 'hardware':
-            set_state = env.get_state()['all_state'].to(device=env.device)
-            set_state = torch.cat((set_state, torch.zeros(1).float().to(env.device)), dim=0)
-            sim_viz_env.set_pose(set_state)
-            sim_viz_env.step(action)
-        elif params['mode'] == 'hardware_copy':
-            ros_copy_node.apply_action(partial_to_full_state(action[0], params['fingers']))
+            action = x[:, manipulation_problem.dx:manipulation_problem.dx+manipulation_problem.du].to(device=env.device)
+            if params['optimize_force']:
+                print("planned force")
+                print(action[:, robot_dof:].reshape(num_fingers + params['num_env_force'], 3)) # print out the action for debugging
+                print("delta action")
+                if params['arm_type'] != 'None':
+                    print(action[:, :arm_dof])
+                    print(action[:, arm_dof:manipulation_problem.robot_dof].reshape(num_fingers, 4))
+                else:
+                    print(action[:, :robot_dof].reshape(num_fingers, 4))
+            action = action[:, :robot_dof]
+            action = action + start.unsqueeze(0)[:, :robot_dof].to(action.device) # NOTE: this is required since we define action as delta action
+            if params['mode'] == 'hardware':
+                set_state = env.get_state()['all_state'].to(device=env.device)
+                set_state = torch.cat((set_state, torch.zeros(1).float().to(env.device)), dim=0)
+                sim_viz_env.set_pose(set_state)
+                sim_viz_env.step(action)
+            elif params['mode'] == 'hardware_copy':
+                ros_copy_node.apply_action(partial_to_full_state(action[0], params['fingers']))
         env.step(action)
         action_list.append(action)
-        manipulation_problem._preprocess(best_traj.unsqueeze(0))
+        # manipulation_problem._preprocess(best_traj.unsqueeze(0))
         
         obj_state = env.get_state()[:, -obj_dof:].cpu()
         if params['task'] == 'screwdriver_turning':
@@ -438,11 +452,14 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             distance2goal = tf.so3_relative_angle(torch.tensor(peg_mat), \
                 torch.tensor(peg_goal_mat).unsqueeze(0), cos_angle=False).detach().cpu().abs()
         
-        if not manipulation_problem.check_validity(env.get_state().cpu()[0]):
+        if not env.check_validity(env.get_state().cpu()[0]):
             validity_flag = False
 
         print(distance2goal, validity_flag)
-        info = {**equality_constr_dict, **inequality_constr_dict, **{'distance2goal': distance2goal, 'validity_flag': validity_flag}}
+        if config['method'] == 'planning':
+            info = {'distance2goal': distance2goal, 'validity_flag': validity_flag}
+        else:
+            info = {**equality_constr_dict, **inequality_constr_dict, **{'distance2goal': distance2goal, 'validity_flag': validity_flag}}
         info_list.append(info)
 
         # if params['simulator'] == 'isaac_gym':
@@ -461,7 +478,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     state = state.reshape(robot_dof + obj_dof).to(device=params['device'])
     actual_trajectory.append(state.clone()[:robot_dof + obj_dof])
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, robot_dof + obj_dof)
-    manipulation_problem.T = actual_trajectory.shape[0]
+    # manipulation_problem.T = actual_trajectory.shape[0]
     # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
     obj_state = actual_trajectory[:, -obj_dof:].cpu()
     if params['task'] == 'screwdriver_turning':
@@ -495,11 +512,15 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
 if __name__ == "__main__":
     # get config
-    # task = 'screwdriver_turning'
+    task = 'screwdriver_turning'
     # task = 'valve_turning'
-    task = 'reorientation'
-    # task = 'peg_alignment'
     # task = 'reorientation'
+    # task = 'peg_alignment'
+    # task = 'peg_turning'
+
+    method = 'csvgd'
+    # method = 'planning'
+
     if task == 'screwdriver_turning':
         config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver.yaml').read_text())
         config['obj_dof_code'] = [0, 0, 0, 1, 1, 1]        
@@ -524,6 +545,7 @@ if __name__ == "__main__":
     obj_dof = sum(config['obj_dof_code'])
     config['obj_dof'] = obj_dof
     config['task'] = task
+    config['method'] = method
 
     sim_env = None
     ros_copy_node = None
@@ -652,8 +674,10 @@ if __name__ == "__main__":
                     results[controller][key].append(ret[key])
         print(results)
 
-    for key in results[controller].keys():
-        print(f"{controller} {key}: avg: {np.array(results[controller][key]).mean()}, std: {np.array(results[controller][key]).std()}")
+    for key in results[method].keys():
+        print(f"{method} {key}: avg: {np.array(results[method][key]).mean()}, std: {np.array(results[method][key]).std()}")
+    print(task)
+    print(method)
     if config['simulator'] == 'isaac_gym':
         gym.destroy_viewer(viewer)
         gym.destroy_sim(sim)

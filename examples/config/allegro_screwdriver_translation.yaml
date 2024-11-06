@@ -32,3 +32,6 @@ controllers:
     penalty: 1000000
     collision_checking: False
     random_init_every_iter: False
+  planning:
+    N: 4  # for pregrasp
+    solve_iters: 1000 

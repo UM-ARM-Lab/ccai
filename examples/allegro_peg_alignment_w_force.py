@@ -648,10 +648,6 @@ class AllegroPegAlignment(AllegroValveTurning):
 
         return h, grad_h, None
     
-    def check_validity(self, state):
-        obj_state = state[-self.obj_dof:]
-        return check_peg_validity(obj_state)
-
 def add_trajectories(trajectories, best_traj, axes, env, sim, gym, viewer, config, state2ee_pos_func):
     wall_coor = torch.tensor([-0.03, 0, 0.25]).to(trajectories.device)
 

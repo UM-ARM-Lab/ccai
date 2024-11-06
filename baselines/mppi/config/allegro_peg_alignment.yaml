@@ -11,7 +11,7 @@ fingers: ['index', 'middle', 'thumb']
 object_type: 'peg'
 sim_device: 'cpu'
 device: 'cpu'
-include_velocity: False
+include_velocity: True
 friction_coefficient: 0.95
 gradual_control: True
 arm_type: 'None' # choose between 'None', 'robot', 'floating_3d', 'floating_6d'

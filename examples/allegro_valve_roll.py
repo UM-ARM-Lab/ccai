@@ -212,12 +212,8 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
         self.world_trans = world_trans.to(device=device)
         self.alpha = 10
-
+        self.env_force = False
         # for honda hand
-        # index_x_max = torch.tensor([0.47, 1.6099999999, 1.7089999, 1.61799999]) - 0.05
-        # index_x_min = torch.tensor([-0.47, -0.195999999999, -0.174000000, -0.227]) + 0.05
-        # thumb_x_max = torch.tensor([1.396, 1.1629999999999, 1.644, 1.71899999]) - 0.05
-        # thumb_x_min = torch.tensor([0.26, -0.1049999999, -0.1889999999, -0.162]) + 0.05
         index_x_max = torch.tensor([0.47, 1.6099999999, 1.7089999, 1.61799999]) + 0.05
         index_x_min = torch.tensor([-0.47, -0.195999999999, -0.174000000, -0.227]) - 0.05
         thumb_x_max = torch.tensor([1.396, 1.1629999999999, 1.644, 1.71899999]) + 0.05
@@ -775,20 +771,16 @@ class AllegroValveTurning(AllegroContactProblem):
 
         if self.optimize_force:
             self.dg_per_t = self.num_fingers * (1 + 2 + 4) + wrench_dim
-            # self.dg_per_t = self.num_fingers * (1 + 2 + 4) + wrench_dim + (self.friction_polytope_k) * self.num_fingers # DEBUG ONLY
         else:
             self.dg_per_t = self.num_fingers * (1 + 2) + wrench_dim
-            # self.dg_per_t = self.num_fingers * (1 + 2) # DEBUG ONLY
-            # self.dg_per_t = self.num_fingers * (1 + 3 + 2) + 3
-            # self.dg_per_t = self.num_fingers * (1 + 3 + 2)
         self.dg_constant = 0
         self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
         self.dz = (self.friction_polytope_k) * self.num_fingers # one friction constraints per finger
+        self.dz += self.num_fingers # minimum force constraint
         if self.contact_region:
             self.dz += 1
         if self.collision_checking:
             self.dz += 2
-        # self.dz = 0 # DEBUG ONLY
         self.dh = self.dz * T  # inequality
     
     def __init__(self,
@@ -859,12 +851,16 @@ class AllegroValveTurning(AllegroContactProblem):
         else:
             self.force_equlibrium_constr = vmap(self._force_equlibrium_constr_w_force)
             self.grad_force_equlibrium_constr = vmap(jacrev(self._force_equlibrium_constr_w_force, argnums=(0, 1, 2, 3, 4, 5, 6)))
+            self.min_force_constr = vmap(self._min_force_constr, randomness='same')
+            self.grad_min_force_constr = vmap(jacrev(self._min_force_constr, argnums=(0,)))
 
         if optimize_force:
             max_f = torch.ones(3 * self.num_fingers) * 10
             min_f = torch.ones(3 * self.num_fingers) * -10
             self.x_max = torch.cat((self.x_max, max_f))
             self.x_min = torch.cat((self.x_min, min_f))
+            self.min_force_dict = {'index': 0.1, 'middle': 0.1, 'ring': 0.1, 'thumb': 0.1}
+            self.grad_min_force_constr = vmap(jacrev(self._min_force_constr, argnums=(0,)))
         self.friction_constr = vmap(self._friction_constr, randomness='same')
         self.grad_friction_constr = vmap(jacrev(self._friction_constr, argnums=(0, 1, 2)))
 
@@ -873,6 +869,8 @@ class AllegroValveTurning(AllegroContactProblem):
 
         self.kinematics_constr_w_proj = vmap(vmap(partial(self._kinematics_constr, projection=True)))
         self.grad_kinematics_constr_w_proj = vmap(vmap(jacrev(partial(self._kinematics_constr, projection=True), argnums=(0, 1, 2, 3, 4, 5, 6))))
+
+
     
     def get_initial_xu(self, N):
         # TODO: fix the initialization, for 6D movement, the angle is not supposed to be the linear interpolation of the euler angle. 
@@ -927,7 +925,7 @@ class AllegroValveTurning(AllegroContactProblem):
 
             # DEBUG ONLY, use initial state as the initialization
             # theta = self.start[-self.obj_dof:].unsqueeze(0).repeat((N, self.T, 1))
-            # theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
+            theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
             x = torch.cat((x, theta), dim=-1)
 
         xu = torch.cat((x, u), dim=2)
@@ -1552,10 +1550,77 @@ class AllegroValveTurning(AllegroContactProblem):
 
         return h, grad_h, None
 
+    def _min_force_constr(self, force_list):
+        force_mag_offset = []
+        # force_mag = []
+        for i, finger_name in enumerate(self.fingers):
+            min_force = self.min_force_dict[finger_name]
+            force = force_list[i]
+            force_norm = torch.linalg.norm(force, dim=-1)
+            # force_mag.append(force / force_norm)
+            force_mag_offset.append(min_force - force_norm)
+            # print(force_norm.min(), min_force)
+        # if self.env_force:
+        #     # no constraint on the environment force
+        #     force_mag_offset.append(torch.zeros_like(force_norm))
+        return torch.stack(force_mag_offset, dim=0)
+    
+    def _min_force_constraints(self, xu, compute_grads=True, compute_hess=False, projected_diffusion=False):
+        N, T, d = xu.shape
+        device = xu.device
+        # d = self.d
+        force = xu[:, :, self.dx+self.robot_dof:]
+        if self.env_force:
+            num_forces = self.num_fingers + 1
+        else:
+            num_forces = self.num_fingers
+        force_list = force.reshape(force.shape[0], force.shape[1], num_forces, 3)
+        finger_force_list = force_list[:, :, :self.num_fingers]
+
+
+        h = self.min_force_constr(finger_force_list.reshape(-1, self.num_fingers, 3),)
+        h = h.reshape(N, T, -1)
+        # dh_dforce = dh_dforce.reshape(N, T, -1, 3)
+        if compute_grads:
+
+            dh_dforce, = self.grad_min_force_constr(finger_force_list.reshape(-1, self.num_fingers, 3))
+            dh_dforce = dh_dforce.reshape(dh_dforce.shape[0], dh_dforce.shape[1], self.num_fingers * 3)
+
+            T_range = torch.arange(T, device=device)
+            T_plus = torch.arange(1, T, device=device)
+            T_minus = torch.arange(T - 1, device=device)
+
+            grad_g = torch.zeros(N, h.shape[2], T, T, d, device=self.device)
+
+            mask_t = torch.zeros_like(grad_g).bool()
+            mask_t[:, :, T_range, T_range] = True
+            mask_t_p = torch.zeros_like(grad_g).bool()
+            mask_t_p[:, :, T_plus, T_minus] = True
+            mask_force = torch.zeros_like(grad_g).bool()
+            force_indices = torch.arange(self.dx + self.robot_dof, self.dx + self.robot_dof + self.num_fingers * 3, device=device)
+            mask_force[:, :, :, :, force_indices] = True
+
+            grad_g[torch.logical_and(mask_t, mask_force)] = dh_dforce.reshape(N, T, -1,
+                                                                              self.num_fingers * 3
+                                                                              ).transpose(1, 2).reshape(-1)
+            grad_h = grad_g.transpose(1, 2)
+            grad_h = grad_h.reshape(N, -1, T * d)
+
+        else:
+            return h.reshape(N, -1), None, None
+        if compute_hess:
+            hess_h = torch.zeros(N, h.shape[1], T * 3, T * 3, device=self.device)
+            return h.reshape(N, -1), grad_h, hess_h
+        return h.reshape(N, -1), grad_h, None
     def _con_ineq(self, xu, compute_grads=True, compute_hess=False, verbose=False):
         N = xu.shape[0]
         T = xu.shape[1]
         h, grad_h, hess_h = self._friction_constraint(
+            xu=xu.reshape(-1, T, self.dx + self.du),
+            compute_grads=compute_grads,
+            compute_hess=compute_hess)
+        
+        h_force, grad_h_force, hess_h_force = self._min_force_constraints(
             xu=xu.reshape(-1, T, self.dx + self.du),
             compute_grads=compute_grads,
             compute_hess=compute_hess)
@@ -1569,6 +1634,7 @@ class AllegroValveTurning(AllegroContactProblem):
         
         if verbose:
             print(f"max friction constraint: {torch.max(h)}")
+            # print(f"max force constraint: {torch.max(h_force)}")
             # print(f"max step size constraint: {torch.max(h_step_size)}")
             # print(f"max singularity constraint: {torch.max(h_sin)}")
             result_dict = {}
@@ -1577,10 +1643,12 @@ class AllegroValveTurning(AllegroContactProblem):
             # result_dict['singularity'] = torch.max(h_sin).item()
             return result_dict
 
-        # h = torch.cat((h,
-        #             #    h_step_size,
-        #                h_sin), dim=1)
+        h = torch.cat((h,
+                       h_force), dim=1)
+        # TODO: debug whether this concatenation is correct
         if compute_grads:
+            grad_h = torch.cat((grad_h,
+                            grad_h_force), dim=1)
             grad_h = grad_h.reshape(N, -1, self.T * (self.dx + self.du))
             # grad_h = torch.cat((grad_h, 
             #                     # grad_h_step_size,

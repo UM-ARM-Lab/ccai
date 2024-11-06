@@ -14,7 +14,7 @@ from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
 
 class NaivePlanner:
-    def __init__(self, chain, fingers, ee_peg_frame, T, world2robot, goal, obj_dof_code, device, obj_pos=None) -> None:
+    def __init__(self, chain, fingers, ee_peg_frame, T, world2robot, goal, obj_dof_code, device, ee_names, solve_iters=1000, obj_pos=None) -> None:
         self.fingers = fingers
         self.num_fingers = len(fingers)
         self.chain = chain
@@ -28,21 +28,22 @@ class NaivePlanner:
         self.obj_dof = self.translational_dim + self.rotational_dim
         self.num_particles = 100
         self.obj_pos = obj_pos
+        self.solve_iters = solve_iters
         if self.translational_dim > 0:
             self.goal_pos = self.goal[:self.translational_dim]
-        if self.rotational_dim > 0:
+        if self.rotational_dim == 3:
             self.goal_R = R.from_euler('XYZ', goal[self.translational_dim:].detach().cpu().numpy())
+        elif self.rotational_dim == 1:
+            obj_ori_3d = np.zeros(3)
+            obj_ori_3d[1] = goal[0]
+            assert self.obj_dof_code[4] == 1
+            self.goal_R = R.from_euler('XYZ', obj_ori_3d)
         self.device = device
         self.finger2index = {'index': [0, 1, 2, 3],
                              'middle': [4, 5, 6, 7],
                              'ring': [8, 9, 10, 11],
                              'thumb': [12, 13, 14, 15]}
-        self.ee_names = {
-            'index': 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
-            'middle': 'allegro_hand_naka_finger_finger_1_aftc_base_link',
-            'ring': 'allegro_hand_kusuri_finger_finger_2_aftc_base_link',
-            'thumb': 'allegro_hand_oya_finger_3_aftc_base_link',
-            }
+        self.ee_names = ee_names
         frame_indices = [self.chain.frame_to_idx[self.ee_names[finger]] for finger in self.fingers]    # combined chain
         self.frame_indices = torch.tensor(frame_indices)
     def step(self, state):
@@ -59,7 +60,13 @@ class NaivePlanner:
             next_pos = self.obj_pos
         if self.rotational_dim > 0:
             obj_ori = obj_state[self.translational_dim:]
-            obj_R = R.from_euler('XYZ', obj_ori.detach().cpu().numpy())
+            if self.rotational_dim == 3:
+                obj_R = R.from_euler('XYZ', obj_ori.detach().cpu().numpy())
+            elif self.rotational_dim == 1:
+                obj_ori_3d = np.zeros(3)
+                obj_ori_3d[1] = obj_ori[0]
+                assert self.obj_dof_code[4] == 1
+                obj_R = R.from_euler('XYZ', obj_ori_3d)
             obj_quat = obj_R.as_quat()
             key_times = [0, self.T]
             times = np.linspace(0, self.T, self.T + 1)
@@ -87,8 +94,7 @@ class NaivePlanner:
 
         _lambda = 1e-6
         eye = torch.eye(6, device=self.device)
-        ret = torch.zeros(16)
-        num_iter = 2000
+        ret = torch.zeros(16).to(self.device)
         for i, finger in enumerate(self.fingers):
             tmp_target_pose = target_pose[i].get_matrix()
             tmp_target_position = tmp_target_pose[:, :3, 3]
@@ -101,7 +107,7 @@ class NaivePlanner:
             q = q.unsqueeze(0)
             q = q.repeat(self.num_particles, 1)
             q = q + torch.randn_like(q) * 0.2
-            for j in range(num_iter):
+            for j in range(self.solve_iters):
                 mat = self.chain.forward_kinematics(q)[self.ee_names[finger]].get_matrix()
                 ee_pos = mat[:, :3, 3]
                 ee_orn = pk.matrix_to_quaternion(mat[:, :3, :3])
@@ -126,16 +132,16 @@ class NaivePlanner:
                 max_lims = torch.tensor([0.47, 1.6099999999999999, 1.7089999999999999, 1.6179999999999999,
                                         0.47, 1.6099999999999999, 1.7089999999999999, 1.6179999999999999,
                                         0.47, 1.6099999999999999, 1.7089999999999999, 1.6179999999999999,
-                                        1.5, 1.1629999999999998, 1.644, 1.7189999999999999])
+                                        1.5, 1.1629999999999998, 1.644, 1.7189999999999999]).to(self.device)
                 min_lims = torch.tensor([-0.47, -0.19599999999999998, -0.17400000000000002, -0.227,
                                         -0.47, -0.19599999999999998, -0.17400000000000002, -0.227,
                                         -0.47, -0.19599999999999998, -0.17400000000000002, -0.227,
-                                        0.263, -0.105,-0.18899999999999997, -0.162])
+                                        0.263, -0.105,-0.18899999999999997, -0.162]).to(self.device)
                 q = torch.clamp(q, min=min_lims, max=max_lims)
                 if torch.linalg.norm(error, dim=-1).min() < 1e-3:
                     ret[self.finger2index[finger]] = q[torch.argmin(torch.linalg.norm(error, dim=-1))][self.finger2index[finger]]
                     break
-                if j == num_iter - 1:
+                if j == self.solve_iters - 1:
                     print(f'{finger} Failed to converge')
                     print(error[torch.argmin(torch.linalg.norm(error, dim=-1))])
                     ret[self.finger2index[finger]] = q[torch.argmin(torch.linalg.norm(error, dim=-1))][self.finger2index[finger]]

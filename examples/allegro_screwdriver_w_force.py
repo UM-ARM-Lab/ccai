@@ -74,7 +74,7 @@ class AllegroScrewdriver(AllegroValveTurning):
         self.dg_constant = -self.num_fingers # remove the kinematics constraint at the first step
         self.dg_constant = 0
         self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
-        self.dz = (self.friction_polytope_k) * self.num_fingers + 1 # one friction constraints per finger
+        self.dz = (self.friction_polytope_k) * self.num_fingers + 1 + self.num_fingers # one friction constraints per finger, num_finger means minimum force constraint
         if self.contact_region:
             self.dz += 1
         if self.collision_checking:
@@ -141,6 +141,7 @@ class AllegroScrewdriver(AllegroValveTurning):
 
         # for validity checking
         self.nominal_screwdriver_top = np.array([0, 0, 1.405]) # in the world frame
+        self.env_force = True
 
     def get_initial_xu(self, N):
         # TODO: fix the initialization, for 6D movement, the angle is not supposed to be the linear interpolation of the euler angle. 
@@ -485,6 +486,11 @@ class AllegroScrewdriver(AllegroValveTurning):
             xu=xu.reshape(-1, T, self.dx + self.du),
             compute_grads=compute_grads,
             compute_hess=compute_hess)
+        
+        h_force, grad_h_force, hess_h_force = self._min_force_constraints(
+            xu=xu.reshape(-1, T, self.dx + self.du),
+            compute_grads=compute_grads,
+            compute_hess=compute_hess)
         # h_vel, grad_h_vel, hess_h_vel = self._friction_vel_constraint(
         #     xu=xu.reshape(-1, T, self.dx + self.du),
         #     compute_grads=compute_grads,
@@ -516,6 +522,7 @@ class AllegroScrewdriver(AllegroValveTurning):
         
         if verbose:
             print(f"max friction constraint: {torch.max(h)}")
+            print(f"max min force constraint: {torch.max(h_force)}")
             if self.collision_checking:
                 print(f"max index repulsive constraint: {torch.max(h_rep)}")
             if self.contact_region:
@@ -540,18 +547,19 @@ class AllegroScrewdriver(AllegroValveTurning):
         # h = torch.cat((h,
         #             #    h_step_size,
         #                h_sin), dim=1)
+        h = torch.cat((h, h_force), dim=1)
+        h = torch.cat((h, h_env), dim=1)
         if self.collision_checking:
             h = torch.cat((h, h_rep), dim=1)  
         if self.contact_region:
             h = torch.cat((h, h_con_region), dim=1)
-        h = torch.cat((h, h_env), dim=1)
         if compute_grads:
-            grad_h = grad_h.reshape(N, -1, self.T * (self.dx + self.du))
+            # NOTE the order of the gradients for different constraints should match the order defined in the value
+            grad_h = torch.cat((grad_h, grad_h_force), dim=1)
             grad_h = torch.cat((grad_h, grad_h_env), dim=1)
             # grad_h = torch.cat((grad_h, 
             #                     # grad_h_step_size,
             #                     grad_h_sin), dim=1)
-            # grad_h = torch.cat((grad_h, grad_h_vel), dim=1)
             if self.collision_checking:
                 grad_h_rep = torch.cat((grad_h_rep_1, grad_h_rep_2), dim=1)
                 grad_h = torch.cat((grad_h, grad_h_rep), dim=1)

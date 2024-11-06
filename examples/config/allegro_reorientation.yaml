@@ -13,14 +13,13 @@ sim_device: 'cpu'
 device: 'cuda:1'
 friction_coefficient: 0.95
 kp: 3.0
-visualize_plan: True
+visualize_plan: False
 optimize_force: True
 force_balance: False  # in addition to the torque balance, do we also need force balance, just for the screwdriver turning experiment w\o slot. 
 gradual_control: True
 arm_type: 'None' # choose between 'None', 'robot', 'floating_3d', 'floating_6d'
 gravity: True  # whether to use gravity in the simulation
-goal: [0, 0, 0, 0, 0, -1.0472]
-method: 'ablation'
+goal: [0.0, 0, 0, 0, 0, -1.0472]
 controllers:
   csvgd:
     N: 16
@@ -36,7 +35,7 @@ controllers:
     resample_temperature: 0.1
     penalty: 1000000
     random_init_every_iter: False
-    obj_gravity: True # whether to conside the object gravity in our optimization
+    obj_gravity: False # whether to conside the object gravity in our optimization
   ablation:
     N: 16
     alpha_J: 5.0e-3
@@ -52,3 +51,6 @@ controllers:
     penalty: 1000000
     random_init_every_iter: False
     obj_gravity: True # whether to conside the object gravity in our optimization
+  planning:
+    N: 4  # for pregrasp
+    solve_iters: 1000 

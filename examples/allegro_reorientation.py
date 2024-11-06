@@ -158,13 +158,6 @@ class AllegroReorientation(AllegroValveTurning):
 
         xu = torch.cat((x, u), dim=2)
         return xu
-    def check_validity(self, state):
-        obj_state = state[-self.obj_dof:]
-        obj_z = obj_state[2]
-        if obj_z < -0.1:
-            return False
-        else:
-            return True
 
 
  

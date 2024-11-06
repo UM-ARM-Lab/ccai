@@ -30,7 +30,6 @@ def get_env(task, img_save_dir, config, num_envs=1):
                                 fingers=config['fingers'],
                                 gravity=config['gravity'],
                                 random_robot_pose=config['random_robot_pose'],
-                                gradual_control=config['gradual_control'],
                                 )
     elif task == 'peg_turning':
         env = AllegroPegTurningEnv(num_envs=num_envs,
