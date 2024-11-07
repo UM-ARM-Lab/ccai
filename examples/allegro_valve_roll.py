@@ -571,12 +571,15 @@ class AllegroContactProblem(AllegroObjectProblem):
                  useVFgrads=False):
         ########################################
         #vfgrad stuff
-        from _value_function.train_value_function import load_ensemble#, query_ensemble 
-        from _value_function.grad_descent_ensemble import get_vf_gradients
+        from _value_function.train_value_function import load_ensemble, query_ensemble 
         self.useVFgrads = useVFgrads
-        self.get_vf_gradients = get_vf_gradients
-        self.models, self.poses_mean, self.poses_std, self.cost_mean, self.cost_std = load_ensemble()
-
+        self.query_ensemble = query_ensemble
+        self.models, self.poses_mean, self.poses_std, self.cost_mean, self.cost_std = load_ensemble(device=device)
+        self.poses_mean = torch.tensor(self.poses_mean).to(device)
+        self.poses_std = torch.tensor(self.poses_std).to(device)
+        self.cost_mean = torch.tensor([self.cost_mean]).to(device)
+        self.cost_std = torch.tensor([self.cost_std]).to(device)
+        self.full_start = start
         ######################################## 
         # 
         #    
@@ -703,19 +706,27 @@ class AllegroContactProblem(AllegroObjectProblem):
         return g, grad_g, None
  
     def _cost(self, xu, start, goal):
-
         state = xu[:, :self.dx]
         state = torch.cat((start.reshape(1, self.dx), state), dim=0)  # combine the first time step into it
         action = xu[:, self.dx:]
         action_cost = torch.sum(action ** 2)
-        smoothness_cost = 10 * torch.sum((state[1:] - state[:-1]) ** 2)
+        smoothness_cost = torch.sum((state[1:] - state[:-1]) ** 2)
         
         if self.useVFgrads is False:
             return smoothness_cost + 10 * action_cost
         else:
-            vf_output = self.query_ensemble(state, self.models, self.poses_mean, self.poses_std, self.cost_mean, self.cost_std)
-            vf_cost = 1.0 * torch.sum(vf_output ** 2)
-            return smoothness_cost + 10 * action_cost + vf_cost
+            last_state = state[-1,:]
+            screwdriver = self.full_start[-3:]
+            # print("screwdriver: ", screwdriver)
+            input = torch.cat((last_state, screwdriver))
+            # print("input: ", input)
+            input_norm = ((input - self.poses_mean) / self.poses_std).float()
+            vf_output_norm = self.query_ensemble(input_norm, self.models)
+            vf_output = vf_output_norm * self.cost_std + self.cost_mean
+            # print("vf_output: ", vf_output)
+            vf_cost = torch.sum(vf_output ** 2)
+            # print("vf_cost: ", vf_cost)
+            return 10 * smoothness_cost + 10 * action_cost + 1.0 * vf_cost
 
     
     def _con_eq(self, xu, compute_grads=True, compute_hess=False):

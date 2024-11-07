@@ -138,14 +138,14 @@ def train(batch_size = 100, lr = 0.01, epochs = 205, neurons = 12):
 def save(model_to_save, path):
     torch.save(model_to_save, path)
 
-def load_ensemble():
+def load_ensemble(device='cuda:0'):
     shape = (15,1)
     checkpoints = torch.load(f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl')
     models = []
     for checkpoint in checkpoints:
         model = Net(shape[0], shape[1])
         model.load_state_dict(checkpoint['model_state'])
-        models.append(model)
+        models.append(model.to(device))
 
     poses_mean = checkpoints[0]['poses_mean']
     poses_std = checkpoints[0]['poses_std']

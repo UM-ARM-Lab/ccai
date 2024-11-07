@@ -25,32 +25,6 @@ def get_data():
     inputs = torch.from_numpy(total_poses)[100:150]
     return inputs
 
-def get_vf_gradients(poses, models, poses_mean, poses_std, cost_mean, cost_std):
-
-    poses_norm = (poses - poses_mean) / poses_std
-    poses_norm = poses_norm.float()
-
-    # Enable gradient computation
-    poses_norm.requires_grad_(True)
-    for model in models:
-        model.eval()
-
-    target_value = torch.tensor([0.0], dtype=torch.float32)
-
-    ensemble_predictions_norm = query_ensemble(poses_norm, models)
-    ensemble_predictions = ensemble_predictions_norm * cost_std + cost_mean
-    predictions = torch.mean(ensemble_predictions, dim=0)
-
-    mse = torch.mean((predictions - target_value) ** 2)
-    mean_squared_variance = torch.mean((ensemble_predictions - predictions) ** 2)
-    loss = mse + mean_squared_variance
-    loss.backward()
-
-    grads_norm = poses_norm.grad
-    grads = grads_norm * poses_std
-    print(grads)
-    return grads
-
 def grad_descent(lr = 0.2358):
     models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble()
     
@@ -198,10 +172,6 @@ def lr_sweep():
 if __name__ == "__main__":
     # lr_sweep()
     # exit()
-    poses = get_data()
-    models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble()
-    get_vf_gradients(poses, models, poses_mean, poses_std, cost_mean, cost_std)
-    exit()
 
     poses, optimized_poses,semi_optimized_poses, _ = grad_descent()
     full_poses = convert_partial_to_full_config(poses)

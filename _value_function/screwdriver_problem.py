@@ -123,6 +123,14 @@ def pregrasp(env, config, chain, useVFgrads=False):
     num_fingers = len(params['fingers'])
     device = params['device']
     sim_device = params['sim_device']
+    
+    # screwdriver_start = torch.tensor([
+    # np.random.uniform(-0.05, 0.05),  # Random value between -0.05 and 0.05
+    # np.random.uniform(-0.05, 0.05),  # Random value between -0.05 and 0.05
+    # np.random.uniform(0, 2 * np.pi),  # Random value between 0 and 2π
+    # 0.0  
+    # ])
+
     default_dof_pos = torch.cat((torch.tensor([[0., 0.5, 0.7, 0.7]]).float().to(device=sim_device),
                                 torch.tensor([[0., 0.5, 0.7, 0.7]]).float().to(device=sim_device),
                                 torch.tensor([[0., 0.5, 0.7, 0.7]]).float().to(device=sim_device),
@@ -132,6 +140,7 @@ def pregrasp(env, config, chain, useVFgrads=False):
 
     env.reset(dof_pos= default_dof_pos, deterministic=False)
     start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=device)
+    print("start: ", start)
 
     screwdriver = start.clone()[-4:-1]
     #print("start screwdriver: ", screwdriver)
