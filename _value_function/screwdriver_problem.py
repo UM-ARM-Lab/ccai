@@ -109,7 +109,7 @@ def init_env(visualize=False):
 
     return config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial
 
-def pregrasp(env, config, chain):
+def pregrasp(env, config, chain, useVFgrads=False):
     params = config.copy()
     controller = 'csvgd'
     params.pop('controllers')
@@ -158,6 +158,7 @@ def pregrasp(env, config, chain):
         obj_dof_code=params['obj_dof_code'],
         obj_joint_dim=1,
         fixed_obj=True,
+        useVFgrads=useVFgrads,
     )
     pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
     pregrasp_planner.warmup_iters = 80#500 #50
@@ -403,5 +404,6 @@ if __name__ == "__main__":
     initial_poses = pkl.load(open(f'{fpath.resolve()}/initial_poses/initial_poses_10k.pkl', 'rb'))
     # show_state(env, initial_poses[0], t=2)
     # show_state(env, initial_poses[1], t=2)
-    initial_pose, final_pose, succ, full_trajectory = do_turn(initial_poses[0], config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
+    pregrasp(env, config, chain, useVFgrads=True)
+    # initial_pose, final_pose, succ, full_trajectory = do_turn(initial_poses[0], config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
     

@@ -1,5 +1,5 @@
 from screwdriver_problem import init_env, convert_full_to_partial_config, convert_partial_to_full_config
-from train_value_function import Net, query_ensemble
+from train_value_function import Net, query_ensemble, load_ensemble
 import pathlib
 import numpy as np
 import pickle as pkl
@@ -25,26 +25,34 @@ def get_data():
     inputs = torch.from_numpy(total_poses)[100:150]
     return inputs
 
-def grad_descent(lr = None):
-    checkpoints = torch.load(open(f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl', 'rb'))
-    models = []
-    for checkpoint in checkpoints:
-        model = Net(shape[0], shape[1])
-        model.load_state_dict(checkpoint['model_state'])
+def get_vf_gradients(poses, models, poses_mean, poses_std, cost_mean, cost_std):
 
-        # checkpoint = torch.load(f'{fpath.resolve()}/value_functions/value_function_{2}.pkl')
-        # model.load_state_dict(checkpoint['model_state'])
-    
-        models.append(model)
-        # break
-    
-    poses_mean = checkpoints[0]['poses_mean']
-    poses_std = checkpoints[0]['poses_std']
-    cost_mean = checkpoints[0]['cost_mean']
-    cost_std = checkpoints[0]['cost_std']
+    poses_norm = (poses - poses_mean) / poses_std
+    poses_norm = poses_norm.float()
 
-    min_std_threshold = 1e-5
-    poses_std = np.where(poses_std < min_std_threshold, min_std_threshold, poses_std)
+    # Enable gradient computation
+    poses_norm.requires_grad_(True)
+    for model in models:
+        model.eval()
+
+    target_value = torch.tensor([0.0], dtype=torch.float32)
+
+    ensemble_predictions_norm = query_ensemble(poses_norm, models)
+    ensemble_predictions = ensemble_predictions_norm * cost_std + cost_mean
+    predictions = torch.mean(ensemble_predictions, dim=0)
+
+    mse = torch.mean((predictions - target_value) ** 2)
+    mean_squared_variance = torch.mean((ensemble_predictions - predictions) ** 2)
+    loss = mse + mean_squared_variance
+    loss.backward()
+
+    grads_norm = poses_norm.grad
+    grads = grads_norm * poses_std
+    print(grads)
+    return grads
+
+def grad_descent(lr = 0.2358):
+    models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble()
     
     poses = get_data()
     poses_norm = (poses - poses_mean) / poses_std
@@ -59,20 +67,21 @@ def grad_descent(lr = None):
     exp = 0
     dump = True
 
-    if exp is 0:
+    if exp == 0:
         experiment_name = '_ensemble_Adam_500_iters'
         optimizer = optim.Adam([poses_norm], lr=0.2358)
         iterations = 500
-    elif exp is 1:
+    elif exp == 1:
         experiment_name = '_ensemble_Adam_5000_iters'
         optimizer = optim.Adam([poses_norm], lr=1e-1)
         iterations = 5000
-    elif exp is 2 and lr is not None:
+    elif exp == 2 and lr is not None:
         dump = False
         optimizer = optim.Adam([poses_norm], lr=lr)
         iterations = 500
 
-    model.eval()
+    for model in models:
+        model.eval()
 
     # gradient descent
     num_iterations = iterations
@@ -189,6 +198,10 @@ def lr_sweep():
 if __name__ == "__main__":
     # lr_sweep()
     # exit()
+    poses = get_data()
+    models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble()
+    get_vf_gradients(poses, models, poses_mean, poses_std, cost_mean, cost_std)
+    exit()
 
     poses, optimized_poses,semi_optimized_poses, _ = grad_descent()
     full_poses = convert_partial_to_full_config(poses)

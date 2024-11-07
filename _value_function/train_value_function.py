@@ -138,6 +138,22 @@ def train(batch_size = 100, lr = 0.01, epochs = 205, neurons = 12):
 def save(model_to_save, path):
     torch.save(model_to_save, path)
 
+def load_ensemble():
+    shape = (15,1)
+    checkpoints = torch.load(f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl')
+    models = []
+    for checkpoint in checkpoints:
+        model = Net(shape[0], shape[1])
+        model.load_state_dict(checkpoint['model_state'])
+        models.append(model)
+
+    poses_mean = checkpoints[0]['poses_mean']
+    poses_std = checkpoints[0]['poses_std']
+    cost_mean = checkpoints[0]['cost_mean']
+    cost_std = checkpoints[0]['cost_std']
+
+    return models, poses_mean, poses_std, cost_mean, cost_std
+
 def query_ensemble(poses, models):
     costs = []
     for model in models:
@@ -156,12 +172,7 @@ def eval(model_name, ensemble = False):
         model.load_state_dict(checkpoint['model_state'])
         model.eval()
     else:
-        checkpoints = torch.load(f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
-        models = []
-        for checkpoint in checkpoints:
-            model = Net(shape[0], shape[1])
-            model.load_state_dict(checkpoint['model_state'])
-            models.append(model)
+        models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble()
     
     def plot_loader(loader, n_samples, title=''):
         with torch.no_grad():

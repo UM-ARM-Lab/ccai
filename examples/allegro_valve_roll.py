@@ -567,7 +567,19 @@ class AllegroContactProblem(AllegroObjectProblem):
                  obj_joint_dim=0,
                  fixed_obj=False,
                  collision_checking=False,
-                 device='cuda:0'):
+                 device='cuda:0',
+                 useVFgrads=False):
+        ########################################
+        #vfgrad stuff
+        from _value_function.train_value_function import load_ensemble#, query_ensemble 
+        from _value_function.grad_descent_ensemble import get_vf_gradients
+        self.useVFgrads = useVFgrads
+        self.get_vf_gradients = get_vf_gradients
+        self.models, self.poses_mean, self.poses_std, self.cost_mean, self.cost_std = load_ensemble()
+
+        ######################################## 
+        # 
+        #    
         # object_location is different from object_asset_pos. object_asset_pos is 
         # used for pytorch volumetric. The asset of valve might contain something else such as a wall, a table
         # object_location is the location of the object joint, which is what we care for motion planning 
@@ -689,14 +701,22 @@ class AllegroContactProblem(AllegroObjectProblem):
             return g, grad_g, hess
 
         return g, grad_g, None
-        
+ 
     def _cost(self, xu, start, goal):
+
         state = xu[:, :self.dx]
         state = torch.cat((start.reshape(1, self.dx), state), dim=0)  # combine the first time step into it
         action = xu[:, self.dx:]
         action_cost = torch.sum(action ** 2)
         smoothness_cost = 10 * torch.sum((state[1:] - state[:-1]) ** 2)
-        return smoothness_cost + 10 * action_cost
+        
+        if self.useVFgrads is False:
+            return smoothness_cost + 10 * action_cost
+        else:
+            vf_output = self.query_ensemble(state, self.models, self.poses_mean, self.poses_std, self.cost_mean, self.cost_std)
+            vf_cost = 1.0 * torch.sum(vf_output ** 2)
+            return smoothness_cost + 10 * action_cost + vf_cost
+
     
     def _con_eq(self, xu, compute_grads=True, compute_hess=False):
         N = xu.shape[0]
