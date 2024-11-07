@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:13:31.584577063-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:13:31.584589302-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_141331-zpdfbmar/logs/debug-core.log"}
+{"time":"2024-11-05T14:13:31.584679408-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:13:31.588703648-05:00","level":"INFO","msg":"created new stream","id":"zpdfbmar"}
+{"time":"2024-11-05T14:13:31.588738811-05:00","level":"INFO","msg":"stream: started","id":"zpdfbmar"}
+{"time":"2024-11-05T14:13:31.588750392-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"zpdfbmar"}}
+{"time":"2024-11-05T14:13:31.588757566-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"zpdfbmar"}}
+{"time":"2024-11-05T14:13:31.588743601-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"zpdfbmar"}}
+{"time":"2024-11-05T14:13:31.754037914-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:13:31.75423068-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:13:50.675679545-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:13:50.679280153-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:13:51.008089858-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:13:52.148928008-05:00","level":"INFO","msg":"stream: closing","id":"zpdfbmar"}
+{"time":"2024-11-05T14:13:52.148958091-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"zpdfbmar"}}
+{"time":"2024-11-05T14:13:52.148996001-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"zpdfbmar"}}
+{"time":"2024-11-05T14:13:52.149002379-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"zpdfbmar"}}
+{"time":"2024-11-05T14:13:52.149111054-05:00","level":"INFO","msg":"stream: closed","id":"zpdfbmar"}
+{"time":"2024-11-05T14:13:55.677441621-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

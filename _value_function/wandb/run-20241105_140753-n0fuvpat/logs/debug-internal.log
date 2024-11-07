@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:07:53.05393144-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:07:53.053951312-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_140753-n0fuvpat/logs/debug-core.log"}
+{"time":"2024-11-05T14:07:53.054079005-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:07:53.0596177-05:00","level":"INFO","msg":"created new stream","id":"n0fuvpat"}
+{"time":"2024-11-05T14:07:53.059630183-05:00","level":"INFO","msg":"stream: started","id":"n0fuvpat"}
+{"time":"2024-11-05T14:07:53.059661183-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"n0fuvpat"}}
+{"time":"2024-11-05T14:07:53.059658709-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"n0fuvpat"}}
+{"time":"2024-11-05T14:07:53.059662724-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"n0fuvpat"}}
+{"time":"2024-11-05T14:07:53.266679924-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:07:53.267133852-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:07:59.401029989-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:07:59.40494907-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:07:59.709052517-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:08:00.848905489-05:00","level":"INFO","msg":"stream: closing","id":"n0fuvpat"}
+{"time":"2024-11-05T14:08:00.848943534-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"n0fuvpat"}}
+{"time":"2024-11-05T14:08:00.84897748-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"n0fuvpat"}}
+{"time":"2024-11-05T14:08:00.849027783-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"n0fuvpat"}}
+{"time":"2024-11-05T14:08:00.849089082-05:00","level":"INFO","msg":"stream: closed","id":"n0fuvpat"}
+{"time":"2024-11-05T14:08:04.403231679-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

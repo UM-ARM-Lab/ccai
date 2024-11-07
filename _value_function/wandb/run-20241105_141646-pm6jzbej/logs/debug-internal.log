@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:16:46.498148927-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:16:46.498173552-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_141646-pm6jzbej/logs/debug-core.log"}
+{"time":"2024-11-05T14:16:46.498334671-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:16:46.504238846-05:00","level":"INFO","msg":"created new stream","id":"pm6jzbej"}
+{"time":"2024-11-05T14:16:46.504262512-05:00","level":"INFO","msg":"stream: started","id":"pm6jzbej"}
+{"time":"2024-11-05T14:16:46.504283341-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"pm6jzbej"}}
+{"time":"2024-11-05T14:16:46.504303233-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"pm6jzbej"}}
+{"time":"2024-11-05T14:16:46.504316984-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"pm6jzbej"}}
+{"time":"2024-11-05T14:16:46.827617429-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:16:46.827843574-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:16:54.027347569-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:16:54.031309596-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:16:55.297991153-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:16:56.640286896-05:00","level":"INFO","msg":"stream: closing","id":"pm6jzbej"}
+{"time":"2024-11-05T14:16:56.640301015-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"pm6jzbej"}}
+{"time":"2024-11-05T14:16:56.640317149-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"pm6jzbej"}}
+{"time":"2024-11-05T14:16:56.640339854-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"pm6jzbej"}}
+{"time":"2024-11-05T14:16:56.640354025-05:00","level":"INFO","msg":"stream: closed","id":"pm6jzbej"}
+{"time":"2024-11-05T14:16:59.029559795-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

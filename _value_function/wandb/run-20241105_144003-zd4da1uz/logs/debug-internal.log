@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:40:03.120121007-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:40:03.12012927-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_144003-zd4da1uz/logs/debug-core.log"}
+{"time":"2024-11-05T14:40:03.120204902-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:40:03.122673988-05:00","level":"INFO","msg":"created new stream","id":"zd4da1uz"}
+{"time":"2024-11-05T14:40:03.122685012-05:00","level":"INFO","msg":"stream: started","id":"zd4da1uz"}
+{"time":"2024-11-05T14:40:03.122707216-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"zd4da1uz"}}
+{"time":"2024-11-05T14:40:03.122716424-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"zd4da1uz"}}
+{"time":"2024-11-05T14:40:03.122722666-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"zd4da1uz"}}
+{"time":"2024-11-05T14:40:03.384802741-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:40:03.385052868-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:40:17.686772618-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:40:17.690417821-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:40:18.010413786-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:40:19.257029167-05:00","level":"INFO","msg":"stream: closing","id":"zd4da1uz"}
+{"time":"2024-11-05T14:40:19.257056886-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"zd4da1uz"}}
+{"time":"2024-11-05T14:40:19.257075843-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"zd4da1uz"}}
+{"time":"2024-11-05T14:40:19.257108978-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"zd4da1uz"}}
+{"time":"2024-11-05T14:40:19.257144574-05:00","level":"INFO","msg":"stream: closed","id":"zd4da1uz"}
+{"time":"2024-11-05T14:40:22.688874754-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

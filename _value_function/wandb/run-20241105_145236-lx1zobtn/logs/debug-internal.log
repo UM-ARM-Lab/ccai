@@ -1,0 +1,16 @@
+{"time":"2024-11-05T14:52:36.525145105-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:52:36.5251537-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_145236-lx1zobtn/logs/debug-core.log"}
+{"time":"2024-11-05T14:52:36.525261648-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:52:36.527999697-05:00","level":"INFO","msg":"created new stream","id":"lx1zobtn"}
+{"time":"2024-11-05T14:52:36.528037138-05:00","level":"INFO","msg":"stream: started","id":"lx1zobtn"}
+{"time":"2024-11-05T14:52:36.528051985-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"lx1zobtn"}}
+{"time":"2024-11-05T14:52:36.528056836-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"lx1zobtn"}}
+{"time":"2024-11-05T14:52:36.528051614-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"lx1zobtn"}}
+{"time":"2024-11-05T14:52:36.692666321-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:52:36.692911775-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:53:01.5071054-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:53:01.514517683-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:53:01.839856435-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:53:06.511972056-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}
+{"time":"2024-11-05T14:53:50.815816794-05:00","level":"INFO","msg":"stream: closing","id":"lx1zobtn"}
+{"time":"2024-11-05T14:53:50.815855145-05:00","level":"ERROR","msg":"sender: received Exit record more than once, ignoring"}

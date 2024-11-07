@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:21:19.007069477-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:21:19.007078468-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_142119-bqlgoyrg/logs/debug-core.log"}
+{"time":"2024-11-05T14:21:19.007151261-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:21:19.009840971-05:00","level":"INFO","msg":"created new stream","id":"bqlgoyrg"}
+{"time":"2024-11-05T14:21:19.009854915-05:00","level":"INFO","msg":"stream: started","id":"bqlgoyrg"}
+{"time":"2024-11-05T14:21:19.009868425-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"bqlgoyrg"}}
+{"time":"2024-11-05T14:21:19.009862801-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"bqlgoyrg"}}
+{"time":"2024-11-05T14:21:19.009858593-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"bqlgoyrg"}}
+{"time":"2024-11-05T14:21:19.477459714-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:21:19.477831545-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:21:25.600281471-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:21:25.603377773-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:21:25.938627593-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:21:27.117032251-05:00","level":"INFO","msg":"stream: closing","id":"bqlgoyrg"}
+{"time":"2024-11-05T14:21:27.117076812-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"bqlgoyrg"}}
+{"time":"2024-11-05T14:21:27.117117552-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"bqlgoyrg"}}
+{"time":"2024-11-05T14:21:27.117164843-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"bqlgoyrg"}}
+{"time":"2024-11-05T14:21:27.117239966-05:00","level":"INFO","msg":"stream: closed","id":"bqlgoyrg"}
+{"time":"2024-11-05T14:21:30.602427753-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

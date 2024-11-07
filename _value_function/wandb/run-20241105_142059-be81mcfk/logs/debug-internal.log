@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:20:59.042437989-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:20:59.042458158-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_142059-be81mcfk/logs/debug-core.log"}
+{"time":"2024-11-05T14:20:59.042612292-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:20:59.048127797-05:00","level":"INFO","msg":"created new stream","id":"be81mcfk"}
+{"time":"2024-11-05T14:20:59.04815274-05:00","level":"INFO","msg":"stream: started","id":"be81mcfk"}
+{"time":"2024-11-05T14:20:59.048174948-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"be81mcfk"}}
+{"time":"2024-11-05T14:20:59.04819503-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"be81mcfk"}}
+{"time":"2024-11-05T14:20:59.048212702-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"be81mcfk"}}
+{"time":"2024-11-05T14:20:59.255863365-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:20:59.25624646-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:21:17.504424129-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:21:17.508567627-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:21:17.83423466-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:21:18.942538303-05:00","level":"INFO","msg":"stream: closing","id":"be81mcfk"}
+{"time":"2024-11-05T14:21:18.942550551-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"be81mcfk"}}
+{"time":"2024-11-05T14:21:18.942576147-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"be81mcfk"}}
+{"time":"2024-11-05T14:21:18.942610199-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"be81mcfk"}}
+{"time":"2024-11-05T14:21:18.942624039-05:00","level":"INFO","msg":"stream: closed","id":"be81mcfk"}
+{"time":"2024-11-05T14:21:22.507026615-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

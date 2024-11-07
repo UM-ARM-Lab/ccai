@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:22:57.927930508-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:22:57.92795462-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_142257-5yg34ugp/logs/debug-core.log"}
+{"time":"2024-11-05T14:22:57.928116114-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:22:57.933650935-05:00","level":"INFO","msg":"created new stream","id":"5yg34ugp"}
+{"time":"2024-11-05T14:22:57.933672656-05:00","level":"INFO","msg":"stream: started","id":"5yg34ugp"}
+{"time":"2024-11-05T14:22:57.933696696-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"5yg34ugp"}}
+{"time":"2024-11-05T14:22:57.933722351-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"5yg34ugp"}}
+{"time":"2024-11-05T14:22:57.933716907-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"5yg34ugp"}}
+{"time":"2024-11-05T14:22:58.302087772-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:22:58.302550164-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:23:02.341886462-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:23:02.345762319-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:23:03.106685675-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:23:04.231523925-05:00","level":"INFO","msg":"stream: closing","id":"5yg34ugp"}
+{"time":"2024-11-05T14:23:04.231550366-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"5yg34ugp"}}
+{"time":"2024-11-05T14:23:04.231561831-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"5yg34ugp"}}
+{"time":"2024-11-05T14:23:04.231572672-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"5yg34ugp"}}
+{"time":"2024-11-05T14:23:04.231608251-05:00","level":"INFO","msg":"stream: closed","id":"5yg34ugp"}
+{"time":"2024-11-05T14:23:07.343628234-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

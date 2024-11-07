@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:06:59.449379537-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:06:59.449387436-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_140659-x42uq3ua/logs/debug-core.log"}
+{"time":"2024-11-05T14:06:59.449460378-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:06:59.452086734-05:00","level":"INFO","msg":"created new stream","id":"x42uq3ua"}
+{"time":"2024-11-05T14:06:59.452105646-05:00","level":"INFO","msg":"stream: started","id":"x42uq3ua"}
+{"time":"2024-11-05T14:06:59.452121586-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"x42uq3ua"}}
+{"time":"2024-11-05T14:06:59.452116494-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"x42uq3ua"}}
+{"time":"2024-11-05T14:06:59.452126698-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"x42uq3ua"}}
+{"time":"2024-11-05T14:06:59.646354984-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:06:59.64666799-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:07:06.037954231-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:07:06.041882947-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:07:06.351132574-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:07:07.489888766-05:00","level":"INFO","msg":"stream: closing","id":"x42uq3ua"}
+{"time":"2024-11-05T14:07:07.489913402-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"x42uq3ua"}}
+{"time":"2024-11-05T14:07:07.489950608-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"x42uq3ua"}}
+{"time":"2024-11-05T14:07:07.490009755-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"x42uq3ua"}}
+{"time":"2024-11-05T14:07:07.490048486-05:00","level":"INFO","msg":"stream: closed","id":"x42uq3ua"}
+{"time":"2024-11-05T14:07:11.039741787-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

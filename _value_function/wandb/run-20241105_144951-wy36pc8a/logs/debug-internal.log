@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:49:51.450466554-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:49:51.450485426-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_144951-wy36pc8a/logs/debug-core.log"}
+{"time":"2024-11-05T14:49:51.450606241-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:49:51.453542715-05:00","level":"INFO","msg":"created new stream","id":"wy36pc8a"}
+{"time":"2024-11-05T14:49:51.453556181-05:00","level":"INFO","msg":"stream: started","id":"wy36pc8a"}
+{"time":"2024-11-05T14:49:51.453588001-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"wy36pc8a"}}
+{"time":"2024-11-05T14:49:51.453587878-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"wy36pc8a"}}
+{"time":"2024-11-05T14:49:51.453569707-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"wy36pc8a"}}
+{"time":"2024-11-05T14:49:51.774842199-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:49:51.775154528-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:50:35.362719278-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:50:35.366888174-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:50:35.750075616-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:50:36.868255957-05:00","level":"INFO","msg":"stream: closing","id":"wy36pc8a"}
+{"time":"2024-11-05T14:50:36.868272906-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"wy36pc8a"}}
+{"time":"2024-11-05T14:50:36.868288689-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"wy36pc8a"}}
+{"time":"2024-11-05T14:50:36.868318849-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"wy36pc8a"}}
+{"time":"2024-11-05T14:50:36.868349252-05:00","level":"INFO","msg":"stream: closed","id":"wy36pc8a"}
+{"time":"2024-11-05T14:50:40.365294109-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

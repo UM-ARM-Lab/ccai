@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:21:53.180961499-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:21:53.180969666-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_142153-rj40m1zv/logs/debug-core.log"}
+{"time":"2024-11-05T14:21:53.181044623-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:21:53.184257701-05:00","level":"INFO","msg":"created new stream","id":"rj40m1zv"}
+{"time":"2024-11-05T14:21:53.18427139-05:00","level":"INFO","msg":"stream: started","id":"rj40m1zv"}
+{"time":"2024-11-05T14:21:53.184285232-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"rj40m1zv"}}
+{"time":"2024-11-05T14:21:53.184302539-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"rj40m1zv"}}
+{"time":"2024-11-05T14:21:53.184306938-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"rj40m1zv"}}
+{"time":"2024-11-05T14:21:53.402690771-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:21:53.40311377-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:22:02.804887322-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:22:02.809057304-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:22:03.154144435-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:22:04.299946975-05:00","level":"INFO","msg":"stream: closing","id":"rj40m1zv"}
+{"time":"2024-11-05T14:22:04.299975202-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"rj40m1zv"}}
+{"time":"2024-11-05T14:22:04.300001196-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"rj40m1zv"}}
+{"time":"2024-11-05T14:22:04.300054024-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"rj40m1zv"}}
+{"time":"2024-11-05T14:22:04.300081324-05:00","level":"INFO","msg":"stream: closed","id":"rj40m1zv"}
+{"time":"2024-11-05T14:22:07.807046049-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

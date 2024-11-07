@@ -8,10 +8,9 @@ sys.path.append(str(CCAI_PATH))
 from screwdriver_problem import init_env, do_turn, emailer
 import torch
 
-
 # experiment_name = '_single_SGD_1k_iters'
 # experiment_name = '_single_SGD_10k_iters'
-experiment_name = '_single_Adam_1k_iters'
+# experiment_name = '_single_Adam_1k_iters'
 
 # experiment_name = '_ensemble_SGD_10k_iters'
 # experiment_name = '_ensemble_SGD_1k_iters'
@@ -19,6 +18,7 @@ experiment_name = '_single_Adam_1k_iters'
 
 # experiment_name = '_ensemble_SGD_100k_iters'
 # experiment_name = '_ensemble_Adam_100k_iters'
+experiment_name = '_ensemble_Adam_500_iters_optimal'
 
 
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
@@ -40,21 +40,26 @@ if __name__ == "__main__":
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
 
-    for i in tqdm(range(len(initial_poses))):
+    try:
+        for i in tqdm(range(len(initial_poses))):
+            _, initial_final_pose, succ, initial_full_trajectory = do_turn(initial_poses[i].reshape(1, 20), 
+                                                  config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
 
-        _, initial_final_pose, succ = do_turn(initial_poses[i].reshape(1,20), 
-                                              config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
- 
-        _, optimized_final_pose, succ = do_turn(optimized_poses[i].reshape(1,20), 
-                                                config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
+            _, optimized_final_pose, succ, optimized_full_trajectory = do_turn(optimized_poses[i].reshape(1, 20), 
+                                                    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
 
+            pose_tuples.append((initial_poses[i], optimized_poses[i], 
+                                initial_final_pose, optimized_final_pose, 
+                                initial_full_trajectory, optimized_full_trajectory))
 
-        pose_tuples.append((initial_poses[i], optimized_poses[i], initial_final_pose, optimized_final_pose))
+    except KeyboardInterrupt:
+        print("\nKeyboard interrupt! Saving...")
 
-    
-    savepath = f'{fpath.resolve()}/eval/final_pose_comparisons{experiment_name}.pkl'
-    with open(savepath, 'wb') as f:
-        pkl.dump(pose_tuples, f)
+    finally:
 
-    print(f'saved to {savepath}')
-    #emailer().send()
+        savepath = f'{fpath.resolve()}/eval/final_pose_comparisons{experiment_name}.pkl'
+        with open(savepath, 'wb') as f:
+            pkl.dump(pose_tuples, f)
+
+        print(f'Saved data to {savepath}')
+        emailer().send()

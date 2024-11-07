@@ -11,17 +11,15 @@ import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation as R
 import pytorch_kinematics.transforms as tf
 import time
+from pathlib import Path
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
 
 filenames = []
-#for i in range(10000/200):
-for i in [1,2,3,4,5,6,7,8,9,10,11,12,14,15,16,17,18,19]:
-#for i in range(19):
-    filename = f'/value_datasets/value_dataset_{i*500}.pkl'
-    filenames.append(filename)
+for file in Path(f'{fpath.resolve()}/value_datasets').glob("value_dataset_*.pkl"):
+    filenames.append(file)
 
 def calculate_cost(initial_pose, final_pose):
 
@@ -64,7 +62,7 @@ if __name__ == "__main__":
     succs = []
     fails = []
     for filename in filenames:
-        with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
+        with open(filename, 'rb') as file:
             pose_tuples = pkl.load(file)
             initial_poses, final_poses = zip(*pose_tuples)
             initial_poses = np.array([t.numpy() for t in initial_poses]).reshape(-1, 20)
@@ -85,6 +83,7 @@ if __name__ == "__main__":
             combined_costs.extend(costs)
 
     combined_costs = np.array(combined_costs)
+    print("combined costs shape: ", combined_costs.shape)
     # plot costs
     # plt.figure(figsize=(10, 6))
     # plt.hist(combined_costs.flatten(), bins=50, color='blue', label='Costs')

@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:13:11.574022677-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:13:11.574047716-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_141311-rql3ogbw/logs/debug-core.log"}
+{"time":"2024-11-05T14:13:11.574204521-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:13:11.579961551-05:00","level":"INFO","msg":"created new stream","id":"rql3ogbw"}
+{"time":"2024-11-05T14:13:11.579984179-05:00","level":"INFO","msg":"stream: started","id":"rql3ogbw"}
+{"time":"2024-11-05T14:13:11.580011522-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"rql3ogbw"}}
+{"time":"2024-11-05T14:13:11.580002632-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"rql3ogbw"}}
+{"time":"2024-11-05T14:13:11.580045713-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"rql3ogbw"}}
+{"time":"2024-11-05T14:13:11.812627083-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:13:11.813154362-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:13:29.947101328-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:13:29.951252922-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:13:30.371121434-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:13:31.523868868-05:00","level":"INFO","msg":"stream: closing","id":"rql3ogbw"}
+{"time":"2024-11-05T14:13:31.523932418-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"rql3ogbw"}}
+{"time":"2024-11-05T14:13:31.523992012-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"rql3ogbw"}}
+{"time":"2024-11-05T14:13:31.524019173-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"rql3ogbw"}}
+{"time":"2024-11-05T14:13:31.524134532-05:00","level":"INFO","msg":"stream: closed","id":"rql3ogbw"}
+{"time":"2024-11-05T14:13:34.949521942-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:37:27.28024163-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:37:27.280252366-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_143727-he5npwth/logs/debug-core.log"}
+{"time":"2024-11-05T14:37:27.280335131-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:37:27.282999316-05:00","level":"INFO","msg":"created new stream","id":"he5npwth"}
+{"time":"2024-11-05T14:37:27.283011729-05:00","level":"INFO","msg":"stream: started","id":"he5npwth"}
+{"time":"2024-11-05T14:37:27.283029023-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"he5npwth"}}
+{"time":"2024-11-05T14:37:27.283028288-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"he5npwth"}}
+{"time":"2024-11-05T14:37:27.283021808-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"he5npwth"}}
+{"time":"2024-11-05T14:37:27.467684494-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:37:27.472695152-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:37:58.882748194-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:37:58.886927464-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:37:59.493726363-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:38:00.631958442-05:00","level":"INFO","msg":"stream: closing","id":"he5npwth"}
+{"time":"2024-11-05T14:38:00.63197053-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"he5npwth"}}
+{"time":"2024-11-05T14:38:00.631982006-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"he5npwth"}}
+{"time":"2024-11-05T14:38:00.632015102-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"he5npwth"}}
+{"time":"2024-11-05T14:38:00.632020716-05:00","level":"INFO","msg":"stream: closed","id":"he5npwth"}
+{"time":"2024-11-05T14:38:03.885302449-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

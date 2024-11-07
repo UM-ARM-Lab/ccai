@@ -48,8 +48,8 @@ while True:
     for _ in tqdm(range(trials_per_save)):
         idx = np.random.randint(0, len(initial_poses))
         initial_pose = initial_poses[idx]
-        _, final_pose, succ = do_turn(initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
-        pose_tuples.append((initial_pose, final_pose))
+        _, final_pose, succ, full_trajectory = do_turn(initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
+        pose_tuples.append((initial_pose, final_pose, full_trajectory))
 
     savepath = f'{fpath.resolve()}/value_datasets/value_dataset_b_{prog_idx}.pkl'
     with open(savepath, 'wb') as f:

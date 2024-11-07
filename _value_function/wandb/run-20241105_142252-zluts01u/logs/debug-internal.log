@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:22:52.866240724-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:22:52.866265773-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_142252-zluts01u/logs/debug-core.log"}
+{"time":"2024-11-05T14:22:52.866460139-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:22:52.872499127-05:00","level":"INFO","msg":"created new stream","id":"zluts01u"}
+{"time":"2024-11-05T14:22:52.872525998-05:00","level":"INFO","msg":"stream: started","id":"zluts01u"}
+{"time":"2024-11-05T14:22:52.872545164-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"zluts01u"}}
+{"time":"2024-11-05T14:22:52.872565949-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"zluts01u"}}
+{"time":"2024-11-05T14:22:52.872562451-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"zluts01u"}}
+{"time":"2024-11-05T14:22:53.105727398-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:22:53.106145236-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:22:56.206807956-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:22:56.212799492-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:22:56.700429269-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:22:57.828568553-05:00","level":"INFO","msg":"stream: closing","id":"zluts01u"}
+{"time":"2024-11-05T14:22:57.828579397-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"zluts01u"}}
+{"time":"2024-11-05T14:22:57.82859131-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"zluts01u"}}
+{"time":"2024-11-05T14:22:57.82862483-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"zluts01u"}}
+{"time":"2024-11-05T14:22:57.828634088-05:00","level":"INFO","msg":"stream: closed","id":"zluts01u"}
+{"time":"2024-11-05T14:23:01.21087129-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

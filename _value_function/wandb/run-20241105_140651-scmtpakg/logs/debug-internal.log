@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:06:51.174898037-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:06:51.174911267-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_140651-scmtpakg/logs/debug-core.log"}
+{"time":"2024-11-05T14:06:51.174998751-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:06:51.178512167-05:00","level":"INFO","msg":"created new stream","id":"scmtpakg"}
+{"time":"2024-11-05T14:06:51.178548135-05:00","level":"INFO","msg":"stream: started","id":"scmtpakg"}
+{"time":"2024-11-05T14:06:51.178555472-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"scmtpakg"}}
+{"time":"2024-11-05T14:06:51.178569031-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"scmtpakg"}}
+{"time":"2024-11-05T14:06:51.178575533-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"scmtpakg"}}
+{"time":"2024-11-05T14:06:51.680704885-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:06:51.681133063-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:06:57.993445644-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:06:57.997079135-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:06:58.273266104-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:06:59.39267399-05:00","level":"INFO","msg":"stream: closing","id":"scmtpakg"}
+{"time":"2024-11-05T14:06:59.392711661-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"scmtpakg"}}
+{"time":"2024-11-05T14:06:59.392728975-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"scmtpakg"}}
+{"time":"2024-11-05T14:06:59.392739283-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"scmtpakg"}}
+{"time":"2024-11-05T14:06:59.39277915-05:00","level":"INFO","msg":"stream: closed","id":"scmtpakg"}
+{"time":"2024-11-05T14:07:02.99550844-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

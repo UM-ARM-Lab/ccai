@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:05:07.888921435-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:05:07.888931115-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_140507-x7tl2040/logs/debug-core.log"}
+{"time":"2024-11-05T14:05:07.889019946-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:05:07.892679799-05:00","level":"INFO","msg":"created new stream","id":"x7tl2040"}
+{"time":"2024-11-05T14:05:07.892704455-05:00","level":"INFO","msg":"stream: started","id":"x7tl2040"}
+{"time":"2024-11-05T14:05:07.892724946-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"x7tl2040"}}
+{"time":"2024-11-05T14:05:07.892726301-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"x7tl2040"}}
+{"time":"2024-11-05T14:05:07.892717567-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"x7tl2040"}}
+{"time":"2024-11-05T14:05:08.062852454-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:05:08.063216744-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:05:33.538753289-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:05:33.542606872-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:05:33.858656829-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:05:34.993198046-05:00","level":"INFO","msg":"stream: closing","id":"x7tl2040"}
+{"time":"2024-11-05T14:05:34.993225994-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"x7tl2040"}}
+{"time":"2024-11-05T14:05:34.993243447-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"x7tl2040"}}
+{"time":"2024-11-05T14:05:34.993247942-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"x7tl2040"}}
+{"time":"2024-11-05T14:05:34.993274228-05:00","level":"INFO","msg":"stream: closed","id":"x7tl2040"}
+{"time":"2024-11-05T14:05:38.540944056-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

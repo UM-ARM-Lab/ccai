@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:17:35.692747023-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:17:35.692771258-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_141735-vm5hh36v/logs/debug-core.log"}
+{"time":"2024-11-05T14:17:35.692903459-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:17:35.698134258-05:00","level":"INFO","msg":"created new stream","id":"vm5hh36v"}
+{"time":"2024-11-05T14:17:35.698162601-05:00","level":"INFO","msg":"stream: started","id":"vm5hh36v"}
+{"time":"2024-11-05T14:17:35.698182274-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"vm5hh36v"}}
+{"time":"2024-11-05T14:17:35.698209183-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"vm5hh36v"}}
+{"time":"2024-11-05T14:17:35.698204695-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"vm5hh36v"}}
+{"time":"2024-11-05T14:17:35.893383219-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:17:35.893691906-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:17:38.847415276-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:17:38.851208324-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:17:40.795202638-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:17:42.083767946-05:00","level":"INFO","msg":"stream: closing","id":"vm5hh36v"}
+{"time":"2024-11-05T14:17:42.083785036-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"vm5hh36v"}}
+{"time":"2024-11-05T14:17:42.083799058-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"vm5hh36v"}}
+{"time":"2024-11-05T14:17:42.083832546-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"vm5hh36v"}}
+{"time":"2024-11-05T14:17:42.083860809-05:00","level":"INFO","msg":"stream: closed","id":"vm5hh36v"}
+{"time":"2024-11-05T14:17:43.849376887-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

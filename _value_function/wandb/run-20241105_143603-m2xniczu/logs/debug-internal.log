@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:36:03.191928741-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:36:03.191937533-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_143603-m2xniczu/logs/debug-core.log"}
+{"time":"2024-11-05T14:36:03.192011613-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:36:03.194932117-05:00","level":"INFO","msg":"created new stream","id":"m2xniczu"}
+{"time":"2024-11-05T14:36:03.194954709-05:00","level":"INFO","msg":"stream: started","id":"m2xniczu"}
+{"time":"2024-11-05T14:36:03.194974815-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"m2xniczu"}}
+{"time":"2024-11-05T14:36:03.194989409-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"m2xniczu"}}
+{"time":"2024-11-05T14:36:03.195013197-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"m2xniczu"}}
+{"time":"2024-11-05T14:36:03.373380605-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:36:03.373731592-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:36:28.13879439-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:36:28.142639137-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:36:28.539034365-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:36:29.658802757-05:00","level":"INFO","msg":"stream: closing","id":"m2xniczu"}
+{"time":"2024-11-05T14:36:29.658814172-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"m2xniczu"}}
+{"time":"2024-11-05T14:36:29.658846629-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"m2xniczu"}}
+{"time":"2024-11-05T14:36:29.658851138-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"m2xniczu"}}
+{"time":"2024-11-05T14:36:29.658878905-05:00","level":"INFO","msg":"stream: closed","id":"m2xniczu"}
+{"time":"2024-11-05T14:36:33.140771362-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

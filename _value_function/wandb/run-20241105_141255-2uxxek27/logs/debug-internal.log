@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:12:55.314601183-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:12:55.31461952-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_141255-2uxxek27/logs/debug-core.log"}
+{"time":"2024-11-05T14:12:55.314730221-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:12:55.319899074-05:00","level":"INFO","msg":"created new stream","id":"2uxxek27"}
+{"time":"2024-11-05T14:12:55.319926482-05:00","level":"INFO","msg":"stream: started","id":"2uxxek27"}
+{"time":"2024-11-05T14:12:55.319943224-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"2uxxek27"}}
+{"time":"2024-11-05T14:12:55.319961624-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"2uxxek27"}}
+{"time":"2024-11-05T14:12:55.31996204-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"2uxxek27"}}
+{"time":"2024-11-05T14:12:55.554638963-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:12:55.555140143-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:12:58.773942055-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:12:58.777819026-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:12:59.154217664-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:13:00.28392145-05:00","level":"INFO","msg":"stream: closing","id":"2uxxek27"}
+{"time":"2024-11-05T14:13:00.28393793-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"2uxxek27"}}
+{"time":"2024-11-05T14:13:00.283960666-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"2uxxek27"}}
+{"time":"2024-11-05T14:13:00.283978451-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"2uxxek27"}}
+{"time":"2024-11-05T14:13:00.284001247-05:00","level":"INFO","msg":"stream: closed","id":"2uxxek27"}
+{"time":"2024-11-05T14:13:03.776171033-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

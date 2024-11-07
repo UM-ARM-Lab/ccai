@@ -1,4 +1,4 @@
-from screwdriver_problem import init_env
+from screwdriver_problem import init_env, convert_full_to_partial_config
 from process_final_poses import calculate_cost
 from train_value_function import Net, query_ensemble
 import pathlib
@@ -24,14 +24,16 @@ fpath = pathlib.Path(f'{CCAI_PATH}/data')
 # experiment_name = '_ensemble_SGD_1k_iters'
 # experiment_name = '_ensemble_Adam_1k_iters'
 # experiment_name = '_ensemble_Adam_100k_iters'
-experiment_name = '_ensemble_SGD_100k_iters'
-
-# experiment_name = '_mse_50samples'
+experiment_name = '_ensemble_Adam_500_iters_optimal'
 
 filename = f'final_pose_comparisons{experiment_name}.pkl'
 with open(f'{fpath.resolve()}/eval/{filename}', 'rb') as file:
     tuples = pkl.load(file)
-    initial_poses, optimized_poses, initial_final_poses, optimized_final_poses = zip(*tuples)
+    # initial_poses_full, optimized_poses_full, initial_final_poses, optimized_final_poses = zip(*[(t[0], t[1], t[2], t[3]) for t in tuples])
+    initial_poses_full, optimized_poses_full,\
+    initial_final_poses, optimized_final_poses,\
+    initial_trajectories, optimized_trajectories = zip(*tuples)
+
     initial_final_poses = np.array(initial_final_poses).reshape(-1, 20)
     optimized_final_poses = np.array(optimized_final_poses).reshape(-1, 20)
 
@@ -42,20 +44,25 @@ with open(f'{fpath.resolve()}/initial_poses/initial_poses_10k.pkl', 'rb') as fil
 
 if __name__ == "__main__":
 
+    ############################################################
+    # Get real costs before and after
+
     initial_costs = []
     optimized_costs = []
-    for i in range(len(initial_poses)):
-        before, _ = calculate_cost(initial_poses[i].numpy(), initial_final_poses[i])
+    for i in range(len(initial_poses_full)):
+        before, _ = calculate_cost(initial_poses_full[i].numpy(), initial_final_poses[i])
         initial_costs.append(before)
-        after, _ = calculate_cost(optimized_poses[i].numpy(), optimized_final_poses[i])
+        after, _ = calculate_cost(optimized_poses_full[i].numpy(), optimized_final_poses[i])
         optimized_costs.append(after)
 
+    # print(initial_costs)
+    # print(optimized_costs)
+    # exit()
     ############################################################
     # Get predicted costs before and after
-
     checkpoints = torch.load(open(f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl', 'rb'))
     models = []
-    shape = (20, 1)
+    shape = (15, 1)
     for checkpoint in checkpoints:
         model = Net(shape[0], shape[1])
         model.load_state_dict(checkpoint['model_state'])
@@ -72,24 +79,28 @@ if __name__ == "__main__":
     predicted_stds_before = []
     predicted_stds_after = []
     
-    for initial_pose, optimized_pose in zip(initial_poses, optimized_poses):
-        initial_pose = (initial_pose - poses_mean) / (poses_std + 0.000001)
-        initial_pose = initial_pose.float()
-        optimized_pose = (optimized_pose - poses_mean) / (poses_std + 0.000001)
-        optimized_pose = optimized_pose.float()
+    for initial_pose_full, optimized_pose_full in zip(initial_poses_full, optimized_poses_full):
 
-        before = query_ensemble(initial_pose, models)
-        after = query_ensemble(optimized_pose, models)
+        initial_pose = convert_full_to_partial_config(initial_pose_full.reshape(1,20))
+        optimized_pose = convert_full_to_partial_config(optimized_pose_full.reshape(1,20))
+        initial_pose_norm = (initial_pose - poses_mean) / poses_std
+        initial_pose_norm = initial_pose_norm.float()
+        optimized_pose_norm = (optimized_pose - poses_mean) / poses_std
+        optimized_pose_norm = optimized_pose_norm.float()
 
-        prediction_before = before.mean(dim=0)
-        stds_before = before.std(dim=0)  
-        prediction_after = after.mean(dim=0)
-        stds_after = after.std(dim=0)
 
-        prediction_before = prediction_before * cost_std + cost_mean
-        prediction_after = prediction_after * cost_std + cost_mean
-        stds_before = stds_before * cost_std
-        stds_after = stds_after * cost_std
+        before = query_ensemble(initial_pose_norm, models)
+        after = query_ensemble(optimized_pose_norm, models)
+
+        prediction_before_norm = before.mean(dim=0)
+        stds_before_norm = before.std(dim=0)  
+        prediction_after_norm = after.mean(dim=0)
+        stds_after_norm = after.std(dim=0)
+
+        prediction_before = prediction_before_norm * cost_std + cost_mean
+        prediction_after = prediction_after_norm * cost_std + cost_mean
+        stds_before = stds_before_norm * cost_std
+        stds_after = stds_after_norm * cost_std
 
         predicted_costs_before.append(prediction_before.detach().numpy())
         predicted_stds_before.append(stds_before.detach().numpy())
@@ -108,12 +119,13 @@ if __name__ == "__main__":
     predicted_offset = -real_offset  # Slightly shift predicted costs to the right
 
     # Limit the values for plotting
-    predicted_costs_before = predicted_costs_before[:20]
-    predicted_costs_after = predicted_costs_after[:20]
-    predicted_stds_before = predicted_stds_before[:20]
-    predicted_stds_after = predicted_stds_after[:20]
-    initial_costs = initial_costs[:20]
-    optimized_costs = optimized_costs[:20]
+    n_plot = 20
+    predicted_costs_before = predicted_costs_before[:n_plot]
+    predicted_costs_after = predicted_costs_after[:n_plot]
+    predicted_stds_before = predicted_stds_before[:n_plot]
+    predicted_stds_after = predicted_stds_after[:n_plot]
+    initial_costs = initial_costs[:n_plot]
+    optimized_costs = optimized_costs[:n_plot]
 
     # Scatter initial and optimized costs with error bars and offsets
     plt.errorbar(
@@ -153,33 +165,35 @@ if __name__ == "__main__":
     plt.show()
 
 
-    vis = False
+    vis = True
     if vis:
         params, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
-        for i in range(len(initial_poses)):
-            print("original turn")
-            print("cost: ", initial_costs[i])
+        for i in range(len(initial_poses_full)):
+        # for i in range(5):
 
-            # env.reset(initial_poses[i].reshape(1,20).float(), deterministic=True)
-            # time.sleep(0.5)
-            # env.reset(torch.from_numpy(initial_final_poses[i]).reshape(1,20).float(), deterministic=True)
-            # time.sleep(1.0)
+            if optimized_costs[i] > 3:
 
-            print("optimized turn")
-            print("cost: ", optimized_costs[i])
+                for j in range(len(initial_trajectories[i])):
+                    env.reset(torch.from_numpy(initial_trajectories[i][j]).reshape(1,20).float(), deterministic=True)
+                    time.sleep(0.1)
+                time.sleep(1.0)
+                for j in range(len(optimized_trajectories[i])):
+                    env.reset(torch.from_numpy(optimized_trajectories[i][j]).reshape(1,20).float(), deterministic=True)
+                    time.sleep(0.1)
+                time.sleep(1.0)
 
-            # if optimized_costs[i] > 3:
+                # print("original turn")
+                # print("cost: ", initial_costs[i])
 
-            env.reset(optimized_poses[i].reshape(1,20).float(), deterministic=True)
-            time.sleep(.5)
-            # env.reset(torch.from_numpy(optimized_final_poses[i]).reshape(1,20).float(), deterministic=True)
-            # time.sleep(1.0)
-
-
-
-                # print("original pose")
-                # env.reset(initial_poses[i].reshape(1,20).float(), deterministic=True)
+                # env.reset(initial_poses_full[i].reshape(1,20).float(), deterministic=True)
                 # time.sleep(0.5)
-                # print("optimized pose")
-                # env.reset(optimized_poses[i].reshape(1,20).float(), deterministic=True)
+                # env.reset(torch.from_numpy(initial_final_poses[i]).reshape(1,20).float(), deterministic=True)
                 # time.sleep(1.0)
+
+                # print("optimized turn")
+                # print("cost: ", optimized_costs[i])
+
+                # env.reset(optimized_poses_full[i].reshape(1,20).float(), deterministic=True)
+                # time.sleep(2.0)
+                # env.reset(torch.from_numpy(optimized_final_poses[i]).reshape(1,20).float(), deterministic=True)
+                # time.sleep(3.0)

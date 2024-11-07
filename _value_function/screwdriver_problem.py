@@ -25,6 +25,90 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+# 20 to 15
+def convert_full_to_partial_config(full_config):
+    assert(full_config.shape[1] == 20)
+
+    if isinstance(full_config, torch.Tensor):
+        full_config = full_config.clone().float()
+        partial_config = torch.cat((
+        full_config[:,:8],
+        full_config[:,12:19]
+        ), dim=1).float()
+    else:
+        full_config = full_config.copy()
+        partial_config = np.concatenate((
+        full_config[:,:8],
+        full_config[:,12:19]
+        ), axis=1)
+
+    return partial_config.reshape(-1,15)
+
+# 15 to 20
+def convert_partial_to_full_config(partial_config):
+    assert(partial_config.shape[1] == 15)
+
+    if isinstance(partial_config, torch.Tensor):
+        partial_config = partial_config.clone().float()
+        full_config = torch.cat((
+        partial_config[:,:8],
+        torch.tensor([[0., 0.5, 0.65, 0.65]]) * torch.ones(partial_config.shape[0], 1),
+        partial_config[:,8:],
+        torch.zeros(partial_config.shape[0], 1)
+        ), dim=1)
+    else:
+        partial_config = partial_config.copy()
+        full_config = np.concatenate((
+        partial_config[:,:8],
+        np.array([[0., 0.5, 0.65, 0.65]]) * np.ones((partial_config.shape[0], 1)),
+        partial_config[:,8:],
+        np.zeros((partial_config.shape[0], 1))
+        ), axis=1)
+
+    return full_config.reshape(-1,20)
+
+def init_env(visualize=False):
+    CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
+    img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver.yaml').read_text())
+    sim_env = None
+    ros_copy_node = None
+    env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
+                                use_cartesian_controller=False,
+                                viewer=visualize,
+                                steps_per_action=60,
+                                friction_coefficient=1.0,
+                                device=config['sim_device'],
+                                video_save_path=img_save_dir,
+                                joint_stiffness=config['kp'],
+                                fingers=config['fingers'],
+                                gradual_control=True,
+                                gravity=True,
+                                randomize_obj_start= True
+                                #device = config['device'],
+                                )
+    sim, gym, viewer = env.get_sim()
+    results = {}
+    succ_rate = {}
+    # set up the kinematic chain
+    asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
+    ee_names = {
+            'index': 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
+            'middle': 'allegro_hand_naka_finger_finger_1_aftc_base_link',
+            'ring': 'allegro_hand_kusuri_finger_finger_2_aftc_base_link',
+            'thumb': 'allegro_hand_oya_finger_3_aftc_base_link',
+            }
+    config['ee_names'] = ee_names
+    config['obj_dof_code'] = [0, 0, 0, 1, 1, 1]
+    config['obj_dof'] = np.sum(config['obj_dof_code'])
+    
+    chain = pk.build_chain_from_urdf(open(asset).read())
+    frame_indices = [chain.frame_to_idx[ee_names[finger]] for finger in config['fingers']]    # combined chain
+    frame_indices = torch.tensor(frame_indices)
+    state2ee_pos_partial = partial(state2ee_pos, fingers=config['fingers'], chain=chain, frame_indices=frame_indices, world_trans=env.world_trans)
+
+    return config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial
+
 def pregrasp(env, config, chain):
     params = config.copy()
     controller = 'csvgd'
@@ -239,55 +323,21 @@ def solve_turn(env, gym, viewer, params, fpath, initial_pose, state2ee_pos_parti
     #     d2goal=final_distance_to_goal.cpu().numpy())
 
     state = env.get_state()['q']
+
     final_state = torch.cat((
                     state.clone()[:, :8], 
                     torch.tensor([[0., 0.5, 0.65, 0.65]]), 
                     state.clone()[:, 8:], 
                     ), dim=1).detach().cpu().numpy()
+     
+    full_trajectory = torch.cat((
+                    actual_trajectory.clone()[:, :8].detach().cpu(), 
+                    torch.tensor([[0., 0.5, 0.65, 0.65]]) * torch.ones(actual_trajectory.shape[0], 1),
+                    actual_trajectory.clone()[:, 8:].detach().cpu(), 
+                    torch.zeros(actual_trajectory.shape[0], 1)
+                    ), dim=1).numpy()
     
-    return final_distance_to_goal.cpu().detach().item(), final_state #final_cost, 
-
-def init_env(visualize=False):
-    CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
-    img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver.yaml').read_text())
-    sim_env = None
-    ros_copy_node = None
-    env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
-                                use_cartesian_controller=False,
-                                viewer=visualize,
-                                steps_per_action=60,
-                                friction_coefficient=1.0,
-                                device=config['sim_device'],
-                                video_save_path=img_save_dir,
-                                joint_stiffness=config['kp'],
-                                fingers=config['fingers'],
-                                gradual_control=True,
-                                gravity=True,
-                                randomize_obj_start= True
-                                #device = config['device'],
-                                )
-    sim, gym, viewer = env.get_sim()
-    results = {}
-    succ_rate = {}
-    # set up the kinematic chain
-    asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
-    ee_names = {
-            'index': 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
-            'middle': 'allegro_hand_naka_finger_finger_1_aftc_base_link',
-            'ring': 'allegro_hand_kusuri_finger_finger_2_aftc_base_link',
-            'thumb': 'allegro_hand_oya_finger_3_aftc_base_link',
-            }
-    config['ee_names'] = ee_names
-    config['obj_dof_code'] = [0, 0, 0, 1, 1, 1]
-    config['obj_dof'] = np.sum(config['obj_dof_code'])
-    
-    chain = pk.build_chain_from_urdf(open(asset).read())
-    frame_indices = [chain.frame_to_idx[ee_names[finger]] for finger in config['fingers']]    # combined chain
-    frame_indices = torch.tensor(frame_indices)
-    state2ee_pos_partial = partial(state2ee_pos, fingers=config['fingers'], chain=chain, frame_indices=frame_indices, world_trans=env.world_trans)
-
-    return config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial
+    return final_distance_to_goal.cpu().detach().item(), final_state, full_trajectory #final_cost, 
 
 def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial):
 
@@ -309,12 +359,12 @@ def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym,
     object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
     params['object_location'] = object_location
 
-    final_distance_to_goal,final_pose = solve_turn(env, gym, viewer, params, fpath, initial_pose, state2ee_pos_partial, sim_env, ros_copy_node)
+    final_distance_to_goal, final_pose, full_trajectory = solve_turn(env, gym, viewer, params, fpath, initial_pose, state2ee_pos_partial, sim_env, ros_copy_node)
     
     if final_distance_to_goal < 30 / 180 * np.pi:
         succ = True
 
-    return initial_pose, final_pose, succ
+    return initial_pose, final_pose, succ, full_trajectory
 
 class emailer():
     def __init__(self):
@@ -342,16 +392,16 @@ class emailer():
         finally:
             server.quit()
 
-def show_state(env, state, t=1):
-    env.reset(dof_pos=state)
-    time.sleep(t)
+# def show_state(env, state, t=1):
+#     env.reset(dof_pos=state)
+#     time.sleep(t)
 
 if __name__ == "__main__":
 
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
     initial_poses = pkl.load(open(f'{fpath.resolve()}/initial_poses/initial_poses_10k.pkl', 'rb'))
-    show_state(env, initial_poses[0], t=2)
-    show_state(env, initial_poses[1], t=2)
-    initial_pose, final_pose, succ = do_turn(initial_poses[0], config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
+    # show_state(env, initial_poses[0], t=2)
+    # show_state(env, initial_poses[1], t=2)
+    initial_pose, final_pose, succ, full_trajectory = do_turn(initial_poses[0], config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
     

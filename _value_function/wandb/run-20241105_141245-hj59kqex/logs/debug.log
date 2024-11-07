@@ -1,0 +1,32 @@
+2024-11-05 14:12:45,360 INFO    MainThread:2609657 [wandb_setup.py:_flush():79] Current SDK version is 0.18.3
+2024-11-05 14:12:45,360 INFO    MainThread:2609657 [wandb_setup.py:_flush():79] Configure stats pid to 2609657
+2024-11-05 14:12:45,360 INFO    MainThread:2609657 [wandb_setup.py:_flush():79] Loading settings from /home/newuser/.config/wandb/settings
+2024-11-05 14:12:45,360 INFO    MainThread:2609657 [wandb_setup.py:_flush():79] Loading settings from /home/newuser/Desktop/Honda/ccai/_value_function/wandb/settings
+2024-11-05 14:12:45,360 INFO    MainThread:2609657 [wandb_setup.py:_flush():79] Loading settings from environment variables: {}
+2024-11-05 14:12:45,360 INFO    MainThread:2609657 [wandb_setup.py:_flush():79] Applying setup settings: {'mode': None, '_disable_service': None}
+2024-11-05 14:12:45,360 INFO    MainThread:2609657 [wandb_setup.py:_flush():79] Inferring run settings from compute environment: {'program_relpath': '_value_function/train_value_function.py', 'program_abspath': '/home/newuser/Desktop/Honda/ccai/_value_function/train_value_function.py', 'program': 'train_value_function.py'}
+2024-11-05 14:12:45,360 INFO    MainThread:2609657 [wandb_setup.py:_flush():79] Applying login settings: {}
+2024-11-05 14:12:45,360 INFO    MainThread:2609657 [wandb_init.py:_log_setup():532] Logging user logs to /home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_141245-hj59kqex/logs/debug.log
+2024-11-05 14:12:45,360 INFO    MainThread:2609657 [wandb_init.py:_log_setup():533] Logging internal logs to /home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_141245-hj59kqex/logs/debug-internal.log
+2024-11-05 14:12:45,360 INFO    MainThread:2609657 [wandb_init.py:init():617] calling init triggers
+2024-11-05 14:12:45,360 INFO    MainThread:2609657 [wandb_init.py:init():624] wandb.init called with sweep_config: {}
+config: {'epochs': 50, 'batch_size': 256, 'learning_rate': 0.0001}
+2024-11-05 14:12:45,360 INFO    MainThread:2609657 [wandb_init.py:init():667] starting backend
+2024-11-05 14:12:45,360 INFO    MainThread:2609657 [wandb_init.py:init():671] sending inform_init request
+2024-11-05 14:12:45,361 INFO    MainThread:2609657 [backend.py:_multiprocessing_setup():104] multiprocessing start_methods=fork,spawn,forkserver, using: spawn
+2024-11-05 14:12:45,362 INFO    MainThread:2609657 [wandb_init.py:init():684] backend started and connected
+2024-11-05 14:12:45,367 INFO    MainThread:2609657 [wandb_init.py:init():779] updated telemetry
+2024-11-05 14:12:45,389 INFO    MainThread:2609657 [wandb_init.py:init():812] communicating run to backend with 90.0 second timeout
+2024-11-05 14:12:45,597 INFO    MainThread:2609657 [wandb_init.py:init():863] starting run threads in backend
+2024-11-05 14:12:45,705 INFO    MainThread:2609657 [wandb_run.py:_console_start():2465] atexit reg
+2024-11-05 14:12:45,705 INFO    MainThread:2609657 [wandb_run.py:_redirect():2313] redirect: wrap_raw
+2024-11-05 14:12:45,705 INFO    MainThread:2609657 [wandb_run.py:_redirect():2378] Wrapping output streams.
+2024-11-05 14:12:45,706 INFO    MainThread:2609657 [wandb_run.py:_redirect():2403] Redirects installed.
+2024-11-05 14:12:45,706 INFO    MainThread:2609657 [wandb_init.py:init():907] run started, returning control to user process
+2024-11-05 14:12:48,724 INFO    MainThread:2609657 [wandb_run.py:_finish():2164] finishing run adamhung00/value-function-training/hj59kqex
+2024-11-05 14:12:48,724 INFO    MainThread:2609657 [wandb_run.py:_atexit_cleanup():2428] got exitcode: 0
+2024-11-05 14:12:48,724 INFO    MainThread:2609657 [wandb_run.py:_restore():2410] restore
+2024-11-05 14:12:48,724 INFO    MainThread:2609657 [wandb_run.py:_restore():2416] restore done
+2024-11-05 14:12:50,303 INFO    MainThread:2609657 [wandb_run.py:_footer_history_summary_info():4049] rendering history
+2024-11-05 14:12:50,303 INFO    MainThread:2609657 [wandb_run.py:_footer_history_summary_info():4081] rendering summary
+2024-11-05 14:12:50,310 INFO    MainThread:2609657 [wandb_run.py:_footer_sync_info():4008] logging synced files

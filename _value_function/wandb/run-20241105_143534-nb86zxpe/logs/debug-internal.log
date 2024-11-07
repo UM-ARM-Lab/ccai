@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:35:34.713288227-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:35:34.713296165-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_143534-nb86zxpe/logs/debug-core.log"}
+{"time":"2024-11-05T14:35:34.713366106-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:35:34.715842998-05:00","level":"INFO","msg":"created new stream","id":"nb86zxpe"}
+{"time":"2024-11-05T14:35:34.715854409-05:00","level":"INFO","msg":"stream: started","id":"nb86zxpe"}
+{"time":"2024-11-05T14:35:34.715861611-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"nb86zxpe"}}
+{"time":"2024-11-05T14:35:34.715868572-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"nb86zxpe"}}
+{"time":"2024-11-05T14:35:34.715865618-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"nb86zxpe"}}
+{"time":"2024-11-05T14:35:34.879624797-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:35:34.879822603-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:36:01.640638104-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:36:01.644779449-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:36:01.976315432-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:36:03.133858898-05:00","level":"INFO","msg":"stream: closing","id":"nb86zxpe"}
+{"time":"2024-11-05T14:36:03.133870467-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"nb86zxpe"}}
+{"time":"2024-11-05T14:36:03.133881019-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"nb86zxpe"}}
+{"time":"2024-11-05T14:36:03.133926697-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"nb86zxpe"}}
+{"time":"2024-11-05T14:36:03.13394629-05:00","level":"INFO","msg":"stream: closed","id":"nb86zxpe"}
+{"time":"2024-11-05T14:36:06.643089023-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

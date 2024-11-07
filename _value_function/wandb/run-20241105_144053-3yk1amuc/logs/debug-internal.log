@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:40:53.552364844-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:40:53.552394084-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_144053-3yk1amuc/logs/debug-core.log"}
+{"time":"2024-11-05T14:40:53.552585569-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:40:53.558401334-05:00","level":"INFO","msg":"created new stream","id":"3yk1amuc"}
+{"time":"2024-11-05T14:40:53.558427329-05:00","level":"INFO","msg":"stream: started","id":"3yk1amuc"}
+{"time":"2024-11-05T14:40:53.558459432-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"3yk1amuc"}}
+{"time":"2024-11-05T14:40:53.558474451-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"3yk1amuc"}}
+{"time":"2024-11-05T14:40:53.55849699-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"3yk1amuc"}}
+{"time":"2024-11-05T14:40:53.783925641-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:40:53.784402759-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:41:11.509616593-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:41:11.513529815-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:41:11.889175231-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:41:13.357638043-05:00","level":"INFO","msg":"stream: closing","id":"3yk1amuc"}
+{"time":"2024-11-05T14:41:13.357653134-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"3yk1amuc"}}
+{"time":"2024-11-05T14:41:13.357688897-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"3yk1amuc"}}
+{"time":"2024-11-05T14:41:13.357666981-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"3yk1amuc"}}
+{"time":"2024-11-05T14:41:13.357740285-05:00","level":"INFO","msg":"stream: closed","id":"3yk1amuc"}
+{"time":"2024-11-05T14:41:16.511793858-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

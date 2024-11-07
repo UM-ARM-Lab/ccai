@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:22:42.306737841-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:22:42.306746112-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_142242-wv498v2s/logs/debug-core.log"}
+{"time":"2024-11-05T14:22:42.306823906-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:22:42.309327681-05:00","level":"INFO","msg":"created new stream","id":"wv498v2s"}
+{"time":"2024-11-05T14:22:42.30934156-05:00","level":"INFO","msg":"stream: started","id":"wv498v2s"}
+{"time":"2024-11-05T14:22:42.309354608-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"wv498v2s"}}
+{"time":"2024-11-05T14:22:42.309347406-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"wv498v2s"}}
+{"time":"2024-11-05T14:22:42.309358301-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"wv498v2s"}}
+{"time":"2024-11-05T14:22:42.693914995-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:22:42.694478294-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:22:46.228521083-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:22:46.231976754-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:22:46.566996366-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:22:47.765144171-05:00","level":"INFO","msg":"stream: closing","id":"wv498v2s"}
+{"time":"2024-11-05T14:22:47.765170238-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"wv498v2s"}}
+{"time":"2024-11-05T14:22:47.765182858-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"wv498v2s"}}
+{"time":"2024-11-05T14:22:47.765210168-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"wv498v2s"}}
+{"time":"2024-11-05T14:22:47.765215291-05:00","level":"INFO","msg":"stream: closed","id":"wv498v2s"}
+{"time":"2024-11-05T14:22:51.230788596-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

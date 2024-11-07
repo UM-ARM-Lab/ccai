@@ -1,3 +1,4 @@
+from screwdriver_problem import convert_full_to_partial_config
 import pathlib
 import numpy as np
 import pickle as pkl
@@ -11,21 +12,22 @@ import matplotlib.pyplot as plt
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
-
-def load_data():
+def load_data(batch_size = 64):
     filename = '/value_datasets/combined_value_dataset.pkl'
     validation_proportion = 0.1
     
     with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
         pose_cost_tuples  = pkl.load(file)
-        poses, costs = zip(*pose_cost_tuples)
+        full_poses, costs = zip(*[(t[0], t[1]) for t in pose_cost_tuples])
+
+    full_poses = np.array(full_poses).reshape(-1,20)
+    poses = convert_full_to_partial_config(full_poses)
 
     num_samples = len(poses)
     split_idx = int(num_samples * (1 - validation_proportion))
 
-    poses = np.array(poses).reshape(-1,20)
     poses_mean, poses_std = np.mean(poses[:split_idx], axis=0), np.std(poses[:split_idx], axis=0)
-    poses_norm = (poses - poses_mean) / (poses_std + 0.000001)
+    poses_norm = (poses - poses_mean) / poses_std
 
     costs = np.array(costs).flatten()
     cost_mean, cost_std = np.mean(costs[:split_idx]), np.std(costs[:split_idx])
@@ -42,8 +44,8 @@ def load_data():
     train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 
     # Create data loaders
-    train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     min_std_threshold = 1e-5
     poses_std = np.where(poses_std < min_std_threshold, min_std_threshold, poses_std)
@@ -51,9 +53,8 @@ def load_data():
     return train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std
 
 class Net(nn.Module):
-    def __init__(self, dim_in, dim_out):
+    def __init__(self, dim_in, dim_out, neurons = 12):
         super(Net, self).__init__()
-        neurons = 32
         self.fc1 = nn.Linear(dim_in, neurons)
         self.fc2 = nn.Linear(neurons, neurons)
         self.fc3 = nn.Linear(neurons, dim_out)
@@ -65,24 +66,24 @@ class Net(nn.Module):
         return output.squeeze()
     
 
-def train():
-    shape = (20,1)
+def train(batch_size = 100, lr = 0.01, epochs = 205, neurons = 12):
+    shape = (15,1)
     
     # Initialize W&B
-    wandb.init(project="value-function-training", config={
-        "epochs": 300,
-        "batch_size": 64,
-        "learning_rate": 0.0001,
-    })
+    # wandb.init(project="value-function-training", config={
+    #     "epochs": epochs,
+    #     "batch_size": batch_size,
+    #     "learning_rate": lr,
+    # })
     
-    train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std = load_data()
+    train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std = load_data(batch_size=batch_size)
 
-    model = Net(shape[0], shape[1])  # Instantiate the neural network model
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001) 
+    model = Net(shape[0], shape[1], neurons = neurons)  # Instantiate the neural network model
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr) 
     criterion = nn.MSELoss()
 
     # Training loop
-    num_epochs = wandb.config.epochs
+    num_epochs = epochs
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
@@ -115,15 +116,15 @@ def train():
             unnormalized_loss = train_loss * (cost_std**2)  # Scale the loss back to original cost scale
             print(f"Epoch [{epoch+1}/{num_epochs}], Training Loss: {train_loss:.8f}, Test Loss: {test_loss:.8f}, Unnormalized Train Loss: {unnormalized_loss:.8f}")
 
-            wandb.log({
-                "epoch": epoch + 1,
-                "train_loss": train_loss,
-                "test_loss": test_loss,
-                "unnormalized_train_loss": unnormalized_loss
-            })
+            # wandb.log({
+            #     "epoch": epoch + 1,
+            #     "train_loss": train_loss,
+            #     "test_loss": test_loss,
+            #     "unnormalized_train_loss": unnormalized_loss
+            # })
 
     # save
-    wandb.finish()
+    # wandb.finish()
     model_to_save = {
         'model_state': model.state_dict(),
         'poses_mean': poses_mean,
@@ -131,7 +132,7 @@ def train():
         'cost_mean': cost_mean,
         'cost_std': cost_std,
     }
-    return model_to_save
+    return model_to_save, test_loss
     
 
 def save(model_to_save, path):
@@ -145,7 +146,7 @@ def query_ensemble(poses, models):
     return costs
 
 def eval(model_name, ensemble = False):
-    shape = (20,1)
+    shape = (15,1)
     
     #model_name = input("Enter model name: ")
     train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std = load_data()
@@ -181,8 +182,8 @@ def eval(model_name, ensemble = False):
                 actual_values.append(labels.numpy())
 
             actual_values = np.concatenate(actual_values).flatten()
-            predicted_values = np.concatenate(predicted_values).flatten()
             actual_values = actual_values * cost_std + cost_mean
+            predicted_values = np.concatenate(predicted_values).flatten()
             predicted_values = predicted_values * cost_std + cost_mean
 
             # select n_samples random samples to plot
@@ -224,16 +225,42 @@ def eval(model_name, ensemble = False):
 
 if __name__ == "__main__":
 
-    # model_name = "2"#input("Enter model name: ")
-    # model_to_save = train()
-    # save(model_to_save, f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
-    # eval(model_name = "2") 
-    # exit()
+    model_name = "2"#input("Enter model name: ")
+    model_to_save, _ = train()
+    save(model_to_save, f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
+    eval(model_name = "2") 
+    exit()
 
-    ensemble = []
-    for i in range(16):
-        net = train()
-        ensemble.append(net)
-    torch.save(ensemble, f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl')
+    # epoch_vals = [205, 210, 215]
+    # lr_vals = [0.01]
+    # batch_size_vals = [100]
+    # neuron_vals = [12]
+    # results = []
+    # total_epochs = np.sum(np.array(epoch_vals)) * len(lr_vals) * len(batch_size_vals) * len(neuron_vals)
+    # epochs_completed = 0
+    # min_test_loss = float('inf')
+    # for epoch in epoch_vals:
+    #     for lr in lr_vals:
+    #         for batch_size in batch_size_vals:
+    #             for neurons in neuron_vals:
+    #                 print(f'On Epoch {epochs_completed}/{total_epochs}')
+    #                 model_to_save, test_loss = train(batch_size = batch_size, lr = lr, epochs = epoch, neurons = neurons)
+    #                 results.append(f'Epochs: {epoch}, LR: {lr}, Batch Size: {batch_size}, Neurons: {neurons}, Test Loss: {test_loss}')
+    #                 if test_loss < min_test_loss:
+    #                     min_test_loss = test_loss
+    #                     best_result = results[-1]
+    #                 epochs_completed += epoch
+    
+    # for result in results:
+    #     print(result)
+    # print(f'Best result: {best_result}')
+
+
+    # ensemble = []
+    # for i in range(16):
+    #     net, _ = train()
+    #     ensemble.append(net)
+    # torch.save(ensemble, f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl')
     eval(model_name = "ensemble", ensemble = True)
+
 

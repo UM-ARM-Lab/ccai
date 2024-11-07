@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:11:37.030565919-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:11:37.030589697-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_141137-jpbwgiar/logs/debug-core.log"}
+{"time":"2024-11-05T14:11:37.030660346-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:11:37.033123756-05:00","level":"INFO","msg":"created new stream","id":"jpbwgiar"}
+{"time":"2024-11-05T14:11:37.033136404-05:00","level":"INFO","msg":"stream: started","id":"jpbwgiar"}
+{"time":"2024-11-05T14:11:37.033149972-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"jpbwgiar"}}
+{"time":"2024-11-05T14:11:37.03314157-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"jpbwgiar"}}
+{"time":"2024-11-05T14:11:37.033162372-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"jpbwgiar"}}
+{"time":"2024-11-05T14:11:37.239968653-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:11:37.24037507-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:11:43.093763248-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:11:43.097604271-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:11:43.419591802-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:11:44.55319288-05:00","level":"INFO","msg":"stream: closing","id":"jpbwgiar"}
+{"time":"2024-11-05T14:11:44.553227333-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"jpbwgiar"}}
+{"time":"2024-11-05T14:11:44.553273501-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"jpbwgiar"}}
+{"time":"2024-11-05T14:11:44.553288928-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"jpbwgiar"}}
+{"time":"2024-11-05T14:11:44.553368636-05:00","level":"INFO","msg":"stream: closed","id":"jpbwgiar"}
+{"time":"2024-11-05T14:11:48.095939788-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

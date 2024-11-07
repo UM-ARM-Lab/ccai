@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:07:26.805680536-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:07:26.805692271-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_140726-b6ruswie/logs/debug-core.log"}
+{"time":"2024-11-05T14:07:26.805778457-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:07:26.816746838-05:00","level":"INFO","msg":"created new stream","id":"b6ruswie"}
+{"time":"2024-11-05T14:07:26.816771532-05:00","level":"INFO","msg":"stream: started","id":"b6ruswie"}
+{"time":"2024-11-05T14:07:26.816789981-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"b6ruswie"}}
+{"time":"2024-11-05T14:07:26.816808017-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"b6ruswie"}}
+{"time":"2024-11-05T14:07:26.81681566-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"b6ruswie"}}
+{"time":"2024-11-05T14:07:27.048278908-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:07:27.048683805-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:07:31.306858199-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:07:31.313005126-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:07:31.572750709-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:07:32.697546313-05:00","level":"INFO","msg":"stream: closing","id":"b6ruswie"}
+{"time":"2024-11-05T14:07:32.697590425-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"b6ruswie"}}
+{"time":"2024-11-05T14:07:32.697631997-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"b6ruswie"}}
+{"time":"2024-11-05T14:07:32.697686904-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"b6ruswie"}}
+{"time":"2024-11-05T14:07:32.697786554-05:00","level":"INFO","msg":"stream: closed","id":"b6ruswie"}
+{"time":"2024-11-05T14:07:36.311295552-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

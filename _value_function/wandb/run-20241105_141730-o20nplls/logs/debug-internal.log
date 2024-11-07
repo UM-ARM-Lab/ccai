@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:17:30.82208702-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:17:30.822105589-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_141730-o20nplls/logs/debug-core.log"}
+{"time":"2024-11-05T14:17:30.822245865-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:17:30.827099875-05:00","level":"INFO","msg":"created new stream","id":"o20nplls"}
+{"time":"2024-11-05T14:17:30.827116127-05:00","level":"INFO","msg":"stream: started","id":"o20nplls"}
+{"time":"2024-11-05T14:17:30.827131457-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"o20nplls"}}
+{"time":"2024-11-05T14:17:30.827155612-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"o20nplls"}}
+{"time":"2024-11-05T14:17:30.827157117-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"o20nplls"}}
+{"time":"2024-11-05T14:17:31.126931884-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:17:31.127380818-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:17:34.184473097-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:17:34.188434342-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:17:34.505818193-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:17:35.62846541-05:00","level":"INFO","msg":"stream: closing","id":"o20nplls"}
+{"time":"2024-11-05T14:17:35.628477838-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"o20nplls"}}
+{"time":"2024-11-05T14:17:35.628489385-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"o20nplls"}}
+{"time":"2024-11-05T14:17:35.628494044-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"o20nplls"}}
+{"time":"2024-11-05T14:17:35.628514799-05:00","level":"INFO","msg":"stream: closed","id":"o20nplls"}
+{"time":"2024-11-05T14:17:39.186688736-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}

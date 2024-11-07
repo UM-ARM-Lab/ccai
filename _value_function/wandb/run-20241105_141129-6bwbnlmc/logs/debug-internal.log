@@ -1,0 +1,19 @@
+{"time":"2024-11-05T14:11:29.15231709-05:00","level":"INFO","msg":"using version","core version":"0.18.3"}
+{"time":"2024-11-05T14:11:29.15234046-05:00","level":"INFO","msg":"created symlink","path":"/home/newuser/Desktop/Honda/ccai/_value_function/wandb/run-20241105_141129-6bwbnlmc/logs/debug-core.log"}
+{"time":"2024-11-05T14:11:29.152505611-05:00","level":"ERROR","msg":"dialing: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information"}
+{"time":"2024-11-05T14:11:29.160016138-05:00","level":"INFO","msg":"created new stream","id":"6bwbnlmc"}
+{"time":"2024-11-05T14:11:29.160051866-05:00","level":"INFO","msg":"stream: started","id":"6bwbnlmc"}
+{"time":"2024-11-05T14:11:29.160060241-05:00","level":"INFO","msg":"writer: Do: started","stream_id":{"value":"6bwbnlmc"}}
+{"time":"2024-11-05T14:11:29.160091358-05:00","level":"INFO","msg":"handler: started","stream_id":{"value":"6bwbnlmc"}}
+{"time":"2024-11-05T14:11:29.160082643-05:00","level":"INFO","msg":"sender: started","stream_id":{"value":"6bwbnlmc"}}
+{"time":"2024-11-05T14:11:29.380338667-05:00","level":"INFO","msg":"wandb-core","!BADKEY":null}
+{"time":"2024-11-05T14:11:29.38080237-05:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-11-05T14:11:35.35733423-05:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2024-11-05T14:11:35.361274089-05:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2024-11-05T14:11:35.847893891-05:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2024-11-05T14:11:36.973163729-05:00","level":"INFO","msg":"stream: closing","id":"6bwbnlmc"}
+{"time":"2024-11-05T14:11:36.973174425-05:00","level":"INFO","msg":"handler: closed","stream_id":{"value":"6bwbnlmc"}}
+{"time":"2024-11-05T14:11:36.973201954-05:00","level":"INFO","msg":"writer: Close: closed","stream_id":{"value":"6bwbnlmc"}}
+{"time":"2024-11-05T14:11:36.973209787-05:00","level":"INFO","msg":"sender: closed","stream_id":{"value":"6bwbnlmc"}}
+{"time":"2024-11-05T14:11:36.973227929-05:00","level":"INFO","msg":"stream: closed","id":"6bwbnlmc"}
+{"time":"2024-11-05T14:11:40.359209264-05:00","level":"ERROR","msg":"monitor: gpu: timeout waiting for process to exit"}
