@@ -36,7 +36,7 @@ img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
    
 def do_trial(env, params, fpath):
     screwdriver_goal = params['object_goal'].cpu()
-    screwdriver_goal_mat = R.from_euler('xyz', screwdriver_goal).as_matrix()
+    screwdriver_goal_mat = R.from_euler('XYZ', screwdriver_goal).as_matrix()
     # step multiple times untile it's stable
     if params['visualize']:
         env.frame_fpath = fpath

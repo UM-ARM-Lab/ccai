@@ -440,8 +440,8 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         """
         z_axis = normal_vector / torch.norm(normal_vector, dim=1, keepdim=True)
         # y_axis = torch.randn_like(z_axis)
-        y_axis = torch.tensor([0.0, 1.0, 0.0],
-                              device=normal_vector.device).unsqueeze(0).repeat(normal_vector.shape[0], 1)
+        y_axis = torch.tensor([1.0, 1.0, 1.0], device=normal_vector.device)\
+            .unsqueeze(0).repeat(normal_vector.shape[0], 1) / torch.sqrt(torch.tensor(3))
         y_axis = y_axis - torch.sum(y_axis * z_axis, dim=1).unsqueeze(-1) * z_axis
         y_axis = y_axis / torch.norm(y_axis, dim=1, keepdim=True)
         x_axis = torch.linalg.cross(y_axis, z_axis, dim=-1)
@@ -948,9 +948,9 @@ class AllegroValveTurning(AllegroContactProblem):
 
         smoothness_cost = 1 * torch.sum((state[1:] - state[:-1]) ** 2)
         # smoothness_cost += 50 * torch.sum((state[1:, -1] - state[:-1, -1]) ** 2)
-        smoothness_cost += 50 * torch.sum((state[1:, -1] - state[:-1, -1]) ** 2)
+        smoothness_cost += 100 * torch.sum((state[1:, -1] - state[:-1, -1]) ** 2)
 
-        goal_cost = (10 * (state[-1, -1] - goal) ** 2).reshape(-1)
+        goal_cost = (20 * (state[-1, -1] - goal) ** 2).reshape(-1)
         # add a running cost
         goal_cost += torch.sum((3 * (state[:, -1] - goal) ** 2), dim=0)
 
@@ -1513,7 +1513,8 @@ class AllegroValveTurning(AllegroContactProblem):
         h = self.friction_constr(u,
                                  contact_normal.reshape(-1, 3),
                                  contact_jac.reshape(-1, 3, self.robot_dof)).reshape(N, -1)
-
+        if h.isnan().any():
+            print("nan in friction constraint")
         # compute the gradient
         if compute_grads:
             dh_du, dh_dnormal, dh_djac = self.grad_friction_constr(u,
@@ -1634,6 +1635,7 @@ class AllegroValveTurning(AllegroContactProblem):
         
         if verbose:
             print(f"max friction constraint: {torch.max(h)}")
+            print(f"max force constraint: {torch.max(h_force)}")
             # print(f"max force constraint: {torch.max(h_force)}")
             # print(f"max step size constraint: {torch.max(h_step_size)}")
             # print(f"max singularity constraint: {torch.max(h_sin)}")

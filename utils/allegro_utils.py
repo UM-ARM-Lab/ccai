@@ -246,7 +246,7 @@ def axis_angle_to_euler(axis_angle):
     euler = tf.matrix_to_euler_angles(matrix, convention='XYZ')
     return euler
 
-def euler_diff(euler1, euler2, representation='xyz'):
+def euler_diff(euler1, euler2, representation='XYZ'):
     """
     :params euler1: B x 3
     :params euler2: B x 3

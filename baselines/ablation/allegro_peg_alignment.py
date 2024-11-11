@@ -29,6 +29,7 @@ class AblationAllegroPegAlignment(AblationAllegroValveTurning):
         self.dg_constant = 0
         self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
         self.dz = (self.friction_polytope_k) * (self.num_fingers + 1) # one friction constraints per finger
+        self.dz += self.num_fingers # min force constraint
         # self.dz = 0 # DEBUG ONLY
         self.dh = self.dz * T  # inequality
     def __init__(self,
@@ -51,8 +52,8 @@ class AblationAllegroPegAlignment(AblationAllegroValveTurning):
                  device='cuda:0', **kwargs):
         self.num_fingers = len(fingers)
         self.optimize_force = optimize_force
-        self.peg_asset_pos = peg_asset_pos
-        self.peg_trans = tf.Transform3d(pos=torch.tensor(self.peg_asset_pos, device=device).float(),
+        self.object_asset_pos = object_asset_pos
+        self.peg_trans = tf.Transform3d(pos=torch.tensor(self.object_asset_pos, device=device).float(),
                                           rot=torch.tensor(
                                         [1, 0, 0, 0],
                                         device=device).float(), device=device)
@@ -62,10 +63,11 @@ class AblationAllegroPegAlignment(AblationAllegroValveTurning):
         self.obj_mass = 0.01
 
         super(AblationAllegroPegAlignment, self).__init__(start=start, goal=goal, T=T, chain=chain, object_location=object_location,
-                                                 object_type=object_type, world_trans=world_trans, object_asset_pos=peg_asset_pos,
+                                                 object_type=object_type, world_trans=world_trans, object_asset_pos=object_asset_pos,
                                                  fingers=fingers, friction_coefficient=friction_coefficient, obj_dof_code=obj_dof_code, 
                                                  obj_joint_dim=0, optimize_force=optimize_force, du=du, obj_gravity=obj_gravity, 
                                                  contact_obj_frame=contact_obj_frame, device=device)
+        self.env_force = True
         self.friction_coefficient = friction_coefficient
         self.force_equlibrium_constr = vmap(self._force_equlibrium_constr_w_force)
         self.grad_force_equlibrium_constr = vmap(jacrev(self._force_equlibrium_constr_w_force, argnums=(0, 1, 2, 3, 4, 5, 6)))
@@ -88,7 +90,7 @@ class AblationAllegroPegAlignment(AblationAllegroValveTurning):
         robot_sdf = pv.RobotSDF(self.chain, path_prefix=get_assets_dir() + '/xela_models', use_collision_geometry=True)
 
         robot2peg = self.world_trans.inverse().compose(
-            pk.Transform3d(device=self.device).translate(self.peg_asset_pos[0], self.peg_asset_pos[1], self.peg_asset_pos[2]))
+            pk.Transform3d(device=self.device).translate(self.object_asset_pos[0], self.object_asset_pos[1], self.object_asset_pos[2]))
 
         # contact checking
         collision_check_links = [self.collision_checking_ee_names[finger] for finger in self.fingers]
@@ -110,7 +112,7 @@ class AblationAllegroPegAlignment(AblationAllegroValveTurning):
                                             )
         # peg and wall
         wall_sdf = pv.BoxSDF([self.wall_dims[0], self.wall_dims[1], self.wall_dims[2]], device=self.device)
-        world2peg = tf.Transform3d(pos=torch.tensor(self.peg_asset_pos, device=self.device).float(),
+        world2peg = tf.Transform3d(pos=torch.tensor(self.object_asset_pos, device=self.device).float(),
                                           rot=torch.tensor(
                                               [1, 0, 0, 0],
                                               device=self.device).float(), device=self.device)
@@ -377,10 +379,16 @@ class AblationAllegroPegAlignment(AblationAllegroValveTurning):
             compute_grads=compute_grads,
             compute_hess=compute_hess)
         
+        h_force, grad_h_force, hess_h_force = self._min_force_constraints(
+            xu=xu.reshape(-1, T, self.dx + self.du),
+            compute_grads=compute_grads,
+            compute_hess=compute_hess)
+        
         
         if verbose:
             print(f"max friction constraint: {torch.max(h)}")
             print(f"max wall friction constraint: {torch.max(h_wall)}")
+            print(f"max force constraint: {torch.max(h_force)}")
             result_dict = {}
             result_dict['friction'] = torch.max(h).item()
             result_dict['friction_mean'] = torch.mean(h).item()
@@ -390,11 +398,13 @@ class AblationAllegroPegAlignment(AblationAllegroValveTurning):
 
         h = torch.cat((h,
                         h_wall,
+                        h_force
                         ), dim=1)
         if compute_grads:
             grad_h = grad_h.reshape(N, -1, self.T * (self.dx + self.du))
             grad_h = torch.cat((grad_h, 
-                                grad_h_wall), dim=1)
+                                grad_h_wall,
+                                grad_h_force), dim=1)
         else:
             return h, None, None
         if compute_hess:

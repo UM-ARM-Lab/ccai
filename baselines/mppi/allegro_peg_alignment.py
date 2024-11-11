@@ -79,7 +79,7 @@ class RunningCost:
 def do_trial(env, params, fpath):
     peg_goal = params['object_goal'].cpu()
     peg_goal_pos = peg_goal[:3]
-    peg_goal_mat = R.from_euler('xyz', peg_goal[-3:]).as_matrix()
+    peg_goal_mat = R.from_euler('XYZ', peg_goal[-3:]).as_matrix()
     # step multiple times untile it's stable
     if params['visualize']:
         env.frame_fpath = fpath
@@ -131,10 +131,6 @@ def do_trial(env, params, fpath):
         action = action.repeat(params['N'], 1)
         env.step(action)
         action_list.append(action)
-
-    desired_table_pose = torch.tensor([0, 0, -1.0, 0, 0, 0, 1]).float().to(env.device)
-    env.set_table_pose(env.handles['table'][0], desired_table_pose)
-
     prime_dof_state = env.dof_states.clone()[0]
     prime_dof_state = prime_dof_state.unsqueeze(0).repeat(params['N'], 1, 1)
     env.set_pose(prime_dof_state, semantic_order=False, zero_velocity=False)
@@ -207,7 +203,7 @@ def do_trial(env, params, fpath):
             
             action_list.append(action)
             peg_state = state[0, -obj_dof:].cpu()
-            peg_mat = R.from_euler('xyz', peg_state[-3:]).as_matrix()
+            peg_mat = R.from_euler('XYZ', peg_state[-3:]).as_matrix()
             distance2goal_ori = tf.so3_relative_angle(torch.tensor(peg_mat).unsqueeze(0), \
             torch.tensor(peg_goal_mat).unsqueeze(0), cos_angle=False).detach().cpu().abs()
             distance2goal_pos = (peg_state[:3].unsqueeze(0) - peg_goal_pos.unsqueeze(0)).norm(dim=-1).detach().cpu()

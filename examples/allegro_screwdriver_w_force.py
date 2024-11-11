@@ -589,7 +589,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     "only turn the screwdriver once"
     env.reset()
     screwdriver_goal = params['screwdriver_goal'].cpu()
-    screwdriver_goal_mat = R.from_euler('xyz', screwdriver_goal).as_matrix()
+    screwdriver_goal_mat = R.from_euler('XYZ', screwdriver_goal).as_matrix()
     num_fingers = len(params['fingers'])
     state = env.get_state()
     action_list = []
@@ -826,7 +826,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             screwdriver_state = env.get_state()['q'][:, -obj_dof-1: -1].cpu()
         elif params['simulator'] == 'isaac_sim':
             screwdriver_state = env.get_state()[:, -obj_dof:].cpu()
-        screwdriver_mat = R.from_euler('xyz', screwdriver_state).as_matrix()
+        screwdriver_mat = R.from_euler('XYZ', screwdriver_state).as_matrix()
         distance2goal = tf.so3_relative_angle(torch.tensor(screwdriver_mat), \
             torch.tensor(screwdriver_goal_mat).unsqueeze(0), cos_angle=False).detach().cpu().abs()
         
@@ -880,7 +880,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     turn_problem.T = actual_trajectory.shape[0]
     # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
     screwdriver_state = actual_trajectory[:, -obj_dof:].cpu()
-    screwdriver_mat = R.from_euler('xyz', screwdriver_state).as_matrix()
+    screwdriver_mat = R.from_euler('XYZ', screwdriver_state).as_matrix()
     distance2goal = tf.so3_relative_angle(torch.tensor(screwdriver_mat), \
         torch.tensor(screwdriver_goal_mat).unsqueeze(0).repeat(screwdriver_mat.shape[0],1,1), cos_angle=False).detach().cpu()
 

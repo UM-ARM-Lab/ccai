@@ -49,7 +49,7 @@ class AllegroPegAlignment(AllegroValveTurning):
         self.dg_constant = 0
         self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
         self.dz = (self.friction_polytope_k) * (self.num_fingers + 1) # one friction constraints per finger
-        # self.dz = 0 # DEBUG ONLY
+        self.dz += self.num_fingers # min force constraint
         self.dh = self.dz * T  # inequality
     def __init__(self,
                  start,
@@ -100,6 +100,7 @@ class AllegroPegAlignment(AllegroValveTurning):
                                                  fingers=fingers, friction_coefficient=friction_coefficient, obj_dof_code=obj_dof_code, 
                                                  obj_joint_dim=0, optimize_force=optimize_force, du=du, obj_gravity=obj_gravity, 
                                                  arm_type=arm_type, arm_stiffness=arm_stiffness, finger_stiffness=finger_stiffness, device=device)
+        self.env_force = True
         self.friction_coefficient = friction_coefficient
         self.force_equlibrium_constr = vmap(self._force_equlibrium_constr_w_force)
         self.grad_force_equlibrium_constr = vmap(jacrev(self._force_equlibrium_constr_w_force, argnums=(0, 1, 2, 3, 4, 5, 6)))
@@ -356,9 +357,10 @@ class AllegroPegAlignment(AllegroValveTurning):
             goal_orientation = tf.euler_angles_to_matrix(goal[-self.obj_rotational_dim:], convention='XYZ')
             goal_orientation = tf.matrix_to_rotation_6d(goal_orientation)
             # terminal cost
-            goal_cost = goal_cost + torch.sum((250 * (obj_orientation[-1] - goal_orientation) ** 2))
+            # goal_cost = goal_cost + torch.sum((250 * (obj_orientation[-1] - goal_orientation) ** 2))
+            goal_cost = goal_cost + torch.sum((1000 * (obj_orientation[-1] - goal_orientation) ** 2))
             # running cost 
-            goal_cost = goal_cost + torch.sum((3 * (obj_orientation - goal_orientation) ** 2))
+            goal_cost = goal_cost + torch.sum((5 * (obj_orientation - goal_orientation) ** 2))
             smoothness_cost = smoothness_cost + 40 * torch.sum((obj_orientation[1:] - obj_orientation[:-1]) ** 2)
         # goal_cost = torch.sum((1000 * (state[-1, -self.obj_dof:] - goal) ** 2)).reshape(-1)
         # goal_cost += torch.sum((10 * (state[:, -self.obj_dof:] - goal.unsqueeze(0)) ** 2))
@@ -445,24 +447,34 @@ class AllegroPegAlignment(AllegroValveTurning):
             compute_grads=compute_grads,
             compute_hess=compute_hess)
         
+        h_force, grad_h_force, hess_h_force = self._min_force_constraints(
+            xu=xu.reshape(-1, T, self.dx + self.du),
+            compute_grads=compute_grads,
+            compute_hess=compute_hess)
         
         if verbose:
             print(f"max friction constraint: {torch.max(h)}")
             print(f"max wall friction constraint: {torch.max(h_wall)}")
+            print(f"max force constraint: {torch.max(h_force)}")
             result_dict = {}
             result_dict['friction'] = torch.max(h).item()
             result_dict['friction_mean'] = torch.mean(h).item()
             result_dict['wall_friction'] = torch.max(h_wall).item()
             result_dict['wall_friction_mean'] = torch.mean(h_wall).item()
+            result_dict['min_force'] = torch.max(h_force).item() 
+            result_dict['min_force_mean'] = torch.mean(h_force).item()
             return result_dict
 
         h = torch.cat((h,
-                        h_wall,
-                        ), dim=1)
+                       h_wall,
+                       h_force,
+                       ), dim=1)
         if compute_grads:
             grad_h = grad_h.reshape(N, -1, self.T * (self.dx + self.du))
             grad_h = torch.cat((grad_h, 
-                                grad_h_wall), dim=1)
+                                grad_h_wall,
+                                grad_h_force
+                                ), dim=1)
         else:
             return h, None, None
         if compute_hess:
@@ -705,7 +717,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     # step multiple times untile it's stable
     peg_goal = params['object_goal'].cpu()
     peg_goal_pos = peg_goal[:3]
-    peg_goal_mat = R.from_euler('xyz', peg_goal[-3:]).as_matrix()
+    peg_goal_mat = R.from_euler('XYZ', peg_goal[-3:]).as_matrix()
     if params['visualize']:
         env.frame_fpath = fpath
         env.frame_id = 0
@@ -787,9 +799,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         action_list.append(action)
         if params['mode'] == 'hardware_copy':
             ros_copy_node.apply_action(partial_to_full_state(x.reshape(-1, robot_dof)[0], params['fingers']))
-
-    desired_table_pose = torch.tensor([0, 0, -1.0, 0, 0, 0, 1]).float().to(env.device)
-    env.set_table_pose(env.handles['table'][0], desired_table_pose)
 
     state = env.get_state()
     state = env.step(state[:, :robot_dof])
@@ -928,7 +937,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                 break
 
         peg_state = env.get_state()['q'][:, -obj_dof:].cpu()
-        peg_mat = R.from_euler('xyz', peg_state[:, -3:]).as_matrix()
+        peg_mat = R.from_euler('XYZ', peg_state[:, -3:]).as_matrix()
         distance2goal_ori = tf.so3_relative_angle(torch.tensor(peg_mat), \
         torch.tensor(peg_goal_mat).unsqueeze(0), cos_angle=False).detach().cpu().abs()
         distance2goal_pos = (peg_state[:, :3] - peg_goal_pos.unsqueeze(0)).norm(dim=-1).detach().cpu()

@@ -34,6 +34,7 @@ class AblationAllegroValveTurning(AllegroValveTurning):
         self.dg_constant = 0
         self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
         self.dz = (self.friction_polytope_k) * self.num_fingers # one friction constraints per finger
+        self.dz += self.num_fingers # min force constraint
         self.dh = self.dz * T  # inequality
     def __init__(self,
                  start,
@@ -196,7 +197,7 @@ class AblationAllegroValveTurning(AllegroValveTurning):
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     "only turn the screwdriver once"
     screwdriver_goal = params['screwdriver_goal'].cpu()
-    screwdriver_goal_mat = R.from_euler('xyz', screwdriver_goal).as_matrix()
+    screwdriver_goal_mat = R.from_euler('XYZ', screwdriver_goal).as_matrix()
     num_fingers = len(params['fingers'])
     state = env.get_state()
     action_list = []
@@ -405,7 +406,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         turn_problem._preprocess(best_traj.unsqueeze(0))
         
         screwdriver_state = env.get_state()['q'][:, -obj_dof-1: -1].cpu()
-        screwdriver_mat = R.from_euler('xyz', screwdriver_state).as_matrix()
+        screwdriver_mat = R.from_euler('XYZ', screwdriver_state).as_matrix()
         distance2goal = tf.so3_relative_angle(torch.tensor(screwdriver_mat), \
             torch.tensor(screwdriver_goal_mat).unsqueeze(0), cos_angle=False).detach().cpu().abs()
         
@@ -459,7 +460,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     turn_problem.T = actual_trajectory.shape[0]
     # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
     screwdriver_state = actual_trajectory[:, -obj_dof:].cpu()
-    screwdriver_mat = R.from_euler('xyz', screwdriver_state).as_matrix()
+    screwdriver_mat = R.from_euler('XYZ', screwdriver_state).as_matrix()
     distance2goal = tf.so3_relative_angle(torch.tensor(screwdriver_mat), \
         torch.tensor(screwdriver_goal_mat).unsqueeze(0).repeat(screwdriver_mat.shape[0],1,1), cos_angle=False).detach().cpu()
 

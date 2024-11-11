@@ -66,13 +66,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     start = state.reshape(robot_dof + obj_dof).to(device=params['device'])        
     
     # setup the pregrasp problem
-    if config['task'] == 'peg_turning' or config['task'] == 'reorientation':
+    if config['task'] == 'peg_turning' or config['task'] == 'reorientation' or config['task'] == 'peg_alignment':
         pass
         # action = torch.cat((env.default_dof_pos[:,:8], env.default_dof_pos[:, 12:16]), dim=-1)
         # env.step(action) # step one step to resolve penetration
     
     else:
-        # if params['controller'] == 'csvgd' or params['controller'] == 'ablation' or params['controller'] == 'planning':
         pregrasp_dx = pregrasp_du = robot_dof
         pregrasp_problem = AllegroContactProblem(
             dx=pregrasp_dx,
@@ -126,12 +125,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             action_list.append(action)
             if params['mode'] == 'hardware_copy':
                 ros_copy_node.apply_action(partial_to_full_state(x.reshape(-1, pregrasp_dx)[0], params['fingers']))
-    if params['task'] == 'peg_alignment':
-        desired_table_pose = torch.tensor([0, 0, -1.0, 0, 0, 0, 1]).float().to(env.device)
-        env.set_table_pose(env.handles['table'][0], desired_table_pose)
-        state = env.get_state()
-        state = env.step(state[:, :robot_dof])
-        env.step(action)
     state = env.get_state()
     start = state.reshape(robot_dof + obj_dof).to(device=params['device'])
     if config['method'] == 'csvgd':
@@ -156,7 +149,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                 obj_gravity=params['obj_gravity'],
                 contact_region=params['contact_region'],
                 arm_type=params['arm_type'],
-            ) # TODO: add other tasks
+            )
         elif config['task'] == 'valve_turning':
             manipulation_problem = AllegroValveTurning(
                 start=start,
@@ -440,17 +433,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         
         obj_state = env.get_state()[:, -obj_dof:].cpu()
         if params['task'] == 'screwdriver_turning':
-            screwdriver_mat = R.from_euler('xyz', obj_state).as_matrix() # TODO: fix it for different tasks
-            screwdriver_goal_mat = R.from_euler('xyz', goal).as_matrix() # TODO: change it for different tasks
-            distance2goal = tf.so3_relative_angle(torch.tensor(screwdriver_mat), \
-                torch.tensor(screwdriver_goal_mat).unsqueeze(0), cos_angle=False).detach().cpu().abs()
+            distance2goal = euler_diff(obj_state, goal.unsqueeze(0)).detach().cpu().abs().item()
         elif params['task'] == 'valve_turning':
             distance2goal = (obj_state[0] - goal).detach().item()
         elif params['task'] == 'peg_turning' or params['task'] == 'peg_alignment' or params['task'] == 'reorientation':
-            peg_mat = R.from_euler('xyz', obj_state[:, -3:]).as_matrix() # TODO: fix it for different tasks
-            peg_goal_mat = R.from_euler('xyz', goal[-3:]).as_matrix() # TODO: change it for different tasks
-            distance2goal = tf.so3_relative_angle(torch.tensor(peg_mat), \
-                torch.tensor(peg_goal_mat).unsqueeze(0), cos_angle=False).detach().cpu().abs()
+            distance2goal = euler_diff(obj_state[:, -3:], goal[-3:].unsqueeze(0)).detach().cpu().abs().item()
         
         if not env.check_validity(env.get_state().cpu()[0]):
             validity_flag = False
@@ -482,20 +469,14 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
     obj_state = actual_trajectory[:, -obj_dof:].cpu()
     if params['task'] == 'screwdriver_turning':
-        screwdriver_mat = R.from_euler('xyz', obj_state).as_matrix() # TODO: fix it for different tasks
-        screwdriver_goal_mat = R.from_euler('xyz', goal).as_matrix() # TODO: change it for different tasks
-        distance2goal = tf.so3_relative_angle(torch.tensor(screwdriver_mat), \
-            torch.tensor(screwdriver_goal_mat).unsqueeze(0).repeat(screwdriver_mat.shape[0],1,1), cos_angle=False).detach().cpu()
+        distance2goal = euler_diff(obj_state, goal.unsqueeze(0).repeat(obj_state.shape[0], 1)).detach().cpu().abs()
     elif params['task'] == 'valve_turning':
-        distance2goal = (obj_state - goal).detach().cpu()
+        distance2goal = (obj_state - goal).detach().cpu().abs()
     elif params['task'] == 'peg_turning' or params['task'] == 'peg_alignment':
-        peg_mat = R.from_euler('xyz', obj_state[:, -3:]).as_matrix()
-        peg_goal_mat = R.from_euler('xyz', goal[-3:]).as_matrix()
-        distance2goal = tf.so3_relative_angle(torch.tensor(peg_mat), \
-            torch.tensor(peg_goal_mat).unsqueeze(0).repeat(peg_mat.shape[0],1,1), cos_angle=False).detach().cpu()
+        distance2goal = euler_diff(obj_state[:, -3:], goal[-3:].unsqueeze(0).repeat(obj_state.shape[0], 1)).detach().cpu().abs()
 
     # final_distance_to_goal = torch.min(distance2goal.abs())
-    final_distance_to_goal = distance2goal.abs()[-1].cpu().detach().item()
+    final_distance_to_goal = distance2goal[-1].cpu().detach().item()
 
     print(f'Controller: {params["controller"]} Final distance to goal: {final_distance_to_goal}, validity: {validity_flag}')
     print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
@@ -512,13 +493,14 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
 if __name__ == "__main__":
     # get config
-    task = 'screwdriver_turning'
+    # task = 'screwdriver_turning'
     # task = 'valve_turning'
     # task = 'reorientation'
     # task = 'peg_alignment'
-    # task = 'peg_turning'
+    task = 'peg_turning'
 
     method = 'csvgd'
+    # method = 'ablation'
     # method = 'planning'
 
     if task == 'screwdriver_turning':

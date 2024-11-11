@@ -48,6 +48,7 @@ class AllegroReorientation(AllegroValveTurning):
         self.dg_constant = 0
         self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
         self.dz = (self.friction_polytope_k) * self.num_fingers # one friction constraints per finger
+        self.dz += self.num_fingers # min force constraint
         # self.dz = 0 # DEBUG ONLY
         self.dh = self.dz * T  # inequality
     def __init__(self,
@@ -68,7 +69,7 @@ class AllegroReorientation(AllegroValveTurning):
         self.num_fingers = len(fingers)
         self.optimize_force = optimize_force
         self.object_asset_pos = object_asset_pos
-        self.obj_mass = 0.022
+        self.obj_mass = 0.01
 
         super(AllegroReorientation, self).__init__(start=start, goal=goal, T=T, chain=chain, object_location=object_location,
                                                  object_type=object_type, world_trans=world_trans, object_asset_pos=object_asset_pos,

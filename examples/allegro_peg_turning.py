@@ -48,6 +48,7 @@ class AllegroPegTurning(AllegroValveTurning):
         self.dg_constant = 0
         self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
         self.dz = (self.friction_polytope_k) * self.num_fingers # one friction constraints per finger
+        self.dz += self.num_fingers # min force constraint
         # self.dz = 0 # DEBUG ONLY
         self.dh = self.dz * T  # inequality
     def __init__(self,

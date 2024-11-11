@@ -513,10 +513,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         action_list.append(action)
         if params['mode'] == 'hardware_copy':
             ros_copy_node.apply_action(partial_to_full_state(x.reshape(-1, 4 * num_fingers)[0], params['fingers']))
-
-    desired_table_pose = torch.tensor([0, 0, -1.0, 0, 0, 0, 1]).float().to(env.device)
-    env.set_table_pose(env.handles['table'][0], desired_table_pose)
-
     state = env.get_state()
     state = env.step(state[:, :4 * num_fingers])
     start = state.reshape(4 * num_fingers + obj_dof).to(device=params['device'])

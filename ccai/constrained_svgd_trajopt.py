@@ -11,11 +11,21 @@ class ConstrainedSteinTrajOpt:
         self.dt = params.get('step_size', 1e-2)
         self.alpha_J = params.get('alpha_J', 1)
         self.alpha_C = params.get('alpha_C', 1)
-        self.momentum = params.get('momentum', 0)
+        # self.momentum = params.get('momentum', 0)
         self.iters = params.get('iters', 100)
         self.penalty = params.get('penalty', 1e2)
         self.resample_sigma = params.get('resample_sigma', 1e-2)
         self.resample_temperature = params.get('resample_temperature', 0.1)
+        self.use_momentum = params.get('use_momentum', False)
+        if self.use_momentum:
+            self.beta_1 = 0.5
+            # self.beta_1 = 0.9
+            # self.beta_2 = 0.999
+            self.adam_eps = 1e-8
+            self.first_moment = 0
+            # self.second_moment = 0
+
+
 
         self.problem = problem
         self.dx = problem.dx
@@ -43,6 +53,19 @@ class ConstrainedSteinTrajOpt:
 
         xuz = xuz.to(dtype=torch.float32)
         grad_J, hess_J, K, grad_K, C, dC, hess_C = self.problem.eval(xuz.to(dtype=torch.float32))
+        if self.use_momentum:
+            self.first_moment = self.beta_1 * self.first_moment + (1 - self.beta_1) * grad_J
+            # self.second_moment = self.beta_2 * self.second_moment + (1 - self.beta_2) * grad_J ** 2
+            # first_unbiased = self.first_moment / (1 - self.beta_1)
+            # second_unbiased = self.second_moment / (1 - self.beta_2)
+            # grad_J = first_unbiased / (torch.sqrt(second_unbiased) + self.adam_eps)
+            grad_J = self.first_moment
+
+            # implement rmsprop
+            # self.first_moment = self.beta_1 * self.first_moment + (1 - self.beta_1) * grad_J ** 2
+            # grad_J = grad_J / (torch.sqrt(self.first_moment) + self.adam_eps)
+
+
 
         if hess_C is None and self.use_constraint_hessian:
             hess_C = torch.zeros(N, self.dh + self.dg, self.T * d + self.dh, self.T * d + self.dh, device=xuz.device)
@@ -138,7 +161,8 @@ class ConstrainedSteinTrajOpt:
             grad_matrix_K = torch.sum(grad_matrix_K, dim=0)
 
             # compute kernelized score
-            kernelized_score = torch.sum(matrix_K @ -grad_J.reshape(N, 1, -1, 1), dim=0)
+            kernelized_score = torch.sum(matrix_K @ -grad_J.reshape(N, 1, -1, 1), dim=0)  # the projected gradient
+
             phi = self.gamma * kernelized_score.squeeze(-1) / N + grad_matrix_K / N  # maximize phi
 
             xi_J = -phi
@@ -231,6 +255,10 @@ class ConstrainedSteinTrajOpt:
         self.dh = self.problem.dh
         self.T = self.problem.T
 
+        if self.use_momentum:
+            self.first_moment = 0
+            self.second_moment = 0
+
         # Get initial slack variable values
         N = x0.shape[0]
         if self.problem.dz > 0:
@@ -275,8 +303,8 @@ class ConstrainedSteinTrajOpt:
             grad_norm = torch.linalg.norm(grad, keepdim=True, dim=-1)
             max_norm = 1
             grad = torch.where(grad_norm > max_norm, grad / grad_norm * max_norm, grad)
+
             xuz.data = xuz.data - self.dt * grad
-            #self.delta_x = self.dt * grad
             torch.nn.utils.clip_grad_norm_(xuz, 10)
             self._clamp_in_bounds(xuz)
 

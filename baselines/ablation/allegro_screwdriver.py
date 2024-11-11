@@ -21,6 +21,7 @@ class AblationAllegroScrewdriver(AblationAllegroValveTurning):
         self.dg_constant = 0
         self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
         self.dz = (self.friction_polytope_k) * self.num_fingers + 1 # one friction constraints per finger
+        self.dz += self.num_fingers # min force constraint
         # self.dz = 0 # DEBUG ONLY
         self.dh = self.dz * T  # inequality
     def __init__(self,
@@ -52,6 +53,7 @@ class AblationAllegroScrewdriver(AblationAllegroValveTurning):
                                                  screwdriver_force_balance=force_balance,
                                                  collision_checking=False, obj_gravity=obj_gravity,
                                                  contact_region=False, du=du, contact_obj_frame=contact_obj_frame, device=device)
+        self.env_force = True
         max_f = torch.ones(3) * 10 # add environment force
         min_f = torch.ones(3) * -10
         self.x_max = torch.cat((self.x_max, max_f))
@@ -284,26 +286,33 @@ class AblationAllegroScrewdriver(AblationAllegroValveTurning):
             compute_grads=compute_grads,
             compute_hess=compute_hess)
         
+        h_force, grad_h_force, hess_h_force = self._min_force_constraints(
+            xu=xu.reshape(-1, T, self.dx + self.du),
+            compute_grads=compute_grads,
+            compute_hess=compute_hess)
+        
         if verbose:
             print(f"max friction constraint: {torch.max(h)}")
             # print(f"max step size constraint: {torch.max(h_step_size)}")
             # print(f"max singularity constraint: {torch.max(h_sin)}")
             print(f"max env force constraint: {torch.max(h_env)}")
+            print(f"max min force constraint: {torch.max(h_force)}")
             result_dict = {}
             result_dict['friction'] = torch.max(h).item()
             result_dict['friction_mean'] = torch.mean(h).item()
             result_dict['env_force'] = torch.max(h_env).item()
             result_dict['env_force_mean'] = torch.mean(h_env).item()
+            result_dict['min_force'] = torch.max(h_force).item()
             # result_dict['singularity'] = torch.max(h_sin).item()
             return result_dict
 
         # h = torch.cat((h,
         #             #    h_step_size,
         #                h_sin), dim=1)
-        h = torch.cat((h, h_env), dim=1)
+        h = torch.cat((h, h_env, h_force), dim=1)
         if compute_grads:
             grad_h = grad_h.reshape(N, -1, self.T * (self.dx + self.du))
-            grad_h = torch.cat((grad_h, grad_h_env), dim=1)
+            grad_h = torch.cat((grad_h, grad_h_env, grad_h_force), dim=1)
         else:
             return h, None, None
         if compute_hess:
