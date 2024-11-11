@@ -25,10 +25,16 @@ def get_data():
     inputs = torch.from_numpy(total_poses)[100:150]
     return inputs
 
+def get_failures():
+    failures = pkl.load(open(f'{fpath.resolve()}/eval/failures.pkl', 'rb'))
+    return torch.stack(failures).reshape(-1,15)
+
 def grad_descent(lr = 0.2358):
     models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble()
     
     poses = get_data()
+    poses = get_failures()
+
     poses_norm = (poses - poses_mean) / poses_std
     poses_norm = poses_norm.float()
     original_costs_norm = torch.mean(query_ensemble(poses_norm, models), dim=0).detach().cpu().numpy()
@@ -107,10 +113,10 @@ def grad_descent(lr = 0.2358):
         config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
         for initial, optimized in initial_pose_tuples:
 
-            env.reset(torch.from_numpy(initial).reshape(1,20).float(), deterministic=True)
+            env.reset(torch.from_numpy(initial).reshape(1,20).float())
             time.sleep(0.5)
             # input("Press Enter to continue...")
-            env.reset(torch.from_numpy(optimized).reshape(1,20).float(), deterministic=True)
+            env.reset(torch.from_numpy(optimized).reshape(1,20).float())
             time.sleep(2.0)
             # input("Press Enter to continue...")
 
@@ -181,16 +187,16 @@ if __name__ == "__main__":
     full_semi_optimized_poses = np.array(full_semi_optimized_poses)
     semi_optimized_poses = np.array(semi_optimized_poses)
     
-    vis_so_poses = False
+    vis_so_poses = True
     if vis_so_poses:
         config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
         for j in range(full_semi_optimized_poses.shape[1]):
             for i in range(full_semi_optimized_poses.shape[0]):
-                env.reset(torch.from_numpy(full_semi_optimized_poses[i,j,:]).reshape(1,20).float(), deterministic=True)
-                if i == 0:
+                env.reset(torch.from_numpy(full_semi_optimized_poses[i,j,:]).reshape(1,20).float())
+                if i == 0 or i == full_semi_optimized_poses.shape[0]-1:
                     time.sleep(1.0)
                 print(f'Setpoint {i}')
-                time.sleep(0.01)
+                time.sleep(0.03)
 
 
     # Fit PCA on the 10k_poses data to get axes

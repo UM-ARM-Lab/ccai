@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from torch.utils.data import random_split, DataLoader
 import wandb
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MultipleLocator
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
@@ -138,7 +139,7 @@ def train(batch_size = 100, lr = 0.01, epochs = 205, neurons = 12):
 def save(model_to_save, path):
     torch.save(model_to_save, path)
 
-def load_ensemble(device='cuda:0'):
+def load_ensemble(device='cpu'):
     shape = (15,1)
     checkpoints = torch.load(f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl')
     models = []
@@ -154,10 +155,10 @@ def load_ensemble(device='cuda:0'):
 
     return models, poses_mean, poses_std, cost_mean, cost_std
 
-def query_ensemble(poses, models):
+def query_ensemble(poses, models, device='cpu'):
     costs = []
     for model in models:
-        costs.append(model(poses))
+        costs.append(model(poses.to(device)))
     costs = torch.stack(costs)
     return costs
 
@@ -229,6 +230,7 @@ def eval(model_name, ensemble = False):
             plt.ylabel('Cost Value')
             plt.title('Actual vs Predicted Costs')
             plt.legend()
+
             plt.show()
     
     plot_loader(train_loader, 100, 'Training Set')
@@ -236,11 +238,11 @@ def eval(model_name, ensemble = False):
 
 if __name__ == "__main__":
 
-    model_name = "2"#input("Enter model name: ")
-    model_to_save, _ = train()
-    save(model_to_save, f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
-    eval(model_name = "2") 
-    exit()
+    # model_name = "2"#input("Enter model name: ")
+    # model_to_save, _ = train()
+    # save(model_to_save, f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
+    # eval(model_name = "2") 
+    # exit()
 
     # epoch_vals = [205, 210, 215]
     # lr_vals = [0.01]

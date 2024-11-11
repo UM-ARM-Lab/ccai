@@ -18,19 +18,27 @@ import torch
 
 # experiment_name = '_ensemble_SGD_100k_iters'
 # experiment_name = '_ensemble_Adam_100k_iters'
-experiment_name = '_ensemble_Adam_500_iters_optimal'
+# experiment_name = '_ensemble_Adam_500_iters_optimal'
+experiment_name = 'testvf_only_20'
 
 
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
-with open(f'{fpath.resolve()}/eval/initial_and_optimized_poses{experiment_name}.pkl', 'rb') as file:
+
+# with open(f'{fpath.resolve()}/eval/initial_and_optimized_poses{experiment_name}.pkl', 'rb') as file:
+with open(f'{fpath.resolve()}/test/{experiment_name}.pkl', 'rb') as file:
     tuples = pkl.load(file)
-    initial_poses, optimized_poses = zip(*tuples)
+    # initial_poses, optimized_poses = zip(*tuples)
 
-    initial_poses = np.array(initial_poses).reshape(-1,20)
-    initial_poses = torch.from_numpy(initial_poses).float()
+    # initial_poses = np.array(initial_poses).reshape(-1,20)
+    # initial_poses = torch.from_numpy(initial_poses).float()
 
-    optimized_poses = np.array(optimized_poses).reshape(-1,20)
-    optimized_poses = torch.from_numpy(optimized_poses).float()
+    # optimized_poses = np.array(optimized_poses).reshape(-1,20)
+    # optimized_poses = torch.from_numpy(optimized_poses).float()
+
+    _, initial_poses, optimized_poses = zip(*tuples)
+    initial_poses = torch.stack(initial_poses).reshape(-1,20).float()
+    optimized_poses = torch.stack(optimized_poses).reshape(-1,20).float()
+
 
 
 if __name__ == "__main__":
@@ -53,7 +61,8 @@ if __name__ == "__main__":
                                 initial_full_trajectory, optimized_full_trajectory))
 
     except KeyboardInterrupt:
-        print("\nKeyboard interrupt! Saving...")
+        # print("\nKeyboard interrupt! Saving...")
+        exit()
 
     finally:
 

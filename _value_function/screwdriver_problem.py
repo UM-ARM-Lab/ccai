@@ -13,7 +13,7 @@ import pytorch_volumetric as pv
 import pytorch_kinematics as pk
 import pytorch_kinematics.transforms as tf
 import matplotlib.pyplot as plt
-from utils.allegro_utils import state2ee_pos
+from utils.allegro_utils import state2ee_pos, visualize_trajectory
 from scipy.spatial.transform import Rotation as R
 import sys
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
@@ -109,7 +109,7 @@ def init_env(visualize=False):
 
     return config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial
 
-def pregrasp(env, config, chain, useVFgrads=False):
+def pregrasp(env, config, chain, deterministic=True, initialization = None, useVFgrads=False, vis_plan = False, iters = 80):
     params = config.copy()
     controller = 'csvgd'
     params.pop('controllers')
@@ -124,21 +124,39 @@ def pregrasp(env, config, chain, useVFgrads=False):
     device = params['device']
     sim_device = params['sim_device']
     
-    # screwdriver_start = torch.tensor([
-    # np.random.uniform(-0.05, 0.05),  # Random value between -0.05 and 0.05
-    # np.random.uniform(-0.05, 0.05),  # Random value between -0.05 and 0.05
-    # np.random.uniform(0, 2 * np.pi),  # Random value between 0 and 2π
-    # 0.0  
-    # ])
 
-    default_dof_pos = torch.cat((torch.tensor([[0., 0.5, 0.7, 0.7]]).float().to(device=sim_device),
-                                torch.tensor([[0., 0.5, 0.7, 0.7]]).float().to(device=sim_device),
-                                torch.tensor([[0., 0.5, 0.7, 0.7]]).float().to(device=sim_device),
-                                torch.tensor([[1.3, 0.3, 0.2, 1.1]]).float().to(device=sim_device),
-                                torch.tensor([[0.0, 0.0, 0.0, 0.0]]).float().to(device=sim_device)),
-                                dim=1).to(sim_device)
+    #['index', 'middle', 'ring', 'thumb']
+    # add random noise to each finger joint other than the ring finger
+    if initialization is None:
+        if deterministic is False:
+            index_noise_mag = torch.tensor([0.08]*4)
+            index_noise = index_noise_mag * (2 * torch.rand(4) - 1)
+            middle_ring_noise_mag = torch.tensor([0.15]*4)
+            middle_ring_noise = middle_ring_noise_mag * (2 * torch.rand(4) - 1)
+            screwdriver_noise = torch.tensor([
+            np.random.uniform(-0.05, 0.05),  # Random value between -0.05 and 0.05
+            np.random.uniform(-0.05, 0.05),  # Random value between -0.05 and 0.05
+            np.random.uniform(0, 2 * np.pi),  # Random value between 0 and 2π
+            0.0  
+            ])
+            
+        
+        else:
+            index_noise = torch.tensor([0., 0., 0., 0.])
+            middle_ring_noise = torch.tensor([0., 0., 0., 0.])
+            screwdriver_noise = torch.tensor([0., 0., 0., 0.])
 
-    env.reset(dof_pos= default_dof_pos, deterministic=False)
+        default_dof_pos = torch.cat((torch.tensor([[0., 0.5, 0.7, 0.7]]).float().to(device=sim_device) + index_noise,
+                                    torch.tensor([[0., 0.5, 0.7, 0.7]]).float().to(device=sim_device) + middle_ring_noise,
+                                    torch.tensor([[0., 0.5, 0.7, 0.7]]).float().to(device=sim_device) + middle_ring_noise,
+                                    torch.tensor([[1.3, 0.3, 0.2, 1.1]]).float().to(device=sim_device),
+                                    torch.tensor([[0.0, 0.0, 0.0, 0.0]]).float().to(device=sim_device) + screwdriver_noise),
+                                    dim=1).to(sim_device)
+    else:
+        default_dof_pos = initialization
+
+    env.reset(dof_pos= default_dof_pos)
+
     start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=device)
     print("start: ", start)
 
@@ -170,12 +188,29 @@ def pregrasp(env, config, chain, useVFgrads=False):
         useVFgrads=useVFgrads,
     )
     pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
-    pregrasp_planner.warmup_iters = 80#500 #50
+    pregrasp_planner.warmup_iters = iters#500 #50
 
     best_traj, _ = pregrasp_planner.step(start[:4 * num_fingers])
 
-    x = best_traj[-1, :4 * num_fingers]
-    action = x.reshape(-1, 4 * num_fingers).to(device=device) 
+    if vis_plan:
+        robot_dof = 4 * num_fingers
+        traj_for_viz = best_traj[:, :pregrasp_problem.dx]
+        tmp = start[robot_dof:].unsqueeze(0).repeat(traj_for_viz.shape[0], 1)
+        traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)  
+        fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_0')
+        pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)  
+        viz_fpath = pathlib.PurePath.joinpath(fpath, "pregrasp")
+        img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
+        gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
+        pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
+        pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
+        visualize_trajectory(traj_for_viz, pregrasp_problem.viz_contact_scenes, viz_fpath, 
+                                pregrasp_problem.fingers, pregrasp_problem.obj_dof+1,)
+        
+
+
+    action = best_traj[-1, :4 * num_fingers]
+    action = action.reshape(-1, 4 * num_fingers).to(device=device) 
     solved_pos = torch.cat((
             action.clone()[:, :8], 
             torch.tensor([[0., 0.5, 0.65, 0.65]]).to(device=device), 
@@ -184,7 +219,7 @@ def pregrasp(env, config, chain, useVFgrads=False):
             #torch.zeros(1,4).to(device=device)
             ), dim=1).to(device)
 
-    env.reset(dof_pos = solved_pos.to(device = sim_device), deterministic=True)
+    env.reset(dof_pos = solved_pos.to(device = sim_device))
 
     return solved_pos.cpu()
 
@@ -207,7 +242,7 @@ def solve_turn(env, gym, viewer, params, fpath, initial_pose, state2ee_pos_parti
         env.frame_fpath = None
         env.frame_id = None
 
-    env.reset(dof_pos = initial_pose, deterministic=True)
+    env.reset(dof_pos = initial_pose)
 
     state = env.get_state()
     start = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
@@ -355,7 +390,7 @@ def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym,
     controller = 'csvgd'
     succ = False
     fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_0')
-    # pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
+    pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
     # set up params
     params.pop('controllers')
     params.update(config['controllers'][controller])
@@ -413,6 +448,7 @@ if __name__ == "__main__":
     initial_poses = pkl.load(open(f'{fpath.resolve()}/initial_poses/initial_poses_10k.pkl', 'rb'))
     # show_state(env, initial_poses[0], t=2)
     # show_state(env, initial_poses[1], t=2)
-    pregrasp(env, config, chain, useVFgrads=True)
+    for i in range(10):
+        pregrasp(env, config, chain, deterministic=False, initialization = None, useVFgrads=True)
     # initial_pose, final_pose, succ, full_trajectory = do_turn(initial_poses[0], config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
     

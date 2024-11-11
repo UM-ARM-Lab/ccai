@@ -98,10 +98,10 @@ if __name__ == "__main__":
         config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
         for idx in fails:
             if combined_costs[idx] > 5.0:
-                env.reset(torch.from_numpy(combined_initial_poses[idx]).reshape(1,20).float(), deterministic=True)
+                env.reset(torch.from_numpy(combined_initial_poses[idx]).reshape(1,20).float())
                 time.sleep(0.5)
                 print("cost: ", combined_costs[idx])
-                env.reset(torch.from_numpy(combined_final_poses[idx]).reshape(1,20).float(), deterministic=True)
+                env.reset(torch.from_numpy(combined_final_poses[idx]).reshape(1,20).float())
                 time.sleep(1.0)
 
     pose_cost_dataset = zip(combined_initial_poses, combined_costs)

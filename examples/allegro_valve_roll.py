@@ -721,12 +721,17 @@ class AllegroContactProblem(AllegroObjectProblem):
             input = torch.cat((last_state, screwdriver))
             # print("input: ", input)
             input_norm = ((input - self.poses_mean) / self.poses_std).float()
-            vf_output_norm = self.query_ensemble(input_norm, self.models)
+            vf_output_norm = self.query_ensemble(input_norm, self.models, device=self.device)
             vf_output = vf_output_norm * self.cost_std + self.cost_mean
-            # print("vf_output: ", vf_output)
-            vf_cost = torch.sum(vf_output ** 2)
+
+            mean = torch.mean(vf_output)
+            mse = torch.mean(vf_output ** 2)
+            mean_squared_variance = torch.mean((vf_output - mean) ** 2)
+
+            print("mse: ", mse)
+            vf_cost = mse + mean_squared_variance
             # print("vf_cost: ", vf_cost)
-            return 10 * smoothness_cost + 10 * action_cost + 1.0 * vf_cost
+            return 1*vf_cost #+ 1/5 * smoothness_cost + 1/5 * action_cost
 
     
     def _con_eq(self, xu, compute_grads=True, compute_hess=False):
