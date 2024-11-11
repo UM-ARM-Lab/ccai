@@ -1,4 +1,4 @@
-model_name: 'allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_all_knotpoints'
+model_name: 'allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_all_knotpoints_bigger_layers'
 T: 13
 dx: 15
 du: 21
