@@ -33,31 +33,6 @@ obj_dof = 3
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 
-
-class ALlegroScrewdriverContact(AllegroContactProblem):
-    def __init__(self, 
-                 dx,
-                 du,
-                 start, 
-                 goal, 
-                 T, 
-                 chain, 
-                 object_type,
-                 world_trans,
-                 object_asset_pos,
-                 fingers=['index', 'middle', 'ring', 'thumb'],
-                 obj_dof_code=[0, 0, 0, 0, 0, 0], 
-                 obj_joint_dim=0,
-                 fixed_obj=False,
-                 collision_checking=False,
-                 arm_type='None',
-                #  default_index_ee_pos=None, 
-                 device='cuda:0'):
-        super(ALlegroScrewdriverContact, self).__init__(dx, du, start, goal, T, 
-                                                        chain, object_type, world_trans,
-                                                        object_asset_pos, fingers, obj_dof_code, obj_joint_dim,
-                                                        fixed_obj, collision_checking, arm_type, device)
-        self.default_index_ee_loc_in_screwdriver = torch.tensor([0.0087, -0.02, 0.1293], device=device).unsqueeze(0)
 class AllegroScrewdriver(AllegroValveTurning):
     def get_constraint_dim(self, T):
         self.friction_polytope_k = 4
@@ -127,8 +102,8 @@ class AllegroScrewdriver(AllegroValveTurning):
                                                  screwdriver_force_balance=force_balance,
                                                  collision_checking=collision_checking, obj_gravity=obj_gravity,
                                                  contact_region=contact_region, du=du, arm_type=arm_type, device=device)
+        self.min_force_dict = {'index': 0.05, 'middle': 0.1, 'ring': 0.1, 'thumb': 0.1}
         self.friction_coefficient = friction_coefficient
-        self.default_index_ee_loc_in_screwdriver = torch.tensor([0.0087, -0.016, 0.1293], device=device).unsqueeze(0)
         self.friction_vel_constr = vmap(self._friction_vel_constr, randomness='same')
         self.grad_friction_vel_constr = vmap(jacrev(self._friction_vel_constr, argnums=(0, 1, 2)))
         if contact_region:
@@ -620,7 +595,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
     if params['controller'] == 'csvgd':
         pregrasp_dx = pregrasp_du = robot_dof
-        pregrasp_problem = ALlegroScrewdriverContact(
+        pregrasp_problem = AllegroContactProblem(
             dx=pregrasp_dx,
             du=pregrasp_du,
             start=start[:pregrasp_dx + obj_dof],

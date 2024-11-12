@@ -1,7 +1,7 @@
 ---
-T: 10
+T: 12
 receding_horizon: False
-num_steps: 10
+num_steps: 12
 num_trials: 20
 visualize: True
 experiment_name: 'allegro_screwdriver'

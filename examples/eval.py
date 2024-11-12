@@ -472,7 +472,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         distance2goal = euler_diff(obj_state, goal.unsqueeze(0).repeat(obj_state.shape[0], 1)).detach().cpu().abs()
     elif params['task'] == 'valve_turning':
         distance2goal = (obj_state - goal).detach().cpu().abs()
-    elif params['task'] == 'peg_turning' or params['task'] == 'peg_alignment':
+    elif params['task'] == 'peg_turning' or params['task'] == 'peg_alignment' or params['task'] == 'reorientation':
         distance2goal = euler_diff(obj_state[:, -3:], goal[-3:].unsqueeze(0).repeat(obj_state.shape[0], 1)).detach().cpu().abs()
 
     # final_distance_to_goal = torch.min(distance2goal.abs())
@@ -493,11 +493,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
 if __name__ == "__main__":
     # get config
-    # task = 'screwdriver_turning'
+    task = 'screwdriver_turning'
     # task = 'valve_turning'
     # task = 'reorientation'
     # task = 'peg_alignment'
-    task = 'peg_turning'
+    # task = 'peg_turning'
 
     method = 'csvgd'
     # method = 'ablation'

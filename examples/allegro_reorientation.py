@@ -69,13 +69,14 @@ class AllegroReorientation(AllegroValveTurning):
         self.num_fingers = len(fingers)
         self.optimize_force = optimize_force
         self.object_asset_pos = object_asset_pos
-        self.obj_mass = 0.01
+        self.obj_mass = 0.0001
 
         super(AllegroReorientation, self).__init__(start=start, goal=goal, T=T, chain=chain, object_location=object_location,
                                                  object_type=object_type, world_trans=world_trans, object_asset_pos=object_asset_pos,
                                                  fingers=fingers, friction_coefficient=friction_coefficient, obj_dof_code=obj_dof_code, 
                                                  obj_joint_dim=0, optimize_force=optimize_force, obj_gravity=obj_gravity, device=device)
         self.friction_coefficient = friction_coefficient
+        # self.min_force_dict = {'index': 0.2, 'middle': 0.2, 'ring': 0.2, 'thumb': 0.2}
     
     def _cost(self, xu, start, goal):
         # TODO: consider using quaternion difference for the orientation.
@@ -98,7 +99,7 @@ class AllegroReorientation(AllegroValveTurning):
             # terminal cost
             goal_cost = goal_cost + torch.sum((100 * (obj_position[-1] - goal[:self.obj_translational_dim]) ** 2))
             # running cost
-            goal_cost = goal_cost + torch.sum((1 * (obj_position - goal[:self.obj_translational_dim]) ** 2))
+            goal_cost = goal_cost + torch.sum((0.1 * (obj_position - goal[:self.obj_translational_dim]) ** 2))
             smoothness_cost = smoothness_cost + 100 * torch.sum((obj_position[1:] - obj_position[:-1]) ** 2)
         if self.obj_rotational_dim:
             obj_orientation = state[:, -self.obj_dof+self.obj_translational_dim:]
@@ -109,7 +110,7 @@ class AllegroReorientation(AllegroValveTurning):
             # terminal cost
             goal_cost = goal_cost + torch.sum((100 * (obj_orientation[-1] - goal_orientation) ** 2))
             # running cost 
-            goal_cost = goal_cost + torch.sum((0.1 * (obj_orientation - goal_orientation) ** 2))
+            goal_cost = goal_cost + torch.sum((1 * (obj_orientation - goal_orientation) ** 2))
             smoothness_cost = smoothness_cost + 50 * torch.sum((obj_orientation[1:] - obj_orientation[:-1]) ** 2)
         return smoothness_cost + action_cost + goal_cost 
 
@@ -124,10 +125,13 @@ class AllegroReorientation(AllegroValveTurning):
         # u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
         u = 0.025 * torch.randn(N, self.T, 4 * self.num_fingers, device=self.device)
         force = 0.025 * torch.randn(N, self.T, 3 * self.num_fingers, device=self.device)
-        # force[:, :, 3:] *= 10 # the catching fingers use a larger force to maintain stability
-        force[:, :, 0] -= 0.2
+        # force[:, :, 0] -= 0.2
         # force[:, :, 3] -= 0.2
-        force[:, :, 6] += 0.2
+        # force[:, :, 6] += 0.2
+        # gravity
+        # force[:, :, 2] += 0.03
+        # force[:, :, 5] += 0.03
+        # force[:, :, 8] += 0.03
         u = torch.cat((u, force), dim=-1)
 
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
@@ -138,20 +142,20 @@ class AllegroReorientation(AllegroValveTurning):
         x = torch.stack(x[1:], dim=1)
 
         # if valve angle in state
-        current_obj_position = self.start[4 * self.num_fingers: 4 * self.num_fingers + self.obj_translational_dim]
-        current_obj_orientation = self.start[4 * self.num_fingers + self.obj_translational_dim:4 * self.num_fingers + self.obj_dof]
-        current_obj_R = R.from_euler('XYZ', current_obj_orientation.cpu().numpy())
-        goal_obj_R = R.from_euler('XYZ', self.goal[self.obj_translational_dim:self.obj_translational_dim + self.obj_rotational_dim].cpu().numpy())
-        key_times = [0, self.T]
-        times = np.linspace(0, self.T, self.T + 1)
-        slerp = Slerp(key_times, R.concatenate([current_obj_R, goal_obj_R]))
-        interp_rots = slerp(times)
-        interp_rots = interp_rots.as_euler('XYZ')[1:]
+        # current_obj_position = self.start[4 * self.num_fingers: 4 * self.num_fingers + self.obj_translational_dim]
+        # current_obj_orientation = self.start[4 * self.num_fingers + self.obj_translational_dim:4 * self.num_fingers + self.obj_dof]
+        # current_obj_R = R.from_euler('XYZ', current_obj_orientation.cpu().numpy())
+        # goal_obj_R = R.from_euler('XYZ', self.goal[self.obj_translational_dim:self.obj_translational_dim + self.obj_rotational_dim].cpu().numpy())
+        # key_times = [0, self.T]
+        # times = np.linspace(0, self.T, self.T + 1)
+        # slerp = Slerp(key_times, R.concatenate([current_obj_R, goal_obj_R]))
+        # interp_rots = slerp(times)
+        # interp_rots = interp_rots.as_euler('XYZ')[1:]
 
-        theta_position = np.linspace(current_obj_position.cpu().numpy(), self.goal[:self.obj_translational_dim].cpu().numpy(), self.T + 1)[1:]
-        theta = np.concatenate((theta_position, interp_rots), axis=-1)
-        theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
-        theta = theta.unsqueeze(0).repeat((N,1,1))
+        # theta_position = np.linspace(current_obj_position.cpu().numpy(), self.goal[:self.obj_translational_dim].cpu().numpy(), self.T + 1)[1:]
+        # theta = np.concatenate((theta_position, interp_rots), axis=-1)
+        # theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
+        # theta = theta.unsqueeze(0).repeat((N,1,1))
 
         theta = self.start[-self.obj_dof:].reshape(1, 1, -1).repeat(N, self.T, 1)
 
