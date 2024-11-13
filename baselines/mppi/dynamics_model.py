@@ -12,16 +12,17 @@ class DynamicsModel:
         if self.include_velocity:
             tmp_obj_joint = torch.zeros((state.shape[0], self.obj_joint_dim, 2)).to(device=state.device)
             state = state.reshape((N, -1, 2))
-            full_state = torch.cat((state, tmp_obj_joint), dim=-2)
-            self.env.set_pose(full_state, semantic_order=False, zero_velocity=False)
-            action = self.env.get_state()[0, : 4 * self.num_fingers] + action
+            # full_state = torch.cat((state, tmp_obj_joint), dim=-2)
+            self.env.set_pose(state, semantic_order=False, zero_velocity=False)
+            action = self.env.get_state()[0, : 4 * self.num_fingers].to(action.device) + action
+            action = action.to(self.env.device)
             self.env.step(action, ignore_img=True)
             ret = self.env.dof_states.clone().reshape(N, -1)
-        else:
-            if self.obj_joint_dim > 0:
-                tmp_obj_joint = torch.zeros((state.shape[0], self.obj_joint_dim)).to(device=state.device)
-                state = torch.cat((state, tmp_obj_joint), dim=-1)
-            self.env.set_pose(state, semantic_order=True, zero_velocity=True)
-            action = state[:, :4 * self.num_fingers] + action
-            ret = self.env.step(action, ignore_img=True)
+        # else:
+        #     if self.obj_joint_dim > 0:
+        #         tmp_obj_joint = torch.zeros((state.shape[0], self.obj_joint_dim)).to(device=state.device)
+        #         state = torch.cat((state, tmp_obj_joint), dim=-1)
+        #     self.env.set_pose(state, semantic_order=True, zero_velocity=True)
+        #     action = state[:, :4 * self.num_fingers] + action
+        #     ret = self.env.step(action, ignore_img=True)
         return ret

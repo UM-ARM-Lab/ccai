@@ -1,17 +1,15 @@
 ---
-T: 10
 receding_horizon: False
 num_steps: 10
 num_trials: 20
 visualize: True
-experiment_name: 'allegro_peg_insertion'
+experiment_name: 'allegro_peg_alignment'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
 object_type: 'peg'
 sim_device: 'cpu'
-device: 'cpu'
-include_velocity: True
+device: 'cuda:0'
 friction_coefficient: 0.95
 gradual_control: True
 arm_type: 'None' # choose between 'None', 'robot', 'floating_3d', 'floating_6d'
@@ -20,7 +18,10 @@ goal: [0, 0, 0, 0, 0, 0]
 kp: 3.0
 controllers:
   mppi:
-    # N: 16
+    T: 4
     N: 200
     lambda: 0.01
     variance: 0.005
+    warmstart_iters: 5
+    include_velocity: True
+

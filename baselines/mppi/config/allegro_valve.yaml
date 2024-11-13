@@ -1,0 +1,28 @@
+---
+receding_horizon: False
+num_steps: 8
+num_trials: 20
+visualize: True
+experiment_name: 'allegro_valve'
+mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
+fingers: ['index', 'middle', 'thumb']
+simulator: "isaac_gym" # choose from 'isaac_sim', 'isaac_gym'
+object_type: 'cross_valve'
+sim_device: 'cpu'
+device: 'cuda:0'
+arm_type: "None"
+friction_coefficient: 0.9
+kp: 3.0
+visualize_plan: False
+random_robot_pose: False
+optimize_force: True
+gravity: True  # whether to use gravity in the simulation
+goal: [-0.785398]
+controllers:
+  mppi:
+    T: 4
+    N: 200
+    lambda: 0.3
+    variance: 0.01
+    warmstart_iters: 3
+    include_velocity: True

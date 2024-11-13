@@ -53,38 +53,44 @@ def do_trial(env, params, fpath):
     action_list = []
 
     start = state[0, :4 * num_fingers + obj_dof].to(device=params['device'])
-  
-    pregrasp_problem = AllegroContactProblem(
-        dx=4 * num_fingers,
-        du=4 * num_fingers,
-        start=start[:4 * num_fingers + obj_dof],
-        goal=None,
-        T=4,
-        chain=params['chain'],
-        device=params['device'],
-        object_asset_pos=env.obj_pose,
-        object_type=params['object_type'],
-        world_trans=env.world_trans,
-        fingers=params['fingers'],
-        obj_dof_code=params['obj_dof_code'],
-        obj_joint_dim=obj_joint_dim,
-        fixed_obj=True
-    )
-    pregrasp_params = params.copy()
-    pregrasp_params['N'] = 10
-    pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, pregrasp_params)
-    pregrasp_planner.warmup_iters = 50
+
+    if config['task'] == 'peg_turning' or config['task'] == 'reorientation' or config['task'] == 'peg_alignment':
+        pass
+        # action = torch.cat((env.default_dof_pos[:,:8], env.default_dof_pos[:, 12:16]), dim=-1)
+        # env.step(action) # step one step to resolve penetration
     
-    
-    start = env.get_state()[0, :4 * num_fingers + obj_dof].to(device=params['device'])
-    best_traj, _ = pregrasp_planner.step(start[:4 * num_fingers])
+    else:
+        pregrasp_problem = AllegroContactProblem(
+            dx=4 * num_fingers,
+            du=4 * num_fingers,
+            start=start[:4 * num_fingers + obj_dof],
+            goal=None,
+            T=4,
+            chain=params['chain'],
+            device=params['device'],
+            object_asset_pos=env.obj_pose,
+            object_type=params['object_type'],
+            world_trans=env.world_trans,
+            fingers=params['fingers'],
+            obj_dof_code=params['obj_dof_code'],
+            obj_joint_dim=obj_joint_dim,
+            fixed_obj=True
+        )
+        pregrasp_params = params.copy()
+        pregrasp_params['N'] = 10
+        pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, pregrasp_params)
+        pregrasp_planner.warmup_iters = 50
+        
+        
+        start = env.get_state()[0, :4 * num_fingers + obj_dof].to(device=params['device'])
+        best_traj, _ = pregrasp_planner.step(start[:4 * num_fingers])
 
 
-    for x in best_traj[:, :4 * num_fingers]:
-        action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
-        action = action.repeat(params['N'], 1)
-        env.step(action)
-        action_list.append(action)
+        for x in best_traj[:, :4 * num_fingers]:
+            action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
+            action = action.repeat(params['N'], 1)
+            env.step(action)
+            action_list.append(action)
     prime_dof_state = env.dof_states.clone()[0]
     prime_dof_state = prime_dof_state.unsqueeze(0).repeat(params['N'], 1, 1)
     env.set_pose(prime_dof_state, semantic_order=False, zero_velocity=False)
@@ -94,16 +100,20 @@ def do_trial(env, params, fpath):
 
     actual_trajectory = []
     duration = 0
+    warmup_time = 0
 
     dynamics = DynamicsModel(env, num_fingers=len(params['fingers']), include_velocity=params['include_velocity'], obj_joint_dim=obj_joint_dim)
     if config['task'] == 'screwdriver_turning':
         from baselines.mppi.allegro_screwdriver import RunningCost
-        from baselines.mppi.allegro_screwdriver import ValidityCheck
-        validity_checker = ValidityCheck(params['object_chain'], obj_dof, env.world_trans, env.obj_pose)
     elif config['task'] == 'peg_alignment':
         from baselines.mppi.allegro_peg_alignment import RunningCost
-        from baselines.mppi.allegro_peg_alignment import ValidityCheck
-        validity_checker = ValidityCheck(obj_dof=obj_dof)
+    elif config['task'] == 'valve_turning':
+        from baselines.mppi.allegro_valve_turning import RunningCost   
+    elif config['task'] == 'peg_turning':
+        from baselines.mppi.allegro_peg_turning import RunningCost  
+    elif config['task'] == 'reorientation':
+        from baselines.mppi.allegro_reorientation import RunningCost 
+
     running_cost = RunningCost(start, params['goal'], include_velocity=params['include_velocity'])
     u_max = torch.ones(4 * len(params['fingers'])) * np.pi / 5 
     u_min = - torch.ones(4 * len(params['fingers'])) * np.pi / 5
@@ -114,7 +124,7 @@ def do_trial(env, params, fpath):
         nx = start.shape[1]
     ctrl = MPPI(dynamics=dynamics, running_cost=running_cost, nx=nx, noise_sigma=noise_sigma, 
                 num_samples=params['N'], horizon=params['T'], lambda_=params['lambda'], u_min=u_min, u_max=u_max,
-                device=params['device'])
+                device=params['device'], warmstart_iters=params['warmstart_iters'])
     
     validity_flag = True
     if params['task'] == 'peg_alignment':
@@ -128,7 +138,7 @@ def do_trial(env, params, fpath):
             actual_trajectory.append(state[0, :4 * num_fingers + obj_dof].clone())
             start_time = time.time()
 
-            prime_dof_state = env.dof_states.clone()[0]
+            prime_dof_state = env.dof_states.clone()[0].to(device=params['device'])
             prime_dof_state = prime_dof_state.unsqueeze(0).repeat(params['N'], 1, 1)
             finger_state = start[:4 * num_fingers].clone()
 
@@ -137,15 +147,19 @@ def do_trial(env, params, fpath):
             else:
                 action = ctrl.command(start[:4 * num_fingers + obj_dof].unsqueeze(0)) # this call will modify the environment
             solve_time = time.time() - start_time
-            duration += solve_time
+            if k == 0:
+                warmup_time = solve_time
+            else:
+                duration += solve_time
 
             action = finger_state + action
             action = action.unsqueeze(0).repeat(params['N'], 1)
             # repeat the primary environment state to all the virtual environments        
             env.set_pose(prime_dof_state, semantic_order=False, zero_velocity=False)
+            action = action.to(env.device)
             state = env.step(action)
             
-            if not validity_checker.check_validity(state):
+            if not env.check_validity(state):
                 validity_flag = False
             # if k < params['num_steps'] - 1:
             #     ctrl.change_horizon(ctrl.T - 1)
@@ -159,27 +173,30 @@ def do_trial(env, params, fpath):
             obj_state = env.get_state()[0, -obj_dof:].cpu().unsqueeze(0)
 
             if params['task'] == 'screwdriver_turning':
-                distance2goal = euler_diff(obj_state, goal.unsqueeze(0)).detach().cpu().abs()
+                distance2goal = euler_diff(obj_state, goal.unsqueeze(0)).detach().cpu().abs().item()
                 print(distance2goal)
-            elif params['task'] == 'peg_alignment':
+            elif params['task'] == 'peg_alignment' or params['task'] == 'peg_turning' or params['task'] == 'reorientation':
                 peg_goal_pos = goal[:3]
                 peg_goal_mat = R.from_euler('XYZ', goal[-3:]).as_matrix()
                 peg_mat = R.from_euler('XYZ', obj_state[0, -3:]).as_matrix()
                 distance2goal_ori = tf.so3_relative_angle(torch.tensor(peg_mat).unsqueeze(0), \
-                torch.tensor(peg_goal_mat).unsqueeze(0), cos_angle=False).detach().cpu().abs()
-                distance2goal_pos = (obj_state[0, :3] - peg_goal_pos).norm(dim=-1).detach().cpu()
+                torch.tensor(peg_goal_mat).unsqueeze(0), cos_angle=False).detach().cpu().abs().item()
+                distance2goal_pos = (obj_state[0, :3] - peg_goal_pos).norm(dim=-1).detach().cpu().item()
                 print(f"distance to goal pos: {distance2goal_pos}, ori: {distance2goal_ori}")
-
-                contacts = gym.get_env_rigid_contacts(env.envs[0])
-                for body0, body1 in zip (contacts['body0'], contacts['body1']):
-                    if body0 == 31 and body1 == 33:
-                        print("contact with wall")
-                        contact_list.append(True)
-                        break
-                    elif body0 == 33 and body1 == 31:
-                        print("contact with wall")
-                        contact_list.append(True)
-                        break
+                if params['task'] == 'peg_alignment':
+                    contacts = gym.get_env_rigid_contacts(env.envs[0])
+                    for body0, body1 in zip (contacts['body0'], contacts['body1']):
+                        if body0 == 31 and body1 == 33:
+                            print("contact with wall")
+                            contact_list.append(True)
+                            break
+                        elif body0 == 33 and body1 == 31:
+                            print("contact with wall")
+                            contact_list.append(True)
+                            break
+            elif params['task'] == 'valve_turning':
+                distance2goal = (obj_state[0] - goal).detach().item()
+                print(distance2goal)
 
             print(validity_flag)
 
@@ -190,7 +207,7 @@ def do_trial(env, params, fpath):
 
 
     state = env.get_state()
-    state = state[0, :4 * num_fingers + obj_dof].to(device=params['device'])
+    state = state[0, :4 * num_fingers + obj_dof]
     actual_trajectory.append(state.clone()[: 4 * num_fingers + obj_dof])
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
     # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
@@ -202,42 +219,52 @@ def do_trial(env, params, fpath):
         final_distance_to_goal = distance2goal.abs()[-1].item()
         ret['final_distance_to_goal'] = final_distance_to_goal
         print(f'Controller: {params["controller"]} Final distance to goal: {final_distance_to_goal}')
-    elif params['task'] == 'peg_alignment':
+    elif params['task'] == 'peg_alignment' or params['task'] == 'peg_turning' or params['task'] == 'reorientation':
         final_distance_to_goal_pos = distance2goal_pos
         final_distance_to_goal_ori = distance2goal_ori
         ret['final_distance_to_goal_pos'] = final_distance_to_goal_pos
         ret['final_distance_to_goal_ori'] = final_distance_to_goal_ori
-        contact_rate = np.array(contact_list).mean()
-        ret['contact_rate'] = contact_rate
+        if params['task'] == 'peg_alignment':
+            contact_rate = np.array(contact_list).mean()
+            ret['contact_rate'] = contact_rate
+    elif params['task'] == 'valve_turning':
+        distance2goal = (obj_state - goal).detach().cpu().abs()
+        final_distance_to_goal = distance2goal.abs()[-1].item()
+        ret['final_distance_to_goal'] = final_distance_to_goal
+        print(f'Controller: {params["controller"]} Final distance to goal: {final_distance_to_goal}')
     print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"])}')
 
     np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy())
     env.reset()
     ret['validity_flag'] = validity_flag
-    ret['avg_online_time'] = duration / (params["num_steps"])
+    ret['avg_online_time'] = duration / (params["num_steps"] - 1)
+    ret['warmup_time'] = warmup_time
     return ret
 
 if __name__ == "__main__":
     # get config
     from tqdm import tqdm
-    # task = 'screwdriver_turning'
-    task = 'peg_alignment'
+    task = 'screwdriver_turning'
+    # task = 'valve_turning'
+    # task = 'peg_alignment'
+    # task = 'peg_turning'
+    # task =  'reorientation'
     if task == 'screwdriver_turning':
         config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/mppi/config/allegro_screwdriver.yaml').read_text())
         config['obj_dof_code'] = [0, 0, 0, 1, 1, 1]        
-        config['num_env_force'] = 1
     elif task == 'valve_turning':
         config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/mppi/config/allegro_valve.yaml').read_text())
         config['obj_dof_code'] = [0, 0, 0, 0, 1, 0]
-        config['num_env_force'] = 0
     elif task == 'peg_turning':
         config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/mppi/config/allegro_peg_turning.yaml').read_text())
         config['obj_dof_code'] = [1, 1, 1, 1, 1, 1]
-        config['num_env_force'] = 0
     elif task == 'peg_alignment':
         config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/mppi/config/allegro_peg_alignment.yaml').read_text())
         config['obj_dof_code'] = [1, 1, 1, 1, 1, 1]
-        config['num_env_force'] = 0
+    elif task == 'reorientation':
+        config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/mppi/config/allegro_reorientation.yaml').read_text())
+        config['obj_dof_code'] = [1, 1, 1, 1, 1, 1]
+
     obj_dof = sum(config['obj_dof_code'])
     config['obj_dof'] = obj_dof
     config['task'] = task
@@ -289,12 +316,6 @@ if __name__ == "__main__":
         env = get_env(task, img_save_dir, config, num_envs=config['controllers']['mppi']['N'])
         sim, gym, viewer = env.get_sim()
 
-    # TODO: fix the object chain
-    if task == 'screwdriver_turning':
-        asset_object = get_assets_dir() + '/screwdriver/screwdriver.urdf'
-        object_chain = pk.build_chain_from_urdf(open(asset_object).read()).to(device=config['device'])
-    else:
-        object_chain = None
 
     # set up the kinematic chain
     asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
@@ -320,7 +341,6 @@ if __name__ == "__main__":
             params['controller'] = controller
             params['goal'] = params['goal'].to(device=params['device'])
             params['chain'] = chain
-            params['object_chain'] = object_chain
             object_location = torch.tensor(env.obj_pose).to(params['device']).float() # TODO: confirm if this is the correct location
             params['object_location'] = object_location
             ret = do_trial(env, params, fpath)
@@ -332,7 +352,15 @@ if __name__ == "__main__":
 
     for key in results.keys():
         print(f"{key}: avg: {np.array(results[key]).mean()}, std: {np.array(results[key]).std()}")
-
+    valid_distance2goal = []
+    for validity, distance2goal in zip(results['validity_flag'], results['final_distance_to_goal']):
+        if validity:
+            valid_distance2goal.append(distance2goal)
+    if len(valid_distance2goal) == 0:
+        print("No valid trials")
+    else:
+        print(f"valid distance2goal: avg: {np.rad2deg(np.array(valid_distance2goal).mean())} degrees, std: {np.rad2deg(np.array(valid_distance2goal).std())} degrees")
+    print(task)
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)
 

@@ -20,12 +20,14 @@ class RunningCost:
         self.include_velocity = include_velocity
     
     def __call__(self, state, action):
+        state = state.to(action.device)
         N = action.shape[0]
         if self.include_velocity:
             state = state.reshape(N, -1 ,2)
             state = state[:, :, 0] # no the cost is only on the position
                 
         action_cost = torch.sum(action ** 2, dim=-1)
+        goal_cost = 0
 
         obj_orientation = state[:, -self.obj_dof:]
         goal_cost = goal_cost + torch.sum((100 * (obj_orientation - self.goal.unsqueeze(0)) ** 2), dim=-1)

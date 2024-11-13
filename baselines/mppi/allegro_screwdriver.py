@@ -13,6 +13,7 @@ class RunningCost:
         self.include_velocity = include_velocity
     
     def __call__(self, state, action):
+        state = state.to(action.device)
         N = action.shape[0]
         if self.include_velocity:
             state = state.reshape(N, -1 ,2)

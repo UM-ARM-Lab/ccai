@@ -950,11 +950,10 @@ class AllegroValveTurning(AllegroContactProblem):
         # smoothness_cost += 50 * torch.sum((state[1:, -1] - state[:-1, -1]) ** 2)
         smoothness_cost += 100 * torch.sum((state[1:, -1] - state[:-1, -1]) ** 2)
 
-        goal_cost = (20 * (state[-1, -1] - goal) ** 2).reshape(-1)
+        goal_cost = (5000 * (state[-1, -1] - goal) ** 2).reshape(-1)
         # add a running cost
-        goal_cost += torch.sum((3 * (state[:, -1] - goal) ** 2), dim=0)
+        goal_cost += torch.sum((10 * (state[:, -1] - goal) ** 2), dim=0)
 
-    
         return smoothness_cost + action_cost + goal_cost
 
     def get_friction_polytope(self):

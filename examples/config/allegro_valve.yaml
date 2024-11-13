@@ -1,9 +1,9 @@
 ---
 receding_horizon: False
-num_steps: 10
-num_trials: 20
+num_steps: 8
+num_trials: 2
 visualize: True
-experiment_name: 'allegro_valve'
+experiment_name: 'allegro_valve_test'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 fingers: ['index', 'middle', 'thumb']
 simulator: "isaac_gym" # choose from 'isaac_sim', 'isaac_gym'
@@ -19,10 +19,11 @@ visualize_plan: False
 random_robot_pose: False
 optimize_force: True
 gravity: True  # whether to use gravity in the simulation
-goal: [-1.5707]
+goal: [-0.785398]
+# goal: [-1.5708]
 controllers:
   csvgd:
-    T: 10
+    T: 8
     # N: 16
     N: 4
     alpha_J: 5.0e-3
@@ -38,7 +39,7 @@ controllers:
     collision_checking: False
     random_init_every_iter: False
   ablation:
-    T: 10
+    T: 8
     # N: 16
     N: 4
     alpha_J: 5.0e-3

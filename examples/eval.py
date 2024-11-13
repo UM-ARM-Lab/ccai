@@ -658,6 +658,14 @@ if __name__ == "__main__":
 
     for key in results[method].keys():
         print(f"{method} {key}: avg: {np.array(results[method][key]).mean()}, std: {np.array(results[method][key]).std()}")
+    valid_distance2goal = []
+    for validity, distance2goal in zip(results[method]['validity_flag'], results[method]['final_distance_to_goal']):
+        if validity:
+            valid_distance2goal.append(distance2goal)
+    if len(valid_distance2goal) == 0:
+        print("No valid trials")
+    else:
+        print(f"{method} valid distance2goal: avg: {np.rad2deg(np.array(valid_distance2goal).mean())} degrees, std: {np.rad2deg(np.array(valid_distance2goal).std())} degrees")
     print(task)
     print(method)
     if config['simulator'] == 'isaac_gym':
