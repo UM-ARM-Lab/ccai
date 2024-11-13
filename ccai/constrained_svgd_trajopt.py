@@ -43,13 +43,15 @@ class ConstrainedSteinTrajOpt:
 
         xuz = xuz.to(dtype=torch.float32)
         grad_J, hess_J, K, grad_K, C, dC, hess_C = self.problem.eval(xuz.to(dtype=torch.float32))
-
+        dC_mask = ~(dC == 0).all(dim=-1)
+        dC = dC[dC_mask].reshape(N, -1, dC.shape[-1])
+        C = C[dC_mask].reshape(N, -1)
         if hess_C is None and self.use_constraint_hessian:
             hess_C = torch.zeros(N, self.dh + self.dg, self.T * d + self.dh, self.T * d + self.dh, device=xuz.device)
 
         with torch.no_grad():
             # we try and invert the dC dCT, if it is singular then we use the psuedo-inverse
-            eye = torch.eye(self.dg + self.dh).repeat(N, 1, 1).to(device=C.device, dtype=self.dtype)
+            eye = torch.eye(C.shape[-1]).repeat(N, 1, 1).to(device=C.device, dtype=self.dtype)
             dCdCT = dC @ dC.permute(0, 2, 1)
             dCdCT = dCdCT.to(dtype=self.dtype)
             A_bmm = lambda x: dCdCT @ x
@@ -69,7 +71,7 @@ class ConstrainedSteinTrajOpt:
             dCdCT_inv = dCdCT_inv.to(dtype=torch.float32)
             # get projection operator
             projection = dCdCT_inv @ dC
-            eye = torch.eye(d * self.T + self.dh, device=xuz.device, dtype=xuz.dtype).unsqueeze(0)
+            eye = torch.eye(dC.shape[-1], device=xuz.device, dtype=xuz.dtype).unsqueeze(0)
             projection = eye - dC.permute(0, 2, 1) @ projection
             # compute term for repelling towards constraint
             xi_C = dCdCT_inv @ C.unsqueeze(-1)
