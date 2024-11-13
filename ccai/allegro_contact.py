@@ -715,13 +715,11 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         self._regrasp_dg_per_t = self.num_regrasps * 4
         self._regrasp_dg_constant = self.num_regrasps
         self._regrasp_dg = self._regrasp_dg_per_t * T + self._regrasp_dg_constant
-        # self._regrasp_dz = self.num_regrasps  # one contact constraints per finger
-        # self._regrasp_dh = self._regrasp_dz * T  # inequality
-        self._regrasp_dz = 0  # one contact constraints per finger
-        self._regrasp_dh_per_t = self.num_regrasps
-        self._regrasp_dh_constant = 0
-        self._regrasp_dh = self.num_regrasps * T  # inequality
+        self._regrasp_dz = self.num_regrasps  # one contact constraints per finger
+        self._regrasp_dz += self.num_regrasps  # one sdf constraint per finger
+        self._regrasp_dh = self._regrasp_dz * T  # inequality
         # self._regrasp_dh += self.num_regrasps
+
 
         if default_dof_pos is None:
             self.default_dof_pos = torch.cat((torch.tensor([[0.1, 0.5, 0.5, 0.5]]).float().to(device=self.device),
@@ -803,15 +801,28 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         # TODO: Get the below to work, then think about if we can make it faster by caching stuff in self.data
         ee_loc_finger = self.data[finger_name]['closest_pt_world'].reshape(N, T + T_offset, 3)[:, T_offset:]
 
+        # self.contact_points = {
+        #     'index': torch.tensor([0.08698072, 0.04505315, 0.06566035], device=xu.device),
+        #     'middle': torch.tensor([0.09539521, 0.00712914, 0.04318945], device=xu.device),
+        #     'thumb': torch.tensor([0.10528128,  0.01956934, -0.00691413], device=xu.device),
+        # }
+
         self.contact_points = {
-            'index': torch.tensor([0.08698072, 0.04505315, 0.06566035], device=xu.device),
-            'middle': torch.tensor([0.09539521, 0.00712914, 0.04318945], device=xu.device),
-            'thumb': torch.tensor([0.10528128,  0.01956934, -0.00691413], device=xu.device),
+            'index': (torch.tensor([0.00750054, -0.00852249,  0.20417026], device=xu.device), 0.027688509),
+            'middle': (torch.tensor([ 0.02001211, -0.0063259 ,  0.16285469], device=xu.device), 0.021481367),
+            'thumb': (torch.tensor([-0.01981559,  0.00899061,  0.13232124], device=xu.device), 0.0194892),
         }
-        self.contact_patch_radius = .02
-        norm = torch.norm(ee_loc_finger - self.contact_points[finger_name], dim=-1)
-        h = norm - self.contact_patch_radius
+
+        this_finger_contact_point, contact_patch_radius = self.contact_points[finger_name]
+        contact_patch_radius /= 2
+        #Convert this_finger_contact_point from object frame to world frame
+        this_finger_contact_point_world = self.contact_scenes.scene_transform.transform_points(this_finger_contact_point.unsqueeze(0))[0]
+        
+        print(this_finger_contact_point_world)
+        norm = torch.norm(ee_loc_finger - this_finger_contact_point_world, dim=-1)
+        h = norm - contact_patch_radius
         h[:, :-1] = 0
+        # h[:, :] = 0
         # h = h[:, -1].reshape(N, 1)
         # print(g[:, -1])
         if compute_grads:
@@ -819,8 +830,10 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             # compute gradient of sdf
             grad_h = torch.zeros(N, T, T, d, device=xu.device)
             grad_ee_q = self.data[finger_name]['closest_pt_q_grad'][:, T_offset:]
-            grad_h_q = torch.einsum('abc, abcd -> abd', (ee_loc_finger - self.contact_points[finger_name])/norm.unsqueeze(-1), grad_ee_q)
+            grad_h_q = torch.einsum('abc, abcd -> abd', (ee_loc_finger - this_finger_contact_point_world)/norm.unsqueeze(-1), grad_ee_q)
             grad_h[:, T_range, T_range, :16] = grad_h_q
+            grad_h[:, :-1] = 0
+            # grad_h[:, :] = 0
             # grad_h[:, T_range, T_range, 16: 16 + self.obj_dof] = grad_h_theta.reshape(N, T + T_offset, self.obj_dof)[:, T_offset:]
             grad_h = grad_h.reshape(N, -1, T, d)
             grad_h = grad_h.reshape(N, -1, T * d)
@@ -945,18 +958,20 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                                                                             compute_hess=compute_hess,
                                                                             projected_diffusion=projected_diffusion)
         
-        # h_patch, grad_h_contact, hess_h_contact = self._contact_patch_constraint(xu=xu.reshape(N, T, -1)[:, :, :self.dx + self.du],
-        #                                                                     compute_grads=compute_grads,
-        #                                                                     compute_hess=compute_hess,
-        #                                                                     projected_diffusion=projected_diffusion)
-        # h = torch.cat((h_contact, h_patch), dim=1)
-        # grad_h = None
-        # hess_h = None
-        # if compute_grads:
-        #     grad_h = torch.cat((grad_h_contact, grad_h_contact), dim=1)
-        # if compute_hess:
-        #     hess_h = torch.cat((hess_h_contact, hess_h_contact), dim=1)
-        return h, grad_h, hess_h, t_mask
+        h_patch, grad_h_patch, hess_h_patch = self._contact_patch_constraint(xu=xu.reshape(N, T, -1)[:, :, :self.dx + self.du],
+                                                                            compute_grads=compute_grads,
+                                                                            compute_hess=compute_hess,
+                                                                            projected_diffusion=projected_diffusion)
+        h = torch.cat((h, h_patch), dim=1)
+        # h = h_contact
+        grad_h = None
+        hess_h = None
+        if compute_grads:
+            grad_h = torch.cat((grad_h, grad_h_patch), dim=1)
+            # grad_h = grad_h_contact
+        if compute_hess:
+            hess_h = torch.cat((hess_h, grad_h_patch), dim=1)
+        return h, grad_h, hess_h
         # print("avoidance", h_contact.max())
 
 class AllegroContactProblem(AllegroObjectProblem):
@@ -1048,8 +1063,8 @@ class AllegroContactProblem(AllegroObjectProblem):
             # self.dg_per_t = self.num_fingers * (1 + 3 + 2)
         self._contact_dg_constant = 0
         self._contact_dg = self._contact_dg_per_t * T + self._contact_dg_constant  # terminal contact points, terminal sdf=0, and dynamics
-        self._contact_dz = (self.friction_polytope_k) * self.num_contacts  # one friction constraints per finger
-        # self._contact_dz = 0 
+        # self._contact_dz = 2 * (self.friction_polytope_k) * self.num_contacts  # one friction constraints per finger
+        self._contact_dz = (self.friction_polytope_k) * self.num_contacts 
 
 
         if self.min_force_dict is not None:
@@ -1180,6 +1195,8 @@ class AllegroContactProblem(AllegroObjectProblem):
             # goal cost
             cost = 10 * torch.sum((theta[-1] - goal[-self.obj_dof:]) ** 2)
             cost += torch.sum((3 * (theta[:-1] - goal[-self.obj_dof:]) ** 2))
+
+
 
         if self.optimize_force:
             force = xu[:, -self.num_contacts * 3:]
@@ -1956,8 +1973,8 @@ class AllegroContactProblem(AllegroObjectProblem):
         if self.optimize_force:
             force = torch.zeros(N, T, 12, device=self.device)
             force[:, :, self._contact_force_indices] = xu[:, :, -self.num_contacts * 3:]
-            h, grad_h, hess_h, t_mask = self._friction_constraint(
-                q=q, delta_q=delta_q, force=force,
+            h, grad_h, hess_h = self._friction_constraint(
+                q=q, delta_q=delta_q, force=None,
                 compute_grads=compute_grads,
                 compute_hess=compute_hess,
                 projected_diffusion=projected_diffusion)
@@ -2402,9 +2419,9 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
 
         goal_cost = 0
         if self.full_dof_goal:
-            x_last = xu[-1, :self.num_fingers * 4 + self.obj_dof-1]
-            goal_cost = 10 * (x_last - goal[:-1]).pow(2).sum(dim=-1)#.sum(dim=-1)
-            goal_cost += 3 * (xu[:-1, :self.num_fingers * 4 + self.obj_dof-1] - goal[:-1]).pow(2).sum(dim=-1).sum(dim=-1)
+            x_last = xu[-1, :self.num_fingers * 4 + self.obj_dof]
+            goal_cost = 10 * (x_last - goal).pow(2).sum(dim=-1)#.sum(dim=-1)
+            goal_cost += 3 * (xu[:-1, :self.num_fingers * 4 + self.obj_dof] - goal).pow(2).sum(dim=-1).sum(dim=-1)
 
         return cost + goal_cost
 

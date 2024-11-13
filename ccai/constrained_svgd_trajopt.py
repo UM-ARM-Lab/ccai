@@ -50,26 +50,30 @@ class ConstrainedSteinTrajOpt:
         xuz.requires_grad = True
 
         xuz = xuz.to(dtype=torch.float32)
-        grad_J, hess_J, K, grad_K, C, dC, hess_C, t_mask = self.problem.eval(xuz.to(dtype=torch.float32))
-        self.t_mask = t_mask
+        # grad_J, hess_J, K, grad_K, C, dC, hess_C, t_mask = self.problem.eval(xuz.to(dtype=torch.float32))
+        # self.t_mask = t_mask
 
-        active_constraint_mask = torch.logical_or((C > 0).unsqueeze(-1), self.dual > 0)
-        active_constraint_mask[:, :self.dg] = True
+        # active_constraint_mask = torch.logical_or((C > 0).unsqueeze(-1), self.dual > 0)
+        # active_constraint_mask[:, :self.dg] = True
 
-        inactive_constraint_mask = ~active_constraint_mask
-        inactive_constraint_mask_eye = torch.logical_and(inactive_constraint_mask, inactive_constraint_mask.transpose(1, 2))
+        # inactive_constraint_mask = ~active_constraint_mask
+        # inactive_constraint_mask_eye = torch.logical_and(inactive_constraint_mask, inactive_constraint_mask.transpose(1, 2))
         
-        C[inactive_constraint_mask[:, :, 0]] = 0
-        dC[inactive_constraint_mask.expand(-1, -1, dC.shape[-1])] = 0
+        # C[inactive_constraint_mask[:, :, 0]] = 0
+        # dC[inactive_constraint_mask.expand(-1, -1, dC.shape[-1])] = 0
 
+        grad_J, hess_J, K, grad_K, C, dC, hess_C, t_mask = self.problem.eval(xuz.to(dtype=torch.float32))
+        dC_mask = ~(dC == 0).all(dim=-1)
+        dC = dC[dC_mask].reshape(N, -1, dC.shape[-1])
+        C = C[dC_mask].reshape(N, -1)
         if hess_C is None and self.use_constraint_hessian:
             hess_C = torch.zeros(N, self.dh + self.dg, self.T * d + self.dh, self.T * d + self.dh, device=xuz.device)
 
         with torch.no_grad():
             # we try and invert the dC dCT, if it is singular then we use the psuedo-inverse
-            eye = torch.eye(self.dg + self.dh).repeat(N, 1, 1).to(device=C.device, dtype=self.dtype)
+            eye = torch.eye(C.shape[-1]).repeat(N, 1, 1).to(device=C.device, dtype=self.dtype)
             eye_0 = eye.clone()
-            eye_0[inactive_constraint_mask_eye] = 0
+            # eye_0[inactive_constraint_mask_eye] = 0
             damping_factor = 1e-6
             eye_0 *= damping_factor
             dCdCT = dC @ dC.permute(0, 2, 1)
@@ -91,8 +95,7 @@ class ConstrainedSteinTrajOpt:
             dCdCT_inv = dCdCT_inv.to(dtype=torch.float32)
             # get projection operator
             projection = dCdCT_inv @ dC
-            # eye = torch.eye(d * self.T + self.dh, device=xuz.device, dtype=xuz.dtype).unsqueeze(0)
-            eye = torch.eye(d * self.T, device=xuz.device, dtype=xuz.dtype).unsqueeze(0)
+            eye = torch.eye(dC.shape[-1], device=xuz.device, dtype=xuz.dtype).unsqueeze(0)
             projection = eye - dC.permute(0, 2, 1) @ projection
             # compute term for repelling towards constraint
 

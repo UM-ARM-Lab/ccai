@@ -5,7 +5,7 @@ num_steps: 12
 num_turns: 3
 num_trials: 10
 visualize: True
-experiment_name: 'allegro_screwdriver_csvto_augmented_lagrangian_100'
+experiment_name: 'allegro_screwdriver_csvto_OOD_ID_contact_region_no_double_friction_fixed'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
