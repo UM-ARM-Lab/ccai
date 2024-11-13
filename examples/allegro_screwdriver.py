@@ -101,6 +101,8 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                  regrasp_fingers=[],
                  contact_fingers=['index', 'middle', 'ring', 'thumb'],
                  friction_coefficient=0.95,
+                #  friction_coefficient=0.5,
+                #  friction_coefficient=1000,
                  obj_dof=1,
                  obj_ori_rep='euler',
                  obj_joint_dim=0,
@@ -264,7 +266,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             min_force_dict=min_force_dict,
             full_dof_goal=params.get('compute_recovery_trajectory', False),
         )
-        pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
+        pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, pregrasp_params)
         index_regrasp_planner = PositionControlConstrainedSVGDMPC(index_regrasp_problem, params)
         thumb_and_middle_regrasp_planner = PositionControlConstrainedSVGDMPC(thumb_and_middle_regrasp_problem, params)
         turn_planner = PositionControlConstrainedSVGDMPC(turn_problem, params)
@@ -379,7 +381,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             default_dof_pos=env.default_dof_pos[:, :16],
             obj_gravity=pregrasp_params.get('obj_gravity', False),
         )
-        pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
+        pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, pregrasp_params)
 
         turn_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
@@ -1401,22 +1403,23 @@ if __name__ == "__main__":
             torch.manual_seed(i)
             np.random.seed(i)
 
-        # goal = torch.tensor([0, 0, float(config['goal'])])
-            env.reset(
-                dof_pos=torch.tensor([
-                                    [
-                                      -0.2066,  0.4522,  0.4844,  0.9538,  
-                                      0.0327,  0.4181,  1.0236,  0.9130,
-                                      0, 0, 0, 0,
-                                      1.3928,  0.1085,  0.3418,  0.5728, 
-                                      -0.0316, -0.0383,  0.8699,
-                                      0 ]])
-            )
-        goal = torch.tensor([ 0.0281,  0.4295,  0.5811,  0.7072, 
-                             -0.0421,  0.5418,  0.8852,  1.1562,
-                             1.5201,  0.0422,  0.1824,  0.5474, 
-                             -0.0337, -0.0239,  1.2601])
-        # goal = goal + 0.025 * torch.randn(1) + 0.2
+        #     env.reset(
+        #         dof_pos=torch.tensor([
+        #                             [
+        #                               -0.2066,  0.4522,  0.4844,  0.9538,  
+        #                               0.0327,  0.4181,  1.0236,  0.9130,
+        #                               0, 0, 0, 0,
+        #                               1.3928,  0.1085,  0.3418,  0.5728, 
+        #                               -0.0316, -0.0383,  0.8699,
+        #                               0 ]])
+        #     )
+        # goal = torch.tensor([ 0.0281,  0.4295,  0.5811,  0.7072, 
+        #                      -0.0421,  0.5418,  0.8852,  1.1562,
+        #                      1.5201,  0.0422,  0.1824,  0.5474, 
+        #                      -0.0337, -0.0239,  1.2601])
+        
+        goal = torch.tensor([0, 0, float(config['goal'])])
+        goal = goal + 0.025 * torch.randn(1) + 0.2
         for controller in config['controllers'].keys():
 
             fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}.{now}/{controller}/trial_{i + 1}')

@@ -3,6 +3,7 @@ import numpy as np
 from torch.profiler import profile, record_function, ProfilerActivity
 
 from torch_cg import cg_batch
+import matplotlib.pyplot as plt
 
 
 class ConstrainedSteinTrajOpt:
@@ -16,6 +17,7 @@ class ConstrainedSteinTrajOpt:
         self.penalty = params.get('penalty', 1e2)
         self.resample_sigma = params.get('resample_sigma', 1e-2)
         self.resample_temperature = params.get('resample_temperature', 0.1)
+        self.N = params.get('N', 16)
 
         self.problem = problem
         self.dx = problem.dx
@@ -34,6 +36,12 @@ class ConstrainedSteinTrajOpt:
         self.dtype = torch.float64
         self.delta_x = None
         self.Bk = None
+        self.t_mask = None
+        self.reset()
+
+    def reset(self):
+        self.dual = torch.zeros((self.N, self.dg+self.dh, 1), device=self.problem.device, dtype=torch.float32)
+        self.dual_history = [self.dual.cpu().detach().numpy()]
 
     def compute_update(self, xuz):
         N = xuz.shape[0]
@@ -42,7 +50,17 @@ class ConstrainedSteinTrajOpt:
         xuz.requires_grad = True
 
         xuz = xuz.to(dtype=torch.float32)
-        grad_J, hess_J, K, grad_K, C, dC, hess_C = self.problem.eval(xuz.to(dtype=torch.float32))
+        grad_J, hess_J, K, grad_K, C, dC, hess_C, t_mask = self.problem.eval(xuz.to(dtype=torch.float32))
+        self.t_mask = t_mask
+
+        active_constraint_mask = torch.logical_or((C > 0).unsqueeze(-1), self.dual > 0)
+        active_constraint_mask[:, :self.dg] = True
+
+        inactive_constraint_mask = ~active_constraint_mask
+        inactive_constraint_mask_eye = torch.logical_and(inactive_constraint_mask, inactive_constraint_mask.transpose(1, 2))
+        
+        C[inactive_constraint_mask[:, :, 0]] = 0
+        dC[inactive_constraint_mask.expand(-1, -1, dC.shape[-1])] = 0
 
         if hess_C is None and self.use_constraint_hessian:
             hess_C = torch.zeros(N, self.dh + self.dg, self.T * d + self.dh, self.T * d + self.dh, device=xuz.device)
@@ -50,28 +68,35 @@ class ConstrainedSteinTrajOpt:
         with torch.no_grad():
             # we try and invert the dC dCT, if it is singular then we use the psuedo-inverse
             eye = torch.eye(self.dg + self.dh).repeat(N, 1, 1).to(device=C.device, dtype=self.dtype)
+            eye_0 = eye.clone()
+            eye_0[inactive_constraint_mask_eye] = 0
+            damping_factor = 1e-6
+            eye_0 *= damping_factor
             dCdCT = dC @ dC.permute(0, 2, 1)
             dCdCT = dCdCT.to(dtype=self.dtype)
             A_bmm = lambda x: dCdCT @ x
             #
             # damping_factor = 1e-1
             try:
-                damping_factor = 1e-6
-                dCdCT_inv = torch.linalg.solve(dCdCT + damping_factor * eye, eye)
+                dCdCT_inv = torch.linalg.solve(dCdCT + eye_0, eye)
                 # dCdCT_inv = torch.linalg.solve(dCdCT, eye)
                 if torch.any(torch.isnan(dCdCT_inv)):
                     raise ValueError('nan in inverse')
             except Exception as e:
                 print(e)
                 # dCdCT_inv = torch.linalg.lstsq(dC @ dC.permute(0, 2, 1), eye).solution
-                # dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1))
-                dCdCT_inv, _ = cg_batch(A_bmm, eye, verbose=False)
+
+                dCdCT_inv = torch.linalg.pinv(dCdCT + eye_0)
+                # dCdCT_inv, _ = cg_batch(A_bmm, eye, verbose=False)
             dCdCT_inv = dCdCT_inv.to(dtype=torch.float32)
             # get projection operator
             projection = dCdCT_inv @ dC
-            eye = torch.eye(d * self.T + self.dh, device=xuz.device, dtype=xuz.dtype).unsqueeze(0)
+            # eye = torch.eye(d * self.T + self.dh, device=xuz.device, dtype=xuz.dtype).unsqueeze(0)
+            eye = torch.eye(d * self.T, device=xuz.device, dtype=xuz.dtype).unsqueeze(0)
             projection = eye - dC.permute(0, 2, 1) @ projection
             # compute term for repelling towards constraint
+
+
             xi_C = dCdCT_inv @ C.unsqueeze(-1)
             xi_C = (dC.permute(0, 2, 1) @ xi_C).squeeze(-1)
             # xi_C = (dC.permute(0, 2, 1) @ C.unsqueeze(-1)).squeeze(-1)
@@ -138,10 +163,21 @@ class ConstrainedSteinTrajOpt:
             grad_matrix_K = torch.sum(grad_matrix_K, dim=0)
 
             # compute kernelized score
-            kernelized_score = torch.sum(matrix_K @ -grad_J.reshape(N, 1, -1, 1), dim=0)
+
+            # J_grad from dual
+
+            # grad_J_rho = self.rho * torch.einsum('ik, ijkl -> ijl', C, dC).squeeze(1)
+
+            
+            grad_J_dual = torch.einsum('ikj, ijkl -> ijl', self.dual, dC).squeeze(1)
+
+            # grad_J_dual[:, ]
+            grad_J_all = grad_J
+
+            kernelized_score = torch.sum(matrix_K @ -grad_J_all.reshape(N, 1, -1, 1), dim=0)
             phi = self.gamma * kernelized_score.squeeze(-1) / N + grad_matrix_K / N  # maximize phi
 
-            xi_J = -phi
+            xi_J = -phi# - grad_J_rho
             if False:
                 # Normalize gradient
                 normxiC = torch.clamp(torch.linalg.norm(xi_C, dim=1, keepdim=True, ord=np.inf), min=1e-9)
@@ -155,7 +191,20 @@ class ConstrainedSteinTrajOpt:
                 normxiJ = torch.clamp(torch.linalg.norm(xi_J, dim=1, keepdim=True, ord=np.inf), min=1e-6)
                 xi_J = self.alpha_J * xi_J / normxiJ
 
-        return (self.alpha_J * xi_J + self.alpha_C * xi_C).detach().to(dtype=torch.float32)
+            self.dual += (self.alpha_C) * C.unsqueeze(-1)
+            self.dual[:, self.dg:] = torch.clamp(self.dual[:, self.dg:], min=0)
+            self.dual[:, :self.dg] = 0
+            self.dual_history.append(self.dual.cpu().detach().numpy())
+            # if self.dh == 0:
+            #     grad_J_dual = 0
+        return (self.alpha_J * (xi_J + grad_J_dual) + self.alpha_C * (xi_C)).detach().to(dtype=torch.float32)
+    
+    def shift(self):
+        a = np.stack(self.dual_history, 0).squeeze()
+        a = a[:, 0]
+        xs = np.arange(a.shape[0])
+        self.dual = self.dual[:, self.t_mask[0]]
+        self.dual_history = [self.dual.cpu().detach().numpy()]
 
     def _clamp_in_bounds(self, xuz):
         N = xuz.shape[0]
@@ -218,6 +267,7 @@ class ConstrainedSteinTrajOpt:
         # we need to add a very small amount of noise just so that the particles are distinct - otherwise
         # they will never separate
         xuz = xuz[idx] + eps.squeeze(-1)
+        self.dual = self.dual[idx]
 
         return xuz
 
@@ -285,9 +335,13 @@ class ConstrainedSteinTrajOpt:
         # sort particles by penalty
         xuz = xuz.to(dtype=torch.float32)
         J = self.problem.get_cost(xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du])
-        C, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1), compute_grads=False, compute_hess=False)
+        C, _, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1), compute_grads=False, compute_hess=False)
         penalty = J.reshape(N) + self.penalty * torch.sum(C.reshape(N, -1).abs(), dim=1)
         idx = torch.argsort(penalty, descending=False)
         path = torch.stack(path, dim=0).reshape(len(path), N, self.T, -1)[:, :, :, :self.dx + self.du]
         path = path[:, idx]
+        self.dual = self.dual[idx]
+        idx_cpu_numpy = idx.cpu().numpy()
+        for i in range(len(self.dual_history)):
+            self.dual_history[i] = self.dual_history[i][idx_cpu_numpy]
         return path.detach()

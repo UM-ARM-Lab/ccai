@@ -2,10 +2,10 @@
 T: 12
 receding_horizon: False
 num_steps: 12
-num_turns: 1
+num_turns: 3
 num_trials: 10
 visualize: True
-experiment_name: 'allegro_screwdriver_csvto_OOD_ID'
+experiment_name: 'allegro_screwdriver_csvto_augmented_lagrangian_100'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -30,7 +30,7 @@ sample_contact: False
 use_partial_constraint: True
 sine_cosine: True
 project_state: False
-compute_recovery_trajectory: True
+compute_recovery_trajectory: False
 model_dir: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion'
 controllers:
   csvgd:
@@ -42,7 +42,7 @@ controllers:
     momentum: 0.
     device: 'cuda:0'
     online_iters: 25
-    warmup_iters: 200
+    warmup_iters: 100
     resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1

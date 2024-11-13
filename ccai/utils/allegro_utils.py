@@ -61,24 +61,26 @@ def finger_constraint_wrapper(self, *args, **kwargs):
     compute_grads = kwargs.pop('compute_grads', True)
     compute_hess = kwargs.pop('compute_hess', False)
     # compute contact constraints for index finger
-    g_list, grad_g_list, hess_g_list = [], [], []
+    g_list, grad_g_list, hess_g_list, t_mask_list = [], [], [], []
     for finger in fingers:
-        g, grad_g, hess_g = func(self, finger_name=finger,
+        g, grad_g, hess_g, t_mask = func(self, finger_name=finger,
                                  compute_grads=compute_grads, compute_hess=compute_hess, **kwargs)
         g_list.append(g)
         grad_g_list.append(grad_g)
         hess_g_list.append(hess_g)
+        t_mask_list.append(t_mask)
     g = torch.cat(g_list, dim=1)
+    t_mask = torch.cat(t_mask_list, dim=1)
     if compute_grads:
         grad_g = torch.cat(grad_g_list, dim=1)
     else:
-        return g, None, None
+        return g, None, None, t_mask
 
     if compute_hess:
         hess_g = torch.cat(hess_g_list, dim=1)
-        return g, grad_g, hess_g
+        return g, grad_g, hess_g, t_mask
 
-    return g, grad_g, None
+    return g, grad_g, None, t_mask
 
 
 def all_finger_constraints(func):
