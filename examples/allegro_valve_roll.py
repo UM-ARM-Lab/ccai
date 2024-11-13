@@ -568,12 +568,17 @@ class AllegroContactProblem(AllegroObjectProblem):
                  fixed_obj=False,
                  collision_checking=False,
                  device='cuda:0',
-                 useVFgrads=False):
+                 useVFgrads=False,
+                 vf_weight=1.0,
+                 other_weight=10.0
+                 ):
         ########################################
         #vfgrad stuff
         from _value_function.train_value_function import load_ensemble, query_ensemble 
         self.useVFgrads = useVFgrads
         self.query_ensemble = query_ensemble
+        self.vf_weight = vf_weight
+        self.other_weight = other_weight
         self.models, self.poses_mean, self.poses_std, self.cost_mean, self.cost_std = load_ensemble(device=device)
         self.poses_mean = torch.tensor(self.poses_mean).to(device)
         self.poses_std = torch.tensor(self.poses_std).to(device)
@@ -728,10 +733,10 @@ class AllegroContactProblem(AllegroObjectProblem):
             mse = torch.mean(vf_output ** 2)
             mean_squared_variance = torch.mean((vf_output - mean) ** 2)
 
-            print("mse: ", mse)
+            # print("mse: ", mse)
             vf_cost = mse + mean_squared_variance
             # print("vf_cost: ", vf_cost)
-            return 1*vf_cost #+ 1/5 * smoothness_cost + 1/5 * action_cost
+            return self.vf_weight*vf_cost + 1/10 * self.other_weight * smoothness_cost + self.other_weight * action_cost
 
     
     def _con_eq(self, xu, compute_grads=True, compute_hess=False):

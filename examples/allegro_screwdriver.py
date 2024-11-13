@@ -56,11 +56,14 @@ class ALlegroScrewdriverContact(AllegroContactProblem):
                  goal_poses=None,
                 #  default_index_ee_pos=None, 
                  device='cuda:0',
-                 useVFgrads=False):
+                 useVFgrads=False,
+                 vf_weight = 0,
+                 other_weight = 10,):
         super(ALlegroScrewdriverContact, self).__init__(dx, du, start, goal, T, 
                                                         chain, object_type, world_trans,
                                                         object_asset_pos, fingers, obj_dof_code, obj_joint_dim,
-                                                        fixed_obj, collision_checking, device, useVFgrads)
+                                                        fixed_obj, collision_checking, device, 
+                                                        useVFgrads, vf_weight, other_weight)
 
 
 class AllegroScrewdriver(AllegroValveTurning):

@@ -1,6 +1,6 @@
 from screwdriver_problem import init_env, convert_full_to_partial_config
 from process_final_poses import calculate_cost
-from train_value_function import Net, query_ensemble
+from train_value_function import Net, query_ensemble, load_ensemble
 import pathlib
 import numpy as np
 import pickle as pkl
@@ -25,7 +25,8 @@ fpath = pathlib.Path(f'{CCAI_PATH}/data')
 # experiment_name = '_ensemble_SGD_1k_iters'
 # experiment_name = '_ensemble_Adam_1k_iters'
 # experiment_name = '_ensemble_Adam_100k_iters'
-experiment_name = '_ensemble_Adam_500_iters_optimal'
+# experiment_name = '_ensemble_Adam_500_iters_optimal'
+experiment_name = 'test_100'
 
 filename = f'final_pose_comparisons{experiment_name}.pkl'
 with open(f'{fpath.resolve()}/eval/{filename}', 'rb') as file:
@@ -61,19 +62,7 @@ if __name__ == "__main__":
     # exit()
     ############################################################
     # Get predicted costs before and after
-    checkpoints = torch.load(open(f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl', 'rb'))
-    models = []
-    shape = (15, 1)
-    for checkpoint in checkpoints:
-        model = Net(shape[0], shape[1])
-        model.load_state_dict(checkpoint['model_state'])
-        models.append(model)
-    poses_mean = checkpoints[0]['poses_mean']
-    poses_std = checkpoints[0]['poses_std']
-    cost_mean = checkpoints[0]['cost_mean']
-    cost_std = checkpoints[0]['cost_std']
-    min_std_threshold = 1e-5
-    poses_std = np.where(poses_std < min_std_threshold, min_std_threshold, poses_std)
+    models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble()
 
     predicted_costs_before = []
     predicted_costs_after = []
@@ -179,22 +168,32 @@ if __name__ == "__main__":
         for i in range(len(initial_trajectories)):
         # for i in range(5):
 
-            if optimized_costs[i] > 3:
-                failure = torch.from_numpy(convert_full_to_partial_config(initial_trajectories[i][0].reshape(1,20)))
-                failures.append(failure)
+            # if optimized_costs[i] > 3:
+            #     failure = torch.from_numpy(convert_full_to_partial_config(initial_trajectories[i][0].reshape(1,20)))
+            #     failures.append(failure)
 
-                env.reset(torch.from_numpy(optimized_trajectories[i][0]).reshape(1,20).float())
-                time.sleep(2.0)
+            #     env.reset(torch.from_numpy(optimized_trajectories[i][0]).reshape(1,20).float())
+            #     time.sleep(2.0)
+            print(initial_trajectories[i][0])
+            if optimized_costs[i] > 2:
 
-                # print("initial")
-                # for j in range(len(initial_trajectories[i])):
-                #     env.reset(torch.from_numpy(initial_trajectories[i][j]).reshape(1,20).float())
-                #     time.sleep(0.1)
-                # time.sleep(1.0)
-                # print("optimized")
-                # for j in range(len(optimized_trajectories[i])):
-                #     env.reset(torch.from_numpy(optimized_trajectories[i][j]).reshape(1,20).float())
-                #     time.sleep(0.1)
-                # time.sleep(1.0)
+                # env.reset(torch.from_numpy(initial_trajectories[i][0]).reshape(1,20).float())
+                # time.sleep(5)
+
+                # env.reset(torch.from_numpy(optimized_trajectories[i][0]).reshape(1,20).float())
+
+                # time.sleep(5)
+
+
+                print("initial")
+                for j in range(len(initial_trajectories[i])):
+                    env.reset(torch.from_numpy(initial_trajectories[i][j]).reshape(1,20).float())
+                    time.sleep(0.1)
+                time.sleep(1.0)
+                print("optimized")
+                for j in range(len(optimized_trajectories[i])):
+                    env.reset(torch.from_numpy(optimized_trajectories[i][j]).reshape(1,20).float())
+                    time.sleep(0.1)
+                time.sleep(1.0)
 
         pkl.dump(failures, open(f'{fpath}/eval/failures.pkl', 'wb'))

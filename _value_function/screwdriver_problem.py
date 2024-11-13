@@ -109,7 +109,7 @@ def init_env(visualize=False):
 
     return config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial
 
-def pregrasp(env, config, chain, deterministic=True, initialization = None, useVFgrads=False, vis_plan = False, iters = 80):
+def pregrasp(env, config, chain, deterministic=True, initialization = None, useVFgrads=False, vf_weight = 0, other_weight = 10, vis_plan = False, iters = 80):
     params = config.copy()
     controller = 'csvgd'
     params.pop('controllers')
@@ -158,7 +158,7 @@ def pregrasp(env, config, chain, deterministic=True, initialization = None, useV
     env.reset(dof_pos= default_dof_pos)
 
     start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=device)
-    print("start: ", start)
+    # print("start: ", start)
 
     screwdriver = start.clone()[-4:-1]
     #print("start screwdriver: ", screwdriver)
@@ -186,6 +186,8 @@ def pregrasp(env, config, chain, deterministic=True, initialization = None, useV
         obj_joint_dim=1,
         fixed_obj=True,
         useVFgrads=useVFgrads,
+        vf_weight = vf_weight,
+        other_weight = other_weight,
     )
     pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
     pregrasp_planner.warmup_iters = iters#500 #50

@@ -1,4 +1,4 @@
-from screwdriver_problem import init_env, pregrasp, do_turn, convert_partial_to_full_config
+from screwdriver_problem import init_env, pregrasp, do_turn, convert_partial_to_full_config, convert_full_to_partial_config
 from train_value_function import Net, query_ensemble, load_ensemble
 import pathlib
 import numpy as np
@@ -6,6 +6,7 @@ import pickle as pkl
 import torch
 import matplotlib.pyplot as plt
 import time
+from tqdm import tqdm
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
@@ -31,6 +32,8 @@ def get_initialization(sim_device, env):
                                     dim=1).to(sim_device)
         
         env.reset(dof_pos= initialization)
+        for _ in range(64):
+            env._step_sim()
         solved_initialization = env.get_state()['q'].reshape(1,16)[:,0:-1].to(device=sim_device)
         return convert_partial_to_full_config(solved_initialization)
 
@@ -49,12 +52,14 @@ def test(test_name=''):
 
     poses_vf = []
     poses_novf = []
-    vis_plan = True
-    for i in range(n_samples):
+    vis_plan = False
+    for i in tqdm(range(n_samples)):
         pose_vf = pregrasp(env, config, chain, deterministic=True, 
-                           initialization = initializations[i], useVFgrads=True, vis_plan=vis_plan, iters = 500)
+                    initialization = initializations[i], useVFgrads=True, vf_weight = 0.7, other_weight = 0.2,
+                    vis_plan=vis_plan, iters = 500)
         pose_novf = pregrasp(env, config, chain, deterministic=True, 
-                             initialization = initializations[i], useVFgrads=False, vis_plan = vis_plan, iters = 50)
+                    initialization = initializations[i], useVFgrads=False,
+                    vis_plan = vis_plan, iters = 50)
         poses_vf.append(pose_vf)
         poses_novf.append(pose_novf)
 
@@ -64,14 +69,58 @@ def test(test_name=''):
     pkl.dump(tuples, open(f'{fpath}/test/test{test_name}.pkl', 'wb'))
 
 if __name__ == "__main__":
-    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
+    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
     sim_device = config['sim_device']
-    n_samples = 20
-    test_name = 'vf_only_20'
+    n_samples = 100
+    test_name = 'test_100'
 
-    # test(test_name)
-    tuples = pkl.load(open(f'{fpath}/test/test{test_name}.pkl', 'rb'))
+    test(test_name)
+    tuples = pkl.load(open(f'{fpath}/test/{test_name}.pkl', 'rb'))
     initializations, poses_vf, poses_novf = zip(*tuples)
+
+     ############################################################
+    # Get predicted costs
+    models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble()
+
+    costs_novf = []
+    costs_vf = []
+    
+    for pose_vf, pose_novf in zip(poses_vf, poses_novf):
+
+        vf_pose = convert_full_to_partial_config(pose_vf.reshape(1,20))
+        vf_pose_norm = (vf_pose - poses_mean) / poses_std
+        vf_pose_norm = vf_pose_norm.float()
+        vf = query_ensemble(vf_pose_norm, models)
+        prediction_vf_norm = vf.mean(dim=0)
+        prediction_vf = prediction_vf_norm * cost_std + cost_mean
+        costs_vf.append(prediction_vf.item())
+
+        novf_pose = convert_full_to_partial_config(pose_novf.reshape(1,20))
+        novf_pose_norm = (novf_pose - poses_mean) / poses_std
+        novf_pose_norm = novf_pose_norm.float()
+        novf = query_ensemble(novf_pose_norm, models)
+        prediction_novf_norm = novf.mean(dim=0)
+        prediction_novf = prediction_novf_norm * cost_std + cost_mean
+        costs_novf.append(prediction_novf.item())
+
+    indices = list(range(len(costs_novf)))
+    # Plot the scatter points
+    plt.scatter(indices, costs_novf, color='red', label='costs_novf', alpha=0.7)
+    plt.scatter(indices, costs_vf, color='blue', label='costs_vf', alpha=0.7)
+    # Plot vertical dotted lines for each sample
+    for i in indices:
+        plt.plot([i, i], [costs_novf[i], costs_vf[i]], 'k--', alpha=0.5)
+    # Add labels and legend
+    plt.xlabel("Sample")
+    plt.ylabel("Predicted Cost")
+    plt.title("Predicted Costs of Pregrasps with and without VF gradients")
+    plt.legend()
+    plt.grid(True)
+
+    plt.show()
+
+    ############################################################
+
 
     while True:
         for i in range(n_samples):
