@@ -21,7 +21,7 @@ if __name__ == "__main__":
             initial_poses = []
             for i in range(10000):
                 print(f"Generating pose {i}")
-                pose = pregrasp(env, params, chain)
+                pose = pregrasp(env, params, chain, deterministic=False, initialization = None, useVFgrads=False)
                 initial_poses.append(pose)
 
             with open(f'{fpath.resolve()}/initial_poses/initial_poses_{batch}.pkl', 'wb') as f:

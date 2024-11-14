@@ -1,5 +1,5 @@
 from screwdriver_problem import init_env, convert_full_to_partial_config, convert_partial_to_full_config
-from train_value_function import Net, query_ensemble
+from train_value_function import Net, query_ensemble, load_ensemble
 import pathlib
 import numpy as np
 import pickle as pkl
@@ -25,28 +25,16 @@ def get_data():
     inputs = torch.from_numpy(total_poses)[100:150]
     return inputs
 
-def grad_descent(lr = None):
-    checkpoints = torch.load(open(f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl', 'rb'))
-    models = []
-    for checkpoint in checkpoints:
-        model = Net(shape[0], shape[1])
-        model.load_state_dict(checkpoint['model_state'])
+def get_failures():
+    failures = pkl.load(open(f'{fpath.resolve()}/eval/failures.pkl', 'rb'))
+    return torch.stack(failures).reshape(-1,15)
 
-        # checkpoint = torch.load(f'{fpath.resolve()}/value_functions/value_function_{2}.pkl')
-        # model.load_state_dict(checkpoint['model_state'])
-    
-        models.append(model)
-        # break
-    
-    poses_mean = checkpoints[0]['poses_mean']
-    poses_std = checkpoints[0]['poses_std']
-    cost_mean = checkpoints[0]['cost_mean']
-    cost_std = checkpoints[0]['cost_std']
-
-    min_std_threshold = 1e-5
-    poses_std = np.where(poses_std < min_std_threshold, min_std_threshold, poses_std)
+def grad_descent(lr = 0.2358):
+    models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble()
     
     poses = get_data()
+    poses = get_failures()
+
     poses_norm = (poses - poses_mean) / poses_std
     poses_norm = poses_norm.float()
     original_costs_norm = torch.mean(query_ensemble(poses_norm, models), dim=0).detach().cpu().numpy()
@@ -59,20 +47,21 @@ def grad_descent(lr = None):
     exp = 0
     dump = True
 
-    if exp is 0:
+    if exp == 0:
         experiment_name = '_ensemble_Adam_500_iters'
         optimizer = optim.Adam([poses_norm], lr=0.2358)
         iterations = 500
-    elif exp is 1:
+    elif exp == 1:
         experiment_name = '_ensemble_Adam_5000_iters'
         optimizer = optim.Adam([poses_norm], lr=1e-1)
         iterations = 5000
-    elif exp is 2 and lr is not None:
+    elif exp == 2 and lr is not None:
         dump = False
         optimizer = optim.Adam([poses_norm], lr=lr)
         iterations = 500
 
-    model.eval()
+    for model in models:
+        model.eval()
 
     # gradient descent
     num_iterations = iterations
@@ -124,10 +113,10 @@ def grad_descent(lr = None):
         config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
         for initial, optimized in initial_pose_tuples:
 
-            env.reset(torch.from_numpy(initial).reshape(1,20).float(), deterministic=True)
+            env.reset(torch.from_numpy(initial).reshape(1,20).float())
             time.sleep(0.5)
             # input("Press Enter to continue...")
-            env.reset(torch.from_numpy(optimized).reshape(1,20).float(), deterministic=True)
+            env.reset(torch.from_numpy(optimized).reshape(1,20).float())
             time.sleep(2.0)
             # input("Press Enter to continue...")
 
@@ -198,16 +187,16 @@ if __name__ == "__main__":
     full_semi_optimized_poses = np.array(full_semi_optimized_poses)
     semi_optimized_poses = np.array(semi_optimized_poses)
     
-    vis_so_poses = False
+    vis_so_poses = True
     if vis_so_poses:
         config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
         for j in range(full_semi_optimized_poses.shape[1]):
             for i in range(full_semi_optimized_poses.shape[0]):
-                env.reset(torch.from_numpy(full_semi_optimized_poses[i,j,:]).reshape(1,20).float(), deterministic=True)
-                if i == 0:
+                env.reset(torch.from_numpy(full_semi_optimized_poses[i,j,:]).reshape(1,20).float())
+                if i == 0 or i == full_semi_optimized_poses.shape[0]-1:
                     time.sleep(1.0)
                 print(f'Setpoint {i}')
-                time.sleep(0.01)
+                time.sleep(0.03)
 
 
     # Fit PCA on the 10k_poses data to get axes

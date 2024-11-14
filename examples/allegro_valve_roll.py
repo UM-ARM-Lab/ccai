@@ -567,7 +567,27 @@ class AllegroContactProblem(AllegroObjectProblem):
                  obj_joint_dim=0,
                  fixed_obj=False,
                  collision_checking=False,
-                 device='cuda:0'):
+                 device='cuda:0',
+                 useVFgrads=False,
+                 vf_weight=1.0,
+                 other_weight=10.0
+                 ):
+        ########################################
+        #vfgrad stuff
+        from _value_function.train_value_function import load_ensemble, query_ensemble 
+        self.useVFgrads = useVFgrads
+        self.query_ensemble = query_ensemble
+        self.vf_weight = vf_weight
+        self.other_weight = other_weight
+        self.models, self.poses_mean, self.poses_std, self.cost_mean, self.cost_std = load_ensemble(device=device)
+        self.poses_mean = torch.tensor(self.poses_mean).to(device)
+        self.poses_std = torch.tensor(self.poses_std).to(device)
+        self.cost_mean = torch.tensor([self.cost_mean]).to(device)
+        self.cost_std = torch.tensor([self.cost_std]).to(device)
+        self.full_start = start
+        ######################################## 
+        # 
+        #    
         # object_location is different from object_asset_pos. object_asset_pos is 
         # used for pytorch volumetric. The asset of valve might contain something else such as a wall, a table
         # object_location is the location of the object joint, which is what we care for motion planning 
@@ -689,14 +709,35 @@ class AllegroContactProblem(AllegroObjectProblem):
             return g, grad_g, hess
 
         return g, grad_g, None
-        
+ 
     def _cost(self, xu, start, goal):
         state = xu[:, :self.dx]
         state = torch.cat((start.reshape(1, self.dx), state), dim=0)  # combine the first time step into it
         action = xu[:, self.dx:]
         action_cost = torch.sum(action ** 2)
-        smoothness_cost = 10 * torch.sum((state[1:] - state[:-1]) ** 2)
-        return smoothness_cost + 10 * action_cost
+        smoothness_cost = torch.sum((state[1:] - state[:-1]) ** 2)
+        
+        if self.useVFgrads is False:
+            return smoothness_cost + 10 * action_cost
+        else:
+            last_state = state[-1,:]
+            screwdriver = self.full_start[-3:]
+            # print("screwdriver: ", screwdriver)
+            input = torch.cat((last_state, screwdriver))
+            # print("input: ", input)
+            input_norm = ((input - self.poses_mean) / self.poses_std).float()
+            vf_output_norm = self.query_ensemble(input_norm, self.models, device=self.device)
+            vf_output = vf_output_norm * self.cost_std + self.cost_mean
+
+            mean = torch.mean(vf_output)
+            mse = torch.mean(vf_output ** 2)
+            mean_squared_variance = torch.mean((vf_output - mean) ** 2)
+
+            # print("mse: ", mse)
+            vf_cost = mse + mean_squared_variance
+            # print("vf_cost: ", vf_cost)
+            return self.vf_weight*vf_cost + 1/10 * self.other_weight * smoothness_cost + self.other_weight * action_cost
+
     
     def _con_eq(self, xu, compute_grads=True, compute_hess=False):
         N = xu.shape[0]

@@ -116,10 +116,10 @@ def grad_descent():
     if vis:
         config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
         for initial, optimized in initial_pose_tuples:
-            env.reset(torch.from_numpy(initial).reshape(1,20), deterministic=True)
+            env.reset(torch.from_numpy(initial).reshape(1,20))
             time.sleep(0.5)
             input("Press Enter to continue...")
-            env.reset(torch.from_numpy(optimized).reshape(1,20).float(), deterministic=True)
+            env.reset(torch.from_numpy(optimized).reshape(1,20).float())
             time.sleep(1.0)
             input("Press Enter to continue...")
 

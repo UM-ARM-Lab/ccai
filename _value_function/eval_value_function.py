@@ -18,20 +18,37 @@ import torch
 
 # experiment_name = '_ensemble_SGD_100k_iters'
 # experiment_name = '_ensemble_Adam_100k_iters'
-experiment_name = '_ensemble_Adam_500_iters_optimal'
+# experiment_name = '_ensemble_Adam_500_iters_optimal'
+experiment_name = 'test_20_fair'
 
 
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
-with open(f'{fpath.resolve()}/eval/initial_and_optimized_poses{experiment_name}.pkl', 'rb') as file:
+
+#_____________________________________________________________________________________
+# code for evaluating grad descent poses
+#_____________________________________________________________________________________
+
+# with open(f'{fpath.resolve()}/eval/initial_and_optimized_poses{experiment_name}.pkl', 'rb') as file:
+#     tuples = pkl.load(file)
+#     initial_poses, optimized_poses = zip(*tuples)
+
+#     initial_poses = np.array(initial_poses).reshape(-1,20)
+#     initial_poses = torch.from_numpy(initial_poses).float()
+
+#     optimized_poses = np.array(optimized_poses).reshape(-1,20)
+#     optimized_poses = torch.from_numpy(optimized_poses).float()
+
+#_____________________________________________________________________________________
+# code for evaluating actual pregrasp poses
+#_____________________________________________________________________________________
+
+with open(f'{fpath.resolve()}/test/{experiment_name}.pkl', 'rb') as file:
     tuples = pkl.load(file)
-    initial_poses, optimized_poses = zip(*tuples)
+    _, optimized_poses, initial_poses = zip(*tuples)
+    initial_poses = torch.stack(initial_poses).reshape(-1,20).float()
+    optimized_poses = torch.stack(optimized_poses).reshape(-1,20).float()
 
-    initial_poses = np.array(initial_poses).reshape(-1,20)
-    initial_poses = torch.from_numpy(initial_poses).float()
-
-    optimized_poses = np.array(optimized_poses).reshape(-1,20)
-    optimized_poses = torch.from_numpy(optimized_poses).float()
-
+#_____________________________________________________________________________________
 
 if __name__ == "__main__":
 
@@ -40,26 +57,22 @@ if __name__ == "__main__":
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
 
-    try:
-        for i in tqdm(range(len(initial_poses))):
-            _, initial_final_pose, succ, initial_full_trajectory = do_turn(initial_poses[i].reshape(1, 20), 
-                                                  config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
 
-            _, optimized_final_pose, succ, optimized_full_trajectory = do_turn(optimized_poses[i].reshape(1, 20), 
-                                                    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
+    for i in tqdm(range(len(initial_poses))):
+        _, initial_final_pose, succ, initial_full_trajectory = do_turn(initial_poses[i].reshape(1, 20), 
+                                                config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
 
-            pose_tuples.append((initial_poses[i], optimized_poses[i], 
-                                initial_final_pose, optimized_final_pose, 
-                                initial_full_trajectory, optimized_full_trajectory))
+        _, optimized_final_pose, succ, optimized_full_trajectory = do_turn(optimized_poses[i].reshape(1, 20), 
+                                                config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial)
 
-    except KeyboardInterrupt:
-        print("\nKeyboard interrupt! Saving...")
+        pose_tuples.append((initial_poses[i], optimized_poses[i], 
+                            initial_final_pose, optimized_final_pose, 
+                            initial_full_trajectory, optimized_full_trajectory))
 
-    finally:
 
-        savepath = f'{fpath.resolve()}/eval/final_pose_comparisons{experiment_name}.pkl'
-        with open(savepath, 'wb') as f:
-            pkl.dump(pose_tuples, f)
+    savepath = f'{fpath.resolve()}/eval/final_pose_comparisons{experiment_name}.pkl'
+    with open(savepath, 'wb') as f:
+        pkl.dump(pose_tuples, f)
 
-        print(f'Saved data to {savepath}')
-        emailer().send()
+    print(f'Saved data to {savepath}')
+    emailer().send()
