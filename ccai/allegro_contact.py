@@ -376,6 +376,10 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.data[finger]['closest_pt_world'] = ret_scene['closest_pt_world'][:, i]
             self.data[finger]['contact_normal'] = ret_scene['contact_normal'][:, i]
 
+            d_contact_loc_denv_q = ret_scene.get('closest_pt_env_q_grad', None)
+            d_contact_loc_denv_q = d_contact_loc_denv_q[:, i, :, :obj_dof].reshape(N, self.T + 1, 3, obj_dof)
+            self.data[finger]['closest_pt_env_q_grad'] = d_contact_loc_denv_q
+
             # gradient of contact normal
             self.data[finger]['dnormal_dq'] = ret_scene['dnormal_dq'][:, i].reshape(N, self.T + 1, 3, 16)  # [:, :, :,
             # self.all_joint_index]
@@ -768,8 +772,8 @@ class AllegroRegraspProblem(AllegroObjectProblem):
     def _cost(self, xu, start, goal):
         # if self.full_dof_goal:
         #     return 0
-        if self.default_ee_locs_constraint:
-            return 0
+        # if self.default_ee_locs_constraint:
+        #     return 0
         if self.num_regrasps == 0:
             return 0.0
         q = partial_to_full_state(xu[:, :self.num_fingers * 4], self.fingers)  # [:, self.regrasp_idx]
@@ -807,19 +811,30 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         #     'thumb': torch.tensor([0.10528128,  0.01956934, -0.00691413], device=xu.device),
         # }
 
-        self.contact_points = {
-            'index': (torch.tensor([0.00750054, -0.00852249,  0.20417026], device=xu.device), 0.027688509),
-            'middle': (torch.tensor([ 0.02001211, -0.0063259 ,  0.16285469], device=xu.device), 0.021481367),
-            'thumb': (torch.tensor([-0.01981559,  0.00899061,  0.13232124], device=xu.device), 0.0194892),
-        }
-
         this_finger_contact_point, contact_patch_radius = self.contact_points[finger_name]
-        contact_patch_radius /= 2
-        #Convert this_finger_contact_point from object frame to world frame
-        this_finger_contact_point_world = self.contact_scenes.scene_transform.transform_points(this_finger_contact_point.unsqueeze(0))[0]
+
+        obj_ori = xu[:, -1, self.num_fingers * 4:self.num_fingers * 4 + self.obj_dof]
+
+        if self.obj_ori_rep == 'axis_angle':
+            obj_ori = axis_angle_to_euler(obj_ori).float()
+        elif self.obj_ori_rep == 'euler':
+            pass
+        else:
+            raise NotImplementedError
         
-        print(this_finger_contact_point_world)
-        norm = torch.norm(ee_loc_finger - this_finger_contact_point_world, dim=-1)
+        # Convert object orientation to rotation matrix
+        screwdirver_ori_mat = tf.euler_angles_to_matrix(obj_ori, convention='XYZ').reshape(-1, 3, 3)
+        screwdriver_ori_quat = tf.matrix_to_quaternion(screwdirver_ori_mat).reshape(-1, 4)
+        tf_obj_to_world = tf.Transform3d(rot=screwdriver_ori_quat, pos=self.object_location, device=xu.device)
+
+        #Convert this_finger_contact_point from object frame to world frame
+        this_finger_contact_point_world = tf_obj_to_world.transform_points(this_finger_contact_point.reshape(1, 1, -1).expand(N, T, -1))
+        
+        #Convert this_finger_contact_point from world frame to robot frame
+        this_finger_contact_point_robot = self.world_trans.inverse().transform_points(this_finger_contact_point_world)
+
+        # this_finger_contact_point_world = self.contact_scenes.scene_transform.transform_points(this_finger_contact_point.unsqueeze(0))[0]
+        norm = torch.norm(ee_loc_finger - this_finger_contact_point_robot, dim=-1)
         h = norm - contact_patch_radius
         h[:, :-1] = 0
         # h[:, :] = 0
@@ -830,8 +845,11 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             # compute gradient of sdf
             grad_h = torch.zeros(N, T, T, d, device=xu.device)
             grad_ee_q = self.data[finger_name]['closest_pt_q_grad'][:, T_offset:]
-            grad_h_q = torch.einsum('abc, abcd -> abd', (ee_loc_finger - this_finger_contact_point_world)/norm.unsqueeze(-1), grad_ee_q)
-            grad_h[:, T_range, T_range, :16] = grad_h_q
+            grad_ee_env_q = -self.data[finger_name]['closest_pt_env_q_grad'][:, T_offset:]
+
+            grad_ee_full_q = torch.cat((grad_ee_q, grad_ee_env_q), dim=-1)
+            grad_h_full_q = torch.einsum('abc, abcd -> abd', (ee_loc_finger - this_finger_contact_point_robot)/norm.unsqueeze(-1), grad_ee_full_q)
+            grad_h[:, T_range, T_range, :16 + self.obj_dof] = grad_h_full_q
             grad_h[:, :-1] = 0
             # grad_h[:, :] = 0
             # grad_h[:, T_range, T_range, 16: 16 + self.obj_dof] = grad_h_theta.reshape(N, T + T_offset, self.obj_dof)[:, T_offset:]
