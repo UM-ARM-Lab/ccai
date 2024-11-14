@@ -124,7 +124,7 @@ def do_trial(env, params, fpath):
         nx = start.shape[1]
     ctrl = MPPI(dynamics=dynamics, running_cost=running_cost, nx=nx, noise_sigma=noise_sigma, 
                 num_samples=params['N'], horizon=params['T'], lambda_=params['lambda'], u_min=u_min, u_max=u_max,
-                device=params['device'], warmstart_iters=params['warmstart_iters'])
+                device=params['device'], warmstart_iters=params['warmstart_iters'], online_iters=params['online_iters'])
     
     validity_flag = True
     if params['task'] == 'peg_alignment':

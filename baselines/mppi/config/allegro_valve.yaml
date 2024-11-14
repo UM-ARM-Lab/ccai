@@ -21,8 +21,9 @@ goal: [-0.785398]
 controllers:
   mppi:
     T: 4
-    N: 200
+    N: 50
     lambda: 0.3
     variance: 0.01
     warmstart_iters: 3
+    online_iters: 1
     include_velocity: True
