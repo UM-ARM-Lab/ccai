@@ -119,6 +119,15 @@ class AllegroScrewdriver(AllegroManipulationProblem):
         elif obj_dof == 6:
             object_link_name = 'card'
         self.obj_link_name = object_link_name
+
+        self.contact_points = {
+            'index': (torch.tensor([0.00750054, -0.00852249,  0.20417026], device=device), 0.010859382),
+            'middle': (torch.tensor([ 0.02001211, -0.0063259 ,  0.16285469], device=device), 0.020614814),
+            'thumb': (torch.tensor([-0.01981559,  0.00899061,  0.13232124], device=device), 0.019848686),
+        }
+
+        contact_points_object = torch.stack([self.contact_points[finger][0] for finger in ['index', 'middle', 'thumb']], dim=0)
+
         super(AllegroScrewdriver, self).__init__(start=start, goal=goal, T=T, chain=chain,
                                                  object_location=object_location,
                                                  object_type=object_type, world_trans=world_trans,
@@ -131,7 +140,9 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                                                  optimize_force=optimize_force, device=device,
                                                  turn=turn, obj_gravity=obj_gravity,
                                                  min_force_dict=min_force_dict, 
-                                                 full_dof_goal=full_dof_goal, **kwargs)
+                                                 full_dof_goal=full_dof_goal,
+                                                  contact_points_object=contact_points_object,
+                                                   **kwargs)
         self.friction_coefficient = friction_coefficient
 
     def _cost(self, xu, start, goal):
