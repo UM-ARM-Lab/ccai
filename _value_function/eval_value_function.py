@@ -19,7 +19,7 @@ import torch
 # experiment_name = '_ensemble_SGD_100k_iters'
 # experiment_name = '_ensemble_Adam_100k_iters'
 # experiment_name = '_ensemble_Adam_500_iters_optimal'
-experiment_name = 'test_100'
+experiment_name = 'test_20_fair'
 
 
 fpath = pathlib.Path(f'{CCAI_PATH}/data')

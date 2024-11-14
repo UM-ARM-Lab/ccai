@@ -59,20 +59,20 @@ def test(test_name=''):
                     vis_plan=vis_plan, iters = 500)
         pose_novf = pregrasp(env, config, chain, deterministic=True, 
                     initialization = initializations[i], useVFgrads=False,
-                    vis_plan = vis_plan, iters = 50)
+                    vis_plan = vis_plan, iters = 500)
         poses_vf.append(pose_vf)
         poses_novf.append(pose_novf)
 
     # construct a list of tuples of the form (initialization, pose_vf, pose_novf)
     tuples = [(initializations[i], poses_vf[i], poses_novf[i]) for i in range(n_samples)]
 
-    pkl.dump(tuples, open(f'{fpath}/test/test{test_name}.pkl', 'wb'))
+    pkl.dump(tuples, open(f'{fpath}/test/{test_name}.pkl', 'wb'))
 
 if __name__ == "__main__":
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
     sim_device = config['sim_device']
-    n_samples = 100
-    test_name = 'test_100'
+    n_samples = 20
+    test_name = 'test_20_fair'
 
     test(test_name)
     tuples = pkl.load(open(f'{fpath}/test/{test_name}.pkl', 'rb'))
