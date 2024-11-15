@@ -27,13 +27,12 @@ def add_text_to_imgs(imgs, labels):
         imgs_with_txt.append(np.asarray(img))
     return imgs_with_txt
 
-for trial_num in range(0, config['num_trials']):
+for trial_num in range(0, 62):
 # for trial_num in [4, 9]:
     fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}./csvgd/trial_{trial_num + 1}')
 
 
     isaac_imgs = [fpath / img for img in sorted(os.listdir(fpath)) if img[-3:] == 'png']#[6:]
-    print(len(isaac_imgs))
     isaac_imgs = [imageio.imread(img) for img in isaac_imgs]
     if len(isaac_imgs) > 0:
         imageio.mimsave(f'{fpath}/isaac.gif', isaac_imgs, loop=0)

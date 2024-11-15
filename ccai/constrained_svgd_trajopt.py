@@ -71,7 +71,7 @@ class ConstrainedSteinTrajOpt:
 
         with torch.no_grad():
             # we try and invert the dC dCT, if it is singular then we use the psuedo-inverse
-            eye = torch.eye(C.shape[-1]).repeat(N, 1, 1).to(device=C.device, dtype=self.dtype)
+            eye = torch.eye(dC.shape[1]).repeat(N, 1, 1).to(device=C.device, dtype=self.dtype)
             eye_0 = eye.clone()
             # eye_0[inactive_constraint_mask_eye] = 0
             damping_factor = 1e-6
@@ -203,11 +203,12 @@ class ConstrainedSteinTrajOpt:
         return (self.alpha_J * (xi_J + grad_J_dual) + self.alpha_C * (xi_C)).detach().to(dtype=torch.float32)
     
     def shift(self):
-        a = np.stack(self.dual_history, 0).squeeze()
-        a = a[:, 0]
-        xs = np.arange(a.shape[0])
-        self.dual = self.dual[:, self.t_mask[0]]
-        self.dual_history = [self.dual.cpu().detach().numpy()]
+        # a = np.stack(self.dual_history, 0).squeeze()
+        # a = a[:, 0]
+        # xs = np.arange(a.shape[0])
+        # self.dual = self.dual[:, self.t_mask[0]]
+        # self.dual_history = [self.dual.cpu().detach().numpy()]
+        pass
 
     def _clamp_in_bounds(self, xuz):
         N = xuz.shape[0]
@@ -270,7 +271,7 @@ class ConstrainedSteinTrajOpt:
         # we need to add a very small amount of noise just so that the particles are distinct - otherwise
         # they will never separate
         xuz = xuz[idx] + eps.squeeze(-1)
-        self.dual = self.dual[idx]
+        # self.dual = self.dual[idx]
 
         return xuz
 
@@ -343,8 +344,8 @@ class ConstrainedSteinTrajOpt:
         idx = torch.argsort(penalty, descending=False)
         path = torch.stack(path, dim=0).reshape(len(path), N, self.T, -1)[:, :, :, :self.dx + self.du]
         path = path[:, idx]
-        self.dual = self.dual[idx]
-        idx_cpu_numpy = idx.cpu().numpy()
-        for i in range(len(self.dual_history)):
-            self.dual_history[i] = self.dual_history[i][idx_cpu_numpy]
+        # self.dual = self.dual[idx]
+        # idx_cpu_numpy = idx.cpu().numpy()
+        # for i in range(len(self.dual_history)):
+        #     self.dual_history[i] = self.dual_history[i][idx_cpu_numpy]
         return path.detach()

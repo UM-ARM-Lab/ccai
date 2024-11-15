@@ -58,11 +58,12 @@ class Constrained_SVGD_MPC:
         self.solver.shift()
         #self.x = self.problem.shift(self.x)
 
-    def reset(self, start, initial_x=None, **kwargs):
+    def reset(self, start, initial_x=None, proj_path=None, **kwargs):
         self.solver.reset()
         self.problem.update(start, **kwargs)
         self.warmed_up = False
         self.iter = 0
+        self.proj_path = proj_path
         self.x = self.problem.get_initial_xu(self.N)
         if initial_x is not None:
             self.x = initial_x

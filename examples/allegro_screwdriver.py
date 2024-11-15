@@ -111,6 +111,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                  obj_gravity=False,
                  min_force_dict=None,
                  device='cuda:0',
+                 proj_path=None,
                  full_dof_goal=False, **kwargs):
         self.obj_mass = 0.1
         self.obj_dof_type = None
@@ -122,13 +123,26 @@ class AllegroScrewdriver(AllegroManipulationProblem):
             object_link_name = 'card'
         self.obj_link_name = object_link_name
 
-        self.contact_points = {
-            'index': (torch.tensor([0.00750054, -0.00852249,  0.20417026], device=device), 0.010859382),
-            'middle': (torch.tensor([ 0.02001211, -0.0063259 ,  0.16285469], device=device), 0.020614814),
-            'thumb': (torch.tensor([-0.01981559,  0.00899061,  0.13232124], device=device), 0.019848686),
-        }
 
-        contact_points_object = torch.stack([self.contact_points[finger][0] for finger in ['index', 'middle', 'thumb']], dim=0)
+        self.contact_points = None
+        if regrasp_fingers == ['index']:
+            self.contact_points = {
+                'index': (torch.tensor([0.00563815, -0.01147131,  0.20851198], device=device), 0.037628144),
+                'middle': (torch.tensor([ 0.02000177, -0.00662838,  0.16340923], device=device), 0.022096813),
+                'thumb': (torch.tensor([-0.02152098,  0.00736444,  0.13183959], device=device), 0.01975702),
+            }
+        elif set(regrasp_fingers) == set(['middle', 'thumb']):
+            self.contact_points = {
+                'index': (torch.tensor([ 0.00746072, -0.00878588,  0.204167], device=device), 0.027221423),
+                'middle': (torch.tensor([ 0.02871195, -0.00318305,  0.16565663], device=device), 0.012123057),
+                'thumb': (torch.tensor([-0.02553045,  0.00958067,  0.13813627], device=device), 0.027129417),
+            }
+
+        if len(regrasp_fingers) > 0 and self.contact_points is not None:
+            contact_points_object = torch.stack([self.contact_points[finger][0] for finger in regrasp_fingers], dim=0)
+        else:
+            contact_points_object = None
+        self.proj_path = proj_path.to(device=device)
 
         super(AllegroScrewdriver, self).__init__(start=start, goal=goal, T=T, chain=chain,
                                                  object_location=object_location,
@@ -159,7 +173,8 @@ class AllegroScrewdriver(AllegroManipulationProblem):
             (state[:, -self.obj_dof:-1] + goal[-self.obj_dof:-1]) ** 2)  # the screwdriver should only rotate in z direction
         return smoothness_cost + upright_cost + super()._cost(xu, start, goal)
 
-def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noise=None, noise_noise=None, sim=None, seed=None):
+def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noise=None, noise_noise=None, sim=None, seed=None,
+             proj_path=None):
     "only turn the valve once"
     num_fingers = len(params['fingers'])
     state = env.get_state()
@@ -215,6 +230,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             default_dof_pos=env.default_dof_pos[:, :16],
             obj_gravity=pregrasp_params.get('obj_gravity', False),
             full_dof_goal=pregrasp_params.get('compute_recovery_trajectory', False),
+            proj_path=proj_path,
         )
         # finger gate index
         index_regrasp_problem = AllegroScrewdriver(
@@ -236,6 +252,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             obj_gravity=params.get('obj_gravity', False),
             min_force_dict=min_force_dict,
             full_dof_goal=params.get('compute_recovery_trajectory', False),
+            proj_path=proj_path,
         )
         thumb_and_middle_regrasp_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
@@ -256,6 +273,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             obj_gravity=params.get('obj_gravity', False),
             min_force_dict=min_force_dict,
             full_dof_goal=params.get('compute_recovery_trajectory', False),
+            proj_path=proj_path,
         )
         turn_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
@@ -276,6 +294,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             obj_gravity=params.get('obj_gravity', False),
             min_force_dict=min_force_dict,
             full_dof_goal=params.get('compute_recovery_trajectory', False),
+            proj_path=proj_path,
         )
         pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, pregrasp_params)
         index_regrasp_planner = PositionControlConstrainedSVGDMPC(index_regrasp_problem, params)
@@ -716,9 +735,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # print(params['T'], state.shape, initial_samples)
 
         if params.get('compute_recovery_trajectory', False):
-            planner.reset(state, T=params['T'], initial_x=initial_samples)
+            planner.reset(state, T=params['T'], initial_x=initial_samples, proj_path=proj_path)
         else:
-            planner.reset(state, T=params['T'], goal=goal, initial_x=initial_samples)
+            planner.reset(state, T=params['T'], goal=goal, initial_x=initial_samples, proj_path=proj_path)
         if params['controller'] != 'diffusion_policy' and (trajectory_sampler is None or not params.get('diff_init', True)):
             initial_samples = planner.x.detach().clone()
             sim_rollouts = torch.zeros_like(initial_samples)
@@ -1022,6 +1041,33 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         torch.cuda.empty_cache()
         return contact_sequence, next_node, initial_samples
 
+    def plan_recovery_contacts(state):
+        distances = []
+        modes = ['index', 'thumb_middle']
+        # for planner in [index_regrasp_planner, thumb_and_middle_regrasp_planner]:
+        goal = index_regrasp_planner.problem.goal.clone()
+        goal[-1] = state[-1]
+        index_regrasp_planner.reset(state, T=params['T'], initial_x=initial_samples, proj_path=proj_path)
+        index_regrasp_planner.warmup_iters = 100
+        xu, plans = index_regrasp_planner.step(state)
+        # x_last = xu[-1, :planner.problem.num_fingers * 4 + planner.problem.obj_dof-1]
+        # goal_cost = (x_last - planner.problem.goal[:-1]).pow(2).sum(dim=-1)#.sum(dim=-1)
+        x_index = xu[:, :index_regrasp_planner.problem.num_fingers * 4 + index_regrasp_planner.problem.obj_dof]
+        # initial_x = index_regrasp_planner.problem.get_initial_xu(1, jitter_std=0).squeeze()[:, :index_regrasp_planner.problem.num_fingers * 4 + index_regrasp_planner.problem.obj_dof-1]
+        distances.append(torch.norm(x_index[-1] - goal).item())
+        index_regrasp_planner.warmup_iters = params['warmup_iters']
+
+        thumb_and_middle_regrasp_planner.reset(state, T=params['T'], initial_x=initial_samples, proj_path=proj_path)
+        thumb_and_middle_regrasp_planner.warmup_iters = 100
+        xu, plans = thumb_and_middle_regrasp_planner.step(state)
+        # x_last = xu[-1, :planner.problem.num_fingers * 4 + planner.problem.obj_dof-1]
+        # goal_cost = (x_last - planner.problem.goal[:-1]).pow(2).sum(dim=-1)#.sum(dim=-1)
+        x_th_m = xu[:, :thumb_and_middle_regrasp_planner.problem.num_fingers * 4 + thumb_and_middle_regrasp_planner.problem.obj_dof]
+        # initial_x = thumb_and_middle_regrasp_planner.problem.get_initial_xu(1, jitter_std=0).squeeze()[:, :thumb_and_middle_regrasp_planner.problem.num_fingers * 4 + thumb_and_middle_regrasp_planner.problem.obj_dof-1]
+        distances.append(torch.norm(x_th_m[-1] - goal).item())
+        thumb_and_middle_regrasp_planner.warmup_iters = params['warmup_iters']
+        return [modes[np.argmin(distances)]]
+    
     state = env.get_state()
     state = state['q'].reshape(-1)[:15].to(device=params['device'])
 
@@ -1037,7 +1083,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     sample_contact = params.get('sample_contact', False)
     num_stages = 2 + 3 * (params['num_turns'] - 1)
     if params.get('compute_recovery_trajectory', False):
-        contact_sequence = ['index']
+        num_stages = 1
+        # contact_sequence = plan_recovery_contacts(state)
+        contact_sequence = ['thumb_middle']
     elif not sample_contact:
         contact_sequence = ['turn']
         for k in range(params['num_turns'] - 1):
@@ -1408,29 +1456,32 @@ if __name__ == "__main__":
         proj_data = pickle.load(open(f'{CCAI_PATH}/{model_dir}/ood_projection/proj_data.pkl', 'rb'))
 
     num_trials = config['num_trials'] if not config['compute_recovery_trajectory'] else len(proj_data)
-    for i in tqdm(range(start_ind, num_trials)):
+    for i in tqdm(range(61, num_trials)):
     # for i in tqdm([1, 2, 4, 7]):
         if config['mode'] != 'hardware':
             torch.manual_seed(i)
             np.random.seed(i)
-
-        #     env.reset(
-        #         dof_pos=torch.tensor([
-        #                             [
-        #                               -0.2066,  0.4522,  0.4844,  0.9538,  
-        #                               0.0327,  0.4181,  1.0236,  0.9130,
-        #                               0, 0, 0, 0,
-        #                               1.3928,  0.1085,  0.3418,  0.5728, 
-        #                               -0.0316, -0.0383,  0.8699,
-        #                               0 ]])
-        #     )
-        # goal = torch.tensor([ 0.0281,  0.4295,  0.5811,  0.7072, 
-        #                      -0.0421,  0.5418,  0.8852,  1.1562,
-        #                      1.5201,  0.0422,  0.1824,  0.5474, 
-        #                      -0.0337, -0.0239,  1.2601])
         
-        goal = torch.tensor([0, 0, float(config['goal'])])
-        goal = goal + 0.025 * torch.randn(1) + 0.2
+        if config['compute_recovery_trajectory']:
+            this_pair = proj_data[i]
+            initial_likelihood = this_pair['initial_likelihood']
+            final_likelihood = this_pair['final_likelihood']
+
+            initial_state = this_pair['initial_state']
+            final_state = this_pair['final_state']
+
+            env.reset(
+                dof_pos=torch.cat(
+                                    [
+                                        final_state[:8],
+                                        torch.tensor([0, 0, 0, 0,]),
+                                        final_state[8:15], 
+                                        torch.tensor([0.]) ], dim=0).reshape(1, -1)
+            )
+            goal = final_state
+            
+            # goal = torch.tensor([0, 0, float(config['goal'])])
+            # goal = goal + 0.025 * torch.randn(1) + 0.2
         for controller in config['controllers'].keys():
 
             fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}.{now}/{controller}/trial_{i + 1}')
@@ -1449,7 +1500,8 @@ if __name__ == "__main__":
                 params['device'])  # TODO: confirm if this is the correct location
             params['object_location'] = object_location
             # If params['device'] is cuda:1 but the computer only has 1 gpu, change to cuda:0
-            final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node, inits_noise[i], noise_noise[i], seed=i)
+            final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node,
+                                              seed=i, proj_path=this_pair['proj_path'][:, :-1])
             #
             # try:
             #     final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node)

@@ -500,11 +500,12 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         # convert to scene base frame
         ee_locs = self.contact_scenes.scene_transform.inverse().transform_points(ee_locs)
 
-        # convert to scene ee frame
-        object_trans = self.contact_scenes.scene_sdf.chain.forward_kinematics(
-            _q_env.reshape(-1, _q_env.shape[-1]))
+        if not self.full_dof_goal:
+            # convert to scene ee frame
+            object_trans = self.contact_scenes.scene_sdf.chain.forward_kinematics(
+                _q_env.reshape(-1, _q_env.shape[-1]))
 
-        ee_locs = object_trans[self.obj_link_name].inverse().transform_points(ee_locs)
+            ee_locs = object_trans[self.obj_link_name].inverse().transform_points(ee_locs)
 
         return ee_locs.reshape(q_rob.shape[:-1] + (self.num_regrasps, 3))
     
@@ -723,6 +724,8 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         self._regrasp_dz += self.num_regrasps  # one sdf constraint per finger
         self._regrasp_dh = self._regrasp_dz * T  # inequality
         # self._regrasp_dh += self.num_regrasps
+        self._regrasp_dh_constant = 0
+        self._regrasp_dh_per_t = self._regrasp_dz
 
 
         if default_dof_pos is None:
@@ -840,6 +843,8 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         # h[:, :] = 0
         # h = h[:, -1].reshape(N, 1)
         # print(g[:, -1])
+        t_mask = torch.ones_like(h, dtype=torch.bool)
+        t_mask[:, 0] = False
         if compute_grads:
             T_range = torch.arange(T, device=xu.device)
             # compute gradient of sdf
@@ -857,13 +862,15 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             grad_h = grad_h.reshape(N, -1, T * d)
             # grad_h = grad_h[:, -1].reshape(N, 1, T * d)
         else:
-            return h, None, None
+            return h, None, None, t_mask
 
         if compute_hess:
             hess = torch.zeros(N, xu.shape[1], T * d, T * d, device=xu.device)
-            return h, grad_h, hess
+            return h, grad_h, hess, t_mask
 
-        return h, grad_h, None
+
+        
+        return h, grad_h, None, t_mask
 
     @regrasp_finger_constraints
     def _contact_avoidance(self, xu, finger_name, compute_grads=True, compute_hess=False, projected_diffusion=False):
@@ -976,20 +983,22 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                                                                             compute_hess=compute_hess,
                                                                             projected_diffusion=projected_diffusion)
         
-        h_patch, grad_h_patch, hess_h_patch = self._contact_patch_constraint(xu=xu.reshape(N, T, -1)[:, :, :self.dx + self.du],
+        h_patch, grad_h_contact, hess_h_contact, t_mask_contact = self._contact_patch_constraint(xu=xu.reshape(N, T, -1)[:, :, :self.dx + self.du],
                                                                             compute_grads=compute_grads,
                                                                             compute_hess=compute_hess,
                                                                             projected_diffusion=projected_diffusion)
         h = torch.cat((h, h_patch), dim=1)
-        # h = h_contact
-        grad_h = None
-        hess_h = None
+        t_mask = torch.cat((t_mask, t_mask_contact), dim=1)
+
         if compute_grads:
-            grad_h = torch.cat((grad_h, grad_h_patch), dim=1)
-            # grad_h = grad_h_contact
+            grad_h = torch.cat((grad_h, grad_h_contact), dim=1)
+        else:
+            grad_h = None
         if compute_hess:
-            hess_h = torch.cat((hess_h, grad_h_patch), dim=1)
-        return h, grad_h, hess_h
+            hess_h = torch.cat((hess_h, hess_h_contact), dim=1)
+        else:
+            hess_h = None
+        return h, grad_h, hess_h, t_mask
         # print("avoidance", h_contact.max())
 
 class AllegroContactProblem(AllegroObjectProblem):
@@ -1091,70 +1100,16 @@ class AllegroContactProblem(AllegroObjectProblem):
         self._contact_dh_per_t = self._contact_dz
         self._contact_dh_constant = 0
         self._contact_dh = self._contact_dz * T  # inequality
-        self._contact_dz = 0
+        # self._contact_dz = 0
 
-    def get_initial_xu(self, N):
+    def get_initial_xu(self, N, jitter_std=.0125):
         """
         use delta joint movement to get the initial trajectory
         the action (force at the finger tip) is not used. it is randomly intiailized
         the actual dynamics model is not used
         """
 
-        # proj_path = torch.tensor([[-0.2066,  0.4522,  0.4844,  0.9538,  0.0327,  0.4181,  1.0236,  0.9130,
-        #     1.3928,  0.1085,  0.3418,  0.5728, -0.0316, -0.0383,  0.8699],
-        #     [-0.2004,  0.4414,  0.4787,  0.9416,  0.0306,  0.4266,  1.0235,  0.9231,
-        #     1.4055,  0.1113,  0.3330,  0.5743, -0.0319, -0.0380,  0.8567],
-        #     [-0.1909,  0.4268,  0.4711,  0.9214,  0.0274,  0.4390,  1.0221,  0.9391,
-        #     1.4220,  0.1146,  0.3191,  0.5761, -0.0322, -0.0375,  0.8700],
-        #     [-0.1797,  0.4105,  0.4673,  0.9020,  0.0239,  0.4524,  1.0187,  0.9564,
-        #     1.4401,  0.1167,  0.3041,  0.5774, -0.0326, -0.0369,  0.8696],
-        #     [-0.1674,  0.3934,  0.4663,  0.8855,  0.0203,  0.4644,  1.0138,  0.9755,
-        #     1.4584,  0.1161,  0.2912,  0.5774, -0.0331, -0.0363,  0.8408],
-        #     [-0.1557,  0.3813,  0.4633,  0.8613,  0.0154,  0.4733,  0.9996,  0.9957,
-        #     1.4717,  0.1125,  0.2794,  0.5741, -0.0331, -0.0359,  0.8611],
-        #     [-0.1437,  0.3715,  0.4626,  0.8368,  0.0105,  0.4817,  0.9833,  1.0141,
-        #     1.4827,  0.1093,  0.2685,  0.5703, -0.0331, -0.0355,  0.9111],
-        #     [-0.1314,  0.3633,  0.4663,  0.8145,  0.0057,  0.4880,  0.9683,  1.0322,
-        #     1.4902,  0.1046,  0.2585,  0.5666, -0.0331, -0.0351,  0.9615],
-        #     [-1.1753e-01,  3.5453e-01,  4.7417e-01,  7.9926e-01,  1.4629e-03,
-        #     4.9397e-01,  9.5852e-01,  1.0486e+00,  1.4977e+00,  9.8562e-02,
-        #     2.5021e-01,  5.6340e-01, -3.3375e-02, -3.4531e-02,  9.8662e-01],
-        #     [-0.1033,  0.3473,  0.4831,  0.7889, -0.0027,  0.5012,  0.9535,  1.0643,
-        #     1.5034,  0.0920,  0.2457,  0.5608, -0.0337, -0.0339,  1.0007],
-        #     [-0.0901,  0.3449,  0.4881,  0.7815, -0.0066,  0.5072,  0.9499,  1.0815,
-        #     1.5093,  0.0837,  0.2382,  0.5580, -0.0340, -0.0332,  1.0283],
-        #     [-0.0766,  0.3429,  0.4957,  0.7751, -0.0099,  0.5139,  0.9469,  1.0957,
-        #     1.5136,  0.0746,  0.2366,  0.5560, -0.0342, -0.0325,  1.0339],
-        #     [-0.0645,  0.3445,  0.5024,  0.7686, -0.0124,  0.5197,  0.9422,  1.1031,
-        #     1.5169,  0.0687,  0.2339,  0.5525, -0.0343, -0.0318,  1.0437],
-        #     [-0.0527,  0.3484,  0.5074,  0.7590, -0.0149,  0.5244,  0.9395,  1.1111,
-        #     1.5195,  0.0632,  0.2301,  0.5493, -0.0345, -0.0312,  1.0827],
-        #     [-0.0409,  0.3538,  0.5109,  0.7522, -0.0179,  0.5288,  0.9423,  1.1169,
-        #     1.5229,  0.0572,  0.2256,  0.5474, -0.0346, -0.0304,  1.1113],
-        #     [-0.0296,  0.3597,  0.5165,  0.7474, -0.0203,  0.5318,  0.9391,  1.1226,
-        #     1.5253,  0.0499,  0.2197,  0.5462, -0.0345, -0.0296,  1.1208],
-        #     [-0.0192,  0.3663,  0.5234,  0.7443, -0.0225,  0.5343,  0.9337,  1.1275,
-        #     1.5272,  0.0425,  0.2133,  0.5455, -0.0345, -0.0288,  1.1051],
-        #     [-0.0106,  0.3746,  0.5321,  0.7368, -0.0251,  0.5365,  0.9277,  1.1342,
-        #     1.5285,  0.0374,  0.2055,  0.5415, -0.0344, -0.0281,  1.1116],
-        #     [-0.0031,  0.3839,  0.5413,  0.7307, -0.0279,  0.5380,  0.9189,  1.1392,
-        #     1.5289,  0.0359,  0.1974,  0.5383, -0.0343, -0.0273,  1.1357],
-        #     [ 0.0043,  0.3940,  0.5487,  0.7228, -0.0309,  0.5388,  0.9138,  1.1426,
-        #     1.5283,  0.0381,  0.1913,  0.5359, -0.0342, -0.0267,  1.1670],
-        #     [ 0.0113,  0.4046,  0.5563,  0.7165, -0.0340,  0.5402,  0.9080,  1.1457,
-        #     1.5276,  0.0396,  0.1894,  0.5351, -0.0340, -0.0259,  1.1876],
-        #     [ 0.0166,  0.4133,  0.5629,  0.7113, -0.0372,  0.5412,  0.9009,  1.1480,
-        #     1.5277,  0.0432,  0.1848,  0.5361, -0.0339, -0.0251,  1.2454],
-        #     [ 0.0227,  0.4220,  0.5726,  0.7091, -0.0398,  0.5415,  0.8925,  1.1524,
-        #     1.5236,  0.0427,  0.1835,  0.5421, -0.0338, -0.0245,  1.2532],
-        #     [ 0.0258,  0.4263,  0.5775,  0.7080, -0.0411,  0.5417,  0.8883,  1.1545,
-        #     1.5216,  0.0424,  0.1829,  0.5451, -0.0337, -0.0241,  1.2571],
-        #     [ 0.0274,  0.4285,  0.5799,  0.7075, -0.0418,  0.5418,  0.8863,  1.1556,
-        #     1.5206,  0.0422,  0.1825,  0.5466, -0.0337, -0.0239,  1.2591],
-        #     [ 0.0281,  0.4295,  0.5811,  0.7072, -0.0421,  0.5418,  0.8852,  1.1562,
-        #     1.5201,  0.0422,  0.1824,  0.5474, -0.0337, -0.0239,  1.2601]], device=self.device)
-
-        # x_all = torch.nn.functional.interpolate(proj_path.unsqueeze(0).permute(0, 2, 1), size=self.T+1, mode='linear', align_corners=True).permute(0, 2, 1)
+        # x_all = torch.nn.functional.interpolate(self.proj_path.unsqueeze(0).permute(0, 2, 1), size=self.T+1, mode='linear', align_corners=True).permute(0, 2, 1)
 
         # u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
         # if self.optimize_force and self.turn:
@@ -1165,7 +1120,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         #         else:
         #             u[..., idx] = 1.5 *.01 * torch.randn(N, self.T, 3, device=self.device)
 
-        # jitter = 0.0 * torch.randn(N, self.T+1, self.num_fingers * 4, device=self.device)
+        # jitter = jitter_std * torch.randn(N, self.T+1, self.num_fingers * 4, device=self.device)
         # jitter[:, 0] = 0
         # x = x_all.repeat(N, 1, 1)
         # x[:, :, :self.num_fingers * 4] += jitter
@@ -1991,7 +1946,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         if self.optimize_force:
             force = torch.zeros(N, T, 12, device=self.device)
             force[:, :, self._contact_force_indices] = xu[:, :, -self.num_contacts * 3:]
-            h, grad_h, hess_h = self._friction_constraint(
+            h, grad_h, hess_h, t_mask = self._friction_constraint(
                 q=q, delta_q=delta_q, force=None,
                 compute_grads=compute_grads,
                 compute_hess=compute_hess,
@@ -2437,9 +2392,9 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
 
         goal_cost = 0
         if self.full_dof_goal:
-            x_last = xu[-1, :self.num_fingers * 4 + self.obj_dof]
-            goal_cost = 10 * (x_last - goal).pow(2).sum(dim=-1)#.sum(dim=-1)
-            goal_cost += 3 * (xu[:-1, :self.num_fingers * 4 + self.obj_dof] - goal).pow(2).sum(dim=-1).sum(dim=-1)
+            x_last = xu[-1, :self.num_fingers * 4 + self.obj_dof-1]
+            goal_cost = 10 * (x_last - goal[:-1]).pow(2).sum(dim=-1)#.sum(dim=-1)
+            goal_cost += 3 * (xu[:-1, :self.num_fingers * 4 + self.obj_dof-1] - goal[:-1]).pow(2).sum(dim=-1).sum(dim=-1)
 
         return cost + goal_cost
 

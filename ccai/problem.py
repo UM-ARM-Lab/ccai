@@ -187,7 +187,7 @@ class ConstrainedSVGDProblem(Problem):
         self._preprocess(x, projected_diffusion)
         T_offset = 1 if projected_diffusion else 0
         N = x.shape[0]
-        h, _, _ = self._con_ineq(x, compute_grads=False, compute_hess=False, projected_diffusion=projected_diffusion)
+        h, _, _, _ = self._con_ineq(x, compute_grads=False, compute_hess=False, projected_diffusion=projected_diffusion)
         if h is not None:
             if self.squared_slack:
                 # z = torch.where(h < 0, torch.sqrt(-2 * h), 0)

@@ -2,10 +2,10 @@
 T: 12
 receding_horizon: False
 num_steps: 12
-num_turns: 3
+num_turns: 1
 num_trials: 10
 visualize: True
-experiment_name: 'allegro_screwdriver_csvto_OOD_ID_contact_region_no_double_friction_fixed'
+experiment_name: 'allegro_screwdriver_csvto_OOD_ID_full_multi_depth_plan'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -30,7 +30,7 @@ sample_contact: False
 use_partial_constraint: True
 sine_cosine: True
 project_state: False
-compute_recovery_trajectory: False
+compute_recovery_trajectory: True
 model_dir: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion'
 controllers:
   csvgd:
