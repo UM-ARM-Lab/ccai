@@ -7,6 +7,7 @@ import rospy
 
 class ObjectPoseReader:
     def __init__(self, obj='valve', mode='relative') -> None:
+        # in this file, the world frame is defined as the root of the robot hand, but the axis aligns with the actual world frame
         self.mode = mode
         self.obj = obj
         self.__intrinsic = np.array([[621.80984333,   0.,         651.09118583],

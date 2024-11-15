@@ -4,7 +4,7 @@ receding_horizon: False
 num_steps: 10
 num_trials: 20
 visualize: True
-experiment_name: 'allegro_peg_alignment'
+experiment_name: 'allegro_peg_alignment_new_env'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 simulator: "isaac_gym" # choose from 'isaac_sim', 'isaac_gym'
 fingers: ['index', 'middle', 'thumb']
@@ -28,7 +28,7 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    online_iters: 30
+    online_iters: 50
     warmup_iters: 300
     resample_steps: 1
     resample_sigma: 0.01
@@ -44,7 +44,7 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    online_iters: 30
+    online_iters: 50
     warmup_iters: 300
     resample_steps: 1
     resample_sigma: 0.01

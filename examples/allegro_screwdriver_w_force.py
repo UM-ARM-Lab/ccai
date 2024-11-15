@@ -79,7 +79,7 @@ class AllegroScrewdriver(AllegroValveTurning):
         self.num_fingers = len(fingers)
         self.obj_dof_code = [0, 0, 0, 1, 1, 1]
         self.optimize_force = optimize_force
-        self.obj_mass = 0.1
+        self.obj_mass = 0.05
         self.contact_region = contact_region
         self.arm_type = arm_type
         if self.arm_type == 'None':
@@ -102,7 +102,7 @@ class AllegroScrewdriver(AllegroValveTurning):
                                                  screwdriver_force_balance=force_balance,
                                                  collision_checking=collision_checking, obj_gravity=obj_gravity,
                                                  contact_region=contact_region, du=du, arm_type=arm_type, device=device)
-        self.min_force_dict = {'index': 0.05, 'middle': 0.1, 'ring': 0.1, 'thumb': 0.1}
+        self.min_force_dict = {'index': 0.0001, 'middle': 0.1, 'ring': 0.1, 'thumb': 0.1}
         self.friction_coefficient = friction_coefficient
         self.friction_vel_constr = vmap(self._friction_vel_constr, randomness='same')
         self.grad_friction_vel_constr = vmap(jacrev(self._friction_vel_constr, argnums=(0, 1, 2)))
@@ -134,9 +134,10 @@ class AllegroScrewdriver(AllegroValveTurning):
         force = 1.5 * torch.randn(N, self.T, 3 * self.num_fingers + 3, device=self.device)
         force[:, :, :3] = force[:, :, :3] * 0.01 # NOTE: scale down the index finger force, might not apply to situations other than screwdriver
         force[:, :, -3:] = force[:, :, -3:] * 0.01 # expect the environment force to be small
-        force[:, :, 2] = -1 # index force pointing down
-        force[:, :, -1] = 1 # ground force pointing up
-        # force = 0.025 * torch.randn(N, self.T, 3 * self.num_fingers + 3, device=self.device)
+        # force[:, :, 2] = -1 # index force pointing down
+        # force[:, :, -1] = 1 # ground force pointing up
+        force[:, :, 2] = -0.1 # index force pointing down
+        force[:, :, -1] = 0.1 # ground force pointing up
         u = torch.cat((u, force), dim=-1)
 
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
