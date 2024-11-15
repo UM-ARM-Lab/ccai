@@ -269,11 +269,11 @@ if __name__ == "__main__":
     # print(f'Best result: {best_result}')
 
 
-    # ensemble = []
-    # for i in range(16):
-    #     net, _ = train()
-    #     ensemble.append(net)
-    # torch.save(ensemble, f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl')
-    eval(model_name = "ensemble", ensemble = True)
+    ensemble = []
+    for i in range(16):
+        net, _ = train()
+        ensemble.append(net)
+    torch.save(ensemble, f'{fpath.resolve()}/value_functions/value_function_ensemble_13k.pkl')
+    eval(model_name = "ensemble_13k", ensemble = True)
 
 
