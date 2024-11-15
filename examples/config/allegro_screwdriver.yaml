@@ -4,7 +4,7 @@ receding_horizon: False
 num_steps: 12
 num_trials: 20
 visualize: True
-experiment_name: 'allegro_screwdriver'
+experiment_name: 'allegro_screwdriver_damped_0.1'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 simulator: "isaac_gym" # choose from 'isaac_sim', 'isaac_gym'
 fingers: ['index', 'middle', 'thumb']

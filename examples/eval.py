@@ -493,14 +493,14 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
 if __name__ == "__main__":
     # get config
-    task = 'screwdriver_turning'
-    # task = 'valve_turning'
+    # task = 'screwdriver_turning'
+    task = 'valve_turning'
     # task = 'reorientation'
     # task = 'peg_alignment'
     # task = 'peg_turning'
 
-    method = 'csvgd'
-    # method = 'ablation'
+    # method = 'csvgd'
+    method = 'ablation'
     # method = 'planning'
 
     if task == 'screwdriver_turning':
