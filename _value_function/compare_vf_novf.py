@@ -69,12 +69,12 @@ def test(test_name=''):
     pkl.dump(tuples, open(f'{fpath}/test/{test_name}.pkl', 'wb'))
 
 if __name__ == "__main__":
-    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
+    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
     sim_device = config['sim_device']
-    n_samples = 20
-    test_name = 'test_20_fair'
+    n_samples = 100
+    test_name = 'test_100'
 
-    test(test_name)
+    # test(test_name)
     tuples = pkl.load(open(f'{fpath}/test/{test_name}.pkl', 'rb'))
     initializations, poses_vf, poses_novf = zip(*tuples)
 
