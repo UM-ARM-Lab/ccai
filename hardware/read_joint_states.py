@@ -6,5 +6,6 @@ if __name__ == '__main__':
     while True:
         robot_state = ros_node.allegro_joint_pos.float()
         thumb_state = robot_state[-4:]
-        print(thumb_state)
+        index_state = robot_state[:4]
+        print(index_state)
         time.sleep(0.1)

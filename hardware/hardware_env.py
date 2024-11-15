@@ -105,7 +105,38 @@ class ObjectPoseReader:
                 for _ in range(i):
                     trans = rotate_90_trans @ trans
                 self.__nominal_root2root.append(trans)
+        elif self.obj == 'peg':
+            self.__objp_palm = np.array([[-0.5, 0, -0.5],
+                                        [0.5, 0, -0.5],
+                                        [0.5, 0, 0.5],
+                                        [-0.5, 0, 0.5]]) * 35
+            hand_center2palm_marker= np.array([[1, 0, 0, 15],
+                                                [0, 1, 0, 55],
+                                                [0, 0, 1, -120],
+                                                [0, 0, 0, 1]])
+            # assume 50 degrees rotation around y axis
+            world2hand_center = np.array([[0.6427876,  0.0000000,  0.7660444],
+                                        [0.0000000,  1.0000000,  0.0000000],
+                                        [-0.7660444,  0.0000000,  0.6427876]])
+            self.__world2palm_marker =  hand_center2palm_marker @ world2hand_center
+            # read the palm marker
+            while True:
+                flag = self.get_robot_frame()
+                if flag:
+                    break
 
+            self.__objp = np.array([[0.5, 0.0, -0.5],
+                    [-0.5, 0.0, -0.5],
+                    [-0.5, 0.0, 0.5],
+                    [0.5, 0.0, 0.5]]) * 35
+            self.__root2marker = np.array([[1, 0, 0, 0], # the root of the screwdriver to the screwdriver marker
+                                    [0, 1, 0, 20.5],
+                                    [0, 0, 1, -80],
+                                    [0, 0, 0, 1]])
+            rotate_90_trans = np.array([[0, 1, 0, 0],
+                                        [-1, 0, 0, 0],
+                                        [0, 0, 1, 0],
+                                        [0, 0, 0, 1]])
     def _get_valve_rot_vec(self):
         ret, frame = self.__cap.read()
         markerCorners, markerIds, rejectedCandidates = self.__detector.detectMarkers(frame)
