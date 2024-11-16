@@ -10,10 +10,15 @@ class ObjectPoseReader:
         # in this file, the world frame is defined as the root of the robot hand, but the axis aligns with the actual world frame
         self.mode = mode
         self.obj = obj
-        self.__intrinsic = np.array([[621.80984333,   0.,         651.09118583],
-        [  0.,         621.66658768, 352.88384525],
-        [  0.,           0. ,          1.,        ]])
-        self.__dist = np.array([[0.07583722,  0.00042308, -0.00245659 , 0.00797877 , 0.01058895]])
+        # self.__intrinsic = np.array([[621.80984333,   0.,         651.09118583],
+        # [  0.,         621.66658768, 352.88384525],
+        # [  0.,           0. ,          1.,        ]])
+        # self.__dist = np.array([[0.07583722,  0.00042308, -0.00245659 , 0.00797877 , 0.01058895]])
+
+        self.__intrinsic = np.array([[606.42074687,   0.,         648.68751226],
+                                    [0.,         606.09387277, 369.09085521],
+                                    [0.,           0.,           1.        ]])
+        self.__dist = np.array([[ 0.11198521, -0.15500009,  0.00198888,  0.0008579,   0.08273805]])
         aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
         aruco_params = cv2.aruco.DetectorParameters()
         self.__detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
@@ -46,6 +51,8 @@ class ObjectPoseReader:
                 cam2world = np.linalg.inv(world2cam)
                 self.__cam2world = global_trans @ cam2world
             elif mode == 'relative':
+                # the following transformation is not following the definition step by step. 
+                # instead, it's directly finding the world frame based on the tag
                 self.__objp_palm = np.array([[-0.5, 0, -0.5],
                                             [0.5, 0, -0.5],
                                             [0.5, 0, 0.5],
@@ -68,6 +75,12 @@ class ObjectPoseReader:
                 #                             [0, 1, 0, 0],
                 #                             [-0.7071068, 0, 0.7071068, 0],
                 #                             [0, 0, 0, 1]])
+
+                # assume 50 degrees rotation around y axis
+                # world2hand_center = np.array([[0.6427876,  0.0000000,  0.7660444],
+                #                         [0.0000000,  1.0000000,  0.0000000],
+                #                         [-0.7660444,  0.0000000,  0.6427876]])
+
                 self.__world2palm_marker =  hand_center2palm_marker @ world2hand_center
                 # self.__world2palm_marker = np.array([[0.7071068, 0, -0.7071068, -25],
                 #                                     [0, 1, 0, -50],
@@ -113,12 +126,20 @@ class ObjectPoseReader:
                                         [-0.5, 0, 0.5]]) * 35
             hand_center2palm_marker= np.array([[1, 0, 0, 15],
                                                 [0, 1, 0, 55],
-                                                [0, 0, 1, -120],
+                                                [0, 0, 1, -80],
                                                 [0, 0, 0, 1]])
             # assume 50 degrees rotation around y axis
-            world2hand_center = np.array([[0.6427876,  0.0000000,  0.7660444],
-                                        [0.0000000,  1.0000000,  0.0000000],
-                                        [-0.7660444,  0.0000000,  0.6427876]])
+            world_temp2hand_center = np.array([[0.6427876,  0.0000000,  0.7660444, 0.0],
+                                        [0.0000000,  1.0000000,  0.0000000, 0.0],
+                                        [-0.7660444,  0.0000000,  0.6427876, 0.0],
+                                        [0.0, 0.0, 0.0, 1.0]])
+            # rotate around z axis for - 90 degrees
+            world2world_temp = np.array([[0, 1, 0, 0],
+                                        [-1, 0, 0, 0],
+                                        [0, 0, 1, 0],
+                                        [0, 0, 0, 1]])
+            world2hand_center = world_temp2hand_center @ world2world_temp
+
             self.__world2palm_marker =  hand_center2palm_marker @ world2hand_center
             # read the palm marker
             while True:
@@ -126,18 +147,20 @@ class ObjectPoseReader:
                 if flag:
                     break
 
-            self.__objp = np.array([[0.5, 0.0, -0.5],
-                    [-0.5, 0.0, -0.5],
-                    [-0.5, 0.0, 0.5],
-                    [0.5, 0.0, 0.5]]) * 35
-            self.__root2marker = np.array([[1, 0, 0, 0], # the root of the screwdriver to the screwdriver marker
-                                    [0, 1, 0, 20.5],
-                                    [0, 0, 1, -80],
+            self.__objp = np.array([[0, -0.5, 0.5],
+                                    [0, -0.5, -0.5],
+                                    [0, 0.5, -0.5],
+                                    [0.0, 0.5, 0.5]]) * 35
+            
+            self.__root2marker = np.array([[1, 0, 0, 20.0], # the root of the screwdriver to the screwdriver marker
+                                    [0, 1, 0, 0.0],
+                                    [0, 0, 1, 0.0],
                                     [0, 0, 0, 1]])
-            rotate_90_trans = np.array([[0, 1, 0, 0],
-                                        [-1, 0, 0, 0],
-                                        [0, 0, 1, 0],
-                                        [0, 0, 0, 1]])
+            # the following are stats in isaac gym, needs to be updated whenever you change the envs
+            self.robot_root_p = np.array([0.11, -0.023, 0.3]) * 1000
+            self.obj_root_p = np.array([0.05, 0, 0.205]) * 1000
+            wall_corner_p = np.array([0, 0, 0.25])
+
     def _get_valve_rot_vec(self):
         ret, frame = self.__cap.read()
         markerCorners, markerIds, rejectedCandidates = self.__detector.detectMarkers(frame)
@@ -159,6 +182,7 @@ class ObjectPoseReader:
         diff_vec = rot_diff.as_rotvec()
         angle = np.linalg.norm(diff_vec) * np.sign(diff_vec[2])
         return angle
+    
     def get_screwdriver_state(self):
         root_coors = []
         screwdriver_ori_eulers = []
@@ -188,18 +212,55 @@ class ObjectPoseReader:
                 root2world = root2world @ trans_mat 
                 root_coor = root2world[:3, 3]
                 scrwedriver_ori_mat = root2world[:3, :3]
-                screwdriver_ori_euler = R.from_matrix(scrwedriver_ori_mat).as_euler('XYZ', degrees=True)
+                screwdriver_ori_euler = R.from_matrix(scrwedriver_ori_mat).as_euler('XYZ', degrees=False)
                 # print(markerIds[i].item(), screwdriver_ori_euler)
                 root_coors.append(root_coor)
                 screwdriver_ori_eulers.append(screwdriver_ori_euler)
             root_coor = np.mean(root_coors, axis=0)
             screwdriver_ori_euler = np.mean(screwdriver_ori_eulers, axis=0)
-            screwdriver_ori_euler = screwdriver_ori_euler / 180 * np.pi # change to radian
             # cv2.imshow('frame', frame) # debug
             return root_coor, screwdriver_ori_euler
         else:
             print("No readings from camera.")
             return None, None
+        
+    def get_peg_state(self):
+        ctr = 0
+        while True:
+            ret, frame = self.__cap.read()
+            ctr += 1
+            if ctr >= 7 and ret:
+                break
+        markerCorners, markerIds, rejectedCandidates = self.__detector.detectMarkers(frame)
+        peg_sim_world_coor, peg_ori_euler = None, None
+        if len(markerCorners) > 0 and markerIds.max() <= 4:
+            # cv2.aruco.drawDetectedMarkers(frame, markerCorners, markerIds)
+            for marker_corner, marker_id in zip(markerCorners, markerIds):
+                if marker_id.item() == 1:
+                    ret, rvecs, tvecs = cv2.solvePnP(self.__objp, marker_corner, self.__intrinsic, self.__dist) 
+                    # cv2.drawFrameAxes(frame, self.__intrinsic, self.__dist, rvecs, tvecs, 35 / 2) # debug
+                    rotation = R.from_rotvec(rvecs[:,0])
+                    rotation_mat = rotation.as_matrix()
+                    translation = tvecs
+                    marker2cam = np.concatenate((rotation_mat, translation), axis=1)
+                    marker2cam = np.concatenate((marker2cam, np.array([[0, 0, 0, 1]])), axis=0)
+                    marker2world = self.__cam2world @ marker2cam
+                    root2world = marker2world @ self.__root2marker
+                    root_coor = root2world[:3, 3]
+                    peg_ori_mat = root2world[:3, :3]
+                    peg_ori_euler = R.from_matrix(peg_ori_mat).as_euler('XYZ', degrees=False)
+
+                    peg_sim_world_coor = root_coor + self.robot_root_p - self.obj_root_p
+                    # peg_sim_world_coor = root_coor
+            # cv2.imshow('frame', frame) # debug
+            if peg_sim_world_coor is None:
+                print("No readings from camera.")
+            return peg_sim_world_coor / 1000, peg_ori_euler
+        else:
+            cv2.imshow('frame', frame) # debug
+            print("No readings from camera.")
+            return None, None
+    
     def get_robot_frame(self):
         
         ctr = 0
@@ -237,9 +298,18 @@ class ObjectPoseReader:
                 if center_coor is not None:
                     break
             return center_coor, screwdriver_ori_euler
+        elif self.obj == 'peg':
+            while True:
+                center_coor, peg_ori_euler = self.get_peg_state()
+                # print(center_coor, peg_ori_euler)
+                if center_coor is not None:
+                    break
+            return center_coor, peg_ori_euler
 
 class HardwareEnv:
-    def __init__(self, default_pos, num_repeat=1, gradual_control=False, finger_list=['index', 'middle', 'ring', 'thumb'], kp=4, obj='valve', ori_only=True, mode='relative', device='cuda:0'):
+    def __init__(self, default_pos, num_repeat=1, gradual_control=False, 
+                 finger_list=['index', 'middle', 'ring', 'thumb'], kp=4, 
+                 obj='valve', ori_only=True, mode='relative', device='cuda:0'):
         self.__all_finger_list = ['index', 'middle', 'ring', 'thumb']
         self.obj = obj
         self.__finger_list = finger_list
@@ -251,7 +321,7 @@ class HardwareEnv:
         self.default_pos = default_pos.clone()
         self.ori_only = ori_only
     
-    def get_state(self):
+    def get_state(self, return_dict=False):
         rospy.sleep(0.5)
         robot_state = self.__ros_node.allegro_joint_pos.float()
         robot_state = robot_state.to(self.device)
@@ -267,6 +337,7 @@ class HardwareEnv:
         if self.obj == 'valve':
             ori = self.obj_reader.get_state()
             ori = torch.tensor([ori]).float().to(self.device)
+            obj_config = ori
             q.append(ori)
         elif self.obj == 'screwdriver':
             pos, ori = self.obj_reader.get_state()
@@ -274,14 +345,24 @@ class HardwareEnv:
             ori = torch.tensor(ori).float().to(self.device)
             # ori = ori * 0 # debug
             if self.ori_only:
+                obj_cofig = ori
                 q.append(ori)
-                q.append(torch.zeros(1).float().to(self.device)) # add the screwdriver cap angle
+                # q.append(torch.zeros(1).float().to(self.device)) # add the screwdriver cap angle
             else:
                 raise NotImplementedError
-        all_state = torch.cat((robot_state, ori), dim=-1)
-        state['all_state'] = all_state
+        elif self.obj == 'peg':
+            pos, ori = self.obj_reader.get_state()
+            pos = torch.tensor(pos).float().to(self.device)
+            ori = torch.tensor(ori).float().to(self.device)
+            obj_config = torch.cat((pos, ori))
+            q.append(obj_config)
+        all_state = torch.cat((robot_state, obj_config), dim=-1)
+        state['all_state'] = all_state.unsqueeze(0)
         state['q'] = torch.cat(q).unsqueeze(0)
-        state['theta'] = ori
+        if not return_dict:
+            state = state['q']
+        # state['theta'] = ori
+        # state = q
         return state
     def step(self, action):
         action = self.partial_to_full_state(action)
@@ -318,7 +399,7 @@ if __name__ == "__main__":
     #     state = env.step(action)
     #     print(state)
     #     rospy.sleep(1)
-    reader = ObjectPoseReader(obj='screwdriver')
+    reader = ObjectPoseReader(obj='peg')
     while True:
         center_coor, screwdriver_ori_euler = reader.get_state()
         print(center_coor, screwdriver_ori_euler)

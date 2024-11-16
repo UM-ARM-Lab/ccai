@@ -1,5 +1,4 @@
 
-# from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
 # from isaacsim_hand_envs.allegro import AllegroScrewdriverEnv # it needs to be imported before numpy and torch
 from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv, AllegroValveTurningEnv, AllegroPegTurningEnv
 import numpy as np
@@ -66,12 +65,15 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     start = state.reshape(robot_dof + obj_dof).to(device=params['device'])        
     
     # setup the pregrasp problem
+    pregrasp_flag = False
     if config['task'] == 'peg_turning' or config['task'] == 'reorientation' or config['task'] == 'peg_alignment':
-        pass
+        if config['mode'] == 'hardware':
+            pregrasp_flag = True
         # action = torch.cat((env.default_dof_pos[:,:8], env.default_dof_pos[:, 12:16]), dim=-1)
         # env.step(action) # step one step to resolve penetration
-    
     else:
+        pregrasp_flag = True
+    if pregrasp_flag:
         pregrasp_dx = pregrasp_du = robot_dof
         pregrasp_problem = AllegroContactProblem(
             dx=pregrasp_dx,
@@ -117,8 +119,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         for x in best_traj[:, :pregrasp_dx]:
             action = x.reshape(-1, pregrasp_dx).to(device=env.device) # move the rest fingers
             if params['mode'] == 'hardware':
-                set_state = env.get_state()['all_state'].to(device=env.device)
-                set_state = torch.cat((set_state, torch.zeros(1).float().to(env.device)), dim=0)
+                set_state = env.get_state(return_dict=True)['q'].to(device=env.device)
+                if params['task'] == 'screwdriver_turning':
+                    set_state = torch.cat((set_state, torch.zeros(1).float().to(env.device)), dim=0)
                 sim_viz_env.set_pose(set_state)
                 sim_viz_env.step(action)
             env.step(action)
@@ -421,8 +424,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             action = action[:, :robot_dof]
             action = action + start.unsqueeze(0)[:, :robot_dof].to(action.device) # NOTE: this is required since we define action as delta action
             if params['mode'] == 'hardware':
-                set_state = env.get_state()['all_state'].to(device=env.device)
-                set_state = torch.cat((set_state, torch.zeros(1).float().to(env.device)), dim=0)
+                set_state = env.get_state(return_dict=True)['q'].to(device=env.device)
+                if params['task'] == 'screwdriver_turning':
+                    set_state = torch.cat((set_state, torch.zeros(1).float().to(env.device)), dim=0)
                 sim_viz_env.set_pose(set_state)
                 sim_viz_env.step(action)
             elif params['mode'] == 'hardware_copy':
@@ -494,13 +498,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 if __name__ == "__main__":
     # get config
     # task = 'screwdriver_turning'
-    task = 'valve_turning'
+    # task = 'valve_turning'
     # task = 'reorientation'
-    # task = 'peg_alignment'
+    task = 'peg_alignment'
     # task = 'peg_turning'
 
-    # method = 'csvgd'
-    method = 'ablation'
+    method = 'csvgd'
+    # method = 'ablation'
     # method = 'planning'
 
     if task == 'screwdriver_turning':
@@ -535,42 +539,65 @@ if __name__ == "__main__":
     if config['mode'] == 'hardware':
         from hardware.hardware_env import HardwareEnv
         # TODO, think about how to read that in simulator
-        default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
-                                    torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float(),
-                                    torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
-                                    torch.tensor([[1.2, 0.3, 0.3, 1.2]]).float()),
+        if task == 'screwdriver_turning':
+            default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
+                                        torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float(),
+                                        torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
+                                        torch.tensor([[1.2, 0.3, 0.3, 1.2]]).float()),
+                                        dim=1)
+            obj = 'screwdriver'
+        elif task == 'peg_alignment':
+            default_dof_pos = torch.cat((torch.tensor([[0, 0.7, 0.8, 0.8]]).float(),
+                                    torch.tensor([[0, 0.8, 0.7, 0.6]]).float(),
+                                    torch.tensor([[0, 0.3, 0.3, 0.6]]).float(),
+                                    torch.tensor([[1.2, 0.3, 0.05, 1.1]]).float()),
                                     dim=1)
+            obj = 'peg'
         env = HardwareEnv(default_dof_pos[:, :16], 
                           finger_list=config['fingers'], 
                           kp=config['kp'], 
-                          obj='screwdriver',
+                          obj=obj,
                           mode='relative',
                           gradual_control=config['gradual_control'],
                           num_repeat=10)
-        root_coor, root_ori = env.obj_reader.get_state()
-        root_coor = root_coor / 1000 # convert to meters
-        # robot_p = np.array([-0.025, -0.1, 1.33])
-        robot_p = np.array([0, -0.095, 1.33])
-        root_coor = root_coor + robot_p
-        sim_env = RosAllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
-                                 use_cartesian_controller=False,
-                                 viewer=True,
-                                 steps_per_action=60,
-                                 friction_coefficient=1.0,
-                                 device=config['sim_device'],
-                                 valve=config['object_type'],
-                                 video_save_path=img_save_dir,
-                                 joint_stiffness=config['kp'],
-                                 fingers=config['fingers'],
-                                 obj_pose=root_coor,
-                                 )
+        if task == 'screwdriver_turning':
+            from isaac_victor_envs.utils import get_assets_dir
+            from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
+            root_coor, root_ori = env.obj_reader.get_state()
+            root_coor = root_coor / 1000 # convert to meters
+            # robot_p = np.array([-0.025, -0.1, 1.33])
+            robot_p = np.array([0, -0.095, 1.33])
+            root_coor = root_coor + robot_p
+            sim_env = AllegroScrewdriverTurningEnv(num_envs=1, 
+                                           control_mode='joint_impedance',
+                                            use_cartesian_controller=False,
+                                            viewer=True,
+                                            steps_per_action=60,
+                                            friction_coefficient=1.0,
+                                            device=config['sim_device'],
+                                            video_save_path=img_save_dir,
+                                            joint_stiffness=config['kp'],
+                                            fingers=config['fingers'],
+                                            gradual_control=config['gradual_control'],
+                                            arm_type=config['arm_type'],
+                                            gravity=config['gravity'],
+                                            obj_pose=root_coor,
+                                            )
+        elif task == 'peg_alignment':
+            from isaac_victor_envs.utils import get_assets_dir
+            from utils.isaacgym_utils import get_env
+            sim_env = get_env(task, img_save_dir, config)
         sim, gym, viewer = sim_env.get_sim()
-        assert (np.array(sim_env.robot_p) == robot_p).all()
+        if task == 'screwdriver_turning':
+            assert (np.array(sim_env.robot_p) == robot_p).all()
         assert (sim_env.default_dof_pos[:, :16] == default_dof_pos.to(config['sim_device'])).all()
         env.world_trans = sim_env.world_trans
         env.joint_stiffness = sim_env.joint_stiffness
         env.device = sim_env.device
         env.obj_pose = sim_env.obj_pose
+        if task == 'peg_alignment':
+            env.wall_pose = sim_env.wall_pose
+            env.wall_dims = sim_env.wall_dims
     else:
         if config['simulator'] == 'isaac_gym':
             from isaac_victor_envs.utils import get_assets_dir

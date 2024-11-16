@@ -113,6 +113,7 @@ class AllegroPegAlignment(AllegroValveTurning):
         min_f = torch.ones(3) * -10
         self.x_max = torch.cat((self.x_max, max_f))
         self.x_min = torch.cat((self.x_min, min_f))
+        self.min_force_dict = {'index': 0.1, 'middle': 0.1, 'ring': 0.1, 'thumb': 0.1}
 
     
     def _init_contact_scenes(self, asset_object, collision_checking):
@@ -272,6 +273,7 @@ class AllegroPegAlignment(AllegroValveTurning):
             u = torch.cat((arm_u, u), dim=-1)
         force = 0.015 * torch.randn(N, self.T, 3 * (self.num_fingers + 1), device=self.device)
         force[:, :, -3:] = force[:, :, -3:] * 0.1
+        force = force * 10 # increase the force to make it transferrable on the hardware
         u = torch.cat((u, force), dim=-1)
 
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
@@ -301,7 +303,7 @@ class AllegroPegAlignment(AllegroValveTurning):
 
         # DEBUG ONLY, use initial state as the initialization
         # theta = self.start[-self.obj_dof:].unsqueeze(0).repeat((N, self.T, 1))
-        # theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
+        theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
         x = torch.cat((x, theta), dim=-1)
 
         xu = torch.cat((x, u), dim=2)
@@ -346,10 +348,10 @@ class AllegroPegAlignment(AllegroValveTurning):
         if self.obj_translational_dim:
             obj_position = state[:, -self.obj_dof:-self.obj_dof+self.obj_translational_dim]
             # terminal cost
-            goal_cost = goal_cost + torch.sum((100 * (obj_position[-1] - goal[:self.obj_translational_dim]) ** 2))
-            # running cost
-            goal_cost = goal_cost + torch.sum((1 * (obj_position - goal[:self.obj_translational_dim]) ** 2))
-            smoothness_cost = smoothness_cost + 100 * torch.sum((obj_position[1:] - obj_position[:-1]) ** 2)
+            # goal_cost = goal_cost + torch.sum((100 * (obj_position[-1, 1:] - goal[1:self.obj_translational_dim]) ** 2)) # give flxibility in x direction
+            # # running cost
+            # goal_cost = goal_cost + torch.sum((1 * (obj_position[:, 1:] - goal[1:self.obj_translational_dim]) ** 2))
+            smoothness_cost = smoothness_cost + 10000 * torch.sum((obj_position[1:] - obj_position[:-1]) ** 2)
         if self.obj_rotational_dim:
             obj_orientation = state[:, -self.obj_dof+self.obj_translational_dim:]
             obj_orientation = tf.euler_angles_to_matrix(obj_orientation, convention='XYZ')
@@ -361,7 +363,7 @@ class AllegroPegAlignment(AllegroValveTurning):
             goal_cost = goal_cost + torch.sum((1000 * (obj_orientation[-1] - goal_orientation) ** 2))
             # running cost 
             goal_cost = goal_cost + torch.sum((5 * (obj_orientation - goal_orientation) ** 2))
-            smoothness_cost = smoothness_cost + 40 * torch.sum((obj_orientation[1:] - obj_orientation[:-1]) ** 2)
+            smoothness_cost = smoothness_cost + 100 * torch.sum((obj_orientation[1:] - obj_orientation[:-1]) ** 2)
         # goal_cost = torch.sum((1000 * (state[-1, -self.obj_dof:] - goal) ** 2)).reshape(-1)
         # goal_cost += torch.sum((10 * (state[:, -self.obj_dof:] - goal.unsqueeze(0)) ** 2))
         return smoothness_cost + action_cost + goal_cost 
