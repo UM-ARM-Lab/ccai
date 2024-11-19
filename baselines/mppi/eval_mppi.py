@@ -27,9 +27,16 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos') # this does not really matter, as it will be overwritten
 
 
-def do_trial(env, params, fpath):
+def do_trial(env, params, fpath, sim_viz_env=None):
     obj_dof = params['obj_dof']
     goal = params['goal'].cpu()
+    arm_dof = get_arm_dof(params['arm_type'])
+    num_fingers = len(params['fingers'])
+    robot_dof = 4 * num_fingers + arm_dof
+    if params['arm_type'] == 'robot':
+        camera_params = "screwdriver_w_arm"
+    elif params['arm_type'] == 'None' or params['arm_type'] == 'floating_3d' or params['arm_type'] == 'floating_6d':
+        camera_params = "screwdriver"
     # step multiple times untile it's stable
     if params['visualize']:
         env.frame_fpath = fpath
@@ -54,43 +61,82 @@ def do_trial(env, params, fpath):
 
     start = state[0, :4 * num_fingers + obj_dof].to(device=params['device'])
 
+    # setup the pregrasp problem
+    pregrasp_flag = False
     if config['task'] == 'peg_turning' or config['task'] == 'reorientation' or config['task'] == 'peg_alignment':
-        pass
+        if config['mode'] == 'hardware':
+            pregrasp_flag = True
         # action = torch.cat((env.default_dof_pos[:,:8], env.default_dof_pos[:, 12:16]), dim=-1)
         # env.step(action) # step one step to resolve penetration
-    
     else:
-        pregrasp_problem = AllegroContactProblem(
-            dx=4 * num_fingers,
-            du=4 * num_fingers,
-            start=start[:4 * num_fingers + obj_dof],
-            goal=None,
-            T=4,
-            chain=params['chain'],
-            device=params['device'],
-            object_asset_pos=env.obj_pose,
-            object_type=params['object_type'],
-            world_trans=env.world_trans,
-            fingers=params['fingers'],
-            obj_dof_code=params['obj_dof_code'],
-            obj_joint_dim=obj_joint_dim,
-            fixed_obj=True
-        )
-        pregrasp_params = params.copy()
-        pregrasp_params['N'] = 10
-        pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, pregrasp_params)
-        pregrasp_planner.warmup_iters = 50
-        
-        
-        start = env.get_state()[0, :4 * num_fingers + obj_dof].to(device=params['device'])
-        best_traj, _ = pregrasp_planner.step(start[:4 * num_fingers])
+        pregrasp_flag = True
+    if pregrasp_flag:
+        pregrasp_succ = False
+        while pregrasp_succ == False:
+            pregrasp_dx = pregrasp_du = robot_dof
+            pregrasp_problem = AllegroContactProblem(
+                dx=pregrasp_dx,
+                du=pregrasp_du,
+                start=start[:pregrasp_dx + obj_dof],
+                goal=None,
+                T=4,
+                chain=params['chain'],
+                device=params['device'],
+                object_asset_pos=env.obj_pose,
+                object_type=params['object_type'],
+                world_trans=env.world_trans,
+                fingers=params['fingers'],
+                obj_dof_code=params['obj_dof_code'],
+                obj_joint_dim=obj_joint_dim,
+                fixed_obj=True,
+                arm_type=params['arm_type'],
+            )
+
+            pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
+            pregrasp_planner.warmup_iters = 50 
+            # else:
+            #     raise ValueError('Invalid controller')
+            
+            start_time = time.time()
+            best_traj, _ = pregrasp_planner.step(start[:pregrasp_dx])
+            print(f"pregrasp solve time: {time.time() - start_time}")
+
+            if params['visualize_plan']:
+                traj_for_viz = best_traj[:, :pregrasp_problem.dx]
+                tmp = start[pregrasp_dx:pregrasp_dx+obj_dof].unsqueeze(0).repeat(traj_for_viz.shape[0], 1)
+                tmp_2 = torch.zeros((traj_for_viz.shape[0], 1)).to(traj_for_viz.device) # the top jint
+                traj_for_viz = torch.cat((traj_for_viz, tmp, tmp_2), dim=1)    
+                viz_fpath = pathlib.PurePath.joinpath(fpath, "pregrasp")
+                img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
+                gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
+                pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
+                pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
+                visualize_trajectory(traj_for_viz, pregrasp_problem.viz_contact_scenes, viz_fpath, pregrasp_problem.fingers, pregrasp_problem.obj_dof + obj_joint_dim,
+                                    camera_params=camera_params, arm_dof=arm_dof)
 
 
-        for x in best_traj[:, :4 * num_fingers]:
-            action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
-            action = action.repeat(params['N'], 1)
-            env.step(action)
-            action_list.append(action)
+            for x in best_traj[:, :pregrasp_dx]:
+                action = x.reshape(-1, pregrasp_dx).to(device=env.device) # move the rest fingers
+                if params['mode'] == 'hardware':
+                    set_state = env.get_state(return_dict=True)['q'].to(device=env.device)
+                    if params['task'] == 'screwdriver_turning':
+                        set_state = torch.cat((set_state, torch.zeros(1).float().to(env.device)), dim=0)
+                    sim_viz_env.set_pose(set_state)
+                    sim_viz_env.step(action)
+                env.step(action)
+                if params['mode'] == 'hardware':
+                    set_state = env.get_state(return_dict=True)['q'].to(device=env.device)
+                    if params['task'] == 'screwdriver_turning':
+                        set_state = torch.cat((set_state, torch.zeros(1).float().to(env.device)), dim=0)
+                    sim_viz_env.set_pose(set_state)
+                    sim_viz_env.step(action)
+                action_list.append(action)
+                if params['mode'] == 'hardware_copy':
+                    ros_copy_node.apply_action(partial_to_full_state(x.reshape(-1, pregrasp_dx)[0], params['fingers']))
+            pregrasp_succ = env.check_validity(env.get_state().cpu()[0])
+            if pregrasp_succ == False:
+                print("pregrasp failed, replanning")
+                env.reset()
     prime_dof_state = env.dof_states.clone()[0]
     prime_dof_state = prime_dof_state.unsqueeze(0).repeat(params['N'], 1, 1)
     env.set_pose(prime_dof_state, semantic_order=False, zero_velocity=False)
@@ -102,7 +148,10 @@ def do_trial(env, params, fpath):
     duration = 0
     warmup_time = 0
 
-    dynamics = DynamicsModel(env, num_fingers=len(params['fingers']), include_velocity=params['include_velocity'], obj_joint_dim=obj_joint_dim)
+    if params['mode'] == 'hardware':
+        dynamics = DynamicsModel(sim_viz_env, num_fingers=len(params['fingers']), include_velocity=params['include_velocity'], obj_joint_dim=obj_joint_dim)
+    elif params['mode'] == 'simulation':
+        dynamics = DynamicsModel(env, num_fingers=len(params['fingers']), include_velocity=params['include_velocity'], obj_joint_dim=obj_joint_dim)
     if config['task'] == 'screwdriver_turning':
         from baselines.mppi.allegro_screwdriver import RunningCost
     elif config['task'] == 'peg_alignment':
@@ -138,8 +187,13 @@ def do_trial(env, params, fpath):
             actual_trajectory.append(state[0, :4 * num_fingers + obj_dof].clone())
             start_time = time.time()
 
-            prime_dof_state = env.dof_states.clone()[0].to(device=params['device'])
-            prime_dof_state = prime_dof_state.unsqueeze(0).repeat(params['N'], 1, 1)
+            if params['mode'] == 'hardware':
+                robot_state = env.__ros_node.allegro_joint_pos.float().to(device=params['device'])
+                prime_dof_state = torch.cat((robot_state, start[4 * num_fingers:]), dim=-1).unsqueeze(0).repeat(params['N'], 1)
+                prime_dof_state = torch.stack((prime_dof_state, torch.zeros_like(prime_dof_state)), dim=-1)
+            else:
+                prime_dof_state = env.dof_states.clone()[0].to(device=params['device'])
+                prime_dof_state = prime_dof_state.unsqueeze(0).repeat(params['N'], 1, 1)
             finger_state = start[:4 * num_fingers].clone()
 
             if params['include_velocity']:
@@ -244,8 +298,8 @@ def do_trial(env, params, fpath):
 if __name__ == "__main__":
     # get config
     from tqdm import tqdm
-    task = 'screwdriver_turning'
-    # task = 'valve_turning'
+    # task = 'screwdriver_turning'
+    task = 'valve_turning'
     # task = 'peg_alignment'
     # task = 'peg_turning'
     # task =  'reorientation'
@@ -275,41 +329,65 @@ if __name__ == "__main__":
     if config['mode'] == 'hardware':
         from hardware.hardware_env import HardwareEnv
         # TODO, think about how to read that in simulator
-        default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
-                                    torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float(),
-                                    torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
-                                    torch.tensor([[1.2, 0.3, 0.3, 1.2]]).float()),
+        if task == 'screwdriver_turning':
+            default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
+                                        torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float(),
+                                        torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
+                                        torch.tensor([[1.2, 0.3, 0.3, 1.2]]).float()),
+                                        dim=1)
+            obj = 'screwdriver'
+        elif task == 'peg_alignment':
+            default_dof_pos = torch.cat((torch.tensor([[0, 0.7, 0.8, 0.8]]).float(),
+                                    torch.tensor([[0, 0.8, 0.7, 0.6]]).float(),
+                                    torch.tensor([[0, 0.3, 0.3, 0.6]]).float(),
+                                    torch.tensor([[1.2, 0.3, 0.05, 1.1]]).float()),
                                     dim=1)
+            obj = 'peg'
         env = HardwareEnv(default_dof_pos[:, :16], 
                           finger_list=config['fingers'], 
                           kp=config['kp'], 
-                          obj='screwdriver',
+                          obj=obj,
                           mode='relative',
                           gradual_control=config['gradual_control'],
                           num_repeat=10)
-        root_coor, root_ori = env.obj_reader.get_state()
-        root_coor = root_coor / 1000 # convert to meters
-        robot_p = np.array([0, -0.095, 1.33])
-        root_coor = root_coor + robot_p
-        sim_env = RosAllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
-                                 use_cartesian_controller=False,
-                                 viewer=True,
-                                 steps_per_action=60,
-                                 friction_coefficient=1.0,
-                                 device=config['sim_device'],
-                                 valve=config['object_type'],
-                                 video_save_path=img_save_dir,
-                                 joint_stiffness=config['kp'],
-                                 fingers=config['fingers'],
-                                 obj_pose=root_coor,
-                                 )
+        if task == 'screwdriver_turning':
+            from isaac_victor_envs.utils import get_assets_dir
+            from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
+            root_coor, root_ori = env.obj_reader.get_state()
+            root_coor = root_coor / 1000 # convert to meters
+            # robot_p = np.array([-0.025, -0.1, 1.33])
+            robot_p = np.array([0, -0.095, 1.33])
+            root_coor = root_coor + robot_p
+            sim_env = AllegroScrewdriverTurningEnv(num_envs=1, 
+                                           control_mode='joint_impedance',
+                                            use_cartesian_controller=False,
+                                            viewer=True,
+                                            steps_per_action=60,
+                                            friction_coefficient=1.0,
+                                            device=config['sim_device'],
+                                            video_save_path=img_save_dir,
+                                            joint_stiffness=config['kp'],
+                                            fingers=config['fingers'],
+                                            gradual_control=config['gradual_control'],
+                                            arm_type=config['arm_type'],
+                                            gravity=config['gravity'],
+                                            obj_pose=root_coor,
+                                            )
+        elif task == 'peg_alignment':
+            from isaac_victor_envs.utils import get_assets_dir
+            from utils.isaacgym_utils import get_env
+            sim_env = get_env(task, img_save_dir, config)
         sim, gym, viewer = sim_env.get_sim()
-        assert (np.array(sim_env.robot_p) == robot_p).all()
+        if task == 'screwdriver_turning':
+            assert (np.array(sim_env.robot_p) == robot_p).all()
         assert (sim_env.default_dof_pos[:, :16] == default_dof_pos.to(config['sim_device'])).all()
         env.world_trans = sim_env.world_trans
         env.joint_stiffness = sim_env.joint_stiffness
         env.device = sim_env.device
         env.obj_pose = sim_env.obj_pose
+        if task == 'peg_alignment':
+            env.wall_pose = sim_env.wall_pose
+            env.wall_dims = sim_env.wall_dims
     else:
         from isaac_victor_envs.utils import get_assets_dir
         from utils.isaacgym_utils import get_env
@@ -343,7 +421,7 @@ if __name__ == "__main__":
             params['chain'] = chain
             object_location = torch.tensor(env.obj_pose).to(params['device']).float() # TODO: confirm if this is the correct location
             params['object_location'] = object_location
-            ret = do_trial(env, params, fpath)
+            ret = do_trial(env, params, fpath, sim_env)
             for key in ret.keys():
                 if key not in results.keys():
                     results[key] = []
@@ -353,9 +431,14 @@ if __name__ == "__main__":
     for key in results.keys():
         print(f"{key}: avg: {np.array(results[key]).mean()}, std: {np.array(results[key]).std()}")
     valid_distance2goal = []
-    for validity, distance2goal in zip(results['validity_flag'], results['final_distance_to_goal']):
-        if validity:
-            valid_distance2goal.append(distance2goal)
+    if 'final_distance_to_goal_ori' in results.keys():
+        for validity, distance2goal_ori in zip(results['validity_flag'], results['final_distance_to_goal_ori']):
+            if validity:
+                valid_distance2goal.append(distance2goal_ori)
+    elif 'final_distance_to_goal' in results.keys():
+        for validity, distance2goal in zip(results['validity_flag'], results['final_distance_to_goal']):
+            if validity:
+                valid_distance2goal.append(distance2goal)
     if len(valid_distance2goal) == 0:
         print("No valid trials")
     else:

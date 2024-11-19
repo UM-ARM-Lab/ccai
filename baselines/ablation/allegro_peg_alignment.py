@@ -215,8 +215,12 @@ class AblationAllegroPegAlignment(AblationAllegroValveTurning):
 
         # u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
         u = 0.025 * torch.randn(N, self.T, 4 * self.num_fingers, device=self.device)
+        if self.arm_type == 'robot':
+            arm_u = 0.002 * torch.randn(N, self.T, 7, device=self.device)
+            u = torch.cat((arm_u, u), dim=-1)
         force = 0.015 * torch.randn(N, self.T, 3 * (self.num_fingers + 1), device=self.device)
         force[:, :, -3:] = force[:, :, -3:] * 0.1
+        force = force * 10 # increase the force to make it transferrable on the hardware
         u = torch.cat((u, force), dim=-1)
 
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
@@ -246,7 +250,7 @@ class AblationAllegroPegAlignment(AblationAllegroValveTurning):
 
         # DEBUG ONLY, use initial state as the initialization
         # theta = self.start[-self.obj_dof:].unsqueeze(0).repeat((N, self.T, 1))
-        # theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
+        theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
         x = torch.cat((x, theta), dim=-1)
 
         xu = torch.cat((x, u), dim=2)
@@ -291,10 +295,10 @@ class AblationAllegroPegAlignment(AblationAllegroValveTurning):
         if self.obj_translational_dim:
             obj_position = state[:, -self.obj_dof:-self.obj_dof+self.obj_translational_dim]
             # terminal cost
-            goal_cost = goal_cost + torch.sum((100 * (obj_position[-1] - goal[:self.obj_translational_dim]) ** 2))
-            # running cost
-            goal_cost = goal_cost + torch.sum((1 * (obj_position - goal[:self.obj_translational_dim]) ** 2))
-            smoothness_cost = smoothness_cost + 100 * torch.sum((obj_position[1:] - obj_position[:-1]) ** 2)
+            # goal_cost = goal_cost + torch.sum((100 * (obj_position[-1, 1:] - goal[1:self.obj_translational_dim]) ** 2)) # give flxibility in x direction
+            # # running cost
+            # goal_cost = goal_cost + torch.sum((1 * (obj_position[:, 1:] - goal[1:self.obj_translational_dim]) ** 2))
+            smoothness_cost = smoothness_cost + 10000 * torch.sum((obj_position[1:] - obj_position[:-1]) ** 2)
         if self.obj_rotational_dim:
             obj_orientation = state[:, -self.obj_dof+self.obj_translational_dim:]
             obj_orientation = tf.euler_angles_to_matrix(obj_orientation, convention='XYZ')
@@ -302,10 +306,11 @@ class AblationAllegroPegAlignment(AblationAllegroValveTurning):
             goal_orientation = tf.euler_angles_to_matrix(goal[-self.obj_rotational_dim:], convention='XYZ')
             goal_orientation = tf.matrix_to_rotation_6d(goal_orientation)
             # terminal cost
-            goal_cost = goal_cost + torch.sum((250 * (obj_orientation[-1] - goal_orientation) ** 2))
+            # goal_cost = goal_cost + torch.sum((250 * (obj_orientation[-1] - goal_orientation) ** 2))
+            goal_cost = goal_cost + torch.sum((1000 * (obj_orientation[-1] - goal_orientation) ** 2))
             # running cost 
-            goal_cost = goal_cost + torch.sum((3 * (obj_orientation - goal_orientation) ** 2))
-            smoothness_cost = smoothness_cost + 40 * torch.sum((obj_orientation[1:] - obj_orientation[:-1]) ** 2)
+            goal_cost = goal_cost + torch.sum((5 * (obj_orientation - goal_orientation) ** 2))
+            smoothness_cost = smoothness_cost + 100 * torch.sum((obj_orientation[1:] - obj_orientation[:-1]) ** 2)
         # goal_cost = torch.sum((1000 * (state[-1, -self.obj_dof:] - goal) ** 2)).reshape(-1)
         # goal_cost += torch.sum((10 * (state[:, -self.obj_dof:] - goal.unsqueeze(0)) ** 2))
         return smoothness_cost + action_cost + goal_cost 
@@ -321,16 +326,10 @@ class AblationAllegroPegAlignment(AblationAllegroValveTurning):
             = self._peg_wall_contact_constraint(xu[:, :, 4 * self.num_fingers: 4 * self.num_fingers + self.obj_dof],
                                                                                                   compute_grads=compute_grads,
                                                                                                   compute_hess=compute_hess)
-        if self.optimize_force:
-            g_equil, grad_g_equil, hess_g_equil = self._force_equlibrium_constraints_w_force(
-                xu=xu.reshape(N, T, self.dx + self.du),
-                compute_grads=compute_grads,
-                compute_hess=compute_hess)
-        else:
-            g_equil, grad_g_equil, hess_g_equil = self._force_equlibrium_constraints(
-                xu=xu.reshape(N, T, self.dx + self.du),
-                compute_grads=compute_grads,
-                compute_hess=compute_hess)
+        g_equil, grad_g_equil, hess_g_equil = self._force_equlibrium_constraints_w_force(
+            xu=xu.reshape(N, T, self.dx + self.du),
+            compute_grads=compute_grads,
+            compute_hess=compute_hess)
         
 
         if verbose:
