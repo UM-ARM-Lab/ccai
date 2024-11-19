@@ -549,6 +549,15 @@ class TemporalUnetStateAction(nn.Module):
             nn.Linear(dim, transition_dim),
         )
 
+        self.noise_mlp = nn.Sequential(
+            nn.Linear(15, dim),
+            Mish(),
+            nn.Linear(dim, dim),
+            Mish(),
+        )
+        self.noise_mean_pred = nn.Linear(dim, 21)
+        self.noise_logvar_pred = nn.Linear(dim, 21)
+
         # self.context_dropout_p = context_dropout_p
         self.cond_dim = cond_dim
 
@@ -556,6 +565,12 @@ class TemporalUnetStateAction(nn.Module):
         self.transition_dim = transition_dim
 
         self.reset_z()
+
+    def noise_dist(self, x):
+        noise_mlp_out = self.noise_mlp(x)
+        noise_mean = self.noise_mean_pred(noise_mlp_out)
+        noise_logvar = self.noise_logvar_pred(noise_mlp_out)
+        return noise_mean, noise_logvar
 
     def vmapped_fwd(self, t, x, context=None):
         return self(t.reshape(1), x.unsqueeze(0), context.unsqueeze(0)).squeeze(0)
@@ -743,7 +758,7 @@ class TemporalUnetStateAction(nn.Module):
         return x, None, None
         return x, p_matrix, xi_C
 
-    @torch.compile(mode='max-autotune')
+    # @torch.compile(mode='max-autotune')
     def compiled_unconditional_test(self, t, x):
         _, x = self(t, x, context=None, dropout=False)
         return x, x

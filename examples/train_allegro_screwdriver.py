@@ -178,7 +178,9 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
     for epoch in range(epochs):
         train_loss = 0.0
         flow_loss = 0.0
+        state_loss = 0.0
         action_loss = 0.0
+        kl_loss = 0.0
         trajectory_sampler.train()
         # for trajectories, traj_class, masks in tqdm.tqdm(train_loader):
         for trajectories, traj_class, masks in (train_loader):
@@ -200,7 +202,9 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
             optimizer.zero_grad()
             train_loss += loss.item()
             flow_loss += sampler_loss['flow_loss'].item()
+            state_loss += sampler_loss['state_loss'].item()
             action_loss += sampler_loss['action_loss'].item()
+            kl_loss += sampler_loss['kl_loss'].item()
             step += 1
             if config['use_ema']:
                 if step % 10 == 0:
@@ -208,14 +212,18 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
 
         train_loss /= len(train_loader)
         flow_loss /= len(train_loader)
+        state_loss /= len(train_loader)
         action_loss /= len(train_loader)
+        kl_loss /= len(train_loader)
         # pbar.set_description(
         #     f'Train loss {train_loss:.3f}')
         try:
             wandb.log({
                     'train_loss_epoch': train_loss,
                     'flow_loss_epoch': flow_loss,
+                    'state_loss_epoch': state_loss,
                     'action_loss_epoch': action_loss,
+                    'kl_loss_epoch': kl_loss,
                     'time': time.time()
                 })
         except:
@@ -223,7 +231,9 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
             print({
                     'train_loss_epoch': train_loss,
                     'flow_loss_epoch': flow_loss,
+                    'state_loss_epoch': state_loss,
                     'action_loss_epoch': action_loss,
+                    'kl_loss_epoch': kl_loss,
                     'time': time.time()
             })
 
@@ -232,7 +242,7 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
                 torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
             else:
                 torch.save(model.state_dict(),
-                           f'{fpath}/allegro_screwdriver_{config["model_type"]}_state_only_{train_loss:.4f}.pt')
+                           f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
     if config['use_ema']:
         torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
     else:

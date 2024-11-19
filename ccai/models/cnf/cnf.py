@@ -172,9 +172,9 @@ class TrajectoryCNF(nn.Module):
             rademacher=False,
         )
 
-        # solver = 'dopri5'
+        solver = 'dopri5'
         # solver = 'bosh3'
-        solver = 'rk4'
+        # solver = 'rk4'
         self.flow = CNF(odefunc=odefunc,
                         T=1.0,
                         train_T=False,
@@ -204,11 +204,11 @@ class TrajectoryCNF(nn.Module):
     def masked_grad(self, t, x, context=None):
         # print(f'step {self.step_id}')
         self.step_id += 1
-            
+
         dx, _, _ = self.model.compiled_conditional_test(t, x, context)
 
-        # dx *= self.horizon - 1
-
+        # dx *= (self.horizon - 1)
+        
         return dx
 
     def flow_matching_loss(self, xu, context, mask=None):
@@ -312,6 +312,9 @@ class TrajectoryCNF(nn.Module):
         ret_dh += hh_deriv[3] * m[idxs+1] * dx
         return ret.squeeze(), ret_dh.squeeze()
     
+    def standard_normal_kl_div(self, mu, logvar):
+        return -0.5 * (1 + logvar - mu.pow(2) - logvar.exp()).mean()
+
     def flow_matching_loss_state_control_only(self, xu, context, mask=None):
 
         # t0 = torch.rand(xu.shape[0], 1, device=xu.device) # initial time (for receding horizon)
@@ -334,22 +337,25 @@ class TrajectoryCNF(nn.Module):
         x0 = torch.gather(xu, 1, t_ind_for_gather).squeeze()
         x1 = torch.gather(xu, 1, t_ind_for_gather_1).squeeze()
 
-        # x_arange = torch.linspace(0, 1, xu.shape[1], device=xu.device).expand(xu.shape[0], -1)
-        x_arange = torch.linspace(0, self.horizon-1, xu.shape[1], device=xu.device).expand(xu.shape[0], -1)
+        x_arange = torch.linspace(0, 1, xu.shape[1], device=xu.device).expand(xu.shape[0], -1)
+        # x_arange = torch.linspace(0, self.horizon-1, xu.shape[1], device=xu.device).expand(xu.shape[0], -1)
 
-        u0 = x0[..., self.dx:]
-        rand_for_u0 = torch.randn_like(u0)
-        goal_u0 = x1[:, self.dx:]
+        rand_for_u0 = torch.randn_like(x0[..., self.dx:])
 
-        arange0 = torch.arange(rand_for_u0.shape[0], device=xu.device)
-        arange1 = torch.arange(goal_u0.shape[0], device=xu.device)
+        noise_mean, noise_logvar = self.model.noise_dist(x0[..., :self.dx])
 
-        rand_for_u0, goal_u0, arange0, arange1 = self.FM.ot_sampler.sample_plan_with_labels(rand_for_u0, goal_u0, y0=arange0, y1=arange1, replace=False)
+        pred_noise_u0 = noise_mean + rand_for_u0 * torch.exp(.5 * noise_logvar)
+        # goal_u0 = x1[:, self.dx:]
+
+        # arange0 = torch.arange(rand_for_u0.shape[0], device=xu.device)
+        # arange1 = torch.arange(goal_u0.shape[0], device=xu.device)
+
+        # rand_for_u0, goal_u0, arange0, arange1 = self.FM.ot_sampler.sample_plan_with_labels(rand_for_u0, goal_u0, y0=arange0, y1=arange1, replace=False)
         # Rearrange ut, true_uv using arange
-        inds = torch.sort(arange1).indices
-        rand_for_u0 = rand_for_u0[inds]#.contiguous()
+        # inds = torch.sort(arange1).indices
+        # rand_for_u0 = rand_for_u0[inds]#.contiguous()
 
-        xu[:, 0, self.dx:] = rand_for_u0
+        xu[:, 0, self.dx:] = pred_noise_u0
 
         xt, truevt = self.interp(x_arange, xu, t)
         # truevt = self.dinterp_dt(x_arange, xu, t).squeeze()
@@ -358,11 +364,15 @@ class TrajectoryCNF(nn.Module):
 
         vt, p_matrix, xi_C = self.model.compiled_conditional_train(t.reshape(-1), xt, context)
         flow_loss = mse_loss(vt, truevt)
-
+        state_loss = mse_loss(vt[:, :self.dx], truevt[:, :self.dx])
+        action_loss = mse_loss(vt[:, self.dx:], truevt[:, self.dx:])
+        kl_loss = self.standard_normal_kl_div(noise_mean, noise_logvar)
         return {
-            'loss': flow_loss,
+            'loss': flow_loss + .1 * kl_loss,
             'flow_loss': flow_loss,
-            'action_loss': torch.tensor(0.0)
+            'kl_loss': kl_loss,
+            'action_loss': state_loss,
+            'state_loss': action_loss
         }
 
     def _sample(self, context=None, condition=None, mask=None, H=None, noise=None):
@@ -386,7 +396,11 @@ class TrajectoryCNF(nn.Module):
 
         self.noise = condition[0][1].clone()
         self.noise = self.noise.reshape(1, -1).repeat(N, 1)
-        self.noise = torch.cat((self.noise, torch.randn(N, self.du, device=self.noise.device)), dim=-1)
+
+        noise_mean, noise_logvar = self.model.noise_dist(self.noise)
+
+        pred_noise_u0 = noise_mean + torch.randn_like(noise_mean) * torch.exp(.5 * noise_logvar)
+        self.noise = torch.cat((self.noise, pred_noise_u0), dim=-1)
         # manually set the conditions
         if condition is not None:
             self.condition = condition
