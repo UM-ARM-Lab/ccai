@@ -67,8 +67,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     # setup the pregrasp problem
     pregrasp_flag = False
     if config['task'] == 'peg_turning' or config['task'] == 'reorientation' or config['task'] == 'peg_alignment':
-        if config['mode'] == 'hardware':
-            pregrasp_flag = True
+        pregrasp_flag = False
+        # if config['mode'] == 'hardware':
+        #     pregrasp_flag = True
         # action = torch.cat((env.default_dof_pos[:,:8], env.default_dof_pos[:, 12:16]), dim=-1)
         # env.step(action) # step one step to resolve penetration
     else:
@@ -443,8 +444,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         elif params['task'] == 'peg_turning' or params['task'] == 'peg_alignment' or params['task'] == 'reorientation':
             distance2goal = euler_diff(obj_state[:, -3:], goal[-3:].unsqueeze(0)).detach().cpu().abs().item()
         
-        if not env.check_validity(env.get_state().cpu()[0]):
-            validity_flag = False
+        if params['mode'] != 'hardware':
+            if not env.check_validity(env.get_state().cpu()[0]):
+                validity_flag = False
 
         print(distance2goal, validity_flag)
         if config['method'] == 'planning':

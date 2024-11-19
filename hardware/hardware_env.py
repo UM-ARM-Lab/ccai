@@ -125,14 +125,19 @@ class ObjectPoseReader:
                                         [0.5, 0, 0.5],
                                         [-0.5, 0, 0.5]]) * 35
             hand_center2palm_marker= np.array([[1, 0, 0, 15],
-                                                [0, 1, 0, 55],
-                                                [0, 0, 1, -80],
+                                                [0, 1, 0, 65],
+                                                [0, 0, 1, -110],
                                                 [0, 0, 0, 1]])
-            # assume 50 degrees rotation around y axis
-            world_temp2hand_center = np.array([[0.6427876,  0.0000000,  0.7660444, 0.0],
-                                        [0.0000000,  1.0000000,  0.0000000, 0.0],
-                                        [-0.7660444,  0.0000000,  0.6427876, 0.0],
-                                        [0.0, 0.0, 0.0, 1.0]])
+            # assume 40 degrees rotation around y axis
+            world_temp2hand_center = np.array([[0.7660444, 0, 0.6427876, 0],
+                                        [0, 1, 0, 0],
+                                        [-0.6427876, 0, 0.7660444, 0],
+                                        [0, 0, 0, 1]])
+            # # assume 50 degrees rotation around y axis
+            # world_temp2hand_center = np.array([[0.6427876,  0.0000000,  0.7660444, 0.0],
+            #                             [0.0000000,  1.0000000,  0.0000000, 0.0],
+            #                             [-0.7660444,  0.0000000,  0.6427876, 0.0],
+            #                             [0.0, 0.0, 0.0, 1.0]])
             # rotate around z axis for - 90 degrees
             world2world_temp = np.array([[0, 1, 0, 0],
                                         [-1, 0, 0, 0],
@@ -255,9 +260,11 @@ class ObjectPoseReader:
             # cv2.imshow('frame', frame) # debug
             if peg_sim_world_coor is None:
                 print("No readings from camera.")
-            return peg_sim_world_coor / 1000, peg_ori_euler
+                return None, None
+            else:
+                return peg_sim_world_coor / 1000, peg_ori_euler
         else:
-            cv2.imshow('frame', frame) # debug
+            # cv2.imshow('frame', frame) # debug
             print("No readings from camera.")
             return None, None
     
