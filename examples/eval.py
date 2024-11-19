@@ -75,60 +75,66 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
     else:
         pregrasp_flag = True
     if pregrasp_flag:
-        pregrasp_dx = pregrasp_du = robot_dof
-        pregrasp_problem = AllegroContactProblem(
-            dx=pregrasp_dx,
-            du=pregrasp_du,
-            start=start[:pregrasp_dx + obj_dof],
-            goal=None,
-            T=4,
-            chain=params['chain'],
-            device=params['device'],
-            object_asset_pos=env.obj_pose,
-            object_type=params['object_type'],
-            world_trans=env.world_trans,
-            fingers=params['fingers'],
-            obj_dof_code=params['obj_dof_code'],
-            obj_joint_dim=obj_joint_dim,
-            fixed_obj=True,
-            arm_type=params['arm_type'],
-        )
+        pregrasp_succ = False
+        while pregrasp_succ == False:
+            pregrasp_dx = pregrasp_du = robot_dof
+            pregrasp_problem = AllegroContactProblem(
+                dx=pregrasp_dx,
+                du=pregrasp_du,
+                start=start[:pregrasp_dx + obj_dof],
+                goal=None,
+                T=4,
+                chain=params['chain'],
+                device=params['device'],
+                object_asset_pos=env.obj_pose,
+                object_type=params['object_type'],
+                world_trans=env.world_trans,
+                fingers=params['fingers'],
+                obj_dof_code=params['obj_dof_code'],
+                obj_joint_dim=obj_joint_dim,
+                fixed_obj=True,
+                arm_type=params['arm_type'],
+            )
 
-        pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
-        pregrasp_planner.warmup_iters = 50 
-        # else:
-        #     raise ValueError('Invalid controller')
-        
-        start_time = time.time()
-        best_traj, _ = pregrasp_planner.step(start[:pregrasp_dx])
-        print(f"pregrasp solve time: {time.time() - start_time}")
+            pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
+            pregrasp_planner.warmup_iters = 50 
+            # else:
+            #     raise ValueError('Invalid controller')
+            
+            start_time = time.time()
+            best_traj, _ = pregrasp_planner.step(start[:pregrasp_dx])
+            print(f"pregrasp solve time: {time.time() - start_time}")
 
-        if params['visualize_plan']:
-            traj_for_viz = best_traj[:, :pregrasp_problem.dx]
-            tmp = start[pregrasp_dx:pregrasp_dx+obj_dof].unsqueeze(0).repeat(traj_for_viz.shape[0], 1)
-            tmp_2 = torch.zeros((traj_for_viz.shape[0], 1)).to(traj_for_viz.device) # the top jint
-            traj_for_viz = torch.cat((traj_for_viz, tmp, tmp_2), dim=1)    
-            viz_fpath = pathlib.PurePath.joinpath(fpath, "pregrasp")
-            img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
-            gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
-            pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
-            pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-            visualize_trajectory(traj_for_viz, pregrasp_problem.viz_contact_scenes, viz_fpath, pregrasp_problem.fingers, pregrasp_problem.obj_dof + obj_joint_dim,
-                                camera_params=camera_params, arm_dof=arm_dof)
+            if params['visualize_plan']:
+                traj_for_viz = best_traj[:, :pregrasp_problem.dx]
+                tmp = start[pregrasp_dx:pregrasp_dx+obj_dof].unsqueeze(0).repeat(traj_for_viz.shape[0], 1)
+                tmp_2 = torch.zeros((traj_for_viz.shape[0], 1)).to(traj_for_viz.device) # the top jint
+                traj_for_viz = torch.cat((traj_for_viz, tmp, tmp_2), dim=1)    
+                viz_fpath = pathlib.PurePath.joinpath(fpath, "pregrasp")
+                img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
+                gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
+                pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
+                pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
+                visualize_trajectory(traj_for_viz, pregrasp_problem.viz_contact_scenes, viz_fpath, pregrasp_problem.fingers, pregrasp_problem.obj_dof + obj_joint_dim,
+                                    camera_params=camera_params, arm_dof=arm_dof)
 
 
-        for x in best_traj[:, :pregrasp_dx]:
-            action = x.reshape(-1, pregrasp_dx).to(device=env.device) # move the rest fingers
-            if params['mode'] == 'hardware':
-                set_state = env.get_state(return_dict=True)['q'].to(device=env.device)
-                if params['task'] == 'screwdriver_turning':
-                    set_state = torch.cat((set_state, torch.zeros(1).float().to(env.device)), dim=0)
-                sim_viz_env.set_pose(set_state)
-                sim_viz_env.step(action)
-            env.step(action)
-            action_list.append(action)
-            if params['mode'] == 'hardware_copy':
-                ros_copy_node.apply_action(partial_to_full_state(x.reshape(-1, pregrasp_dx)[0], params['fingers']))
+            for x in best_traj[:, :pregrasp_dx]:
+                action = x.reshape(-1, pregrasp_dx).to(device=env.device) # move the rest fingers
+                if params['mode'] == 'hardware':
+                    set_state = env.get_state(return_dict=True)['q'].to(device=env.device)
+                    if params['task'] == 'screwdriver_turning':
+                        set_state = torch.cat((set_state, torch.zeros(1).float().to(env.device)), dim=0)
+                    sim_viz_env.set_pose(set_state)
+                    sim_viz_env.step(action)
+                env.step(action)
+                action_list.append(action)
+                if params['mode'] == 'hardware_copy':
+                    ros_copy_node.apply_action(partial_to_full_state(x.reshape(-1, pregrasp_dx)[0], params['fingers']))
+            pregrasp_succ = env.check_validity(env.get_state().cpu()[0])
+            if pregrasp_succ == False:
+                print("pregrasp failed, replanning")
+                env.reset()
     state = env.get_state()
     start = state.reshape(robot_dof + obj_dof).to(device=params['device'])
     if config['method'] == 'csvgd':
@@ -659,7 +665,6 @@ if __name__ == "__main__":
     frame_indices = torch.tensor(frame_indices)
     state2ee_pos = partial(state2ee_pos, fingers=config['fingers'], chain=chain, frame_indices=frame_indices, world_trans=env.world_trans, arm_dof=arm_dof)
     forward_kinematics = partial(chain.forward_kinematics, frame_indices=frame_indices) # full_to= _partial_state = partial(full_to_partial_state, fingers=config['fingers'])
-
     for controller in config['controllers'].keys():
         results[controller] = {}
 

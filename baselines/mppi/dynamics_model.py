@@ -1,11 +1,12 @@
 import torch
 class DynamicsModel:
     "This uses the simulation environment as the dynamcis model"
-    def __init__(self, env, num_fingers, include_velocity=False, obj_joint_dim=0):
+    def __init__(self, env, num_fingers, include_velocity=False, obj_joint_dim=0, hardware=False):
         self.env = env
         self.num_fingers = num_fingers
         self.include_velocity = include_velocity
         self.obj_joint_dim = obj_joint_dim
+        self.hardware = hardware
     def __call__(self, state, action):
         N = action.shape[0]
         # for the 1st env, action is to repeat the current state
@@ -13,7 +14,10 @@ class DynamicsModel:
             tmp_obj_joint = torch.zeros((state.shape[0], self.obj_joint_dim, 2)).to(device=state.device)
             state = state.reshape((N, -1, 2))
             # full_state = torch.cat((state, tmp_obj_joint), dim=-2)
-            self.env.set_pose(state, semantic_order=False, zero_velocity=False)
+            if self.hardware:
+                self.env.set_pose(state, semantic_order=True, zero_velocity=False)
+            else:
+                self.env.set_pose(state, semantic_order=False, zero_velocity=False)
             action = self.env.get_state()[0, : 4 * self.num_fingers].to(action.device) + action
             action = action.to(self.env.device)
             self.env.step(action, ignore_img=True)

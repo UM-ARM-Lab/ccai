@@ -26,7 +26,7 @@ class NaivePlanner:
         self.translational_dim = sum(obj_dof_code[:3])
         self.rotational_dim = sum(obj_dof_code[3:])
         self.obj_dof = self.translational_dim + self.rotational_dim
-        self.num_particles = 100
+        self.num_particles = 10
         self.obj_pos = obj_pos
         self.solve_iters = solve_iters
         if self.translational_dim > 0:
