@@ -50,6 +50,8 @@ class AllegroPegAlignment(AllegroValveTurning):
         self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
         self.dz = (self.friction_polytope_k) * (self.num_fingers + 1) # one friction constraints per finger
         self.dz += self.num_fingers # min force constraint
+        if self.collision_checking:
+            self.dz += 1
         self.dh = self.dz * T  # inequality
     def __init__(self,
                  start,
@@ -70,6 +72,7 @@ class AllegroPegAlignment(AllegroValveTurning):
                  arm_type='None',
                  arm_stiffness=None,
                  finger_stiffness=None,
+                 collision_checking=True,
                  device='cuda:0', **kwargs):
         self.fingers = fingers
         self.num_fingers = len(fingers)
@@ -94,12 +97,14 @@ class AllegroPegAlignment(AllegroValveTurning):
         robot_dof = self.arm_dof + 4 * self.num_fingers
         du = robot_dof + 3 * self.num_fingers + 3 
         self.obj_mass = 0.01
+        self.collision_checking = collision_checking
 
         super(AllegroPegAlignment, self).__init__(start=start, goal=goal, T=T, chain=chain, object_location=object_location,
                                                  object_type=object_type, world_trans=world_trans, object_asset_pos=peg_asset_pos,
                                                  fingers=fingers, friction_coefficient=friction_coefficient, obj_dof_code=obj_dof_code, 
                                                  obj_joint_dim=0, optimize_force=optimize_force, du=du, obj_gravity=obj_gravity, 
-                                                 arm_type=arm_type, arm_stiffness=arm_stiffness, finger_stiffness=finger_stiffness, device=device)
+                                                 arm_type=arm_type, arm_stiffness=arm_stiffness, finger_stiffness=finger_stiffness, 
+                                                 collision_checking=self.collision_checking, device=device)
         self.env_force = True
         self.friction_coefficient = friction_coefficient
         self.force_equlibrium_constr = vmap(self._force_equlibrium_constr_w_force)
@@ -107,6 +112,7 @@ class AllegroPegAlignment(AllegroValveTurning):
 
         self.wall_friction_constr = vmap(self._wall_friction_constr, randomness='same')
         self.grad_wall_friction_constr = vmap(jacrev(self._wall_friction_constr, argnums=(0, 1)))
+
 
         # append the additional env force 
         max_f = torch.ones(3) * 10
@@ -157,6 +163,20 @@ class AllegroPegAlignment(AllegroValveTurning):
                                             points_per_link=2000,
                                             partial_patch=False,
                                             )
+        
+        # robot and wall
+        if self.collision_checking:
+            robot2wall = self.world_trans.inverse().compose(
+                pk.Transform3d(device=self.device).translate(self.wall_asset_pos[0], self.wall_asset_pos[1], self.wall_asset_pos[2]))
+            self.robot_wall_scenes = pv.RobotScene(robot_sdf, wall_sdf, robot2wall,
+                                                collision_check_links=['allegro_hand_oya_finger_link_15'],
+                                                softmin_temp=1.0e3,
+                                                points_per_link=2000,
+                                                partial_patch=False,
+                                                )
+            # self.robot_wall_scenes.visualize_robot(partial_to_full_state(self.start[:self.robot_dof], fingers=self.fingers, arm_dof=self.arm_dof), None)
+
+
         # peg_wall_transforms = torch.tensor([[[1, 0, 0, 0],
         #                                     [0, 1, 0, 0],
         #                                     [0, 0, 1, 0.1],
@@ -257,6 +277,14 @@ class AllegroPegAlignment(AllegroValveTurning):
         # gradient of contact normal
         self.data['peg']['dnormal_dq'] = ret_scene_peg_wall['dnormal_dq'].reshape(N, self.T + 1, 3, 6)
 
+        if self.collision_checking:
+            ret_scene_robot_wall = self.robot_wall_scenes.scene_collision_check(full_q, None,
+                                                                    compute_gradient=True,
+                                                                    compute_hessian=False)
+            self.data['allegro_hand_oya_finger_link_15'] = {}
+            self.data['allegro_hand_oya_finger_link_15']['sdf'] = ret_scene_robot_wall['sdf'].reshape(N, self.T + 1)
+            grad_g_q = ret_scene_robot_wall.get('grad_sdf', None)
+            self.data['allegro_hand_oya_finger_link_15']['grad_sdf'] = grad_g_q.reshape(N, self.T + 1, 16)[:, :, self.all_joint_index]
 
     def get_initial_xu(self, N):
         # TODO: fix the initialization, for 6D movement, the angle is not supposed to be the linear interpolation of the euler angle. 
@@ -334,6 +362,36 @@ class AllegroPegAlignment(AllegroValveTurning):
 
         return g, grad_g, None
 
+    def _thumb_repulsive(self, xu, link_name, compute_grads=True, compute_hess=False):
+        """
+        the thumb should not touch the wall
+        """
+        # print(xu[0, :2, 4 * self.num_fingers])
+        N, T, _ = xu.shape
+        # Retrieve pre-processed data
+        ret_scene = self.data[link_name]
+        g = -ret_scene.get('sdf').reshape(N, T + 1, 1)  + 0.01
+        grad_g_q = -ret_scene.get('grad_sdf', None)
+
+        # Ignore first value, as it is the start state
+        g = g[:, 1:].reshape(N, -1)
+        if compute_grads:
+            T_range = torch.arange(T, device=xu.device)
+            # compute gradient of sdf
+            grad_g = torch.zeros(N, T, T, self.dx + self.du, device=xu.device)
+            grad_g[:, T_range, T_range, :self.robot_dof] = grad_g_q[:, 1:]
+            # is valve in state
+            grad_g = grad_g.reshape(N, -1, T, self.dx + self.du)
+            grad_g = grad_g.reshape(N, -1, T * (self.dx + self.du))
+        else:
+            return g, None, None
+
+        if compute_hess:
+            hess = torch.zeros(N, g.shape[1], T * (self.dx + self.du), T * (self.dx + self.du), device=self.device)
+            return g, grad_g, hess
+
+        return g, grad_g, None
+    
     def _cost(self, xu, start, goal):
         # TODO: consider using quaternion difference for the orientation.
         state = xu[:, :self.dx]  # state dim = 9
@@ -453,6 +511,13 @@ class AllegroPegAlignment(AllegroValveTurning):
             xu=xu.reshape(-1, T, self.dx + self.du),
             compute_grads=compute_grads,
             compute_hess=compute_hess)
+        if self.collision_checking:
+            h_rep, grad_h_rep, hess_h_rep = self._thumb_repulsive(
+                xu.reshape(-1, T, self.dx + self.du),
+                link_name='allegro_hand_oya_finger_link_15',
+                compute_grads=compute_grads,
+                compute_hess=compute_hess,
+            )
         
         if verbose:
             print(f"max friction constraint: {torch.max(h)}")
@@ -465,18 +530,26 @@ class AllegroPegAlignment(AllegroValveTurning):
             result_dict['wall_friction_mean'] = torch.mean(h_wall).item()
             result_dict['min_force'] = torch.max(h_force).item() 
             result_dict['min_force_mean'] = torch.mean(h_force).item()
+            if self.collision_checking:
+                print(f"max thumb repulsive constraint: {torch.max(h_rep)}")
+                result_dict['thumb_repulsive'] = torch.max(h_rep).item()
+                result_dict['thumb_repulsive_mean'] = torch.mean(h_rep).item()
             return result_dict
 
         h = torch.cat((h,
                        h_wall,
                        h_force,
                        ), dim=1)
+        if self.collision_checking:
+            h = torch.cat((h, h_rep), dim=1)
         if compute_grads:
             grad_h = grad_h.reshape(N, -1, self.T * (self.dx + self.du))
             grad_h = torch.cat((grad_h, 
                                 grad_h_wall,
                                 grad_h_force
                                 ), dim=1)
+            if self.collision_checking:
+                grad_h = torch.cat((grad_h, grad_h_rep), dim=1)
         else:
             return h, None, None
         if compute_hess:

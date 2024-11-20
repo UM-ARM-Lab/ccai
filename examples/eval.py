@@ -212,6 +212,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                             optimize_force=params['optimize_force'],
                             obj_gravity = params['obj_gravity'],
                             arm_type = params['arm_type'],
+                            collision_checking=params['collision_checking'],
                         )
         elif config['task'] == 'reorientation':
             manipulation_problem = AllegroReorientation(

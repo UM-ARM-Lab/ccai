@@ -160,7 +160,6 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         self.obj_translational_dim = np.sum(self.obj_translational_code)
         self.obj_rotational_dim = np.sum(self.obj_rotational_code)
         self.obj_joint_dim = obj_joint_dim
-        self.collision_checking = False
         self.arm_type = arm_type
         if self.arm_type == 'None':
             self.arm_dof = 0
@@ -281,81 +280,6 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         }
         with open(save_dir, 'wb') as f:
             pkl.dump(result_dict, f)
-
-    def _preprocess(self, xu):
-        N = xu.shape[0]
-        xu = xu.reshape(N, self.T, -1)
-        x = xu[:, :, :self.dx]
-        # expand to include start
-        x_expanded = torch.cat((self.start.reshape(1, 1, -1).repeat(N, 1, 1), x), dim=1)
-
-        q = x_expanded[:, :, :self.robot_dof]
-        if self.fixed_obj:
-            theta = self.start_obj_pose.unsqueeze(0).repeat((N, self.T + 1, 1))
-        else:
-            theta = x_expanded[:, :, self.robot_dof: self.robot_dof + self.obj_dof]
-        self._preprocess_fingers(q, theta)
-
-    def _preprocess_fingers(self, q, theta):
-        N, _, _ = q.shape
-
-        # reshape to batch across time
-        q_b = q.reshape(-1, self.robot_dof)
-        theta_b = theta.reshape(-1, self.obj_dof)
-        if self.obj_joint_dim > 0:
-            theta_obj_joint = torch.zeros((theta_b.shape[0], self.obj_joint_dim),
-                                          device=theta_b.device)  # add an additional dimension for the cap of the screw driver
-            # the cap does not matter for the task, but needs to be included in the state for the model
-            theta_b = torch.cat((theta_b, theta_obj_joint), dim=1)
-        full_q = partial_to_full_state(q_b, fingers=self.fingers, arm_dof=self.arm_dof)
-        ret_scene = self.contact_scenes.scene_collision_check(full_q, theta_b,
-                                                              compute_gradient=True,
-                                                              compute_hessian=False)
-        full_robot_dof = self.arm_dof + 16
-        for i, finger in enumerate(self.fingers):
-            self.data[finger] = {}
-            self.data[finger]['sdf'] = ret_scene['sdf'][:, i].reshape(N, self.T + 1)
-            # reshape and throw away data for unused fingers
-            grad_g_q = ret_scene.get('grad_sdf', None)
-            self.data[finger]['grad_sdf'] = grad_g_q[:, i].reshape(N, self.T + 1, full_robot_dof)[:, :, self.all_joint_index]
-
-            # contact jacobian
-            contact_jacobian = ret_scene.get('contact_jacobian', None)
-            self.data[finger]['contact_jacobian'] = contact_jacobian[:, i].reshape(N, self.T + 1, 3, full_robot_dof)[:, :, :, self.all_joint_index]
-
-            # contact hessian
-            contact_hessian = ret_scene.get('contact_hessian', None)
-            contact_hessian = contact_hessian[:, i].reshape(N, self.T + 1, 3, full_robot_dof, full_robot_dof)[:, :, :, self.all_joint_index]
-            contact_hessian = contact_hessian[:, :, :, :, self.all_joint_index]  # [:, :, :, self.all_joint_index]
-            # contact_hessian = contact_hessian[:, :, :, :, self.all_joint_index]  # shape (N, T+1, 3, 8, 8)
-
-            # gradient of contact point
-            d_contact_loc_dq = ret_scene.get('closest_pt_q_grad', None)
-            d_contact_loc_dq = d_contact_loc_dq[:, i].reshape(N, self.T + 1, 3, full_robot_dof)[:, :, :, self.all_joint_index]  # [:, :, :, self.all_joint_index]
-            self.data[finger]['closest_pt_q_grad'] = d_contact_loc_dq
-            self.data[finger]['contact_hessian'] = contact_hessian
-            self.data[finger]['closest_pt_world'] = ret_scene['closest_pt_world'][:, i] # the contact points are in the robot frame 
-            self.data[finger]['contact_normal'] = ret_scene['contact_normal'][:, i]
-
-            # gradient of contact normal
-            self.data[finger]['dnormal_dq'] = ret_scene['dnormal_dq'][:, i].reshape(N, self.T + 1, 3, full_robot_dof)[:, :, :, self.all_joint_index]  # [:, :, :,
-            # self.all_joint_index]
-
-            self.data[finger]['dnormal_denv_q'] = ret_scene['dnormal_denv_q'][:, i, :, :self.obj_dof]
-            self.data[finger]['grad_env_sdf'] = ret_scene['grad_env_sdf'][:, i, :self.obj_dof]
-            dJ_dq = contact_hessian
-            self.data[finger]['dJ_dq'] = dJ_dq  # Jacobian of the contact point
-        if self.collision_checking:
-            self.data['allegro_hand_hitosashi_finger_finger_link_2'] = {}
-            self.data['allegro_hand_hitosashi_finger_finger_link_2']['sdf'] = ret_scene['sdf'][:, -2].reshape(N, self.T + 1)
-            grad_g_q = ret_scene.get('grad_sdf', None)
-            self.data['allegro_hand_hitosashi_finger_finger_link_2']['grad_sdf'] = grad_g_q[:, -2].reshape(N, self.T + 1, full_robot_dof)[:, :, self.all_joint_index]
-            self.data['allegro_hand_hitosashi_finger_finger_link_2']['grad_env_sdf'] = ret_scene['grad_env_sdf'][:, -2, :self.obj_dof]
-
-            self.data['allegro_hand_hitosashi_finger_finger_link_3'] = {}
-            self.data['allegro_hand_hitosashi_finger_finger_link_3']['sdf'] = ret_scene['sdf'][:, -1].reshape(N, self.T + 1)
-            self.data['allegro_hand_hitosashi_finger_finger_link_3']['grad_sdf'] = grad_g_q[:, -1].reshape(N, self.T + 1, full_robot_dof)[:, :, self.all_joint_index]
-            self.data['allegro_hand_hitosashi_finger_finger_link_3']['grad_env_sdf'] = ret_scene['grad_env_sdf'][:, -1, :self.obj_dof]
 
     
     def _cost(self, x, start, goal):
@@ -691,6 +615,81 @@ class AllegroContactProblem(AllegroObjectProblem):
                                             partial_patch=False,
                                             )
         # self.viz_contact_scenes.visualize_robot(partial_to_full_state(self.start[:self.robot_dof], fingers=self.fingers, arm_dof=self.arm_dof), None)
+
+    def _preprocess(self, xu):
+        N = xu.shape[0]
+        xu = xu.reshape(N, self.T, -1)
+        x = xu[:, :, :self.dx]
+        # expand to include start
+        x_expanded = torch.cat((self.start.reshape(1, 1, -1).repeat(N, 1, 1), x), dim=1)
+
+        q = x_expanded[:, :, :self.robot_dof]
+        if self.fixed_obj:
+            theta = self.start_obj_pose.unsqueeze(0).repeat((N, self.T + 1, 1))
+        else:
+            theta = x_expanded[:, :, self.robot_dof: self.robot_dof + self.obj_dof]
+        self._preprocess_fingers(q, theta)
+
+    def _preprocess_fingers(self, q, theta):
+        N, _, _ = q.shape
+
+        # reshape to batch across time
+        q_b = q.reshape(-1, self.robot_dof)
+        theta_b = theta.reshape(-1, self.obj_dof)
+        if self.obj_joint_dim > 0:
+            theta_obj_joint = torch.zeros((theta_b.shape[0], self.obj_joint_dim),
+                                          device=theta_b.device)  # add an additional dimension for the cap of the screw driver
+            # the cap does not matter for the task, but needs to be included in the state for the model
+            theta_b = torch.cat((theta_b, theta_obj_joint), dim=1)
+        full_q = partial_to_full_state(q_b, fingers=self.fingers, arm_dof=self.arm_dof)
+        ret_scene = self.contact_scenes.scene_collision_check(full_q, theta_b,
+                                                              compute_gradient=True,
+                                                              compute_hessian=False)
+        full_robot_dof = self.arm_dof + 16
+        for i, finger in enumerate(self.fingers):
+            self.data[finger] = {}
+            self.data[finger]['sdf'] = ret_scene['sdf'][:, i].reshape(N, self.T + 1)
+            # reshape and throw away data for unused fingers
+            grad_g_q = ret_scene.get('grad_sdf', None)
+            self.data[finger]['grad_sdf'] = grad_g_q[:, i].reshape(N, self.T + 1, full_robot_dof)[:, :, self.all_joint_index]
+
+            # contact jacobian
+            contact_jacobian = ret_scene.get('contact_jacobian', None)
+            self.data[finger]['contact_jacobian'] = contact_jacobian[:, i].reshape(N, self.T + 1, 3, full_robot_dof)[:, :, :, self.all_joint_index]
+
+            # contact hessian
+            contact_hessian = ret_scene.get('contact_hessian', None)
+            contact_hessian = contact_hessian[:, i].reshape(N, self.T + 1, 3, full_robot_dof, full_robot_dof)[:, :, :, self.all_joint_index]
+            contact_hessian = contact_hessian[:, :, :, :, self.all_joint_index]  # [:, :, :, self.all_joint_index]
+            # contact_hessian = contact_hessian[:, :, :, :, self.all_joint_index]  # shape (N, T+1, 3, 8, 8)
+
+            # gradient of contact point
+            d_contact_loc_dq = ret_scene.get('closest_pt_q_grad', None)
+            d_contact_loc_dq = d_contact_loc_dq[:, i].reshape(N, self.T + 1, 3, full_robot_dof)[:, :, :, self.all_joint_index]  # [:, :, :, self.all_joint_index]
+            self.data[finger]['closest_pt_q_grad'] = d_contact_loc_dq
+            self.data[finger]['contact_hessian'] = contact_hessian
+            self.data[finger]['closest_pt_world'] = ret_scene['closest_pt_world'][:, i] # the contact points are in the robot frame 
+            self.data[finger]['contact_normal'] = ret_scene['contact_normal'][:, i]
+
+            # gradient of contact normal
+            self.data[finger]['dnormal_dq'] = ret_scene['dnormal_dq'][:, i].reshape(N, self.T + 1, 3, full_robot_dof)[:, :, :, self.all_joint_index]  # [:, :, :,
+            # self.all_joint_index]
+
+            self.data[finger]['dnormal_denv_q'] = ret_scene['dnormal_denv_q'][:, i, :, :self.obj_dof]
+            self.data[finger]['grad_env_sdf'] = ret_scene['grad_env_sdf'][:, i, :self.obj_dof]
+            dJ_dq = contact_hessian
+            self.data[finger]['dJ_dq'] = dJ_dq  # Jacobian of the contact point
+        if self.collision_checking:
+            self.data['allegro_hand_hitosashi_finger_finger_link_2'] = {}
+            self.data['allegro_hand_hitosashi_finger_finger_link_2']['sdf'] = ret_scene['sdf'][:, -2].reshape(N, self.T + 1)
+            grad_g_q = ret_scene.get('grad_sdf', None)
+            self.data['allegro_hand_hitosashi_finger_finger_link_2']['grad_sdf'] = grad_g_q[:, -2].reshape(N, self.T + 1, full_robot_dof)[:, :, self.all_joint_index]
+            self.data['allegro_hand_hitosashi_finger_finger_link_2']['grad_env_sdf'] = ret_scene['grad_env_sdf'][:, -2, :self.obj_dof]
+
+            self.data['allegro_hand_hitosashi_finger_finger_link_3'] = {}
+            self.data['allegro_hand_hitosashi_finger_finger_link_3']['sdf'] = ret_scene['sdf'][:, -1].reshape(N, self.T + 1)
+            self.data['allegro_hand_hitosashi_finger_finger_link_3']['grad_sdf'] = grad_g_q[:, -1].reshape(N, self.T + 1, full_robot_dof)[:, :, self.all_joint_index]
+            self.data['allegro_hand_hitosashi_finger_finger_link_3']['grad_env_sdf'] = ret_scene['grad_env_sdf'][:, -1, :self.obj_dof]
 
 
     @all_finger_constraints

@@ -218,6 +218,7 @@ class AllegroScrewdriver(AllegroValveTurning):
         goal_cost += torch.sum((1 * (state[:, -self.obj_dof:] - goal.unsqueeze(0)) ** 2))
 
         return smoothness_cost + action_cost + goal_cost + upright_cost
+        
     def _index_repulsive(self, xu, link_name, compute_grads=True, compute_hess=False):
         """
         None teriminal link of the finger tip should have >= 0 sdf value
