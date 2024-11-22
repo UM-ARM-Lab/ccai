@@ -3,6 +3,7 @@ T: 12
 receding_horizon: False
 num_steps: 12
 num_turns: 1
+max_recovery_stages: 4
 num_trials: 10
 visualize: True
 experiment_name: 'allegro_screwdriver_csvto_OOD_ID_full_multi_depth_plan'
@@ -31,7 +32,9 @@ use_partial_constraint: True
 sine_cosine: True
 project_state: False
 compute_recovery_trajectory: True
+diff_init: False
 model_dir: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion'
+model_path: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
 controllers:
   csvgd:
     # N: 16

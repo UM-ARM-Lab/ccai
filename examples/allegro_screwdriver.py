@@ -1083,9 +1083,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     sample_contact = params.get('sample_contact', False)
     num_stages = 2 + 3 * (params['num_turns'] - 1)
     if params.get('compute_recovery_trajectory', False):
-        num_stages = 1
-        # contact_sequence = plan_recovery_contacts(state)
-        contact_sequence = ['thumb_middle']
+        num_stages = params['max_recovery_stages']
+        contact_sequence = plan_recovery_contacts(state)
+        # contact_sequence = ['thumb_middle']
     elif not sample_contact:
         contact_sequence = ['turn']
         for k in range(params['num_turns'] - 1):
@@ -1303,6 +1303,32 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         with open(f'{fpath.resolve()}/trajectory.pkl', 'wb') as f:
             pickle.dump([i.cpu().numpy() for i in actual_trajectory_save], f)
         del actual_trajectory_save
+
+        if params['compute_recovery_trajectory']:
+            # Check if the current state is in distribution
+
+            start = state[:4 * num_fingers + obj_dof]
+            start_sine_cosine = convert_yaw_to_sine_cosine(start)
+            samples, _, likelihood = trajectory_sampler.sample(N=params['N'], H=params['T']+1, start=start_sine_cosine.reshape(1, -1))
+            likelihood = likelihood.reshape(N).mean().item()
+            # samples = samples.cpu().numpy()
+            if likelihood > -30:
+                print('State is in distribution')
+                break
+            else:
+                print('State is out of distribution')
+                # Project the state back into the distribution
+                projected_samples, _, _, _, (all_losses, all_samples, all_likelihoods) = trajectory_sampler.sample(N, H=config['T']+1, start=start_sine_cosine, project=True)
+                if all_likelihoods[-1] < -30:
+                    print('Projection failed')
+                    break
+                else:
+                    print('Projection succeeded')
+                    goal = projected_samples[-1][0]
+                    index_regrasp_planner.reset(start, goal=goal)
+                    thumb_and_middle_regrasp_planner.reset(start, goal=goal)
+                    turn_planner.reset(start, goal=goal)
+
     # np.savez(f'{fpath.resolve()}/trajectory.npz', x=[i.cpu().numpy() for i in actual_trajectory],)
              #  constr=constraint_val.cpu().numpy(),
             #  d2goal=final_distance_to_goal.cpu().numpy())
