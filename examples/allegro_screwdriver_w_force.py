@@ -103,6 +103,7 @@ class AllegroScrewdriver(AllegroValveTurning):
                                                  collision_checking=collision_checking, obj_gravity=obj_gravity,
                                                  contact_region=contact_region, du=du, arm_type=arm_type, device=device)
         self.min_force_dict = {'index': 0.0001, 'middle': 0.1, 'ring': 0.1, 'thumb': 0.1}
+        # self.min_force_dict = {'index': 0.0001, 'middle': 1.0, 'ring': 1.0, 'thumb': 1.0}
         self.friction_coefficient = friction_coefficient
         self.friction_vel_constr = vmap(self._friction_vel_constr, randomness='same')
         self.grad_friction_vel_constr = vmap(jacrev(self._friction_vel_constr, argnums=(0, 1, 2)))

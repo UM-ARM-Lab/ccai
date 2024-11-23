@@ -1,7 +1,7 @@
 ---
 receding_horizon: False
 num_steps: 12
-num_trials: 20
+num_trials: 30
 visualize: True
 experiment_name: 'allegro_screwdriver'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'

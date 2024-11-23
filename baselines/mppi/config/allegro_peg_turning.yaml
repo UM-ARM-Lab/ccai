@@ -1,7 +1,7 @@
 ---
 receding_horizon: False
 num_steps: 10
-num_trials: 20
+num_trials: 30
 visualize: True
 experiment_name: 'allegro_peg_turning'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'

@@ -91,8 +91,9 @@ def do_trial(env, params, fpath, sim_viz_env=None):
                 fixed_obj=True,
                 arm_type=params['arm_type'],
             )
-
-            pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
+            pregrasp_params = params.copy()
+            pregrasp_params['N'] = 8
+            pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, pregrasp_params)
             pregrasp_planner.warmup_iters = 50 
             # else:
             #     raise ValueError('Invalid controller')
@@ -101,18 +102,6 @@ def do_trial(env, params, fpath, sim_viz_env=None):
             best_traj, _ = pregrasp_planner.step(start[:pregrasp_dx])
             print(f"pregrasp solve time: {time.time() - start_time}")
 
-            if params['visualize_plan']:
-                traj_for_viz = best_traj[:, :pregrasp_problem.dx]
-                tmp = start[pregrasp_dx:pregrasp_dx+obj_dof].unsqueeze(0).repeat(traj_for_viz.shape[0], 1)
-                tmp_2 = torch.zeros((traj_for_viz.shape[0], 1)).to(traj_for_viz.device) # the top jint
-                traj_for_viz = torch.cat((traj_for_viz, tmp, tmp_2), dim=1)    
-                viz_fpath = pathlib.PurePath.joinpath(fpath, "pregrasp")
-                img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
-                gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
-                pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
-                pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-                visualize_trajectory(traj_for_viz, pregrasp_problem.viz_contact_scenes, viz_fpath, pregrasp_problem.fingers, pregrasp_problem.obj_dof + obj_joint_dim,
-                                    camera_params=camera_params, arm_dof=arm_dof)
 
 
             for x in best_traj[:, :pregrasp_dx]:
@@ -298,8 +287,8 @@ def do_trial(env, params, fpath, sim_viz_env=None):
 if __name__ == "__main__":
     # get config
     from tqdm import tqdm
-    # task = 'screwdriver_turning'
-    task = 'valve_turning'
+    task = 'screwdriver_turning'
+    # task = 'valve_turning'
     # task = 'peg_alignment'
     # task = 'peg_turning'
     # task =  'reorientation'
