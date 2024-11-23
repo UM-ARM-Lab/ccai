@@ -22,11 +22,11 @@ class DynamicsModel:
             action = action.to(self.env.device)
             self.env.step(action, ignore_img=True)
             ret = self.env.dof_states.clone().reshape(N, -1)
-        # else:
-        #     if self.obj_joint_dim > 0:
-        #         tmp_obj_joint = torch.zeros((state.shape[0], self.obj_joint_dim)).to(device=state.device)
-        #         state = torch.cat((state, tmp_obj_joint), dim=-1)
-        #     self.env.set_pose(state, semantic_order=True, zero_velocity=True)
-        #     action = state[:, :4 * self.num_fingers] + action
-        #     ret = self.env.step(action, ignore_img=True)
+        else:
+            if self.obj_joint_dim > 0:
+                tmp_obj_joint = torch.zeros((state.shape[0], self.obj_joint_dim)).to(device=state.device)
+                state = torch.cat((state, tmp_obj_joint), dim=-1)
+            self.env.set_pose(state, semantic_order=True, zero_velocity=True)
+            action = state[:, :4 * self.num_fingers] + action.to(state.device)
+            ret = self.env.step(action, ignore_img=True)
         return ret

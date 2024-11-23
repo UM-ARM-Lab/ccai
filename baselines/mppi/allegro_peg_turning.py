@@ -16,8 +16,8 @@ class ValidityCheck:
             return True
         
 class RunningCost:
-    def __init__(self, start, goal, include_velocity=False):
-        self.start = start
+    def __init__(self, goal, include_velocity=False):
+        # self.start = start
         self.goal = goal
         self.obj_dof = 6
         self.obj_translational_dim = 3

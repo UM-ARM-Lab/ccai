@@ -4,8 +4,8 @@ from utils.allegro_utils import get_screwdriver_top_in_world
 
 
 class RunningCost:
-    def __init__(self, start, goal, include_velocity=False):
-        self.start = start
+    def __init__(self, goal, include_velocity=False):
+        # self.start = start
         self.goal = goal
         self.obj_dof = 3
         self.obj_translational_dim = 0

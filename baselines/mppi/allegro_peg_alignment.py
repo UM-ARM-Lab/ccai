@@ -42,8 +42,7 @@ class ValidityCheck:
         return validity_flag
 
 class RunningCost:
-    def __init__(self, start, goal, include_velocity=False):
-        self.start = start
+    def __init__(self, goal, include_velocity=False):
         self.goal = goal
         self.obj_dof = 6
         self.obj_translational_dim = 3
@@ -147,7 +146,7 @@ def do_trial(env, params, fpath):
     num_fingers_to_plan = num_fingers
     info_list = []
     dynamics = DynamicsModel(env, num_fingers=len(params['fingers']), include_velocity=params['include_velocity'])
-    running_cost = RunningCost(start, params['object_goal'], include_velocity=params['include_velocity'])
+    running_cost = RunningCost(params['object_goal'], include_velocity=params['include_velocity'])
     u_max = torch.ones(4 * len(params['fingers'])) * np.pi / 5 
     u_min = - torch.ones(4 * len(params['fingers'])) * np.pi / 5
     noise_sigma = torch.eye(4 * len(params['fingers'])).to(params['device']) * params['variance']

@@ -57,19 +57,19 @@ class ObjectPoseReader:
                                             [0.5, 0, -0.5],
                                             [0.5, 0, 0.5],
                                             [-0.5, 0, 0.5]]) * 35
-                # self.__world2palm_marker = np.array([[1, 0, 0, 20],
-                #                                     [0, 1, 0, 50],
-                #                                     [0, 0, 1, -110],
-                #                                     [0, 0, 0, 1]])
                 hand_center2palm_marker= np.array([[1, 0, 0, 15],
-                                                    [0, 1, 0, 55],
+                                                    [0, 1, 0, 65],
                                                     [0, 0, 1, -120],
                                                     [0, 0, 0, 1]])
-                # assume 40 degrees rotation around y axis
-                world2hand_center = np.array([[0.7660444, 0, 0.6427876, 0],
-                                            [0, 1, 0, 0],
-                                            [-0.6427876, 0, 0.7660444, 0],
-                                            [0, 0, 0, 1]])
+                # hand_center2palm_marker= np.array([[1, 0, 0, 5],
+                #                                     [0, 1, 0, 55],
+                #                                     [0, 0, 1, -120],
+                #                                     [0, 0, 0, 1]])
+                # # assume 40 degrees rotation around y axis
+                # world2hand_center = np.array([[0.7660444, 0, 0.6427876, 0],
+                #                             [0, 1, 0, 0],
+                #                             [-0.6427876, 0, 0.7660444, 0],
+                #                             [0, 0, 0, 1]])
                 # assume 45 degrees rotation around y axis
                 # world2hand_center = np.array([[0.7071068, 0, 0.7071068, 0],
                 #                             [0, 1, 0, 0],
@@ -77,9 +77,10 @@ class ObjectPoseReader:
                 #                             [0, 0, 0, 1]])
 
                 # assume 50 degrees rotation around y axis
-                # world2hand_center = np.array([[0.6427876,  0.0000000,  0.7660444],
-                #                         [0.0000000,  1.0000000,  0.0000000],
-                #                         [-0.7660444,  0.0000000,  0.6427876]])
+                world2hand_center = np.array([[0.6427876,  0.0000000,  0.7660444, 0],
+                                                [0.0000000,  1.0000000,  0.0000000, 0],
+                                                [-0.7660444,  0.0000000,  0.6427876, 0],
+                                                [0, 0, 0, 1]])
 
                 self.__world2palm_marker =  hand_center2palm_marker @ world2hand_center
                 # self.__world2palm_marker = np.array([[0.7071068, 0, -0.7071068, -25],
@@ -328,6 +329,25 @@ class HardwareEnv:
         self.default_pos = default_pos.clone()
         self.ori_only = ori_only
     
+    def get_raw_robot_state(self):
+        robot_state = self.__ros_node.allegro_joint_pos.float()
+        robot_state = robot_state.to(self.device)
+        return robot_state
+    def get_processed_robot_state(self):
+        robot_state = self.__ros_node.allegro_joint_pos.float()
+        robot_state = robot_state.to(self.device)
+        index, mid, ring, thumb = torch.chunk(robot_state, chunks=4, dim=-1)
+        state = {}
+        state['index'] = index
+        state['middle'] = mid
+        state['ring'] = ring
+        state['thumb'] = thumb
+        q = []
+        for finger_name in self.__finger_list:
+            q.append(state[finger_name])
+        return torch.cat(q).unsqueeze(0)
+
+
     def get_state(self, return_dict=False):
         rospy.sleep(0.5)
         robot_state = self.__ros_node.allegro_joint_pos.float()
@@ -352,7 +372,7 @@ class HardwareEnv:
             ori = torch.tensor(ori).float().to(self.device)
             # ori = ori * 0 # debug
             if self.ori_only:
-                obj_cofig = ori
+                obj_config = ori
                 q.append(ori)
                 # q.append(torch.zeros(1).float().to(self.device)) # add the screwdriver cap angle
             else:

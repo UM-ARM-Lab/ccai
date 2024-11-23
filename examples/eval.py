@@ -55,6 +55,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
     env.reset()
     if params['visualize']:
+        if params['mode'] == 'hardware':
+            sim_viz_env.frame_fpath = fpath
+            sim_viz_env.frame_id = 0
         env.frame_fpath = fpath
         env.frame_id = 0
     else:
@@ -74,6 +77,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
         # env.step(action) # step one step to resolve penetration
     else:
         pregrasp_flag = True
+    if config['mode'] == 'hardware':
+        pregrasp_flag = False
     if pregrasp_flag:
         pregrasp_succ = False
         while pregrasp_succ == False:
@@ -124,14 +129,17 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                 if params['mode'] == 'hardware':
                     set_state = env.get_state(return_dict=True)['q'].to(device=env.device)
                     if params['task'] == 'screwdriver_turning':
-                        set_state = torch.cat((set_state, torch.zeros(1).float().to(env.device)), dim=0)
+                        set_state = torch.cat((set_state, torch.zeros(1).unsqueeze(0).float().to(env.device)), dim=-1)
                     sim_viz_env.set_pose(set_state)
                     sim_viz_env.step(action)
                 env.step(action)
                 action_list.append(action)
                 if params['mode'] == 'hardware_copy':
                     ros_copy_node.apply_action(partial_to_full_state(x.reshape(-1, pregrasp_dx)[0], params['fingers']))
-            pregrasp_succ = env.check_validity(env.get_state().cpu()[0])
+            if params['mode'] == 'simulation':
+                pregrasp_succ = env.check_validity(env.get_state().cpu()[0])
+            elif params['mode'] == 'hardware':
+                pregrasp_succ = True
             if pregrasp_succ == False:
                 print("pregrasp failed, replanning")
                 env.reset()
@@ -434,7 +442,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             if params['mode'] == 'hardware':
                 set_state = env.get_state(return_dict=True)['q'].to(device=env.device)
                 if params['task'] == 'screwdriver_turning':
-                    set_state = torch.cat((set_state, torch.zeros(1).float().to(env.device)), dim=0)
+                    set_state = torch.cat((set_state, torch.zeros(1).unsqueeze(0).float().to(env.device)), dim=-1)
                 sim_viz_env.set_pose(set_state)
                 sim_viz_env.step(action)
             elif params['mode'] == 'hardware_copy':
@@ -506,10 +514,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
 if __name__ == "__main__":
     # get config
-    # task = 'screwdriver_turning'
+    task = 'screwdriver_turning'
     # task = 'valve_turning'
     # task = 'reorientation'
-    task = 'peg_alignment'
+    # task = 'peg_alignment'
     # task = 'peg_turning'
 
     method = 'csvgd'
