@@ -1,7 +1,7 @@
 ---
 receding_horizon: False
 num_steps: 10
-num_trials: 20
+num_trials: 30
 visualize: True
 experiment_name: 'allegro_peg_alignment'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
@@ -14,7 +14,7 @@ friction_coefficient: 0.95
 gradual_control: True
 arm_type: 'None' # choose between 'None', 'robot', 'floating_3d', 'floating_6d'
 gravity: True  # whether to use gravity in the simulation
-goal: [0, 0, 0, 0, 0, 0]
+goal: [-0.05, 0.0, 0.08, 0, 0, 0]
 kp: 3.0
 controllers:
   mppi:
