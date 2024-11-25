@@ -171,7 +171,7 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
     optimizer = torch.optim.Adam(trajectory_sampler.parameters(), lr=config['lr'])
 
     step = 0
-
+    init_time = time.perf_counter()
     epochs = config['epochs']
     # pbar = tqdm.tqdm(range(epochs))
     # for epoch in pbar:
@@ -224,7 +224,7 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
                     'state_loss_epoch': state_loss,
                     'action_loss_epoch': action_loss,
                     'kl_loss_epoch': kl_loss,
-                    'time': time.time()
+                    'time': time.perf_counter() - init_time
                 })
         except:
             print('Could not log to wandb')
@@ -234,7 +234,7 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
                     'state_loss_epoch': state_loss,
                     'action_loss_epoch': action_loss,
                     'kl_loss_epoch': kl_loss,
-                    'time': time.time()
+                    'time': time.perf_counter() - init_time
             })
 
         if (epoch + 1) % config['save_every'] == 0:

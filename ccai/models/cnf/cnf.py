@@ -267,23 +267,29 @@ class TrajectoryCNF(nn.Module):
         }
 
     def h_poly(self, t):
-        tt = t[None, :]**torch.arange(4, device=t.device)[:, None]
+        tt = t[None, :]**torch.arange(6, device=t.device)[:, None]
         A = torch.tensor([
-            [1, 0, -3, 2],
-            [0, 1, -2, 1],
-            [0, 0, 3, -2],
-            [0, 0, -1, 1]
+        #[0, 1,  2,    3,   4,   5],
+            [1, 0,  0,  -10,  15,  -6],     #p0
+            [0, 1,  0,   -6,   8,  -3],       #v0
+            [0, 0, .5, -1.5, 1.5, -.5], #a0
+            [0, 0,  0,   .5,  -1,  .5],      #p1
+            [0, 0,  0,   -4,   7,  -3],       #v1
+            [0, 0,  0,   10, -15,   6],      #a1
         ], dtype=t.dtype, device=t.device)
         return A @ tt
 
     def dh_poly(self, t):
-        tt = t[None, :]**torch.arange(4, device=t.device)[:, None]
+        tt = t[None, :]**torch.arange(6, device=t.device)[:, None]
         A = torch.tensor([
-            [0, -6, 6, 0],
-            [1, -4, 3, 0],
-            [0, 6, -6, 0],
-            [0, -2, 3, 0]
+            [0, 0, -30, 60, -30, 0],
+            [1, 0, -18, 32, -15, 0],
+            [0, 1, -4.5, 6, -2.5, 0],
+            [0, 0, 1.5, -4, 2.5, 0],
+            [0, 0, -12, 28, -15, 0],
+            [0, 0, 30, -60, 30, 0]
         ], dtype=t.dtype, device=t.device)
+        
         return A @ tt
 
 
@@ -291,25 +297,33 @@ class TrajectoryCNF(nn.Module):
         x_ = x.reshape(-1, 1)
         m = (y[1:] - y[:-1]) / (x_[1:] - x_[:-1])
         m = torch.cat([m[[0]], (m[1:] + m[:-1]) / 2, m[[-1]]])
+        m_prime = (m[1:] - m[:-1]) / (x_[1:] - x_[:-1])
+        m_prime = torch.cat([m_prime[[0]], (m_prime[1:] + m_prime[:-1]) / 2, m_prime[[-1]]])
 
         idxs = torch.searchsorted(x[1:], xs)
         dx = (x[idxs + 1] - x[idxs])
         hh = self.dh_poly((xs - x[idxs]) / dx).unsqueeze(-1)
         hh_deriv = self.h_poly((xs - x[idxs]) / dx).unsqueeze(-1)#.unsqueeze(-1)        # ret = hh[0] * torch.gather(y, 1, idxs.reshape(-1, 1, 1).expand(-1, -1, y.shape[-1]))
-        ret = hh[0] * y[idxs]
-        ret_dh = hh_deriv[0] * y[idxs]
         dx = dx.unsqueeze(-1)#.unsqueeze(-1)
         # ret += hh[1] * torch.gather(m, 1, idxs.reshape(-1, 1, 1).expand(-1, -1, y.shape[-1])) * dx
         # ret += hh[2] * torch.gather(y, 1, 1+idxs.reshape(-1, 1, 1).expand(-1, -1, y.shape[-1]))
         # ret += hh[3] * torch.gather(m, 1, 1+idxs.reshape(-1, 1, 1).expand(-1, -1, y.shape[-1])) * dx
         
+        ret = hh[0] * y[idxs]
         ret += hh[1] * m[idxs] * dx
-        ret += hh[2] * y[idxs+1]
-        ret += hh[3] * m[idxs+1] * dx
+        ret += hh[2] * m_prime[idxs] * dx * dx * .5
 
+        ret += hh[3] * m_prime[idxs+1] * dx * dx * .5
+        ret += hh[4] * m[idxs+1] * dx
+        ret += hh[5] * y[idxs+1]
+
+        ret_dh = hh_deriv[0] * y[idxs]
         ret_dh += hh_deriv[1] * m[idxs] * dx
-        ret_dh += hh_deriv[2] * y[idxs+1]
-        ret_dh += hh_deriv[3] * m[idxs+1] * dx
+        ret_dh += hh_deriv[2] * m_prime[idxs] * dx * dx * .5
+
+        ret_dh += hh_deriv[3] * m_prime[idxs+1] * dx * dx * .5
+        ret_dh += hh_deriv[4] * m[idxs+1] * dx
+        ret_dh += hh_deriv[5] * y[idxs+1]
         return ret.squeeze(), ret_dh.squeeze()
     
     def standard_normal_kl_div(self, mu, logvar):
@@ -329,8 +343,8 @@ class TrajectoryCNF(nn.Module):
         t_ind.clamp_(0, self.horizon-2)
         t0_ind.clamp_(0, self.horizon-2)
         t_ind_for_gather = t_ind.reshape(xu.shape[0], 1, 1).repeat(1, 1, self.xu_dim)
-        # t_ind_for_gather_1 = t_ind_for_gather + 1
-        t_ind_for_gather_1 = t_ind_for_gather - t_ind_for_gather + self.horizon - 1
+        t_ind_for_gather_1 = t_ind_for_gather + 1
+        # t_ind_for_gather_1 = t_ind_for_gather - t_ind_for_gather + self.horizon - 1
 
         if t_ind_for_gather_1.max() >= self.horizon:
             print('t_ind_for_gather_1', t_ind_for_gather_1.max())
@@ -345,17 +359,20 @@ class TrajectoryCNF(nn.Module):
         noise_mean, noise_logvar = self.model.noise_dist(x0[..., :self.dx])
 
         pred_noise_u0 = noise_mean + rand_for_u0 * torch.exp(.5 * noise_logvar)
+
+
         # goal_u0 = x1[:, self.dx:]
 
         # arange0 = torch.arange(rand_for_u0.shape[0], device=xu.device)
         # arange1 = torch.arange(goal_u0.shape[0], device=xu.device)
 
         # rand_for_u0, goal_u0, arange0, arange1 = self.FM.ot_sampler.sample_plan_with_labels(rand_for_u0, goal_u0, y0=arange0, y1=arange1, replace=False)
-        # Rearrange ut, true_uv using arange
+        # # Rearrange ut, true_uv using arange
         # inds = torch.sort(arange1).indices
         # rand_for_u0 = rand_for_u0[inds]#.contiguous()
 
         xu[:, 0, self.dx:] = pred_noise_u0
+        # xu[:, 0, self.dx:] = rand_for_u0
 
         xt, truevt = self.interp(x_arange, xu, t)
         # truevt = self.dinterp_dt(x_arange, xu, t).squeeze()
@@ -368,7 +385,7 @@ class TrajectoryCNF(nn.Module):
         action_loss = mse_loss(vt[:, self.dx:], truevt[:, self.dx:])
         kl_loss = self.standard_normal_kl_div(noise_mean, noise_logvar)
         return {
-            'loss': flow_loss + .1 * kl_loss,
+            'loss': flow_loss,
             'flow_loss': flow_loss,
             'kl_loss': kl_loss,
             'action_loss': state_loss,
