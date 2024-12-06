@@ -547,7 +547,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         trajectory_sampler.load_state_dict(torch.load(f'{CCAI_PATH}/{model_path}', map_location=torch.device(params['device'])), strict=True)
         trajectory_sampler.to(device=params['device'])
         trajectory_sampler.send_norm_constants_to_submodels()
-        if params['project_state']:
+        if params['project_state'] or params['compute_recovery_trajectory']:
             trajectory_sampler.model.diffusion_model.classifier=None
         print('Loaded trajectory sampler')
 
@@ -1084,7 +1084,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     num_stages = 2 + 3 * (params['num_turns'] - 1)
     if params.get('compute_recovery_trajectory', False):
         num_stages = params['max_recovery_stages']
-        contact_sequence = plan_recovery_contacts(state)
+        # contact_sequence = plan_recovery_contacts(state)
         # contact_sequence = ['thumb_middle']
     elif not sample_contact:
         contact_sequence = ['turn']
@@ -1108,6 +1108,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     executed_contacts = []
     stages_since_plan = 0
     for stage in range(num_stages):
+        if params.get('compute_recovery_trajectory', False):
+            num_stages = params['max_recovery_stages']
+            state = env.get_state()
+            state = state['q'].reshape(-1)[:15].to(device=params['device'])
+            contact_sequence = plan_recovery_contacts(state)
         state = env.get_state()
         state = state['q'].reshape(-1)[:15].to(device=params['device'])
         ori = state[:15][-3:]
@@ -1230,12 +1235,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             print(contact_sequence)
             # return -1
             contact = contact_sequence[0]  
+        elif params.get('compute_recovery_trajectory', False):
+            contact = contact_sequence[0]
         elif stage > len(contact_sequence):
             print('Planner thinks task is complete')
             print(executed_contacts)
             break
-        elif params.get('compute_recovery_trajectory', False):
-            contact = contact_sequence[stage]
         else:
             contact = contact_sequence[stage-1]
         executed_contacts.append(contact)
@@ -1312,19 +1317,21 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             samples, _, likelihood = trajectory_sampler.sample(N=params['N'], H=params['T']+1, start=start_sine_cosine.reshape(1, -1))
             likelihood = likelihood.reshape(N).mean().item()
             # samples = samples.cpu().numpy()
-            if likelihood > -30:
+            print('Likelihood:', likelihood)
+            if likelihood > -15:
                 print('State is in distribution')
                 break
             else:
                 print('State is out of distribution')
-                # Project the state back into the distribution
-                projected_samples, _, _, _, (all_losses, all_samples, all_likelihoods) = trajectory_sampler.sample(N, H=config['T']+1, start=start_sine_cosine, project=True)
-                if all_likelihoods[-1] < -30:
+                # Project the state back into distribution
+                projected_samples, _, _, _, (all_losses, all_samples, all_likelihoods) = trajectory_sampler.sample(8, H=config['T']+1, start=start_sine_cosine.reshape(1, -1), project=True)
+                print('Final likelihood:', all_likelihoods[-1])
+                if all_likelihoods[-1].mean().item() < -15:
                     print('Projection failed')
                     break
                 else:
                     print('Projection succeeded')
-                    goal = projected_samples[-1][0]
+                    goal = convert_sine_cosine_to_yaw(projected_samples[-1][0])[:15]
                     index_regrasp_planner.reset(start, goal=goal)
                     thumb_and_middle_regrasp_planner.reset(start, goal=goal)
                     turn_planner.reset(start, goal=goal)
@@ -1482,12 +1489,12 @@ if __name__ == "__main__":
         proj_data = pickle.load(open(f'{CCAI_PATH}/{model_dir}/ood_projection/proj_data.pkl', 'rb'))
 
     num_trials = config['num_trials'] if not config['compute_recovery_trajectory'] else len(proj_data)
-    for i in tqdm(range(61, num_trials)):
+    for i in tqdm(range(137, num_trials)):
     # for i in tqdm([1, 2, 4, 7]):
         if config['mode'] != 'hardware':
             torch.manual_seed(i)
             np.random.seed(i)
-        
+        # 8709 11200
         if config['compute_recovery_trajectory']:
             this_pair = proj_data[i]
             initial_likelihood = this_pair['initial_likelihood']
@@ -1526,8 +1533,20 @@ if __name__ == "__main__":
                 params['device'])  # TODO: confirm if this is the correct location
             params['object_location'] = object_location
             # If params['device'] is cuda:1 but the computer only has 1 gpu, change to cuda:0
-            final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node,
-                                              seed=i, proj_path=this_pair['proj_path'][:, :-1])
+            succ = False
+            while not succ:
+                # final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node,
+                #                                 seed=i, proj_path=this_pair['proj_path'][:, :-1])
+                # succ = True
+                try:
+                    final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node,
+                                                    seed=i, proj_path=this_pair['proj_path'][:, :-1])
+                    succ = True
+                except Exception as e:
+                    print(e)
+                    torch.cuda.empty_cache()
+                    continue
+            
             #
             # try:
             #     final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node)

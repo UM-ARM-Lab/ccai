@@ -976,6 +976,8 @@ class UnetClassifier(nn.Module):
                 mask_dist = Bernoulli(probs=1 - self.context_dropout_p)
                 mask = mask_dist.sample((B,))  # .to(device=context.device)
                 c = mask * c
+        else:
+            c = torch.zeros(B, 32, device=t.device)
 
         t = self.time_mlp(c)
         h = []

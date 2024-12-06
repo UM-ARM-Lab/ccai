@@ -511,7 +511,7 @@ class GaussianDiffusion(nn.Module):
             likelihood = self.classifier(
                 torch.zeros(B * N, device=sample.device),
                 sample.reshape(-1, self.horizon, self.xu_dim),
-                context=context.reshape(-1, self.context_dim)
+                context=context.reshape(-1, self.context_dim) if context is not None else None
             )
         else:
             # return sample, None
@@ -664,13 +664,14 @@ class GaussianDiffusion(nn.Module):
         all_samples = []
         all_losses = []
         all_likelihoods = []
-        for proj_t in tqdm(range(25)):
+        broke = False
+        for proj_t in tqdm(range(15)):
             optimizer.zero_grad()
             # Sample N trajectories
             samples, likelihoods = self.sample(N, H, condition=condition, context=context, no_grad=False)
             all_samples.append(samples.clone().detach().cpu())
             all_likelihoods.append(likelihoods.clone().detach().cpu())
-            likelihood_reshape = likelihoods.reshape(-1, 8).mean(1)
+            likelihood_reshape = likelihoods.reshape(-1, N).mean(1)
             grad_mask[likelihood_reshape >= min_likelihood] = 0.0
 
             if proj_t == 0:
@@ -678,6 +679,7 @@ class GaussianDiffusion(nn.Module):
             if grad_mask.sum() == 0:
                 likelihoods_loss = -likelihoods.mean()
                 likelihoods_loss.backward()
+                broke = True
                 break
             likelihoods_loss = -likelihoods.mean()
             all_losses.append(likelihoods_loss.item())
@@ -690,13 +692,15 @@ class GaussianDiffusion(nn.Module):
             optimizer.step()
             condition[0][1] = x.detach()
 
-        samples, likelihoods = self.sample(N, H, condition=condition, context=context, no_grad=False)
-        all_samples.append(samples.clone().detach().cpu())
-        all_likelihoods.append(likelihoods.clone().detach().cpu())
-        likelihoods_loss = -likelihoods.mean(0)
-        all_losses.append(likelihoods_loss.item())
+        if not broke:
+            samples, likelihoods = self.sample(N, H, condition=condition, context=context, no_grad=False)
+            all_samples.append(samples.clone().detach().cpu())
+            all_likelihoods.append(likelihoods.clone().detach().cpu())
+            likelihoods_loss = -likelihoods.mean(0)
+            all_losses.append(likelihoods_loss.item())
+            likelihoods_loss.backward()
+
         print(f'Projection step: {proj_t+1}, Loss: {-likelihoods.mean(0)}')
-        likelihoods_loss.backward()
         best_sample = all_samples[-1].to(x.device)
         best_likelihood = all_likelihoods[-1].to(x.device)
         return (best_sample, best_likelihood), samples_0, (all_losses, all_samples, all_likelihoods)

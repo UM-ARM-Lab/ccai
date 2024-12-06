@@ -172,7 +172,7 @@ class ConstrainedSteinTrajOpt:
             # grad_J_rho = self.rho * torch.einsum('ik, ijkl -> ijl', C, dC).squeeze(1)
 
             
-            grad_J_dual = torch.einsum('ikj, ijkl -> ijl', self.dual, dC).squeeze(1)
+            # grad_J_dual = torch.einsum('ikj, ijkl -> ijl', self.dual, dC).squeeze(1)
 
             # grad_J_dual[:, ]
             grad_J_all = grad_J
@@ -194,13 +194,14 @@ class ConstrainedSteinTrajOpt:
                 normxiJ = torch.clamp(torch.linalg.norm(xi_J, dim=1, keepdim=True, ord=np.inf), min=1e-6)
                 xi_J = self.alpha_J * xi_J / normxiJ
 
-            self.dual += (self.alpha_C) * C.unsqueeze(-1)
-            self.dual[:, self.dg:] = torch.clamp(self.dual[:, self.dg:], min=0)
-            self.dual[:, :self.dg] = 0
-            self.dual_history.append(self.dual.cpu().detach().numpy())
+            # self.dual += (self.alpha_C) * C.unsqueeze(-1)
+            # self.dual[:, self.dg:] = torch.clamp(self.dual[:, self.dg:], min=0)
+            # self.dual[:, :self.dg] = 0
+            # self.dual_history.append(self.dual.cpu().detach().numpy())
             # if self.dh == 0:
             #     grad_J_dual = 0
-        return (self.alpha_J * (xi_J + grad_J_dual) + self.alpha_C * (xi_C)).detach().to(dtype=torch.float32)
+        # return (self.alpha_J * (xi_J + grad_J_dual) + self.alpha_C * (xi_C)).detach().to(dtype=torch.float32)
+        return (self.alpha_J * (xi_J) + self.alpha_C * (xi_C)).detach().to(dtype=torch.float32)
     
     def shift(self):
         # a = np.stack(self.dual_history, 0).squeeze()

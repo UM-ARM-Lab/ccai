@@ -37,7 +37,7 @@ fingers = ['index', 'middle', 'thumb']
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='allegro_screwdriver_cnf_state_control_only.yaml')
+    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_filter_recovery_trajectories.yaml')
     return parser.parse_args()
 
 
@@ -603,7 +603,6 @@ def identify_OOD_states(model, train_loader, config):
     
     # Loop through the dataset and evaluate the likelihood of the training data
     model.model.diffusion_model.classifier = None
-    model.eval()
     print(f'Identifying OOD states of model {config["model_name"]}_{config["model_type"]}\n')
     all_states = []
     all_trajectories = []
@@ -848,6 +847,45 @@ def visualize_ood_projection(model, config):
     with open(f'{fpath}/proj_data.pkl', 'wb') as f:
         pickle.dump(proj_data, f)
 
+def filter_bad_traj(model, train_loader, config):
+    N = 8
+    model.model.diffusion_model.classifier = None
+    all_likelihoods = []
+    for i, (trajectories, _, _) in enumerate(tqdm.tqdm(train_loader)):
+        trajectories = trajectories.to(device=config['device'])
+        B, T, dxu = trajectories.shape
+        # trajectories = trajectories.flatten(0, 1)
+        # if config['use_class']:
+        #     traj_class = traj_class.to(device=config['device']).float()
+        #     traj_class = traj_class.repeat_interleave(T, 0)
+        # else:
+        #     traj_class = None
+        with torch.no_grad():
+            # likelihood = model.model.diffusion_model.approximate_likelihood(trajectories, context=traj_class)
+            end = trajectories[:, -1, :15]
+            start_sine_cosine = convert_yaw_to_sine_cosine(end)
+            _, _, likelihood = model.sample(N*trajectories.shape[0], H=config['T'], start=start_sine_cosine.repeat_interleave(N, 0))
+            likelihood = likelihood.reshape(-1, N).mean(1)
+            all_likelihoods.append(likelihood.cpu().numpy())
+
+
+        if i % 25 == 0:
+            all_likelihoods_save = np.concatenate(all_likelihoods, axis=0)
+
+            np.save(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/ood_likelihoods.npy', all_likelihoods_save)
+    all_likelihoods_save = np.concatenate(all_likelihoods, axis=0)
+
+    np.save(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/ood_likelihoods.npy', all_likelihoods_save)
+    # Hist plot of all likelihoods
+    plt.hist(all_likelihoods_save, bins=100)
+    plt.xlabel('likelihood')
+    plt.ylabel('Frequency')
+    plt.title('Histogram of likelihoods')
+    plt.savefig(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/ood_likelihood_hist.png')
+    import sys
+    sys.exit()
+
+
 if __name__ == "__main__":
     CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
     print(CCAI_PATH)
@@ -1031,7 +1069,8 @@ if __name__ == "__main__":
                                                 cosine_sine=config['sine_cosine'],
                                                 states_only=config['du'] == 0,
                                                 skip_pregrasp=config['skip_pregrasp'],
-                                                type=config['model_type'],)
+                                                type=config['model_type'],
+                                                exec_only=config.get('filter_recovery_trajectories', False),)
     train_dataset.update_masks(p1=1, p2=1)
     if config['normalize_data']:
         # normalize data
@@ -1116,9 +1155,12 @@ if __name__ == "__main__":
     if config['id_ood_states']:
         identify_OOD_states(model, train_loader, config)
 
-    if config['project_ood_states']:
+    if config.get('project_ood_states', False):
         # project_OOD_states(model, config)
         visualize_ood_projection(model, config)
+
+    if config['filter_recovery_trajectories']:
+        filter_bad_traj(model, train_loader, config)
 
     if config['plot']:
         if config['load_model'] and config['discriminator_guidance']:
