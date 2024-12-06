@@ -97,7 +97,7 @@ class MLPBlock(nn.Module):
 
         self.block = nn.Sequential(
             nn.Linear(inp_channels, out_channels),
-            nn.BatchNorm1d(out_channels),
+            nn.GroupNorm(8, out_channels),
             Mish(),
         )
 

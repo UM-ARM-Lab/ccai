@@ -175,7 +175,7 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
     epochs = config['epochs']
     # pbar = tqdm.tqdm(range(epochs))
     # for epoch in pbar:
-    for epoch in range(epochs):
+    for epoch in tqdm.tqdm(range(epochs)):
         train_loss = 0.0
         flow_loss = 0.0
         state_loss = 0.0

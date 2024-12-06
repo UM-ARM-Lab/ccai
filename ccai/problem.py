@@ -85,7 +85,10 @@ class ConstrainedSVGDProblem(Problem):
                              compute_inequality=True):
         N = augmented_x.shape[0]
         T_offset = 0
-        augmented_x = augmented_x.reshape(N, self.T + T_offset, self.dx + self.du + self.dz)
+        if include_slack:
+            augmented_x = augmented_x.reshape(N, self.T + T_offset, self.dx + self.du + self.dz)
+        else:
+            augmented_x = augmented_x.reshape(N, self.T + T_offset, self.dx + self.du)
         xu = augmented_x[:, :, :(self.dx + self.du)]
         z = augmented_x[:, :, -self.dz:]
 

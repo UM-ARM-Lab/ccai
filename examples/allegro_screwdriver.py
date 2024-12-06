@@ -178,6 +178,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # initial grasp
         pregrasp_params = copy.deepcopy(params)
         pregrasp_params['warmup_iters'] = 80
+        pregrasp_params['N'] = 16
         pregrasp_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
             goal=pregrasp_params['valve_goal'] * 0,
@@ -509,6 +510,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         trajectory_sampler.send_norm_constants_to_submodels()
         if params['project_state']:
             trajectory_sampler.model.diffusion_model.classifier=None
+
         # trajectory_sampler.eval()
         print('Loaded trajectory sampler')
 
@@ -640,6 +642,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 start_for_diff = convert_yaw_to_sine_cosine(start)
             else:
                 start_for_diff = start
+            
+            if params['type'] == 'cnf':
+                orig_yaw = start_for_diff[14]
+                start_for_diff[14] = 0
             if params['project_state']:
                 initial_samples, _, _, initial_samples_0, (all_losses, all_samples, all_likelihoods) = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
                                                                     H=params['T'] + 1,
@@ -660,6 +666,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 if params['project_state']:
                     initial_samples_0 = convert_sine_cosine_to_yaw(initial_samples_0)
             print('Sampling time', time.perf_counter() - a)
+
+            if params['type'] == 'cnf':
+                initial_samples[..., 14] += orig_yaw
             # if state[-1] < -1.0:
             #     initial_samples[:, :, -1] -= 0.75
             if params['visualize_plan']:

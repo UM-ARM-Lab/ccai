@@ -13,6 +13,7 @@ from ccai.models.temporal import TemporalUnet, TemporalUnetDynamics, TemporalUne
 from ccai.models.cnf.ffjord.layers import CNF, ODEfunc
 from torchcfm.conditional_flow_matching import SchrodingerBridgeConditionalFlowMatcher, ExactOptimalTransportConditionalFlowMatcher
 from ccai.models.helpers import SinusoidalPosEmb
+from torch_cg import cg_batch
 # import ot
 import numpy as np
 from tqdm import tqdm
@@ -89,7 +90,7 @@ def set_cnf_options(solver, model):
             if solver in ['fixed_adams', 'explicit_adams']:
                 module.solver_options['max_order'] = 4
             if solver == 'rk4':
-                module.solver_options['step_size'] = .01
+                module.solver_options['step_size'] = .1
 
             # Set the test settings
             module.test_solver = solver
@@ -172,9 +173,9 @@ class TrajectoryCNF(nn.Module):
             rademacher=False,
         )
 
-        solver = 'dopri5'
+        # solver = 'dopri5'
         # solver = 'bosh3'
-        # solver = 'rk4'
+        solver = 'rk4'
         self.flow = CNF(odefunc=odefunc,
                         T=1.0,
                         train_T=False,
@@ -342,12 +343,14 @@ class TrajectoryCNF(nn.Module):
         t0_ind = (t0 * (self.horizon-1)).long() # Get local time index for vector field prediction
         t_ind.clamp_(0, self.horizon-2)
         t0_ind.clamp_(0, self.horizon-2)
+        t0_ind_for_gather = t0_ind.reshape(xu.shape[0], 1, 1).repeat(1, 1, self.xu_dim)
         t_ind_for_gather = t_ind.reshape(xu.shape[0], 1, 1).repeat(1, 1, self.xu_dim)
         t_ind_for_gather_1 = t_ind_for_gather + 1
         # t_ind_for_gather_1 = t_ind_for_gather - t_ind_for_gather + self.horizon - 1
 
         if t_ind_for_gather_1.max() >= self.horizon:
             print('t_ind_for_gather_1', t_ind_for_gather_1.max())
+        x_init = torch.gather(xu, 1, t0_ind_for_gather).squeeze()
         x0 = torch.gather(xu, 1, t_ind_for_gather).squeeze()
         x1 = torch.gather(xu, 1, t_ind_for_gather_1).squeeze()
 
@@ -356,7 +359,7 @@ class TrajectoryCNF(nn.Module):
 
         rand_for_u0 = torch.randn_like(x0[..., self.dx:])
 
-        noise_mean, noise_logvar = self.model.noise_dist(x0[..., :self.dx])
+        noise_mean, noise_logvar = self.model.noise_dist(x_init[..., :self.dx])
 
         pred_noise_u0 = noise_mean + rand_for_u0 * torch.exp(.5 * noise_logvar)
 
@@ -377,7 +380,8 @@ class TrajectoryCNF(nn.Module):
         xt, truevt = self.interp(x_arange, xu, t)
         # truevt = self.dinterp_dt(x_arange, xu, t).squeeze()
         truevt = truevt.squeeze()
-        xt += torch.randn_like(xt) * .1
+        # xt += torch.randn_like(xt) * .1
+        xt += torch.randn_like(xt) * .03
 
         vt, p_matrix, xi_C = self.model.compiled_conditional_train(t.reshape(-1), xt, context)
         flow_loss = mse_loss(vt, truevt)
@@ -385,7 +389,7 @@ class TrajectoryCNF(nn.Module):
         action_loss = mse_loss(vt[:, self.dx:], truevt[:, self.dx:])
         kl_loss = self.standard_normal_kl_div(noise_mean, noise_logvar)
         return {
-            'loss': flow_loss,
+            'loss': flow_loss + .01 * kl_loss,
             'flow_loss': flow_loss,
             'kl_loss': kl_loss,
             'action_loss': state_loss,
@@ -414,9 +418,16 @@ class TrajectoryCNF(nn.Module):
         self.noise = condition[0][1].clone()
         self.noise = self.noise.reshape(1, -1).repeat(N, 1)
 
-        noise_mean, noise_logvar = self.model.noise_dist(self.noise)
 
-        pred_noise_u0 = noise_mean + torch.randn_like(noise_mean) * torch.exp(.5 * noise_logvar)
+        #TODO: Is this defined properly?
+        self.model.delta_goal = torch.zeros((N, 3), dtype=self.noise.dtype, device=self.noise.device)
+        self.model.delta_goal[:, -1] = (-torch.pi/6 - self.x_mean[14])/self.x_std[14]
+
+        with torch.no_grad():
+            noise_mean, noise_logvar = self.model.noise_dist(self.noise)
+        # torch.manual_seed(234)
+        # pred_noise_u0 = noise_mean + torch.randn_like(noise_mean) * torch.exp(.5 * noise_logvar)
+        pred_noise_u0 = torch.randn_like(noise_mean)
         self.noise = torch.cat((self.noise, pred_noise_u0), dim=-1)
         # manually set the conditions
         if condition is not None:
