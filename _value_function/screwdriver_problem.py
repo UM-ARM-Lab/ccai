@@ -17,6 +17,9 @@ from scipy.spatial.transform import Rotation as R
 import sys
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 sys.path.append(str(CCAI_PATH))
+import sys
+import os
+sys.path.insert(0, os.path.abspath("/home/newuser/Desktop/Temp/ccai/"))
 from utils.allegro_utils import state2ee_pos
 from examples.allegro_valve_roll import PositionControlConstrainedSVGDMPC
 from examples.allegro_screwdriver import AllegroScrewdriver, ALlegroScrewdriverContact
@@ -109,7 +112,7 @@ def init_env(visualize=False):
 
     return config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial
 
-def pregrasp(env, config, chain):
+def pregrasp(env, config, chain, deterministic=True):
     params = config.copy()
     controller = 'csvgd'
     params.pop('controllers')
@@ -130,7 +133,7 @@ def pregrasp(env, config, chain):
                                 torch.tensor([[0.0, 0.0, 0.0, 0.0]]).float().to(device=sim_device)),
                                 dim=1).to(sim_device)
 
-    env.reset(dof_pos= default_dof_pos, deterministic=False)
+    env.reset(dof_pos= default_dof_pos, deterministic=deterministic)
     start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=device)
 
     screwdriver = start.clone()[-4:-1]

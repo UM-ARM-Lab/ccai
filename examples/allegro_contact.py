@@ -679,7 +679,9 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         # print('--')
         # print(self._ee_locations_in_screwdriver(q, theta))
         # print(self.default_ee_locs)
-        return 1000 * torch.sum((self.default_ee_locs - self._ee_locations_in_screwdriver(q, theta)) ** 2)
+
+        # goal cost for pregrasp and regrasp
+        return 0# 1000 * torch.sum((self.default_ee_locs - self._ee_locations_in_screwdriver(q, theta)) ** 2)
 
         # dof_pos = self.default_dof_pos[None, self.regrasp_idx]
         # return 10 * torch.sum((q - dof_pos) ** 2)

@@ -7,6 +7,9 @@ import torch
 import matplotlib.pyplot as plt
 import time
 from tqdm import tqdm
+import sys
+import os
+sys.path.insert(0, os.path.abspath("/home/newuser/Desktop/Temp/ccai/"))
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
@@ -71,10 +74,10 @@ def test(test_name=''):
 if __name__ == "__main__":
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
     sim_device = config['sim_device']
-    n_samples = 100
-    test_name = 'test_100'
+    n_samples = 5
+    test_name = 'test_5_noinfo'
 
-    # test(test_name)
+    test(test_name)
     tuples = pkl.load(open(f'{fpath}/test/{test_name}.pkl', 'rb'))
     initializations, poses_vf, poses_novf = zip(*tuples)
 
