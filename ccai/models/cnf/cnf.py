@@ -90,7 +90,7 @@ def set_cnf_options(solver, model):
             if solver in ['fixed_adams', 'explicit_adams']:
                 module.solver_options['max_order'] = 4
             if solver == 'rk4':
-                module.solver_options['step_size'] = .1
+                module.solver_options['step_size'] = .03
 
             # Set the test settings
             module.test_solver = solver
@@ -421,7 +421,9 @@ class TrajectoryCNF(nn.Module):
 
         #TODO: Is this defined properly?
         self.model.delta_goal = torch.zeros((N, 3), dtype=self.noise.dtype, device=self.noise.device)
-        self.model.delta_goal[:, -1] = (-torch.pi/6 - self.x_mean[14])/self.x_std[14]
+        self.model.delta_goal[:, -1] = -torch.pi/2
+        self.model.delta_goal -= self.x_mean[12:15]
+        self.model.delta_goal /= self.x_std[12:15]
 
         with torch.no_grad():
             noise_mean, noise_logvar = self.model.noise_dist(self.noise)

@@ -1021,7 +1021,8 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         if self.optimize_force:
             # self._contact_dg_per_t = self.num_contacts * (1 + 2 + 4) + 3
-            self._contact_dg_per_t = self.num_contacts * (2) + 3
+            # self._contact_dg_per_t = self.num_contacts * (2) + 3
+            self._contact_dg_per_t = self.num_contacts * (1 + 4) + 3
 
         else:
             self._contact_dg_per_t = self.num_contacts * (1 + 2) + 3
@@ -1348,7 +1349,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         force_list = force[:, :, self._contact_force_indices].reshape(force.shape[0], force.shape[1], self.num_contacts,
                                                                       3)
         if 'delta_f' in self.data:
-            force_list += self.data['delta_f']
+            force_list += self.data['delta_f'].reshape(N, T, self.num_contacts, 3)
         if self.env_force:
             env_force = force[:, :, -3:]
             force_list = torch.cat((force_list, env_force.unsqueeze(2)), dim=2)
@@ -1590,8 +1591,8 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         if compute_grads:
             T_range = torch.arange(T, device=device)
-            T_range_minus = torch.arange(T - 1, device=device)
-            T_range_plus = torch.arange(1, T, device=device)
+            T_range_minus = torch.arange(T - T_offset, device=device)
+            T_range_plus = torch.arange(T_offset, T, device=device)
 
             if 'delta_q' in self.data:
                 dg_d_current_q, dg_d_next_q, dg_d_current_theta, dg_d_next_theta, dg_d_contact_jac, dg_d_contact_loc, dg_d_normal \
@@ -1620,10 +1621,11 @@ class AllegroContactProblem(AllegroObjectProblem):
                 mask_state = torch.zeros_like(grad_g).bool()
                 mask_state[:, :, :, :, self.contact_state_indices] = True
 
-                grad_g[torch.logical_and(mask_t_p, mask_state)] = dg_d_current_q[:, 1:].reshape(-1)
-                grad_g[:, T_range_plus, T_range_minus, :, 16: 16 + self.obj_dof] = dg_d_current_theta[:, 1:]
-                grad_g[torch.logical_and(mask_t, mask_state)] = dg_d_next_q.reshape(-1)
-                grad_g[:, T_range, T_range, :, 16:16 + self.obj_dof] = dg_d_next_theta
+                grad_g[torch.logical_and(mask_t_p, mask_state)] = dg_d_current_q[:, T_offset:].reshape(-1)
+                grad_g[:, T_range_plus, T_range_minus, :, 16: 16 + self.obj_dof] = dg_d_current_theta[:, T_offset:]
+                if not projected_diffusion:
+                    grad_g[torch.logical_and(mask_t, mask_state)] = dg_d_next_q.reshape(-1)
+                    grad_g[:, T_range, T_range, :, 16:16 + self.obj_dof] = dg_d_next_theta
                 grad_g = grad_g.permute(0, 1, 3, 2, 4).reshape(N, -1, T * d)
 
                 if torch.any(torch.isnan(grad_g)):
@@ -1897,7 +1899,7 @@ class AllegroContactProblem(AllegroObjectProblem):
             force = torch.zeros(N, T, 12, device=self.device)
             force[:, :, self._contact_force_indices] = xu[:, :, -self.num_contacts * 3:]
             h, grad_h, hess_h = self._friction_constraint(
-                q=q, delta_q=delta_q, force=None,
+                q=q, delta_q=delta_q, force=force,
                 compute_grads=compute_grads,
                 compute_hess=compute_hess,
                 projected_diffusion=projected_diffusion)
@@ -1960,28 +1962,28 @@ class AllegroContactProblem(AllegroObjectProblem):
                                                                                       compute_hess=compute_hess, 
                                                                                       projected_diffusion=projected_diffusion)
         force = None
-        # if self.optimize_force:
-        #     if self.env_force:
-        #         force = torch.zeros(N, T, 12 + 3, device=self.device) # assume one env contact
-        #         force[:, :, self._contact_force_indices] = xu[:, :, -(self.num_contacts + 1) * 3: -3]
-        #         force[:, :, -3:] = xu[:, :, -3:]
-        #     else:
-        #         force = torch.zeros(N, T, 12, device=self.device)
-        #         force[:, :, self._contact_force_indices] = xu[:, :, -self.num_contacts * 3:]
+        if self.optimize_force:
+            if self.env_force:
+                force = torch.zeros(N, T, 12 + 3, device=self.device) # assume one env contact
+                force[:, :, self._contact_force_indices] = xu[:, :, -(self.num_contacts + 1) * 3: -3]
+                force[:, :, -3:] = xu[:, :, -3:]
+            else:
+                force = torch.zeros(N, T, 12, device=self.device)
+                force[:, :, self._contact_force_indices] = xu[:, :, -self.num_contacts * 3:]
 
-        #     g_equil, grad_g_equil, hess_g_equil = self._force_equlibrium_constraints_w_force(
-        #         q=q,
-        #         delta_q=delta_q,
-        #         force=force,
-        #         compute_grads=compute_grads,
-        #         compute_hess=compute_hess,
-        #         projected_diffusion=projected_diffusion)
-        # else:
-        #     g_equil, grad_g_equil, hess_g_equil = self._force_equlibrium_constraints(
-        #         q=q, delta_q=delta_q,
-        #         compute_grads=compute_grads,
-        #         compute_hess=compute_hess,
-        #         projected_diffusion=projected_diffusion)
+            g_equil, grad_g_equil, hess_g_equil = self._force_equlibrium_constraints_w_force(
+                q=q,
+                delta_q=delta_q,
+                force=force,
+                compute_grads=compute_grads,
+                compute_hess=compute_hess,
+                projected_diffusion=projected_diffusion)
+        else:
+            g_equil, grad_g_equil, hess_g_equil = self._force_equlibrium_constraints(
+                q=q, delta_q=delta_q,
+                compute_grads=compute_grads,
+                compute_hess=compute_hess,
+                projected_diffusion=projected_diffusion)
 
         g_valve, grad_g_valve, hess_g_valve = self._kinematics_constraints(
             q=q, delta_q=delta_q, theta=theta,
@@ -1994,23 +1996,23 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         g_contact = torch.cat((g_contact,
                                #    g_dynamics,
-                            #    g_equil,
-                               g_valve,
+                               g_equil,
+                            #    g_valve,
                                ), dim=1)
 
         if grad_g_contact is not None:
             grad_g_contact = torch.cat((grad_g_contact,
                                         # grad_g_dynamics,
-                                        # grad_g_equil,
-                                        grad_g_valve,
+                                        grad_g_equil,
+                                        # grad_g_valve,
                                         ), dim=1)
             if torch.any(torch.isinf(grad_g_contact)) or torch.any(torch.isnan(grad_g_contact)):
                 print('hello')
         if hess_g_contact is not None:
             hess_g_contact = torch.cat((hess_g_contact,
                                         # hess_g_dynamics,
-                                        # hess_g_equil,
-                                        hess_g_valve,
+                                        hess_g_equil,
+                                        # hess_g_valve,
                                         ), dim=1)
 
         return g_contact, grad_g_contact, hess_g_contact

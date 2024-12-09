@@ -667,11 +667,12 @@ class TemporalUnetStateAction(nn.Module):
 
     def project(self, x_orig, x, context, p_matrix=None, xi_C=None):
         N = x.shape[0]
-        Kh = 1
-        Ktheta = 10
+        Kh = 4
+        Ktheta = 1
 
         # Is the below sufficient to go from dtheta/dt to df/dtheta?
-        # x /= -Ktheta
+        x /= -Ktheta
+        # x = -x
 
         if self.problem_dict is not None:
             for problem_idx in self.problem_dict:
@@ -710,6 +711,7 @@ class TemporalUnetStateAction(nn.Module):
                 dC = dC.to(dtype=dtype)
 
                 dC_mask = ~(dC == 0).all(dim=-1)
+                # dC_mask[:, :3] = False
                 dg_mask = dC_mask[:, :g_dim]
                 g = C[:, :g_dim]
                 dg = dC[:, :g_dim]
@@ -731,6 +733,9 @@ class TemporalUnetStateAction(nn.Module):
 
                 h_bar = torch.cat((g_masked, h_I_p), dim=1).to(dtype=x.dtype)
                 dh_bar = torch.cat((dg_masked, dh_I_p), dim=1).to(dtype=x.dtype)
+
+                # h_bar = g_masked.to(dtype=x.dtype)
+                # dh_bar = dg_masked.to(dtype=x.dtype)
 
                 # we try and invert the dC dCT, if it is singular then we use the psuedo-inverse
                 # eye = torch.eye(dC.shape[1]).repeat(N, 1, 1).to(device=C.device, dtype=self.dtype)
@@ -763,14 +768,14 @@ class TemporalUnetStateAction(nn.Module):
                 # now the second index (1) is the
                 # x with which we are differentiating
 
-                dCT = dC.permute(0, 2, 1).unsqueeze(1)
+                # dCT = dC.permute(0, 2, 1).unsqueeze(1)
                 dC = dC.unsqueeze(1)
                 dh_bar_dJ = torch.bmm(dh_bar, update_this_c.permute(0, 2, 1))
                 second_term =  Ktheta * dh_bar_dJ - Kh * h_bar.unsqueeze(-1)
 
                 pi = -dCdCT_inv @ second_term
 
-                pi[..., g_masked.shape[-1]:] = torch.clamp(pi[..., g_masked.shape[-1]:], min=0)
+                pi[:, g_masked.shape[-1]:] = torch.clamp(pi[:, g_masked.shape[-1]:], min=0)
                     # p_matrix = p_matrix[:, :-z_dim, :-z_dim]
                 update_this_c = -Ktheta * (update_this_c.squeeze(1) + (dh_bar.permute(0, 2, 1) @ pi).squeeze(-1))
 
@@ -799,18 +804,22 @@ class TemporalUnetStateAction(nn.Module):
     def compiled_conditional_test(self, t, x, context):
         # x_orig, x = self.compiled_conditional_test_fwd(t, x, context)
         dx = torch.zeros_like(x)
-        dx[:, 12:15] = (self.delta_goal - x[:, 12:15]) / (1-t)
+        dx[:, 12:15] = (self.delta_goal - x[:, 12:15]) #/ (1-t)
+        # dx[:, -21:] = .1 * x[:, -21:]
         # Clip norm of dx[:, 12:15] to pi/6
-        norm_mask = torch.norm(dx[:, 12:15], dim=-1) > 1
-        dx[norm_mask, 12:15] = dx[norm_mask, 12:15] / torch.norm(dx[norm_mask, 12:15], dim=-1, keepdim=True) * 1
+        # norm_mask = torch.norm(dx[:, 12:15], dim=-1) > 1
+        # dx[norm_mask, 12:15] = dx[norm_mask, 12:15] / torch.norm(dx[norm_mask, 12:15], dim=-1, keepdim=True) * 1
         print(dx[:, 12:15])
         if torch.isnan(dx).any():
             print('nan in dx', t)
             # Replace nan with 0
             dx[torch.isnan(dx)] = 0
-        x, p_matrix, xi_C = self.project(x, dx, context)
-        # return x, None, None
-        return x, p_matrix, xi_C
+        dx, p_matrix, xi_C = self.project(x, dx, context)
+
+        # x_norm_mask = torch.norm(x, dim=-1) > 1
+        # x[x_norm_mask] = x[x_norm_mask] / torch.norm(x[x_norm_mask], dim=-1, keepdim=True) * 1
+        # return dx, None, None
+        return dx, p_matrix, xi_C
 
     # @torch.compile(mode='max-autotune')
     def compiled_unconditional_test(self, t, x):
