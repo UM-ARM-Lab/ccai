@@ -208,7 +208,6 @@ class AllegroValveDataset(Dataset):
     def get_norm_constants(self):
         return self.mean, self.std
 
-
 class AllegroScrewDriverDataset(Dataset):
 
     def __init__(self, folders, max_T, cosine_sine=False, states_only=False, 

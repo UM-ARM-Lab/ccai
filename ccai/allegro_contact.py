@@ -317,6 +317,9 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         self.grad_singularity_constr = vmap(jacrev(self._singularity_constr))
         self.grad_euler_to_angular_velocity = jacrev(euler_to_angular_velocity, argnums=(0, 1))
 
+
+        self.contact_points = kwargs['contact_points_dict']
+
     def _preprocess(self, xu, projected_diffusion=False):
         N = xu.shape[0]
         if not projected_diffusion:
@@ -500,7 +503,8 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         # convert to scene base frame
         ee_locs = self.contact_scenes.scene_transform.inverse().transform_points(ee_locs)
 
-        if not self.full_dof_goal:
+        # if not self.full_dof_goal:
+        if self.contact_points is None:
             # convert to scene ee frame
             object_trans = self.contact_scenes.scene_sdf.chain.forward_kinematics(
                 _q_env.reshape(-1, _q_env.shape[-1]))
@@ -721,7 +725,10 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         self._regrasp_dg_constant = self.num_regrasps
         self._regrasp_dg = self._regrasp_dg_per_t * T + self._regrasp_dg_constant
         self._regrasp_dz = self.num_regrasps  # one contact constraints per finger
-        self._regrasp_dz += self.num_regrasps  # one sdf constraint per finger
+        if contact_points_object is not None:
+            self._regrasp_dz += self.num_regrasps  # Contact region constraint
+        elif contact_points_robot is not None:
+            raise NotImplementedError("Contact points in robot frame not implemented")
         self._regrasp_dh = self._regrasp_dz * T  # inequality
         # self._regrasp_dh += self.num_regrasps
         self._regrasp_dh_constant = 0

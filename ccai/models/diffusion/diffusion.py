@@ -610,7 +610,7 @@ class GaussianDiffusion(nn.Module):
                                   return_all_timesteps=False,
                                   start_timestep=timestep,
                                   trajectory=x_noised)
-
+    @torch.no_grad()
     def approximate_likelihood(self, x, context=None, forward_kl=False):
         B, H, d = x.shape
         device = self.betas.device
@@ -635,12 +635,12 @@ class GaussianDiffusion(nn.Module):
 
         # Compute our diffusing step from t to t-1
         # p_next_x = self.p_mean_variance(x=x_t, t=t, context=context)
-        # batch_size = 256
-        batch_size = 4096*32
+        batch_size = 2048
+        # batch_size = 1
         all_p_next_x = []
         for i in range(0, B * N, batch_size):
             p_next_x = self.p_mean_variance(x=x_t[i:i + batch_size], t=t[i:i + batch_size], context=context[i:i + batch_size] if context is not None else None)
-            all_p_next_x.append(p_next_x)
+            all_p_next_x.append((p_next_x[0], p_next_x[1]))
         # p_next_x = {k: torch.cat([p[k] for p in p_next_x], dim=0) for k in all_p_next_x[0].keys()}
         p_next_x = [torch.cat([p[k] for p in all_p_next_x], dim=0) for k in range(2)]
 
@@ -648,7 +648,7 @@ class GaussianDiffusion(nn.Module):
             kl_x = self._gaussian_kl(p_next_x[0], p_next_x[1], q_next_x[0], q_next_x[1])
         else:
             kl_x = self._gaussian_kl(q_next_x[0], q_next_x[1], p_next_x[0], p_next_x[1])
-        overall_kl = kl_x.reshape(B, N).mean(dim=1)
+        overall_kl = kl_x.reshape(B, N).mean(dim=1).to(x.device)
         return -overall_kl
  
     def project(self, N, H=None, condition=None, context=None):
