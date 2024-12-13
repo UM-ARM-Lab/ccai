@@ -185,11 +185,11 @@ class TrajectoryDiffusionModel(nn.Module):
 
         if project:
             samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.diffusion_model.project(N=N, H=H, context=context, condition=condition)
+            return samples, samples_0, (all_losses, all_samples, all_likelihoods)
         else:
             samples = self.diffusion_model.sample(N=N, H=H, context=context, condition=condition)  # .reshape(-1, H#,
         #         self.dx + self.du)
-        return samples, samples_0, (all_losses, all_samples, all_likelihoods)
-
+            return samples
     def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
         B = trajectories.shape[0]
         if start is not None:

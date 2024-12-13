@@ -114,7 +114,7 @@ class TrajectoryCNF(nn.Module):
             hidden_dim=32,
             inflation_noise=0.0,
             state_only=False,
-            state_control_only=False
+            state_control_only=False,
     ):
         super().__init__()
 
@@ -173,9 +173,9 @@ class TrajectoryCNF(nn.Module):
             rademacher=False,
         )
 
-        # solver = 'dopri5'
+        solver = 'dopri5'
         # solver = 'bosh3'
-        solver = 'rk4'
+        # solver = 'rk4'
         self.flow = CNF(odefunc=odefunc,
                         T=1.0,
                         train_T=False,

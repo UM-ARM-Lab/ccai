@@ -3,6 +3,7 @@ import numpy as np
 from torch.profiler import profile, record_function, ProfilerActivity
 
 from torch_cg import cg_batch
+from ccai.models.cnf.ffjord.layers import CNF, ODEfunc
 
 
 class ConstrainedSteinTrajOpt:
@@ -34,6 +35,113 @@ class ConstrainedSteinTrajOpt:
         self.dtype = torch.float64
         self.delta_x = None
         self.Bk = None
+
+        self.Ktheta = 1
+        self.Kh = .1
+        self.ode_solve = params.get('ode_solve', True)
+        if self.ode_solve:
+            self.odefunc = ODEfunc(
+                diffeq=self.ode_update,# if self.loss_type == 'conditional_ot_sb' else self.state_control_only_forward,
+                divergence_fn='approximate',
+                residual=False,
+                rademacher=False,
+            )
+            solver = 'dopri5'
+            self.flow = CNF(odefunc=self.odefunc,
+                            T=50.0,
+                            train_T=False,
+                            solver=solver
+                            )
+            self.flow.atol = 1e-5
+            self.flow.rtol = 1e-5
+            # self.flow.solver_options['step_size'] = .03
+    def ode_update(self, t, xuz):
+        N = xuz.shape[0]
+        d = self.dx + self.du
+        xuz = xuz[:, :, :d]
+        xuz = xuz.detach()
+        xuz.requires_grad = True
+
+        xuz = xuz.to(dtype=torch.float32)
+        grad_J, hess_J, K, grad_K, C, dC, hess_C = self.problem.eval(xuz.to(dtype=torch.float32),
+                                                                     include_slack=False)
+        grad_J = grad_J.unsqueeze(0)
+        g_dim = self.problem.dg
+
+        dC_mask = ~(dC == 0).all(dim=-1)
+        # dC_mask[:, :3] = False
+        dg_mask = dC_mask[:, :g_dim]
+        g = C[:, :g_dim]
+        dg = dC[:, :g_dim]
+        dh_mask = dC_mask[:, g_dim:]
+        h = C[:, g_dim:]
+        dh = dC[:, g_dim:]
+        g_masked = g[dg_mask].reshape(N, -1)
+        h_masked = h[dh_mask].reshape(N, -1)
+        dg_masked = dg[dg_mask].reshape(N, -1, dC.shape[-1])
+        dh_masked = dh[dh_mask].reshape(N, -1, dC.shape[-1])
+        dC = torch.cat((dg_masked, dh_masked), dim=1).reshape(N, -1, dC.shape[-1])
+        C = torch.cat((g_masked, h_masked), dim=-1).reshape(N, -1)
+
+        #TODO: Is this the correct way to mask the constraints?
+        I_p = h >= 0
+
+        h_I_p = h_masked[I_p].reshape(N, -1)
+        dh_I_p = dh_masked[I_p].reshape(N, -1, dC.shape[-1])
+
+        h_bar = torch.cat((g_masked, h_I_p), dim=1).to(dtype=grad_J.dtype)
+        dh_bar = torch.cat((dg_masked, dh_I_p), dim=1).to(dtype=grad_J.dtype)
+
+        # h_bar = g_masked.to(dtype=grad_J.dtype)
+        # dh_bar = dg_masked.to(dtype=grad_J.dtype)
+
+        # we try and invert the dC dCT, if it is singular then we use the psuedo-inverse
+        # eye = torch.eye(dC.shape[1]).repeat(N, 1, 1).to(device=C.device, dtype=self.dtype)
+        eye = torch.eye(dh_bar.shape[1]).repeat(N, 1, 1).to(device=C.device, dtype=grad_J.dtype)
+
+        eye_0 = eye.clone()
+        # eye_0[inactive_constraint_mask_eye] = 0
+        damping_factor = 1e-6
+        eye_0 *= damping_factor
+
+        dCdCT = dh_bar @ dh_bar.permute(0, 2, 1)
+        dCdCT = dCdCT.to(dtype=grad_J.dtype) * self.Ktheta
+        A_bmm = lambda x: dCdCT @ x
+        #
+        # damping_factor = 1e-1
+        try:
+            dCdCT_inv = torch.linalg.solve(dCdCT + eye_0, eye)
+            # dCdCT_inv = torch.linalg.solve(dCdCT, eye)
+            if torch.any(torch.isnan(dCdCT_inv)):
+                raise ValueError('nan in inverse')
+        except Exception as e:
+            print(e)
+            # dCdCT_inv = torch.linalg.lstsq(dC @ dC.permute(0, 2, 1), eye).solution
+            # dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1))
+            dCdCT_inv, _ = cg_batch(A_bmm, eye, verbose=False)
+        dCdCT_inv = dCdCT_inv.to(dtype=torch.float32)
+        # get projection operator
+
+        # compute gradient for projection
+        # now the second index (1) is the
+        # x with which we are differentiating
+
+        # dCT = dC.permute(0, 2, 1).unsqueeze(1)
+        dC = dC.unsqueeze(1)
+        dh_bar_dJ = torch.bmm(dh_bar, grad_J.permute(0, 2, 1))
+        second_term =  self.Ktheta * dh_bar_dJ - self.Kh * h_bar.unsqueeze(-1)
+
+        pi = -dCdCT_inv @ second_term
+
+        pi[:, g_masked.shape[-1]:] = torch.clamp(pi[:, g_masked.shape[-1]:], min=0)
+            # p_matrix = p_matrix[:, :-z_dim, :-z_dim]
+        ret = -self.Ktheta * (grad_J.squeeze(1) + (dh_bar.permute(0, 2, 1) @ pi).squeeze(-1))
+
+        grad_norm = torch.linalg.norm(ret, keepdim=True, dim=-1)
+        max_norm = 2
+        ret = torch.where(grad_norm > max_norm, ret / grad_norm * max_norm, ret)
+
+        return ret.detach().to(dtype=torch.float32)
 
     def compute_update(self, xuz):
         N = xuz.shape[0]
@@ -252,36 +360,43 @@ class ConstrainedSteinTrajOpt:
             xuz.data = self.resample(xuz.data)
 
         resample_period = 50
-        path = [xuz.data.clone()]
         self.gamma = self.max_gamma
-        for iter in range(T):
-            # print(iter)
-            # reset slack variables
-            # if self.problem.dz > 0:
-            #    xu = xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du]
-            #    z_init = self.problem.get_initial_z(xu)
-            #    xuz = torch.cat((xu, z_init), dim=2).reshape(N, -1)
 
-            s = time.time()
-            if T > 50:
-                self.gamma = self.max_gamma * driving_force(iter)
-            else:
-                self.gamma = self.max_gamma
 
-            # if (iter + 1) % resample_period == 0 and (iter < T - 1):
-            #    xuz.data = self.resample(xuz.data)
-            grad = self.compute_update(xuz)
 
-            grad_norm = torch.linalg.norm(grad, keepdim=True, dim=-1)
-            max_norm = 1
-            grad = torch.where(grad_norm > max_norm, grad / grad_norm * max_norm, grad)
-            xuz.data = xuz.data - self.dt * grad
-            #self.delta_x = self.dt * grad
-            torch.nn.utils.clip_grad_norm_(xuz, 10)
-            self._clamp_in_bounds(xuz)
+        if not self.ode_solve:
+            path = [xuz.data.clone()]
+            for iter in range(T):
+                # print(iter)
+                # reset slack variables
+                # if self.problem.dz > 0:
+                #    xu = xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du]
+                #    z_init = self.problem.get_initial_z(xu)
+                #    xuz = torch.cat((xu, z_init), dim=2).reshape(N, -1)
 
-            path.append(xuz.data.clone())
+                s = time.time()
+                if T > 50:
+                    self.gamma = self.max_gamma * driving_force(iter)
+                else:
+                    self.gamma = self.max_gamma
 
+                # if (iter + 1) % resample_period == 0 and (iter < T - 1):
+                #    xuz.data = self.resample(xuz.data)
+                grad = self.compute_update(xuz)
+
+                grad_norm = torch.linalg.norm(grad, keepdim=True, dim=-1)
+                max_norm = 1
+                grad = torch.where(grad_norm > max_norm, grad / grad_norm * max_norm, grad)
+                xuz.data = xuz.data - self.dt * grad
+                #self.delta_x = self.dt * grad
+                torch.nn.utils.clip_grad_norm_(xuz, 10)
+                self._clamp_in_bounds(xuz)
+
+                path.append(xuz.data.clone())
+        else:
+            path = [xuz.data.clone().reshape(N, self.T, -1)[..., :self.dx + self.du]]
+            solve = self.flow(xuz.reshape(N, self.T, -1)[..., :self.dx + self.du])
+            path.append(solve)
         # sort particles by penalty
         xuz = xuz.to(dtype=torch.float32)
         J = self.problem.get_cost(xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du])
