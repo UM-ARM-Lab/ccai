@@ -34,8 +34,22 @@ for trial_num in range(0, config['num_trials']):
 
     isaac_imgs = [fpath / img for img in sorted(os.listdir(fpath)) if img[-3:] == 'png'][6:]
     isaac_imgs = [imageio.imread(img) for img in isaac_imgs]
-    if len(isaac_imgs) > 0:
-        imageio.mimsave(f'{fpath}/isaac.gif', isaac_imgs, loop=0)
+
+    x0 = 675
+    y0 = 750
+    width = 300
+    # Add a progress bar to the gif by editing each image. Overwrite the original images
+    imgs_with_progress_bar = []
+    for i in range(len(isaac_imgs)):
+        img = isaac_imgs[i]
+        # Add progress bar to image. Should be green rectangle that grows depending on i
+        img = Image.fromarray(img)
+        draw = ImageDraw.Draw(img)
+        draw.rectangle([x0, y0, x0 + width * i / len(isaac_imgs), y0 + 20], fill='green')
+        img = np.asarray(img)
+        imgs_with_progress_bar.append(img)
+    if len(imgs_with_progress_bar) > 0:
+        imageio.mimsave(f'{fpath}/isaac.gif', imgs_with_progress_bar, loop=0)
     # Get names of directories in fpath
     for c_plan in range(4):
         fpath_cind = fpath / f'c{c_plan}'

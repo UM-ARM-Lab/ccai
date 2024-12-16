@@ -33,8 +33,8 @@ fingers = ['index', 'middle', 'thumb']
 
 def get_args():
     parser = argparse.ArgumentParser()
-    # parser.add_argument('--config', type=str, default='allegro_screwdriver_cnf_state_control_only.yaml')
-    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion.yaml')
+    parser.add_argument('--config', type=str, default='allegro_screwdriver_cnf_state_control_only.yaml')
+    # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion.yaml')
     return parser.parse_args()
 
 
@@ -77,7 +77,7 @@ def train_model(trajectory_sampler, train_loader, config):
     step = 0
 
     epochs = config['epochs']
-    # pbar = tqdm.tqdm(range(epochs))
+    pbar = tqdm.tqdm(range(epochs))
     for epoch in range(epochs):
         train_loss = 0.0
         trajectory_sampler.train()
@@ -105,8 +105,8 @@ def train_model(trajectory_sampler, train_loader, config):
                     update_ema(trajectory_sampler)
 
         train_loss /= len(train_loader)
-        # pbar.set_description(
-        #     f'Train loss {train_loss:.3f}')
+        pbar.set_description(
+            f'Train loss {train_loss:.3f}')
         try:
             wandb.log({'train_loss_epoch': train_loss})
         except:

@@ -667,7 +667,7 @@ class TemporalUnetStateAction(nn.Module):
 
     def project(self, x_orig, x, context, p_matrix=None, xi_C=None):
         N = x.shape[0]
-        Kh = 4
+        Kh = 10
         Ktheta = 1
 
         # Is the below sufficient to go from dtheta/dt to df/dtheta?
@@ -705,7 +705,8 @@ class TemporalUnetStateAction(nn.Module):
 
                 C, dC, _ = problem.combined_constraints(x_this_problem, 
                                                         compute_hess=False, projected_diffusion=True,
-                                                        include_slack=False)
+                                                        include_slack=False,
+                                                        compute_inequality=False)
 
                 C = C.to(dtype=dtype)
                 dC = dC.to(dtype=dtype)
@@ -802,19 +803,22 @@ class TemporalUnetStateAction(nn.Module):
         return x_orig, x
 
     def compiled_conditional_test(self, t, x, context):
-        # x_orig, x = self.compiled_conditional_test_fwd(t, x, context)
-        dx = torch.zeros_like(x)
-        dx[:, 12:15] = (self.delta_goal - x[:, 12:15]) #/ (1-t)
+        x_orig, dx = self.compiled_conditional_test_fwd(t, x, context)
+        p_matrix, xi_C = None, None
+        # dx = torch.zeros_like(x)
+        # dx[:, 12:15] = (self.delta_goal - x[:, 12:15]) #/ (1-t)
         # dx[:, -21:] = .1 * x[:, -21:]
         # Clip norm of dx[:, 12:15] to pi/6
         # norm_mask = torch.norm(dx[:, 12:15], dim=-1) > 1
         # dx[norm_mask, 12:15] = dx[norm_mask, 12:15] / torch.norm(dx[norm_mask, 12:15], dim=-1, keepdim=True) * 1
-        print(dx[:, 12:15])
-        if torch.isnan(dx).any():
-            print('nan in dx', t)
-            # Replace nan with 0
-            dx[torch.isnan(dx)] = 0
-        dx, p_matrix, xi_C = self.project(x, dx, context)
+        # print(dx[:, 12:15])
+        # if torch.isnan(dx).any():
+        #     print('nan in dx', t)
+        #     # Replace nan with 0
+        #     dx[torch.isnan(dx)] = 0
+        dx *= -1
+
+        # dx, p_matrix, xi_C = self.project(x, dx, context)
 
         # x_norm_mask = torch.norm(x, dim=-1) > 1
         # x[x_norm_mask] = x[x_norm_mask] / torch.norm(x[x_norm_mask], dim=-1, keepdim=True) * 1

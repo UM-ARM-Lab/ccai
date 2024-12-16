@@ -1022,7 +1022,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         if self.optimize_force:
             # self._contact_dg_per_t = self.num_contacts * (1 + 2 + 4) + 3
             # self._contact_dg_per_t = self.num_contacts * (2) + 3
-            self._contact_dg_per_t = self.num_contacts * (1 + 4) + 3
+            self._contact_dg_per_t = self.num_contacts * (1) + 3
 
         else:
             self._contact_dg_per_t = self.num_contacts * (1 + 2) + 3
@@ -1037,6 +1037,9 @@ class AllegroContactProblem(AllegroObjectProblem):
             self.min_force_dict = {k:v for k, v in self.min_force_dict.items() if k in self.contact_fingers}
             self._contact_dz += 1 * len(self.min_force_dict)
         self._contact_dh = self._contact_dz * T  # inequality
+
+        self._contact_dz = 0
+        self._contact_dh = 0
 
     def get_initial_xu(self, N):
         """
@@ -1996,14 +1999,14 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         g_contact = torch.cat((g_contact,
                                #    g_dynamics,
-                               g_equil,
+                            #    g_equil,
                             #    g_valve,
                                ), dim=1)
 
         if grad_g_contact is not None:
             grad_g_contact = torch.cat((grad_g_contact,
                                         # grad_g_dynamics,
-                                        grad_g_equil,
+                                        # grad_g_equil,
                                         # grad_g_valve,
                                         ), dim=1)
             if torch.any(torch.isinf(grad_g_contact)) or torch.any(torch.isnan(grad_g_contact)):
@@ -2011,7 +2014,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         if hess_g_contact is not None:
             hess_g_contact = torch.cat((hess_g_contact,
                                         # hess_g_dynamics,
-                                        hess_g_equil,
+                                        # hess_g_equil,
                                         # hess_g_valve,
                                         ), dim=1)
 

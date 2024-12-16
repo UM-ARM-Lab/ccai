@@ -262,7 +262,7 @@ class AllegroScrewDriverDataset(Dataset):
         self.trajectories = self.trajectories.reshape(-1, self.trajectories.shape[-2], self.trajectories.shape[-1])
         self.masks = self.masks.reshape(-1, self.masks.shape[-1])
         self.trajectories = torch.from_numpy(self.trajectories).float()
-        # self.trajectories[:, :, 14] = self.trajectories[:, :, 14] - self.trajectories[:, :1, 14].expand(-1, max_T+1)
+        self.trajectories[:, :, 14] = self.trajectories[:, :, 14] - self.trajectories[:, :1, 14].expand(-1, max_T+1)
         self.masks = torch.from_numpy(self.masks).float()
         if states_only:
             self.trajectories = self.trajectories[:, :, :15]
@@ -281,10 +281,10 @@ class AllegroScrewDriverDataset(Dataset):
         self.std = 1
 
         # Filter out all non-turn modes 
-        # turn_mask = self.trajectory_type.sum(1) == 3
-        # self.trajectories = self.trajectories[turn_mask]
-        # self.trajectory_type = self.trajectory_type[turn_mask]
-        # self.masks = self.masks[turn_mask]
+        turn_mask = self.trajectory_type.sum(1) == 3
+        self.trajectories = self.trajectories[turn_mask]
+        self.trajectory_type = self.trajectory_type[turn_mask]
+        self.masks = self.masks[turn_mask]
 
         self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.75)
         self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.5)
@@ -305,7 +305,7 @@ class AllegroScrewDriverDataset(Dataset):
         dx = 15
 
         ## randomly perturb angle of screwdriver
-        traj[:, dx-1] += 2 * np.pi * (np.random.rand() - 0.5)
+        # traj[:, dx-1] += 2 * np.pi * (np.random.rand() - 0.5)
 
         if self.cosine_sine:
                 traj_q = traj[:, :14]

@@ -284,8 +284,9 @@ class ConstrainedSteinTrajOpt:
 
         # sort particles by penalty
         xuz = xuz.to(dtype=torch.float32)
+        self.problem._preprocess(xuz)
         J = self.problem.get_cost(xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du])
-        C, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1), compute_grads=False, compute_hess=False)
+        C, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du], compute_grads=False, compute_hess=False, include_slack=False)
         penalty = J.reshape(N) + self.penalty * torch.sum(C.reshape(N, -1).abs(), dim=1)
         idx = torch.argsort(penalty, descending=False)
         path = torch.stack(path, dim=0).reshape(len(path), N, self.T, -1)[:, :, :, :self.dx + self.du]

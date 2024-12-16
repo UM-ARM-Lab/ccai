@@ -12,7 +12,7 @@ visualize: True
 # experiment_name: 'allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_no_project_training_project_inference_alpha_C_.1_all_constraints'
 # experiment_name: 'allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_project_training_C_0_project_inference_alpha_C_10_all_constraints'
 # experiment_name: 'allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_project_inference_alpha_C_10_all_constraints'
-experiment_name: 'allegro_cnf_state_control_only_turn_only_group_norm_projected'
+experiment_name: 'allegro_cnf_state_control_only_turn_only_layer_norm_fixed_noise_pred_kl_.01_sigma_.03_cnf_pred_noise_fix_contact_no_project_negative'
 type: 'cnf'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
@@ -42,12 +42,12 @@ project_state: False
 state_control_only: True
 # model_path: 'data/training/allegro_screwdriver/allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_no_project_training_cnf/allegro_screwdriver_cnf.pt'
 # model_path: 'data/training/allegro_screwdriver/allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_projected_training_projected_target_alpha_C_0_cnf/allegro_screwdriver_cnf.pt'
-model_path: 'data/training/allegro_screwdriver/allegro_cnf_state_control_only_turn_only_group_norm_cnf/allegro_screwdriver_cnf.pt'
+model_path: 'data/training/allegro_screwdriver/allegro_cnf_state_control_only_turn_only_layer_norm_fixed_noise_pred_kl_.01_sigma_.03_cnf/allegro_screwdriver_cnf.pt'
 # model_path: 'data/training/allegro_screwdriver/allegro_cnf_exact_ot_cnf/allegro_screwdriver_cnf.pt'
 controllers:
   csvgd:
-    # N: 16
-    N: 1
+    N: 16
+    # N: 1
     alpha_J: 1.0e-2
     alpha_C: 1
     step_size: 0.1

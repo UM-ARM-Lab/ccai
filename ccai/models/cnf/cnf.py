@@ -173,9 +173,9 @@ class TrajectoryCNF(nn.Module):
             rademacher=False,
         )
 
-        # solver = 'dopri5'
+        solver = 'dopri5'
         # solver = 'bosh3'
-        solver = 'rk4'
+        # solver = 'rk4'
         self.flow = CNF(odefunc=odefunc,
                         T=1.0,
                         train_T=False,
@@ -268,31 +268,60 @@ class TrajectoryCNF(nn.Module):
         }
 
     def h_poly(self, t):
-        tt = t[None, :]**torch.arange(6, device=t.device)[:, None]
+        tt = t[None, :]**torch.arange(8, device=t.device)[:, None]
         A = torch.tensor([
-        #[0, 1,  2,    3,   4,   5],
-            [1, 0,  0,  -10,  15,  -6],     #p0
-            [0, 1,  0,   -6,   8,  -3],       #v0
-            [0, 0, .5, -1.5, 1.5, -.5], #a0
-            [0, 0,  0,   .5,  -1,  .5],      #p1
-            [0, 0,  0,   -4,   7,  -3],       #v1
-            [0, 0,  0,   10, -15,   6],      #a1
+        #[0, 1,  2,   3,    4,   5,    6,   7],
+            [1, 0,  0,   0,  -35,  84,  -70,  20], #p0
+            [0, 1,  0,   0,  -20,  45,  -36,  10], #v0
+            [0, 0, .5,   0,   -5,  10, -7.5,   2], #a0
+            [0, 0,  0, 1/6, -2/3,   1, -2/3, 1/6], #j0
+            [0, 0,  0,   0,   35, -84,   70, -20], #p1
+            [0, 0,  0,   0,  -15,  39,  -34,  10], #v1
+            [0, 0,  0,   0,  5/2,  -7, 13/2,  -2], #a1
+            [0, 0,  0,   0, -1/6, 1/2, -1/2, 1/6], #j1
         ], dtype=t.dtype, device=t.device)
         return A @ tt
 
     def dh_poly(self, t):
-        tt = t[None, :]**torch.arange(6, device=t.device)[:, None]
-        A = torch.tensor([
-            [0, 0, -30, 60, -30, 0],
-            [1, 0, -18, 32, -15, 0],
-            [0, 1, -4.5, 6, -2.5, 0],
-            [0, 0, 1.5, -4, 2.5, 0],
-            [0, 0, -12, 28, -15, 0],
-            [0, 0, 30, -60, 30, 0]
-        ], dtype=t.dtype, device=t.device)
+        tt = t[None, :]**torch.arange(8, device=t.device)[:, None]
+        A = torch.tensor([[   0.0000,    0.0000,    0.0000, -140.0000,  420.0000, -420.0000,
+            140.0000,    0.0000],
+            [   1.0000,    0.0000,    0.0000,  -80.0000,  225.0000, -216.0000,
+            70.0000,    0.0000],
+            [   0.0000,    1.0000,    0.0000,  -20.0000,   50.0000,  -45.0000,
+            14.0000,    0.0000],
+            [   0.0000,    0.0000,    0.5000,   -2.6667,    5.0000,   -4.0000,
+                1.1667,    0.0000],
+            [   0.0000,    0.0000,    0.0000,  140.0000, -420.0000,  420.0000,
+            -140.0000,    0.0000],
+            [   0.0000,    0.0000,    0.0000,  -60.0000,  195.0000, -204.0000,
+            70.0000,    0.0000],
+            [   0.0000,    0.0000,    0.0000,   10.0000,  -35.0000,   39.0000,
+            -14.0000,    0.0000],
+            [   0.0000,    0.0000,    0.0000,   -0.6667,    2.5000,   -3.0000,
+                1.1667,    0.0000]], dtype=t.dtype, device=t.device)
         
         return A @ tt
 
+    def d2h_poly(self, t):
+        tt = t[None, :]**torch.arange(8, device=t.device)[:, None]
+        A = torch.tensor([[ 0.0000e+00,  0.0000e+00, -4.2000e+02,  1.6800e+03, -2.1000e+03,
+            8.4000e+02,  0.0000e+00,  0.0000e+00],
+            [ 0.0000e+00,  0.0000e+00, -2.4000e+02,  9.0000e+02, -1.0800e+03,
+            4.2000e+02,  0.0000e+00,  0.0000e+00],
+            [ 1.0000e+00,  0.0000e+00, -6.0000e+01,  2.0000e+02, -2.2500e+02,
+            8.4000e+01,  0.0000e+00,  0.0000e+00],
+            [ 0.0000e+00,  1.0000e+00, -8.0000e+00,  2.0000e+01, -2.0000e+01,
+            7.0000e+00,  0.0000e+00,  0.0000e+00],
+            [ 0.0000e+00,  0.0000e+00,  4.2000e+02, -1.6800e+03,  2.1000e+03,
+            -8.4000e+02,  0.0000e+00,  0.0000e+00],
+            [ 0.0000e+00,  0.0000e+00, -1.8000e+02,  7.8000e+02, -1.0200e+03,
+            4.2000e+02,  0.0000e+00,  0.0000e+00],
+            [ 0.0000e+00,  0.0000e+00,  3.0000e+01, -1.4000e+02,  1.9500e+02,
+            -8.4000e+01,  0.0000e+00,  0.0000e+00],
+            [ 0.0000e+00,  0.0000e+00, -2.0000e+00,  1.0000e+01, -1.5000e+01,
+            7.0000e+00,  0.0000e+00,  0.0000e+00]], dtype=t.dtype, device=t.device)
+        return A @ tt
 
     def _interp(self,x, y, xs):
         x_ = x.reshape(-1, 1)
@@ -301,10 +330,14 @@ class TrajectoryCNF(nn.Module):
         m_prime = (m[1:] - m[:-1]) / (x_[1:] - x_[:-1])
         m_prime = torch.cat([m_prime[[0]], (m_prime[1:] + m_prime[:-1]) / 2, m_prime[[-1]]])
 
+        m_prime_prime = (m_prime[1:] - m_prime[:-1]) / (x_[1:] - x_[:-1])
+        m_prime_prime = torch.cat([m_prime_prime[[0]], (m_prime_prime[1:] + m_prime_prime[:-1]) / 2, m_prime_prime[[-1]]])
+        
         idxs = torch.searchsorted(x[1:], xs)
         dx = (x[idxs + 1] - x[idxs])
-        hh = self.dh_poly((xs - x[idxs]) / dx).unsqueeze(-1)
-        hh_deriv = self.h_poly((xs - x[idxs]) / dx).unsqueeze(-1)#.unsqueeze(-1)        # ret = hh[0] * torch.gather(y, 1, idxs.reshape(-1, 1, 1).expand(-1, -1, y.shape[-1]))
+        hh = self.h_poly((xs - x[idxs]) / dx).unsqueeze(-1)
+        # hh_deriv = self.dh_poly((xs - x[idxs]) / dx).unsqueeze(-1)#.unsqueeze(-1)        # ret = hh[0] * torch.gather(y, 1, idxs.reshape(-1, 1, 1).expand(-1, -1, y.shape[-1]))
+        hh_deriv2 = self.d2h_poly((xs - x[idxs]) / dx).unsqueeze(-1)#.unsqueeze(-1)
         dx = dx.unsqueeze(-1)#.unsqueeze(-1)
         # ret += hh[1] * torch.gather(m, 1, idxs.reshape(-1, 1, 1).expand(-1, -1, y.shape[-1])) * dx
         # ret += hh[2] * torch.gather(y, 1, 1+idxs.reshape(-1, 1, 1).expand(-1, -1, y.shape[-1]))
@@ -313,19 +346,23 @@ class TrajectoryCNF(nn.Module):
         ret = hh[0] * y[idxs]
         ret += hh[1] * m[idxs] * dx
         ret += hh[2] * m_prime[idxs] * dx * dx * .5
+        ret += hh[3] * m_prime_prime[idxs] * dx * dx * dx * (1/6)
 
-        ret += hh[3] * m_prime[idxs+1] * dx * dx * .5
-        ret += hh[4] * m[idxs+1] * dx
-        ret += hh[5] * y[idxs+1]
+        ret += hh[4] * y[idxs+1]
+        ret += hh[5] * m[idxs+1] * dx
+        ret += hh[6] * m_prime[idxs+1] * dx * dx * .5
+        ret += hh[7] * m_prime_prime[idxs+1] * dx * dx * dx * (1/6)
 
-        ret_dh = hh_deriv[0] * y[idxs]
-        ret_dh += hh_deriv[1] * m[idxs] * dx
-        ret_dh += hh_deriv[2] * m_prime[idxs] * dx * dx * .5
+        ret_d2h = hh_deriv2[0] * y[idxs]
+        ret_d2h += hh_deriv2[1] * m[idxs] * dx
+        ret_d2h += hh_deriv2[2] * m_prime[idxs] * dx * dx * .5
+        ret_d2h += hh_deriv2[3] * m_prime_prime[idxs] * dx * dx * dx * (1/6)
 
-        ret_dh += hh_deriv[3] * m_prime[idxs+1] * dx * dx * .5
-        ret_dh += hh_deriv[4] * m[idxs+1] * dx
-        ret_dh += hh_deriv[5] * y[idxs+1]
-        return ret.squeeze(), ret_dh.squeeze()
+        ret_d2h += hh_deriv2[4] * y[idxs+1]
+        ret_d2h += hh_deriv2[5] * m[idxs+1] * dx
+        ret_d2h += hh_deriv2[6] * m_prime[idxs+1] * dx * dx * .5
+        ret_d2h += hh_deriv2[7] * m_prime_prime[idxs+1] * dx * dx * dx * (1/6)
+        return ret.squeeze(), ret_d2h.squeeze()
     
     def standard_normal_kl_div(self, mu, logvar):
         return -0.5 * (1 + logvar - mu.pow(2) - logvar.exp()).mean()
@@ -344,25 +381,16 @@ class TrajectoryCNF(nn.Module):
         t_ind.clamp_(0, self.horizon-2)
         t0_ind.clamp_(0, self.horizon-2)
         t0_ind_for_gather = t0_ind.reshape(xu.shape[0], 1, 1).repeat(1, 1, self.xu_dim)
-        t_ind_for_gather = t_ind.reshape(xu.shape[0], 1, 1).repeat(1, 1, self.xu_dim)
-        t_ind_for_gather_1 = t_ind_for_gather + 1
-        # t_ind_for_gather_1 = t_ind_for_gather - t_ind_for_gather + self.horizon - 1
 
-        if t_ind_for_gather_1.max() >= self.horizon:
-            print('t_ind_for_gather_1', t_ind_for_gather_1.max())
         x_init = torch.gather(xu, 1, t0_ind_for_gather).squeeze()
-        x0 = torch.gather(xu, 1, t_ind_for_gather).squeeze()
-        x1 = torch.gather(xu, 1, t_ind_for_gather_1).squeeze()
 
         x_arange = torch.linspace(0, 1, xu.shape[1], device=xu.device).expand(xu.shape[0], -1)
-        # x_arange = torch.linspace(0, self.horizon-1, xu.shape[1], device=xu.device).expand(xu.shape[0], -1)
 
-        rand_for_u0 = torch.randn_like(x0[..., self.dx:])
+        rand_for_u0 = torch.randn_like(xu[:, 0,  self.dx:])
 
         noise_mean, noise_logvar = self.model.noise_dist(x_init[..., :self.dx])
 
         pred_noise_u0 = noise_mean + rand_for_u0 * torch.exp(.5 * noise_logvar)
-
 
         # goal_u0 = x1[:, self.dx:]
 
@@ -428,8 +456,8 @@ class TrajectoryCNF(nn.Module):
         with torch.no_grad():
             noise_mean, noise_logvar = self.model.noise_dist(self.noise)
         # torch.manual_seed(234)
-        # pred_noise_u0 = noise_mean + torch.randn_like(noise_mean) * torch.exp(.5 * noise_logvar)
-        pred_noise_u0 = torch.randn_like(noise_mean)
+        pred_noise_u0 = noise_mean + torch.randn_like(noise_mean) * torch.exp(.5 * noise_logvar)
+        # pred_noise_u0 = torch.randn_like(noise_mean)
         self.noise = torch.cat((self.noise, pred_noise_u0), dim=-1)
         # manually set the conditions
         if condition is not None:
