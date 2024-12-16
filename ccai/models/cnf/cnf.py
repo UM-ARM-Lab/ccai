@@ -157,6 +157,7 @@ class TrajectoryCNF(nn.Module):
         # self.model = MLP(horizon * xu_dim, context_dim, 256, num_layers=4)
         # self.model = TrajectoryConvNet(xu_dim, context_dim)
 
+        self.label_norm = nn.BatchNorm1d(self.xu_dim, affine=False)
         self.register_buffer('prior_mu', torch.zeros(horizon, self.xu_dim))
         self.register_buffer('prior_sigma', torch.ones(horizon, self.xu_dim))
         self.register_buffer('x_mean', torch.zeros(self.xu_dim))
@@ -202,15 +203,18 @@ class TrajectoryCNF(nn.Module):
         dx, _ = self.model(t, x, context)
         return dx * (self.horizon-1)
 
-    def masked_grad(self, t, x, context=None):
+    def masked_grad(self, t, xdx, context=None):
         # print(f'step {self.step_id}')
         self.step_id += 1
 
-        dx, _, _ = self.model.compiled_conditional_test(t, x, context)
 
-        # dx *= (self.horizon - 1)
+        ddx, _, _ = self.model.compiled_conditional_test(t, x, context)
+
+        ds_ret = torch.zeros_like(xdx)
+        ds_ret[..., :self.dx] = xdx[..., self.dx:]
+        ds_ret[..., self.dx:] = ddx
         
-        return dx
+        return ds_ret
 
     def flow_matching_loss(self, xu, context, mask=None):
         if self.loss_type == 'diffusion':
@@ -408,20 +412,21 @@ class TrajectoryCNF(nn.Module):
         xt, truevt = self.interp(x_arange, xu, t)
         # truevt = self.dinterp_dt(x_arange, xu, t).squeeze()
         truevt = truevt.squeeze()
+        truevt_norm = self.label_norm(truevt)
         # xt += torch.randn_like(xt) * .1
         xt += torch.randn_like(xt) * .03
 
         vt, p_matrix, xi_C = self.model.compiled_conditional_train(t.reshape(-1), xt, context)
-        flow_loss = mse_loss(vt, truevt)
-        state_loss = mse_loss(vt[:, :self.dx], truevt[:, :self.dx])
-        action_loss = mse_loss(vt[:, self.dx:], truevt[:, self.dx:])
+        flow_loss = mse_loss(vt, truevt_norm)
+        state_loss = mse_loss(vt[:, :self.dx], truevt_norm[:, :self.dx])
+        action_loss = mse_loss(vt[:, self.dx:], truevt_norm[:, self.dx:])
         kl_loss = self.standard_normal_kl_div(noise_mean, noise_logvar)
         return {
             'loss': flow_loss + .01 * kl_loss,
             'flow_loss': flow_loss,
             'kl_loss': kl_loss,
-            'action_loss': state_loss,
-            'state_loss': action_loss
+            'state_loss': state_loss,
+            'action_loss': action_loss
         }
 
     def _sample(self, context=None, condition=None, mask=None, H=None, noise=None):
@@ -459,6 +464,9 @@ class TrajectoryCNF(nn.Module):
         pred_noise_u0 = noise_mean + torch.randn_like(noise_mean) * torch.exp(.5 * noise_logvar)
         # pred_noise_u0 = torch.randn_like(noise_mean)
         self.noise = torch.cat((self.noise, pred_noise_u0), dim=-1)
+
+        # Add derivative to state
+        self.noise = torch.cat((self.noise, torch.zeros_like(self.noise)), dim=-1)
         # manually set the conditions
         if condition is not None:
             self.condition = condition
@@ -488,6 +496,8 @@ class TrajectoryCNF(nn.Module):
 
         trajectories, log_prob = out[:2]
         trajectories = trajectories.permute(1, 0, 2)
+        # Remove the derivative from state
+        trajectories = trajectories[..., :self.dx]
         self.FM.sigma = sigma_save
 
         return trajectories.reshape(N, -1, self.xu_dim), log_prob.reshape(N, -1).sum(dim=1)
