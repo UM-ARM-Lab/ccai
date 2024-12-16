@@ -671,7 +671,7 @@ class TemporalUnetStateAction(nn.Module):
         Ktheta = 1
 
         # Is the below sufficient to go from dtheta/dt to df/dtheta?
-        x /= -Ktheta
+        # x /= -Ktheta
         # x = -x
 
         if self.problem_dict is not None:

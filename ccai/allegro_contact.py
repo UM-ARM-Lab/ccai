@@ -558,7 +558,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         R = torch.stack((x_axis, y_axis, z_axis), dim=2)
         return R
 
-    def eval(self, augmented_trajectory):
+    def eval(self, augmented_trajectory, include_slack=True):
         N = augmented_trajectory.shape[0]
         augmented_trajectory = augmented_trajectory.clone().reshape(N, self.T, -1)
         x = augmented_trajectory[:, :, :self.dx + self.du]
@@ -569,18 +569,21 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         # compute objective
         J, grad_J, hess_J = self._objective(x)
         hess_J = None
-        grad_J = torch.cat((grad_J.reshape(N, self.T, -1),
-                            torch.zeros(N, self.T, self.dz, device=x.device)), dim=2).reshape(N, -1)
+        if include_slack:
+            grad_J = torch.cat((grad_J.reshape(N, self.T, -1),
+                                torch.zeros(N, self.T, self.dz, device=x.device)), dim=2).reshape(N, -1)
 
         Xk = x.reshape(N, self.T, -1)
         K = self.K(Xk, Xk, None)  # hess_J.mean(dim=0))
         grad_K = -self.grad_kernel(Xk, Xk, None)  # @hess_J.mean(dim=0))
         grad_K = grad_K.reshape(N, N, N, self.T * (self.dx + self.du))
         grad_K = torch.einsum('nmmi->nmi', grad_K)
-        grad_K = torch.cat((grad_K.reshape(N, N, self.T, self.dx + self.du),
-                            torch.zeros(N, N, self.T, self.dz, device=x.device)), dim=-1)
+        if include_slack:
+            grad_K = torch.cat((grad_K.reshape(N, N, self.T, self.dx + self.du),
+                                torch.zeros(N, N, self.T, self.dz, device=x.device)), dim=-1)
         grad_K = grad_K.reshape(N, N, -1)
-        G, dG, hessG = self.combined_constraints(augmented_trajectory, compute_hess=self.compute_hess)
+        G, dG, hessG = self.combined_constraints(augmented_trajectory, compute_hess=self.compute_hess,
+                                                 include_slack=include_slack)
 
         if hessG is not None:
             hessG.detach_()

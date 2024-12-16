@@ -179,6 +179,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         pregrasp_params = copy.deepcopy(params)
         pregrasp_params['warmup_iters'] = 80
         pregrasp_params['N'] = 16
+        pregrasp_params['ode_solve'] = False
         pregrasp_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
             goal=pregrasp_params['valve_goal'] * 0,
@@ -497,7 +498,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             for param in vae.parameters():
                 param.requires_grad = False
         trajectory_sampler = TrajectorySampler(T=params['T'] + 1, dx=(15 + (1 if params['sine_cosine'] else 0)) if not model_t else params['nzt'], du=21 if not model_t else 0, type=params['type'],
-                                               timesteps=256, hidden_dim=256 if not model_t else 64,
+                                               timesteps=256, hidden_dim=128 if not model_t else 64,
                                                context_dim=3, generate_context=False,
                                                constrain=params['projected'],
                                                problem=problem_for_sampler,
@@ -505,10 +506,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                                                guided=params['use_guidance'],
                                                state_control_only=params.get('state_control_only', False),
                                                vae=vae)
-        try:
-            trajectory_sampler.load_state_dict(torch.load(f'{CCAI_PATH}/{model_path}', map_location=torch.device(params['device'])), strict=True)
-        except:
-            print('failed to load model')
+        # try:
+        trajectory_sampler.load_state_dict(torch.load(f'{CCAI_PATH}/{model_path}', map_location=torch.device(params['device'])), strict=True)
+        # except:
+        #     print('failed to load model')
         trajectory_sampler.to(device=params['device'])
         trajectory_sampler.send_norm_constants_to_submodels()
         if params['project_state']:
