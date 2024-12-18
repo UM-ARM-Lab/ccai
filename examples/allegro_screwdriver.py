@@ -1018,19 +1018,20 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                                                torch.device(params['device']), initial_run=initial_run,
                                                multi_particle=multi_particle,
                                                prior=params['prior'],
-                                               sine_cosine=params['sine_cosine'])
+                                               sine_cosine=params['sine_cosine'],
+                                               model_orig=trajectory_sampler_orig)
         a = time.perf_counter()
         contact_node_sequence = contact_sequence_sampler.astar(next_node, None)
         planning_time = time.perf_counter() - a
         print('Contact sequence search time:', planning_time)
-        closed_set = contact_sequence_sampler.closed_set
+        closed_set = None#contact_sequence_sampler.closed_set
         if contact_node_sequence is not None:
             contact_node_sequence = list(contact_node_sequence)
         pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
 
         with open(f"{fpath}/contact_planning_{stage}.pkl", "wb") as f:
             pkl.dump((contact_node_sequence, closed_set, planning_time, contact_sequence_sampler.iter), f)
-        if contact_node_sequence is None:
+        if contact_node_sequence is None and closed_set is not None:
             print('No contact sequence found')
             # Find the node in the closed set with the lowest cost
             min_yaw = float('inf')
@@ -1042,6 +1043,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     min_node = node
             contact_node_sequence = [min_node.data]
             # return None, None, None
+        elif contact_node_sequence is None and closed_set is None:
+            print('No contact sequence found')
+            return None, None, None
         last_node = contact_node_sequence[-1]
 
         if next_node_init:
@@ -1111,8 +1115,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     def plan_recovery_contacts_w_model(state):
         likelihoods= []
         mean_obj_configs = []
-        # modes = ['index', 'thumb_middle']
-        modes = ['thumb_middle']
+        modes = ['index', 'thumb_middle']
+        # modes = ['thumb_middle']
         if params['sine_cosine']:
             start_for_diff = convert_yaw_to_sine_cosine(state)
         else:
@@ -1181,9 +1185,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     for stage in range(num_stages):
         state = env.get_state()
         state = state['q'].reshape(-1)[:15].to(device=params['device'])
-        if params.get('compute_recovery_trajectory', False):
+        if params.get('compute_recovery_trajectory', False) and not params['sample_contact']:
             contact_sequence = plan_recovery_contacts(state)
-        elif params.get('test_recovery_trajectory', False):
+        elif params.get('test_recovery_trajectory', False) and not params['sample_contact']:
             contact_sequence, goal_config, all_samples_, all_likelihoods_ = plan_recovery_contacts_w_model(state)
             data['all_samples_'].append(all_samples_)
             data['all_likelihoods_'].append(all_likelihoods_)
@@ -1267,7 +1271,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             if params['mode'] == 'hardware':
                 input("Pregrasp complete. Ready to execute. Press <ENTER> to continue.")
             continue
-        elif sample_contact and (stage == 1 or (params['replan'] and (stages_since_plan == 0 or len(contact_sequence) == 1))):
+        elif sample_contact and (stage == 1 or (params.get('test_recovery_trajectory', False)) or (params['replan'] and (stages_since_plan == 0 or len(contact_sequence) == 1))):
             # if yaw <= params['goal']:
             #     # params['goal'] -= .5
             #     params['goal'] = yaw + float(params['goal_update'])
@@ -1376,7 +1380,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 if params['compute_recovery_trajectory']:
                     projected_samples, _, _, _, (all_losses, all_samples, all_likelihoods) = trajectory_sampler_orig.sample(8, H=config['T']+1, start=start_sine_cosine.reshape(1, -1), project=True)
                     print('Final likelihood:', all_likelihoods[-1])
-                    if all_likelihoods[-1].mean().item() < -15:
+                    if all_likelihoods[-1].mean().item() < params.get('likelihood_threshold', -15):
                         print('Projection failed')
                         done = True
                     else:

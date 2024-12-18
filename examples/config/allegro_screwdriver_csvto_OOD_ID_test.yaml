@@ -6,7 +6,7 @@ num_turns: 1
 max_recovery_stages: 4
 num_trials: 10
 visualize: True
-experiment_name: 'allegro_screwdriver_csvto_OOD_ID_full_multi_depth_plan_fixed_likelihood_stochastic_likelihood_adj_test'
+experiment_name: 'allegro_screwdriver_csvto_OOD_ID_full_online_contact_planning'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -16,7 +16,7 @@ friction_coefficient: 1.0
 kp: 3.0
 heuristic: 1000
 max_depth: 11
-goal: -1.5
+goal: -17
 prior: 1
 likelihood_threshold: -17
 multi_particle_search: True
@@ -28,7 +28,7 @@ projected: False
 use_saved_plans: True
 use_saved_noise: False
 use_guidance: False
-sample_contact: False
+sample_contact: True
 use_partial_constraint: True
 sine_cosine: True
 project_state: False

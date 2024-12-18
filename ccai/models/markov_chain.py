@@ -3,6 +3,8 @@ import torch
 class MarkovChain:
     def __init__(self, transition_matrix):
         self.transition_matrix = transition_matrix
+        # Normalize the transition matrix
+        self.transition_matrix /= self.transition_matrix.sum(dim=1, keepdim=True)
 
     def sample(self, T, c0):
         c = [c0]
