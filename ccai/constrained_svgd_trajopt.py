@@ -38,7 +38,7 @@ class ConstrainedSteinTrajOpt:
 
         self.Ktheta = 1
         self.Kh = .1
-        self.ode_solve = params.get('ode_solve', True)
+        self.ode_solve = params.get('ode_solve', False)
         if self.ode_solve:
             self.odefunc = ODEfunc(
                 diffeq=self.ode_update,# if self.loss_type == 'conditional_ot_sb' else self.state_control_only_forward,

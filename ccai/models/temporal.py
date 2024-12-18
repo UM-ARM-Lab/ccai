@@ -544,7 +544,12 @@ class TemporalUnetStateAction(nn.Module):
             if not is_last:
                 horizon = horizon * 2
 
-        self.final_conv = nn.Sequential(
+        self.final_conv_dx = nn.Sequential(
+            MLPBlock(dim, dim),
+            nn.Linear(dim, transition_dim),
+        )
+
+        self.final_conv_ddx = nn.Sequential(
             MLPBlock(dim, dim),
             nn.Linear(dim, transition_dim),
         )
@@ -631,9 +636,10 @@ class TemporalUnetStateAction(nn.Module):
             x = resnet2(x, t)
             # x = attn(x)
             # x = upsample(x)
-        x = self.final_conv(x)
+        dx = self.final_conv_dx(x)
+        ddx = self.final_conv_ddx(x)
 
-        return x_orig, x
+        return x_orig, dx, ddx
         # x = einops.rearrange(x, 'b t h -> b h t')
         # x = x.permute(0, 2, 1)
         # get rid of padding
@@ -803,7 +809,7 @@ class TemporalUnetStateAction(nn.Module):
         return x_orig, x
 
     def compiled_conditional_test(self, t, x, context):
-        x_orig, dx = self.compiled_conditional_test_fwd(t, x, context)
+        x_orig, dx, ddx = self.compiled_conditional_test_fwd(t, x, context)
         p_matrix, xi_C = None, None
         # dx = torch.zeros_like(x)
         # dx[:, 12:15] = (self.delta_goal - x[:, 12:15]) #/ (1-t)
@@ -816,14 +822,14 @@ class TemporalUnetStateAction(nn.Module):
         #     print('nan in dx', t)
         #     # Replace nan with 0
         #     dx[torch.isnan(dx)] = 0
-        dx *= -1
+        # dx *= -1
 
         # dx, p_matrix, xi_C = self.project(x, dx, context)
 
         # x_norm_mask = torch.norm(x, dim=-1) > 1
         # x[x_norm_mask] = x[x_norm_mask] / torch.norm(x[x_norm_mask], dim=-1, keepdim=True) * 1
         # return dx, None, None
-        return dx, p_matrix, xi_C
+        return ddx, p_matrix, xi_C
 
     # @torch.compile(mode='max-autotune')
     def compiled_unconditional_test(self, t, x):
@@ -832,13 +838,13 @@ class TemporalUnetStateAction(nn.Module):
     
     @torch.compile(mode='max-autotune')
     def compiled_conditional_train_fwd(self, t, x, context):
-        x_orig, x = self(t, x, context, dropout=True)
-        return x_orig, x
+        x_orig, dx, ddx = self(t, x, context, dropout=True)
+        return x_orig, dx, ddx
     
     def compiled_conditional_train(self, t, x, context):
-        x_orig, x = self.compiled_conditional_train_fwd(t, x, context)
+        x_orig, dx, ddx = self.compiled_conditional_train_fwd(t, x, context)
         # x, p_matrix, xi_C = self.project(x_orig, x, context)
-        return x, None, None
+        return dx, ddx, None, None
 
 class StateActionMLP(nn.Module):
 

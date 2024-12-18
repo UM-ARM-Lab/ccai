@@ -179,6 +179,8 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
     for epoch in tqdm.tqdm(range(epochs)):
         train_loss = 0.0
         flow_loss = 0.0
+        flow_loss_v = 0.0
+        flow_loss_a = 0.0
         state_loss = 0.0
         action_loss = 0.0
         kl_loss = 0.0
@@ -203,6 +205,8 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
             optimizer.zero_grad()
             train_loss += loss.item()
             flow_loss += sampler_loss['flow_loss'].item()
+            flow_loss_v += sampler_loss['flow_loss_v'].item()
+            flow_loss_a += sampler_loss['flow_loss_a'].item()
             state_loss += sampler_loss['state_loss'].item()
             action_loss += sampler_loss['action_loss'].item()
             kl_loss += sampler_loss['kl_loss'].item()
@@ -213,6 +217,8 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
 
         train_loss /= len(train_loader)
         flow_loss /= len(train_loader)
+        flow_loss_v /= len(train_loader)
+        flow_loss_a /= len(train_loader)
         state_loss /= len(train_loader)
         action_loss /= len(train_loader)
         kl_loss /= len(train_loader)
@@ -222,6 +228,8 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
             wandb.log({
                     'train_loss_epoch': train_loss,
                     'flow_loss_epoch': flow_loss,
+                    'flow_loss_v_epoch': flow_loss_v,
+                    'flow_loss_a_epoch': flow_loss_a,
                     'state_loss_epoch': state_loss,
                     'action_loss_epoch': action_loss,
                     'kl_loss_epoch': kl_loss,
@@ -232,6 +240,8 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
             print({
                     'train_loss_epoch': train_loss,
                     'flow_loss_epoch': flow_loss,
+                    'flow_loss_v_epoch': flow_loss_v,
+                    'flow_loss_a_epoch': flow_loss_a,
                     'state_loss_epoch': state_loss,
                     'action_loss_epoch': action_loss,
                     'kl_loss_epoch': kl_loss,

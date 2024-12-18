@@ -498,7 +498,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             for param in vae.parameters():
                 param.requires_grad = False
         trajectory_sampler = TrajectorySampler(T=params['T'] + 1, dx=(15 + (1 if params['sine_cosine'] else 0)) if not model_t else params['nzt'], du=21 if not model_t else 0, type=params['type'],
-                                               timesteps=256, hidden_dim=128 if not model_t else 64,
+                                               timesteps=256, hidden_dim=256 if not model_t else 64,
                                                context_dim=3, generate_context=False,
                                                constrain=params['projected'],
                                                problem=problem_for_sampler,
