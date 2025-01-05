@@ -172,7 +172,7 @@ class GraphSearch(ContactSampler, AStar):
         cosine = state[:, 14]
         return torch.atan2(sine, cosine)
     
-    def get_orig_model_sample(self, end_state, contact_mode, weights):
+    def get_orig_model_sample(self, end_state, contact_mode):
         context = torch.tensor(contact_mode).unsqueeze(0).repeat(self.num_samples * end_state.shape[0], 1).to(self.device)
         samples, _, likelihood = self.model_orig.sample(N=self.num_samples * end_state.shape[0], start=end_state.repeat_interleave(self.num_samples, 0).to(self.device),
                                 H=self.model_orig.T, constraints=context)
@@ -190,11 +190,19 @@ class GraphSearch(ContactSampler, AStar):
             contact_mode = current.contact_sequence[-1]
             end_state = current.trajectory[:, -1, :self.dx_sine_cosine]
             likelihood_for_average = self.normalize_likelihood(current.likelihoods)
-            _, mean_likelihood = self.get_orig_model_sample(end_state, contact_mode, likelihood_for_average)
+            _, mean_likelihood = self.get_orig_model_sample(end_state, contact_mode)
             mean_likelihood = (mean_likelihood.cpu() * likelihood_for_average).sum().item()
             return mean_likelihood, mean_likelihood >= self.goal
             # Turn into context tensor
 
+    def get_goal_config(self, current):
+        if current.trajectory.shape[1] == 0:
+            return self.start
+        end_state = current.trajectory[:, -1, :self.dx_sine_cosine]
+        end_state = self.convert_sine_cosine_to_yaw(end_state)
+        likelihood_for_average = self.normalize_likelihood(current.likelihoods)
+        average_end_state = (end_state.cpu() * likelihood_for_average.unsqueeze(-1)).sum(0)
+        return average_end_state
 
     def is_goal_reached(self, current, goal):
         self.iter += 1
@@ -261,7 +269,6 @@ class GraphSearch(ContactSampler, AStar):
             problem = self.problem_dict[c_state]
             sample_range_mask = samples[sample_range][: , :, mask_without_z]
             likelihood_this_c = likelihood[sample_range] * self.discount ** (len(cur_seq) - 1 * self.initial_run)
-            probs = self.normalize_likelihood(likelihood_this_c)
             if not self.recovery:
                 problem._preprocess(sample_range_mask, projected_diffusion=True)
 
@@ -273,6 +280,7 @@ class GraphSearch(ContactSampler, AStar):
                 likelihood_this_c += node.likelihoods.repeat(self.num_samples_multi).to(likelihood_this_c.device)
             # likelihood_this_c = constraint_val
             # top_likelihoods = torch.topk(likelihood_this_c, k=self.num_samples, largest=True)
+            probs = self.normalize_likelihood(likelihood_this_c)
             if self.multi_particle:
                 # print(probs)
                 # Sample from the probs
@@ -282,7 +290,7 @@ class GraphSearch(ContactSampler, AStar):
                 top_samples_orig = samples_orig[sample_range][top_likelihoods]
 
                 if self.recovery:
-                    _, l = self.get_orig_model_sample(top_samples_orig[:, -1, :self.dx_sine_cosine], c_state, probs)
+                    _, l = self.get_orig_model_sample(top_samples_orig[:, -1, :self.dx_sine_cosine], c_state)
                     J = self.goal - l
                 
                 # print(likelihood[sample_range].max().item())
@@ -291,6 +299,9 @@ class GraphSearch(ContactSampler, AStar):
                 sample_likelihoods = likelihood_this_c[top_likelihoods].cpu()
                 likelihood_for_average = self.normalize_likelihood(likelihood_this_c[top_likelihoods])
                 cost = (J[top_likelihoods] * likelihood_for_average).sum().item()
+                
+                if self.recovery:
+                    cost -= likelihood[sample_range][top_likelihoods].mean().item()
                 traj_this_step = top_samples_orig
 
                 prior_traj_indices = self.neighbors_c_states_indices[top_likelihoods.cpu()]
@@ -303,7 +314,8 @@ class GraphSearch(ContactSampler, AStar):
                 if not self.recovery:
                     cost = J[min_violation_ind].item()
                 else:
-                    _, J = self.goal - self.get_orig_model_sample(traj_this_step[-1, :self.dx_sine_cosine], c_state, probs)
+                    _, cost = self.goal - self.get_orig_model_sample(traj_this_step[-1, :self.dx_sine_cosine], c_state)
+
                 sample_likelihoods = likelihood_this_c[min_violation_ind].cpu()
                 # Ensure that the sample_likelihood is a vector
                 if len(sample_likelihoods.shape) == 0:

@@ -1062,8 +1062,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         initial_samples = None
 
+        goal_config = contact_sequence_sampler.get_goal_config(last_node)
+        goal_config = goal_config.to(device=params['device'])
+
         torch.cuda.empty_cache()
-        return contact_sequence, next_node, initial_samples
+        return contact_sequence, next_node, initial_samples, goal_config
 
     def plan_recovery_contacts(state):
         distances = []
@@ -1283,7 +1286,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             print('Adjusting goal to', params['goal'])
             for key in problem_for_sampler:
                 problem_for_sampler[key].goal = torch.tensor([0, 0, params['goal']]).to(device=params['device'])
-            new_contact_sequence, new_next_node, initial_samples = plan_contacts(state, stage, 7, next_node, params['multi_particle_search'])
+            new_contact_sequence, new_next_node, initial_samples, goal_config = plan_contacts(state, stage, 7, next_node, params['multi_particle_search'])
             stages_since_plan = 0
             if new_contact_sequence is not None and len(new_contact_sequence) == 0:
                 print('Planner thinks task is complete')

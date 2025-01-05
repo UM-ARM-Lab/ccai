@@ -638,7 +638,7 @@ class GaussianDiffusion(nn.Module):
         batch_size = 2048
         # batch_size = 1
         all_p_next_x = []
-        for i in tqdm(range(0, B * N, batch_size)):
+        for i in (range(0, B * N, batch_size)):
             p_next_x = self.p_mean_variance(x=x_t[i:i + batch_size], t=t[i:i + batch_size], context=context[i:i + batch_size] if context is not None else None)
             all_p_next_x.append((p_next_x[0], p_next_x[1]))
         # p_next_x = {k: torch.cat([p[k] for p in p_next_x], dim=0) for k in all_p_next_x[0].keys()}
