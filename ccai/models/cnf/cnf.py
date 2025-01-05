@@ -425,8 +425,12 @@ class TrajectoryCNF(nn.Module):
 
         xt, truevt, trueat = self.interp(x_arange, xu, t)
         # truevt = self.dinterp_dt(x_arange, xu, t).squeeze()
-        truevt_norm = self.label_norm_v(truevt)
-        trueat_norm = self.label_norm_a(trueat)
+        if True:
+            truevt_norm = self.label_norm_v(truevt)
+            trueat_norm = self.label_norm_a(trueat)
+        else:
+            truevt_norm = truevt
+            trueat_norm = trueat
         # xt += torch.randn_like(xt) * .1
         xt += torch.randn_like(xt) * .03
 
@@ -447,6 +451,7 @@ class TrajectoryCNF(nn.Module):
             'action_loss': action_loss
         }
 
+    @torch.no_grad()
     def _sample(self, context=None, condition=None, mask=None, H=None, noise=None):
         N = context.shape[0]
         if H is None:
@@ -484,8 +489,12 @@ class TrajectoryCNF(nn.Module):
         self.noise = torch.cat((self.noise, pred_noise_u0), dim=-1)
 
         # Add derivative to state
+
+        # Predict first derivative
+        t_0 = torch.zeros(N, 1, device=self.noise.device)
+        _, vt, _ = self.model.compiled_conditional_test_fwd(t_0, self.noise, context)
         # self.noise = torch.cat((self.noise, torch.zeros_like(self.noise)), dim=-1)
-        self.noise = torch.cat((self.noise, torch.zeros_like(self.noise)), dim=-1)
+        self.noise = torch.cat((self.noise, vt), dim=-1)
         # manually set the conditions
         if condition is not None:
             self.condition = condition

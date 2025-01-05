@@ -805,8 +805,8 @@ class TemporalUnetStateAction(nn.Module):
 
     # @torch.compile(mode='max-autotune')
     def compiled_conditional_test_fwd(self, t, x, context):
-        x_orig, x = self(t, x, context, dropout=False)
-        return x_orig, x
+        x_orig, dx, ddx = self(t, x, context, dropout=False)
+        return x_orig, dx, ddx
 
     def compiled_conditional_test(self, t, x, context):
         x_orig, dx, ddx = self.compiled_conditional_test_fwd(t, x, context)
