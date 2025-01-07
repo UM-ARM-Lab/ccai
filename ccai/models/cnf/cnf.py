@@ -90,7 +90,7 @@ def set_cnf_options(solver, model):
             if solver in ['fixed_adams', 'explicit_adams']:
                 module.solver_options['max_order'] = 4
             if solver == 'rk4':
-                module.solver_options['step_size'] = .03
+                module.solver_options['step_size'] = .003
 
             # Set the test settings
             module.test_solver = solver
@@ -175,9 +175,8 @@ class TrajectoryCNF(nn.Module):
             rademacher=False,
         )
 
-        solver = 'dopri5'
-        # solver = 'bosh3'
-        # solver = 'rk4'
+        # solver = 'dopri5'
+        solver = 'rk4'
         self.flow = CNF(odefunc=odefunc,
                         T=1.0,
                         train_T=False,
@@ -209,13 +208,17 @@ class TrajectoryCNF(nn.Module):
         self.step_id += 1
 
         x = xdx[..., :self.xu_dim]
-        ddx, _, _ = self.model.compiled_conditional_test(t, x, context)
+        dx = xdx[..., self.xu_dim:]
+        dx, ddx, _, _ = self.model.compiled_conditional_test(t, x, dx, context)
 
-        if hasattr(self, 'label_norm'):
-            ddx = self.label_norm.running_mean + ddx * self.label_norm.running_var.sqrt()
+        # if hasattr(self, 'label_norm_a'):
+        #     ddx = self.label_norm_a.running_mean + ddx * self.label_norm_a.running_var.sqrt()
 
         ds_ret = torch.zeros_like(xdx)
-        ds_ret[..., :self.xu_dim] = xdx[..., self.xu_dim:]
+        if dx is None:
+            ds_ret[..., :self.xu_dim] = xdx[..., self.xu_dim:]
+        else:
+            ds_ret[..., :self.xu_dim] = dx
         ds_ret[..., self.xu_dim:] = ddx
         
         return ds_ret
@@ -452,14 +455,14 @@ class TrajectoryCNF(nn.Module):
         }
 
     @torch.no_grad()
-    def _sample(self, context=None, condition=None, mask=None, H=None, noise=None):
+    def _sample(self, context=None, condition=None, mask=None, H=None, noise=None, start_time=0, end_time=1):
         N = context.shape[0]
         if H is None:
             H = self.horizon
 
         sigma_save = self.FM.sigma
         self.FM.sigma = 0
-        num_sub_trajectories = H // self.horizon
+        num_sub_trajectories = max(H // self.horizon, 1)
         sample_shape = torch.Size([N, num_sub_trajectories])
         assert context.shape[1] == num_sub_trajectories
 
@@ -481,19 +484,24 @@ class TrajectoryCNF(nn.Module):
         self.model.delta_goal -= self.x_mean[12:15]
         self.model.delta_goal /= self.x_std[12:15]
 
-        with torch.no_grad():
-            noise_mean, noise_logvar = self.model.noise_dist(self.noise)
-        # torch.manual_seed(234)
-        pred_noise_u0 = noise_mean + torch.randn_like(noise_mean) * torch.exp(.5 * noise_logvar)
-        # pred_noise_u0 = torch.randn_like(noise_mean)
-        self.noise = torch.cat((self.noise, pred_noise_u0), dim=-1)
+        if start_time == 0:
+            with torch.no_grad():
+                noise_mean, noise_logvar = self.model.noise_dist(self.noise)
+            # torch.manual_seed(234)
+            pred_noise_u0 = noise_mean + torch.randn_like(noise_mean) * torch.exp(.5 * noise_logvar)
+            # pred_noise_u0 = torch.randn_like(noise_mean)
+            self.noise = torch.cat((self.noise, pred_noise_u0), dim=-1)
 
         # Add derivative to state
 
         # Predict first derivative
-        t_0 = torch.zeros(N, 1, device=self.noise.device)
+        t_0 = torch.zeros(N, 1, device=self.noise.device) + start_time
         _, vt, _ = self.model.compiled_conditional_test_fwd(t_0, self.noise, context)
+        # if hasattr(self, 'label_norm_v'):
+        #     vt = self.label_norm_v.running_mean + vt * self.label_norm_v.running_var.sqrt()
         # self.noise = torch.cat((self.noise, torch.zeros_like(self.noise)), dim=-1)
+        
+        vt *= 1
         self.noise = torch.cat((self.noise, vt), dim=-1)
         # manually set the conditions
         if condition is not None:
@@ -519,7 +527,7 @@ class TrajectoryCNF(nn.Module):
                             logpx=log_prob,
                             context=context.reshape(-1, context.shape[-1]),
                             reverse=False,
-                            integration_times=torch.linspace(0, 1, self.horizon, device=self.noise.device))
+                            integration_times=torch.linspace(start_time, end_time, H, device=self.noise.device))
             print(f'Elapsed time: {time.perf_counter() - a}')
 
         trajectories, log_prob = out[:2]

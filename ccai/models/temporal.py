@@ -659,7 +659,9 @@ class TemporalUnetStateAction(nn.Module):
             mask[30:36] = False
         # Concat False to mask to match the size of x
         # mask = torch.cat((mask, torch.zeros(self.transition_dim + z_dim -x.shape[-1], device=x.device).bool()))
+        
         mask_no_z = mask.clone()
+        mask = torch.cat((mask, mask), dim=-1)
         # if z_dim > 0:
         #     mask_no_z[-z_dim:] = False
         return c_state, mask, mask_no_z
@@ -673,11 +675,12 @@ class TemporalUnetStateAction(nn.Module):
 
     def project(self, x_orig, x, context, p_matrix=None, xi_C=None):
         N = x.shape[0]
-        Kh = 10
-        Ktheta = 1
+        Kh = .1
+        Ktheta = 3
 
         # Is the below sufficient to go from dtheta/dt to df/dtheta?
-        # x /= -Ktheta
+        # x[..., 14] += -33
+        x /= -Ktheta
         # x = -x
 
         if self.problem_dict is not None:
@@ -688,7 +691,9 @@ class TemporalUnetStateAction(nn.Module):
                 x_this_problem = x_orig[context.sum(-1) == p_idx][:, None] * self.x_std + self.x_mean
                 if x_this_problem.shape[0] == 0:
                     continue
-                grad_x_this_problem = x[context.sum(-1) == p_idx][:, None] * self.x_std
+                grad_x_this_problem = x[context.sum(-1) == p_idx][:, None]
+                grad_x_this_problem[:,:, :self.x_std.shape[0]] *= self.x_std
+                grad_x_this_problem[:,:, self.x_std.shape[0]:] *= self.x_std
                 b = x_this_problem.shape[0]
 
                 c_state, mask, mask_no_z = self.c_state_mask(problem_idx, x)
@@ -704,7 +709,7 @@ class TemporalUnetStateAction(nn.Module):
                 
                 # if p_matrix is None:
 
-                problem._preprocess(x_this_problem[:, :, mask_no_z], dxu=update_this_c, projected_diffusion=True)
+                problem._preprocess(x_this_problem[:, :, mask_no_z], dxu=update_this_c[:, :, :self.transition_dim][:, :, mask_no_z], projected_diffusion=True)
                 # x_this_problem_for_cnstrt = x_this_problem
                 num_dim = x_this_problem.shape[-1]
                 # num_dim = x_this_problem_for_cnstrt.shape[-1]
@@ -712,8 +717,8 @@ class TemporalUnetStateAction(nn.Module):
                 C, dC, _ = problem.combined_constraints(x_this_problem, 
                                                         compute_hess=False, projected_diffusion=True,
                                                         include_slack=False,
-                                                        compute_inequality=False)
-
+                                                        compute_inequality=True,
+                                                        include_deriv_grad=True,)
                 C = C.to(dtype=dtype)
                 dC = dC.to(dtype=dtype)
 
@@ -725,6 +730,9 @@ class TemporalUnetStateAction(nn.Module):
                 dh_mask = dC_mask[:, g_dim:]
                 h = C[:, g_dim:]
                 dh = dC[:, g_dim:]
+
+                h_r = torch.relu(h)
+                print(np.round(torch.cat((g, h_r), dim=-1).flatten().cpu().detach().numpy(), 3))
                 g_masked = g[dg_mask].reshape(N, -1)
                 h_masked = h[dh_mask].reshape(N, -1)
                 dg_masked = dg[dg_mask].reshape(N, -1, dC.shape[-1])
@@ -789,7 +797,7 @@ class TemporalUnetStateAction(nn.Module):
                 # if problem.dz > 0:
                 #     update_this_c = update_this_c[:, : :-problem.dz]
 
-                update_this_c = (update_this_c) / self.x_std[mask]
+                update_this_c = (update_this_c) / self.x_std[mask[:self.transition_dim]].repeat(2)
 
                 update_this_c = update_this_c.to(dtype=x.dtype)
 
@@ -808,8 +816,8 @@ class TemporalUnetStateAction(nn.Module):
         x_orig, dx, ddx = self(t, x, context, dropout=False)
         return x_orig, dx, ddx
 
-    def compiled_conditional_test(self, t, x, context):
-        x_orig, dx, ddx = self.compiled_conditional_test_fwd(t, x, context)
+    def compiled_conditional_test(self, t, x, dx, context):
+        x_orig, _, ddx = self.compiled_conditional_test_fwd(t, x, context)
         p_matrix, xi_C = None, None
         # dx = torch.zeros_like(x)
         # dx[:, 12:15] = (self.delta_goal - x[:, 12:15]) #/ (1-t)
@@ -823,13 +831,37 @@ class TemporalUnetStateAction(nn.Module):
         #     # Replace nan with 0
         #     dx[torch.isnan(dx)] = 0
         # dx *= -1
-
-        # dx, p_matrix, xi_C = self.project(x, dx, context)
-
+        
+        # dx = None
+        # ddx *= 5
+        theta = torch.cat((dx, ddx), dim=-1)
+        # theta *= 25
+        before_x = np.round(((x*self.x_std) + self.x_mean)[0, 14].item(), 3)
+        before_dx = np.round((dx*self.x_std)[0, 14].item(), 3)
+        before_ddx = np.round((ddx*self.x_std)[0, 14].item(), 3)
+        proj = True
+        if proj:
+            theta_adj, p_matrix, xi_C = self.project(x, theta, context)
+        else:
+            theta_adj, p_matrix, xi_C = theta, None, None
+        
+        dx = theta_adj[:, :self.transition_dim]
+        ddx = theta_adj[:, self.transition_dim:]
+        
         # x_norm_mask = torch.norm(x, dim=-1) > 1
         # x[x_norm_mask] = x[x_norm_mask] / torch.norm(x[x_norm_mask], dim=-1, keepdim=True) * 1
         # return dx, None, None
-        return ddx, p_matrix, xi_C
+        after_x = np.round(((x*self.x_std) + self.x_mean)[0, 14].item(), 3)
+        after_dx = np.round((dx*self.x_std)[0, 14].item(), 3)
+        after_ddx = np.round((ddx*self.x_std)[0, 14].item(), 3)
+        print('Before adj:', (before_x, before_dx, before_ddx))
+        print('After adj:', (after_x, after_dx, after_ddx))
+        print('Diff:', (after_x - before_x, after_dx - before_dx, after_ddx - before_ddx))
+        if (after_dx - before_dx) > 0:
+            print('dx increased')
+        if (after_ddx - before_ddx) > 0:
+            print('ddx increased')
+        return dx, ddx, p_matrix, xi_C
 
     # @torch.compile(mode='max-autotune')
     def compiled_unconditional_test(self, t, x):

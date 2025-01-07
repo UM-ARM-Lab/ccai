@@ -246,11 +246,11 @@ class ODEfunc(nn.Module):
             else:
                 self._e = [sample_gaussian_like(y) for k in range(self.div_samples)]
 
-        with torch.set_grad_enabled(True):
-            y.requires_grad_(True)
-            t.requires_grad_(True)
+        with torch.set_grad_enabled(False):
+            y.requires_grad_(False)
+            t.requires_grad_(False)
             for s_ in states[2:]:
-                s_.requires_grad_(True)
+                s_.requires_grad_(False)
             dy = self.diffeq(t, y, *states[2:])
             # Hack for 2D data to use brute force divergence computation.
             # if not self.training and dy.view(dy.shape[0], -1).shape[1] == 2:

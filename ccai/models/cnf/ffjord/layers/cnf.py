@@ -54,8 +54,8 @@ class CNF(nn.Module):
         )
 
         #TODO: Fix for other integration time settings
-        if len(integration_times) == 2:
-            state_t = tuple(s[1] for s in state_t)
+        # if len(integration_times) == 2:
+        #     state_t = tuple(s[1] for s in state_t)
 
         z_t, dlogpx_t = state_t[:2]
 

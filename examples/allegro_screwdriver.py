@@ -176,10 +176,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         #     'index': 0,
         # }
         # initial grasp
+
+        cnf_T = 1
         pregrasp_params = copy.deepcopy(params)
         pregrasp_params['warmup_iters'] = 80
         pregrasp_params['N'] = 16
         pregrasp_params['ode_solve'] = False
+        pregrasp_params['receding_horizon'] = False
         pregrasp_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
             goal=pregrasp_params['valve_goal'] * 0,
@@ -202,7 +205,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         index_regrasp_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
             goal=params['valve_goal'] * 0,
-            T=params['T'],
+            T=cnf_T if params['type'] == 'cnf' else params['T'],
             chain=params['chain'],
             device=params['device'],
             object_asset_pos=env.table_pose,
@@ -221,7 +224,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         thumb_and_middle_regrasp_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
             goal=params['valve_goal'] * 0,
-            T=params['T'],
+            T=cnf_T if params['type'] == 'cnf' else params['T'],
             chain=params['chain'],
             device=params['device'],
             object_asset_pos=env.table_pose,
@@ -240,7 +243,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         turn_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
             goal=params['valve_goal'] * 0,
-            T=params['T'],
+            T=cnf_T if params['type'] == 'cnf' else params['T'],
             chain=params['chain'],
             device=params['device'],
             object_asset_pos=env.table_pose,
@@ -626,6 +629,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             contact[:, 2] = 1
         elif mode == 'turn':
             contact[:, :] = 1
+        H = 2 if params['type'] == 'cnf' else params['T'] + 1
+        # H =  params['T'] + 1
 
         # generate initial samples with diffusion model
         sim_rollouts = None
@@ -657,7 +662,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                                                                     project=params['project_state'],)
             else:
                 initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
-                                                                    H=params['T'] + 1,
+                                                                    H=H,
+                                                                    start_time=0,
+                                                                    end_time=1/(params['T']-1),
                                                                     constraints=contact,
                                                                     project=params['project_state'],)
             mode_fpath = f'{fpath}/{fname}'
@@ -692,7 +699,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                         traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
                         # traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof] = axis_angle_to_euler(traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof])
 
-                        viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/{name}/{k}")
+                        viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/{name}/init/{k}")
                         img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
                         gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
                         pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
@@ -711,7 +718,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
             initial_samples = _full_to_partial(initial_samples, mode)
             initial_x = initial_samples[:, 1:, :planner.problem.dx]
-            initial_u = initial_samples[:, :-1, -planner.problem.du:]
+            if params['type'] == 'cnf':
+                initial_u = initial_samples[:, 1:, -planner.problem.du:]
+            else:
+                initial_u = initial_samples[:, :-1, -planner.problem.du:]
             initial_samples = torch.cat((initial_x, initial_u), dim=-1)
 
 
@@ -720,7 +730,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         state = state[:planner.problem.dx]
         # print(params['T'], state.shape, initial_samples)
 
-        planner.reset(state, T=params['T'], goal=goal, initial_x=initial_samples)
+        planner.reset(state, T=cnf_T if params['type'] == 'cnf' else params['T'], goal=goal, initial_x=initial_samples)
         if params['controller'] != 'diffusion_policy' and (trajectory_sampler is None or not params.get('diff_init', True)):
             initial_samples = planner.x.detach().clone()
             sim_rollouts = torch.zeros_like(initial_samples)
@@ -736,7 +746,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         }
         plans = None
         resample = params.get('diffusion_resample', False)
-        for k in range(planner.problem.T):  # range(params['num_steps']):
+        resample_cnf = params.get('cnf_resample', False)
+        for k in range(params['T']):  # range(params['num_steps']):
             state = env.get_state()
             state = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
             state = state[:planner.problem.dx]
@@ -765,7 +776,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                             timestep=50)
                     initial_samples = _full_to_partial(initial_samples, mode)
                     initial_x = initial_samples[:, 1:, :planner.problem.dx]
-                    initial_u = initial_samples[:, :-1, -planner.problem.du:]
+                    if params['type'] == 'cnf':
+                        initial_u = initial_samples[:, 1:, -planner.problem.du:]
+                    else:
+                        initial_u = initial_samples[:, :-1, -planner.problem.du:]
                     initial_samples = torch.cat((initial_x, initial_u), dim=-1)
 
                     # if state[-1] < -1.0:
@@ -773,6 +787,64 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     # update the initial samples
                     planner.x = initial_samples[:, k:]
 
+            if resample_cnf and k > 0:
+                with torch.no_grad():
+                    if params['sine_cosine']:
+                        start_for_diff = convert_yaw_to_sine_cosine(state)
+                    else:
+                        start_for_diff = state
+                    orig_yaw = start_for_diff[14]
+                    start_for_diff[14] = 0
+                    init = torch.cat((start_for_diff, xu[15:].to(params['device'])), dim=-1).unsqueeze(0)
+                    initial_samples, _, _ = trajectory_sampler.sample(
+                        N=params['N'], start=init,
+                        H=2,
+                        start_time=k/(params['T']),
+                        end_time=(k+1)/(params['T']),
+                        constraints=contact,
+                        project=False
+                    )
+                    if params['sine_cosine']:
+                        initial_samples = convert_sine_cosine_to_yaw(initial_samples)
+                if params['type'] == 'cnf':
+                    initial_samples[..., 14] += orig_yaw
+                if params['visualize_plan']:
+                    if params['project_state']:
+                        iter_set = [('initial_samples_project', initial_samples), ('initial_samples_0', initial_samples_0)]
+                    else:
+                        iter_set = [('initial_samples', initial_samples)]
+                    for (name, traj_set) in iter_set:
+                        for s in range(params['N']):
+                            traj_for_viz = traj_set[s, :, :planner.problem.dx]
+                            # if params['exclude_index']:
+                            #     traj_for_viz = torch.cat((state[4:4 + planner.problem.dx].unsqueeze(0), traj_for_viz), dim=0)
+                            # else:
+                            #     traj_for_viz = torch.cat((state[:planner.problem.dx].unsqueeze(0), traj_for_viz), dim=0)
+                            tmp = torch.zeros((traj_for_viz.shape[0], 1),
+                                            device=traj_for_viz.device)  # add the joint for the screwdriver cap
+                            traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
+                            # traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof] = axis_angle_to_euler(traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof])
+
+                            viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/{name}/{k}/{s}")
+                            img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
+                            gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
+                            pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
+                            pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
+                            visualize_trajectory(traj_for_viz, turn_problem.contact_scenes, viz_fpath,
+                                                turn_problem.fingers, turn_problem.obj_dof + 1)
+                
+                if initial_samples is not None:
+                    if params['mode'] == 'hardware' and mode == 'turn':
+                        initial_samples[..., 30:] = 1.5 * torch.randn(params['N'], params['T']+1, 6, device=initial_samples.device)
+
+                    initial_samples = _full_to_partial(initial_samples, mode)
+                    initial_x = initial_samples[:, 1:, :planner.problem.dx]
+                    if params['type'] == 'cnf':
+                        initial_u = initial_samples[:, 1:, -planner.problem.du:]
+                    else:
+                        initial_u = initial_samples[:, :-1, -planner.problem.du:]                   
+                    initial_samples = torch.cat((initial_x, initial_u), dim=-1)
+                    planner.x = initial_samples
             s = time.time()
             best_traj, plans = planner.step(state)
             print(f'Solve time for step {k+1}', time.time() - s)
@@ -813,7 +885,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 index_force = torch.norm(best_traj[..., 27:30], dim=-1)
                 print('Index force:', index_force)
             if params['controller'] != 'diffusion_policy':
-                action = best_traj[0, planner.problem.dx:planner.problem.dx + planner.problem.du]
                 x = best_traj[0, :planner.problem.dx + planner.problem.du]
                 x = x.reshape(1, planner.problem.dx + planner.problem.du)
                 action = x[:, planner.problem.dx:planner.problem.dx + planner.problem.du].to(device=env.device)

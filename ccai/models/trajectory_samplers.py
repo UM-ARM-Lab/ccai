@@ -246,7 +246,8 @@ class TrajectoryCNFModel(TrajectoryCNF):
         super().__init__(horizon, dx, du, context_dim, problem, hidden_dim=hidden_dim, state_only=state_only,
                          state_control_only=state_control_only)
 
-    def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None, project=False):
+    def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None, project=False,
+               start_time=0, end_time=1):
         # B, N, _ = constraints.shape
         if constraints is not None:
             constraints = constraints.reshape(constraints.shape[0], -1, constraints.shape[-1])
@@ -278,7 +279,7 @@ class TrajectoryCNFModel(TrajectoryCNF):
             samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.project(H=H, context=context, condition=condition)
             return samples, samples_0, (all_losses, all_samples, all_likelihoods)
         else:
-            samples = self._sample(H=H, context=context, condition=condition)  # .reshape(-1, H#,
+            samples = self._sample(H=H, context=context, condition=condition, start_time=start_time, end_time=end_time)  # .reshape(-1, H#,
         #         self.dx + self.du)
             return samples
 
@@ -337,11 +338,15 @@ class TrajectorySampler(nn.Module):
     def send_norm_constants_to_submodels(self):
         self.model.set_norm_constants(self.x_mean, self.x_std)
 
-    def sample(self, N, H=10, start=None, goal=None, constraints=None, past=None, project=False):
+    def sample(self, N, H=10, start=None, goal=None, constraints=None, past=None, project=False,
+               start_time=0, end_time=1):
         norm_start = None
         norm_past = None
         if start is not None and self.type != 'latent_diffusion':
-            norm_start = (start - self.x_mean[:self.dx]) / self.x_std[:self.dx]
+            if start.shape[-1] == self.dx:
+                norm_start = (start - self.x_mean[:self.dx]) / self.x_std[:self.dx]
+            else:
+                norm_start = (start - self.x_mean)/self.x_std
         else:
             norm_start = start
         if past is not None and self.type != 'latent_diffusion':
@@ -352,7 +357,8 @@ class TrajectorySampler(nn.Module):
         if project:
             samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project)
         else:
-            samples = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project)
+            samples = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project, start_time=start_time,
+                                        end_time=end_time)
         # if len(samples) == N:
         #     x = samples
         #     c = None

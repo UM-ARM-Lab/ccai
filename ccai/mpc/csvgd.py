@@ -50,10 +50,10 @@ class Constrained_SVGD_MPC:
         return best_trajectory, all_trajectories
 
     def shift(self):
-        if self.fix_T:
+        if self.fix_T and self.problem.T > 1:
             self.x = torch.roll(self.x, shifts=-1, dims=1)
             self.x[:, -1] = self.x[:, -2]  # just copy over previous last
-        else:
+        elif not self.fix_T:
             self.x = self.x[:, 1:]
         #self.x = self.problem.shift(self.x)
 
