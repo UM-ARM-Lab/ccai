@@ -591,6 +591,8 @@ class TemporalUnetStateAction(nn.Module):
         t = t.reshape(-1)
         if t.shape[0] == 1:
             t = t.repeat(B)
+
+        t = torch.zeros_like(t) # Dirty hack to remove time dependence. TODO: Fix this
         t = self.time_embedding(t)
         # x = einops.rearrange(x, 'b h t -> b t h')
         # x = x.permute(0, 2, 1)

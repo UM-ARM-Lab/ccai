@@ -428,7 +428,7 @@ class TrajectoryCNF(nn.Module):
 
         xt, truevt, trueat = self.interp(x_arange, xu, t)
         # truevt = self.dinterp_dt(x_arange, xu, t).squeeze()
-        if True:
+        if False:
             truevt_norm = self.label_norm_v(truevt)
             trueat_norm = self.label_norm_a(trueat)
         else:
