@@ -592,7 +592,7 @@ class TemporalUnetStateAction(nn.Module):
         if t.shape[0] == 1:
             t = t.repeat(B)
 
-        t = torch.zeros_like(t) # Dirty hack to remove time dependence. TODO: Fix this
+        # t = torch.zeros_like(t) # Dirty hack to remove time dependence. TODO: Fix this
         t = self.time_embedding(t)
         # x = einops.rearrange(x, 'b h t -> b t h')
         # x = x.permute(0, 2, 1)
@@ -677,12 +677,13 @@ class TemporalUnetStateAction(nn.Module):
 
     def project(self, x_orig, x, context, p_matrix=None, xi_C=None):
         N = x.shape[0]
-        Kh = .1
-        Ktheta = 3
+        Kh = 3
+        Ktheta = 1
 
         # Is the below sufficient to go from dtheta/dt to df/dtheta?
         # x[..., 14] += -33
-        x /= -Ktheta
+        dx = x.clone()
+        dx /= -Ktheta
         # x = -x
 
         if self.problem_dict is not None:
@@ -693,12 +694,12 @@ class TemporalUnetStateAction(nn.Module):
                 x_this_problem = x_orig[context.sum(-1) == p_idx][:, None] * self.x_std + self.x_mean
                 if x_this_problem.shape[0] == 0:
                     continue
-                grad_x_this_problem = x[context.sum(-1) == p_idx][:, None]
+                grad_x_this_problem = dx[context.sum(-1) == p_idx][:, None]
                 grad_x_this_problem[:,:, :self.x_std.shape[0]] *= self.x_std
                 grad_x_this_problem[:,:, self.x_std.shape[0]:] *= self.x_std
                 b = x_this_problem.shape[0]
 
-                c_state, mask, mask_no_z = self.c_state_mask(problem_idx, x)
+                c_state, mask, mask_no_z = self.c_state_mask(problem_idx, dx)
                 problem = self.problem_dict[problem_idx]
                 g_dim = problem.dg
                 h_dim = problem.dh
@@ -748,15 +749,15 @@ class TemporalUnetStateAction(nn.Module):
                 h_I_p = h_masked[I_p].reshape(N, -1)
                 dh_I_p = dh_masked[I_p].reshape(N, -1, dC.shape[-1])
 
-                h_bar = torch.cat((g_masked, h_I_p), dim=1).to(dtype=x.dtype)
-                dh_bar = torch.cat((dg_masked, dh_I_p), dim=1).to(dtype=x.dtype)
+                h_bar = torch.cat((g_masked, h_I_p), dim=1).to(dtype=dx.dtype)
+                dh_bar = torch.cat((dg_masked, dh_I_p), dim=1).to(dtype=dx.dtype)
 
-                # h_bar = g_masked.to(dtype=x.dtype)
-                # dh_bar = dg_masked.to(dtype=x.dtype)
+                # h_bar = g_masked.to(dtype=dx.dtype)
+                # dh_bar = dg_masked.to(dtype=dx.dtype)
 
                 # we try and invert the dC dCT, if it is singular then we use the psuedo-inverse
                 # eye = torch.eye(dC.shape[1]).repeat(N, 1, 1).to(device=C.device, dtype=self.dtype)
-                eye = torch.eye(dh_bar.shape[1]).repeat(N, 1, 1).to(device=C.device, dtype=x.dtype)
+                eye = torch.eye(dh_bar.shape[1]).repeat(N, 1, 1).to(device=C.device, dtype=dx.dtype)
 
                 eye_0 = eye.clone()
                 # eye_0[inactive_constraint_mask_eye] = 0
@@ -764,7 +765,7 @@ class TemporalUnetStateAction(nn.Module):
                 eye_0 *= damping_factor
 
                 dCdCT = dh_bar @ dh_bar.permute(0, 2, 1)
-                dCdCT = dCdCT.to(dtype=x.dtype) * Ktheta
+                dCdCT = dCdCT.to(dtype=dx.dtype) * Ktheta
                 A_bmm = lambda x: dCdCT @ x
                 #
                 # damping_factor = 1e-1
@@ -801,17 +802,17 @@ class TemporalUnetStateAction(nn.Module):
 
                 update_this_c = (update_this_c) / self.x_std[mask[:self.transition_dim]].repeat(2)
 
-                update_this_c = update_this_c.to(dtype=x.dtype)
+                update_this_c = update_this_c.to(dtype=dx.dtype)
 
-                c_ = (context.sum(-1) == p_idx).reshape(-1, 1).repeat(1, x.shape[-1])
-                m = mask.reshape(1, -1).repeat(x.shape[0], 1)
+                c_ = (context.sum(-1) == p_idx).reshape(-1, 1).repeat(1, dx.shape[-1])
+                m = mask.reshape(1, -1).repeat(dx.shape[0], 1)
 
                 full_mask = c_ & m
                 full_mask_inv_m = c_ & ~m
-                x[full_mask] = update_this_c.flatten()
-                x[full_mask_inv_m] = 0
+                dx[full_mask] = update_this_c.flatten()
+                dx[full_mask_inv_m] = 0
 
-        return x, p_matrix, xi_C
+        return dx, p_matrix, xi_C
 
     # @torch.compile(mode='max-autotune')
     def compiled_conditional_test_fwd(self, t, x, context):
@@ -822,7 +823,8 @@ class TemporalUnetStateAction(nn.Module):
         x_orig, _, ddx = self.compiled_conditional_test_fwd(t, x, context)
         p_matrix, xi_C = None, None
         # dx = torch.zeros_like(x)
-        # dx[:, 12:15] = (self.delta_goal - x[:, 12:15]) #/ (1-t)
+        # dx[:, 12:15] = (self.delta_goal - x[:, 12:15]) / (1-t)
+        # ddx = torch.zeros_like(ddx)
         # dx[:, -21:] = .1 * x[:, -21:]
         # Clip norm of dx[:, 12:15] to pi/6
         # norm_mask = torch.norm(dx[:, 12:15], dim=-1) > 1
@@ -835,12 +837,13 @@ class TemporalUnetStateAction(nn.Module):
         # dx *= -1
         
         # dx = None
-        # ddx *= 5
+        ddx *= 1.
         theta = torch.cat((dx, ddx), dim=-1)
-        # theta *= 25
-        before_x = np.round(((x*self.x_std) + self.x_mean)[0, 14].item(), 3)
-        before_dx = np.round((dx*self.x_std)[0, 14].item(), 3)
-        before_ddx = np.round((ddx*self.x_std)[0, 14].item(), 3)
+        
+        
+        # before_x = np.round(((x*self.x_std) + self.x_mean)[0, 14].item(), 3)
+        # before_dx = np.round((dx*self.x_std)[0, 14].item(), 3)
+        # before_ddx = np.round((ddx*self.x_std)[0, 14].item(), 3)
         proj = True
         if proj:
             theta_adj, p_matrix, xi_C = self.project(x, theta, context)
@@ -853,16 +856,17 @@ class TemporalUnetStateAction(nn.Module):
         # x_norm_mask = torch.norm(x, dim=-1) > 1
         # x[x_norm_mask] = x[x_norm_mask] / torch.norm(x[x_norm_mask], dim=-1, keepdim=True) * 1
         # return dx, None, None
-        after_x = np.round(((x*self.x_std) + self.x_mean)[0, 14].item(), 3)
-        after_dx = np.round((dx*self.x_std)[0, 14].item(), 3)
-        after_ddx = np.round((ddx*self.x_std)[0, 14].item(), 3)
-        print('Before adj:', (before_x, before_dx, before_ddx))
-        print('After adj:', (after_x, after_dx, after_ddx))
-        print('Diff:', (after_x - before_x, after_dx - before_dx, after_ddx - before_ddx))
-        if (after_dx - before_dx) > 0:
-            print('dx increased')
-        if (after_ddx - before_ddx) > 0:
-            print('ddx increased')
+        # after_x = np.round(((x*self.x_std) + self.x_mean)[0, 14].item(), 3)
+        # after_dx = np.round((dx*self.x_std)[0, 14].item(), 3)
+        # after_ddx = np.round((ddx*self.x_std)[0, 14].item(), 3)
+        # print('t:', t.mean().item())
+        # print('Before adj:', (before_x, before_dx, before_ddx))
+        # print('After adj:', (after_x, after_dx, after_ddx))
+        # print('Diff:', (after_x - before_x, after_dx - before_dx, after_ddx - before_ddx))
+        # if (after_dx - before_dx) > 0:
+        #     print('dx increased')
+        # if (after_ddx - before_ddx) > 0:
+        #     print('ddx increased')
         return dx, ddx, p_matrix, xi_C
 
     # @torch.compile(mode='max-autotune')

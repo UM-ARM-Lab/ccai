@@ -1023,7 +1023,8 @@ class AllegroContactProblem(AllegroObjectProblem):
         self.friction_polytope_k = 8
 
         if self.optimize_force:
-            self._contact_dg_per_t = self.num_contacts * (1 + 2 + 4) + 3
+            # self._contact_dg_per_t = self.num_contacts * (1 + 2 + 4) + 3
+            self._contact_dg_per_t = self.num_contacts * (1 + 2) + 3
             # self._contact_dg_per_t = self.num_contacts * (2 + 4) + 3
 
 
@@ -1314,7 +1315,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         if delta_q is None:
             delta_q = q + u - next_q
         else:
-            delta_q = -delta_q * .003 + u# + delta_u
+            delta_q = -delta_q * 1/12 + u# + delta_u
         torque_list = []
         reactional_torque_list = []
         for i, finger_name in enumerate(self.contact_fingers):
@@ -1332,14 +1333,64 @@ class AllegroContactProblem(AllegroObjectProblem):
         torque_list = torch.stack(torque_list, dim=0)
         torque_list = torch.sum(torque_list, dim=0)
         reactional_torque_list = torch.stack(reactional_torque_list, dim=0)
-        sum_reactional_torque = torch.sum(reactional_torque_list, dim=0)
-        g_force_torque_balance = (sum_reactional_torque + 3.0 * delta_q)
+        # sum_reactional_torque = torch.sum(reactional_torque_list, dim=0)
+        # g_force_torque_balance = (sum_reactional_torque + 3.0 * delta_q)
         # print(g_force_torque_balance.max(), torque_list.max())
-        g = torch.cat((torque_list, g_force_torque_balance.reshape(-1)), dim=-1)
+        # g = torch.cat((torque_list, g_force_torque_balance.reshape(-1)), dim=-1)
+        g = torque_list
         # residual_list = torch.stack(residual_list, dim=0) * 100
         # g = torch.cat((torque_list, residual_list), dim=-1)
         return g
 
+    def solve_for_u_hat(self, xu):
+        T_offset = 1
+        q = xu[:, :, :self.num_fingers * 4]
+        q = partial_to_full_state(q, fingers=self.fingers)
+        N, T = q.shape[:2]
+        force = torch.zeros(N, T, 12, device=self.device)
+        force[:, :, self._contact_force_indices] = xu[:, :, -self.num_contacts * 3:]
+        device = q.device
+        d = self.d
+
+        full_start = partial_to_full_state(self.start[None, :self.num_fingers * 4], self.fingers)
+        q = torch.cat((full_start.reshape(1, 1, -1).repeat(N, 1, 1), q), dim=1)
+        next_q = q[:, 1:, self.contact_state_indices]
+        q = q[:, :-1, self.contact_state_indices]
+        force_list = force[:, :, self._contact_force_indices].reshape(force.shape[0], force.shape[1], self.num_contacts,
+                                                                      3)
+        mult = 1
+        if 'delta_f' in self.data:
+            # force_list += self.data['delta_f'].reshape(N, T, self.num_contacts, 3)
+            mult = 2
+        if self.env_force:
+            env_force = force[:, :, -3:]
+            force_list = torch.cat((force_list, env_force.unsqueeze(2)), dim=2)
+            num_forces = self.num_contacts + 1
+        else:
+            num_forces = self.num_contacts
+        force_list = force_list.reshape(-1, num_forces, 3)[0]
+        # retrieve contact jacobians and points
+        contact_jac_list = []
+        for finger in self.contact_fingers:
+            jac = self.data[finger]['contact_jacobian'].reshape(N, T + T_offset, 3, -1)[:, T_offset:, :, self.contact_state_indices]
+            contact_jac_list.append(jac.reshape(N * T, 3, -1))
+
+        contact_jac_list = torch.stack(contact_jac_list, dim=1).to(device=device)[0]
+
+        q_delta = next_q - q
+        reactional_torque_list = []
+        for i, finger_name in enumerate(self.contact_fingers):
+            # TODO: Assume that all the fingers are having an equlibrium, maybe we should change so that index finger is not considered
+            contact_jacobian = contact_jac_list[i]
+            force_robot_frame = self.world_trans.inverse().transform_normals(force_list[i].unsqueeze(0)).squeeze(0)
+            reactional_torque_list.append(contact_jacobian.T @ -force_robot_frame)
+        reactional_torque_list = torch.stack(reactional_torque_list, dim=0)
+
+        sum_reactional_torque = torch.sum(reactional_torque_list, dim=0)
+
+        u_hat = q_delta + sum_reactional_torque/3.0
+
+        return u_hat
 
     def update_grad_g(self, num_forces, gshape2, device, grad_g, N, T, d_offset, dg_dq, dg_du, dg_dnext_q, dg_dforce):
         T_range = torch.arange(T, device=device)

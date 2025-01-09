@@ -177,7 +177,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # }
         # initial grasp
 
-        cnf_T = 1
+        # cnf_T = 1
+        cnf_T = 1 if params['cnf_resample'] else params['T']
         pregrasp_params = copy.deepcopy(params)
         pregrasp_params['warmup_iters'] = 80
         pregrasp_params['N'] = 16
@@ -259,6 +260,26 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             obj_gravity=params.get('obj_gravity', False),
             min_force_dict=min_force_dict
         )
+
+        # turn_problem_full_T = AllegroScrewdriver(
+        #     start=start[:4 * num_fingers + obj_dof],
+        #     goal=params['valve_goal'] * 0,
+        #     T=params['T'],
+        #     chain=params['chain'],
+        #     device=params['device'],
+        #     object_asset_pos=env.table_pose,
+        #     object_location=params['object_location'],
+        #     object_type=params['object_type'],
+        #     world_trans=env.world_trans,
+        #     contact_fingers=['index', 'middle', 'thumb'],
+        #     obj_dof=obj_dof,
+        #     obj_joint_dim=1,
+        #     optimize_force=params['optimize_force'],
+        #     default_dof_pos=env.default_dof_pos[:, :16],
+        #     turn=True,
+        #     obj_gravity=params.get('obj_gravity', False),
+        #     min_force_dict=min_force_dict
+        # )
 
         pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, pregrasp_params)
         index_regrasp_planner = PositionControlConstrainedSVGDMPC(index_regrasp_problem, params)
@@ -629,7 +650,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             contact[:, 2] = 1
         elif mode == 'turn':
             contact[:, :] = 1
-        H = 2 if params['type'] == 'cnf' else params['T'] + 1
+        H = 2 if params['cnf_resample']else params['T'] + 1
         # H =  params['T'] + 1
 
         # generate initial samples with diffusion model
@@ -653,7 +674,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 start_for_diff = start
             
             if params['type'] == 'cnf':
-                orig_yaw = start_for_diff[14]
+                orig_yaw = start_for_diff[14].item()
                 start_for_diff[14] = 0
             if params['project_state']:
                 initial_samples, _, _, initial_samples_0, (all_losses, all_samples, all_likelihoods) = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
@@ -664,7 +685,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
                                                                     H=H,
                                                                     start_time=0,
-                                                                    end_time=1/(params['T']-1),
+                                                                    end_time=1/(params['T'] if params['cnf_resample'] else 1),
                                                                     constraints=contact,
                                                                     project=params['project_state'],)
             mode_fpath = f'{fpath}/{fname}'
@@ -793,7 +814,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                         start_for_diff = convert_yaw_to_sine_cosine(state)
                     else:
                         start_for_diff = state
-                    orig_yaw = start_for_diff[14]
+                    orig_yaw = start_for_diff[14].item()
                     start_for_diff[14] = 0
                     init = torch.cat((start_for_diff, xu[15:].to(params['device'])), dim=-1).unsqueeze(0)
                     initial_samples, _, _ = trajectory_sampler.sample(
@@ -1475,7 +1496,7 @@ if __name__ == "__main__":
         now = datetime.datetime.now().strftime("%m.%d.%y:%I:%M:%S")
     else:
         now = ''
-    start_ind = 0# if config['experiment_name'] == 'allegro_screwdriver_csvto_diff_sine_cosine_eps_.015_2.5_damping_pi_6' else 0
+    start_ind = 5# if config['experiment_name'] == 'allegro_screwdriver_csvto_diff_sine_cosine_eps_.015_2.5_damping_pi_6' else 0
     for i in tqdm(range(start_ind, config['num_trials'])):
     # for i in tqdm([1, 2, 4, 7]):
         if config['mode'] != 'hardware':

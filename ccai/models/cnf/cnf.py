@@ -90,7 +90,7 @@ def set_cnf_options(solver, model):
             if solver in ['fixed_adams', 'explicit_adams']:
                 module.solver_options['max_order'] = 4
             if solver == 'rk4':
-                module.solver_options['step_size'] = .003
+                module.solver_options['step_size'] = .1
 
             # Set the test settings
             module.test_solver = solver
@@ -497,11 +497,12 @@ class TrajectoryCNF(nn.Module):
         # Predict first derivative
         t_0 = torch.zeros(N, 1, device=self.noise.device) + start_time
         _, vt, _ = self.model.compiled_conditional_test_fwd(t_0, self.noise, context)
+
+        vt *= 1.
         # if hasattr(self, 'label_norm_v'):
         #     vt = self.label_norm_v.running_mean + vt * self.label_norm_v.running_var.sqrt()
         # self.noise = torch.cat((self.noise, torch.zeros_like(self.noise)), dim=-1)
         
-        vt *= 1
         self.noise = torch.cat((self.noise, vt), dim=-1)
         # manually set the conditions
         if condition is not None:
@@ -533,10 +534,19 @@ class TrajectoryCNF(nn.Module):
         trajectories, log_prob = out[:2]
         trajectories = trajectories.permute(1, 0, 2)
         # Remove the derivative from state
-        trajectories = trajectories[..., :self.xu_dim]
+        trajectories = trajectories[..., :self.xu_dim].reshape(N, -1, self.xu_dim)
         self.FM.sigma = sigma_save
 
-        return trajectories.reshape(N, -1, self.xu_dim), log_prob.reshape(N, -1).sum(dim=1)
+        turn_problem = self.problem_dict[(1, 1, 1)]
+        turn_problem.start = trajectories[0, 0, :15]
+
+        turn_problem._preprocess(trajectories[:, 1:2])
+
+        u_hat = turn_problem.solve_for_u_hat(trajectories[:, 1:2])
+
+        trajectories[:, 1, 15:27] = u_hat
+
+        return trajectories, log_prob.reshape(N, -1).sum(dim=1)
 
     def project(self, H=None, condition=None, context=None):
         N = context.shape[0]

@@ -1,9 +1,8 @@
 import numpy as np
 
 dir_name = './logs/'
-
 log_files = [
-    'projected_cnf_only_all_cnstrts_C_10_rk4_.1'
+    'ode_project_kh_1_ktheta_1_dt_.1_solve_for_u_hat'
     # 'allegro_screwdriver_csvto_diff_sine_cosine_planned_replanned_contact_eps_.015_2.5_damping_pi_6',
     # 'allegro_screwdriver_csvto_diff_planned_contact_sine_cosine_1.7',
     # 'allegro_screwdriver_csvto_diff_sine_cosine_eps_.015_2.5_damping_pi_6',
@@ -66,6 +65,6 @@ for log_file in log_files:
 # print(a)
 # print(f'Average sequence search time: {np.mean(sequence_search_time)}')
 print(f'Average diff time: {np.mean(diff_time)}')
-print(f'Average traj opt time: {np.mean(traj_opt_time)}')
+print(f'Average traj opt time: {np.mean(traj_opt_time[1:])}')
 
 print(np.mean(traj_opt_time) * 12)
