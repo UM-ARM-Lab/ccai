@@ -532,6 +532,16 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                                                vae=vae)
         # try:
         trajectory_sampler.load_state_dict(torch.load(f'{CCAI_PATH}/{model_path}', map_location=torch.device(params['device'])), strict=True)
+        traj = torch.load(f'{CCAI_PATH}/examples/sanity_check_turn_traj.pt')
+        traj = torch.tensor(traj)
+        orig_yaw = traj[0, 14].item()
+        traj[:, 14] -= orig_yaw
+        traj = (traj - trajectory_sampler.model.x_mean) / trajectory_sampler.model.x_std
+        traj = traj.unsqueeze(0)
+        traj = traj.to(params['device'])
+
+        trajectory_sampler.model.traj = traj
+        
         # except:
         #     print('failed to load model')
         trajectory_sampler.to(device=params['device'])
@@ -1216,6 +1226,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             del actual_trajectory_save
             continue
         if stage == 0:
+            continue
             contact = 'pregrasp'
             start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
             a = time.perf_counter()
@@ -1496,7 +1507,7 @@ if __name__ == "__main__":
         now = datetime.datetime.now().strftime("%m.%d.%y:%I:%M:%S")
     else:
         now = ''
-    start_ind = 5# if config['experiment_name'] == 'allegro_screwdriver_csvto_diff_sine_cosine_eps_.015_2.5_damping_pi_6' else 0
+    start_ind = 0# if config['experiment_name'] == 'allegro_screwdriver_csvto_diff_sine_cosine_eps_.015_2.5_damping_pi_6' else 0
     for i in tqdm(range(start_ind, config['num_trials'])):
     # for i in tqdm([1, 2, 4, 7]):
         if config['mode'] != 'hardware':
@@ -1506,7 +1517,19 @@ if __name__ == "__main__":
         goal = torch.tensor([0, 0, float(config['goal'])])
         # goal = goal + 0.025 * torch.randn(1) + 0.2
         for controller in config['controllers'].keys():
-            env.reset()
+            # env.reset()
+            traj = torch.load(f'{CCAI_PATH}/examples/sanity_check_turn_traj.pt')
+            traj = torch.tensor(traj).to(device=config['sim_device'])
+            traj[..., 14] -= traj[0, 14]
+            start_state = traj[0]
+            env.reset(
+                dof_pos=torch.cat(
+                                    [
+                                        start_state[:8],
+                                        torch.tensor([0, 0, 0, 0,]),
+                                        start_state[8:15], 
+                                        torch.tensor([0.]) ], dim=0).reshape(1, -1)
+            )
             fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}.{now}/{controller}/trial_{i + 1}')
             if config['mode'] != 'hardware':
                 pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)

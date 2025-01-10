@@ -1,6 +1,6 @@
 ---
 T: 12
-receding_horizon: True
+receding_horizon: False
 num_steps: 12
 num_turns: 1
 num_trials: 10
@@ -13,10 +13,10 @@ visualize: True
 # experiment_name: 'allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_project_training_C_0_project_inference_alpha_C_10_all_constraints'
 # experiment_name: 'allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_project_inference_alpha_C_10_all_constraints'
 # experiment_name: 'allegro_cnf_state_control_only_turn_only_group_norm_projected'
-experiment_name: 'allegro_cnf_no_label_norm_cnf_sample_1_action_each_t_rk4_kh_3_ktheta_1_dt_.1_dx_ddx_mult_1._solve_for_u_hat'
+# experiment_name: 'allegro_cnf_no_label_norm_cnf_sample_1_action_each_t_rk4_kh_3_ktheta_1_dt_.1_dx_ddx_mult_1._solve_for_u_hat'
 # experiment_name: 'allegro_cnf_no_label_norm_sample_1_action_each_t_rk4_dt_.1'
 # experiment_name: 'allegro_cnf_no_label_norm_cnf_sample_full_traj_rk4_kh_1_ktheta_3_dt_.003'
-# experiment_name: 'allegro_cnf_no_label_norm_cnf_sample_full_traj_dt_.003'
+experiment_name: 'allegro_cnf_no_label_norm_cnf_sample_full_traj_dopri5_sanity_check_spline'
 # experiment_name: 'allegro_cnf_no_label_norm_cnf_sample_full_project'
 type: 'cnf'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
@@ -45,7 +45,7 @@ use_partial_constraint: True
 sine_cosine: False
 project_state: False
 state_control_only: True
-cnf_resample: True
+cnf_resample: False
 # model_path: 'data/training/allegro_screwdriver/allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_no_project_training_cnf/allegro_screwdriver_cnf.pt'
 # model_path: 'data/training/allegro_screwdriver/allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_projected_training_projected_target_alpha_C_0_cnf/allegro_screwdriver_cnf.pt'
 # model_path: 'data/training/allegro_screwdriver/allegro_cnf_state_control_only_turn_only_group_norm_cnf/allegro_screwdriver_cnf.pt'
