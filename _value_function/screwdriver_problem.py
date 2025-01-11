@@ -86,7 +86,7 @@ def init_env(visualize=False):
                                 joint_stiffness=config['kp'],
                                 fingers=config['fingers'],
                                 gradual_control=False,
-                                gravity=False,
+                                gravity=True,
                                 randomize_obj_start= True
                                 #device = config['device'],
                                 )
@@ -265,8 +265,10 @@ def pregrasp(env, config, chain, deterministic=True, initialization = None, perc
     
     return end_state_full.cpu(), action.cpu()
 
-def regrasp(env, config, gym, viewer, chain, state2ee_pos_partial, perception_noise = 0, initialization = None, useVFgrads=False, 
-            image_path = None, vf_weight = 0, other_weight = 10, vis_plan = False):
+def regrasp(env, config, chain, state2ee_pos_partial, perception_noise = 0, initialization = None, 
+             model_name = 'ensemble', mode='no_vf', vf_weight = 0, other_weight = 10, variance_ratio = 1,
+            image_path = None, vis_plan = False, iters = 200):
+    
     params = config.copy()
     controller = 'csvgd'
     params.pop('controllers')
@@ -311,13 +313,20 @@ def regrasp(env, config, gym, viewer, chain, state2ee_pos_partial, perception_no
             optimize_force=params['optimize_force'],
             default_dof_pos=env.initial_dof_pos[:, :16],
             obj_gravity=params.get('obj_gravity', False),
-            min_force_dict=None
+            min_force_dict=None,
+            model_name=model_name,
+            mode = mode,
+            vf_weight=vf_weight,
+            other_weight=other_weight,
+            variance_ratio=1,
         )
     
     regrasp_planner = PositionControlConstrainedSVGDMPC(regrasp_problem, params)
-    # regrasp_planner.warmup_iters = warmup_iters
+    regrasp_planner.warmup_iters = iters
     # regrasp_planner.online_iters = online_iters
 
+    # print("n steps: ", params['T'])
+    # print("n online iters: ", regrasp_planner.online_iters)
 
     actual_trajectory = []
 
@@ -374,17 +383,17 @@ def regrasp(env, config, gym, viewer, chain, state2ee_pos_partial, perception_no
         env.step(action, path_override = image_path)
         regrasp_problem._preprocess(best_traj.unsqueeze(0))
         
-        gym.clear_lines(viewer)
-        state = env.get_state()
-        start = state['q'][:,:4 * num_fingers + obj_dof].squeeze(0).to(device=params['device'])
-        for finger in params['fingers']:
-            ee = state2ee_pos_partial(start[:4 * num_fingers], regrasp_problem.ee_names[finger])
-            finger_traj_history[finger].append(ee.detach().cpu().numpy())
-        for finger in params['fingers']:
-            traj_history = finger_traj_history[finger]
-            temp_for_plot = np.stack(traj_history, axis=0)
-            if k >= 2:
-                axes[finger].plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray', label='actual')
+        # gym.clear_lines(viewer)
+        # state = env.get_state()
+        # start = state['q'][:,:4 * num_fingers + obj_dof].squeeze(0).to(device=params['device'])
+        # for finger in params['fingers']:
+        #     ee = state2ee_pos_partial(start[:4 * num_fingers], regrasp_problem.ee_names[finger])
+        #     finger_traj_history[finger].append(ee.detach().cpu().numpy())
+        # for finger in params['fingers']:
+        #     traj_history = finger_traj_history[finger]
+        #     temp_for_plot = np.stack(traj_history, axis=0)
+        #     if k >= 2:
+        #         axes[finger].plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray', label='actual')
 
     state = env.get_state()
     state = state['q'].reshape(4 * num_fingers + obj_dof + 1).to(device=params['device'])
@@ -398,7 +407,7 @@ def regrasp(env, config, gym, viewer, chain, state2ee_pos_partial, perception_no
                     state.clone()[:, :8], 
                     torch.tensor([[0., 0.5, 0.65, 0.65]]), 
                     state.clone()[:, 8:], 
-                    ), dim=1).detach().cpu().numpy()
+                    ), dim=1).detach().cpu()
      
     full_trajectory = torch.cat((
                     actual_trajectory.clone()[:, :8].detach().cpu(), 
@@ -594,7 +603,7 @@ def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym,
     params['object_location'] = object_location
 
     final_distance_to_goal, final_pose, full_trajectory = solve_turn(env, gym, viewer, params, fpath, initial_pose, state2ee_pos_partial, image_path = None,
-                                                                     sim_viz_env=sim_env, ros_copy_node=ros_copy_node, perception_noise=0)
+                                                                     sim_viz_env=sim_env, ros_copy_node=ros_copy_node, perception_noise=perception_noise)
     
     if final_distance_to_goal < 30 / 180 * np.pi:
         succ = True
@@ -649,21 +658,37 @@ if __name__ == "__main__":
 
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
-    # initial_poses = pkl.load(open(f'{fpath.resolve()}/initial_poses/initial_poses_10k.pkl', 'rb'))
-    # show_state(env, initial_poses[0], t=2)
-    # show_state(env, initial_poses[1], t=2)
-        
-    pregrasp_pose = pregrasp(env, config, chain, deterministic=True, perception_noise = 0, initialization = None, useVFgrads=False, iters = 10)
-    # initial_pose, final_pose, succ, full_trajectory = do_turn(pregrasp_pose, config, env, sim_env, 
-    #                                                           ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, 
-    #                                                           turn_angle = np.pi/2, perception_noise = 0)
     
-    regrasp_pose, regrasp_traj = regrasp(env, config, chain, perception_noise=0, initialization = None, useVFgrads=False, iters = 200)
+    img_save_dir = None
+    pregrasp_iters = 200#200
+    regrasp_iters = 200
+    perception_noise = 0.0
 
-    print("enter to continue")
-    wait = input()
+    pregrasp_pose_vf, plan_vf = pregrasp(env, config, chain, deterministic=True, perception_noise=perception_noise, 
+                            image_path = img_save_dir, initialization = None, 
+                            model_name = 'ensemble', mode='vf', iters = pregrasp_iters,
+                            vf_weight = 10.0, other_weight = 0.1, variance_ratio = 5)
+
+    print("done pregrasp")
+    
+    regrasp_pose, regrasp_traj = regrasp(env, config, chain, state2ee_pos_partial, perception_noise=perception_noise, 
+                                         initialization = pregrasp_pose_vf, useVFgrads=False, iters = regrasp_iters)
+
+    print("done regrasp")
     while True:
-        for traj in regrasp_traj:
-            env.reset(dof_pos=torch.tensor(traj).reshape(1,20))
-            time.sleep(0.2)
+        for idx, state in enumerate(regrasp_traj):
+            print(f"step {idx}")
+            env.reset(dof_pos=torch.tensor(state).reshape(1,20))
+            time.sleep(0.1)
+
+    _, turn_pose_vf, turn_succ, turn_trajectory_vf = do_turn(pregrasp_pose_vf, config, env, 
+                    sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, 
+                    perception_noise=perception_noise, image_path = img_save_dir)
+    
+    # print("enter to continue")
+    # wait = input()
+    # while True:
+    #     for traj in regrasp_traj:
+    #         env.reset(dof_pos=torch.tensor(traj).reshape(1,20))
+    #         time.sleep(0.2)
     

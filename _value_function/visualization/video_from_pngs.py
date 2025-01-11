@@ -35,12 +35,29 @@ def display_and_save_video(image_dir, output_video_path=None, frame_rate=30):
         video_writer.release()
         print(f"Video saved to {output_video_path}")
     cv2.destroyAllWindows()
-
-
-
-output_path = '/home/newuser/Desktop/Honda/ccai/data/plots/vid'
-for i in range(100):
-    image_directory = f"/home/newuser/Desktop/Honda/ccai/data/experiments/imgs/trial_{i+1}"
-    op = output_path + str(i) + '.mp4'
-    display_and_save_video(image_directory, op, frame_rate=10)
  
+
+# output_path = '/home/newuser/Desktop/Honda/ccai/data/plots/vid_results_vf_'
+# for i in range(8):
+#     for j in range(1):
+#         j=0
+#         image_directory = f"/home/newuser/Desktop/Honda/ccai/data/experiments/imgs/trial_results{i}_{j}_vf"
+#         op = output_path + str(i) + '.mp4'
+#         display_and_save_video(image_directory, op, frame_rate=50)
+ 
+
+def convert_dirs_to_videos(source_dir, output_dir, frame_rate):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    subdirs = [os.path.join(source_dir, d) for d in os.listdir(source_dir) if os.path.isdir(os.path.join(source_dir, d))]
+    subdirs = natsorted(subdirs)  # Ensure natural sorting
+    for idx, subdir in enumerate(subdirs):
+        print(subdir)
+        output_video_path = os.path.join(output_dir, f"vid_{idx}.mp4")
+        display_and_save_video(subdir, output_video_path, frame_rate=frame_rate)
+
+
+source_dir = '/home/newuser/Desktop/Honda/ccai/data/experiments/imgs'
+output_dir = '/home/newuser/Desktop/Honda/ccai/data/plots/regrasp_vids'
+convert_dirs_to_videos(source_dir, output_dir, frame_rate=30)

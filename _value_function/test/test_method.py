@@ -11,40 +11,44 @@ from _value_function.screwdriver_problem import init_env, do_turn, pregrasp, ema
 import torch
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
-def get_initialization(sim_device, env, screwdriver_noise_mag, finger_noise_mag):
-        # torch.random.manual_seed(1)
-        index_noise_mag = torch.tensor([finger_noise_mag]*4)
-        index_noise = index_noise_mag * (2 * torch.rand(4) - 1)
-        middle_thumb_noise_mag = torch.tensor([finger_noise_mag]*4)
-        middle_thumb_noise = middle_thumb_noise_mag * (2 * torch.rand(4) - 1)
-        screwdriver_noise = torch.tensor([
-        np.random.uniform(-screwdriver_noise_mag, screwdriver_noise_mag),  # Random value between -0.05 and 0.05
-        np.random.uniform(-screwdriver_noise_mag, screwdriver_noise_mag),  # Random value between -0.05 and 0.05
-        np.random.uniform(0, 2 * np.pi),  # Random value between 0 and 2π
-        0.0  
-        ])
-        #fingers=['index', 'middle', 'ring', 'thumb']
-        initialization = torch.cat((torch.tensor([[0., 0.5, 0.7, 0.7]]).float().to(device=sim_device) + index_noise,
-                                    torch.tensor([[0., 0.5, 0.7, 0.7]]).float().to(device=sim_device) + middle_thumb_noise,
-                                    torch.tensor([[0., 0.5, 0.65, 0.65]]).float().to(device=sim_device),
-                                    torch.tensor([[1.3, 0.3, 0.2, 1.1]]).float().to(device=sim_device) + middle_thumb_noise,
-                                    torch.tensor([[0.0, 0.0, 0.0, 0.0]]).float().to(device=sim_device) + screwdriver_noise),
-                                    dim=1).to(sim_device)
+def get_initialization(sim_device, env, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag):
+        while True:
+            # torch.random.manual_seed(1)
+            index_noise_mag = torch.tensor([finger_noise_mag]*4)
+            index_noise = index_noise_mag * (2 * torch.rand(4) - 1)
+            middle_thumb_noise_mag = torch.tensor([finger_noise_mag]*4)
+            middle_thumb_noise = middle_thumb_noise_mag * (2 * torch.rand(4) - 1)
+            screwdriver_noise = torch.tensor([
+            np.random.uniform(-screwdriver_noise_mag, screwdriver_noise_mag),  # Random value between -0.05 and 0.05
+            np.random.uniform(-screwdriver_noise_mag, screwdriver_noise_mag),  # Random value between -0.05 and 0.05
+            np.random.uniform(0, 2 * np.pi),  # Random value between 0 and 2π
+            0.0  
+            ])
+            #fingers=['index', 'middle', 'ring', 'thumb']
+            initialization = torch.cat((torch.tensor([[0., 0.5, 0.7, 0.7]]).float().to(device=sim_device) + index_noise,
+                                        torch.tensor([[0., 0.5, 0.7, 0.7]]).float().to(device=sim_device) + middle_thumb_noise,
+                                        torch.tensor([[0., 0.5, 0.65, 0.65]]).float().to(device=sim_device),
+                                        torch.tensor([[1.3, 0.3, 0.2, 1.1]]).float().to(device=sim_device) + middle_thumb_noise,
+                                        torch.tensor([[0.0, 0.0, 0.0, 0.0]]).float().to(device=sim_device) + screwdriver_noise),
+                                        dim=1).to(sim_device)
+            
+            env.reset(dof_pos= initialization)
+            for _ in range(64):
+                env._step_sim()
+            solved_initialization = env.get_state()['q'].reshape(1,16)[:,0:-1].to(device=sim_device)
+            solved_initialization = convert_partial_to_full_config(solved_initialization)
+
+            sd = solved_initialization[0, -4:-1]
+            if abs(sd[0]) < max_screwdriver_tilt and abs(sd[1]) < max_screwdriver_tilt:
+                return solved_initialization
         
-        env.reset(dof_pos= initialization)
-        for _ in range(64):
-            env._step_sim()
-        solved_initialization = env.get_state()['q'].reshape(1,16)[:,0:-1].to(device=sim_device)
-        return convert_partial_to_full_config(solved_initialization)
 
 def get_initializations(sim_device, env, n_samples, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag):
     
     initializations = []
-    while len(initializations) < n_samples:
-        initialization = get_initialization(sim_device, env, screwdriver_noise_mag, finger_noise_mag)
-        sd = initialization[0, -4:-1]
-        if abs(sd[0]) < max_screwdriver_tilt and abs(sd[1]) < max_screwdriver_tilt:
-            initializations.append(initialization)
+    for _ in range(n_samples):
+        initialization = get_initialization(sim_device, env, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag)
+        initializations.append(initialization)
     return initializations
 
 
