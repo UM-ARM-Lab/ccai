@@ -1,0 +1,1035 @@
+Importing module 'gym_38' (/home/fanyang/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/fanyang/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.2.1
+Device count 2
+/home/fanyang/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/fanyang/github/ccai
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/fanyang/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/fanyang/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/fanyang/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/fanyang/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+Current yaw: tensor(-0.0393, device='cuda:0')
+0 pregrasp
+Current yaw: tensor(-0.0526, device='cuda:0')
+1 turn
+Solve time for step 29.45671248435974
+Solve time for step 6.927499532699585
+Solve time for step 6.409759283065796
+Solve time for step 5.986771583557129
+Solve time for step 5.614586353302002
+Solve time for step 5.242101669311523
+Solve time for step 5.056305408477783
+Solve time for step 4.879259824752808
+Solve time for step 4.982442855834961
+Solve time for step 4.794909715652466
+Solve time for step 4.6030919551849365
+Solve time for step 4.514690637588501
+Current yaw: tensor(-0.5397, device='cuda:0')
+2 thumb_middle
+Solve time for step 18.84972333908081
+Solve time for step 4.867338180541992
+Solve time for step 4.737323522567749
+Solve time for step 4.379714488983154
+Solve time for step 4.209329128265381
+Solve time for step 4.1255388259887695
+Solve time for step 4.020834684371948
+Solve time for step 3.9705018997192383
+Solve time for step 3.959230661392212
+Solve time for step 4.001336574554443
+Solve time for step 4.0214362144470215
+Solve time for step 3.8746893405914307
+Current yaw: tensor(-0.5464, device='cuda:0')
+3 index
+Solve time for step 25.52364730834961
+Solve time for step 6.256070375442505
+Solve time for step 5.997918128967285
+Solve time for step 5.584604740142822
+Solve time for step 5.512796640396118
+Solve time for step 5.194139719009399
+Solve time for step 5.774872541427612
+Solve time for step 5.00045919418335
+Solve time for step 5.265042781829834
+Solve time for step 4.835973024368286
+Solve time for step 4.769169330596924
+Solve time for step 4.647040128707886
+Current yaw: tensor(-0.6029, device='cuda:0')
+4 turn
+Solve time for step 29.43795609474182
+Solve time for step 7.0364768505096436
+Solve time for step 6.448064565658569
+Solve time for step 6.082224369049072
+Solve time for step 5.735330104827881
+Solve time for step 5.257492780685425
+Solve time for step 5.113497495651245
+Solve time for step 5.043855905532837
+Solve time for step 5.0772998332977295
+Solve time for step 4.60860013961792
+Solve time for step 4.692688941955566
+Solve time for step 4.4822962284088135
+Current yaw: tensor(-0.9380, device='cuda:0')
+5 index
+Solve time for step 25.510998725891113
+Solve time for step 6.36196756362915
+Solve time for step 6.194186687469482
+Solve time for step 5.817037582397461
+Solve time for step 5.3366265296936035
+Solve time for step 5.086937665939331
+Solve time for step 5.107560157775879
+Solve time for step 4.89306116104126
+Solve time for step 4.892138719558716
+Solve time for step 4.814647436141968
+Solve time for step 4.6679847240448
+Solve time for step 4.5450310707092285
+Current yaw: tensor(-0.9800, device='cuda:0')
+6 thumb_middle
+Solve time for step 19.024796962738037
+Solve time for step 4.693035840988159
+Solve time for step 4.513638019561768
+Solve time for step 4.306868076324463
+Solve time for step 4.403357744216919
+Solve time for step 4.184927463531494
+Solve time for step 4.144579887390137
+Solve time for step 4.620383262634277
+Solve time for step 4.168709754943848
+Solve time for step 4.045612573623657
+Solve time for step 3.9165828227996826
+Solve time for step 4.183441638946533
+Current yaw: tensor(-0.9759, device='cuda:0')
+7 turn
+Solve time for step 29.01479172706604
+Solve time for step 7.28727126121521
+Solve time for step 6.307142019271851
+Solve time for step 6.020732164382935
+Solve time for step 5.720388174057007
+Solve time for step 5.5047242641448975
+Solve time for step 5.203577041625977
+Solve time for step 5.056684494018555
+Solve time for step 5.027726411819458
+Solve time for step 4.907634258270264
+Solve time for step 4.592543125152588
+Solve time for step 4.783573865890503
+csvgd, Average time per step: 0.0
+{}
+Current yaw: tensor(-0.0393, device='cuda:0')
+0 pregrasp
+Current yaw: tensor(-0.0460, device='cuda:0')
+1 turn
+Solve time for step 29.7488956451416
+Solve time for step 7.130026817321777
+Solve time for step 6.313205718994141
+Solve time for step 6.0155439376831055
+Solve time for step 5.762298345565796
+Solve time for step 5.337190866470337
+Solve time for step 5.067414283752441
+Solve time for step 4.906826972961426
+Solve time for step 4.720048904418945
+Solve time for step 4.539605140686035
+Solve time for step 4.683082342147827
+Solve time for step 4.792328119277954
+Current yaw: tensor(-0.4974, device='cuda:0')
+2 thumb_middle
+Solve time for step 19.08801770210266
+Solve time for step 5.1945130825042725
+Solve time for step 4.851908922195435
+Solve time for step 4.78872275352478
+Solve time for step 4.318909645080566
+Solve time for step 4.146838903427124
+Solve time for step 4.198392391204834
+Solve time for step 4.103655576705933
+Solve time for step 4.107590198516846
+Solve time for step 3.924405097961426
+Solve time for step 3.91694974899292
+Solve time for step 4.032126426696777
+Current yaw: tensor(-0.5039, device='cuda:0')
+3 index
+Solve time for step 25.48150324821472
+Solve time for step 6.212310075759888
+Solve time for step 5.935784101486206
+Solve time for step 5.679348945617676
+Solve time for step 5.507527589797974
+Solve time for step 5.29887318611145
+Solve time for step 5.498154401779175
+Solve time for step 5.3690736293792725
+Solve time for step 5.08023476600647
+Solve time for step 4.704769849777222
+Solve time for step 4.870070457458496
+Solve time for step 4.7298760414123535
+Current yaw: tensor(-0.5418, device='cuda:0')
+4 turn
+Solve time for step 28.71678590774536
+Solve time for step 6.92654013633728
+Solve time for step 6.664154767990112
+Solve time for step 6.0882697105407715
+Solve time for step 5.5922441482543945
+Solve time for step 5.530082702636719
+Solve time for step 5.405117750167847
+Solve time for step 5.230118751525879
+Solve time for step 4.791520118713379
+Solve time for step 5.050202369689941
+Solve time for step 4.881277084350586
+Solve time for step 4.528547525405884
+Current yaw: tensor(-0.9245, device='cuda:0')
+5 thumb_middle
+Solve time for step 19.47550392150879
+Solve time for step 5.00157904624939
+Solve time for step 4.58267879486084
+Solve time for step 4.545597553253174
+Solve time for step 4.482151031494141
+Solve time for step 4.236587285995483
+Solve time for step 4.17753005027771
+Solve time for step 4.48702597618103
+Solve time for step 4.332309246063232
+Solve time for step 4.366887807846069
+Solve time for step 3.904078722000122
+Solve time for step 4.103073835372925
+Current yaw: tensor(-0.9246, device='cuda:0')
+6 index
+Solve time for step 25.844124794006348
+Solve time for step 6.2832114696502686
+Solve time for step 5.925273895263672
+Solve time for step 5.663335800170898
+Solve time for step 5.420887470245361
+Solve time for step 6.049379587173462
+Solve time for step 5.731927394866943
+Solve time for step 5.362351179122925
+Solve time for step 4.8683083057403564
+Solve time for step 5.536913871765137
+Solve time for step 5.43921422958374
+Solve time for step 4.785765171051025
+Current yaw: tensor(-0.9906, device='cuda:0')
+7 turn
+Solve time for step 29.518091440200806
+Solve time for step 6.981719970703125
+Solve time for step 6.199388742446899
+Solve time for step 5.954669952392578
+Solve time for step 5.7399678230285645
+Solve time for step 5.3369786739349365
+Solve time for step 5.160908460617065
+Solve time for step 5.036396503448486
+Solve time for step 4.675364017486572
+Solve time for step 4.903772592544556
+Solve time for step 5.01020622253418
+Solve time for step 4.637062311172485
+csvgd, Average time per step: 0.0
+{}
+Current yaw: tensor(-0.0393, device='cuda:0')
+0 pregrasp
+Current yaw: tensor(-0.0612, device='cuda:0')
+1 turn
+Solve time for step 29.86928939819336
+Solve time for step 6.691511392593384
+Solve time for step 6.316851615905762
+Solve time for step 5.994286775588989
+Solve time for step 5.837096691131592
+Solve time for step 5.350900173187256
+Solve time for step 5.072528600692749
+Solve time for step 4.989924192428589
+Solve time for step 4.992677450180054
+Solve time for step 4.735667705535889
+Solve time for step 4.785870313644409
+Solve time for step 4.499631404876709
+Current yaw: tensor(-0.4882, device='cuda:0')
+2 index
+Solve time for step 25.660053491592407
+Solve time for step 6.255062818527222
+Solve time for step 6.012926816940308
+Solve time for step 5.921103477478027
+Solve time for step 5.4800519943237305
+Solve time for step 5.464609622955322
+Solve time for step 5.510261535644531
+Solve time for step 5.161607980728149
+Solve time for step 5.102812051773071
+Solve time for step 4.783716678619385
+Solve time for step 4.848099946975708
+Solve time for step 5.699681043624878
+Current yaw: tensor(-0.5383, device='cuda:0')
+3 thumb_middle
+Solve time for step 19.202486753463745
+Solve time for step 4.847240209579468
+Solve time for step 4.980199575424194
+Solve time for step 4.774079322814941
+Solve time for step 4.828521251678467
+Solve time for step 4.525569438934326
+Solve time for step 4.17151951789856
+Solve time for step 4.1453070640563965
+Solve time for step 4.050955772399902
+Solve time for step 4.2885191440582275
+Solve time for step 4.23329758644104
+Solve time for step 4.299227952957153
+Current yaw: tensor(-0.5377, device='cuda:0')
+4 turn
+Solve time for step 29.643479108810425
+Solve time for step 7.008044481277466
+Solve time for step 6.455132007598877
+Solve time for step 6.357330799102783
+Solve time for step 5.839659214019775
+Solve time for step 5.440775632858276
+Solve time for step 4.9901580810546875
+Solve time for step 4.9625468254089355
+Solve time for step 4.742372035980225
+Solve time for step 4.737266540527344
+Solve time for step 4.582007884979248
+Solve time for step 4.5039167404174805
+Current yaw: tensor(-1.0228, device='cuda:0')
+5 index
+Solve time for step 25.471797227859497
+Solve time for step 6.407428741455078
+Solve time for step 5.9056236743927
+Solve time for step 5.793304681777954
+Solve time for step 5.823216199874878
+Solve time for step 5.19066596031189
+Solve time for step 5.211381912231445
+Solve time for step 5.013871192932129
+Solve time for step 4.898457288742065
+Solve time for step 5.390516996383667
+Solve time for step 4.783673524856567
+Solve time for step 4.719920873641968
+Current yaw: tensor(-1.0323, device='cuda:0')
+6 thumb_middle
+Solve time for step 19.131634950637817
+Solve time for step 4.67645788192749
+Solve time for step 4.66294264793396
+Solve time for step 4.439899206161499
+Solve time for step 4.509524822235107
+Solve time for step 4.125553131103516
+Solve time for step 4.065794467926025
+Solve time for step 4.045919179916382
+Solve time for step 4.222264528274536
+Solve time for step 3.9741108417510986
+Solve time for step 3.895456314086914
+Solve time for step 3.8578546047210693
+Current yaw: tensor(-1.0231, device='cuda:0')
+7 turn
+Solve time for step 29.352774381637573
+Solve time for step 6.944664478302002
+Solve time for step 6.543210029602051
+Solve time for step 6.0703184604644775
+Solve time for step 6.537737131118774
+Solve time for step 6.134727478027344
+Solve time for step 5.9157044887542725
+Solve time for step 5.019561767578125
+Solve time for step 5.188299655914307
+Solve time for step 4.668759346008301
+Solve time for step 4.601240873336792
+Solve time for step 4.468860149383545
+csvgd, Average time per step: 0.0
+{}
+Current yaw: tensor(-0.0393, device='cuda:0')
+0 pregrasp
+Current yaw: tensor(-0.0404, device='cuda:0')
+1 turn
+Solve time for step 28.88847255706787
+Solve time for step 7.352829456329346
+Solve time for step 6.919486999511719
+Solve time for step 6.415823221206665
+Solve time for step 5.673079490661621
+Solve time for step 5.260544776916504
+Solve time for step 5.029792070388794
+Solve time for step 4.9394004344940186
+Solve time for step 4.869901895523071
+Solve time for step 4.8575966358184814
+Solve time for step 4.712344408035278
+Solve time for step 4.486137628555298
+Current yaw: tensor(-0.4805, device='cuda:0')
+2 thumb_middle
+Solve time for step 19.62674641609192
+Solve time for step 4.876610994338989
+Solve time for step 4.727288722991943
+Solve time for step 4.467216491699219
+Solve time for step 4.476397752761841
+Solve time for step 4.437856197357178
+Solve time for step 4.103242874145508
+Solve time for step 4.26673698425293
+Solve time for step 4.205225944519043
+Solve time for step 3.9379281997680664
+Solve time for step 3.6680662631988525
+Solve time for step 3.782623052597046
+Current yaw: tensor(-0.4915, device='cuda:0')
+3 index
+Solve time for step 25.44585132598877
+Solve time for step 6.379416465759277
+Solve time for step 5.927671670913696
+Solve time for step 5.628290414810181
+Solve time for step 5.820107460021973
+Solve time for step 5.283384799957275
+Solve time for step 5.322244167327881
+Solve time for step 4.978041172027588
+Solve time for step 4.892650127410889
+Solve time for step 4.850321531295776
+Solve time for step 4.826498985290527
+Solve time for step 5.079880237579346
+Current yaw: tensor(-0.5064, device='cuda:0')
+4 turn
+Solve time for step 29.75885009765625
+Solve time for step 6.671368837356567
+Solve time for step 6.359845399856567
+Solve time for step 6.06552529335022
+Solve time for step 5.7018866539001465
+Solve time for step 5.320707321166992
+Solve time for step 5.080320358276367
+Solve time for step 4.845571756362915
+Solve time for step 4.665975332260132
+Solve time for step 4.750275135040283
+Solve time for step 4.641705513000488
+Solve time for step 4.759910345077515
+Current yaw: tensor(-0.9146, device='cuda:0')
+5 thumb_middle
+Solve time for step 19.319831371307373
+Solve time for step 5.199170827865601
+Solve time for step 4.640240430831909
+Solve time for step 4.658165454864502
+Solve time for step 4.255136013031006
+Solve time for step 4.117719650268555
+Solve time for step 4.106600046157837
+Solve time for step 4.076120138168335
+Solve time for step 4.358412981033325
+Solve time for step 4.110621452331543
+Solve time for step 3.9744560718536377
+Solve time for step 4.143854141235352
+Current yaw: tensor(-0.9161, device='cuda:0')
+6 index
+Solve time for step 25.901806116104126
+Solve time for step 6.185811996459961
+Solve time for step 5.89892053604126
+Solve time for step 5.64575982093811
+Solve time for step 5.362321138381958
+Solve time for step 5.108258485794067
+Solve time for step 4.851849317550659
+Solve time for step 4.631710052490234
+Solve time for step 4.82581090927124
+Solve time for step 4.820319890975952
+Solve time for step 4.766164779663086
+Solve time for step 4.674603462219238
+Current yaw: tensor(-0.9776, device='cuda:0')
+7 turn
+Solve time for step 28.74788737297058
+Solve time for step 6.86188006401062
+Solve time for step 6.570690155029297
+Solve time for step 5.930781126022339
+Solve time for step 5.49955153465271
+Solve time for step 5.214416980743408
+Solve time for step 5.0532355308532715
+Solve time for step 4.92255711555481
+Solve time for step 4.827121734619141
+Solve time for step 4.660460948944092
+Solve time for step 4.590194225311279
+Solve time for step 4.525050163269043
+csvgd, Average time per step: 0.0
+{}
+Current yaw: tensor(-0.0393, device='cuda:0')
+0 pregrasp
+Current yaw: tensor(-0.0536, device='cuda:0')
+1 turn
+Solve time for step 29.00809359550476
+Solve time for step 7.065377712249756
+Solve time for step 6.442463397979736
+Solve time for step 6.627763271331787
+Solve time for step 5.852360725402832
+Solve time for step 5.569040060043335
+Solve time for step 5.1154139041900635
+Solve time for step 4.827545642852783
+Solve time for step 4.805169343948364
+Solve time for step 4.739748239517212
+Solve time for step 4.6144397258758545
+Solve time for step 4.242150545120239
+Current yaw: tensor(-0.5921, device='cuda:0')
+2 index
+Solve time for step 25.515648126602173
+Solve time for step 6.134666204452515
+Solve time for step 5.8944268226623535
+Solve time for step 5.557678699493408
+Solve time for step 5.282399892807007
+Solve time for step 5.745296478271484
+Solve time for step 5.167829990386963
+Solve time for step 5.402052640914917
+Solve time for step 5.204956293106079
+Solve time for step 5.434982538223267
+Solve time for step 4.976747035980225
+Solve time for step 4.579613924026489
+Current yaw: tensor(-0.6210, device='cuda:0')
+3 thumb_middle
+Solve time for step 19.011348247528076
+Solve time for step 4.714126348495483
+Solve time for step 4.527096509933472
+Solve time for step 4.606736421585083
+Solve time for step 4.511612176895142
+Solve time for step 4.587037086486816
+Solve time for step 4.503646612167358
+Solve time for step 4.22289776802063
+Solve time for step 4.239727258682251
+Solve time for step 4.252869129180908
+Solve time for step 4.079761743545532
+Solve time for step 4.307146787643433
+Current yaw: tensor(-0.6206, device='cuda:0')
+4 turn
+Solve time for step 29.334677934646606
+Solve time for step 6.76418924331665
+Solve time for step 6.302951335906982
+Solve time for step 6.021373748779297
+Solve time for step 5.855909109115601
+Solve time for step 5.344897985458374
+Solve time for step 5.087634801864624
+Solve time for step 4.941258907318115
+Solve time for step 4.972081184387207
+Solve time for step 4.56886100769043
+Solve time for step 4.4805145263671875
+Solve time for step 5.11698579788208
+Current yaw: tensor(-1.0411, device='cuda:0')
+5 thumb_middle
+Solve time for step 19.501537561416626
+Solve time for step 5.2657036781311035
+Solve time for step 4.669604539871216
+Solve time for step 4.821460008621216
+Solve time for step 4.431664943695068
+Solve time for step 4.71521258354187
+Solve time for step 4.287351608276367
+Solve time for step 4.519350051879883
+Solve time for step 3.99104380607605
+Solve time for step 3.8942699432373047
+Solve time for step 4.272315740585327
+Solve time for step 3.7743470668792725
+Current yaw: tensor(-1.0396, device='cuda:0')
+6 index
+Solve time for step 25.300172328948975
+Solve time for step 6.7224297523498535
+Solve time for step 6.638523101806641
+Solve time for step 6.239216566085815
+Solve time for step 5.432203054428101
+Solve time for step 5.851823568344116
+Solve time for step 5.034693241119385
+Solve time for step 5.019141912460327
+Solve time for step 5.105660915374756
+Solve time for step 4.986982107162476
+Solve time for step 4.971776008605957
+Solve time for step 4.937802314758301
+Current yaw: tensor(-1.0941, device='cuda:0')
+7 turn
+Solve time for step 29.09316062927246
+Solve time for step 6.894357681274414
+Solve time for step 6.511772871017456
+Solve time for step 6.0705108642578125
+Solve time for step 5.870009422302246
+Solve time for step 5.7545201778411865
+Solve time for step 5.052605390548706
+Solve time for step 5.701996564865112
+Solve time for step 5.538736581802368
+Solve time for step 5.073545694351196
+Solve time for step 4.522279500961304
+Solve time for step 4.5419981479644775
+csvgd, Average time per step: 0.0
+{}
+Current yaw: tensor(-0.0393, device='cuda:0')
+0 pregrasp
+Current yaw: tensor(-0.0605, device='cuda:0')
+1 turn
+Solve time for step 28.996652126312256
+Solve time for step 6.958027601242065
+Solve time for step 6.710756063461304
+Solve time for step 6.425072431564331
+Solve time for step 6.22495698928833
+Solve time for step 5.442429542541504
+Solve time for step 5.300026178359985
+Solve time for step 5.555791616439819
+Solve time for step 4.777615308761597
+Solve time for step 4.514452934265137
+Solve time for step 4.489156246185303
+Solve time for step 4.590194463729858
+Current yaw: tensor(-0.6090, device='cuda:0')
+2 index
+Solve time for step 25.54552960395813
+Solve time for step 6.168344020843506
+Solve time for step 6.059736490249634
+Solve time for step 5.8593385219573975
+Solve time for step 5.675866365432739
+Solve time for step 5.439010381698608
+Solve time for step 5.819471597671509
+Solve time for step 5.561075925827026
+Solve time for step 5.513365745544434
+Solve time for step 5.135056018829346
+Solve time for step 5.00748610496521
+Solve time for step 5.350512504577637
+Current yaw: tensor(-0.7203, device='cuda:0')
+3 thumb_middle
+Solve time for step 18.958211421966553
+Solve time for step 4.551690340042114
+Solve time for step 4.528733015060425
+Solve time for step 4.467257499694824
+Solve time for step 4.407490253448486
+Solve time for step 4.321140289306641
+Solve time for step 4.389530658721924
+Solve time for step 4.150943756103516
+Solve time for step 4.4333672523498535
+Solve time for step 4.30054235458374
+Solve time for step 3.972163438796997
+Solve time for step 3.904696464538574
+Current yaw: tensor(-0.7153, device='cuda:0')
+4 turn
+Solve time for step 29.073400497436523
+Solve time for step 6.869302749633789
+Solve time for step 6.367119550704956
+Solve time for step 5.913617134094238
+Solve time for step 5.605741500854492
+Solve time for step 5.353402614593506
+Solve time for step 5.151673793792725
+Solve time for step 5.0322089195251465
+Solve time for step 5.376493453979492
+Solve time for step 4.74352765083313
+Solve time for step 5.439963102340698
+Solve time for step 5.318809986114502
+Current yaw: tensor(-1.2553, device='cuda:0')
+5 thumb_middle
+Solve time for step 19.662287712097168
+Solve time for step 5.216344833374023
+Solve time for step 5.054392337799072
+Solve time for step 4.934052467346191
+Solve time for step 4.6070897579193115
+Solve time for step 4.233073711395264
+Solve time for step 4.221457004547119
+Solve time for step 4.058370590209961
+Solve time for step 4.382646799087524
+Solve time for step 4.058809757232666
+Solve time for step 3.933932304382324
+Solve time for step 3.9216744899749756
+Current yaw: tensor(-1.2459, device='cuda:0')
+6 index
+Solve time for step 25.82709240913391
+Solve time for step 6.285895347595215
+Solve time for step 6.079004764556885
+Solve time for step 5.900579452514648
+Solve time for step 5.543231964111328
+Solve time for step 5.446334600448608
+Solve time for step 5.165931701660156
+Solve time for step 4.961385726928711
+Solve time for step 5.0664381980896
+Solve time for step 5.258582830429077
+Solve time for step 4.8671135902404785
+Solve time for step 4.759500503540039
+Current yaw: tensor(-1.3194, device='cuda:0')
+7 turn
+Solve time for step 28.94122314453125
+Solve time for step 7.072397947311401
+Solve time for step 6.560873031616211
+Solve time for step 6.255131959915161
+Solve time for step 5.747421026229858
+Solve time for step 5.41380763053894
+Solve time for step 5.142927885055542
+Solve time for step 5.048571586608887
+Solve time for step 5.139543294906616
+Solve time for step 4.941842794418335
+Solve time for step 4.86163592338562
+Solve time for step 5.266175985336304
+csvgd, Average time per step: 0.0
+{}
+Current yaw: tensor(-0.0393, device='cuda:0')
+0 pregrasp
+Current yaw: tensor(-0.0490, device='cuda:0')
+1 turn
+Solve time for step 28.990857124328613
+Solve time for step 6.93366265296936
+Solve time for step 6.626080513000488
+Solve time for step 6.74857234954834
+Solve time for step 6.424785137176514
+Solve time for step 6.119955539703369
+Solve time for step 5.510079622268677
+Solve time for step 5.032487630844116
+Solve time for step 5.0786964893341064
+Solve time for step 4.7293994426727295
+Solve time for step 4.550737380981445
+Solve time for step 4.460677862167358
+Current yaw: tensor(-0.4299, device='cuda:0')
+2 index
+Solve time for step 25.617303133010864
+Solve time for step 6.183395862579346
+Solve time for step 5.906599044799805
+Solve time for step 5.8084070682525635
+Solve time for step 5.882281303405762
+Solve time for step 5.858006477355957
+Solve time for step 5.541015148162842
+Solve time for step 5.714613437652588
+Solve time for step 5.119025707244873
+Solve time for step 5.1668336391448975
+Solve time for step 5.154744625091553
+Solve time for step 4.960050821304321
+Current yaw: tensor(-0.4580, device='cuda:0')
+3 thumb_middle
+Solve time for step 19.90141487121582
+Solve time for step 4.765893459320068
+Solve time for step 4.5486228466033936
+Solve time for step 4.539747953414917
+Solve time for step 4.400158405303955
+Solve time for step 4.368347883224487
+Solve time for step 4.167582035064697
+Solve time for step 4.118156671524048
+Solve time for step 4.0289106369018555
+Solve time for step 3.9649558067321777
+Solve time for step 3.9587044715881348
+Solve time for step 3.9255411624908447
+Current yaw: tensor(-0.4552, device='cuda:0')
+4 turn
+Solve time for step 29.18825387954712
+Solve time for step 7.001998662948608
+Solve time for step 6.415471315383911
+Solve time for step 6.0920939445495605
+Solve time for step 5.795315504074097
+Solve time for step 5.494665622711182
+Solve time for step 4.999213218688965
+Solve time for step 5.126469850540161
+Solve time for step 4.975985765457153
+Solve time for step 4.707506895065308
+Solve time for step 4.669415473937988
+Solve time for step 4.595518350601196
+Current yaw: tensor(-0.8630, device='cuda:0')
+5 index
+Solve time for step 25.454405546188354
+Solve time for step 6.126939535140991
+Solve time for step 6.037301063537598
+Solve time for step 5.947302341461182
+Solve time for step 5.418307542800903
+Solve time for step 5.240296363830566
+Solve time for step 5.202025413513184
+Solve time for step 5.009528875350952
+Solve time for step 4.974947452545166
+Solve time for step 4.923430442810059
+Solve time for step 4.826212167739868
+Solve time for step 4.726782321929932
+Current yaw: tensor(-0.8479, device='cuda:0')
+6 thumb_middle
+Solve time for step 19.358696699142456
+Solve time for step 4.75842547416687
+Solve time for step 4.564831972122192
+Solve time for step 4.509623289108276
+Solve time for step 4.534523963928223
+Solve time for step 4.26546049118042
+Solve time for step 4.135255575180054
+Solve time for step 4.088398218154907
+Solve time for step 3.9905052185058594
+Solve time for step 4.090927600860596
+Solve time for step 4.044424772262573
+Solve time for step 3.8677403926849365
+Current yaw: tensor(-0.8459, device='cuda:0')
+7 turn
+Solve time for step 29.106263160705566
+Solve time for step 6.995757341384888
+Solve time for step 6.673957824707031
+Solve time for step 6.087285280227661
+Solve time for step 5.910778045654297
+Solve time for step 5.338420629501343
+Solve time for step 5.072110414505005
+Solve time for step 4.96755051612854
+Solve time for step 5.561152219772339
+Solve time for step 4.959995269775391
+Solve time for step 4.731687307357788
+Solve time for step 4.337893009185791
+csvgd, Average time per step: 0.0
+{}
+Current yaw: tensor(-0.0393, device='cuda:0')
+0 pregrasp
+Current yaw: tensor(-0.0532, device='cuda:0')
+1 turn
+Solve time for step 29.201403617858887
+Solve time for step 6.948424816131592
+Solve time for step 6.335220575332642
+Solve time for step 5.778747081756592
+Solve time for step 5.89321756362915
+Solve time for step 5.366581201553345
+Solve time for step 5.518346548080444
+Solve time for step 5.293580532073975
+Solve time for step 5.677603006362915
+Solve time for step 5.145129680633545
+Solve time for step 5.277272462844849
+Solve time for step 4.977442264556885
+Current yaw: tensor(-0.5030, device='cuda:0')
+2 thumb_middle
+Solve time for step 19.384336948394775
+Solve time for step 4.752732515335083
+Solve time for step 4.661641359329224
+Solve time for step 4.433880090713501
+Solve time for step 4.34895133972168
+Solve time for step 4.231075763702393
+Solve time for step 4.1775963306427
+Solve time for step 4.090380668640137
+Solve time for step 4.1311845779418945
+Solve time for step 3.93735671043396
+Solve time for step 3.6969385147094727
+Solve time for step 3.8994061946868896
+Current yaw: tensor(-0.5089, device='cuda:0')
+3 index
+Solve time for step 25.763744115829468
+Solve time for step 6.256786346435547
+Solve time for step 6.574504137039185
+Solve time for step 5.586297273635864
+Solve time for step 5.817197322845459
+Solve time for step 5.8820295333862305
+Solve time for step 5.261379957199097
+Solve time for step 5.119983673095703
+Solve time for step 4.814441919326782
+Solve time for step 4.7590155601501465
+Solve time for step 5.073182582855225
+Solve time for step 5.324325799942017
+Current yaw: tensor(-0.5198, device='cuda:0')
+4 turn
+Solve time for step 29.065003395080566
+Solve time for step 7.361492872238159
+Solve time for step 7.204120635986328
+Solve time for step 6.875088453292847
+Solve time for step 5.655607223510742
+Solve time for step 5.412585973739624
+Solve time for step 5.765671730041504
+Solve time for step 5.4536683559417725
+Solve time for step 4.9911110401153564
+Solve time for step 4.870197057723999
+Solve time for step 4.7163987159729
+Solve time for step 4.749150514602661
+Current yaw: tensor(-0.7220, device='cuda:0')
+5 index
+Solve time for step 26.052773237228394
+Solve time for step 6.431214332580566
+Solve time for step 6.542684316635132
+Solve time for step 5.781062364578247
+Solve time for step 5.528360843658447
+Solve time for step 5.080915451049805
+Solve time for step 5.034016370773315
+Solve time for step 4.861972093582153
+Solve time for step 4.78232479095459
+Solve time for step 4.729659795761108
+Solve time for step 4.791757106781006
+Solve time for step 4.8500378131866455
+Current yaw: tensor(-0.6917, device='cuda:0')
+6 thumb_middle
+Solve time for step 19.502164363861084
+Solve time for step 5.002810478210449
+Solve time for step 4.792819023132324
+Solve time for step 4.519340991973877
+Solve time for step 4.508201837539673
+Solve time for step 4.632290840148926
+Solve time for step 4.496451139450073
+Solve time for step 4.41317892074585
+Solve time for step 4.123490571975708
+Solve time for step 4.3577721118927
+Solve time for step 4.12187933921814
+Solve time for step 3.9803168773651123
+Current yaw: tensor(-0.6909, device='cuda:0')
+7 turn
+Solve time for step 29.27634835243225
+Solve time for step 6.90022087097168
+Solve time for step 6.328198671340942
+Solve time for step 5.749247312545776
+Solve time for step 5.589717388153076
+Solve time for step 5.300060510635376
+Solve time for step 5.231396198272705
+Solve time for step 5.168893337249756
+Solve time for step 4.880526304244995
+Solve time for step 4.846514940261841
+Solve time for step 4.969024658203125
+Solve time for step 5.374928951263428
+csvgd, Average time per step: 0.0
+{}
+Current yaw: tensor(-0.0393, device='cuda:0')
+0 pregrasp
+Current yaw: tensor(-0.0441, device='cuda:0')
+1 turn
+Solve time for step 29.26015329360962
+Solve time for step 6.912406921386719
+Solve time for step 6.532697439193726
+Solve time for step 5.962337970733643
+Solve time for step 5.786368131637573
+Solve time for step 5.502234697341919
+Solve time for step 5.16019868850708
+Solve time for step 4.955415487289429
+Solve time for step 4.802010774612427
+Solve time for step 4.904258966445923
+Solve time for step 4.881489992141724
+Solve time for step 4.603169918060303
+Current yaw: tensor(-0.4923, device='cuda:0')
+2 index
+Solve time for step 25.86417841911316
+Solve time for step 6.536045074462891
+Solve time for step 5.980687618255615
+Solve time for step 6.186352014541626
+Solve time for step 5.653086185455322
+Solve time for step 5.587615013122559
+Solve time for step 5.111000061035156
+Solve time for step 5.035553455352783
+Solve time for step 4.879287004470825
+Solve time for step 4.7589123249053955
+Solve time for step 4.719821929931641
+Solve time for step 4.816021680831909
+Current yaw: tensor(-0.5449, device='cuda:0')
+3 thumb_middle
+Solve time for step 19.39949321746826
+Solve time for step 4.944344520568848
+Solve time for step 4.652093172073364
+Solve time for step 4.579056262969971
+Solve time for step 4.771975994110107
+Solve time for step 4.634701251983643
+Solve time for step 4.580735206604004
+Solve time for step 4.459173679351807
+Solve time for step 4.044029474258423
+Solve time for step 4.089249134063721
+Solve time for step 3.9452321529388428
+Solve time for step 3.8032948970794678
+Current yaw: tensor(-0.5506, device='cuda:0')
+4 turn
+Solve time for step 29.049118995666504
+Solve time for step 7.158957242965698
+Solve time for step 6.450524091720581
+Solve time for step 6.052762269973755
+Solve time for step 5.851873874664307
+Solve time for step 6.122138023376465
+Solve time for step 5.533961772918701
+Solve time for step 4.9066290855407715
+Solve time for step 5.025979280471802
+Solve time for step 4.903788805007935
+Solve time for step 4.667409420013428
+Solve time for step 5.281771898269653
+Current yaw: tensor(-1.0045, device='cuda:0')
+5 index
+Solve time for step 25.82568669319153
+Solve time for step 6.159786224365234
+Solve time for step 5.928104877471924
+Solve time for step 5.6129701137542725
+Solve time for step 5.5588250160217285
+Solve time for step 5.526273488998413
+Solve time for step 5.370278358459473
+Solve time for step 5.250932693481445
+Solve time for step 4.940608739852905
+Solve time for step 5.240658760070801
+Solve time for step 4.9321441650390625
+Solve time for step 4.900346994400024
+Current yaw: tensor(-1.0099, device='cuda:0')
+6 thumb_middle
+Solve time for step 19.739924430847168
+Solve time for step 4.857360601425171
+Solve time for step 4.771623611450195
+Solve time for step 4.375056982040405
+Solve time for step 4.255741596221924
+Solve time for step 4.216481447219849
+Solve time for step 4.153484344482422
+Solve time for step 4.083466053009033
+Solve time for step 4.063072681427002
+Solve time for step 3.9663524627685547
+Solve time for step 4.359723091125488
+Solve time for step 4.345623731613159
+Current yaw: tensor(-1.0157, device='cuda:0')
+7 turn
+Solve time for step 29.736618280410767
+Solve time for step 7.079249620437622
+Solve time for step 6.619204759597778
+Solve time for step 5.937969923019409
+Solve time for step 5.869726896286011
+Solve time for step 5.5122230052948
+Solve time for step 5.071866035461426
+Solve time for step 4.9871745109558105
+Solve time for step 4.853634357452393
+Solve time for step 4.7635064125061035
+Solve time for step 4.861803770065308
+Solve time for step 4.601156949996948
+csvgd, Average time per step: 0.0
+{}
+Current yaw: tensor(-0.0393, device='cuda:0')
+0 pregrasp
+Current yaw: tensor(-0.0491, device='cuda:0')
+1 turn
+Solve time for step 29.892080783843994
+Solve time for step 6.911438465118408
+Solve time for step 6.386855363845825
+Solve time for step 5.9475181102752686
+Solve time for step 5.606661558151245
+Solve time for step 5.23700737953186
+Solve time for step 5.005878686904907
+Solve time for step 4.982156753540039
+Solve time for step 4.786635160446167
+Solve time for step 4.636161804199219
+Solve time for step 4.570363759994507
+Solve time for step 4.464811325073242
+Current yaw: tensor(-0.3821, device='cuda:0')
+2 index
+Solve time for step 24.965163707733154
+Solve time for step 6.2494330406188965
+Solve time for step 6.098147630691528
+Solve time for step 5.737648963928223
+Solve time for step 6.180592060089111
+Solve time for step 5.393424987792969
+Solve time for step 5.232644081115723
+Solve time for step 5.137540578842163
+Solve time for step 4.876238584518433
+Solve time for step 4.729207277297974
+Solve time for step 4.668791770935059
+Solve time for step 4.8154456615448
+Current yaw: tensor(-0.3973, device='cuda:0')
+3 thumb_middle
+Solve time for step 19.182466983795166
+Solve time for step 4.7704057693481445
+Solve time for step 4.589173793792725
+Solve time for step 4.7244789600372314
+Solve time for step 4.3805224895477295
+Solve time for step 4.44171929359436
+Solve time for step 4.200725793838501
+Solve time for step 4.2728095054626465
+Solve time for step 4.105713367462158
+Solve time for step 3.9828920364379883
+Solve time for step 4.438601016998291
+Solve time for step 4.058798789978027
+Current yaw: tensor(-0.3959, device='cuda:0')
+4 turn
+Solve time for step 29.839738845825195
+Solve time for step 7.127488374710083
+Solve time for step 6.389184951782227
+Solve time for step 6.262757301330566
+Solve time for step 5.672168731689453
+Solve time for step 6.355502605438232
+Solve time for step 5.202892065048218
+Solve time for step 5.002989292144775
+Solve time for step 4.805253028869629
+Solve time for step 5.03743052482605
+Solve time for step 4.701758861541748
+Solve time for step 4.7601377964019775
+Current yaw: tensor(-0.8181, device='cuda:0')
+5 index
+Solve time for step 25.85205316543579
+Solve time for step 6.275662899017334
+Solve time for step 6.553128719329834
+Solve time for step 6.25213623046875
+Solve time for step 5.675053834915161
+Solve time for step 5.349090576171875
+Solve time for step 5.028036117553711
+Solve time for step 5.034197568893433
+Solve time for step 5.533651828765869
+Solve time for step 4.834911584854126
+Solve time for step 4.850007772445679
+Solve time for step 4.974391460418701
+Current yaw: tensor(-0.8582, device='cuda:0')
+6 thumb_middle
+Solve time for step 19.643282890319824
+Solve time for step 4.9738569259643555
+Solve time for step 4.989386081695557
+Solve time for step 4.946438312530518
+Solve time for step 4.616443634033203
+Solve time for step 4.187432050704956
+Solve time for step 4.1777260303497314
+Solve time for step 4.239014625549316
+Solve time for step 4.146034002304077
+Solve time for step 4.181925058364868
+Solve time for step 3.8549978733062744
+Solve time for step 3.797872304916382
+Current yaw: tensor(-0.8516, device='cuda:0')
+7 turn
+Solve time for step 28.92252230644226
+Solve time for step 7.55999231338501
+Solve time for step 6.919877052307129
+Solve time for step 5.899410009384155
+Solve time for step 5.819836616516113
+Solve time for step 5.35628604888916
+Solve time for step 5.070936918258667
+Solve time for step 4.953505754470825
+Solve time for step 4.817175626754761
+Solve time for step 4.797773838043213
+Solve time for step 4.613373756408691
+Solve time for step 4.5900397300720215
+csvgd, Average time per step: 0.0
+{}

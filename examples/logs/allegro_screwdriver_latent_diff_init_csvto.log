@@ -1,0 +1,421 @@
+Importing module 'gym_38' (/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.3.1+cu118
+Device count 1
+/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinav/Documents/ccai
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(24, 64), (64, 128), (128, 256)]
+[ models/temporal ] Channel dimensions: [(24, 64), (64, 128), (128, 256)]
+Loaded trajectory sampler
+['pregrasp', 'turn', 'index', 'thumb_middle', 'turn', 'thumb_middle', 'index', 'turn', 'index', 'thumb_middle', 'turn']
+0 pregrasp
+Sampling time 2.7415299650165252
+Solve time for step 15.101873636245728
+Solve time for step 3.753054618835449
+Solve time for step 3.5762012004852295
+Solve time for step 3.408705949783325
+Solve time for step 3.3152804374694824
+Solve time for step 3.210693597793579
+Solve time for step 3.1032416820526123
+Solve time for step 2.9879276752471924
+Solve time for step 2.9021124839782715
+Solve time for step 2.795058250427246
+Solve time for step 2.760615110397339
+Solve time for step 2.6139259338378906
+Solve time for step 2.503312826156616
+Solve time for step 2.421973705291748
+Solve time for step 2.3874616622924805
+1 turn
+Sampling time 2.626547074993141
+Solve time for step 49.21494221687317
+Solve time for step 11.15925145149231
+Solve time for step 9.761312246322632
+Solve time for step 8.538796424865723
+Solve time for step 7.964623212814331
+Solve time for step 7.047041893005371
+Solve time for step 6.144662141799927
+Solve time for step 5.630542278289795
+Solve time for step 5.135249853134155
+Solve time for step 4.745716571807861
+Solve time for step 4.479585647583008
+Solve time for step 4.218003034591675
+Solve time for step 4.01544189453125
+Solve time for step 3.8704309463500977
+Solve time for step 3.76690411567688
+2 index
+Sampling time 2.656780923018232
+Solve time for step 34.64877200126648
+Solve time for step 8.177413702011108
+Solve time for step 7.279469966888428
+Solve time for step 6.828603506088257
+Solve time for step 6.330734968185425
+Solve time for step 5.97202730178833
+Solve time for step 5.520246267318726
+Solve time for step 5.113627910614014
+Solve time for step 4.90933632850647
+Solve time for step 4.6728246212005615
+Solve time for step 4.4687910079956055
+Solve time for step 4.34030818939209
+Solve time for step 4.178397178649902
+Solve time for step 3.9941959381103516
+Solve time for step 3.989276170730591
+3 thumb_middle
+Sampling time 2.7022729630116373
+Solve time for step 22.77272868156433
+Solve time for step 5.4849958419799805
+Solve time for step 5.077234745025635
+Solve time for step 4.898355007171631
+Solve time for step 4.697712659835815
+Solve time for step 4.437535524368286
+Solve time for step 4.223786115646362
+Solve time for step 3.983311414718628
+Solve time for step 4.03255295753479
+Solve time for step 3.7183420658111572
+Solve time for step 3.6954774856567383
+Solve time for step 3.5274550914764404
+Solve time for step 3.438530921936035
+Solve time for step 3.27413010597229
+Solve time for step 3.176068067550659
+4 turn
+Sampling time 2.6279588590259664
+Solve time for step 49.36857223510742
+Solve time for step 11.245089769363403
+Solve time for step 9.934125423431396
+Solve time for step 8.737253189086914
+Solve time for step 7.951456785202026
+Solve time for step 7.06944465637207
+Solve time for step 6.27115797996521
+Solve time for step 5.770430326461792
+Solve time for step 5.207673072814941
+Solve time for step 4.911897659301758
+Solve time for step 4.64693808555603
+Solve time for step 4.198350667953491
+Solve time for step 4.093228101730347
+Solve time for step 3.910154104232788
+Solve time for step 3.8592333793640137
+5 thumb_middle
+Sampling time 2.6155249489820562
+Solve time for step 22.87076163291931
+Solve time for step 5.480834007263184
+Solve time for step 5.077522039413452
+Solve time for step 4.917366027832031
+Solve time for step 4.675236940383911
+Solve time for step 4.408756256103516
+Solve time for step 4.227307319641113
+Solve time for step 4.043739318847656
+Solve time for step 3.869843006134033
+Solve time for step 3.7108259201049805
+Solve time for step 3.566727638244629
+Solve time for step 3.537716865539551
+Solve time for step 3.3372747898101807
+Solve time for step 3.23968768119812
+Solve time for step 3.1604554653167725
+6 index
+Sampling time 2.70394210802624
+Solve time for step 34.43978452682495
+Solve time for step 8.112323522567749
+Solve time for step 7.261943101882935
+Solve time for step 6.9228599071502686
+Solve time for step 6.354748487472534
+Solve time for step 5.913123846054077
+Solve time for step 5.562467336654663
+Solve time for step 5.207553386688232
+Solve time for step 4.82470703125
+Solve time for step 4.727239608764648
+Solve time for step 4.444435119628906
+Solve time for step 4.375896215438843
+Solve time for step 4.168519735336304
+Solve time for step 3.9442007541656494
+Solve time for step 3.8423573970794678
+7 turn
+Sampling time 2.583330316003412
+Solve time for step 49.43292760848999
+Solve time for step 11.175647258758545
+Solve time for step 9.86098575592041
+Solve time for step 8.63103461265564
+Solve time for step 7.942444801330566
+Solve time for step 7.030536890029907
+Solve time for step 6.276127338409424
+Solve time for step 5.8151233196258545
+Solve time for step 5.209540128707886
+Solve time for step 4.87225341796875
+Solve time for step 4.579904317855835
+Solve time for step 4.277338743209839
+Solve time for step 4.02562952041626
+Solve time for step 3.9225897789001465
+Solve time for step 3.7902586460113525
+8 index
+Sampling time 2.6262074949918315
+Solve time for step 34.929428815841675
+Solve time for step 8.205627918243408
+Solve time for step 7.369420051574707
+Solve time for step 6.898993492126465
+Solve time for step 6.330989360809326
+Solve time for step 5.952251434326172
+Solve time for step 5.456527471542358
+Solve time for step 5.18155312538147
+Solve time for step 4.9040915966033936
+Solve time for step 4.706039190292358
+Solve time for step 4.4566614627838135
+Solve time for step 4.306086540222168
+Solve time for step 4.16578221321106
+Solve time for step 4.026439666748047
+Solve time for step 3.898543357849121
+9 thumb_middle
+Sampling time 2.5933514070347883
+Solve time for step 22.6644766330719
+Solve time for step 5.564082145690918
+Solve time for step 5.153205156326294
+Solve time for step 4.890375852584839
+Solve time for step 4.6748175621032715
+Solve time for step 4.400764226913452
+Solve time for step 4.193735837936401
+Solve time for step 3.977121353149414
+Solve time for step 3.8206803798675537
+Solve time for step 3.699206590652466
+Solve time for step 3.6476941108703613
+Solve time for step 3.5258870124816895
+Solve time for step 3.3602733612060547
+Solve time for step 3.307002067565918
+Solve time for step 3.221325635910034
+10 turn
+Sampling time 2.573530227993615
+Solve time for step 49.395968198776245
+Solve time for step 11.201884269714355
+Solve time for step 9.864042282104492
+Solve time for step 8.634797096252441
+Solve time for step 8.084217071533203
+Solve time for step 7.10910177230835
+Solve time for step 6.334257364273071
+Solve time for step 5.743206024169922
+Solve time for step 5.286697864532471
+Solve time for step 4.766988754272461
+Solve time for step 4.551472425460815
+Solve time for step 4.246297597885132
+Solve time for step 3.9956672191619873
+Solve time for step 3.856879472732544
+Solve time for step 3.8232781887054443
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(24, 64), (64, 128), (128, 256)]
+[ models/temporal ] Channel dimensions: [(24, 64), (64, 128), (128, 256)]
+Loaded trajectory sampler
+['pregrasp', 'turn', 'index', 'thumb_middle', 'turn', 'index', 'thumb_middle', 'turn', 'index', 'thumb_middle', 'turn']
+0 pregrasp
+Sampling time 2.7198422090150416
+Solve time for step 15.157196998596191
+Solve time for step 3.701108932495117
+Solve time for step 3.725402355194092
+Solve time for step 3.4286608695983887
+Solve time for step 3.318183183670044
+Solve time for step 3.2128450870513916
+Solve time for step 3.131791830062866
+Solve time for step 2.98574161529541
+Solve time for step 2.9401397705078125
+Solve time for step 2.8677661418914795
+Solve time for step 2.7214412689208984
+Solve time for step 2.635490894317627
+Solve time for step 2.5753087997436523
+Solve time for step 2.492605209350586
+Solve time for step 2.5367441177368164
+1 turn
+Sampling time 2.601356767991092
+Solve time for step 49.19072079658508
+Solve time for step 11.180624723434448
+Solve time for step 9.869343280792236
+Solve time for step 8.704447269439697
+Solve time for step 7.914312362670898
+Solve time for step 7.0436952114105225
+Solve time for step 6.208337783813477
+Solve time for step 5.7347023487091064
+Solve time for step 5.356905698776245
+Solve time for step 4.907840251922607
+Solve time for step 4.62567400932312
+Solve time for step 4.2734599113464355
+Solve time for step 4.037606239318848
+Solve time for step 3.8238182067871094
+Solve time for step 3.699735403060913
+2 index
+Sampling time 2.7117744829738513
+Solve time for step 34.66376447677612
+Solve time for step 8.186849594116211
+Solve time for step 7.328322172164917
+Solve time for step 6.943894624710083
+Solve time for step 6.288391590118408
+Solve time for step 6.010938405990601
+Solve time for step 5.599651336669922
+Solve time for step 5.262357473373413
+Solve time for step 4.89693021774292
+Solve time for step 4.68557596206665
+Solve time for step 4.451545476913452
+Solve time for step 4.197443246841431
+Solve time for step 4.122365951538086
+Solve time for step 4.034295082092285
+Solve time for step 3.9437320232391357
+3 thumb_middle
+Sampling time 2.7136899959878065
+Solve time for step 22.762293338775635
+Solve time for step 5.497215986251831
+Solve time for step 5.10853385925293
+Solve time for step 4.972431659698486
+Solve time for step 4.771574020385742
+Solve time for step 4.45783805847168
+Solve time for step 4.304758548736572
+Solve time for step 4.083068370819092
+Solve time for step 3.9379754066467285
+Solve time for step 3.805475950241089
+Solve time for step 3.603472948074341
+Solve time for step 3.6448512077331543
+Solve time for step 3.4542336463928223
+Solve time for step 3.4062676429748535
+Solve time for step 3.3172008991241455
+4 turn
+Sampling time 2.582620011002291
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 12): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.
+hello
+hello
+hello
+hello
+hello
+torch.linalg.solve: (Batch element 0): The solver failed because the input matrix is singular.

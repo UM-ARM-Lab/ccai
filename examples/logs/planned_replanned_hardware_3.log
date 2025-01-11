@@ -1,0 +1,411 @@
+Importing module 'gym_38' (/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.0+cu121
+Device count 1
+/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinav/Documents/ccai
+joint command publisher initialized.
+ros listner initialized.
+joint command publisher initialized.
+joint state subscriber initialized.
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+No readings from camera.
+No readings from camera.
+No readings from camera.
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Current yaw: tensor(0.0139, device='cuda:0')
+No readings from camera.
+Pregrasp complete. Ready to execute. Press <ENTER> to continue.Current yaw: tensor(-0.1501, device='cuda:0')
+Adjusting goal to tensor(-1.1973, device='cuda:0')
+1 () -0.15012972056865692
+2 () -0.15012972056865692
+3 ((1.0, 1.0, 1.0),) -0.7583877444267273
+4 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.2592281103134155
+Contact sequence search time: 7.846122884999204
+['turn', 'thumb_middle']
+1 turn
+No readings from camera.
+No readings from camera.
+Solve time for step 1 90.07042670249939
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Current yaw: tensor(-0.1523, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 2 16.92614483833313
+No readings from camera.
+Current yaw: tensor(-0.1790, device='cuda:0')
+No readings from camera.
+No readings from camera.
+Solve time for step 3 15.099474430084229
+No readings from camera.
+No readings from camera.
+Current yaw: tensor(-0.1440, device='cuda:0')
+No readings from camera.
+No readings from camera.
+Solve time for step 4 13.474126100540161
+Current yaw: tensor(-0.2679, device='cuda:0')
+No readings from camera.
+Solve time for step 5 12.658790349960327
+No readings from camera.
+Current yaw: tensor(-0.4557, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 6 11.387215614318848
+Current yaw: tensor(-0.4901, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 7 10.79502272605896
+Current yaw: tensor(-0.4938, device='cuda:0')
+No readings from camera.
+No readings from camera.
+Solve time for step 8 10.184341669082642
+Current yaw: tensor(-0.5187, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 9 9.655637979507446
+No readings from camera.
+Current yaw: tensor(-0.5404, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 10 8.962579488754272
+Current yaw: tensor(-0.5734, device='cuda:0')
+No readings from camera.
+Solve time for step 11 8.854972124099731
+No readings from camera.
+Current yaw: tensor(-0.5856, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 12 8.505897998809814
+No readings from camera.
+Current yaw: tensor(-0.5932, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Current yaw: tensor(-0.5932, device='cuda:0')
+Adjusting goal to tensor(-1.6404, device='cuda:0')
+1 ((1.0, 1.0, 1.0),) -0.5931834578514099
+2 ((1.0, 1.0, 1.0),) -0.5931834578514099
+3 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.8851370811462402
+4 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.5779497623443604
+5 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.5425366163253784
+6 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -1.6701273918151855
+Contact sequence search time: 14.38884383200093
+['turn', 'thumb_middle', 'index']
+2 turn
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 1 90.87609505653381
+Current yaw: tensor(-0.5932, device='cuda:0')
+No readings from camera.
+Solve time for step 2 16.734092712402344
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Current yaw: tensor(-0.7112, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 3 14.95521330833435
+No readings from camera.
+Current yaw: tensor(-0.7718, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 4 13.831282377243042
+Current yaw: tensor(-0.7948, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 5 12.522691011428833
+No readings from camera.
+No readings from camera.
+Current yaw: tensor(-0.8749, device='cuda:0')
+No readings from camera.
+No readings from camera.
+Solve time for step 6 11.432200193405151
+No readings from camera.
+Current yaw: tensor(-0.8987, device='cuda:0')
+No readings from camera.
+No readings from camera.
+Solve time for step 7 10.903828144073486
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Current yaw: tensor(-0.9275, device='cuda:0')
+No readings from camera.
+Solve time for step 8 10.289220333099365
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Current yaw: tensor(-0.9732, device='cuda:0')
+Solve time for step 9 9.607180118560791
+Current yaw: tensor(-0.9826, device='cuda:0')
+No readings from camera.
+No readings from camera.
+Solve time for step 10 9.010083675384521
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Current yaw: tensor(-0.9987, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 11 8.855527639389038
+Current yaw: tensor(-0.9937, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 12 8.756667613983154
+Current yaw: tensor(-0.9910, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Current yaw: tensor(-1.0020, device='cuda:0')
+Adjusting goal to tensor(-2.0492, device='cuda:0')
+1 ((1.0, 1.0, 1.0),) -1.0020086765289307
+2 ((1.0, 1.0, 1.0),) -1.0020086765289307
+3 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.1990658044815063
+4 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.5366826057434082
+5 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.745375394821167
+6 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -2.031447410583496
+7 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.9369527101516724
+8 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -2.0569581985473633
+Contact sequence search time: 22.764081752000493
+['thumb_middle', 'turn', 'thumb_middle', 'turn', 'index', 'turn']
+3 thumb_middle
+No readings from camera.
+Solve time for step 1 53.929312229156494
+No readings from camera.
+No readings from camera.
+Current yaw: tensor(-0.9944, device='cuda:0')
+No readings from camera.
+Solve time for step 2 10.508940935134888
+Current yaw: tensor(-1.0005, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 3 9.971436977386475
+Current yaw: tensor(-1.0053, device='cuda:0')
+Solve time for step 4 9.589856624603271
+No readings from camera.
+Current yaw: tensor(-0.9933, device='cuda:0')
+No readings from camera.
+Solve time for step 5 9.154315710067749
+No readings from camera.
+No readings from camera.
+Current yaw: tensor(-1.0005, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 6 8.785096406936646
+Current yaw: tensor(-1.0496, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 7 8.827908515930176
+No readings from camera.
+Current yaw: tensor(-1.0419, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 8 8.329174518585205
+No readings from camera.
+Current yaw: tensor(-1.0624, device='cuda:0')
+Solve time for step 9 8.05588960647583
+Current yaw: tensor(-1.0649, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 10 7.885125637054443
+Current yaw: tensor(-1.0657, device='cuda:0')
+Solve time for step 11 7.462193965911865
+No readings from camera.
+Current yaw: tensor(-1.0668, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 12 7.403690338134766
+No readings from camera.
+Current yaw: tensor(-1.0668, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Current yaw: tensor(-1.0081, device='cuda:0')
+Adjusting goal to tensor(-2.0553, device='cuda:0')
+1 ((1.0, -1.0, -1.0),) -1.008131504058838
+2 ((1.0, -1.0, -1.0),) -1.008131504058838
+3 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.7790799140930176
+4 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -2.329941511154175
+Contact sequence search time: 7.282504290000361
+['turn', 'turn']
+4 turn
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 1 90.74764323234558
+Current yaw: tensor(-1.0123, device='cuda:0')
+No readings from camera.
+No readings from camera.
+Solve time for step 2 16.825100421905518
+Current yaw: tensor(-1.0288, device='cuda:0')
+No readings from camera.
+No readings from camera.
+Solve time for step 3 15.167011737823486
+No readings from camera.
+Current yaw: tensor(-1.1649, device='cuda:0')
+No readings from camera.
+Solve time for step 4 13.633265256881714
+Current yaw: tensor(-1.1158, device='cuda:0')
+No readings from camera.
+Solve time for step 5 12.570345401763916
+No readings from camera.
+Current yaw: tensor(-1.2131, device='cuda:0')
+Solve time for step 6 11.457494258880615
+Current yaw: tensor(-1.2400, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 7 10.89162302017212
+Current yaw: tensor(-1.2722, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 8 10.169569969177246
+Current yaw: tensor(-1.2734, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 9 9.559314250946045
+Current yaw: tensor(-1.2748, device='cuda:0')
+Solve time for step 10 9.11942982673645
+Current yaw: tensor(-1.3166, device='cuda:0')
+Solve time for step 11 8.805752277374268
+Current yaw: tensor(-1.3615, device='cuda:0')
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Solve time for step 12 8.462763786315918
+No readings from camera.
+Current yaw: tensor(-1.3308, device='cuda:0')
+No readings from camera.
+No readings from camera.
+Ready to regrasp. Press <ENTER> to continue.{}
+No readings from camera.
+No readings from camera.
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+No readings from camera.
+Current yaw: tensor(-0.1243, device='cuda:0')
+Pregrasp complete. Ready to execute. Press <ENTER> to continue.

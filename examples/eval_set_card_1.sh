@@ -1,0 +1,3 @@
+python -u allegro_card.py allegro_card_csvto_diff_plan_receding > ./logs/allegro_card_csvto_diff_plan_receding.log
+python -u allegro_card.py allegro_card_csvto_diff_plan_no_uncertainty_prop_receding > ./logs/allegro_card_csvto_diff_plan_no_uncertainty_prop_receding.log
+python -u allegro_card.py allegro_card_csvto_diff_plan_max_likelihood_receding > ./logs/allegro_card_csvto_diff_plan_max_likelihood_receding.log

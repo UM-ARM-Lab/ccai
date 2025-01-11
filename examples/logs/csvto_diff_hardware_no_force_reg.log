@@ -1,0 +1,135 @@
+Importing module 'gym_38' (/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.0+cu121
+Device count 1
+/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinav/Documents/ccai
+joint command publisher initialized.
+ros listner initialized.
+Root coor: [  -1.81619913   95.57239031 -140.80128643]
+Root ori: [-0.02215669  0.01025985 -0.03841283]
+joint command publisher initialized.
+joint state subscriber initialized.
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current yaw: tensor(0.0099, device='cuda:0')
+Pregrasp complete. Ready to execute. Press <ENTER> to continue.Current yaw: tensor(-0.1491, device='cuda:0')
+1 turn
+Sampling time 3.4721070830128156
+Solve time for step 1 48.15816259384155
+Current yaw: tensor(-0.1494, device='cuda:0')
+Solve time for step 2 12.57582712173462
+Current yaw: tensor(-0.3108, device='cuda:0')
+Solve time for step 3 11.242370367050171
+Current yaw: tensor(-0.3274, device='cuda:0')
+Solve time for step 4 10.239093542098999
+Current yaw: tensor(-0.3374, device='cuda:0')
+Solve time for step 5 9.396106243133545
+Current yaw: tensor(-0.3071, device='cuda:0')
+Solve time for step 6 8.597970247268677
+Current yaw: tensor(-0.3160, device='cuda:0')
+Solve time for step 7 8.012431144714355
+Current yaw: tensor(-0.3164, device='cuda:0')
+Solve time for step 8 7.511753797531128
+Current yaw: tensor(-0.3374, device='cuda:0')
+Solve time for step 9 7.237766265869141
+Current yaw: tensor(-0.3257, device='cuda:0')
+Solve time for step 10 6.880645513534546
+Current yaw: tensor(-0.3290, device='cuda:0')
+Solve time for step 11 6.533477306365967
+Current yaw: tensor(-0.3674, device='cuda:0')
+Solve time for step 12 6.368655681610107
+Current yaw: tensor(-0.3737, device='cuda:0')
+Current yaw: tensor(-0.3735, device='cuda:0')
+2 thumb_middle
+Sampling time 3.37592448698706
+Solve time for step 1 29.20558190345764
+Current yaw: tensor(-0.3735, device='cuda:0')
+Solve time for step 2 7.939378261566162
+Current yaw: tensor(-0.2664, device='cuda:0')
+Solve time for step 3 7.557875394821167
+Current yaw: tensor(-0.2339, device='cuda:0')
+Solve time for step 4 7.362331390380859
+Current yaw: tensor(-0.2352, device='cuda:0')
+Solve time for step 5 6.902738094329834
+Current yaw: tensor(-0.2482, device='cuda:0')
+Solve time for step 6 6.724361896514893
+Current yaw: tensor(-0.3172, device='cuda:0')
+Solve time for step 7 6.407956838607788
+Current yaw: tensor(-0.3399, device='cuda:0')
+Solve time for step 8 6.211970090866089
+Current yaw: tensor(-0.3513, device='cuda:0')
+Solve time for step 9 6.125715017318726
+Current yaw: tensor(-0.3442, device='cuda:0')
+Solve time for step 10 5.817891836166382
+Current yaw: tensor(-0.3138, device='cuda:0')
+Solve time for step 11 5.717124938964844
+Current yaw: tensor(-0.3168, device='cuda:0')
+Solve time for step 12 5.5749547481536865
+Current yaw: tensor(-0.3192, device='cuda:0')
+Current yaw: tensor(-0.3212, device='cuda:0')
+3 index
+Sampling time 3.572761943010846
+Solve time for step 1 40.47646617889404
+Current yaw: tensor(-0.3201, device='cuda:0')
+Solve time for step 2 10.496721267700195
+Current yaw: tensor(-0.3349, device='cuda:0')
+Solve time for step 3 9.905285596847534
+Current yaw: tensor(-0.3421, device='cuda:0')
+Solve time for step 4 9.435935020446777
+Current yaw: tensor(-0.3440, device='cuda:0')
+Solve time for step 5 9.024753332138062
+Current yaw: tensor(-0.3415, device='cuda:0')
+Solve time for step 6 8.437598466873169
+Current yaw: tensor(-0.3496, device='cuda:0')
+Solve time for step 7 7.849582672119141
+Current yaw: tensor(-0.3552, device='cuda:0')
+Solve time for step 8 7.633161306381226
+Current yaw: tensor(-0.3552, device='cuda:0')
+Solve time for step 9 7.221502780914307
+Current yaw: tensor(-0.3648, device='cuda:0')
+Solve time for step 10 7.039068222045898
+Current yaw: tensor(-0.3648, device='cuda:0')
+Solve time for step 11 6.799562931060791
+Current yaw: tensor(-0.3604, device='cuda:0')
+Solve time for step 12 6.78098464012146
+Current yaw: tensor(-0.3604, device='cuda:0')
+Current yaw: tensor(-0.3301, device='cuda:0')
+4 turn
+Sampling time 3.4940587730088737
+Solve time for step 1 48.91604995727539
+Current yaw: tensor(-0.3375, device='cuda:0')
+Solve time for step 2 12.660037517547607
+Current yaw: tensor(-0.4207, device='cuda:0')
+Solve time for step 3 11.339266061782837
+Current yaw: tensor(-0.5672, device='cuda:0')
+Solve time for step 4 10.282690525054932
+Current yaw: tensor(-0.5818, device='cuda:0')
+Solve time for step 5 9.603275537490845
+Current yaw: tensor(-0.5633, device='cuda:0')
+Solve time for step 6 8.676560401916504
+Current yaw: tensor(-0.5513, device='cuda:0')
+Solve time for step 7 8.18111801147461
+Current yaw: tensor(-0.5513, device='cuda:0')
+Solve time for step 8 7.832856178283691
+Current yaw: tensor(-0.5463, device='cuda:0')
+Solve time for step 9 7.273534774780273
+Current yaw: tensor(-0.5563, device='cuda:0')
+Solve time for step 10 6.915756702423096
+Current yaw: tensor(-0.5200, device='cuda:0')
+Solve time for step 11 6.683429002761841
+Current yaw: tensor(-0.4936, device='cuda:0')
+Solve time for step 12 6.509876012802124
+Current yaw: tensor(-0.4567, device='cuda:0')
+Ready to regrasp. Press <ENTER> to continue.

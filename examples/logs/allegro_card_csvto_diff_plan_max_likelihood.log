@@ -1,0 +1,2607 @@
+Importing module 'gym_38' (/home/fanyang/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/fanyang/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.2.1
+Device count 2
+/home/fanyang/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/fanyang/github/ccai
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/fanyang/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/fanyang/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/fanyang/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/fanyang/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current y: tensor(0.0003, device='cuda:1')
+Adjusting goal to tensor(-0.0197, device='cuda:1')
+params num_samples 16
+1 () 0.0002522412978578359
+2 () 0.0002522412978578359
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, 1.0),) -0.0058337245136499405
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((-1.0, 1.0),) -0.012894650921225548
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((1.0, 1.0), (-1.0, -1.0)) 0.0006451215595006943
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+6 ((1.0, 1.0), (1.0, -1.0)) -0.022500749677419662
+Contact sequence search time: 16.024854838993633
+['index_middle', 'index']
+0 index_middle
+Sampling time 3.404061423992971
+Solve time for step 16.667038679122925
+Solve time for step 3.61027193069458
+Solve time for step 3.5676534175872803
+Solve time for step 3.497865676879883
+Solve time for step 3.476531505584717
+Solve time for step 3.4181673526763916
+Solve time for step 3.407876491546631
+Solve time for step 3.759000062942505
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0098, device='cuda:1')
+Adjusting goal to tensor(-0.0298, device='cuda:1')
+params num_samples 16
+1 ((1.0, 1.0),) -0.009845520369708538
+2 ((1.0, 1.0),) -0.009845520369708538
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, 1.0), (-1.0, -1.0)) -7.875915616750717e-05
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((1.0, 1.0), (1.0, -1.0)) -0.02574474737048149
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((1.0, 1.0), (1.0, -1.0), (1.0, -1.0)) -0.037663355469703674
+Contact sequence search time: 11.11896998899465
+['index', 'index']
+1 index
+Sampling time 3.417084326996701
+Solve time for step 18.43181610107422
+Solve time for step 4.288058280944824
+Solve time for step 4.065756320953369
+Solve time for step 3.9419636726379395
+Solve time for step 3.9979474544525146
+Solve time for step 7.047622203826904
+Solve time for step 4.839740514755249
+Solve time for step 5.850928544998169
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0212, device='cuda:1')
+Adjusting goal to tensor(-0.0412, device='cuda:1')
+params num_samples 16
+1 ((1.0, -1.0),) -0.02119729109108448
+2 ((1.0, -1.0),) -0.02119729109108448
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, -1.0), (1.0, -1.0)) -0.041594602167606354
+Contact sequence search time: 4.934797594003612
+['index']
+2 index
+Sampling time 4.110743149998598
+Solve time for step 30.45824909210205
+Solve time for step 6.916013240814209
+Solve time for step 7.127680063247681
+Solve time for step 6.718456268310547
+Solve time for step 7.6666178703308105
+Solve time for step 6.628689765930176
+Solve time for step 6.640336036682129
+Solve time for step 6.47961950302124
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0263, device='cuda:1')
+Adjusting goal to tensor(-0.0463, device='cuda:1')
+params num_samples 16
+1 ((1.0, -1.0),) -0.026271432638168335
+2 ((1.0, -1.0),) -0.026271432638168335
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, -1.0), (1.0, -1.0)) -0.0458659753203392
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((1.0, -1.0), (1.0, -1.0), (1.0, -1.0)) -0.060055553913116455
+Contact sequence search time: 9.727305253996747
+['index', 'index']
+3 index
+Sampling time 4.501141877000919
+Solve time for step 29.32589840888977
+Solve time for step 6.807056665420532
+Solve time for step 7.060152530670166
+Solve time for step 6.833825349807739
+Solve time for step 6.555548906326294
+Solve time for step 7.053964614868164
+Solve time for step 7.070079803466797
+Solve time for step 6.400046348571777
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0333, device='cuda:1')
+Adjusting goal to tensor(-0.0533, device='cuda:1')
+params num_samples 16
+1 ((1.0, -1.0),) -0.033288441598415375
+2 ((1.0, -1.0),) -0.033288441598415375
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, -1.0), (1.0, 1.0)) -0.03985828161239624
+4 ((1.0, -1.0), (1.0, -1.0)) -0.056950636208057404
+Contact sequence search time: 4.428360931997304
+['index']
+4 index
+Sampling time 4.092868940002518
+Solve time for step 30.19254970550537
+Solve time for step 7.2017505168914795
+Solve time for step 7.0824878215789795
+Solve time for step 7.07087779045105
+Solve time for step 6.883997917175293
+Solve time for step 7.096122741699219
+Solve time for step 6.893486261367798
+Solve time for step 6.56364893913269
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current y: tensor(0.0003, device='cuda:1')
+Adjusting goal to tensor(-0.0197, device='cuda:1')
+params num_samples 16
+1 () 0.0002522412978578359
+2 () 0.0002522412978578359
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, 1.0),) -0.004625821020454168
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((-1.0, 1.0),) -0.01203298382461071
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((-1.0, 1.0), (1.0, 1.0)) -0.005198664031922817
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+6 ((-1.0, -1.0),) 0.0007875189185142517
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+7 ((-1.0, 1.0), (1.0, 1.0), (-1.0, -1.0)) 0.0006589731201529503
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+8 ((-1.0, 1.0), (1.0, 1.0), (-1.0, -1.0), (-1.0, 1.0)) -0.01389652956277132
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+9 ((-1.0, 1.0), (1.0, 1.0), (-1.0, -1.0), (-1.0, 1.0), (-1.0, -1.0)) -3.98559495806694e-05
+10 ((1.0, 1.0), (-1.0, 1.0)) -0.02217654138803482
+Contact sequence search time: 32.14044438999554
+['index_middle', 'middle']
+0 index_middle
+Sampling time 3.654846167002688
+Solve time for step 28.244274139404297
+Solve time for step 5.85271954536438
+Solve time for step 7.38446831703186
+Solve time for step 6.540062189102173
+Solve time for step 6.326216459274292
+Solve time for step 6.574523448944092
+Solve time for step 5.648367166519165
+Solve time for step 6.082798719406128
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0094, device='cuda:1')
+Adjusting goal to tensor(-0.0294, device='cuda:1')
+params num_samples 16
+1 ((1.0, 1.0),) -0.009412233717739582
+2 ((1.0, 1.0),) -0.009412233717739582
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, 1.0), (-1.0, -1.0)) 6.0267746448516846e-05
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((1.0, 1.0), (1.0, 1.0)) -0.01520544197410345
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((1.0, 1.0), (1.0, -1.0)) -0.029556337743997574
+Contact sequence search time: 13.856220175992348
+['index']
+1 index
+Sampling time 4.05465008498868
+Solve time for step 29.44732141494751
+Solve time for step 6.194247722625732
+Solve time for step 7.196666240692139
+Solve time for step 6.853089332580566
+Solve time for step 7.237228155136108
+Solve time for step 7.0638039112091064
+Solve time for step 7.636354923248291
+Solve time for step 6.480539798736572
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0182, device='cuda:1')
+Adjusting goal to tensor(-0.0382, device='cuda:1')
+params num_samples 16
+1 ((1.0, -1.0),) -0.018192144110798836
+2 ((1.0, -1.0),) -0.018192144110798836
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, -1.0), (1.0, 1.0)) -0.021327482536435127
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)) -0.03703037276864052
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((1.0, -1.0), (1.0, -1.0)) -0.03993232548236847
+Contact sequence search time: 13.659680673998082
+['index']
+2 index
+Sampling time 3.829497689002892
+Solve time for step 30.75448250770569
+Solve time for step 5.549910545349121
+Solve time for step 7.375556707382202
+Solve time for step 7.121231555938721
+Solve time for step 7.013749122619629
+Solve time for step 5.871520280838013
+Solve time for step 7.370440244674683
+Solve time for step 6.590014457702637
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0241, device='cuda:1')
+Adjusting goal to tensor(-0.0441, device='cuda:1')
+params num_samples 16
+1 ((1.0, -1.0),) -0.024083875119686127
+2 ((1.0, -1.0),) -0.024083875119686127
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, -1.0), (-1.0, 1.0)) -0.03742482513189316
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((1.0, -1.0), (1.0, -1.0)) -0.04756097495555878
+Contact sequence search time: 9.582208553998498
+['index']
+3 index
+Sampling time 3.802314753003884
+Solve time for step 29.847047090530396
+Solve time for step 6.187163352966309
+Solve time for step 7.957738876342773
+Solve time for step 6.974084377288818
+Solve time for step 7.131860017776489
+Solve time for step 6.439730644226074
+Solve time for step 7.26941442489624
+Solve time for step 6.796578407287598
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0295, device='cuda:1')
+Adjusting goal to tensor(-0.0495, device='cuda:1')
+params num_samples 16
+1 ((1.0, -1.0),) -0.02950219437479973
+2 ((1.0, -1.0),) -0.02950219437479973
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, -1.0), (-1.0, -1.0)) -0.0009812787175178528
+4 ((1.0, -1.0), (1.0, -1.0)) -0.05283862352371216
+Contact sequence search time: 4.199053150994587
+['index']
+4 index
+Sampling time 4.254860444998485
+Solve time for step 29.47857928276062
+Solve time for step 7.446928262710571
+Solve time for step 6.027022123336792
+Solve time for step 7.507209300994873
+Solve time for step 6.714355945587158
+Solve time for step 6.8519299030303955
+Solve time for step 7.060257911682129
+Solve time for step 6.225831508636475
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current y: tensor(0.0003, device='cuda:1')
+Adjusting goal to tensor(-0.0197, device='cuda:1')
+params num_samples 16
+1 () 0.0002522412978578359
+2 () 0.0002522412978578359
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, 1.0),) -0.005148906726390123
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((1.0, 1.0), (1.0, 1.0)) -0.009627512656152248
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((1.0, -1.0),) -0.017800236120820045
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+6 ((-1.0, -1.0),) 0.0007937038317322731
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+7 ((1.0, 1.0), (1.0, 1.0), (1.0, 1.0)) -0.01621980220079422
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+8 ((-1.0, 1.0),) -0.013975659385323524
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+9 ((1.0, 1.0), (1.0, 1.0), (-1.0, 1.0)) -0.0287308469414711
+Contact sequence search time: 31.448176801000955
+['index_middle', 'index_middle', 'middle']
+0 index_middle
+Sampling time 4.389816369992332
+Solve time for step 27.695711612701416
+Solve time for step 6.408461809158325
+Solve time for step 6.333397626876831
+Solve time for step 6.282098054885864
+Solve time for step 6.243494033813477
+Solve time for step 6.2811195850372314
+Solve time for step 6.265894412994385
+Solve time for step 5.750738620758057
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0071, device='cuda:1')
+Adjusting goal to tensor(-0.0271, device='cuda:1')
+params num_samples 16
+1 ((1.0, 1.0),) -0.00709712877869606
+2 ((1.0, 1.0),) -0.00709712877869606
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, 1.0), (1.0, 1.0)) -0.017350047826766968
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((1.0, 1.0), (-1.0, -1.0)) 0.0005509452894330025
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((1.0, 1.0), (1.0, 1.0), (1.0, 1.0)) -0.01746470108628273
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+6 ((1.0, 1.0), (-1.0, 1.0)) -0.03004731424152851
+Contact sequence search time: 18.34616219099553
+['middle']
+1 middle
+Sampling time 3.737553262995789
+Solve time for step 29.094220638275146
+Solve time for step 6.461451768875122
+Solve time for step 7.061646223068237
+Solve time for step 6.590104341506958
+Solve time for step 6.767981767654419
+Solve time for step 6.4978766441345215
+Solve time for step 6.540084600448608
+Solve time for step 6.5722880363464355
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+Current y: tensor(-0.0163, device='cuda:1')
+Adjusting goal to tensor(-0.0363, device='cuda:1')
+params num_samples 16
+1 ((-1.0, 1.0),) -0.016333531588315964
+2 ((-1.0, 1.0),) -0.016333531588315964
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((-1.0, 1.0), (-1.0, 1.0)) -0.03694982826709747
+Contact sequence search time: 4.619710950006265
+['middle']
+2 middle
+Sampling time 3.8409323360101553
+Solve time for step 30.83660626411438
+Solve time for step 7.319089412689209
+Solve time for step 7.247128009796143
+Solve time for step 7.170699119567871
+Solve time for step 6.8613505363464355
+Solve time for step 7.0566747188568115
+Solve time for step 6.998834609985352
+Solve time for step 6.252247333526611
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+Current y: tensor(-0.0268, device='cuda:1')
+Adjusting goal to tensor(-0.0468, device='cuda:1')
+params num_samples 16
+1 ((-1.0, 1.0),) -0.02676061913371086
+2 ((-1.0, 1.0),) -0.02676061913371086
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((-1.0, 1.0), (-1.0, -1.0)) 0.0005263322964310646
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((-1.0, 1.0), (1.0, -1.0)) -0.03333757072687149
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((-1.0, 1.0), (1.0, -1.0), (-1.0, 1.0)) -0.051561132073402405
+Contact sequence search time: 13.869156239001313
+['index', 'middle']
+3 index
+Sampling time 3.8215519869991113
+Solve time for step 30.626742601394653
+Solve time for step 7.101417779922485
+Solve time for step 7.172770023345947
+Solve time for step 7.034969806671143
+Solve time for step 7.406939744949341
+Solve time for step 6.18478798866272
+Solve time for step 6.95444655418396
+Solve time for step 7.201651096343994
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0408, device='cuda:1')
+Adjusting goal to -0.06
+params num_samples 16
+1 ((1.0, -1.0),) -0.04083462059497833
+2 ((1.0, -1.0),) -0.04083462059497833
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, -1.0), (-1.0, 1.0)) -0.04725806415081024
+4 ((1.0, -1.0), (1.0, -1.0)) -0.04767405986785889
+5 ((1.0, -1.0), (-1.0, -1.0)) 0.0003172829747200012
+6 ((1.0, -1.0), (1.0, 1.0)) -0.04844221472740173
+Contact sequence search time: 4.778001793005387
+No contact sequence found
+['index_middle']
+4 index_middle
+Sampling time 4.27655491400219
+Solve time for step 30.498313903808594
+Solve time for step 6.804365873336792
+Solve time for step 6.454732894897461
+Solve time for step 6.24991774559021
+Solve time for step 6.431724548339844
+Solve time for step 6.460621118545532
+Solve time for step 6.706537246704102
+Solve time for step 4.892353773117065
+traj index middle torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current y: tensor(0.0003, device='cuda:1')
+Adjusting goal to tensor(-0.0197, device='cuda:1')
+params num_samples 16
+1 () 0.0002522412978578359
+2 () 0.0002522412978578359
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((-1.0, -1.0),) 0.0015621371567249298
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((-1.0, 1.0),) -0.012912101112306118
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((-1.0, 1.0), (-1.0, -1.0)) 0.000289219431579113
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+6 ((1.0, -1.0),) -0.017481982707977295
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+7 ((1.0, -1.0), (-1.0, -1.0)) -7.458776235580444e-05
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+8 ((-1.0, 1.0), (-1.0, -1.0), (-1.0, -1.0)) 0.0005876552313566208
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+9 ((-1.0, 1.0), (-1.0, -1.0), (-1.0, -1.0), (-1.0, -1.0)) 0.0009930459782481194
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+10 ((-1.0, 1.0), (-1.0, -1.0), (-1.0, -1.0), (-1.0, -1.0), (-1.0, -1.0)) 0.00113601703196764
+11 ((-1.0, 1.0), (-1.0, -1.0), (-1.0, -1.0), (-1.0, -1.0), (1.0, -1.0)) -0.014721963554620743
+12 ((-1.0, 1.0), (-1.0, -1.0), (-1.0, -1.0), (1.0, -1.0)) -0.018056849017739296
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+13 ((-1.0, 1.0), (-1.0, -1.0), (-1.0, -1.0), (1.0, -1.0), (1.0, 1.0)) -0.014191936701536179
+14 ((-1.0, 1.0), (-1.0, -1.0), (-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0)) -0.023366834968328476
+Contact sequence search time: 40.58511986301164
+['middle', 'reposition', 'reposition', 'index', 'middle']
+0 middle
+Sampling time 4.177233688998967
+Solve time for step 29.559536457061768
+Solve time for step 7.61794638633728
+Solve time for step 7.576186418533325
+Solve time for step 7.088925361633301
+Solve time for step 6.914800405502319
+Solve time for step 6.9491071701049805
+Solve time for step 7.255136489868164
+Solve time for step 6.808054208755493
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+Current y: tensor(-0.0108, device='cuda:1')
+Adjusting goal to tensor(-0.0308, device='cuda:1')
+params num_samples 16
+1 ((-1.0, 1.0),) -0.01076211966574192
+2 ((-1.0, 1.0),) -0.01076211966574192
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((-1.0, 1.0), (-1.0, 1.0)) -0.02643367275595665
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((-1.0, 1.0), (1.0, -1.0)) -0.019076291471719742
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((-1.0, 1.0), (1.0, -1.0), (1.0, -1.0)) -0.03166890889406204
+Contact sequence search time: 14.004639645994757
+['index', 'index']
+1 index
+Sampling time 3.7874027969955932
+Solve time for step 29.96611738204956
+Solve time for step 7.618136167526245
+Solve time for step 7.090026378631592
+Solve time for step 7.324585914611816
+Solve time for step 7.084327697753906
+Solve time for step 7.282550096511841
+Solve time for step 7.5466694831848145
+Solve time for step 6.943028450012207
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0223, device='cuda:1')
+Adjusting goal to tensor(-0.0423, device='cuda:1')
+params num_samples 16
+1 ((1.0, -1.0),) -0.0222743209451437
+2 ((1.0, -1.0),) -0.0222743209451437
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, -1.0), (-1.0, -1.0)) 0.0003661159425973892
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((1.0, -1.0), (-1.0, -1.0), (-1.0, -1.0)) 7.681269198656082e-05
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((1.0, -1.0), (-1.0, 1.0)) -0.026090402156114578
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+6 ((1.0, -1.0), (-1.0, 1.0), (1.0, -1.0)) -0.02954590879380703
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+7 ((1.0, -1.0), (-1.0, 1.0), (1.0, -1.0), (-1.0, -1.0)) 0.0005000624805688858
+8 ((1.0, -1.0), (-1.0, 1.0), (-1.0, -1.0)) -2.191402018070221e-05
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+9 ((1.0, -1.0), (-1.0, 1.0), (-1.0, -1.0), (-1.0, 1.0)) -0.032409198582172394
+10 ((1.0, -1.0), (-1.0, 1.0), (1.0, -1.0), (-1.0, 1.0)) -0.04077935591340065
+11 ((1.0, -1.0), (-1.0, 1.0), (-1.0, -1.0), (1.0, -1.0)) -0.02592543140053749
+12 ((1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)) -0.033613041043281555
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+13 ((1.0, -1.0), (-1.0, 1.0), (1.0, 1.0), (-1.0, 1.0)) -0.045772358775138855
+Contact sequence search time: 31.479790012992453
+['middle', 'index_middle', 'middle']
+2 middle
+Sampling time 3.724447839005734
+Solve time for step 29.94128394126892
+Solve time for step 7.563981533050537
+Solve time for step 7.314484119415283
+Solve time for step 7.020583152770996
+Solve time for step 7.3256542682647705
+Solve time for step 5.983189582824707
+Solve time for step 7.008820295333862
+Solve time for step 6.769560098648071
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+Current y: tensor(-0.0381, device='cuda:1')
+Adjusting goal to tensor(-0.0581, device='cuda:1')
+params num_samples 16
+1 ((-1.0, 1.0),) -0.038080845028162
+2 ((-1.0, 1.0),) -0.038080845028162
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((-1.0, 1.0), (1.0, -1.0)) -0.04064486175775528
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((-1.0, 1.0), (1.0, -1.0), (-1.0, 1.0)) -0.048021264374256134
+5 ((-1.0, 1.0), (1.0, -1.0), (1.0, -1.0)) -0.0459921732544899
+6 ((-1.0, 1.0), (1.0, -1.0), (-1.0, -1.0)) 4.4209882616996765e-05
+7 ((-1.0, 1.0), (1.0, -1.0), (1.0, 1.0)) -0.046971455216407776
+8 ((-1.0, 1.0), (-1.0, 1.0)) -0.023938380181789398
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+9 ((-1.0, 1.0), (-1.0, 1.0), (-1.0, -1.0)) 0.0006660735234618187
+10 ((-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)) -0.03434912860393524
+11 ((-1.0, 1.0), (-1.0, 1.0), (1.0, 1.0)) -0.03261170536279678
+12 ((-1.0, 1.0), (-1.0, 1.0), (1.0, -1.0)) -0.028105679899454117
+13 ((-1.0, 1.0), (-1.0, -1.0)) 0.000388595275580883
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+14 ((-1.0, 1.0), (-1.0, -1.0), (1.0, -1.0)) -0.028490863740444183
+15 ((-1.0, 1.0), (1.0, 1.0)) -0.0239398330450058
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+16 ((-1.0, 1.0), (1.0, 1.0), (1.0, -1.0)) -0.03660291060805321
+17 ((-1.0, 1.0), (1.0, 1.0), (-1.0, 1.0)) -0.03493444621562958
+18 ((-1.0, 1.0), (-1.0, -1.0), (-1.0, 1.0)) -0.02409057319164276
+19 ((-1.0, 1.0), (1.0, 1.0), (-1.0, -1.0)) 0.00030794739723205566
+20 ((-1.0, 1.0), (1.0, 1.0), (1.0, 1.0)) -0.026184426620602608
+21 ((-1.0, 1.0), (-1.0, -1.0), (-1.0, -1.0)) 0.00034949369728565216
+22 ((-1.0, 1.0), (-1.0, -1.0), (1.0, 1.0)) -0.007231062278151512
+Contact sequence search time: 23.85473772000114
+No contact sequence found
+['index', 'middle']
+3 index
+Sampling time 4.082027059994289
+Solve time for step 30.874804973602295
+Solve time for step 7.094651222229004
+Solve time for step 7.0581724643707275
+Solve time for step 7.228862285614014
+Solve time for step 6.401857376098633
+Solve time for step 7.257443428039551
+Solve time for step 7.325010776519775
+Solve time for step 6.389222145080566
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0516, device='cuda:1')
+Adjusting goal to -0.06
+params num_samples 16
+1 ((1.0, -1.0),) -0.05163140222430229
+2 ((1.0, -1.0),) -0.05163140222430229
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, -1.0), (1.0, 1.0)) -0.05401003360748291
+4 ((1.0, -1.0), (-1.0, 1.0)) -0.05926882475614548
+5 ((1.0, -1.0), (1.0, -1.0)) -0.03911181539297104
+6 ((1.0, -1.0), (-1.0, -1.0)) 0.0008494462817907333
+Contact sequence search time: 4.590219860008801
+No contact sequence found
+['middle']
+4 middle
+Sampling time 4.023065404006047
+Solve time for step 29.486154794692993
+Solve time for step 7.417560338973999
+Solve time for step 7.41522479057312
+Solve time for step 6.737874984741211
+Solve time for step 7.125959873199463
+Solve time for step 6.975526332855225
+Solve time for step 6.870870351791382
+Solve time for step 5.577384948730469
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current y: tensor(0.0003, device='cuda:1')
+Adjusting goal to tensor(-0.0197, device='cuda:1')
+params num_samples 16
+1 () 0.0002522412978578359
+2 () 0.0002522412978578359
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((-1.0, 1.0),) -0.011878857389092445
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((-1.0, -1.0),) 0.0013948408886790276
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((-1.0, 1.0), (1.0, -1.0)) -0.015846634283661842
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+6 ((1.0, -1.0),) -0.01252733450382948
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+7 ((1.0, -1.0), (1.0, -1.0)) -0.022012978792190552
+Contact sequence search time: 22.877372261995333
+['index', 'index']
+0 index
+Sampling time 3.424880895006936
+Solve time for step 18.59541606903076
+Solve time for step 4.338890790939331
+Solve time for step 4.3115174770355225
+Solve time for step 4.235137939453125
+Solve time for step 4.214193344116211
+Solve time for step 4.168328762054443
+Solve time for step 4.143891096115112
+Solve time for step 4.116683721542358
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0091, device='cuda:1')
+Adjusting goal to tensor(-0.0291, device='cuda:1')
+params num_samples 16
+1 ((1.0, -1.0),) -0.009120192378759384
+2 ((1.0, -1.0),) -0.009120192378759384
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, -1.0), (-1.0, 1.0)) -0.01764526404440403
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((1.0, -1.0), (-1.0, 1.0), (-1.0, -1.0)) -0.00018993299454450607
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((1.0, -1.0), (1.0, 1.0)) -0.017559299245476723
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+6 ((1.0, -1.0), (-1.0, 1.0), (-1.0, -1.0), (-1.0, -1.0)) 6.563309580087662e-05
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+7 ((1.0, -1.0), (-1.0, 1.0), (-1.0, -1.0), (-1.0, 1.0)) -0.023150332272052765
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+8 ((1.0, -1.0), (-1.0, 1.0), (-1.0, -1.0), (-1.0, 1.0), (-1.0, -1.0)) 0.00024052057415246964
+9 ((1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)) -0.028148295357823372
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+10 ((1.0, -1.0), (1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)) -0.03633546084165573
+Contact sequence search time: 26.16792610999255
+['index_middle', 'middle', 'middle']
+1 index_middle
+Sampling time 3.409656193005503
+Solve time for step 17.818583965301514
+Solve time for step 4.09592342376709
+Solve time for step 4.159436941146851
+Solve time for step 4.0169477462768555
+Solve time for step 3.990593910217285
+Solve time for step 3.9218997955322266
+Solve time for step 3.8749632835388184
+Solve time for step 3.864260196685791
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0182, device='cuda:1')
+Adjusting goal to tensor(-0.0382, device='cuda:1')
+params num_samples 16
+1 ((1.0, 1.0),) -0.018205391243100166
+2 ((1.0, 1.0),) -0.018205391243100166
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, 1.0), (1.0, -1.0)) -0.033828455954790115
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((1.0, 1.0), (1.0, 1.0)) -0.02258303388953209
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((1.0, 1.0), (1.0, 1.0), (1.0, 1.0)) -0.02447957545518875
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+6 ((1.0, 1.0), (1.0, 1.0), (1.0, 1.0), (-1.0, 1.0)) -0.03825107216835022
+Contact sequence search time: 15.288055652010371
+['index_middle', 'index_middle', 'middle']
+2 index_middle
+Sampling time 3.4330019030021504
+Solve time for step 16.44206190109253
+Solve time for step 3.6790597438812256
+Solve time for step 3.6655497550964355
+Solve time for step 3.549048662185669
+Solve time for step 3.5609347820281982
+Solve time for step 3.516054630279541
+Solve time for step 3.4293861389160156
+Solve time for step 3.379934072494507
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0273, device='cuda:1')
+Adjusting goal to tensor(-0.0473, device='cuda:1')
+params num_samples 16
+1 ((1.0, 1.0),) -0.027348781004548073
+2 ((1.0, 1.0),) -0.027348781004548073
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, 1.0), (1.0, -1.0)) -0.04055723547935486
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((1.0, 1.0), (1.0, -1.0), (1.0, -1.0)) -0.0523984357714653
+Contact sequence search time: 7.489558399000089
+['index', 'index']
+3 index
+Sampling time 3.5433131009922363
+Solve time for step 17.357487201690674
+Solve time for step 4.042277097702026
+Solve time for step 3.999785900115967
+Solve time for step 4.0256898403167725
+Solve time for step 3.98427677154541
+Solve time for step 3.9065136909484863
+Solve time for step 3.811976432800293
+Solve time for step 3.8033266067504883
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0321, device='cuda:1')
+Adjusting goal to tensor(-0.0521, device='cuda:1')
+params num_samples 16
+1 ((1.0, -1.0),) -0.032058000564575195
+2 ((1.0, -1.0),) -0.032058000564575195
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, -1.0), (1.0, 1.0)) -0.033960409462451935
+4 ((1.0, -1.0), (-1.0, -1.0)) 0.0008631376549601555
+5 ((1.0, -1.0), (1.0, -1.0)) -0.04623022675514221
+6 ((1.0, -1.0), (-1.0, 1.0)) -0.05159076303243637
+Contact sequence search time: 3.729277409001952
+No contact sequence found
+['middle']
+4 middle
+Sampling time 3.423476723008207
+Solve time for step 17.329689979553223
+Solve time for step 4.068136215209961
+Solve time for step 4.024448394775391
+Solve time for step 4.012264966964722
+Solve time for step 3.963836669921875
+Solve time for step 3.868917465209961
+Solve time for step 3.888422727584839
+Solve time for step 3.8689258098602295
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current y: tensor(0.0003, device='cuda:1')
+Adjusting goal to tensor(-0.0197, device='cuda:1')
+params num_samples 16
+1 () 0.0002522412978578359
+2 () 0.0002522412978578359
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, 1.0),) -0.00429191067814827
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((-1.0, -1.0),) 0.001582808792591095
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((-1.0, -1.0), (-1.0, -1.0)) -8.974410593509674e-05
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+6 ((-1.0, -1.0), (-1.0, -1.0), (-1.0, 1.0)) -0.012851597741246223
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+7 ((-1.0, 1.0),) -0.015626566484570503
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+8 ((1.0, 1.0), (-1.0, -1.0)) 0.000654885545372963
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+9 ((-1.0, 1.0), (1.0, -1.0)) -0.014226468279957771
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+10 ((-1.0, 1.0), (1.0, -1.0), (-1.0, -1.0)) 0.0007319627329707146
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+11 ((1.0, -1.0),) -0.013542075641453266
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+12 ((1.0, -1.0), (-1.0, 1.0)) -0.016981415450572968
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+13 ((1.0, -1.0), (-1.0, 1.0), (-1.0, -1.0)) 0.0005054492503404617
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+14 ((1.0, -1.0), (-1.0, 1.0), (1.0, -1.0)) -0.02224990911781788
+Contact sequence search time: 44.69657216400083
+['index', 'middle', 'index']
+0 index
+Sampling time 3.413673834002111
+Solve time for step 17.346216201782227
+Solve time for step 4.093189716339111
+Solve time for step 4.000440835952759
+Solve time for step 3.9662435054779053
+Solve time for step 3.9158213138580322
+Solve time for step 3.9070122241973877
+Solve time for step 3.833543539047241
+Solve time for step 3.8660531044006348
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0103, device='cuda:1')
+Adjusting goal to tensor(-0.0303, device='cuda:1')
+params num_samples 16
+1 ((1.0, -1.0),) -0.010267010889947414
+2 ((1.0, -1.0),) -0.010267010889947414
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, -1.0), (1.0, -1.0)) -0.032167114317417145
+Contact sequence search time: 3.9475459509994835
+['index']
+1 index
+Sampling time 3.638897699987865
+Solve time for step 17.34566378593445
+Solve time for step 4.017690420150757
+Solve time for step 3.9998106956481934
+Solve time for step 3.939685344696045
+Solve time for step 3.9389164447784424
+Solve time for step 3.949305534362793
+Solve time for step 3.8523638248443604
+Solve time for step 3.802002429962158
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0195, device='cuda:1')
+Adjusting goal to tensor(-0.0395, device='cuda:1')
+params num_samples 16
+1 ((1.0, -1.0),) -0.019545026123523712
+2 ((1.0, -1.0),) -0.019545026123523712
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, -1.0), (1.0, -1.0)) -0.03779664263129234
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((1.0, -1.0), (1.0, 1.0)) -0.024488573893904686
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((1.0, -1.0), (1.0, 1.0), (1.0, 1.0)) -0.028973201289772987
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+6 ((1.0, -1.0), (1.0, 1.0), (1.0, 1.0), (-1.0, -1.0)) 0.00017988216131925583
+7 ((1.0, -1.0), (1.0, 1.0), (1.0, 1.0), (-1.0, 1.0)) -0.03646436333656311
+8 ((1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)) -0.03183054178953171
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+9 ((1.0, -1.0), (1.0, 1.0), (-1.0, 1.0), (1.0, -1.0)) -0.041714467108249664
+Contact sequence search time: 19.079370438004844
+['index_middle', 'middle', 'index']
+2 index_middle
+Sampling time 3.413792471998022
+Solve time for step 15.876012802124023
+Solve time for step 3.7299888134002686
+Solve time for step 3.6803858280181885
+Solve time for step 3.607834577560425
+Solve time for step 3.5068118572235107
+Solve time for step 3.4636733531951904
+Solve time for step 3.351879596710205
+Solve time for step 3.334853172302246
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0226, device='cuda:1')
+Adjusting goal to tensor(-0.0426, device='cuda:1')
+params num_samples 16
+1 ((1.0, 1.0),) -0.02263946458697319
+2 ((1.0, 1.0),) -0.02263946458697319
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, 1.0), (1.0, 1.0)) -0.025872107595205307
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((1.0, 1.0), (1.0, 1.0), (1.0, 1.0)) -0.02631508931517601
+5 ((1.0, 1.0), (1.0, 1.0), (-1.0, -1.0)) 0.0002886764705181122
+6 ((1.0, 1.0), (1.0, 1.0), (1.0, -1.0)) -0.04315877705812454
+Contact sequence search time: 7.60945656299009
+['index_middle', 'index']
+3 index_middle
+Sampling time 3.414506604996859
+Solve time for step 16.025524616241455
+Solve time for step 3.608397960662842
+Solve time for step 3.562941789627075
+Solve time for step 3.56649112701416
+Solve time for step 3.424124002456665
+Solve time for step 3.353243350982666
+Solve time for step 3.41320538520813
+Solve time for step 3.3006935119628906
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0348, device='cuda:1')
+Adjusting goal to tensor(-0.0548, device='cuda:1')
+params num_samples 16
+1 ((1.0, 1.0),) -0.03478493168950081
+2 ((1.0, 1.0),) -0.03478493168950081
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, 1.0), (-1.0, 1.0)) -0.04531162977218628
+4 ((1.0, 1.0), (-1.0, -1.0)) 0.0009780218824744225
+5 ((1.0, 1.0), (1.0, -1.0)) -0.04177292436361313
+6 ((1.0, 1.0), (1.0, 1.0)) -0.030895888805389404
+Contact sequence search time: 3.731591182993725
+No contact sequence found
+['middle']
+4 middle
+Sampling time 3.4170902960031526
+Solve time for step 17.044249057769775
+Solve time for step 3.8925390243530273
+Solve time for step 3.851360321044922
+Solve time for step 3.808631181716919
+Solve time for step 3.7938880920410156
+Solve time for step 3.7709813117980957
+Solve time for step 3.7089245319366455
+Solve time for step 3.7675929069519043
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current y: tensor(0.0003, device='cuda:1')
+Adjusting goal to tensor(-0.0197, device='cuda:1')
+params num_samples 16
+1 () 0.0002522412978578359
+2 () 0.0002522412978578359
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, 1.0),) -0.0034846877679228783
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((-1.0, -1.0),) 0.0023294268175959587
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((-1.0, 1.0),) -0.016739102080464363
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+6 ((-1.0, 1.0), (-1.0, -1.0)) 0.0002672281116247177
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+7 ((1.0, 1.0), (-1.0, 1.0)) -0.02086120843887329
+Contact sequence search time: 18.732264251011657
+['index_middle', 'middle']
+0 index_middle
+Sampling time 3.410747978996369
+Solve time for step 18.09115982055664
+Solve time for step 3.6628835201263428
+Solve time for step 3.6201136112213135
+Solve time for step 3.5442657470703125
+Solve time for step 3.4996497631073
+Solve time for step 3.4334521293640137
+Solve time for step 3.4292290210723877
+Solve time for step 3.3554508686065674
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0105, device='cuda:1')
+Adjusting goal to tensor(-0.0305, device='cuda:1')
+params num_samples 16
+1 ((1.0, 1.0),) -0.010547541081905365
+2 ((1.0, 1.0),) -0.010547541081905365
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, 1.0), (1.0, 1.0)) -0.017796853557229042
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((1.0, 1.0), (-1.0, -1.0)) 0.00013054627925157547
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((1.0, 1.0), (1.0, 1.0), (1.0, -1.0)) -0.032234642654657364
+Contact sequence search time: 11.153644585996517
+['index_middle', 'index']
+1 index_middle
+Sampling time 3.4087615349999396
+Solve time for step 15.920741319656372
+Solve time for step 3.698591947555542
+Solve time for step 3.640054225921631
+Solve time for step 3.8288636207580566
+Solve time for step 3.5431137084960938
+Solve time for step 3.4761791229248047
+Solve time for step 3.398191213607788
+Solve time for step 3.377224922180176
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0219, device='cuda:1')
+Adjusting goal to tensor(-0.0419, device='cuda:1')
+params num_samples 16
+1 ((1.0, 1.0),) -0.021905284374952316
+2 ((1.0, 1.0),) -0.021905284374952316
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, 1.0), (-1.0, -1.0)) 0.0003330288454890251
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((1.0, 1.0), (-1.0, 1.0)) -0.03855828195810318
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((1.0, 1.0), (-1.0, 1.0), (1.0, 1.0)) -0.043037012219429016
+Contact sequence search time: 11.229333112001768
+['middle', 'index_middle']
+2 middle
+Sampling time 3.426491539008566
+Solve time for step 17.49695134162903
+Solve time for step 4.011337518692017
+Solve time for step 3.988765239715576
+Solve time for step 3.9487786293029785
+Solve time for step 3.9349279403686523
+Solve time for step 3.8858561515808105
+Solve time for step 3.8396236896514893
+Solve time for step 3.852017641067505
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+Current y: tensor(-0.0368, device='cuda:1')
+Adjusting goal to tensor(-0.0568, device='cuda:1')
+params num_samples 16
+1 ((-1.0, 1.0),) -0.03675365820527077
+2 ((-1.0, 1.0),) -0.03675365820527077
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((-1.0, 1.0), (1.0, 1.0)) -0.0361032634973526
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((-1.0, 1.0), (1.0, -1.0)) -0.04570913314819336
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((-1.0, 1.0), (1.0, -1.0), (1.0, -1.0)) -0.05006690323352814
+6 ((-1.0, 1.0), (1.0, -1.0), (-1.0, 1.0)) -0.060855478048324585
+Contact sequence search time: 11.189941509990604
+['index', 'middle']
+3 index
+Sampling time 3.415602280991152
+Solve time for step 17.483930349349976
+Solve time for step 4.0701234340667725
+Solve time for step 4.009188413619995
+Solve time for step 3.962554931640625
+Solve time for step 3.9080307483673096
+Solve time for step 3.882401466369629
+Solve time for step 3.8487484455108643
+Solve time for step 3.8535189628601074
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0492, device='cuda:1')
+Adjusting goal to -0.06
+params num_samples 16
+1 ((1.0, -1.0),) -0.04922482743859291
+2 ((1.0, -1.0),) -0.04922482743859291
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, -1.0), (-1.0, 1.0)) -0.05814209580421448
+4 ((1.0, -1.0), (-1.0, -1.0)) 0.0009485399350523949
+5 ((1.0, -1.0), (1.0, 1.0)) -0.042537935078144073
+6 ((1.0, -1.0), (1.0, -1.0)) -0.057963885366916656
+Contact sequence search time: 3.965401068009669
+No contact sequence found
+['middle']
+4 middle
+Sampling time 3.421333851001691
+Solve time for step 17.356922149658203
+Solve time for step 4.154440641403198
+Solve time for step 3.9994590282440186
+Solve time for step 3.945383310317993
+Solve time for step 3.9209794998168945
+Solve time for step 3.8738369941711426
+Solve time for step 3.8523950576782227
+Solve time for step 3.8136093616485596
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current y: tensor(0.0003, device='cuda:1')
+Adjusting goal to tensor(-0.0197, device='cuda:1')
+params num_samples 16
+1 () 0.0002522412978578359
+2 () 0.0002522412978578359
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, 1.0),) -0.00496962945908308
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((-1.0, -1.0),) 0.0007877293974161148
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((1.0, 1.0), (-1.0, 1.0)) -0.020037032663822174
+Contact sequence search time: 11.357862474993453
+['index_middle', 'middle']
+0 index_middle
+Sampling time 3.410295951005537
+Solve time for step 16.087493896484375
+Solve time for step 3.688664674758911
+Solve time for step 3.6692183017730713
+Solve time for step 3.5765552520751953
+Solve time for step 3.5196187496185303
+Solve time for step 3.4490702152252197
+Solve time for step 3.4352872371673584
+Solve time for step 3.3480312824249268
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0110, device='cuda:1')
+Adjusting goal to tensor(-0.0310, device='cuda:1')
+params num_samples 16
+1 ((1.0, 1.0),) -0.010980828665196896
+2 ((1.0, 1.0),) -0.010980828665196896
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, 1.0), (-1.0, 1.0)) -0.03487061709165573
+Contact sequence search time: 3.8323423879919574
+['middle']
+1 middle
+Sampling time 3.4264342130045407
+Solve time for step 17.46542739868164
+Solve time for step 4.419798851013184
+Solve time for step 4.407384157180786
+Solve time for step 4.3639748096466064
+Solve time for step 4.233574867248535
+Solve time for step 4.143672466278076
+Solve time for step 4.18256402015686
+Solve time for step 4.118839263916016
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+Current y: tensor(-0.0241, device='cuda:1')
+Adjusting goal to tensor(-0.0441, device='cuda:1')
+params num_samples 16
+1 ((-1.0, 1.0),) -0.024132074788212776
+2 ((-1.0, 1.0),) -0.024132074788212776
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((-1.0, 1.0), (-1.0, 1.0)) -0.045113854110240936
+Contact sequence search time: 3.745684542998788
+['middle']
+2 middle
+Sampling time 3.4085111079912167
+Solve time for step 18.601212978363037
+Solve time for step 4.347844123840332
+Solve time for step 4.313533544540405
+Solve time for step 4.26056432723999
+Solve time for step 4.238532066345215
+Solve time for step 4.188201665878296
+Solve time for step 4.14867377281189
+Solve time for step 4.118414878845215
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+Current y: tensor(-0.0388, device='cuda:1')
+Adjusting goal to tensor(-0.0588, device='cuda:1')
+params num_samples 16
+1 ((-1.0, 1.0),) -0.03881058096885681
+2 ((-1.0, 1.0),) -0.03881058096885681
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((-1.0, 1.0), (1.0, 1.0)) -0.042868003249168396
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((-1.0, 1.0), (1.0, 1.0), (1.0, 1.0)) -0.04317754507064819
+5 ((-1.0, 1.0), (1.0, 1.0), (-1.0, -1.0)) 0.0010427497327327728
+6 ((-1.0, 1.0), (1.0, 1.0), (1.0, -1.0)) -0.04800756275653839
+7 ((-1.0, 1.0), (-1.0, 1.0)) -0.04619760066270828
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+8 ((-1.0, 1.0), (-1.0, 1.0), (1.0, 1.0)) -0.042212486267089844
+9 ((-1.0, 1.0), (-1.0, 1.0), (-1.0, -1.0)) 0.0012138178572058678
+10 ((-1.0, 1.0), (-1.0, 1.0), (1.0, -1.0)) -0.038362156599760056
+11 ((-1.0, 1.0), (-1.0, -1.0)) 0.0008157957345247269
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+12 ((-1.0, 1.0), (-1.0, -1.0), (-1.0, 1.0)) -0.042759522795677185
+13 ((-1.0, 1.0), (-1.0, -1.0), (-1.0, -1.0)) 0.0005535101518034935
+14 ((-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)) -0.049582406878471375
+15 ((-1.0, 1.0), (1.0, 1.0), (-1.0, 1.0)) -0.04973156750202179
+16 ((-1.0, 1.0), (1.0, -1.0)) -0.04589128494262695
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+17 ((-1.0, 1.0), (1.0, -1.0), (-1.0, -1.0)) 0.0006208959966897964
+18 ((-1.0, 1.0), (1.0, -1.0), (-1.0, 1.0)) -0.059071339666843414
+Contact sequence search time: 18.716770375001943
+['index', 'middle']
+3 index
+Sampling time 3.42736277700169
+Solve time for step 18.7639217376709
+Solve time for step 4.37676477432251
+Solve time for step 4.349660158157349
+Solve time for step 4.268234968185425
+Solve time for step 4.218822479248047
+Solve time for step 4.157371759414673
+Solve time for step 4.148960113525391
+Solve time for step 4.1257898807525635
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0487, device='cuda:1')
+Adjusting goal to -0.06
+params num_samples 16
+1 ((1.0, -1.0),) -0.04869459569454193
+2 ((1.0, -1.0),) -0.04869459569454193
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, -1.0), (1.0, 1.0)) -0.054406553506851196
+4 ((1.0, -1.0), (-1.0, -1.0)) 0.0010515889152884483
+5 ((1.0, -1.0), (-1.0, 1.0)) -0.05891043692827225
+6 ((1.0, -1.0), (1.0, -1.0)) -0.050926484167575836
+Contact sequence search time: 3.758990255999379
+No contact sequence found
+['middle']
+4 middle
+Sampling time 3.4595357090001926
+Solve time for step 18.151905298233032
+Solve time for step 4.3730010986328125
+Solve time for step 4.35620641708374
+Solve time for step 4.280972719192505
+Solve time for step 4.225258111953735
+Solve time for step 4.190094947814941
+Solve time for step 4.183170318603516
+Solve time for step 4.1433939933776855
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current y: tensor(0.0003, device='cuda:1')
+Adjusting goal to tensor(-0.0197, device='cuda:1')
+params num_samples 16
+1 () 0.0002522412978578359
+2 () 0.0002522412978578359
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, 1.0),) -0.0050988649018108845
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((1.0, 1.0), (1.0, 1.0)) -0.009075084701180458
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((-1.0, 1.0),) -0.014731342904269695
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+6 ((1.0, 1.0), (1.0, 1.0), (-1.0, -1.0)) 1.733284443616867e-05
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+7 ((1.0, 1.0), (-1.0, -1.0)) 0.0009036492556333542
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+8 ((1.0, 1.0), (-1.0, 1.0)) -0.019933249801397324
+Contact sequence search time: 22.563666963993455
+['index_middle', 'middle']
+0 index_middle
+Sampling time 3.5658346860000165
+Solve time for step 18.112506866455078
+Solve time for step 4.18354058265686
+Solve time for step 4.087252855300903
+Solve time for step 4.020894765853882
+Solve time for step 3.963238000869751
+Solve time for step 3.9126570224761963
+Solve time for step 3.8598439693450928
+Solve time for step 3.783808946609497
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0067, device='cuda:1')
+Adjusting goal to tensor(-0.0267, device='cuda:1')
+params num_samples 16
+1 ((1.0, 1.0),) -0.006656068377196789
+2 ((1.0, 1.0),) -0.006656068377196789
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, 1.0), (1.0, 1.0)) -0.01638537459075451
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((1.0, 1.0), (-1.0, -1.0)) 0.00017910078167915344
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((1.0, 1.0), (1.0, 1.0), (1.0, 1.0)) -0.02469417080283165
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+6 ((1.0, 1.0), (-1.0, 1.0)) -0.03214271366596222
+Contact sequence search time: 15.041456435996224
+['middle']
+1 middle
+Sampling time 3.411514906998491
+Solve time for step 18.665679931640625
+Solve time for step 4.343111991882324
+Solve time for step 4.309524059295654
+Solve time for step 4.256428956985474
+Solve time for step 4.24750018119812
+Solve time for step 4.228629112243652
+Solve time for step 4.142390966415405
+Solve time for step 4.141706705093384
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+Current y: tensor(-0.0177, device='cuda:1')
+Adjusting goal to tensor(-0.0377, device='cuda:1')
+params num_samples 16
+1 ((-1.0, 1.0),) -0.017668645828962326
+2 ((-1.0, 1.0),) -0.017668645828962326
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((-1.0, 1.0), (1.0, 1.0)) -0.02412572130560875
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((-1.0, 1.0), (-1.0, -1.0)) 0.00020399130880832672
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((-1.0, 1.0), (1.0, 1.0), (-1.0, 1.0)) -0.03798113018274307
+Contact sequence search time: 11.240552112009027
+['index_middle', 'middle']
+2 index_middle
+Sampling time 3.4370699309947668
+Solve time for step 16.390671253204346
+Solve time for step 4.216977834701538
+Solve time for step 4.162036657333374
+Solve time for step 4.0903894901275635
+Solve time for step 4.036321640014648
+Solve time for step 3.9793741703033447
+Solve time for step 3.943509578704834
+Solve time for step 3.8584177494049072
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0290, device='cuda:1')
+Adjusting goal to tensor(-0.0490, device='cuda:1')
+params num_samples 16
+1 ((1.0, 1.0),) -0.02899763733148575
+2 ((1.0, 1.0),) -0.02899763733148575
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, 1.0), (1.0, 1.0)) -0.03163263946771622
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((1.0, 1.0), (1.0, 1.0), (-1.0, 1.0)) -0.05997291952371597
+Contact sequence search time: 7.527725697000278
+['index_middle', 'middle']
+3 index_middle
+Sampling time 3.4212236200110056
+Solve time for step 17.97315740585327
+Solve time for step 4.163630247116089
+Solve time for step 4.091179609298706
+Solve time for step 4.0497777462005615
+Solve time for step 4.0014731884002686
+Solve time for step 3.904390573501587
+Solve time for step 3.94087553024292
+Solve time for step 3.8719825744628906
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0431, device='cuda:1')
+Adjusting goal to -0.06
+params num_samples 16
+1 ((1.0, 1.0),) -0.043102484196424484
+2 ((1.0, 1.0),) -0.043102484196424484
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, 1.0), (1.0, -1.0)) -0.05281846225261688
+4 ((1.0, 1.0), (-1.0, 1.0)) -0.05300778150558472
+5 ((1.0, 1.0), (1.0, 1.0)) -0.048028379678726196
+6 ((1.0, 1.0), (-1.0, -1.0)) -2.5210902094841003e-06
+Contact sequence search time: 3.7465624150063377
+No contact sequence found
+['middle']
+4 middle
+Sampling time 3.406977666003513
+Solve time for step 18.184757471084595
+Solve time for step 4.413412570953369
+Solve time for step 4.367159366607666
+Solve time for step 4.335453748703003
+Solve time for step 4.232597351074219
+Solve time for step 4.204981565475464
+Solve time for step 4.185382604598999
+Solve time for step 4.126871824264526
+traj pre middle torch.Size([8, 25])
+traj post middle torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+Current y: tensor(0.0003, device='cuda:1')
+Adjusting goal to tensor(-0.0197, device='cuda:1')
+params num_samples 16
+1 () 0.0002522412978578359
+2 () 0.0002522412978578359
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((-1.0, -1.0),) 0.002040681429207325
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((1.0, 1.0),) -0.0051283277571201324
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((-1.0, -1.0), (1.0, -1.0)) -0.013869048096239567
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+6 ((-1.0, 1.0),) -0.015094536356627941
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+7 ((1.0, 1.0), (-1.0, -1.0)) 0.00043896399438381195
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+8 ((1.0, 1.0), (-1.0, 1.0)) -0.021579500287771225
+Contact sequence search time: 22.417624834008166
+['index_middle', 'middle']
+0 index_middle
+Sampling time 3.4287824539933354
+Solve time for step 17.854274034500122
+Solve time for step 4.15229058265686
+Solve time for step 4.088540315628052
+Solve time for step 4.037164926528931
+Solve time for step 3.9954819679260254
+Solve time for step 3.942324161529541
+Solve time for step 3.9206533432006836
+Solve time for step 3.7825326919555664
+traj index middle torch.Size([8, 28])
+Current y: tensor(-0.0116, device='cuda:1')
+Adjusting goal to tensor(-0.0316, device='cuda:1')
+params num_samples 16
+1 ((1.0, 1.0),) -0.011595377698540688
+2 ((1.0, 1.0),) -0.011595377698540688
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, 1.0), (-1.0, -1.0)) -9.969249367713928e-05
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((1.0, 1.0), (-1.0, -1.0), (-1.0, -1.0)) 0.00018717069178819656
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((1.0, 1.0), (-1.0, -1.0), (-1.0, -1.0), (-1.0, 1.0)) -0.02961026132106781
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+6 ((1.0, 1.0), (-1.0, 1.0)) -0.030779171735048294
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+7 ((1.0, 1.0), (-1.0, -1.0), (-1.0, -1.0), (-1.0, 1.0), (1.0, -1.0)) -0.03508364409208298
+Contact sequence search time: 18.70758620799461
+['reposition', 'reposition', 'middle', 'index']
+1 reposition
+Sampling time 3.4280792880017543
+Solve time for step 15.040858745574951
+Solve time for step 3.5483591556549072
+Solve time for step 3.545091390609741
+Solve time for step 3.4775924682617188
+Solve time for step 3.45094633102417
+Solve time for step 3.399878978729248
+Solve time for step 3.389441728591919
+Solve time for step 3.3754234313964844
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+Current y: tensor(-0.0099, device='cuda:1')
+Adjusting goal to tensor(-0.0299, device='cuda:1')
+params num_samples 16
+1 ((-1.0, -1.0),) -0.009894180111587048
+2 ((-1.0, -1.0),) -0.009894180111587048
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((-1.0, -1.0), (-1.0, -1.0)) 0.0003086905926465988
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((-1.0, -1.0), (1.0, 1.0)) -0.01842692121863365
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((-1.0, -1.0), (-1.0, -1.0), (1.0, -1.0)) -0.028564197942614555
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+6 ((-1.0, -1.0), (-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0)) -0.02662387117743492
+7 ((-1.0, -1.0), (-1.0, -1.0), (1.0, -1.0), (1.0, -1.0)) -0.03730614110827446
+Contact sequence search time: 14.971344756006147
+['reposition', 'index', 'index']
+2 reposition
+Sampling time 3.4167923990025884
+Solve time for step 14.885820627212524
+Solve time for step 3.5035223960876465
+Solve time for step 3.47072172164917
+Solve time for step 3.4561214447021484
+Solve time for step 3.441586494445801
+Solve time for step 3.410555124282837
+Solve time for step 3.388929605484009
+Solve time for step 3.385664939880371
+traj pre reposition torch.Size([8, 22])
+traj post reposition torch.Size([8, 28])
+Current y: tensor(-0.0076, device='cuda:1')
+Adjusting goal to tensor(-0.0276, device='cuda:1')
+params num_samples 16
+1 ((-1.0, -1.0),) -0.007596349343657494
+2 ((-1.0, -1.0),) -0.007596349343657494
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((-1.0, -1.0), (1.0, 1.0)) -0.01781078800559044
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+4 ((-1.0, -1.0), (1.0, -1.0)) -0.023026861250400543
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+5 ((-1.0, -1.0), (1.0, -1.0), (1.0, -1.0)) -0.03768087923526764
+Contact sequence search time: 11.442329122000956
+['index', 'index']
+3 index
+Sampling time 3.510989825008437
+Solve time for step 18.638020515441895
+Solve time for step 4.35109806060791
+Solve time for step 4.4245781898498535
+Solve time for step 4.270769357681274
+Solve time for step 4.231319904327393
+Solve time for step 4.174940347671509
+Solve time for step 4.181494235992432
+Solve time for step 4.149497985839844
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+Current y: tensor(-0.0188, device='cuda:1')
+Adjusting goal to tensor(-0.0388, device='cuda:1')
+params num_samples 16
+1 ((1.0, -1.0),) -0.018771063536405563
+2 ((1.0, -1.0),) -0.018771063536405563
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+       device='cuda:1')
+3 ((1.0, -1.0), (-1.0, 1.0)) -0.03619767725467682
+4 ((1.0, -1.0), (-1.0, -1.0)) -0.0002618599683046341
+5 ((1.0, -1.0), (1.0, 1.0)) -0.02292957529425621
+6 ((1.0, -1.0), (1.0, -1.0)) -0.03871878981590271
+Contact sequence search time: 3.7512878900015494
+No contact sequence found
+['index']
+4 index
+Sampling time 3.4142902540042996
+Solve time for step 18.633764505386353
+Solve time for step 4.284916877746582
+Solve time for step 4.298923015594482
+Solve time for step 4.214833974838257
+Solve time for step 4.25459623336792
+Solve time for step 4.171029329299927
+Solve time for step 4.140969276428223
+Solve time for step 4.154767036437988
+traj pre index torch.Size([8, 25])
+traj post index torch.Size([8, 28])
+csvgd, Average time per step: 0.0
+{}

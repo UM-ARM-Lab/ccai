@@ -1,0 +1,10 @@
+__pycache__/
+.vscode/
+#*.pkl
+venv/
+ccai.egg-info/
+notebooks/diff_gif_imgs/*
+*.pt
+examples/wandb/*
+wandb/*
+data/experiments/imgs

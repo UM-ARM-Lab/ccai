@@ -1,0 +1,20 @@
+from setuptools import setup
+
+setup(
+    name='ccai',
+    version='0.1.0',
+    packages=['ccai'],
+    license='MIT',
+    author='zhsh',
+    author_email='tpower@umich.edu',
+    description='Constrained control-as-inference with SVGD',
+    install_requires=[
+        'torch',
+        'numpy',
+        'better-abc',
+        'colorednoise'
+    ],
+    tests_require=[
+        'pytest'
+    ]
+)

@@ -1,0 +1,14 @@
+allegro_screwdriver_cnf_state_control_only.yaml
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512), (512, 1024)]
+torch.Size([322560, 13, 36])
+Dset size 322560
+tensor([ 7.0312e-02,  4.1875e-01,  6.3004e-01,  7.7245e-01, -3.6139e-02,
+         4.6071e-01,  8.0263e-01,  1.0195e+00,  1.3466e+00,  2.3108e-01,
+         2.5054e-01,  8.8967e-01, -1.2990e-03,  2.3048e-03, -7.2245e-01,
+        -5.1840e-03,  5.4679e-03,  9.0155e-03,  5.9746e-03,  1.5805e-02,
+         5.1156e-03,  3.2381e-03,  3.6084e-03,  6.2200e-03,  6.0297e-03,
+         1.7895e-02,  1.2706e-03,  2.7658e-02,  3.9709e-02, -9.8086e-02,
+        -1.6472e-01,  1.2839e-02, -2.7920e-03,  1.6501e-01, -7.5704e-02,
+        -2.9793e-02])
+[1;34mwandb[0m: 🚀 View run [33mallegro_cnf_state_control_only_s0_s1_sigma_.1_projected_training_cnf_2024-10-07-15-00-20[0m at: [34mhttps://wandb.ai/abhinavk99/ccai-screwdriver/runs/u86yzk33[0m
+[1;34mwandb[0m: Find logs at: [1;35mwandb/run-20241007_150020-u86yzk33/logs[0m

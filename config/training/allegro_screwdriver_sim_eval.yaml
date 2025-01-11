@@ -1,0 +1,34 @@
+---
+model_name: 'allegro_test_new_data'
+T: 16
+dx: 15
+du: 21
+load_checkpoint: False
+epochs: 5000
+batch_size: 256
+lr: 1.0e-4
+model_type: 'diffusion'
+data_directory: 'allegro_screwdriver_random_init_lower_random_init_noise'
+device: 'cuda:0'
+test_every: 5001
+save_every: 500
+normalize_data: True
+constraint_embedding_dim: 64
+constrained: False
+guided: False
+timesteps: 256
+hidden_dim: 128
+unconditional: True
+sine_cosine: False
+use_class: True
+diffuse_class: True
+# Only applies to using EMA for training
+use_ema: True
+ema_decay: 0.995
+ema_warmup_steps: 1000
+ema_update_every: 10
+
+test_directory: 'quadrotor_compose'
+test_samples: False
+test_name: None
+visualize: False

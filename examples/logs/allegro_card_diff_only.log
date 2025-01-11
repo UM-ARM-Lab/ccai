@@ -1,0 +1,79 @@
+Importing module 'gym_38' (/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.0+cu121
+Device count 2
+/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinav/Documents/ccai
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(29, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+0 index_middle
+Sampling time 3.708991353982128
+Solve time for step 0.447481632232666
+Solve time for step 0.07782268524169922
+Solve time for step 0.11508440971374512
+Solve time for step 0.10844659805297852
+Solve time for step 0.07082533836364746
+Solve time for step 0.1137840747833252
+Solve time for step 0.11052179336547852
+Solve time for step 0.0820608139038086
+1 reposition
+Sampling time 3.58085384091828
+Solve time for step 0.19045042991638184
+Solve time for step 0.13936924934387207
+Solve time for step 0.14760589599609375
+Solve time for step 0.14576125144958496
+Solve time for step 0.144273042678833
+Solve time for step 0.1418447494506836
+Solve time for step 0.14486956596374512
+Solve time for step 0.14325237274169922
+2 reposition
+Sampling time 3.5950421700254083
+Solve time for step 0.07713007926940918
+Solve time for step 0.14541244506835938
+Solve time for step 0.13825535774230957
+Solve time for step 0.1003110408782959
+Solve time for step 0.14893651008605957
+Solve time for step 0.14061665534973145
+Solve time for step 0.08432769775390625
+Solve time for step 0.13854598999023438
+3 index
+Sampling time 3.7610314950579777
+Solve time for step 0.08927369117736816
+Solve time for step 0.16312003135681152
+Solve time for step 0.143174409866333
+Solve time for step 0.08533477783203125
+Solve time for step 0.15328288078308105
+Solve time for step 0.14656448364257812
+Solve time for step 0.09446454048156738
+Solve time for step 0.14603900909423828
+4 index_middle
+Sampling time 3.522816956974566
+Solve time for step 0.06846189498901367
+Solve time for step 0.11021566390991211
+Solve time for step 0.10669136047363281
+Solve time for step 0.07491469383239746
+Solve time for step 0.13324999809265137
+Solve time for step 0.13400769233703613
+Solve time for step 0.11317658424377441
+Solve time for step 0.10691690444946289
+5 reposition
+Sampling time 3.71893156808801
+Solve time for step 0.14817261695861816
+Solve time for step 0.14634156227111816
+Solve time for step 0.14300203323364258
+Solve time for step 0.14737820625305176
+Solve time for step 0.1397533416748047
+Solve time for step 0.14863371849060059
+Solve time for step 0.13120532035827637
+Solve time for step 0.150834321975708

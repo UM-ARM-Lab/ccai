@@ -1,0 +1,54 @@
+---
+nx: 15
+nu: 21
+nc: 3
+nz: 16
+nzx: 8
+nzu: 16
+nzt: 24
+nhidden: 128
+lambda_recon: 1
+lambda_constraint: 1
+
+T: 15
+receding_horizon: False
+num_steps: 15
+num_turns: 4
+num_trials: 10
+visualize: True
+experiment_name: 'allegro_screwdriver_latent_diffusion_init_no_guidance'
+# experiment_name: 'allegro_screwdriver_new_data_collection_5'
+mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
+# fingers: ['index', 'thumb']
+fingers: ['index', 'middle', 'thumb']
+object_type: 'screwdriver'
+sim_device: 'cuda:0'
+friction_coefficient: 1.0
+kp: 3.0
+visualize_plan: False
+optimize_force: True
+exclude_index: False
+projected: False
+use_saved_plans: False
+use_saved_noise: False
+use_guidance: False
+type: 'latent_diffusion'
+vae_path: 'data/training/allegro_screwdriver/latent_diffusion_initial/allegro_vae.pth'
+model_path: 'data/training/allegro_screwdriver/latent_diffusion_initial/allegro_latent_diffusion.pt'
+controllers:
+  csvgd:
+    # N: 16
+    N: 16
+    alpha_J: 5.0e-3
+    alpha_C: 1
+    step_size: 0.1
+    momentum: 0.
+    device: 'cuda:0'
+    online_iters: 25
+    warmup_iters: 100
+    resample_steps: 16
+    resample_sigma: 0.01
+    resample_temperature: 0.1
+    penalty: 1000000
+    collision_checking: False
+    joint_friction: 0.0

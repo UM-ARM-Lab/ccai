@@ -1,0 +1,834 @@
+Importing module 'gym_38' (/home/fanyang/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/fanyang/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.2.1
+Device count 2
+/home/fanyang/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/fanyang/github/ccai
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/fanyang/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/fanyang/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/fanyang/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/fanyang/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+0 pregrasp
+1 () -0.22932977974414825
+2 () -0.22932977974414825
+3 ((-1.0, 1.0, 1.0),) -0.3244035243988037
+4 ((1.0, -1.0, -1.0),) -0.313432514667511
+5 ((1.0, 1.0, 1.0),) -0.8201057314872742
+6 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.9591498970985413
+7 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.9734175801277161
+8 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.4448135197162628
+9 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.4102163016796112
+10 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.3967592716217041
+11 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.1396629810333252
+12 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.03830092400312424
+13 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.9725674986839294
+14 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -1.005268931388855
+15 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.9253395795822144
+16 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -1.1318581104278564
+17 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.651237964630127
+18 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.0435457229614258
+19 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.0364781618118286
+20 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.6006929278373718
+21 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.0148673057556152
+22 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.0134927034378052
+23 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.9703975319862366
+24 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.8803764581680298
+25 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.2732210159301758
+26 ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -1.6823346614837646
+Contact sequence search time: 112.78049041097984
+['turn', 'turn', 'thumb_middle', 'index']
+1 turn
+Sampling time 3.430902111053001
+Solve time for step 28.295217275619507
+Solve time for step 6.8730387687683105
+Solve time for step 5.974526643753052
+Solve time for step 5.697983503341675
+Solve time for step 5.374035358428955
+Solve time for step 5.115741014480591
+Solve time for step 4.978284597396851
+Solve time for step 4.742478132247925
+Solve time for step 4.557920217514038
+Solve time for step 4.983419895172119
+Solve time for step 4.624506950378418
+Solve time for step 4.20615816116333
+2 turn
+Sampling time 3.33354069001507
+Solve time for step 28.74041223526001
+Solve time for step 6.848463296890259
+Solve time for step 6.596332311630249
+Solve time for step 5.685114145278931
+Solve time for step 5.554572820663452
+Solve time for step 5.26082444190979
+Solve time for step 4.813276290893555
+Solve time for step 4.7676637172698975
+Solve time for step 4.939081907272339
+Solve time for step 4.36004638671875
+Solve time for step 4.122117280960083
+Solve time for step 4.161725282669067
+3 thumb_middle
+Sampling time 3.31488050497137
+Solve time for step 18.171852827072144
+Solve time for step 4.605782508850098
+Solve time for step 4.364320278167725
+Solve time for step 4.295110464096069
+Solve time for step 4.166105270385742
+Solve time for step 3.9795706272125244
+Solve time for step 3.941866636276245
+Solve time for step 3.825589656829834
+Solve time for step 3.770599842071533
+Solve time for step 3.778571844100952
+Solve time for step 3.6969642639160156
+Solve time for step 3.6366822719573975
+Planner thinks task is complete
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+0 pregrasp
+1 () -0.23878809809684753
+2 () -0.23878809809684753
+3 ((-1.0, 1.0, 1.0),) -0.3565210700035095
+4 ((1.0, -1.0, -1.0),) -0.44617557525634766
+5 ((1.0, 1.0, 1.0),) -1.098593831062317
+6 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.0121912956237793
+7 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.092895746231079
+8 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.5167964100837708
+9 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.9676288366317749
+10 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.4754219055175781
+11 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.31254372000694275
+12 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.1689468622207642
+13 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.219341516494751
+14 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.5061585903167725
+Contact sequence search time: 56.711941625981126
+['turn', 'index', 'turn', 'turn']
+1 turn
+Sampling time 3.312050784006715
+Solve time for step 28.046440362930298
+Solve time for step 6.785401344299316
+Solve time for step 6.255347967147827
+Solve time for step 5.854804039001465
+Solve time for step 5.448161840438843
+Solve time for step 5.144914865493774
+Solve time for step 5.147010803222656
+Solve time for step 4.8629748821258545
+Solve time for step 4.521301031112671
+Solve time for step 4.7923688888549805
+Solve time for step 4.704117298126221
+Solve time for step 4.625295877456665
+2 index
+Sampling time 3.340102086949628
+Solve time for step 24.9956533908844
+Solve time for step 6.138948678970337
+Solve time for step 6.044391393661499
+Solve time for step 5.61213231086731
+Solve time for step 5.1883344650268555
+Solve time for step 4.973620414733887
+Solve time for step 5.016765832901001
+Solve time for step 4.986284971237183
+Solve time for step 4.895376205444336
+Solve time for step 4.822508335113525
+Solve time for step 4.620350122451782
+Solve time for step 4.950925588607788
+3 turn
+Sampling time 3.3060743759851903
+Solve time for step 28.415218353271484
+Solve time for step 6.934735298156738
+Solve time for step 6.312333583831787
+Solve time for step 6.057564735412598
+Solve time for step 5.52857518196106
+Solve time for step 5.6693031787872314
+Solve time for step 4.797524929046631
+Solve time for step 4.685154676437378
+Solve time for step 4.472429275512695
+Solve time for step 4.340916633605957
+Solve time for step 4.4306933879852295
+Solve time for step 4.270907878875732
+Planner thinks task is complete
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+0 pregrasp
+1 () -0.27528807520866394
+2 () -0.27528807520866394
+3 ((-1.0, 1.0, 1.0),) -0.38838768005371094
+4 ((1.0, -1.0, -1.0),) -0.4260009229183197
+5 ((1.0, 1.0, 1.0),) -1.0613539218902588
+6 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.5547553300857544
+7 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.5631430149078369
+8 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.935936450958252
+9 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.146177053451538
+10 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.4543426036834717
+11 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.6466540098190308
+12 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.2916972637176514
+13 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.39276123046875
+14 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -1.2657532691955566
+15 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.503670573234558
+Contact sequence search time: 60.95146005495917
+['turn', 'thumb_middle', 'index', 'thumb_middle']
+1 turn
+Sampling time 3.2915493409964256
+Solve time for step 28.261823892593384
+Solve time for step 7.081907749176025
+Solve time for step 6.288273334503174
+Solve time for step 5.881669759750366
+Solve time for step 5.425444602966309
+Solve time for step 5.156465291976929
+Solve time for step 4.946556806564331
+Solve time for step 5.151357650756836
+Solve time for step 4.553445816040039
+Solve time for step 4.943207263946533
+Solve time for step 4.4110517501831055
+Solve time for step 4.713253736495972
+2 thumb_middle
+Sampling time 3.3721493869670667
+Solve time for step 18.934918642044067
+Solve time for step 4.6577770709991455
+Solve time for step 4.528477191925049
+Solve time for step 4.415088891983032
+Solve time for step 4.324335098266602
+Solve time for step 4.369984865188599
+Solve time for step 4.1509222984313965
+Solve time for step 3.9876656532287598
+Solve time for step 4.1216161251068115
+Solve time for step 6.190416574478149
+Solve time for step 5.884023427963257
+Solve time for step 5.592407703399658
+3 index
+Sampling time 3.589308800001163
+Solve time for step 26.363966941833496
+Solve time for step 6.3888609409332275
+Solve time for step 5.808857202529907
+Solve time for step 5.394676208496094
+Solve time for step 5.2232749462127686
+Solve time for step 5.668008804321289
+Solve time for step 4.9755213260650635
+Solve time for step 5.122138738632202
+Solve time for step 4.967414855957031
+Solve time for step 4.8188841342926025
+Solve time for step 4.691496133804321
+Solve time for step 4.557602643966675
+Planner thinks task is complete
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+0 pregrasp
+1 () -0.17705415189266205
+2 () -0.17705415189266205
+3 ((-1.0, 1.0, 1.0),) -0.3502025902271271
+4 ((1.0, -1.0, -1.0),) -0.20295767486095428
+5 ((1.0, 1.0, 1.0),) -0.8936357498168945
+6 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.0067274570465088
+7 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.8750932812690735
+8 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.3453157842159271
+9 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.26670336723327637
+10 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.5487174987792969
+11 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.25060975551605225
+12 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.0805286169052124
+13 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.154725432395935
+14 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.932198166847229
+15 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.946174144744873
+16 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.1500643491744995
+17 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.1451960802078247
+18 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.1111056804656982
+19 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.0757476091384888
+20 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -1.329540729522705
+21 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.458768606185913
+22 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -1.4952290058135986
+23 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.5024442672729492
+Contact sequence search time: 94.77191039099125
+['turn', 'thumb_middle', 'index', 'thumb_middle', 'index', 'thumb_middle', 'turn']
+1 turn
+Sampling time 3.3426970849977806
+Solve time for step 28.94940161705017
+Solve time for step 6.913503408432007
+Solve time for step 6.349966526031494
+Solve time for step 5.984853982925415
+Solve time for step 5.51005482673645
+Solve time for step 5.57464861869812
+Solve time for step 5.199890851974487
+Solve time for step 4.78894567489624
+Solve time for step 4.678187370300293
+Solve time for step 4.563176155090332
+Solve time for step 4.9207916259765625
+Solve time for step 4.846821069717407
+2 thumb_middle
+Sampling time 3.6412890609935857
+Solve time for step 20.363930463790894
+Solve time for step 6.516607284545898
+Solve time for step 6.447671890258789
+Solve time for step 4.639734506607056
+Solve time for step 4.301217555999756
+Solve time for step 4.131665945053101
+Solve time for step 4.196793556213379
+Solve time for step 3.934567451477051
+Solve time for step 3.9015815258026123
+Solve time for step 3.787174701690674
+Solve time for step 3.7469899654388428
+Solve time for step 3.7478199005126953
+3 index
+Sampling time 3.4858121850411408
+Solve time for step 24.768280267715454
+Solve time for step 6.0390846729278564
+Solve time for step 5.82293438911438
+Solve time for step 5.702670335769653
+Solve time for step 5.296319007873535
+Solve time for step 5.081277132034302
+Solve time for step 5.282313346862793
+Solve time for step 4.9601359367370605
+Solve time for step 4.906988859176636
+Solve time for step 5.151968479156494
+Solve time for step 5.14406681060791
+Solve time for step 5.022518157958984
+4 thumb_middle
+Sampling time 3.430809455050621
+Solve time for step 18.708667993545532
+Solve time for step 4.656419992446899
+Solve time for step 4.515366554260254
+Solve time for step 4.4014363288879395
+Solve time for step 4.2512047290802
+Solve time for step 4.376066207885742
+Solve time for step 4.064965486526489
+Solve time for step 4.108694076538086
+Solve time for step 3.8804619312286377
+Solve time for step 4.055578947067261
+Solve time for step 3.8261513710021973
+Solve time for step 4.054518222808838
+5 index
+Sampling time 3.324224666983355
+Solve time for step 25.21284317970276
+Solve time for step 6.088852643966675
+Solve time for step 5.754177808761597
+Solve time for step 5.420862436294556
+Solve time for step 5.42925763130188
+Solve time for step 4.9833173751831055
+Solve time for step 5.274255990982056
+Solve time for step 5.564595460891724
+Solve time for step 5.282315492630005
+Solve time for step 4.886724948883057
+Solve time for step 4.965486764907837
+Solve time for step 4.613052845001221
+6 thumb_middle
+Sampling time 3.4521718350006267
+Solve time for step 19.865938425064087
+Solve time for step 4.900152921676636
+Solve time for step 4.750012159347534
+Solve time for step 4.381410598754883
+Solve time for step 4.304681777954102
+Solve time for step 4.170648097991943
+Solve time for step 4.030541658401489
+Solve time for step 3.9838931560516357
+Solve time for step 3.950209617614746
+Solve time for step 3.8800737857818604
+Solve time for step 3.7994613647460938
+Solve time for step 3.7083487510681152
+Planner thinks task is complete
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+0 pregrasp
+1 () -0.22139765322208405
+2 () -0.22139765322208405
+3 ((1.0, -1.0, -1.0),) -0.34938913583755493
+4 ((-1.0, 1.0, 1.0),) -0.3814840018749237
+5 ((1.0, 1.0, 1.0),) -1.0334205627441406
+6 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.059279441833496
+7 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.0908429622650146
+8 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.5751436948776245
+9 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.538597583770752
+10 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.4309251308441162
+11 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.7800651788711548
+12 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.2507363557815552
+13 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.1453646421432495
+14 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.1472232341766357
+15 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.3905205726623535
+16 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, -1.0, -1.0)) -1.5753353834152222
+Contact sequence search time: 66.42246246204013
+['turn', 'index', 'turn', 'thumb_middle', 'thumb_middle']
+1 turn
+Sampling time 3.4528006440377794
+Solve time for step 34.00843644142151
+Solve time for step 6.638617992401123
+Solve time for step 6.320393085479736
+Solve time for step 5.767220735549927
+Solve time for step 5.481201171875
+Solve time for step 5.016396522521973
+Solve time for step 4.969676733016968
+Solve time for step 4.557417631149292
+Solve time for step 4.571961879730225
+Solve time for step 4.549416780471802
+Solve time for step 4.3726372718811035
+Solve time for step 4.293221473693848
+2 index
+Sampling time 3.48929533502087
+Solve time for step 24.827914237976074
+Solve time for step 6.089714288711548
+Solve time for step 5.754273176193237
+Solve time for step 5.383604049682617
+Solve time for step 5.180446147918701
+Solve time for step 5.425877571105957
+Solve time for step 4.946072816848755
+Solve time for step 4.9814817905426025
+Solve time for step 5.301242113113403
+Solve time for step 4.670691728591919
+Solve time for step 4.943376541137695
+Solve time for step 5.231064319610596
+3 turn
+Sampling time 3.362647783011198
+Solve time for step 28.186610221862793
+Solve time for step 6.732742071151733
+Solve time for step 6.218969345092773
+Solve time for step 5.922034025192261
+Solve time for step 5.50383734703064
+Solve time for step 5.05994439125061
+Solve time for step 4.840661525726318
+Solve time for step 5.123183727264404
+Solve time for step 5.163496017456055
+Solve time for step 4.948663711547852
+Solve time for step 4.723970651626587
+Solve time for step 4.451704740524292
+4 thumb_middle
+Sampling time 3.403053967980668
+Solve time for step 20.094407081604004
+Solve time for step 4.764053106307983
+Solve time for step 4.495501518249512
+Solve time for step 4.799584627151489
+Solve time for step 4.657296419143677
+Solve time for step 4.277222156524658
+Solve time for step 4.228561639785767
+Solve time for step 4.431714773178101
+Solve time for step 4.384014129638672
+Solve time for step 3.855454444885254
+Solve time for step 3.8776886463165283
+Solve time for step 3.731595993041992
+Planner thinks task is complete
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+0 pregrasp
+1 () -0.23375056684017181
+2 () -0.23375056684017181
+3 ((-1.0, 1.0, 1.0),) -0.3650992214679718
+4 ((1.0, -1.0, -1.0),) -0.4266679286956787
+5 ((1.0, 1.0, 1.0),) -0.8968623876571655
+6 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.827330470085144
+7 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.8439598679542542
+8 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.4715312719345093
+9 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.5460206270217896
+10 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.41990524530410767
+11 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.4294445514678955
+12 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.2051098346710205
+13 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.4885196685791016
+14 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.5155630111694336
+Contact sequence search time: 55.806884938967414
+['turn', 'index', 'turn', 'turn', 'thumb_middle']
+1 turn
+Sampling time 3.3901604040293023
+Solve time for step 28.160517692565918
+Solve time for step 6.933293342590332
+Solve time for step 6.480557441711426
+Solve time for step 6.079202890396118
+Solve time for step 5.63169002532959
+Solve time for step 5.7451722621917725
+Solve time for step 5.555205583572388
+Solve time for step 4.988973379135132
+Solve time for step 4.646692991256714
+Solve time for step 4.3761937618255615
+Solve time for step 4.321943521499634
+Solve time for step 4.019254446029663
+2 index
+Sampling time 3.5047053979942575
+Solve time for step 25.2988224029541
+Solve time for step 6.351809978485107
+Solve time for step 6.533179044723511
+Solve time for step 5.586972713470459
+Solve time for step 5.642667293548584
+Solve time for step 5.80865216255188
+Solve time for step 5.511728286743164
+Solve time for step 5.239039897918701
+Solve time for step 4.697255849838257
+Solve time for step 4.451418161392212
+Solve time for step 4.561209678649902
+Solve time for step 4.60577654838562
+3 turn
+Sampling time 3.461315136984922
+Solve time for step 27.612635135650635
+Solve time for step 6.692890882492065
+Solve time for step 6.350373983383179
+Solve time for step 5.917327404022217
+Solve time for step 5.516588926315308
+Solve time for step 5.255197525024414
+Solve time for step 5.004996061325073
+Solve time for step 5.2440290451049805
+Solve time for step 4.755205869674683
+Solve time for step 4.735074520111084
+Solve time for step 5.052794456481934
+Solve time for step 4.405116081237793
+4 turn
+Sampling time 3.2869743569754064
+Solve time for step 28.32838201522827
+Solve time for step 6.871885538101196
+Solve time for step 6.576152563095093
+Solve time for step 6.676114082336426
+Solve time for step 5.531949520111084
+Solve time for step 5.2240355014801025
+Solve time for step 5.043210983276367
+Solve time for step 4.858834743499756
+Solve time for step 4.81512188911438
+Solve time for step 5.297640562057495
+Solve time for step 4.616392135620117
+Solve time for step 4.445338010787964
+Planner thinks task is complete
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+0 pregrasp
+1 () -0.2767224609851837
+2 () -0.2767224609851837
+3 ((1.0, -1.0, -1.0),) -0.4519556164741516
+4 ((-1.0, 1.0, 1.0),) -0.4888131022453308
+5 ((1.0, 1.0, 1.0),) -1.0296282768249512
+6 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.0544086694717407
+7 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.6378998756408691
+8 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.2394367456436157
+9 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.52451092004776
+10 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.49600309133529663
+11 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.4076376259326935
+12 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.2376328706741333
+13 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.256636142730713
+14 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, -1.0, -1.0)) -1.4302741289138794
+15 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, -1.0, -1.0), (1.0, -1.0, -1.0)) -1.5328737497329712
+Contact sequence search time: 61.433544108993374
+['turn', 'index', 'thumb_middle', 'thumb_middle', 'thumb_middle']
+1 turn
+Sampling time 3.447979894990567
+Solve time for step 28.546778917312622
+Solve time for step 6.96693754196167
+Solve time for step 6.2975685596466064
+Solve time for step 5.880000114440918
+Solve time for step 5.548915386199951
+Solve time for step 5.2240986824035645
+Solve time for step 4.92867112159729
+Solve time for step 5.237242698669434
+Solve time for step 5.059178113937378
+Solve time for step 4.801567792892456
+Solve time for step 4.437793016433716
+Solve time for step 4.345055818557739
+2 index
+Sampling time 3.422983722004574
+Solve time for step 24.950740575790405
+Solve time for step 6.039689779281616
+Solve time for step 5.676721572875977
+Solve time for step 5.50538182258606
+Solve time for step 5.171221971511841
+Solve time for step 5.007522821426392
+Solve time for step 4.903074741363525
+Solve time for step 4.791958332061768
+Solve time for step 4.66058087348938
+Solve time for step 4.560542345046997
+Solve time for step 4.524323463439941
+Solve time for step 4.523865461349487
+3 thumb_middle
+Sampling time 3.4750533319893293
+Solve time for step 18.90456771850586
+Solve time for step 4.737161159515381
+Solve time for step 4.567596197128296
+Solve time for step 4.403400659561157
+Solve time for step 4.286259651184082
+Solve time for step 4.23153018951416
+Solve time for step 4.511286735534668
+Solve time for step 4.428430080413818
+Solve time for step 4.168558359146118
+Solve time for step 3.894881010055542
+Solve time for step 3.952051877975464
+Solve time for step 3.630790948867798
+4 thumb_middle
+Sampling time 3.3291921929921955
+Solve time for step 18.944955110549927
+Solve time for step 4.680495977401733
+Solve time for step 4.935608148574829
+Solve time for step 4.7563135623931885
+Solve time for step 4.684432029724121
+Solve time for step 4.368239402770996
+Solve time for step 4.166240215301514
+Solve time for step 4.466461658477783
+Solve time for step 4.411401271820068
+Solve time for step 3.80253529548645
+Solve time for step 4.324563980102539
+Solve time for step 3.938554048538208
+Planner thinks task is complete
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+0 pregrasp
+1 () -0.20291538536548615
+2 () -0.20291538536548615
+3 ((-1.0, 1.0, 1.0),) -0.3005160987377167
+4 ((1.0, -1.0, -1.0),) -0.3373180627822876
+5 ((1.0, 1.0, 1.0),) -1.0217409133911133
+6 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.0687708854675293
+7 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.0874100923538208
+8 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.40780967473983765
+9 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.44714871048927307
+10 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.32194775342941284
+11 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.719426155090332
+12 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.2690460681915283
+13 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, -1.0, -1.0)) -1.4550480842590332
+14 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -1.524033784866333
+Contact sequence search time: 55.97955513000488
+['turn', 'index', 'thumb_middle', 'thumb_middle', 'index']
+1 turn
+Sampling time 3.3847529950435273
+Solve time for step 28.400851488113403
+Solve time for step 6.885059833526611
+Solve time for step 6.254538536071777
+Solve time for step 5.837924957275391
+Solve time for step 5.950380086898804
+Solve time for step 5.455272674560547
+Solve time for step 4.897671222686768
+Solve time for step 4.938746690750122
+Solve time for step 4.715163707733154
+Solve time for step 4.922723054885864
+Solve time for step 4.504590749740601
+Solve time for step 4.1709513664245605
+2 index
+Sampling time 3.4915080729988404
+Solve time for step 24.91064953804016
+Solve time for step 5.963247299194336
+Solve time for step 5.722118377685547
+Solve time for step 5.473413705825806
+Solve time for step 5.3299055099487305
+Solve time for step 5.129647970199585
+Solve time for step 5.046428442001343
+Solve time for step 4.889771461486816
+Solve time for step 4.721937417984009
+Solve time for step 4.64788031578064
+Solve time for step 4.598262310028076
+Solve time for step 4.551201105117798
+3 thumb_middle
+Sampling time 3.266844697005581
+Solve time for step 18.95574951171875
+Solve time for step 4.667613983154297
+Solve time for step 4.726716756820679
+Solve time for step 4.5247838497161865
+Solve time for step 4.241518497467041
+Solve time for step 4.225241661071777
+Solve time for step 4.243997097015381
+Solve time for step 4.178609848022461
+Solve time for step 4.336341381072998
+Solve time for step 3.9616527557373047
+Solve time for step 3.876030445098877
+Solve time for step 3.821777820587158
+4 thumb_middle
+Sampling time 3.3976793750189245
+Solve time for step 18.304821252822876
+Solve time for step 4.562638998031616
+Solve time for step 4.551560401916504
+Solve time for step 4.364382266998291
+Solve time for step 4.2598347663879395
+Solve time for step 4.047405481338501
+Solve time for step 3.9818263053894043
+Solve time for step 3.8411741256713867
+Solve time for step 3.862004518508911
+Solve time for step 3.683950662612915
+Solve time for step 3.812121868133545
+Solve time for step 3.7726120948791504
+Planner thinks task is complete
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+0 pregrasp
+1 () -0.22450916469097137
+2 () -0.22450916469097137
+3 ((-1.0, 1.0, 1.0),) -0.35803714394569397
+4 ((1.0, -1.0, -1.0),) -0.399129182100296
+5 ((1.0, 1.0, 1.0),) -0.8971324563026428
+6 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.0021214485168457
+7 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -0.8541276454925537
+8 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.6240110993385315
+9 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.3651854991912842
+10 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.3947095274925232
+11 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.561021625995636
+12 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.04426908493042
+13 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.0085641145706177
+14 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.9828528165817261
+15 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.7902714610099792
+16 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.1830108165740967
+17 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, -1.0, -1.0)) -1.4790292978286743
+18 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.495843768119812
+19 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -1.4230849742889404
+20 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.5010639429092407
+Contact sequence search time: 84.39838875597343
+['turn', 'thumb_middle', 'turn', 'thumb_middle', 'index', 'thumb_middle']
+1 turn
+Sampling time 3.3386176899657585
+Solve time for step 29.323187351226807
+Solve time for step 7.474982976913452
+Solve time for step 6.411101579666138
+Solve time for step 6.016883373260498
+Solve time for step 6.03845477104187
+Solve time for step 5.48433518409729
+Solve time for step 4.952955484390259
+Solve time for step 4.865327835083008
+Solve time for step 4.749950647354126
+Solve time for step 4.488268136978149
+Solve time for step 4.411842584609985
+Solve time for step 4.262372970581055
+2 thumb_middle
+Sampling time 3.4180634139920585
+Solve time for step 18.66934871673584
+Solve time for step 4.882444858551025
+Solve time for step 4.5280351638793945
+Solve time for step 4.37037467956543
+Solve time for step 4.24475884437561
+Solve time for step 4.161183595657349
+Solve time for step 4.055061340332031
+Solve time for step 3.9531962871551514
+Solve time for step 3.9055938720703125
+Solve time for step 3.8247933387756348
+Solve time for step 3.8496594429016113
+Solve time for step 3.6658782958984375
+3 turn
+Sampling time 3.4074143770267256
+Solve time for step 28.597431182861328
+Solve time for step 7.470003366470337
+Solve time for step 6.703782081604004
+Solve time for step 6.1588428020477295
+Solve time for step 5.753575325012207
+Solve time for step 5.577794075012207
+Solve time for step 5.7352454662323
+Solve time for step 4.902637004852295
+Solve time for step 4.790761709213257
+Solve time for step 4.6100592613220215
+Solve time for step 4.559978246688843
+Solve time for step 4.380200386047363
+4 thumb_middle
+Sampling time 3.389758936013095
+Solve time for step 18.88264799118042
+Solve time for step 4.682245492935181
+Solve time for step 4.479848146438599
+Solve time for step 4.6126017570495605
+Solve time for step 4.278584241867065
+Solve time for step 4.239166021347046
+Solve time for step 4.2453272342681885
+Solve time for step 4.1025145053863525
+Solve time for step 3.784417152404785
+Solve time for step 3.812866449356079
+Solve time for step 3.8960366249084473
+Solve time for step 3.7934041023254395
+5 index
+Sampling time 3.394961997983046
+Solve time for step 24.873979806900024
+Solve time for step 6.134732007980347
+Solve time for step 5.910331726074219
+Solve time for step 5.542325258255005
+Solve time for step 5.144865036010742
+Solve time for step 4.9991984367370605
+Solve time for step 4.876647233963013
+Solve time for step 5.155543327331543
+Solve time for step 4.82902717590332
+Solve time for step 4.705496788024902
+Solve time for step 4.651576280593872
+Solve time for step 4.482410430908203
+Planner thinks task is complete
+csvgd, Average time per step: 0.0
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+0 pregrasp
+1 () -0.3141186237335205
+2 () -0.3141186237335205
+3 ((-1.0, 1.0, 1.0),) -0.5112091302871704
+4 ((1.0, -1.0, -1.0),) -0.5232121348381042
+5 ((1.0, 1.0, 1.0),) -1.1955177783966064
+6 ((-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -0.5968517065048218
+7 ((-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -0.5751227140426636
+8 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0)) -1.1669974327087402
+9 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.2689094543457031
+10 ((1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -0.8667792081832886
+11 ((1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -0.4411437511444092
+12 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.2835164070129395
+13 ((1.0, 1.0, 1.0), (-1.0, 1.0, 1.0), (1.0, 1.0, 1.0)) -1.222550392150879
+14 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (1.0, 1.0, 1.0)) -1.3112633228302002
+15 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0)) -1.244361162185669
+16 ((1.0, 1.0, 1.0), (1.0, -1.0, -1.0), (-1.0, 1.0, 1.0), (1.0, -1.0, -1.0)) -1.5656298398971558
+Contact sequence search time: 64.46580914204242
+['turn', 'thumb_middle', 'index', 'thumb_middle']
+1 turn
+Sampling time 3.3272168000112288
+Solve time for step 28.692673921585083
+Solve time for step 6.825096130371094
+Solve time for step 6.405674695968628
+Solve time for step 6.001307487487793
+Solve time for step 6.140286445617676
+Solve time for step 5.200912237167358
+Solve time for step 4.971484899520874
+Solve time for step 4.836697578430176
+Solve time for step 4.793370485305786
+Solve time for step 4.499738693237305
+Solve time for step 4.391150951385498
+Solve time for step 4.20784068107605
+2 thumb_middle
+Sampling time 3.3844078929978423
+Solve time for step 19.342864513397217
+Solve time for step 5.121823310852051
+Solve time for step 5.0235559940338135
+Solve time for step 4.496439695358276
+Solve time for step 4.290851831436157
+Solve time for step 4.573733568191528
+Solve time for step 4.091407537460327
+Solve time for step 4.109062910079956
+Solve time for step 4.007538795471191
+Solve time for step 3.9020016193389893
+Solve time for step 3.8457696437835693
+Solve time for step 3.804630994796753
+3 index
+Sampling time 3.4040478150127456
+Solve time for step 24.863224267959595
+Solve time for step 6.088315010070801
+Solve time for step 5.869433403015137
+Solve time for step 5.739126682281494
+Solve time for step 5.399428606033325
+Solve time for step 5.1460230350494385
+Solve time for step 5.01483678817749
+Solve time for step 4.969622373580933
+Solve time for step 4.780285835266113
+Solve time for step 4.726144075393677
+Solve time for step 4.693264961242676
+Solve time for step 4.733662128448486
+Planner thinks task is complete
+csvgd, Average time per step: 0.0
+{}

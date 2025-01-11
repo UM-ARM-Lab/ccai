@@ -1,0 +1,200 @@
+import math
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import einops
+from einops.layers.torch import Rearrange
+import pdb
+class Mish(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.tanh = nn.Tanh()
+        self.softplus = nn.Softplus()
+
+    def forward(self, x):
+        return x * self.tanh(self.softplus(x))
+#Mish = nn.Mish
+
+# -----------------------------------------------------------------------------#
+# ---------------------------------- modules ----------------------------------#
+# -----------------------------------------------------------------------------#
+class MLP(nn.Module):
+
+    def __init__(self, input_size, output_size, hidden_size=256):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(input_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, output_size)
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+
+class SinusoidalPosEmb(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.dim = dim
+        half_dim = self.dim // 2
+        emb = math.log(10000) / (half_dim - 1)
+        emb = torch.exp(torch.arange(half_dim) * -emb)
+        self.register_buffer('emb', emb)
+
+    def forward(self, x):
+        emb = x[:, None] * self.emb[None, :]
+        emb = torch.cat((emb.sin(), emb.cos()), dim=-1)
+        return emb
+
+
+class Downsample1d(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.conv = nn.Conv1d(dim, dim, 3, 2, 1)
+
+    def forward(self, x):
+        return self.conv(x)
+
+
+class Upsample1d(nn.Module):
+    def __init__(self, dim, kernel_size):
+        super().__init__()
+        self.conv = nn.ConvTranspose1d(dim, dim, 4, 2, 1)
+        #self.conv = nn.Upsample(scale_factor=2, mode='linear')
+
+    def forward(self, x):
+        return self.conv(x)
+
+class Conv1dBlock(nn.Module):
+    '''
+        Conv1d --> GroupNorm --> Mish
+    '''
+
+    def __init__(self, inp_channels, out_channels, kernel_size, n_groups=8):
+        super().__init__()
+
+        self.block = nn.Sequential(
+            nn.Conv1d(inp_channels, out_channels, kernel_size, padding=1),
+            Rearrange('batch channels horizon -> batch channels 1 horizon'),
+            nn.GroupNorm(n_groups, out_channels),
+            Rearrange('batch channels 1 horizon -> batch channels horizon'),
+            Mish(),
+        )
+
+    def forward(self, x):
+        return self.block(x)
+
+class MLPBlock(nn.Module):
+    '''
+        MLP --> GroupNorm --> Mish
+    '''
+
+    def __init__(self, inp_channels, out_channels):
+        super().__init__()
+
+        self.block = nn.Sequential(
+            nn.Linear(inp_channels, out_channels),
+            nn.BatchNorm1d(out_channels),
+            Mish(),
+        )
+
+    def forward(self, x):
+        return self.block(x)
+
+
+# -----------------------------------------------------------------------------#
+# --------------------------------- attention ---------------------------------#
+# -----------------------------------------------------------------------------#
+
+class Residual(nn.Module):
+    def __init__(self, fn):
+        super().__init__()
+        self.fn = fn
+
+    def forward(self, x, *args, **kwargs):
+        return self.fn(x, *args, **kwargs) + x
+
+
+class LayerNorm(nn.Module):
+    def __init__(self, dim, eps=1e-5):
+        super().__init__()
+        self.eps = eps
+        self.g = nn.Parameter(torch.ones(1, dim, 1))
+        self.b = nn.Parameter(torch.zeros(1, dim, 1))
+
+    def forward(self, x):
+        var = torch.var(x, dim=1, unbiased=False, keepdim=True)
+        mean = torch.mean(x, dim=1, keepdim=True)
+        return (x - mean) / (var + self.eps).sqrt() * self.g + self.b
+
+
+class PreNorm(nn.Module):
+    def __init__(self, dim, fn):
+        super().__init__()
+        self.fn = fn
+        self.norm = LayerNorm(dim)
+
+    def forward(self, x):
+        x = self.norm(x)
+        return self.fn(x)
+
+
+class LinearAttention(nn.Module):
+    def __init__(self, dim, heads=4, dim_head=32):
+        super().__init__()
+        self.scale = dim_head ** -0.5
+        self.heads = heads
+        hidden_dim = dim_head * heads
+        self.to_qkv = nn.Conv1d(dim, hidden_dim * 3, 1, bias=False)
+        self.to_out = nn.Conv1d(hidden_dim, dim, 1)
+
+    def forward(self, x):
+        qkv = self.to_qkv(x).chunk(3, dim=1)
+        q, k, v = map(lambda t: einops.rearrange(t, 'b (h c) d -> b h c d', h=self.heads), qkv)
+        q = q * self.scale
+
+        k = k.softmax(dim=-1)
+        context = torch.einsum('b h d n, b h e n -> b h d e', k, v)
+
+        out = torch.einsum('b h d e, b h d n -> b h e n', context, q)
+        out = einops.rearrange(out, 'b h c d -> b (h c) d')
+        return self.to_out(out)
+
+
+# -----------------------------------------------------------------------------#
+# ---------------------------------- sampling ---------------------------------#
+# -----------------------------------------------------------------------------#
+
+def extract(a, t, x_shape):
+    b, *_ = t.shape
+    out = a.gather(-1, t)
+    return out.reshape(b, *((1,) * (len(x_shape) - 1)))
+
+
+def cosine_beta_schedule(timesteps, s=0.008, dtype=torch.float32):
+    """
+    cosine schedule
+    as proposed in https://openreview.net/forum?id=-NEXDKk8gZ
+    """
+    steps = timesteps + 1
+    x = np.linspace(0, steps, steps)
+    alphas_cumprod = np.cos(((x / steps) + s) / (1 + s) * np.pi * 0.5) ** 2
+    alphas_cumprod = alphas_cumprod / alphas_cumprod[0]
+    betas = 1 - (alphas_cumprod[1:] / alphas_cumprod[:-1])
+    betas_clipped = np.clip(betas, a_min=0, a_max=0.999)
+    return torch.tensor(betas_clipped, dtype=dtype)
+
+
+def apply_conditioning(x, conditions, action_dim):
+    for t, val in conditions.items():
+        x[:, t, action_dim:] = val.clone()
+    return x
+
+
+def pad_to_multiple(x, m=4):
+    # x is of shape B, d, H
+    # pad horizon to multiple of 8
+    return x if x.shape[2] % m == 0 else F.pad(x, (0, m - x.shape[2] % m))

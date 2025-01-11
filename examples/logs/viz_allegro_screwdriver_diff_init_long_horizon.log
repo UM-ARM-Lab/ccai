@@ -1,0 +1,1132 @@
+Importing module 'gym_38' (/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.3.1+cu118
+Device count 1
+/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinav/Documents/ccai
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+['pregrasp', 'turn', 'index', 'thumb_middle', 'turn']
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+['pregrasp', 'turn', 'index', 'thumb_middle', 'turn']
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+['pregrasp', 'turn', 'index', 'thumb_middle', 'turn']
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+['pregrasp', 'turn', 'index', 'thumb_middle', 'turn']
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+['pregrasp', 'turn', 'index', 'thumb_middle', 'turn']
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+['pregrasp', 'turn', 'index', 'thumb_middle', 'turn']
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+['pregrasp', 'turn', 'index', 'thumb_middle', 'turn']
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+['pregrasp', 'turn', 'index', 'thumb_middle', 'turn']
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+['pregrasp', 'turn', 'index', 'thumb_middle', 'turn']
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+{}
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512)]
+Loaded trajectory sampler
+['pregrasp', 'turn', 'index', 'thumb_middle', 'turn']
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+torch.Size([16, 5, 16, 36])
+{}
+[Open3D INFO] Memory Statistics: (Device) (#Malloc) (#Free)
+[Open3D INFO] ---------------------------------------------
+[1;33m[Open3D WARNING] CPU:0: 26880 26628 --> 252 with 21828672 total bytes[0;m
+[1;33m[Open3D WARNING]     0x89b55300 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x89420810 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x89a0fea0 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x89567e10 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x893f82a0 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x8925bf60 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x8919c890 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x89242360 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x89679b20 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x89203750 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x891f4b40 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x89049b00 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x8327fad0 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x88b10320 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x88fe28e0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x8884f200 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x89b7ed30 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x88341490 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x881b6910 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x88ca6790 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x86243890 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x8326a090 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x8326bd60 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x83297ce0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x87b51a40 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x88084430 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x884195c0 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x884b3e90 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x7c172ec0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x85dcec70 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x85db5d80 @ 102120 bytes[0;m
+[1;33m[Open3D WARNING]     0x5caf0100 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x7a4bb300 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x87068d80 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x86703bd0 @ 10728 bytes[0;m
+[1;33m[Open3D WARNING]     0x80ee1190 @ 47136 bytes[0;m
+[1;33m[Open3D WARNING]     0x790f0a10 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x8957fdd0 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x7d2514e0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x62a1b570 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x643c65d0 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x66233580 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x70edcc40 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x86e922e0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x7d236ec0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x79b66bd0 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x5ce8f980 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x8756bf80 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x85e03320 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x7e110640 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x88571850 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x86a9d130 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x7b87a640 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x5cb35740 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x657efe00 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x61d6c2c0 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x84936390 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x84a17720 @ 102120 bytes[0;m
+[1;33m[Open3D WARNING]     0x845b5200 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x845a0610 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x84882da0 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x8491e2b0 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x8496f440 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x84942f80 @ 47136 bytes[0;m
+[1;33m[Open3D WARNING]     0x840c4b50 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x8484e160 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x8478ca80 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x84546af0 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x83ffde60 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x842156c0 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x83f561f0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x8435c050 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x83eb5ed0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x84971410 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x84190ea0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x83f49750 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x83ad1e80 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x8415fe70 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x83d8a6c0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x83c7b350 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x83cec200 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x8375d610 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x88816dd0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x86aa24e0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x83affd80 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x8663b2f0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x83aee3c0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x86b1c300 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x841772a0 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x8743be70 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x8726bdd0 @ 102120 bytes[0;m
+[1;33m[Open3D WARNING]     0x8720d9c0 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x85deb240 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x86d98770 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x874be1e0 @ 10728 bytes[0;m
+[1;33m[Open3D WARNING]     0x82fe5c00 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x6c83f230 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x87461710 @ 47136 bytes[0;m
+[1;33m[Open3D WARNING]     0x86dcb790 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x834ee9c0 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x86dc1b80 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x87482b40 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x8122ebd0 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x86df67c0 @ 118824 bytes[0;m
+[1;33m[Open3D WARNING]     0x8708d640 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x5cabad10 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x8716f340 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x871c0230 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x871b1620 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x6c7d0390 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x7c078e50 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x7cd1d290 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x700a77a0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x6da913a0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x73ec7510 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x65d0cf40 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x6e9eaea0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x85e6a040 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x7161ecc0 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x6378f4a0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x5cb4aad0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x85e50440 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x7e1d0800 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x86173e50 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x6605b1d0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x81308e60 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x700ebd90 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x83638570 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x722d61a0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x8720bc40 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x84978160 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x8489ae80 @ 118824 bytes[0;m
+[1;33m[Open3D WARNING]     0x65afe440 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x700dd180 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x83286340 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x83ecb8d0 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x8477b0c0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x68cbc290 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x872225b0 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x691c5aa0 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x81264bd0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x86efbb10 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x849733e0 @ 10728 bytes[0;m
+[1;33m[Open3D WARNING]     0x8714d800 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x8670f3d0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x72961850 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x873c6ad0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x844f6640 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x8988d0a0 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x69372580 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x728ed7c0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x86bfa7e0 @ 118824 bytes[0;m
+[1;33m[Open3D WARNING]     0x8914bd80 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x6375fac0 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x862c8950 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x8622ab40 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x889caf10 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x82fd9bc0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x8927e0f0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x7e8bfab0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x6e9fa8d0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x7cb27ac0 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x88870d00 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x6ba52550 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x5cea4a80 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x7c0bc240 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x5d03fbb0 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x89692890 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x89014ec0 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x83b349c0 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x860cd1d0 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x7cd03690 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x8956e480 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x8375f880 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x8913fd40 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x84843f00 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x87674840 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x867676e0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x657a2180 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x7b36d750 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x868c2fd0 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x846c2060 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x86e81d40 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x703fdd80 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x86924800 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x5d938a00 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x88041040 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x88a63be0 @ 54528 bytes[0;m
+[1;33m[Open3D WARNING]     0x898edc80 @ 118824 bytes[0;m
+[1;33m[Open3D WARNING]     0x884c1ac0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x895051c0 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x76d8f980 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x5cf7b3f0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x895af6c0 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x89507190 @ 10728 bytes[0;m
+[1;33m[Open3D WARNING]     0x888405f0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x895899e0 @ 47136 bytes[0;m
+[1;33m[Open3D WARNING]     0x89612010 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x793afaa0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x8379c8d0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x7dbf9090 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x812d3ff0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x86c26d60 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x8483a2f0 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x8840d950 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x83968710 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x65cc9b50 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x889cd0d0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x84515650 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x845060d0 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x8955bdd0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x87fb53b0 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x5d04a000 @ 54528 bytes[0;m
+[1;33m[Open3D WARNING]     0x76d26140 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x6e8298d0 @ 54528 bytes[0;m
+[1;33m[Open3D WARNING]     0x8388aa80 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x69656b30 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x80ed00c0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x76218180 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x896647a0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x600624c0 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x76d802e0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x79b73100 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x6b9ecba0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x5c5cf9c0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x83cf8240 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x83b1ecd0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x86ad8f10 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x84121c50 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x86896730 @ 54528 bytes[0;m
+[1;33m[Open3D WARNING]     0x86470920 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x844e12c0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x86c25330 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x6ebda210 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x84175810 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x8498a910 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x88ddb810 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x7d899650 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x840edf50 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x86a81b20 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x6377a120 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x86245660 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x89435400 @ 102120 bytes[0;m
+[1;33m[Open3D WARNING]     0x8181d7f0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x6ea15350 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x83efa7f0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x8499c2d0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x8764dd00 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x7c139010 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x8885de10 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x88e1ec00 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x832291d0 @ 105456 bytes[0;m
+[Open3D INFO] ---------------------------------------------
