@@ -12,7 +12,7 @@ fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
 loop_idx = 0
 prog_id = 'a'
-trials_per_save = 10
+trials_per_save = 5
 perception_noise = 0.0
 pregrasp_iters = 80
 regrasp_iters = 200
