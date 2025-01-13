@@ -292,13 +292,15 @@ def regrasp(env, config, chain, state2ee_pos_partial, perception_noise = 0, init
     start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=device)
     # print("start: ", start)
 
-    # screwdriver = start.clone()[-4:-1]
+    screwdriver = start.clone()[-4:-1]
+    initial_yaw = screwdriver[2].item()
+    # print("initial yaw: ", initial_yaw)
     #print("start screwdriver: ", screwdriver)
     # screwdriver = torch.cat((screwdriver, torch.tensor([0]).to(device=device)),dim=0).reshape(1,4)
 
     regrasp_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
-            goal=torch.tensor([0., 0., 0.]).to(device=device),
+            goal=torch.tensor([0., 0., initial_yaw]).to(device=device),
             T=params['T'],
             chain=params['chain'],
             device=params['device'],

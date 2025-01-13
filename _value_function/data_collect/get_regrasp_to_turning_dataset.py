@@ -43,13 +43,13 @@ while True:
         
         print("done regrasp")
         
-        _, turn_pose, succ, turn_traj = do_turn(regrasp_pose, config, env, 
-                        sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, 
-                        perception_noise=perception_noise, image_path = img_save_dir)
+        # _, turn_pose, succ, turn_traj = do_turn(regrasp_pose, config, env, 
+        #                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, 
+        #                 perception_noise=perception_noise, image_path = img_save_dir)
         
-        print("done turn")
+        # print("done turn")
         
-        pose_tuples.append((pregrasp_pose, regrasp_pose, regrasp_traj, turn_pose, turn_traj))
+        # pose_tuples.append((pregrasp_pose, regrasp_pose, regrasp_traj, turn_pose, turn_traj))
 
     if perception_noise == 0:
         savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_dataset_{prog_id}_{loop_idx}.pkl'

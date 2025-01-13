@@ -190,7 +190,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             obj_dof=obj_dof,
             obj_joint_dim=1,
             optimize_force=pregrasp_params['optimize_force'],
-            default_dof_pos=env.default_dof_pos[:, :16],
+            default_dof_pos=env.initial_dof_pos[:, :16],
             obj_gravity=pregrasp_params.get('obj_gravity', False),
         )
         # finger gate index
@@ -209,7 +209,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             obj_dof=obj_dof,
             obj_joint_dim=1,
             optimize_force=params['optimize_force'],
-            default_dof_pos=env.default_dof_pos[:, :16],
+            default_dof_pos=env.initial_dof_pos[:, :16],
             obj_gravity=params.get('obj_gravity', False),
             min_force_dict=min_force_dict
         )
@@ -228,7 +228,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             obj_dof=obj_dof,
             obj_joint_dim=1,
             optimize_force=params['optimize_force'],
-            default_dof_pos=env.default_dof_pos[:, :16],
+            default_dof_pos=env.initial_dof_pos[:, :16],
             obj_gravity=params.get('obj_gravity', False),
             min_force_dict=min_force_dict
         )
@@ -246,7 +246,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             obj_dof=obj_dof,
             obj_joint_dim=1,
             optimize_force=params['optimize_force'],
-            default_dof_pos=env.default_dof_pos[:, :16],
+            default_dof_pos=env.initial_dof_pos[:, :16],
             turn=True,
             obj_gravity=params.get('obj_gravity', False),
             min_force_dict=min_force_dict
@@ -365,7 +365,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             obj_dof=obj_dof,
             obj_joint_dim=1,
             optimize_force=pregrasp_params['optimize_force'],
-            default_dof_pos=env.default_dof_pos[:, :16],
+            default_dof_pos=env.initial_dof_pos[:, :16],
             obj_gravity=pregrasp_params.get('obj_gravity', False),
         )
         pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, pregrasp_params)
@@ -384,7 +384,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             obj_dof=obj_dof,
             obj_joint_dim=1,
             optimize_force=params['optimize_force'],
-            default_dof_pos=env.default_dof_pos[:, :16],
+            default_dof_pos=env.initial_dof_pos[:, :16],
             turn=True,
             obj_gravity=params.get('obj_gravity', False),
         )
@@ -431,7 +431,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 obj_dof=obj_dof,
                 obj_joint_dim=1,
                 optimize_force=params['optimize_force'],
-                default_dof_pos=env.default_dof_pos[:, :16]
+                default_dof_pos=env.initial_dof_pos[:, :16]
             )
             thumb_and_middle_regrasp_problem_diff = AllegroScrewdriver(
                 start=start[:4 * num_fingers + obj_dof],
@@ -448,7 +448,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 obj_dof=obj_dof,
                 obj_joint_dim=1,
                 optimize_force=params['optimize_force'],
-                default_dof_pos=env.default_dof_pos[:, :16]
+                default_dof_pos=env.initial_dof_pos[:, :16]
             )
             turn_problem_diff = AllegroScrewdriver(
                 start=start[:4 * num_fingers + obj_dof],
@@ -464,7 +464,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 obj_dof=obj_dof,
                 obj_joint_dim=1,
                 optimize_force=params['optimize_force'],
-                default_dof_pos=env.default_dof_pos[:, :16]
+                default_dof_pos=env.initial_dof_pos[:, :16]
             )
 
             if params['use_partial_constraint']:
@@ -1021,17 +1021,17 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
     sample_contact = params.get('sample_contact', False)
     num_stages = 2 + 3 * (params['num_turns'] - 1)
-    if not sample_contact:
-        contact_sequence = ['turn']
-        for k in range(params['num_turns'] - 1):
-            contact_options = ['index', 'thumb_middle']
-            perm = np.random.permutation(2)
-            # perm = [0, 1]
-            contact_sequence += [contact_options[perm[0]], contact_options[perm[1]], 'turn']
-        # contact_sequence = ['thumb_middle']
-    else:
-        contact_sequence = None
-
+    # if not sample_contact:
+    #     contact_sequence = ['turn']
+    #     for k in range(params['num_turns'] - 1):
+    #         contact_options = ['index', 'thumb_middle']
+    #         perm = np.random.permutation(2)
+    #         # perm = [0, 1]
+    #         contact_sequence += [contact_options[perm[0]], contact_options[perm[1]], 'turn']
+    #     # contact_sequence = ['thumb_middle']
+    # else:
+    #     contact_sequence = None
+    contact_sequence = ['thumb_middle']
     # state = state['q'].reshape(-1)[:15].to(device=params['device'])
     # initial_samples = gen_initial_samples_multi_mode(contact_sequence)
     # pkl.dump(initial_samples, open(f"{fpath}/long_horizon_inits.p", "wb"))
@@ -1254,7 +1254,8 @@ if __name__ == "__main__":
     # get config
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.y/aml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_only.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_cnf_only.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_adam0.yaml').read_text())
+    # yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_cnf_only.yaml').read_text())
 
     from tqdm import tqdm
 
@@ -1302,7 +1303,7 @@ if __name__ == "__main__":
         
         sim, gym, viewer = sim_env.get_sim()
         assert (np.array(sim_env.robot_p) == robot_p).all()
-        assert (sim_env.default_dof_pos[:, :16] == default_dof_pos.to(config['sim_device'])).all()
+        assert (sim_env.initial_dof_pos[:, :16] == default_dof_pos.to(config['sim_device'])).all()
         # for _ in range(1):
         #     sim_env.step(default_dof_pos[:, :16])
             # state = sim_env.get_state()
@@ -1372,15 +1373,6 @@ if __name__ == "__main__":
     partial_to_full_state = partial(partial_to_full_state, fingers=config['fingers'])
     
     inits_noise, noise_noise = [None]*config['num_trials'], [None]*config['num_trials']
-    if config['use_saved_noise']:
-        if config['T'] > 16:
-            inits_noise, noise_noise = torch.load(f'{CCAI_PATH}/examples/saved_noise_long_horizon.pt')
-        else:
-            inits_noise, noise_noise = torch.load(f'{CCAI_PATH}/examples/saved_noise.pt')
-            if len(inits_noise.shape) == 5:
-                inits_noise = inits_noise[:, :, 0, :, :]
-            if len(noise_noise.shape) == 6:
-                noise_noise = noise_noise[:, :, :, 0, :, :]
 
     # Get datetime
     if config['mode'] == 'hardware':
@@ -1395,7 +1387,7 @@ if __name__ == "__main__":
             torch.manual_seed(i)
             np.random.seed(i)
 
-        goal = torch.tensor([0, 0, float(config['goal'])])
+        goal = torch.tensor([0, 0, 0])
         # goal = goal + 0.025 * torch.randn(1) + 0.2
         for controller in config['controllers'].keys():
             env.reset()

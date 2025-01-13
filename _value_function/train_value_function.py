@@ -15,32 +15,42 @@ fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
 def load_data(batch_size = 64, noisy = False):
     if noisy:
-        filename = '/pregrasp_to_turn_datasets/noisy_combined_pregrasp_to_turn_dataset.pkl'
+        filename = '/regrasp_to_turn_datasets/noisy_combined_regrasp_to_turn_dataset.pkl'
     else:
-        filename = '/pregrasp_to_turn_datasets/combined_pregrasp_to_turn_dataset.pkl'
+        filename = '/regrasp_to_turn_datasets/combined_regrasp_to_turn_dataset.pkl'
 
     validation_proportion = 0.1
     
     with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
         pose_cost_tuples  = pkl.load(file)
-        full_poses, costs = zip(*[(t[0], t[1]) for t in pose_cost_tuples])
+        full_trajs, costs = zip(*[(t[0], t[1]) for t in pose_cost_tuples])
     
-    print(f'Loaded {len(full_poses)} samples')
+    n_trajs = len(full_trajs)
+    print(f'Loaded {n_trajs} samples')
 
-    full_poses = np.array(full_poses).reshape(-1,20)
+    stacked = np.stack(full_trajs, axis=0)
+    full_poses = stacked.reshape(-1, 20)
+
     poses = convert_full_to_partial_config(full_poses)
 
     num_samples = len(poses)
     split_idx = int(num_samples * (1 - validation_proportion))
 
+    # normalize
     poses_mean, poses_std = np.mean(poses[:split_idx], axis=0), np.std(poses[:split_idx], axis=0)
     poses_norm = (poses - poses_mean) / poses_std
 
     costs = np.array(costs).flatten()
     cost_mean, cost_std = np.mean(costs[:split_idx]), np.std(costs[:split_idx])
     costs_norm = (costs - cost_mean) / cost_std
+    costs_norm = np.repeat(costs_norm, 13)
 
-    # Convert to tensors
+
+    # add indices
+    indices = np.tile(np.arange(13), n_trajs).reshape(-1, 1)
+    poses_norm = np.hstack([poses_norm, indices])
+
+    # Convert to tensorss
     poses_tensor = torch.from_numpy(poses_norm).float()
     costs_tensor = torch.from_numpy(costs_norm).float()
 
@@ -74,7 +84,7 @@ class Net(nn.Module):
     
 
 def train(batch_size = 100, lr = 0.01, epochs = 205, neurons = 12, noisy = False, verbose=False):
-    shape = (15,1)
+    shape = (16,1)
     
     # Initialize W&B
     # wandb.init(project="value-function-training", config={
@@ -151,7 +161,7 @@ def save(model_to_save, path):
     torch.save(model_to_save, path)
 
 def load_ensemble(device='cpu', model_name = "ensemble_throwerror"):
-    shape = (15,1)
+    shape = (16,1)
     checkpoints = torch.load(f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
     models = []
     for checkpoint in checkpoints:
@@ -299,10 +309,9 @@ if __name__ == "__main__":
 
     ensemble = []
     for i in range(16):
-        net, _ = train(noisy=noisy, epochs=201)
+        net, _ = train(noisy=noisy, epochs=61)
         ensemble.append(net)
     torch.save(ensemble, path)
-
-    # eval(model_name = model_name, ensemble = True)
+    eval(model_name = model_name, ensemble = True)
 
 

@@ -43,3 +43,5 @@ controllers:
     obj_gravity: False # whether to conside the object gravity in our optimization
     contact_region: False # whether to consider the contact region of the index finegr in our optimization
     static_init: False # whether to use the static initialization for the optimization
+    exclude_index: False
+    num_turns: 2
