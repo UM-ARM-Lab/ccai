@@ -1173,6 +1173,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             print('Planner thinks task is complete')
             print(executed_contacts)
             break
+        #help
         else:
             contact = contact_sequence[stage-1]
         executed_contacts.append(contact)
