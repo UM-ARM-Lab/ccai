@@ -8,3 +8,4 @@ notebooks/diff_gif_imgs/*
 examples/wandb/*
 wandb/*
 data/experiments/imgs
+data/experiments
