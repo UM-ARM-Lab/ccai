@@ -402,7 +402,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             pregrasp_problem_diff = AllegroScrewdriver(
                 start=start[:4 * num_fingers + obj_dof],
                 goal=params['valve_goal'],
-                T=1,
+                T=params['T'],
                 chain=params['chain'],
                 device=params['device'],
                 object_asset_pos=env.table_pose,
@@ -419,7 +419,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             index_regrasp_problem_diff = AllegroScrewdriver(
                 start=start[:4 * num_fingers + obj_dof],
                 goal=params['valve_goal'],
-                T=1,
+                T=params['T'],
                 chain=params['chain'],
                 device=params['device'],
                 object_asset_pos=env.table_pose,
@@ -436,7 +436,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             thumb_and_middle_regrasp_problem_diff = AllegroScrewdriver(
                 start=start[:4 * num_fingers + obj_dof],
                 goal=params['valve_goal'],
-                T=1,
+                T=params['T'],
                 chain=params['chain'],
                 device=params['device'],
                 object_asset_pos=env.table_pose,
@@ -1255,7 +1255,11 @@ if __name__ == "__main__":
     # get config
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.y/aml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_only.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_adam0.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_adam0.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_adam_rg.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_only.yaml').read_text())
+
+
     # yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_cnf_only.yaml').read_text())
 
     from tqdm import tqdm

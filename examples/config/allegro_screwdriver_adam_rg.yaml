@@ -1,0 +1,52 @@
+---
+T: 12
+receding_horizon: False
+num_steps: 12
+num_turns: 3
+num_trials: 10
+visualize: True
+# experiment_name: 'allegro_screwdriver_csvto_only_eps_.01_.5_damping_pi_6'
+experiment_name: 'allegro_screwdriver_csvto_only_anytime_regrasp_constraint_no_contact_avoidance'
+# experiment_name: 'allegro_screwdriver_new_data_collection_5'
+mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
+# fingers: ['index', 'thumb']
+fingers: ['index', 'middle', 'thumb']
+object_type: 'screwdriver'
+sim_device: 'cpu'
+friction_coefficient: 1.0
+kp: 3.0
+heuristic: 1000
+max_depth: 11
+goal: -1.5
+prior: 1
+multi_particle_search: True
+replan: False
+visualize_plan: False
+optimize_force: True
+exclude_index: False
+projected: False
+use_saved_plans: True
+use_saved_noise: False
+use_guidance: False
+sample_contact: False
+use_partial_constraint: True
+sine_cosine: False
+# model_path: 'data/training/allegro_screwdriver/allegro_better_model/allegro_screwdriver_diffusion_w_classifier.pt'
+# model_path: 'data/training/allegro_screwdriver/allegro_test_new_data_augment_angle_diffusion/allegro_screwdriver_diffusion.pt'
+controllers:
+  csvgd:
+    # N: 16
+    N: 16
+    alpha_J: 1.0e-2
+    alpha_C: 1
+    step_size: 0.1
+    momentum: 0.
+    device: 'cuda:0'
+    online_iters: 25
+    warmup_iters: 100
+    resample_steps: 16
+    resample_sigma: 0.01
+    resample_temperature: 0.1
+    penalty: 1000000
+    collision_checking: False
+    joint_friction: 0.0
