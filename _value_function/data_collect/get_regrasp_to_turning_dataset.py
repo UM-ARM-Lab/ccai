@@ -8,6 +8,7 @@ from tqdm import tqdm
 from pathlib import Path
 from _value_function.screwdriver_problem import init_env, do_turn, pregrasp, regrasp, emailer, delete_imgs
 from _value_function.test.test_method import get_initialization
+import torch
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
 loop_idx = 0
@@ -37,6 +38,7 @@ while True:
                         image_path = img_save_dir, initialization = initialization, mode='no_vf', iters = pregrasp_iters)
 
         print("done pregrasp")
+        print(f"Allocated memory: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
 
         regrasp_pose, regrasp_traj = regrasp(env, config, chain, state2ee_pos_partial, perception_noise=perception_noise, 
                                 image_path = img_save_dir, initialization = pregrasp_pose, mode='no_vf', iters = regrasp_iters)
@@ -50,6 +52,8 @@ while True:
         print("done turn")
         
         pose_tuples.append((pregrasp_pose, regrasp_pose, regrasp_traj, turn_pose, turn_traj))
+
+        print(torch.cuda.memory_summary(device='cuda', abbreviated=False))
 
     if perception_noise == 0:
         savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_dataset_{prog_id}_{loop_idx}.pkl'

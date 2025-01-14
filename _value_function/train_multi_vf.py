@@ -132,7 +132,7 @@ def save(model_to_save, path):
     torch.save(model_to_save, path)
 
 def load_ensemble(device='cpu', name = 'multi_ensemble'):
-    checkpoints = torch.load(f'{fpath.resolve()}/value_functions/value_function_{name}.pkl')
+    checkpoints = torch.load(f'{fpath.resolve()}/value_functions/value_function_{name}.pkl', weights_only=True)
     models = []
     for checkpoint in checkpoints:
         model = Net(shape[0], shape[1])
@@ -157,7 +157,7 @@ def eval(model_name, ensemble = False):
     train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std = load_data()
     if not ensemble:
         model = Net(shape[0], shape[1])
-        checkpoint = torch.load(f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
+        checkpoint = torch.load(f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl', weights_only=True)
         model.load_state_dict(checkpoint['model_state'])
         model.eval()
     else:

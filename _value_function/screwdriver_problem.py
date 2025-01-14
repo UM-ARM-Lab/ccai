@@ -112,9 +112,10 @@ def init_env(visualize=False):
 
     return config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial
 
-def pregrasp(env, config, chain, deterministic=True, initialization = None, perception_noise = 0, 
-             model_name = 'ensemble', mode='no_vf', vf_weight = 0, other_weight = 10, variance_ratio = 1,
-             vis_plan = False, image_path = None, iters = 80):
+def pregrasp(env, config, chain, deterministic=True, initialization=None, perception_noise=0, 
+             model_name='ensemble', mode='no_vf', vf_weight=0, other_weight=10, variance_ratio=1,
+             vis_plan=False, image_path=None, iters=80):
+
     params = config.copy()
     controller = 'csvgd'
     params.pop('controllers')
@@ -129,8 +130,7 @@ def pregrasp(env, config, chain, deterministic=True, initialization = None, perc
     device = params['device']
     sim_device = params['sim_device']
     
-    #['index', 'middle', 'ring', 'thumb']
-    # add random noise to each finger joint other than the ring finger
+    # Random initialization of DOF positions if none are provided
     if initialization is None:
         if deterministic is False:
             index_noise_mag = torch.tensor([0.08]*4)
@@ -138,64 +138,60 @@ def pregrasp(env, config, chain, deterministic=True, initialization = None, perc
             middle_thumb_noise_mag = torch.tensor([0.15]*4)
             middle_thumb_noise = middle_thumb_noise_mag * (2 * torch.rand(4) - 1)
             screwdriver_noise = torch.tensor([
-            np.random.uniform(-0.08, 0.08),  # Random value between -0.05 and 0.05
-            np.random.uniform(-0.08, 0.08),  # Random value between -0.05 and 0.05
-            np.random.uniform(0, 2 * np.pi),  # Random value between 0 and 2π
-            0.0  
+                np.random.uniform(-0.08, 0.08),
+                np.random.uniform(-0.08, 0.08),
+                np.random.uniform(0, 2*np.pi),
+                0.0
             ])
         else:
-            index_noise = torch.tensor([0., 0., 0., 0.])
-            middle_thumb_noise = torch.tensor([0., 0., 0., 0.])
-            screwdriver_noise = torch.tensor([0., 0., 0., 0.])
+            index_noise = torch.zeros(4)
+            middle_thumb_noise = torch.zeros(4)
+            screwdriver_noise = torch.zeros(4)
 
-        default_dof_pos = torch.cat((torch.tensor([[0.1000,  0.6000,  0.6000,  0.6000]]).float().to(device=sim_device) + index_noise,
-                                    torch.tensor([[-0.1000,  0.5000,  0.9000,  0.9000]]).float().to(device=sim_device) + middle_thumb_noise,
-                                    torch.tensor([[0.0000,  0.5000,  0.6500,  0.6500]]).float().to(device=sim_device),
-                                    torch.tensor([[1.2000,  0.3000,  0.3000,  1.2000]]).float().to(device=sim_device) + middle_thumb_noise,
-                                    torch.tensor([[0.0000,  0.0000,  0.0000,  0.0000]]).float().to(device=sim_device) + screwdriver_noise,
-                                    ),
-                                    dim=1).to(sim_device)
-        
+        default_dof_pos = torch.cat((
+            torch.tensor([[0.1000, 0.6000, 0.6000, 0.6000]]).float().to(sim_device) + index_noise,
+            torch.tensor([[-0.1000, 0.5000, 0.9000, 0.9000]]).float().to(sim_device) + middle_thumb_noise,
+            torch.tensor([[0.0000, 0.5000, 0.6500, 0.6500]]).float().to(sim_device),
+            torch.tensor([[1.2000, 0.3000, 0.3000, 1.2000]]).float().to(sim_device) + middle_thumb_noise,
+            torch.tensor([[0.0000, 0.0000, 0.0000, 0.0000]]).float().to(sim_device) + screwdriver_noise,
+        ), dim=1).to(sim_device)
     else:
         default_dof_pos = initialization
 
-    env.reset(dof_pos = default_dof_pos)
+    # Reset environment
+    env.reset(dof_pos=default_dof_pos)
 
+    # Current environment state
     start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=device)
-    # print("start: ", start)
-
     screwdriver = start.clone()[-4:-1]
-    #print("start screwdriver: ", screwdriver)
-    screwdriver = torch.cat((screwdriver, torch.tensor([0]).to(device=device)),dim=0).reshape(1,4)
+    screwdriver = torch.cat((screwdriver, torch.tensor([0]).to(device=device)), dim=0).reshape(1,4)
 
+    # Choose which fingers to use
     if 'index' in params['fingers']:
         contact_fingers = params['fingers']
     else:
         contact_fingers = ['index'] + params['fingers']    
 
+    # If mode == 'baseline0', do a quick NN-based action
     if mode == 'baseline0':
         full_initial, full_action = find_nn(start)
-        action = np.concatenate((full_action[:,:8], full_action[:,12:16]), axis=1)
+        action = np.concatenate((full_action[:, :8], full_action[:, 12:16]), axis=1)
         action = torch.tensor(action).to(device=device).reshape(1, 12)
-        # action is 1x12 here
-        # print("stepping pregrasp")
-        env.step(action.to(device = sim_device), path_override = image_path)
+        env.step(action.to(device=sim_device), path_override=image_path)
         end_state = env.get_state()['q'].reshape(4 * num_fingers + obj_dof + 1)
-
         end_state = end_state.unsqueeze(0) 
         end_state_full = torch.cat((
-                end_state.clone()[:, :8], 
-                torch.tensor([[0., 0.5, 0.65, 0.65]]), 
-                end_state.clone()[:, 8:], 
-                ), dim=1)
+            end_state.clone()[:, :8], 
+            torch.tensor([[0., 0.5, 0.65, 0.65]]), 
+            end_state.clone()[:, 8:], 
+        ), dim=1)
         return end_state_full.cpu()
 
+    # Set up the problem
     pregrasp_problem = AllegroScrewdriver(
         start=start[:4 * num_fingers + obj_dof],
         goal=torch.tensor([0., 0., 0.]).to(device=device),
-        # adam change nmmber of steps here
-        #T=2,
-        T = 4,
+        T=4,
         chain=params['chain'],
         device=params['device'],
         object_asset_pos=env.table_pose,
@@ -207,63 +203,58 @@ def pregrasp(env, config, chain, deterministic=True, initialization = None, perc
         obj_dof=obj_dof,
         obj_joint_dim=1,
         optimize_force=params['optimize_force'],
-        # default_dof_pos=env.default_dof_pos[:, :16],
         obj_gravity=params.get('obj_gravity', False),
         model_name=model_name,
         mode=mode,
-        vf_weight = vf_weight,
-        other_weight = other_weight,
-        variance_ratio = variance_ratio,
+        vf_weight=vf_weight,
+        other_weight=other_weight,
+        variance_ratio=variance_ratio,
     )
     
+    # Initialize planner
     pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
     pregrasp_planner.warmup_iters = iters
-    # if perception_noise:
-    # add screwdriver noise here
-    noise = (torch.rand(3, device=device) - 0.5) * perception_noise*2
+
+    # Add optional perception noise to the last 3 DOFs (the screwdriver part)
     noisy_start = start.clone()
-    noisy_start[-4:-1] += noise
-    best_traj, _ = pregrasp_planner.step(noisy_start[:4 * num_fingers + obj_dof])
-    # else:
-    #     best_traj, _ = pregrasp_planner.step(start[:4 * num_fingers + obj_dof])
+    if perception_noise:
+        noise = (torch.rand(3, device=device) - 0.5) * perception_noise * 2
+        noisy_start[-4:-1] += noise
 
-    # if vis_plan:
-    #     robot_dof = 4 * num_fingers
-    #     traj_for_viz = best_traj[:, :pregrasp_problem.dx]
-    #     tmp = start[robot_dof:].unsqueeze(0).repeat(traj_for_viz.shape[0], 1)
-    #     traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)  
-    #     fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_0')
-    #     pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)  
-    #     viz_fpath = pathlib.PurePath.joinpath(fpath, "pregrasp")
-    #     img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
-    #     gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
-    #     pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
-    #     pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-    #     visualize_trajectory(traj_for_viz, pregrasp_problem.viz_contact_scenes, viz_fpath, 
-    #                             pregrasp_problem.fingers, pregrasp_problem.obj_dof+1,)
-        
+    # -------------------------
+    # Key memory-usage fix: no_grad()
+    # -------------------------
+    with torch.no_grad():
+        # Step the planner (no gradients needed)
+        best_traj, _ = pregrasp_planner.step(noisy_start[:4 * num_fingers + obj_dof])
+        # Detach the resulting trajectory to avoid keeping the graph
+        best_traj = best_traj.detach()
 
+    # Take the last step of the best found trajectory
     action = best_traj[-1, :4 * num_fingers]
-    action = action.reshape(-1, 4 * num_fingers).to(device=device) 
+    action = action.reshape(-1, 4 * num_fingers).to(device=device).detach()
 
-    env.step(action.to(device = sim_device), path_override = image_path)
-    # env.reset(dof_pos = solved_pos.to(device = sim_device))
+    # Step the environment
+    env.step(action.to(device=sim_device), path_override=image_path)
     end_state = env.get_state()['q'].reshape(4 * num_fingers + obj_dof + 1)
-    end_state = end_state.unsqueeze(0) 
+    end_state = end_state.unsqueeze(0)
     end_state_full = torch.cat((
-            end_state.clone()[:, :8], 
-            torch.tensor([[0., 0.5, 0.65, 0.65]]), 
-            end_state.clone()[:, 8:], 
-            ), dim=1)
+        end_state.clone()[:, :8],
+        torch.tensor([[0., 0.5, 0.65, 0.65]]),
+        end_state.clone()[:, 8:], 
+    ), dim=1)
     
+    # Add the screwdriver dof back to action for final record
     action = torch.cat((
-            action.clone()[:, :8], 
-            torch.tensor([[0., 0.5, 0.65, 0.65]]).to(device=device), 
-            action.clone()[:, 8:], 
-            screwdriver.clone(),
-            ), dim=1)
-    
+        action.clone()[:, :8],
+        torch.tensor([[0., 0.5, 0.65, 0.65]]).to(device=device),
+        action.clone()[:, 8:],
+        screwdriver.clone(),
+    ), dim=1)
+
+    # Move final outputs to CPU and return
     return end_state_full.cpu(), action.cpu()
+
 
 def regrasp(env, config, chain, state2ee_pos_partial, perception_noise = 0, initialization = None, 
              model_name = 'ensemble', mode='no_vf', vf_weight = 0, other_weight = 10, variance_ratio = 1,
