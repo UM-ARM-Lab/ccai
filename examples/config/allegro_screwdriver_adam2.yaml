@@ -24,16 +24,16 @@ device: 'cuda:2'
 controllers:
   csvgd:
     # N: 16
-    N: 4
-    alpha_J: 5.0e-3
-    # alpha_J: 1.0e-2
+    N: 16
+    # alpha_J: 5.0e-3
+    alpha_J: 1.0e-2
     # alpha_C: 1
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    online_iters: 50
-    warmup_iters: 200
-    resample_steps: 1
+    online_iters: 25
+    warmup_iters: 100
+    resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1
     penalty: 1000000
@@ -43,3 +43,5 @@ controllers:
     obj_gravity: False # whether to conside the object gravity in our optimization
     contact_region: False # whether to consider the contact region of the index finegr in our optimization
     static_init: False # whether to use the static initialization for the optimization
+    exclude_index: False
+    num_turns: 2
