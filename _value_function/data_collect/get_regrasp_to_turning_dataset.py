@@ -12,7 +12,7 @@ import torch
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
 loop_idx = 0
-prog_id = 'a'
+prog_id = 'b'
 trials_per_save = 100
 perception_noise = 0.0
 pregrasp_iters = 80

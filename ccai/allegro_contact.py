@@ -433,6 +433,10 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             # print("screwdriver: ", screwdriver)
             input = torch.cat((last_state, screwdriver))
             # print("input: ", input)
+
+            indices = np.arange(13).reshape(-1, 1)
+            q_indexed = np.hstack([q, indices])
+
             input_norm = ((input - self.poses_mean) / self.poses_std).float()
             vf_output_norm = self.query_ensemble(input_norm, self.models, device=self.device)
             vf_output = vf_output_norm * self.cost_std + self.cost_mean
