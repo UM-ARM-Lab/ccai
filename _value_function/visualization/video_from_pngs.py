@@ -10,6 +10,7 @@ def display_and_save_video(image_dir, output_video_path=None, frame_rate=30):
     if not images:
         print("No PNG images found in the directory.")
         return
+    
     first_image = cv2.imread(images[0])
     height, width, _ = first_image.shape
     video_writer = None
@@ -60,4 +61,4 @@ def convert_dirs_to_videos(source_dir, output_dir, frame_rate):
 
 source_dir = '/home/newuser/Desktop/Honda/ccai/data/experiments/imgs'
 output_dir = '/home/newuser/Desktop/Honda/ccai/data/plots/regrasp_vids'
-convert_dirs_to_videos(source_dir, output_dir, frame_rate=50)
+convert_dirs_to_videos(source_dir, output_dir, frame_rate=200)

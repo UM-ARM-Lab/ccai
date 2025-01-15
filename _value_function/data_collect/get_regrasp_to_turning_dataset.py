@@ -53,7 +53,7 @@ while True:
         
         pose_tuples.append((pregrasp_pose, regrasp_pose, regrasp_traj, turn_pose, turn_traj))
 
-        print(torch.cuda.memory_summary(device='cuda', abbreviated=False))
+        # print(torch.cuda.memory_summary(device='cuda', abbreviated=False))
 
     if perception_noise == 0:
         savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_dataset_{prog_id}_{loop_idx}.pkl'

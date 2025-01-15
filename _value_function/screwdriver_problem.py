@@ -221,9 +221,7 @@ def pregrasp(env, config, chain, deterministic=True, initialization=None, percep
         noise = (torch.rand(3, device=device) - 0.5) * perception_noise * 2
         noisy_start[-4:-1] += noise
 
-    # -------------------------
     # Key memory-usage fix: no_grad()
-    # -------------------------
     with torch.no_grad():
         # Step the planner (no gradients needed)
         best_traj, _ = pregrasp_planner.step(noisy_start[:4 * num_fingers + obj_dof])
@@ -252,7 +250,6 @@ def pregrasp(env, config, chain, deterministic=True, initialization=None, percep
         screwdriver.clone(),
     ), dim=1)
 
-    # Move final outputs to CPU and return
     return end_state_full.cpu(), action.cpu()
 
 
@@ -354,13 +351,17 @@ def regrasp(env, config, chain, state2ee_pos_partial, perception_noise = 0, init
         noise = (torch.rand(3, device=params['device']) - 0.5) * perception_noise * 2
         noisy_start = start.clone()
         noisy_start[-4:-1] += noise
-        best_traj, _ = regrasp_planner.step(noisy_start[:4 * num_fingers + obj_dof])
-        
+
+        # -------------------------
+        # Key memory-usage fix: no_grad()
+        # -------------------------
+        with torch.no_grad():
+            best_traj, _ = regrasp_planner.step(noisy_start[:4 * num_fingers + obj_dof])
+            best_traj = best_traj.detach()
+
         if torch.isnan(best_traj).any().item():
             env.reset()
             break
-        #debug only
-        # turn_problem.save_history(f'{fpath.resolve()}/op_traj.pkl')
 
         x = best_traj[0, :regrasp_problem.dx+regrasp_problem.du]
         x = x.reshape(1, regrasp_problem.dx+regrasp_problem.du)
@@ -482,20 +483,20 @@ def solve_turn(env, gym, viewer, params, fpath, initial_pose, state2ee_pos_parti
         actual_trajectory.append(state['q'][:, :4 * num_fingers + obj_dof].squeeze(0).clone())
         start_time = time.time()
 
-        # if perception_noise:
-            # add screwdriver noise here
         noise = (torch.rand(3, device=params['device']) - 0.5) * perception_noise * 2
         noisy_start = start.clone()
         noisy_start[-4:-1] += noise
-        best_traj, _ = turn_planner.step(noisy_start[:4 * num_fingers + obj_dof])
-        # else:
-        #     best_traj, _ = turn_planner.step(start[:4 * num_fingers + obj_dof])
-        
+
+        # -------------------------
+        # Key memory-usage fix: no_grad()
+        # -------------------------
+        with torch.no_grad():
+            best_traj, _ = turn_planner.step(noisy_start[:4 * num_fingers + obj_dof])
+            best_traj = best_traj.detach()
+
         if torch.isnan(best_traj).any().item():
             env.reset()
             break
-        #debug only
-        # turn_problem.save_history(f'{fpath.resolve()}/op_traj.pkl')
 
         x = best_traj[0, :turn_problem.dx+turn_problem.du]
         x = x.reshape(1, turn_problem.dx+turn_problem.du)
@@ -517,17 +518,12 @@ def solve_turn(env, gym, viewer, params, fpath, initial_pose, state2ee_pos_parti
         distance2goal = tf.so3_relative_angle(torch.tensor(screwdriver_mat), \
             torch.tensor(screwdriver_goal_mat).unsqueeze(0), cos_angle=False).detach().cpu().abs()
 
-        # distance2goal = (screwdriver_goal - screwdriver_state)).detach().cpu()
         if torch.isnan(distance2goal).item():
             env.reset()
             break
-        #print(distance2goal)
         if torch.isnan(distance2goal).any().item():
             env.reset()
-            #print("NAN")
             break
-        # info = {**equality_constr_dict, **inequality_constr_dict, **{'distance2goal': distance2goal}}
-        # info_list.append(info)
 
         # gym.clear_lines(viewer)
         # state = env.get_state()
@@ -547,18 +543,14 @@ def solve_turn(env, gym, viewer, params, fpath, initial_pose, state2ee_pos_parti
     actual_trajectory = [tensor.to(device=params['device']) for tensor in actual_trajectory]
     actual_trajectory = torch.stack(actual_trajectory, dim=0).reshape(-1, 4 * num_fingers + obj_dof)
     turn_problem.T = actual_trajectory.shape[0]
-    # constraint_val = problem._con_eq(actual_trajectory.unsqueeze(0))[0].squeeze(0)
     screwdriver_state = actual_trajectory[:, -obj_dof:].cpu()
     screwdriver_mat = R.from_euler('xyz', screwdriver_state).as_matrix()
     distance2goal = tf.so3_relative_angle(torch.tensor(screwdriver_mat), \
         torch.tensor(screwdriver_goal_mat).unsqueeze(0).repeat(screwdriver_mat.shape[0],1,1), cos_angle=False).detach().cpu()
 
     final_distance_to_goal = torch.min(distance2goal.abs())
-    # np.savez(f'{fpath.resolve()}/trajectory.npz', x=actual_trajectory.cpu().numpy(),
-    #     d2goal=final_distance_to_goal.cpu().numpy())
 
     state = env.get_state()['q']
-
     final_state = torch.cat((
                     state.clone()[:, :8], 
                     torch.tensor([[0., 0.5, 0.65, 0.65]]), 
@@ -650,11 +642,11 @@ def delete_imgs():
 if __name__ == "__main__":
 
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
-    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
+    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
     
     img_save_dir = None
-    pregrasp_iters = 200#200
-    regrasp_iters = 200
+    pregrasp_iters = 80#200
+    regrasp_iters = 100
     perception_noise = 0.0
 
     pregrasp_pose_vf, plan_vf = pregrasp(env, config, chain, deterministic=True, perception_noise=perception_noise, 
@@ -684,4 +676,3 @@ if __name__ == "__main__":
     #     for traj in regrasp_traj:
     #         env.reset(dof_pos=torch.tensor(traj).reshape(1,20))
     #         time.sleep(0.2)
-    
