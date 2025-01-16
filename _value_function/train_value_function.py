@@ -121,7 +121,7 @@ def train(batch_size = 100, lr = 0.01, epochs = 205, neurons = 12, noisy = False
         if verbose:
             freq = 1
         else:
-            freq = 100
+            freq = epochs // 3
         if epoch == 0 or (epoch+1) % freq == 0:
             model.eval()
             test_loss = 0.0
@@ -184,7 +184,7 @@ def query_ensemble(poses, models, device='cpu'):
     return costs
 
 def eval(model_name, ensemble=False):
-    shape = (15, 1)
+    shape = (16, 1)
     
     #model_name = input("Enter model name: ")
     train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std = load_data()

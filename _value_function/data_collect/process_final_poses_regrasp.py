@@ -109,7 +109,7 @@ if __name__ == "__main__":
                 cost, succ = calculate_turn_cost(regrasp_poses[i], turn_poses[i])
                 turn_costs.append(cost)
                 if succ:
-                    combined_succ_regrasp_tuples.append((regrasp_trajs[i].reshape(1, 20), turn_poses[i].reshape(1, 20)))
+                    combined_succ_regrasp_tuples.append((regrasp_trajs[i].reshape(13, 20), turn_poses[i].reshape(1, 20)))
             
             combined_turn_costs.extend(turn_costs)
 

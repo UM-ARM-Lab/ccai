@@ -421,23 +421,32 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.data[finger]['dJ_dq'] = dJ_dq  # Jacobian of the contact point
 
     def _cost(self, xu, start, goal):
-        start_q = partial_to_full_state(start[None, :self.num_fingers * 4], self.fingers)[:, self.all_joint_index]
-        q = partial_to_full_state(xu[:, :self.num_fingers * 4], self.fingers)[:, self.all_joint_index]
-        q = torch.cat((start_q, q), dim=0)
+        # start_q = partial_to_full_state(start[None, :self.num_fingers * 4], self.fingers)[:, self.all_joint_index]
+        # q = partial_to_full_state(xu[:, :self.num_fingers * 4], self.fingers)[:, self.all_joint_index]
+
+        #don't include start_q because this can't be changed
+        # start_q = partial_to_full_state(start[None, :self.num_fingers * 4 + 3], self.fingers)[:, self.all_joint_index]
+        # q = torch.cat((start_q, q), dim=0)
+        
+        # need to confirm that xu is only fingers of interest
+        q = xu[:, :self.num_fingers * 4 + 3]
+        
         delta_q = partial_to_full_state(xu[:, self.dx:self.dx + 4 * self.num_fingers], self.fingers)
         
         if self.mode == 'vf':
 
-            last_state = q[-1,:]
-            screwdriver = self.full_start[-3:]
+            # last_state = q[-1,:]
+            # screwdriver = self.full_start[-3:]
+
             # print("screwdriver: ", screwdriver)
-            input = torch.cat((last_state, screwdriver))
+            # input = torch.cat((last_state, screwdriver))
             # print("input: ", input)
+            n_steps = q.shape[0]
 
-            indices = np.arange(13).reshape(-1, 1)
-            q_indexed = np.hstack([q, indices])
+            input_norm = ((q - self.poses_mean) / self.poses_std).float()
+            indices = torch.arange(n_steps).unsqueeze(1).to(self.device)
+            input_norm = torch.cat([q, indices], dim=1)
 
-            input_norm = ((input - self.poses_mean) / self.poses_std).float()
             vf_output_norm = self.query_ensemble(input_norm, self.models, device=self.device)
             vf_output = vf_output_norm * self.cost_std + self.cost_mean
 

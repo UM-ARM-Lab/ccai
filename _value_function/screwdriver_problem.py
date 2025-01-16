@@ -115,7 +115,9 @@ def init_env(visualize=False):
 def pregrasp(env, config, chain, deterministic=True, initialization=None, perception_noise=0, 
              model_name='ensemble', mode='no_vf', vf_weight=0, other_weight=10, variance_ratio=1,
              vis_plan=False, image_path=None, iters=80):
-
+    if mode == 'vf':
+        print("mode 'vf' is not supported for pregrasp")
+        exit()
     params = config.copy()
     controller = 'csvgd'
     params.pop('controllers')
@@ -649,15 +651,16 @@ if __name__ == "__main__":
     regrasp_iters = 100
     perception_noise = 0.0
 
-    pregrasp_pose_vf, plan_vf = pregrasp(env, config, chain, deterministic=True, perception_noise=perception_noise, 
-                            image_path = img_save_dir, initialization = None, 
-                            model_name = 'ensemble', mode='vf', iters = pregrasp_iters,
-                            vf_weight = 10.0, other_weight = 0.1, variance_ratio = 5)
+    pregrasp_pose, planned_pose = pregrasp(env, config, chain, deterministic=True, perception_noise=perception_noise, 
+                        image_path = img_save_dir, initialization = None, mode='no_vf', iters = pregrasp_iters)
 
-    print("done pregrasp")
-    
     regrasp_pose, regrasp_traj = regrasp(env, config, chain, state2ee_pos_partial, perception_noise=perception_noise, 
-                                         initialization = pregrasp_pose_vf, useVFgrads=False, iters = regrasp_iters)
+                            image_path = img_save_dir, initialization = pregrasp_pose, mode='vf', iters = regrasp_iters)
+    
+    _, turn_pose, succ, turn_traj = do_turn(regrasp_pose, config, env, 
+                    sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, 
+                    perception_noise=perception_noise, image_path = img_save_dir)
+    
 
     print("done regrasp")
     while True:
@@ -665,10 +668,6 @@ if __name__ == "__main__":
             print(f"step {idx}")
             env.reset(dof_pos=torch.tensor(state).reshape(1,20))
             time.sleep(0.1)
-
-    _, turn_pose_vf, turn_succ, turn_trajectory_vf = do_turn(pregrasp_pose_vf, config, env, 
-                    sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, 
-                    perception_noise=perception_noise, image_path = img_save_dir)
     
     # print("enter to continue")
     # wait = input()
