@@ -61,4 +61,4 @@ def convert_dirs_to_videos(source_dir, output_dir, frame_rate):
 
 source_dir = '/home/newuser/Desktop/Honda/ccai/data/experiments/imgs'
 output_dir = '/home/newuser/Desktop/Honda/ccai/data/plots/regrasp_vids'
-convert_dirs_to_videos(source_dir, output_dir, frame_rate=200)
+convert_dirs_to_videos(source_dir, output_dir, frame_rate=50)

@@ -11,6 +11,15 @@ from _value_function.test.test_method import get_initialization
 import torch
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
+def validate_pregrasp_pose(pregrasp_pose):
+    screwdriver = pregrasp_pose[0,-4:-2]
+    # print(screwdriver)
+    # print(np.linalg.norm(screwdriver))
+    if np.linalg.norm(screwdriver) > 0.3 :
+        return False
+    else:
+        return True
+
 loop_idx = 0
 prog_id = 'b'
 trials_per_save = 100
@@ -21,12 +30,13 @@ delete_imgs()
 
 while True:
     pose_tuples = []
-    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
+    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
 
-    for i in tqdm(range(trials_per_save)):
+    trials_done = 0
+    while trials_done < trials_per_save:
 
         # img_save_dir = None
-        img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/imgs/regrasp_trial_{i+1}')
+        img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/imgs/regrasp_trial_{trials_done+1}')
         pathlib.Path.mkdir(img_save_dir, parents=True, exist_ok=True)  
         env.frame_fpath = img_save_dir
         env.frame_id = 0
@@ -37,8 +47,17 @@ while True:
         pregrasp_pose, planned_pose = pregrasp(env, config, chain, deterministic=True, perception_noise=perception_noise, 
                         image_path = img_save_dir, initialization = initialization, mode='no_vf', iters = pregrasp_iters)
 
-        print("done pregrasp")
-        print(f"Allocated memory: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
+        flag = validate_pregrasp_pose(pregrasp_pose)
+        if flag:
+            print("done pregrasp")
+        else:
+            print("pregrasp failed")
+            gym.destroy_viewer(viewer)
+            gym.destroy_sim(sim)
+            del env, sim_env, viewer
+            torch.cuda.empty_cache()
+            continue
+        # print(f"Allocated memory: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
 
         regrasp_pose, regrasp_traj = regrasp(env, config, chain, state2ee_pos_partial, perception_noise=perception_noise, 
                                 image_path = img_save_dir, initialization = pregrasp_pose, mode='no_vf', iters = regrasp_iters)
@@ -52,6 +71,7 @@ while True:
         print("done turn")
         
         pose_tuples.append((pregrasp_pose, regrasp_pose, regrasp_traj, turn_pose, turn_traj))
+        trials_done += 1
 
         # print(torch.cuda.memory_summary(device='cuda', abbreviated=False))
 
@@ -65,5 +85,7 @@ while True:
     loop_idx += 1
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)
+    del env, sim_env, viewer
+    torch.cuda.empty_cache()
 
 emailer().send()
