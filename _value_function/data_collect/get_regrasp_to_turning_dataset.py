@@ -30,14 +30,19 @@ delete_imgs()
 
 while True:
     pose_tuples = []
-    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
+    visualize = False
+    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
 
     trials_done = 0
     while trials_done < trials_per_save:
+        print(f"Starting Trial {trials_done+1}")
 
-        # img_save_dir = None
-        img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/imgs/regrasp_trial_{trials_done+1}')
-        pathlib.Path.mkdir(img_save_dir, parents=True, exist_ok=True)  
+        if visualize:
+            img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/imgs/regrasp_trial_{trials_done+1}')
+            pathlib.Path.mkdir(img_save_dir, parents=True, exist_ok=True)  
+        else:
+            img_save_dir = None
+        
         env.frame_fpath = img_save_dir
         env.frame_id = 0
 
@@ -57,7 +62,7 @@ while True:
             del env, sim_env, viewer
             torch.cuda.empty_cache()
             continue
-        # print(f"Allocated memory: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
+        
 
         regrasp_pose, regrasp_traj = regrasp(env, config, chain, state2ee_pos_partial, perception_noise=perception_noise, 
                                 image_path = img_save_dir, initialization = pregrasp_pose, mode='no_vf', iters = regrasp_iters)
@@ -73,6 +78,7 @@ while True:
         pose_tuples.append((pregrasp_pose, regrasp_pose, regrasp_traj, turn_pose, turn_traj))
         trials_done += 1
 
+        # print(f"Allocated memory: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
         # print(torch.cuda.memory_summary(device='cuda', abbreviated=False))
 
     if perception_noise == 0:
