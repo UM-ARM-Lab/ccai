@@ -16,13 +16,13 @@ id_ood_states: False
 project_ood_states: True
 epochs: 10000
 classifier_epochs: 100
-batch_size: 12
+batch_size: 6
 lr: 1.0e-4
 model_type: 'diffusion'
 discriminator_guidance: True
 inverse_dynamics: False
 data_directory: 'allegro_ood_gen'
-device: 'cuda:0'
+device: 'cuda:1'
 test_every: 10001
 save_every: 10
 normalize_data: False
@@ -31,6 +31,7 @@ constrained: False
 guided: False
 timesteps: 256
 hidden_dim: 128
+quantile: .05
 unconditional: True
 sine_cosine: True
 use_class: True

@@ -109,9 +109,11 @@ class GraphSearch(ContactSampler, AStar):
             ])
         elif self.model_orig is not None:
             prior_tensor = torch.tensor([
-                [.25, .25, .25],
-                [.25, .25, .25],
-                [.25, .25, .25],
+                [.25, .25, .25, .25, .25],
+                [.25, .25, .25, .25, .25],
+                [.25, .25, .25, .25, .25],
+                [.25, .25, .25, .25, .25],
+                [.25, .25, .25, .25, .25],
             ])
         self.markov_chain = MarkovChain(
             prior_tensor
@@ -137,6 +139,8 @@ class GraphSearch(ContactSampler, AStar):
                 [-1., -1, -1],
                 [-1, 1, 1],
                 [1, -1, -1],
+                [1, 1, -1],
+                [1, -1, 1]
             ]).to(self.device)
         
         self.num_c_states = self.neighbors_c_states.shape[0]

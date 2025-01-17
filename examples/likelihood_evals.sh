@@ -1,0 +1,2 @@
+python train_allegro_screwdriver.py --config allegro_screwdriver_diffusion_eval_train_likelihood.yaml
+python train_allegro_screwdriver.py --config allegro_screwdriver_diffusion_id_ood_states.yaml

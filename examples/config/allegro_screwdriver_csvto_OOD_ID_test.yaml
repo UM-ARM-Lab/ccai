@@ -34,6 +34,7 @@ sine_cosine: True
 project_state: False
 compute_recovery_trajectory: False
 test_recovery_trajectory: True
+viz_states: False
 diff_init: True
 type: 'diffusion'
 model_dir: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion'

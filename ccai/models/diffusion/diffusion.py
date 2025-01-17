@@ -579,7 +579,7 @@ class GaussianDiffusion(nn.Module):
     def loss(self, x, context, mask=None):
         # print('x shape', x.shape, self.dx, self.xu_dim)
         b = x.shape[0]
-        x = x[:, :, :self.dx]
+        # x = x[:, :, :self.dx]
         x = x.reshape(b, -1, self.xu_dim)
         device = x.device
         t = torch.randint(0, self.num_timesteps, (b,), device=device).long()
@@ -610,7 +610,7 @@ class GaussianDiffusion(nn.Module):
                                   return_all_timesteps=False,
                                   start_timestep=timestep,
                                   trajectory=x_noised)
-    @torch.no_grad()
+
     def approximate_likelihood(self, x, context=None, forward_kl=False):
         B, H, d = x.shape
         device = self.betas.device
@@ -620,6 +620,8 @@ class GaussianDiffusion(nn.Module):
         t = torch.arange(1, self.num_timesteps, device=device).long()
         # t = torch.arange(1, self.num_timesteps, 8, device=device).long()
         # t = torch.arange(5, 30, 2, device=device).long()
+
+        # t = torch.tensor([5, 10, 15], device=device).long()
 
         N = t.shape[0]
         t = t[None, :].repeat(B, 1).reshape(B * N)
@@ -636,6 +638,7 @@ class GaussianDiffusion(nn.Module):
         # Compute our diffusing step from t to t-1
         # p_next_x = self.p_mean_variance(x=x_t, t=t, context=context)
         batch_size = 2048
+        # batch_size = 8
         # batch_size = 1
         all_p_next_x = []
         for i in (range(0, B * N, batch_size)):
@@ -653,7 +656,7 @@ class GaussianDiffusion(nn.Module):
  
     def project(self, N, H=None, condition=None, context=None):
 
-        min_likelihood = -14.2147057056427
+        min_likelihood = self.cutoff
         context = None
 
         x = condition[0][1]
@@ -671,7 +674,7 @@ class GaussianDiffusion(nn.Module):
             samples, likelihoods = self.sample(N, H, condition=condition, context=context, no_grad=False)
             all_samples.append(samples.clone().detach().cpu())
             all_likelihoods.append(likelihoods.clone().detach().cpu())
-            likelihood_reshape = likelihoods.reshape(-1, N).mean(1)
+            likelihood_reshape = likelihoods.reshape(B, -1).mean(1)
             grad_mask[likelihood_reshape >= min_likelihood] = 0.0
 
             if proj_t == 0:
@@ -685,7 +688,7 @@ class GaussianDiffusion(nn.Module):
             all_losses.append(likelihoods_loss.item())
             print(f'Projection step: {proj_t}, Loss: {-likelihoods.mean(0)}')
             likelihoods_loss.backward()
-            x.grad = samples.grad.reshape(B, 8, self.horizon, -1)[:, :, 0, :self.dx].mean(1) * grad_mask
+            x.grad = samples.grad.reshape(B, 16, self.horizon, -1)[:, :, 0, :self.dx].mean(1) * grad_mask
             print(x.grad)
             # x.grad[:, -2:] = 0.0
 

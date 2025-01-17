@@ -238,6 +238,12 @@ class AllegroScrewDriverDataset(Dataset):
                         print('Fail')
                         continue
                     actual_traj = []
+                    # if len(data[t]['starts']) == 0: 
+                    #     print('No starts')
+                    #     continue
+                    if len(data['final_likelihoods']) == 1 and data['final_likelihoods'][0] < -50:
+                        print('No Data')
+                        continue
                     for t in range(max_T, min_t - 1, -1):
                         actual_traj.append(data[t]['starts'][:, :, None, :])
                         traj = data[t]['plans']
@@ -253,8 +259,8 @@ class AllegroScrewDriverDataset(Dataset):
                         if not exec_only:
                             # combine traj and starts
                             if use_actual_traj:
-                                traj = np.concatenate(actual_traj + [traj], axis=2)[..., :1 , :,:]
-                                masks.append(np.ones((traj.shape[0], traj.shape[1], traj.shape[2]))[..., :1, :])
+                                traj = np.concatenate(actual_traj + [traj], axis=2)
+                                masks.append(np.ones((traj.shape[0], traj.shape[1], traj.shape[2])))
                             else:
                                 zeros = [np.zeros_like(actual_traj[0])] * (len(actual_traj) - 1)
                                 traj = np.concatenate([actual_traj[-1]] + [traj] + zeros, axis=2)

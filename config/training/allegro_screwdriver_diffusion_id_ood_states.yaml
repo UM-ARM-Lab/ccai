@@ -1,6 +1,6 @@
 ---
-model_name: 'allegro_variable_traj_start'
-# model_name: 'allegro_high_force_high_eps_pi_6'
+# model_name: 'allegro_variable_traj_start'
+model_name: 'allegro_high_force_high_eps_pi_6'
 T: 13
 dx: 15
 du: 21
@@ -21,7 +21,7 @@ model_type: 'diffusion'
 discriminator_guidance: True
 inverse_dynamics: False
 data_directory: 'allegro_ood_gen'
-device: 'cuda:0'
+device: 'cuda:1'
 test_every: 10001
 save_every: 10
 normalize_data: False

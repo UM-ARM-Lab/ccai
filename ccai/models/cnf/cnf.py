@@ -9,7 +9,7 @@ from torch.func import jacrev, vmap
 from ccai.models.temporal import TemporalUnet, TemporalUnetDynamics, TemporalUnetStateAction, StateActionMLP
 
 from ccai.models.cnf.ffjord.layers import CNF, ODEfunc
-from torchcfm.conditional_flow_matching import SchrodingerBridgeConditionalFlowMatcher, ExactOptimalTransportConditionalFlowMatcher
+# from torchcfm.conditional_flow_matching import SchrodingerBridgeConditionalFlowMatcher, ExactOptimalTransportConditionalFlowMatcher
 from ccai.models.helpers import SinusoidalPosEmb
 # import ot
 import numpy as np

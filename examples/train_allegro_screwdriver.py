@@ -37,7 +37,10 @@ fingers = ['index', 'middle', 'thumb']
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_filter_recovery_trajectories.yaml')
+    # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_eval_train_likelihood.yaml')
+    # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_id_ood_states.yaml')
+    # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_project_ood_states.yaml')
+    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion.yaml')
     return parser.parse_args()
 
 
@@ -142,15 +145,15 @@ def train_model(trajectory_sampler, train_loader, config):
 
         if (epoch + 1) % config['save_every'] == 0:
             if config['use_ema']:
-                torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}_{epoch+1}_{train_loss:.4f}.pt')
+                torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}pt')
             else:
                 torch.save(model.state_dict(),
-                           f'{fpath}/allegro_screwdriver_{config["model_type"]}_{epoch+1}_{train_loss:.4f}.pt')
+                           f'{fpath}/allegro_screwdriver_{config["model_type"]}pt')
     if config['use_ema']:
-        torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}_{epoch+1}_{train_loss:.4f}.pt')
+        torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}pt')
     else:
         torch.save(model.state_dict(),
-                   f'{fpath}/allegro_screwdriver_{config["model_type"]}_{epoch+1}_{train_loss:.4f}.pt')
+                   f'{fpath}/allegro_screwdriver_{config["model_type"]}pt')
 
 def train_model_state_only(trajectory_sampler, train_loader, config):
     fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}'
@@ -242,8 +245,6 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
         torch.save(model.state_dict(),
                    f'{fpath}/allegro_screwdriver_{config["model_type"]}_state_only_{epoch+1}_{train_loss:.4f}.pt')
 
-
-
 def plot_long_horizon(test_model, loader, config, name):
     fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/{name}'
     pathlib.Path.mkdir(pathlib.Path(fpath), parents=True, exist_ok=True)
@@ -283,7 +284,6 @@ def plot_long_horizon(test_model, loader, config, name):
                                                                                 constraints=context.repeat(N, 1, 1))
         print(sampled_contexts)
         visualize_trajectories(sampled_trajectories, config['scene'], plot_fpath, headless=False)
-
 
 def vis_dataset(loader, config, N=100):
     fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/dataset_vis'
@@ -349,7 +349,6 @@ def visualize_trajectory_in_sim(trajectory, env, fpath):
           f"-lavfi paletteuse {output_dir}"
     subprocess.call(cmd, shell=True)
 
-
 def generate_simulated_data(model, loader, config, name=None):
     fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/simulated_dataset'
     pathlib.Path.mkdir(pathlib.Path(fpath), parents=True, exist_ok=True)
@@ -358,13 +357,11 @@ def generate_simulated_data(model, loader, config, name=None):
     loader.dataset.update_masks(p1=1.0, p2=1.0)  # no masking
 
     # generate three subtrajectories
-    num_sub_traj = 3
+    num_sub_traj = 1
 
     ACTION_DICT = {
-        0: torch.tensor([[-1.0, -1.0, -1.0]]),  # pregrasp
-        1: torch.tensor([[1.0, -1.0, -1.0]]),  # regrasp thumb / middle
-        2: torch.tensor([[-1.0, 1.0, 1.0]]),  # regrasp index
-        3: torch.tensor([[1.0, 1.0, 1.0]]),  # turn
+        0: torch.tensor([[1.0, -1.0, -1.0]]),  # regrasp thumb / middle
+        1: torch.tensor([[-1.0, 1.0, 1.0]]),  # regrasp index
     }
     ACTION_TENSOR = torch.cat([ACTION_DICT[i] for i in ACTION_DICT.keys()], dim=0).to(device=config['device'])
 
@@ -383,11 +380,11 @@ def generate_simulated_data(model, loader, config, name=None):
         B = trajectories.shape[0]
         trajectories = trajectories.to(device=config['device'])
         traj_class = traj_class.to(device=config['device'])
-        p = torch.tensor([0.25, 0.25, 0.25, 0.25], device=config['device'])
-        idx = p.multinomial(num_samples=((num_sub_traj - 1) * B), replacement=True)
-        _next_class = ACTION_TENSOR[idx].reshape(B, -1, 3)
+        # p = torch.tensor([0.5, 0.5], device=config['device'])
+        # idx = p.multinomial(num_samples=((num_sub_traj - 1) * B), replacement=True)
+        # _next_class = ACTION_TENSOR[idx].reshape(B, -1, 3)
 
-        traj_class = torch.cat((traj_class.reshape(B, 1, 3), _next_class), dim=1)
+        # traj_class = torch.cat((traj_class.reshape(B, 1, 3), _next_class), dim=1)
         start = (trajectories[:N, 0, :dx] * model.x_std[:dx].to(device=trajectories.device) +
                  model.x_mean[:dx].to(device=trajectories.device))
 
@@ -414,7 +411,6 @@ def generate_simulated_data(model, loader, config, name=None):
     # save the new dataset
 
     np.savez(f'{fpath}/simulated_trajectories_{name}.npz', trajectories=simulated_trajectories, contact=simulated_class)
-
 
 def train_classifier(model, train_loader, config):
     fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}'
@@ -457,7 +453,6 @@ def train_classifier(model, train_loader, config):
 
     torch.save(model.state_dict(),
                f'{fpath}/allegro_screwdriver_{config["model_type"]}_w_classifier.pt')
-
 
 def eval_classifier(model, train_loader, config):
     step = 0
@@ -542,15 +537,15 @@ def eval_train_likelihood(model, train_loader, config):
     model.eval()
     print(f'Evaluating likelhood on training dset (all states) of model {config["model_name"]}_{config["model_type"]}\n')
     train_likelihoods = []
-    for (trajectories) in (tqdm.tqdm(train_loader)):
+    for (trajectories, ind) in (tqdm.tqdm(train_loader)):
         trajectories = trajectories.to(device=config['device'])
+        trajectories = trajectories.flatten(0, 1)
         traj_class = None
         with torch.no_grad():
             # likelihood = model.model.diffusion_model.approximate_likelihood(trajectories, context=traj_class)
             # print(likelihood)
-            start = trajectories.flatten(0, 1)[:, :15]
             # start = trajectories[:, 0, :15]
-            start_sine_cosine = convert_yaw_to_sine_cosine(start)
+            start_sine_cosine = trajectories[:, :16]
             _, _, likelihood = model.sample(N*trajectories.shape[0], H=config['T'], start=start_sine_cosine.repeat_interleave(N, 0))
             likelihood = likelihood.reshape(-1, N).mean(1)
             print(likelihood)
@@ -595,7 +590,7 @@ def eval_train_likelihood(model, train_loader, config):
     #     sys.exit()
 
 def identify_OOD_states(model, train_loader, config):
-    N = 8
+    N = 16
     # alpha = .5491095797801617
     # loc = .5124469995498656
     # beta = 4.292522581313451
@@ -619,8 +614,8 @@ def identify_OOD_states(model, train_loader, config):
         #     traj_class = None
         with torch.no_grad():
             # likelihood = model.model.diffusion_model.approximate_likelihood(trajectories, context=traj_class)
-            start = trajectories[:, :15]
-            start_sine_cosine = convert_yaw_to_sine_cosine(start)
+            start_sine_cosine = trajectories[:, :16]
+            start_yaw = convert_sine_cosine_to_yaw(start_sine_cosine)
             samples, _, likelihood = model.sample(N*trajectories.shape[0], H=config['T'], start=start_sine_cosine.repeat_interleave(N, 0))
             likelihood = likelihood.reshape(-1, N).mean(1)
             samples = samples.cpu().numpy()
@@ -637,7 +632,7 @@ def identify_OOD_states(model, train_loader, config):
             # print(likelihood_mean[idx])
             # torch_idx = torch.tensor(idx).to(device=config['device'])
             # ood_states = trajectories[torch_idx]
-            all_states.append(start.cpu().numpy())
+            all_states.append(start_yaw.cpu().numpy())
 
         if i % 25 == 0:
             all_trajectories_save = np.concatenate(all_trajectories, axis=0)
@@ -666,7 +661,7 @@ def identify_OOD_states(model, train_loader, config):
 
 def project_OOD_states(model, config):
     # ood_states = np.load(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/ood_states.npy')
-    N = 8
+    N = 16
     print(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/gen_train_likelihoods_all_states.pkl')
     train_likelihoods = np.load(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/gen_train_likelihoods_all_states.pkl', allow_pickle=True)
     
@@ -680,21 +675,23 @@ def project_OOD_states(model, config):
     ood_likelihoods = np.load(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/candidate_ood_likelihoods.npy')
     ood_states = np.load(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/ood_states.npy')
 
-    quantile = np.quantile(train_likelihoods, .75)
+    quantile = np.quantile(train_likelihoods, config['quantile'])
     print(quantile)
-    ood_states = ood_states[(ood_likelihoods < quantile) & (ood_likelihoods > -500)]
+
+    model.model.diffusion_model.cutoff = quantile
+    ood_states = ood_states[(ood_likelihoods < quantile) & (ood_likelihoods > -50)]
     # ood_states = ood_states[(ood_likelihoods < quantile) & (ood_likelihoods > -75) & (ood_likelihoods < -50)]
-    ood_states = ood_states[:, :16]
-    
+
     # project the ood states to the manifold
     model.model.diffusion_model.classifier = None
     model.eval()
-    print(f'Projecting OOD states of model {config["model_name"]}_{config["model_type"]}\n')
+    print(f'Projecting {ood_states.shape[0]} OOD states of model {config["model_name"]}_{config["model_type"]}\n')
     all_projected_samples = []
     all_all_losses = []
     all_all_samples = []
     all_all_likelihoods = []
     bs = config['batch_size']
+
     for i in tqdm.tqdm(range(0, len(ood_states), bs)):
 
         ood_states_batch = torch.tensor(ood_states[i:i+bs]).to(device=config['device'])
@@ -723,7 +720,7 @@ def project_OOD_states(model, config):
             pickle.dump(all_all_likelihoods, open(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/all_likelihoods.pkl', 'wb'))
 
 def visualize_ood_projection(model, config):
-    N = 8
+    N = 16
     fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/ood_projection'
     projected_samples = np.load(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/projected_samples.npy')
     all_losses = pickle.load(open(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/all_losses.pkl', 'rb'))
@@ -762,18 +759,22 @@ def visualize_ood_projection(model, config):
     # for i in range(10):
     #     visualize_trajectories(projected_samples[i], config['scene'], f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/ood_projected_samples_{i}', headless=False)
     if config['model_name'] == 'allegro_high_force_high_eps_pi_6':
-        # min_likelihood = -14.2147057056427
-        min_likelihood = -30
+        min_likelihood = -24.739238929748534
+        # min_likelihood = -30
     else:
-        min_likelihood = -10.685428142547607
+        raise ValueError('Model name not recognized')
 
     print(min_likelihood)
     bs = config['batch_size']
 
     proj_data = []
+    proj_data_succ = []
+    proj_data_fail = []
     all_states = 0
     all_ood = 0
     all_succ_proj = 0
+    all_fail_proj = 0
+
     for idx, (sample_list, likelihood_list) in (enumerate(zip(all_samples, all_likelihoods))):
         # if likelihood_list[-1]
         initial_likelihoods = likelihood_list[0].reshape(-1, N).mean(1)
@@ -785,22 +786,16 @@ def visualize_ood_projection(model, config):
         # idx is intersection of both
         idx_full = np.intersect1d(idx_0, idx_final)
         all_succ_proj += len(idx_full)
-
+        all_fail_proj += len(idx_0) - len(idx_full)
         
-        for i in idx_full:
-            # if bs*idx + i != 1776:
-            #     continue
-            # for i in range(initial_state_traj.shape[0]):
-                # initial_likelihood = initial_likelihoods[i]
-                # if initial_likelihood > -40 and initial_likelihood < -30 and (bs*idx+1) > 347:
-                #     print('State', bs*idx + i)
-                # else:
-                #     continue
+        for i in range(initial_likelihoods.shape[0]):
             this_idx_data = {
                 'initial_likelihood': initial_likelihoods[i],
                 'final_likelihood': final_likelihoods[i],
             }
             proj_path = []
+
+            succ_str = 'Success' if i in idx_full else 'Fail'
             for proj_ind in range(len(sample_list)):
 
                 initial_traj = sample_list[proj_ind]
@@ -808,12 +803,6 @@ def visualize_ood_projection(model, config):
                 initial_traj = initial_traj.reshape(-1, N, 13, 36)[:, 0]
                 initial_state_traj = initial_traj[..., :15]
 
-                # if bs*idx + i == 1776:
-                #     print(proj_ind)
-                #     traj_for_viz = torch.from_numpy(initial_state_traj[i])
-                #     traj_for_viz[:, :14] = traj_for_viz[:, :14] * model.x_std[:14].to(traj_for_viz.device) + model.x_mean[:14].to(traj_for_viz.device)
-                #     print(traj_for_viz[0])
-                #     print()
                 traj_for_viz = torch.from_numpy(initial_state_traj[i])
                 traj_for_viz[:, :14] = traj_for_viz[:, :14] * model.x_std[:14].to(traj_for_viz.device) + model.x_mean[:14].to(traj_for_viz.device)
                 
@@ -826,24 +815,35 @@ def visualize_ood_projection(model, config):
                     traj_for_viz,
                     torch.zeros((traj_for_viz.shape[0], 1)).to(traj_for_viz.device),
                 ), dim=1)
-                # vid_path = f'{fpath}/state_{bs*idx + i}/proj_step_{proj_ind}'
-                # # Pathlib with vid_path
-                # pathlib.Path.mkdir(pathlib.Path(vid_path + '/img'), parents=True, exist_ok=True)
-                # pathlib.Path.mkdir(pathlib.Path(vid_path + '/gif'), parents=True, exist_ok=True)
-                # visualize_trajectory(traj_for_viz, config["scene"], vid_path, headless=False,
-                #                         fingers=fingers, obj_dof=4)
+                if config['vis_dataset']:
+                    vid_path = f'{fpath}/{succ_str}/state_{bs*idx + i}_{initial_likelihoods[i]:.1f}_{final_likelihoods[i]:.1f}/proj_step_{proj_ind}'
+                    # Pathlib with vid_path
+                    pathlib.Path.mkdir(pathlib.Path(vid_path + '/img'), parents=True, exist_ok=True)
+                    pathlib.Path.mkdir(pathlib.Path(vid_path + '/gif'), parents=True, exist_ok=True)
+                    visualize_trajectory(traj_for_viz, config["scene"], vid_path, headless=False,
+                                            fingers=fingers, obj_dof=4)
                 
                 proj_path.append(traj_for_viz[0])
 
             proj_path = torch.stack(proj_path, dim=0)
-            # vid_path = f'{fpath}/state_{bs*idx + i}/proj_path'
-            # pathlib.Path.mkdir(pathlib.Path(vid_path + '/img'), parents=True, exist_ok=True)
-            # pathlib.Path.mkdir(pathlib.Path(vid_path + '/gif'), parents=True, exist_ok=True)
-            # visualize_trajectory(proj_path, config["scene"], vid_path, headless=False,
-            #                         fingers=fingers, obj_dof=4)
+            if config['vis_dataset']:
+                vid_path = f'{fpath}/{succ_str}/state_{bs*idx + i}_{initial_likelihoods[i]:.1f}_{final_likelihoods[i]:.1f}/proj_path'
+                pathlib.Path.mkdir(pathlib.Path(vid_path + '/img'), parents=True, exist_ok=True)
+                pathlib.Path.mkdir(pathlib.Path(vid_path + '/gif'), parents=True, exist_ok=True)
+                visualize_trajectory(proj_path, config["scene"], vid_path, headless=False,
+                                        fingers=fingers, obj_dof=4)
             this_idx_data['proj_path'] = proj_path
+            if i in idx_full:
+                proj_data_succ.append(this_idx_data)
+            else:
+                proj_data_fail.append(this_idx_data)
             proj_data.append(this_idx_data)
-    print(f'All states: {all_states}, All OOD: {all_ood}, All Successful Projection: {all_succ_proj}')
+    print(f'All states: {all_states}, All OOD: {all_ood}, All Successful Projection: {all_succ_proj}, All Failed Projection: {all_fail_proj}')
+    pathlib.Path.mkdir(pathlib.Path(fpath), parents=True, exist_ok=True)
+    with open(f'{fpath}/proj_data_succ.pkl', 'wb') as f:
+        pickle.dump(proj_data_succ, f)
+    with open(f'{fpath}/proj_data_fail.pkl', 'wb') as f:
+        pickle.dump(proj_data_fail, f)
     with open(f'{fpath}/proj_data.pkl', 'wb') as f:
         pickle.dump(proj_data, f)
 
@@ -885,7 +885,6 @@ def filter_bad_traj(model, train_loader, config):
     import sys
     sys.exit()
 
-
 if __name__ == "__main__":
     CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
     print(CCAI_PATH)
@@ -926,6 +925,10 @@ if __name__ == "__main__":
     #         time.sleep(0.1)
     # except KeyboardInterrupt:
     #     pass
+    if 'state_only' not in config:
+        config['state_only'] = False
+    if 'state_control_only' not in config:
+        config['state_control_only'] = False
     if config['train_diffusion'] and config['state_control_only']:
         # set up pytorch volumetric for rendering
         asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
@@ -1063,7 +1066,7 @@ if __name__ == "__main__":
                                                 states_only=config['du'] == 0,
                                                 skip_pregrasp=config['skip_pregrasp'],
                                                 type=config['model_type'],)
-    else:
+    elif not config.get('project_ood_states', False):
         train_dataset = AllegroScrewDriverDataset([p for p in data_path.glob('*train_data*')],
                                                 config['T']-1,
                                                 cosine_sine=config['sine_cosine'],
@@ -1071,20 +1074,20 @@ if __name__ == "__main__":
                                                 skip_pregrasp=config['skip_pregrasp'],
                                                 type=config['model_type'],
                                                 exec_only=config.get('filter_recovery_trajectories', False),)
-    train_dataset.update_masks(p1=1, p2=1)
-    if config['normalize_data']:
-        # normalize data
-        train_dataset.compute_norm_constants()
-        model.set_norm_constants(*train_dataset.get_norm_constants())
+    if not config.get('project_ood_states', False):
+        if config['normalize_data']:
+            # normalize data
+            train_dataset.compute_norm_constants()
+            model.set_norm_constants(*train_dataset.get_norm_constants())
 
-    print('Dset size', len(train_dataset))
-    
-    print(train_dataset.mean)
-    # train_sampler = RandomSampler(train_dataset)
-    train_sampler = None
-    train_loader = DataLoader(train_dataset, batch_size=config['batch_size'],
-                              sampler=train_sampler, num_workers=4, pin_memory=True, drop_last=True,
-                              shuffle=False)
+        print('Dset size', len(train_dataset))
+        
+        print(train_dataset.mean)
+        # train_sampler = RandomSampler(train_dataset)
+        train_sampler = None
+        train_loader = DataLoader(train_dataset, batch_size=config['batch_size'],
+                                sampler=train_sampler, num_workers=4, pin_memory=True, drop_last=True,
+                                shuffle=False)
 
     model = model.to(device=config['device'])
 
@@ -1145,7 +1148,7 @@ if __name__ == "__main__":
 
         model.load_state_dict(torch.load(
             f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/{model_name}'
-        ))
+        , map_location=config['device']))
         model.send_norm_constants_to_submodels()
 
 
@@ -1159,8 +1162,8 @@ if __name__ == "__main__":
         # project_OOD_states(model, config)
         visualize_ood_projection(model, config)
 
-    if config['filter_recovery_trajectories']:
-        filter_bad_traj(model, train_loader, config)
+    # if config['filter_recovery_trajectories']:
+    #     filter_bad_traj(model, train_loader, config)
 
     if config['plot']:
         if config['load_model'] and config['discriminator_guidance']:

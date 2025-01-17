@@ -1136,13 +1136,13 @@ class AllegroContactProblem(AllegroObjectProblem):
         # u[:, :, :self.num_fingers * 4] = u_from_proj_path[:, :, :self.num_fingers * 4]
 
         u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
-        if self.optimize_force and self.turn:
+        if self.optimize_force:
             for i, finger in enumerate(self.contact_fingers):
                 idx = self.contact_force_indices_dict[finger]
-                if finger != 'index':
+                if finger != 'index' and self.turn:
                     u[..., idx] = 1.5 * torch.randn(N, self.T, 3, device=self.device)
                 else:
-                    u[..., idx] = 1.5 *.01 * torch.randn(N, self.T, 3, device=self.device)
+                    u[..., idx] = .05 * torch.randn(N, self.T, 3, device=self.device)
 
         x = [self.start.reshape(1, self.dx).repeat(N, 1)]
         for t in range(self.T):

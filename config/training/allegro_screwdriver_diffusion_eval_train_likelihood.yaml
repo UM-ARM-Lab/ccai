@@ -1,5 +1,6 @@
 ---
-model_name: 'allegro_variable_traj_start'
+# model_name: 'allegro_variable_traj_start'
+model_name: 'allegro_high_force_high_eps_pi_6'
 T: 13
 dx: 15
 du: 21

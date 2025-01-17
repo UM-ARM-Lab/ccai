@@ -6,7 +6,7 @@ num_turns: 1
 max_recovery_stages: 4
 num_trials: 10
 visualize: True
-experiment_name: 'allegro_screwdriver_csvto_OOD_ID_full_multi_depth_plan_fixed_likelihood_stochastic_likelihood_adj'
+experiment_name: 'allegro_screwdriver_recovery_data'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -20,7 +20,8 @@ goal: -1.5
 prior: 1
 multi_particle_search: True
 replan: False
-visualize_plan: True
+visualize_plan: False
+visualize_contact_plan: False
 optimize_force: True
 exclude_index: False
 projected: False
@@ -32,21 +33,25 @@ use_partial_constraint: True
 sine_cosine: True
 project_state: False
 compute_recovery_trajectory: True
+test_recovery_trajectory: False
+viz_states: False
 diff_init: False
 type: 'diffusion'
 model_dir: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion'
 model_path: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
+likelihood_threshold: -24.739238929748534
+parity: 0
 controllers:
   csvgd:
     # N: 16
     N: 16
-    alpha_J: 1.0e-2
+    alpha_J: 5.0e-3
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
     device: 'cuda:0'
     online_iters: 25
-    warmup_iters: 100
+    warmup_iters: 75
     resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1

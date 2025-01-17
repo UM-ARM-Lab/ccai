@@ -1,0 +1,2 @@
+python allegro_screwdriver.py allegro_screwdriver_csvto_viz_states
+python allegro_screwdriver.py allegro_screwdriver_csvto_viz_states_all_likelihood_steps
