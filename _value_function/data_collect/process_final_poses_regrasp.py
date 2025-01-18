@@ -55,6 +55,16 @@ def calculate_turn_cost(initial_pose, final_pose):
 
     return total_cost, succ
 
+def calculate_regrasp_cost(q):
+    delta_q = q[1:] - q[:-1]
+    smoothness_cost = np.sum((q[1:] - q[-1]) ** 2)
+    action_cost = np.sum(delta_q ** 2)
+
+    total_cost = np.minimum(smoothness_cost + action_cost, 5.0)
+
+    return total_cost
+
+
 if __name__ == "__main__":
 
     combined_regrasp_poses = np.empty((0, 20))
@@ -63,6 +73,7 @@ if __name__ == "__main__":
     combined_turn_trajs = np.empty((0, 13, 20))
     combined_succ_regrasp_tuples = []
     combined_turn_costs = []
+    combined_regrasp_costs = []
 
     for filename in filenames:
         with open(filename, 'rb') as file:
@@ -105,17 +116,23 @@ if __name__ == "__main__":
             combined_regrasp_trajs = np.concatenate((combined_regrasp_trajs, regrasp_trajs), axis=0)
             
             turn_costs = []
+            regrasp_costs = []
             for i in range(len(regrasp_poses)):
                 cost, succ = calculate_turn_cost(regrasp_poses[i], turn_poses[i])
+                regrasp_cost = calculate_regrasp_cost(regrasp_trajs[i])
                 turn_costs.append(cost)
+                regrasp_costs.append(regrasp_cost)
                 if succ:
+                    # double check this
                     combined_succ_regrasp_tuples.append((regrasp_trajs[i].reshape(13, 20), turn_poses[i].reshape(1, 20)))
             
             combined_turn_costs.extend(turn_costs)
+            combined_regrasp_costs.extend(regrasp_costs)
 
     combined_turn_costs = np.array(combined_turn_costs)
+    combined_regrasp_costs = np.array(combined_regrasp_costs)
 
-    regrasp_cost_dataset = zip(combined_regrasp_trajs, combined_turn_costs, combined_turn_trajs)
+    regrasp_cost_dataset = zip(combined_regrasp_trajs, combined_regrasp_costs, combined_turn_trajs, combined_turn_costs)
     
     if noisy:
         regrasp_cost_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_combined_regrasp_to_turn_dataset.pkl'

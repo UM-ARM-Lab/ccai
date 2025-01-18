@@ -17,7 +17,7 @@ visualize_plan: False
 optimize_force: True
 force_balance: False  # in addition to the torque balance, do we also need force balance, just for the screwdriver turning experiment w\o slot. 
 arm_type: 'robot' # choose between 'None', 'robot', 'floating_3d'
-gravity: False  # whether to use gravity in the simulation NOTE: this is set to be False for debugging
+gravity: True  # whether to use gravity in the simulation NOTE: this is set to be False for debugging
 
 device: 'cuda:3'
 

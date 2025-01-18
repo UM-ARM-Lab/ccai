@@ -23,31 +23,49 @@ def load_data(batch_size = 64, noisy = False):
     
     with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
         pose_cost_tuples  = pkl.load(file)
-        full_trajs, costs = zip(*[(t[0], t[1]) for t in pose_cost_tuples])
+        regrasp_trajs, regrasp_costs, turn_trajs, turn_costs = zip(*pose_cost_tuples)
     
-    n_trajs = len(full_trajs)
+    T_rg = regrasp_trajs[0].shape[0]
+    T_t = turn_trajs[0].shape[0]
+    T = T_rg + T_t
+    n_trajs = len(regrasp_trajs)
     print(f'Loaded {n_trajs} samples')
 
-    stacked = np.stack(full_trajs, axis=0)
-    full_poses = stacked.reshape(-1, 20)
+    regrasp_stacked = np.stack(regrasp_trajs, axis=0)
+    regrasp_poses = regrasp_stacked.reshape(-1, 20)
+    regrasp_poses = convert_full_to_partial_config(regrasp_poses)
 
-    poses = convert_full_to_partial_config(full_poses)
+    turn_stacked = np.stack(turn_trajs, axis=0)
+    turn_poses = turn_stacked.reshape(-1, 20)
+    turn_poses = convert_full_to_partial_config(turn_poses)
 
-    num_samples = len(poses)
+    num_samples = len(regrasp_poses)*2
+    poses = np.empty((regrasp_poses.shape[0] + turn_poses.shape[0], regrasp_poses.shape[1]), dtype=regrasp_poses.dtype)
+    assert(regrasp_poses.shape == turn_poses.shape)
+    poses[0::2] = regrasp_poses  # Fill even indices with elements from array1
+    poses[1::2] = turn_poses  # Fill odd indices with elements from array2
+    
     split_idx = int(num_samples * (1 - validation_proportion))
 
     # normalize
     poses_mean, poses_std = np.mean(poses[:split_idx], axis=0), np.std(poses[:split_idx], axis=0)
     poses_norm = (poses - poses_mean) / poses_std
 
-    costs = np.array(costs).flatten()
+    cost_weight = 1.0
+    discount_factor = 0.99
+    turn_costs = np.array(turn_costs).flatten()
+    regrasp_costs = np.array(regrasp_costs).flatten()
+    costs = regrasp_costs + turn_costs * cost_weight
+    costs = np.repeat(costs, T)
+    powers = np.arange(T-1, -1, -1)
+    discounts = np.repeat(np.power(discount_factor, powers), n_trajs)
+    costs = costs * discounts
+    
     cost_mean, cost_std = np.mean(costs[:split_idx]), np.std(costs[:split_idx])
     costs_norm = (costs - cost_mean) / cost_std
-    costs_norm = np.repeat(costs_norm, 13)
-
 
     # add indices
-    indices = np.tile(np.arange(13), n_trajs).reshape(-1, 1)
+    indices = np.tile(np.arange(T), n_trajs).reshape(-1, 1)
     poses_norm = np.hstack([poses_norm, indices])
 
     # Convert to tensorss
@@ -58,6 +76,7 @@ def load_data(batch_size = 64, noisy = False):
     dataset = torch.utils.data.TensorDataset(poses_tensor, costs_tensor)
     train_size = int((1-validation_proportion) * len(dataset))
     test_size = len(dataset) - train_size
+    print(f'Train size: {train_size}, Test size: {test_size}')
     train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 
     # Create data loaders
@@ -255,7 +274,7 @@ def eval(model_name, ensemble=False):
             fs = 20
             plt.xlabel('Sample Index', fontsize=fs)
             plt.ylabel('Cost Value', fontsize=fs)
-            plt.title('Actual vs Predicted Costs', fontsize=fs)
+            plt.title(f'Actual vs Predicted Costs, {title}', fontsize=fs)
             plt.legend(loc='upper right', fontsize=fs)
             plt.tight_layout()
             plt.show()
