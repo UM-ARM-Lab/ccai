@@ -458,7 +458,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
             smoothness_cost = torch.sum((q[1:] - q[-1]) ** 2)
             action_cost = torch.sum(delta_q ** 2)
-            print(f'vf_cost: {vf_cost.reshape(1)}')
+            # print(f'vf_cost: {vf_cost.reshape(1)}')
             return self.vf_weight*vf_cost + self.other_weight * smoothness_cost + self.other_weight * action_cost
         
         else:

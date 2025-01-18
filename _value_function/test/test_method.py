@@ -43,19 +43,21 @@ def get_initialization(sim_device, env, max_screwdriver_tilt, screwdriver_noise_
                 return solved_initialization
         
 
-def get_initializations(sim_device, env, n_samples, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag):
+def get_initializations(sim_device, env, n_samples, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save = False):
     
     initializations = []
     for _ in range(n_samples):
         initialization = get_initialization(sim_device, env, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag)
         initializations.append(initialization)
+
+    pkl.dump(initializations, open(f'{fpath}/vf_weight_sweep/initializations.pkl', 'wb'))
     return initializations
 
 
 if __name__ == '__main__':
 
     test_name = 'multi_step'
-    n_trials = 4
+    n_trials = 5
     n_repeat = 1
     perception_noise = 0.0
     calc_novf = True
