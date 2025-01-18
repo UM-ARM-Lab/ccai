@@ -25,9 +25,9 @@ def test(prediction_only=False):
     # Starting values
     lowest_total_cost = float('inf') 
     results = []
-    pregrasp_iters = 1#80
-    regrasp_iters = 1#100
-    turn_iters= 1#100
+    pregrasp_iters = 80
+    regrasp_iters = 100
+    turn_iters= 100
 
 
     # Define grid bounds
@@ -91,7 +91,7 @@ def test(prediction_only=False):
                         mode='vf', vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio)
                 
 
-                turn_cost, _ = calculate_turn_cost(regrasp_pose, turn_pose)
+                turn_cost, _ = calculate_turn_cost(regrasp_pose.numpy(), turn_pose)
                 total_cost += turn_cost
                 print("turn cost: ", turn_cost)
 
