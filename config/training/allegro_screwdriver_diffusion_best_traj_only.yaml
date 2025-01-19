@@ -1,5 +1,5 @@
 ---
-model_name: 'allegro_screwdriver_recovery_new_2'
+model_name: 'allegro_screwdriver_recovery_new_best_traj_only'
 T: 13
 dx: 15
 du: 21
@@ -18,7 +18,7 @@ model_type: 'diffusion'
 discriminator_guidance: True
 inverse_dynamics: False
 data_directory: 'allegro_screwdriver_recovery_data'
-device: 'cuda:0'
+device: 'cuda:1'
 test_every: 10001
 save_every: 10
 normalize_data: True
@@ -31,6 +31,7 @@ unconditional: True
 sine_cosine: True
 use_class: True
 diffuse_class: False
+# filter_recovery_trajectories: True
 # Only applies to using EMA for training
 use_ema: True
 ema_decay: 0.995

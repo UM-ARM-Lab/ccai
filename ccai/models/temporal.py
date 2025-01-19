@@ -901,7 +901,7 @@ class UnetClassifier(nn.Module):
             transition_dim,
             cond_dim,
             dim=32,
-            dim_mults=(1, 2, 4),
+            dim_mults=(1, 2),
             attention=False,
     ):
         super().__init__()

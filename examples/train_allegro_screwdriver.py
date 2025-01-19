@@ -5,6 +5,7 @@ import yaml
 import copy
 import tqdm
 import torch
+from torch.utils.data import Subset
 import pathlib
 import numpy as np
 import argparse
@@ -40,7 +41,7 @@ def get_args():
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_eval_train_likelihood.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_id_ood_states.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_project_ood_states.yaml')
-    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion.yaml')
+    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_recovery_best_traj_only_gen_sim_data.yaml')
     return parser.parse_args()
 
 
@@ -145,15 +146,15 @@ def train_model(trajectory_sampler, train_loader, config):
 
         if (epoch + 1) % config['save_every'] == 0:
             if config['use_ema']:
-                torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}pt')
+                torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
             else:
                 torch.save(model.state_dict(),
                            f'{fpath}/allegro_screwdriver_{config["model_type"]}pt')
     if config['use_ema']:
-        torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}pt')
+        torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
     else:
         torch.save(model.state_dict(),
-                   f'{fpath}/allegro_screwdriver_{config["model_type"]}pt')
+                   f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
 
 def train_model_state_only(trajectory_sampler, train_loader, config):
     fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}'
@@ -352,6 +353,11 @@ def visualize_trajectory_in_sim(trajectory, env, fpath):
 def generate_simulated_data(model, loader, config, name=None):
     fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/simulated_dataset'
     pathlib.Path.mkdir(pathlib.Path(fpath), parents=True, exist_ok=True)
+
+    # Check if simulated_trajectories_{name}.npz already exists. If it does, return
+    if name is not None:
+        if pathlib.Path(f'{fpath}/simulated_trajectories_{name}.npz').exists():
+            return
     # assume we want a dataset size as large as the original dataset
     N = len(loader.dataset)
     loader.dataset.update_masks(p1=1.0, p2=1.0)  # no masking
@@ -369,7 +375,7 @@ def generate_simulated_data(model, loader, config, name=None):
     simulated_class = []
     dataset_size = 0
 
-    for trajectories, traj_class, _ in train_loader:
+    for trajectories, traj_class, _ in tqdm.tqdm(train_loader):
 
         if train_loader.dataset.cosine_sine:
             dx = 16
@@ -388,18 +394,16 @@ def generate_simulated_data(model, loader, config, name=None):
         start = (trajectories[:N, 0, :dx] * model.x_std[:dx].to(device=trajectories.device) +
                  model.x_mean[:dx].to(device=trajectories.device))
 
-        new_traj, _, _ = model.sample(N=B, H=num_sub_traj * 16, start=start, constraints=traj_class)
+        new_traj, _, _ = model.sample(N=B, H=num_sub_traj * config['T'], start=start, constraints=traj_class, skip_likelihood=True)
+
+        if config['sine_cosine']:
+            new_traj = convert_sine_cosine_to_yaw(new_traj)
 
         # visualize_trajectories(new_traj, config['scene'], fpath, headless=False)
 
-        for i in range(num_sub_traj):
-            if i == 0:
-                idx = 0
-            else:
-                idx = i * 16 - 1
 
-            simulated_trajectories.append(new_traj[:, idx:idx + 16].detach().cpu())
-            simulated_class.append(traj_class[:, i].detach().cpu())
+        simulated_trajectories.append(new_traj.detach().cpu())
+        simulated_class.append(traj_class.detach().cpu())
 
         dataset_size += B * num_sub_traj
         if dataset_size >= N:
@@ -412,7 +416,7 @@ def generate_simulated_data(model, loader, config, name=None):
 
     np.savez(f'{fpath}/simulated_trajectories_{name}.npz', trajectories=simulated_trajectories, contact=simulated_class)
 
-def train_classifier(model, train_loader, config):
+def train_classifier(model, train_loader, val_loader, config):
     fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}'
     pathlib.Path.mkdir(pathlib.Path(fpath), parents=True, exist_ok=True)
 
@@ -426,6 +430,7 @@ def train_classifier(model, train_loader, config):
     pbar = tqdm.tqdm(range(epochs))
     for epoch in pbar:
         train_loss = 0.0
+        train_accuracy = 0.0
         model.train()
         for real_traj, real_class, real_masks, fake_traj, fake_class, fake_masks in train_loader:
             B1, B2 = real_traj.shape[0], fake_traj.shape[0]
@@ -442,11 +447,33 @@ def train_classifier(model, train_loader, config):
             optimizer.step()
             optimizer.zero_grad()
             train_loss += loss.item()
+            train_accuracy += acc.item()
 
         train_loss /= len(train_loader)
+        train_accuracy /= len(train_loader)
+
         pbar.set_description(
             f'Train loss {train_loss:.3f}')
 
+        # Validation
+        val_accuracy = 0.0
+        val_loss = 0.0  
+        model.eval()
+        for real_traj, real_class, real_masks, fake_traj, fake_class, fake_masks in val_loader:
+            B1, B2 = real_traj.shape[0], fake_traj.shape[0]
+            trajectories = torch.cat((real_traj, fake_traj), dim=0).to(device=config['device'])
+            context = torch.cat((real_class, fake_class), dim=0).to(device=config['device'])
+            masks = torch.cat((real_masks, fake_masks), dim=0).to(device=config['device'])
+            labels = torch.cat((torch.ones(B1, 1), torch.zeros(B2, 1)), dim=0).to(device=config['device'])
+
+            loss, accuracy = model.classifier_loss(trajectories, mask=masks, label=labels, context=context)
+            val_accuracy += accuracy.item()
+            val_loss += loss.item()
+
+        val_accuracy /= len(val_loader)
+        val_loss /= len(val_loader)
+
+        print(f'Epoch {epoch + 1} Train loss: {train_loss:.3f} Train accuracy: {train_accuracy:.3f} Val loss: {val_loss:.3f} Val accuracy: {val_accuracy:.3f}')
         if (epoch + 1) % config['save_every'] == 0:
             torch.save(model.state_dict(),
                        f'{fpath}/allegro_screwdriver_{config["model_type"]}_w_classifier.pt')
@@ -929,6 +956,10 @@ if __name__ == "__main__":
         config['state_only'] = False
     if 'state_control_only' not in config:
         config['state_control_only'] = False
+
+    for key in ['eval_train_likelihood', 'id_ood_states']:
+        if key not in config:
+            config[key] = False
     if config['train_diffusion'] and config['state_control_only']:
         # set up pytorch volumetric for rendering
         asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
@@ -1090,7 +1121,7 @@ if __name__ == "__main__":
                                 shuffle=False)
 
     model = model.to(device=config['device'])
-
+    # model.model.diffusion_model.add_classifier(dim_mults=(1,2,4))
     # i = np.random.randint(low=0, high=len(train_dataset))
     # visualize_trajectory(train_dataset[i] * train_dataset.std + train_dataset.mean,
     #                     scene, scene_fpath=f'{CCAI_PATH}/examples', headless=False)
@@ -1184,16 +1215,34 @@ if __name__ == "__main__":
         fake_dataset.set_norm_constants(train_dataset.mean, train_dataset.std)
         train_loader = DataLoader(fake_dataset, batch_size=config['batch_size'])
 
-        classifier_dataset = RealAndFakeDataset(train_dataset, fake_dataset)
-        classifier_sampler = RandomSampler(classifier_dataset)
+        length = min(len(train_dataset), len(fake_dataset))
+        # Split train, val
+        train_size = int(0.8 * length)
+        val_size = length - train_size
+
+        inds = torch.randperm(length)
+        train_inds = inds[:train_size]
+        val_inds = inds[train_size:]
+
+        train_real_dataset = Subset(train_dataset, train_inds)
+        val_real_dataset = Subset(train_dataset, val_inds)
+
+        train_fake_dataset = Subset(fake_dataset, train_inds)
+        val_fake_dataset = Subset(fake_dataset, val_inds)
+
+        train_classifier_dataset = RealAndFakeDataset(train_real_dataset, train_fake_dataset)
+        train_classifier_sampler = RandomSampler(train_real_dataset)
+
+        val_classifier_dataset = RealAndFakeDataset(val_real_dataset, val_fake_dataset)
+
         # train_sampler = None
-        classifier_loader = DataLoader(classifier_dataset, batch_size=config['batch_size'],
-                                   sampler=classifier_sampler, num_workers=4, pin_memory=True, drop_last=True)
+        train_classifier_loader = DataLoader(train_classifier_dataset, batch_size=config['batch_size'],
+                                   sampler=train_classifier_sampler, num_workers=4, pin_memory=True, drop_last=True)
 
-
-        train_classifier(model, classifier_loader, config)
+        val_classifier_loader = DataLoader(val_classifier_dataset, batch_size=config['batch_size'],
+                                   shuffle=False, num_workers=4, pin_memory=True, drop_last=True)
+        train_classifier(model, train_classifier_loader, val_classifier_loader, config)
         # eval trained classifier on training data
-        eval_classifier(model, classifier_loader, config)
 
     if config['eval_classifier']:
         # generate new test set with classifier guidance and evaluate on that - ideally classifier performance gets worse!

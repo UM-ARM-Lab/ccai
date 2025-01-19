@@ -209,9 +209,10 @@ class GaussianDiffusion(nn.Module):
 
         self.classifier_guidance = torch.vmap(torch.func.jacrev(self._classifier_guidance, argnums=1))
 
-    def add_classifier(self):
+    def add_classifier(self, dim_mults=(1,2)):
         #self.classifier = BinaryClassifier()
-        self.classifier = UnetClassifier(self.horizon, self.xu_dim, cond_dim=self.context_dim, dim=self.hidden_dim)
+        self.classifier = UnetClassifier(self.horizon, self.xu_dim, cond_dim=self.context_dim, dim=self.hidden_dim,
+                                         dim_mults=dim_mults)
 
     def predict_start_from_noise(self, x_t, t, noise):
         return (
@@ -461,7 +462,7 @@ class GaussianDiffusion(nn.Module):
         ret = img if not return_all_timesteps else torch.stack(imgs, dim=1)
         return ret
 
-    def sample(self, N, H=None, condition=None, context=None, return_all_timesteps=False, no_grad=True):
+    def sample(self, N, H=None, condition=None, context=None, return_all_timesteps=False, no_grad=True, skip_likelihood=False):
         B = 1
         if H is None:
             H = self.horizon
@@ -506,18 +507,19 @@ class GaussianDiffusion(nn.Module):
 
         sample = sample_fn((B * N, H, self.xu_dim), condition=condition, context=context,
                          return_all_timesteps=return_all_timesteps)
-
-        if self.classifier is not None:
-            likelihood = self.classifier(
-                torch.zeros(B * N, device=sample.device),
-                sample.reshape(-1, self.horizon, self.xu_dim),
-                context=context.reshape(-1, self.context_dim) if context is not None else None
-            )
-        else:
-            # return sample, None
-            if not no_grad:
-                sample.requires_grad = True
-            likelihood = self.approximate_likelihood(sample.reshape(-1, self.horizon, self.xu_dim), context=context.reshape(-1, self.context_dim) if context is not None else None)
+        likelihood = None
+        if not skip_likelihood:
+            if self.classifier is not None:
+                likelihood = self.classifier(
+                    torch.zeros(B * N, device=sample.device),
+                    sample.reshape(-1, self.horizon, self.xu_dim),
+                    context=context.reshape(-1, self.context_dim) if context is not None else None
+                )
+            else:
+                # return sample, None
+                if not no_grad:
+                    sample.requires_grad = True
+                likelihood = self.approximate_likelihood(sample.reshape(-1, self.horizon, self.xu_dim), context=context.reshape(-1, self.context_dim) if context is not None else None)
 
         return sample, likelihood
 

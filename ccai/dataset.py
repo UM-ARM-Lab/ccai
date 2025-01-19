@@ -259,7 +259,7 @@ class AllegroScrewDriverDataset(Dataset):
                         if not exec_only:
                             # combine traj and starts
                             if use_actual_traj:
-                                traj = np.concatenate(actual_traj + [traj], axis=2)
+                                traj = np.concatenate(actual_traj + [traj], axis=2)[..., :1 , :,:]
                                 masks.append(np.ones((traj.shape[0], traj.shape[1], traj.shape[2])))
                             else:
                                 zeros = [np.zeros_like(actual_traj[0])] * (len(actual_traj) - 1)
@@ -280,6 +280,7 @@ class AllegroScrewDriverDataset(Dataset):
                         end_states = np.stack(end_states, axis=0)
                         end_states = end_states.reshape(end_states.shape[0], 1, 1, -1)
                         end_states = end_states.repeat(traj.shape[1], axis=1)
+                        end_states = end_states[:traj.shape[0]]
                         traj = np.concatenate([traj, end_states], axis=2)
                         # combine traj and starts
                         if use_actual_traj:
@@ -764,7 +765,6 @@ class RealAndFakeDataset(Dataset):
         self.real_dataset = real_dataset
         self.fake_dataset = fake_dataset
 
-        self.fake_dataset.set_norm_constants(self.real_dataset.mean, self.real_dataset.std)
 
     def __len__(self):
         return len(self.fake_dataset)

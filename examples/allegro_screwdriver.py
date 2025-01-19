@@ -115,7 +115,8 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                  min_force_dict=None,
                  device='cuda:0',
                  proj_path=None,
-                 full_dof_goal=False, **kwargs):
+                 full_dof_goal=False, 
+                 project=False, **kwargs):
         self.obj_mass = 0.1
         self.obj_dof_type = None
         if obj_dof == 3:
@@ -158,6 +159,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                                                  full_dof_goal=full_dof_goal,
                                                   contact_points_object=contact_points_object,
                                                   contact_points_dict = self.contact_points,
+                                                  project=project,
                                                    **kwargs)
         self.friction_coefficient = friction_coefficient
 
@@ -168,9 +170,9 @@ class AllegroScrewdriver(AllegroManipulationProblem):
 
         smoothness_cost = torch.sum((state[1:, -self.obj_dof:] - state[:-1, -self.obj_dof:]) ** 2)
         upright_cost = 0
-        # if not self.full_dof_goal:
-        upright_cost = 500 * torch.sum(
-            (state[:, -self.obj_dof:-1] + goal[-self.obj_dof:-1]) ** 2)  # the screwdriver should only rotate in z direction
+        if not self.project:
+            upright_cost = 500 * torch.sum(
+                (state[:, -self.obj_dof:-1] + goal[-self.obj_dof:-1]) ** 2)  # the screwdriver should only rotate in z direction
         return smoothness_cost + upright_cost + super()._cost(xu, start, goal)
 
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noise=None, noise_noise=None, sim=None, seed=None,
@@ -209,11 +211,15 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         #     'index': 0,
         # }
         # initial grasp
+        if params.get('compute_recovery_trajectory', False):
+            goal = start[-4: -1]
+        else:
+            goal = params['valve_goal']
         pregrasp_params = copy.deepcopy(params)
         pregrasp_params['warmup_iters'] = 80
         pregrasp_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
-            goal=pregrasp_params['valve_goal'],
+            goal=goal,
             T=2,
             chain=pregrasp_params['chain'],
             device=pregrasp_params['device'],
@@ -234,7 +240,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # finger gate index
         index_regrasp_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
-            goal=params['valve_goal'],
+            goal=goal,
             T=params['T'],
             chain=params['chain'],
             device=params['device'],
@@ -252,10 +258,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             min_force_dict=min_force_dict,
             full_dof_goal=params.get('compute_recovery_trajectory', False),
             proj_path=proj_path,
+            project=params.get('compute_recovery_trajectory', False),
         )
         thumb_and_middle_regrasp_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
-            goal=params['valve_goal'],
+            goal=goal,
             T=params['T'],
             chain=params['chain'],
             device=params['device'],
@@ -273,10 +280,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             min_force_dict=min_force_dict,
             full_dof_goal=params.get('compute_recovery_trajectory', False),
             proj_path=proj_path,
+            project=params.get('compute_recovery_trajectory', False),
         )
         turn_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
-            goal=params['valve_goal'],
+            goal=goal,
             T=params['T'],
             chain=params['chain'],
             device=params['device'],
@@ -298,7 +306,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         thumb_regrasp_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
-            goal=params['valve_goal'],
+            goal=goal,
             T=params['T'],
             chain=params['chain'],
             device=params['device'],
@@ -321,7 +329,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         middle_regrasp_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
-            goal=params['valve_goal'],
+            goal=goal,
             T=params['T'],
             chain=params['chain'],
             device=params['device'],
@@ -607,6 +615,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             trajectory_sampler_orig = load_sampler(model_path_orig)
         else:
             trajectory_sampler_orig = trajectory_sampler
+        if params['compute_recovery_trajectory']:
+            index_regrasp_problem.model = trajectory_sampler_orig
+            thumb_and_middle_regrasp_problem.model = trajectory_sampler_orig
         print('Loaded trajectory sampler')
 
     # start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
@@ -819,7 +830,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         if params.get('compute_recovery_trajectory', False):
             planner.reset(state, T=params['T'], initial_x=initial_samples, proj_path=proj_path)
-            planner.warmup_iters = 0
+            # planner.warmup_iters = 0
         else:
             planner.reset(state, T=params['T'], goal=goal, initial_x=initial_samples, proj_path=proj_path)
         if params['controller'] != 'diffusion_policy' and (trajectory_sampler is None or not params.get('diff_init', True)):
@@ -1149,8 +1160,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     def plan_recovery_contacts(state, stage):
         distances = []
         # modes = ['index', 'thumb_middle', 'middle', 'thumb']
-        # return ['thumb_middle']
-        modes = ['thumb_middle', 'index']
+        return ['index'], None
+        # modes = ['thumb_middle', 'index']
         # for planner in [index_regrasp_planner, thumb_and_middle_regrasp_planner]:
         goal = index_regrasp_planner.problem.goal.clone()
         goal[-1] = state[-1]
@@ -1610,8 +1621,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 if __name__ == "__main__":
     # get config
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_only.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_1.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_only.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID.yaml').read_text())
 
     from tqdm import tqdm
 
@@ -1752,7 +1763,8 @@ if __name__ == "__main__":
         now = ''
     
     if config['compute_recovery_trajectory']:
-        start_ind = config['parity']# if config['experiment_name'] == 'allegro_screwdriver_csvto_diff_sine_cosine_eps_.015_2.5_damping_pi_6' else 0
+        # start_ind = config['parity']
+        start_ind = 4
         step_size = 2
     else:
         start_ind = 0

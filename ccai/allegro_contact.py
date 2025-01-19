@@ -310,9 +310,9 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
         #### functorch functions ######
         self.grad_kernel = jacrev(rbf_kernel, argnums=0)
-        self.cost = vmap(partial(self._cost, start=self.start, goal=self.goal))
-        self.grad_cost = vmap(jacrev(partial(self._cost, start=self.start, goal=self.goal)))
-        self.hess_cost = vmap(hessian(partial(self._cost, start=self.start, goal=self.goal)))
+        self.cost = vmap(partial(self._cost, start=self.start, goal=self.goal), randomness='same')
+        self.grad_cost = vmap(jacrev(partial(self._cost, start=self.start, goal=self.goal)), randomness='same')
+        self.hess_cost = vmap(hessian(partial(self._cost, start=self.start, goal=self.goal)), randomness='same')
         self.singularity_constr = vmap(self._singularity_constr)
         self.grad_singularity_constr = vmap(jacrev(self._singularity_constr))
         self.grad_euler_to_angular_velocity = jacrev(euler_to_angular_velocity, argnums=(0, 1))
@@ -407,9 +407,27 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         N = x.shape[0]
         J, grad_J = self.cost(x), self.grad_cost(x)
 
+        x_for_diff = x.clone().detach()
+        x_for_diff.requires_grad_(True)
+        if self.project:
+
+            project_grad = torch.zeros_like(grad_J)
+            _, T = x.shape[:2]
+            N = 1
+            start_for_diff = x_for_diff[:, -1, :self.num_fingers * 4 + self.obj_dof]
+            start_for_diff = torch.cat((start_for_diff[:, :-1], torch.cos(start_for_diff[:, -1]).unsqueeze(1), torch.sin(start_for_diff[:, -1]).unsqueeze(1)), -1)
+
+            samples, _, likelihoods = self.model.sample(N=N*start_for_diff.shape[0], H=13, start=start_for_diff, no_grad=False)
+
+            likelihoods = -1 * likelihoods.sum()
+            likelihoods.backward()
+            project_grad[:, -1, :self.dx] = samples.grad.reshape(N, 1, 13, -1)[:, :, 0, :self.dx].mean(1) * self.model.x_std[:self.dx]
+
+            J += likelihoods.detach()
+
         N = x.shape[0]
         return (self.alpha * J.reshape(N),
-                self.alpha * grad_J.reshape(N, -1),
+                self.alpha * ((grad_J + project_grad).reshape(N, -1)),
                 None)
         # self.alpha * hess_J.reshape(N, self.T * (self.dx + self.du), self.T * (self.dx + self.du)))
 
@@ -628,9 +646,9 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.goal = goal
 
         # update functions that require start
-        self.cost = vmap(partial(self._cost, start=self.start, goal=self.goal))
-        self.grad_cost = vmap(jacrev(partial(self._cost, start=self.start, goal=self.goal)))
-        self.hess_cost = vmap(hessian(partial(self._cost, start=self.start, goal=self.goal)))
+        self.cost = vmap(partial(self._cost, start=self.start, goal=self.goal), randomness='same')
+        self.grad_cost = vmap(jacrev(partial(self._cost, start=self.start, goal=self.goal)), randomness='same')
+        self.hess_cost = vmap(hessian(partial(self._cost, start=self.start, goal=self.goal)), randomness='same')
 
         if T is not None:
             self.T = T
@@ -2337,7 +2355,8 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                  env_contact=False,
                  min_force_dict=None,
                  device='cuda:0', 
-                 full_dof_goal=False, **kwargs):
+                 full_dof_goal=False, 
+                 project=False, **kwargs):
 
         # super(AllegroManipulationProblem, self).__init__(start=start, goal=goal, T=T, chain=chain,
         #                                                  object_location=object_location, object_type=object_type,
@@ -2392,18 +2411,31 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
         # self.dz += self._base_dz
         # self.dh += self._base_dz * T
 
+        self.project = project
 
     def _cost(self, xu, start, goal):
         cost = AllegroContactProblem._cost(self, xu, start, goal) + \
             AllegroObjectProblem._cost(self, xu, start, goal) + AllegroRegraspProblem._cost(self, xu, start, goal)
 
-        goal_cost = 0
-        if self.full_dof_goal:
-            x_last = xu[-1, :self.num_fingers * 4 + self.obj_dof-1]
-            goal_cost = 10 * (x_last - goal[:-1]).pow(2).sum(dim=-1)#.sum(dim=-1)
-            goal_cost += 3 * (xu[:-1, :self.num_fingers * 4 + self.obj_dof-1] - goal[:-1]).pow(2).sum(dim=-1).sum(dim=-1)
+        # goal_cost = 0
+        # if self.full_dof_goal:
+        #     x_last = xu[-1, :self.num_fingers * 4 + self.obj_dof-1]
+        #     goal_cost = 10 * (x_last - goal[:-1]).pow(2).sum(dim=-1)#.sum(dim=-1)
+        #     goal_cost += 3 * (xu[:-1, :self.num_fingers * 4 + self.obj_dof-1] - goal[:-1]).pow(2).sum(dim=-1).sum(dim=-1)
 
-        return cost + goal_cost
+        # if self.project:
+        #     _, T = xu.shape[:2]
+        #     N = 1
+        #     start_for_diff = xu[-1, :self.num_fingers * 4 + self.obj_dof]
+        #     start_for_diff = torch.cat((start_for_diff[:-1], torch.cos(start_for_diff[-1]).unsqueeze(0), torch.sin(start_for_diff[-1]).unsqueeze(0)), -1)
+
+        #     _, _, likelihoods = self.model.sample(N=N, H=T+1, start=start_for_diff.unsqueeze(0))
+
+        #     likelihoods = likelihoods.mean()
+
+        #     cost += 0.1 * -likelihoods
+
+        return cost
 
 
     def _con_eq(self, xu, compute_grads=True, compute_hess=False, verbose=False, projected_diffusion=False):
