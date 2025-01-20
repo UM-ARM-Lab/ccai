@@ -136,5 +136,5 @@ if __name__ == "__main__":
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
     sim_device = config['sim_device']
     
-    get_initializations(n_samples, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save = True)
+    get_initializations(env, sim_env, n_samples, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save = True)
     test()
