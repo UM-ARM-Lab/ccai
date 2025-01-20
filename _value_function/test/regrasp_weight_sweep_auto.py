@@ -75,9 +75,6 @@ def test(prediction_only=False):
 
             for i in range(n_samples):
 
-                config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
-                sim_device = config['sim_device']
-
                 img_save_dir = None
                 env.frame_fpath = img_save_dir
                 env.frame_id = 0
@@ -97,11 +94,6 @@ def test(prediction_only=False):
                 turn_cost, _ = calculate_turn_cost(regrasp_pose.numpy(), turn_pose)
                 total_cost += turn_cost
                 print("turn cost: ", turn_cost)
-
-                gym.destroy_viewer(viewer)
-                gym.destroy_sim(sim)
-                del config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial
-                torch.cuda.empty_cache()
 
             print(f"vf_weight: {vf_weight}, other_weight: {other_weight}, variance_ratio: {variance_ratio}, total_cost: {total_cost}")
 
@@ -135,11 +127,14 @@ def test(prediction_only=False):
     print(results)
     print(f'best_vf_weight: {best_vf_weight}, best_other_weight: {best_other_weight}, lowest_total_cost: {lowest_total_cost}')
 
-
 if __name__ == "__main__":
     n_samples = 3
     max_screwdriver_tilt=0.015
     screwdriver_noise_mag=0.015
     finger_noise_mag=0.25
+
+    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
+    sim_device = config['sim_device']
+    
     get_initializations(n_samples, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save = True)
     test()
