@@ -21,7 +21,7 @@ def validate_pregrasp_pose(pregrasp_pose):
         return True
 
 loop_idx = 0
-prog_id = 'e'
+prog_id = 'f'
 trials_per_save = 10
 perception_noise = 0.0
 pregrasp_iters = 80
@@ -29,7 +29,7 @@ regrasp_iters = 100
 turn_iters = 200
 delete_imgs()
 
-visualize = True
+visualize = False
 config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
 sim_device = config['sim_device']
 
