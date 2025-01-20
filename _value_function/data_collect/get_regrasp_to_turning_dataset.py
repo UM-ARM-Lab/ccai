@@ -21,8 +21,8 @@ def validate_pregrasp_pose(pregrasp_pose):
         return True
 
 loop_idx = 0
-prog_id = 'c'
-trials_per_save = 10
+prog_id = 'd'
+trials_per_save = 20
 perception_noise = 0.0
 pregrasp_iters = 80
 regrasp_iters = 100
@@ -30,6 +30,7 @@ delete_imgs()
 
 visualize = False
 config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
+sim_device = config['sim_device']
 
 
 while True:
@@ -50,7 +51,7 @@ while True:
 
         print(f"Starting Trial {trials_done+1}")
 
-        initialization = get_initialization(max_screwdriver_tilt=0.015, screwdriver_noise_mag=0.015, finger_noise_mag=0.25)
+        initialization = get_initialization(env, sim_device, max_screwdriver_tilt=0.015, screwdriver_noise_mag=0.015, finger_noise_mag=0.25)
         
         pregrasp_pose, planned_pose = pregrasp(env, config, chain, deterministic=True, perception_noise=perception_noise, 
                         image_path = img_save_dir, initialization = initialization, mode='no_vf', iters = pregrasp_iters)
