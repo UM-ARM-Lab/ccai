@@ -11,8 +11,13 @@ from _value_function.screwdriver_problem import init_env, do_turn, pregrasp, ema
 import torch
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
-def get_initialization(sim_device, env, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag):
+def get_initialization(max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag):
+
         while True:
+
+            config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
+            sim_device = config['sim_device']
+
             # torch.random.manual_seed(1)
             index_noise_mag = torch.tensor([finger_noise_mag]*4)
             index_noise = index_noise_mag * (2 * torch.rand(4) - 1)
@@ -39,15 +44,21 @@ def get_initialization(sim_device, env, max_screwdriver_tilt, screwdriver_noise_
             solved_initialization = convert_partial_to_full_config(solved_initialization)
 
             sd = solved_initialization[0, -4:-1]
+
+            gym.destroy_viewer(viewer)
+            gym.destroy_sim(sim)
+            del env, sim_env, viewer
+            torch.cuda.empty_cache()
+
             if abs(sd[0]) < max_screwdriver_tilt and abs(sd[1]) < max_screwdriver_tilt:
                 return solved_initialization
         
 
-def get_initializations(sim_device, env, n_samples, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save = False):
+def get_initializations(n_samples, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save = False):
     
     initializations = []
     for _ in range(n_samples):
-        initialization = get_initialization(sim_device, env, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag)
+        initialization = get_initialization(max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag)
         initializations.append(initialization)
 
     pkl.dump(initializations, open(f'{fpath}/vf_weight_sweep/initializations.pkl', 'wb'))
