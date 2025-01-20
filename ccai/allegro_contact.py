@@ -1713,7 +1713,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                 grad_g = grad_g.permute(0, 1, 3, 2, 4).reshape(N, -1, T * d)
 
                 if torch.any(torch.isnan(grad_g)):
-                    print('hello')
+                    print('hello0')
 
         else:
             return g, None, None
@@ -2093,7 +2093,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                                         grad_g_valve,
                                         ), dim=1)
             if torch.any(torch.isinf(grad_g_contact)) or torch.any(torch.isnan(grad_g_contact)):
-                print('hello')
+                print('hello1')
         if hess_g_contact is not None:
             hess_g_contact = torch.cat((hess_g_contact,
                                         # hess_g_dynamics,
@@ -2452,7 +2452,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
             grad_g = grad_g.reshape(grad_g.shape[0], grad_g.shape[1], T, -1)[:, :, :, self.all_var_index]
             grad_g = grad_g.reshape(N, -1, T * (self.dx + self.du))
             if torch.any(torch.isinf(grad_g)) or torch.any(torch.isnan(grad_g)):
-                print('hello')
+                print('hello2')
         if compute_hess:
             if hess_g is None:
                 hess_g = torch.cat((hess_g_regrasp, hess_g_contact), dim=1)
@@ -2657,7 +2657,7 @@ class AllegroManipulationExternalContactProblem(AllegroContactWithEnvProblem, Al
             grad_g = grad_g.reshape(grad_g.shape[0], grad_g.shape[1], T, -1)[:, :, :, self.all_var_index]
             grad_g = grad_g.reshape(N, -1, T * (self.dx + self.du))
             if torch.any(torch.isinf(grad_g)) or torch.any(torch.isnan(grad_g)):
-                print('hello')
+                print('hello3')
         if compute_hess:
             if hess_g is None:
                 hess_g = torch.cat((hess_g_regrasp, hess_g_contact), dim=1)
