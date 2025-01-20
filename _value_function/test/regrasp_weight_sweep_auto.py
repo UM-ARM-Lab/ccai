@@ -69,9 +69,6 @@ def test(prediction_only=False):
         # Perform grid search with current vf_weights and other_weights
         # img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/imgs/trial_{0}')
         # pathlib.Path.mkdir(img_save_dir, parents=True, exist_ok=True)
-        img_save_dir = None
-        env.frame_fpath = img_save_dir
-        env.frame_id = 0
 
         for vf_weight, other_weight, variance_ratio in product(*hyperparameters):
             total_cost = 0
@@ -80,6 +77,10 @@ def test(prediction_only=False):
 
                 config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
                 sim_device = config['sim_device']
+
+                img_save_dir = None
+                env.frame_fpath = img_save_dir
+                env.frame_id = 0
                 
                 pregrasp_pose, planned_pose = pregrasp(env, config, chain, deterministic=True, perception_noise=0, 
                         image_path = img_save_dir, initialization = initializations[i], mode='no_vf', iters = pregrasp_iters)
@@ -92,7 +93,6 @@ def test(prediction_only=False):
                         sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, 
                         perception_noise=0, image_path = img_save_dir, iters = turn_iters,
                         mode='vf', vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio)
-                
 
                 turn_cost, _ = calculate_turn_cost(regrasp_pose.numpy(), turn_pose)
                 total_cost += turn_cost
@@ -100,7 +100,7 @@ def test(prediction_only=False):
 
                 gym.destroy_viewer(viewer)
                 gym.destroy_sim(sim)
-                del env, sim_env, viewer
+                del config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial
                 torch.cuda.empty_cache()
 
             print(f"vf_weight: {vf_weight}, other_weight: {other_weight}, variance_ratio: {variance_ratio}, total_cost: {total_cost}")

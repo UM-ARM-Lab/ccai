@@ -31,10 +31,10 @@ delete_imgs()
 while True:
     pose_tuples = []
     visualize = False
-    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
-
     trials_done = 0
+
     while trials_done < trials_per_save:
+
         print(f"Starting Trial {trials_done+1}")
 
         if visualize:
@@ -42,12 +42,12 @@ while True:
             pathlib.Path.mkdir(img_save_dir, parents=True, exist_ok=True)  
         else:
             img_save_dir = None
+
+        initialization = get_initialization(max_screwdriver_tilt=0.015, screwdriver_noise_mag=0.015, finger_noise_mag=0.25)
         
+        config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
         env.frame_fpath = img_save_dir
         env.frame_id = 0
-
-        initialization = get_initialization(config['sim_device'], env, 
-                    max_screwdriver_tilt=0.015, screwdriver_noise_mag=0.015, finger_noise_mag=0.25)
         
         pregrasp_pose, planned_pose = pregrasp(env, config, chain, deterministic=True, perception_noise=perception_noise, 
                         image_path = img_save_dir, initialization = initialization, mode='no_vf', iters = pregrasp_iters)
@@ -59,7 +59,7 @@ while True:
             print("pregrasp failed")
             gym.destroy_viewer(viewer)
             gym.destroy_sim(sim)
-            del env, sim_env, viewer
+            del config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial
             torch.cuda.empty_cache()
             continue
         
@@ -79,7 +79,7 @@ while True:
 
         gym.destroy_viewer(viewer)
         gym.destroy_sim(sim)
-        del env, sim_env, viewer
+        del config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial
         torch.cuda.empty_cache()
 
         # print(f"Allocated memory: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")

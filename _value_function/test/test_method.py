@@ -47,7 +47,7 @@ def get_initialization(max_screwdriver_tilt, screwdriver_noise_mag, finger_noise
 
             gym.destroy_viewer(viewer)
             gym.destroy_sim(sim)
-            del env, sim_env, viewer
+            del config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial
             torch.cuda.empty_cache()
 
             if abs(sd[0]) < max_screwdriver_tilt and abs(sd[1]) < max_screwdriver_tilt:
