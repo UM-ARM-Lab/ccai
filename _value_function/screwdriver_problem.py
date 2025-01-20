@@ -662,7 +662,7 @@ if __name__ == "__main__":
                         image_path = img_save_dir, initialization = None, mode='no_vf', iters = pregrasp_iters)
 
     regrasp_pose, regrasp_traj = regrasp(env, config, chain, state2ee_pos_partial, perception_noise=perception_noise, 
-                            image_path = img_save_dir, initialization = pregrasp_pose, mode='vf', iters = regrasp_iters,
+                            image_path = img_save_dir, initialization = pregrasp_pose, mode='no_vf', iters = regrasp_iters,
                             vf_weight = 100.0, other_weight = 0.1, variance_ratio = 5)
     
     _, turn_pose, succ, turn_traj = do_turn(regrasp_pose, config, env, 

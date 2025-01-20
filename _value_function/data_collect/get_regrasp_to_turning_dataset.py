@@ -21,14 +21,15 @@ def validate_pregrasp_pose(pregrasp_pose):
         return True
 
 loop_idx = 0
-prog_id = 'd'
-trials_per_save = 20
+prog_id = 'e'
+trials_per_save = 10
 perception_noise = 0.0
 pregrasp_iters = 80
 regrasp_iters = 100
+turn_iters = 200
 delete_imgs()
 
-visualize = False
+visualize = True
 config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
 sim_device = config['sim_device']
 
@@ -70,7 +71,7 @@ while True:
         
         _, turn_pose, succ, turn_traj = do_turn(regrasp_pose, config, env, 
                         sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, 
-                        perception_noise=perception_noise, image_path = img_save_dir)
+                        iters = turn_iters, perception_noise=perception_noise, image_path = img_save_dir)
         
         print("done turn")
         
