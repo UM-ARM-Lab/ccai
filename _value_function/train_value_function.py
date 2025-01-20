@@ -13,6 +13,23 @@ from matplotlib.ticker import MultipleLocator
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
+def index_and_sort_regrasp_and_turn_trajs(regrasp_trajs, turn_trajs):
+
+    regrasp_stacked = np.stack(regrasp_trajs, axis=0)
+    regrasp_poses = regrasp_stacked.reshape(-1, 20)
+    regrasp_poses = convert_full_to_partial_config(regrasp_poses)
+
+    turn_stacked = np.stack(turn_trajs, axis=0)
+    turn_poses = turn_stacked.reshape(-1, 20)
+    turn_poses = convert_full_to_partial_config(turn_poses)
+
+    poses = np.empty((regrasp_poses.shape[0] + turn_poses.shape[0], regrasp_poses.shape[1]), dtype=regrasp_poses.dtype)
+    assert(regrasp_poses.shape == turn_poses.shape)
+    poses[0::2] = regrasp_poses  # Fill even indices with elements from array1
+    poses[1::2] = turn_poses  # Fill odd indices with elements from array2
+
+    return poses
+
 def load_data(batch_size = 64, noisy = False):
     if noisy:
         filename = '/regrasp_to_turn_datasets/noisy_combined_regrasp_to_turn_dataset.pkl'
@@ -29,22 +46,11 @@ def load_data(batch_size = 64, noisy = False):
     T_t = turn_trajs[0].shape[0]
     T = T_rg + T_t
     n_trajs = len(regrasp_trajs)
-    print(f'Loaded {n_trajs} samples')
+    print(f'Loaded {n_trajs} trials, which will create {n_trajs*T} samples')
 
-    regrasp_stacked = np.stack(regrasp_trajs, axis=0)
-    regrasp_poses = regrasp_stacked.reshape(-1, 20)
-    regrasp_poses = convert_full_to_partial_config(regrasp_poses)
-
-    turn_stacked = np.stack(turn_trajs, axis=0)
-    turn_poses = turn_stacked.reshape(-1, 20)
-    turn_poses = convert_full_to_partial_config(turn_poses)
-
-    num_samples = len(regrasp_poses)*2
-    poses = np.empty((regrasp_poses.shape[0] + turn_poses.shape[0], regrasp_poses.shape[1]), dtype=regrasp_poses.dtype)
-    assert(regrasp_poses.shape == turn_poses.shape)
-    poses[0::2] = regrasp_poses  # Fill even indices with elements from array1
-    poses[1::2] = turn_poses  # Fill odd indices with elements from array2
+    poses = index_and_sort_regrasp_and_turn_trajs(regrasp_trajs, turn_trajs)
     
+    num_samples = len(poses)
     split_idx = int(num_samples * (1 - validation_proportion))
 
     # normalize

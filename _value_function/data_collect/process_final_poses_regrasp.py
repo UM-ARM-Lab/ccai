@@ -123,8 +123,7 @@ if __name__ == "__main__":
                 turn_costs.append(cost)
                 regrasp_costs.append(regrasp_cost)
                 if succ:
-                    # double check this
-                    combined_succ_regrasp_tuples.append((regrasp_trajs[i].reshape(13, 20), turn_poses[i].reshape(1, 20)))
+                    combined_succ_regrasp_tuples.append((regrasp_trajs[i].reshape(13, 20), turn_trajs[i].reshape(13, 20)))
             
             combined_turn_costs.extend(turn_costs)
             combined_regrasp_costs.extend(regrasp_costs)

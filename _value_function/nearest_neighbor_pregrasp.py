@@ -7,13 +7,13 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 sys.path.append(str(CCAI_PATH))
 from tqdm import tqdm
 from pathlib import Path
-# from _value_function.screwdriver_problem import init_env, do_turn, pregrasp, regrasp, emailer, convert_partial_to_full_config, delete_imgs
+# from _value_function.screwdriver_problem import init_env, do_turn, pregrasp, emailer, convert_partial_to_full_config, delete_imgs
 import torch
 from scipy.spatial import KDTree
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
 def save_neighbors():
-    dataset = pkl.load(open(f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_succ_dataset.pkl', 'rb'))
+    dataset = pkl.load(open(f'{fpath.resolve()}/pregrasp_to_turn_datasets/pregrasp_to_turn_succ_dataset.pkl', 'rb'))
     neighbors = np.array([tup[0].flatten() for tup in dataset])
     neighbor_actions = np.array([tup[1].flatten() for tup in dataset])
     neighbors[:,-2:] = 0.0   
@@ -21,10 +21,12 @@ def save_neighbors():
     neighbors = torch.tensor(neighbors)
     neighbor_actions = torch.tensor(neighbor_actions)
 
-    pkl.dump(neighbors, open(f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_neighbors.pkl', 'wb'))
-    pkl.dump(neighbor_actions, open(f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_neighbor_actions.pkl', 'wb'))
+    pkl.dump(neighbors, open(f'{fpath.resolve()}/pregrasp_to_turn_datasets/pregrasp_to_turn_neighbors.pkl', 'wb'))
+    pkl.dump(neighbor_actions, open(f'{fpath.resolve()}/pregrasp_to_turn_datasets/pregrasp_to_turn_neighbor_actions.pkl', 'wb'))
 
     print(f'saved {neighbors.shape[0]} succesful neighbors')
+    # tree = KDTree(initials)
+    # pkl.dump(tree, open(f'{fpath.resolve()}/pregrasp_to_turn_datasets/pregrasp_to_turn_tree.pkl', 'wb'))
 
 def find_nn(state):
 
@@ -39,9 +41,13 @@ def find_nn(state):
         state_full = state
 
     state_full[-2:] = 0.0
+    
+    # dataset = pkl.load(open(f'{fpath.resolve()}/pregrasp_to_turn_datasets/pregrasp_to_turn_succ_dataset.pkl', 'rb'))
+    # tree = pkl.load(open(f'{fpath.resolve()}/pregrasp_to_turn_datasets/pregrasp_to_turn_tree.pkl', 'rb'))
+    # distance, idx = tree.query(state_full, k=1)  
 
-    neighbors = pkl.load(open(f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_neighbors.pkl', 'rb'))
-    neighbor_actions = pkl.load(open(f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_neighbor_actions.pkl', 'rb'))
+    neighbors = pkl.load(open(f'{fpath.resolve()}/pregrasp_to_turn_datasets/pregrasp_to_turn_neighbors.pkl', 'rb'))
+    neighbor_actions = pkl.load(open(f'{fpath.resolve()}/pregrasp_to_turn_datasets/pregrasp_to_turn_neighbor_actions.pkl', 'rb'))
 
     distances = torch.norm(neighbors - state_full, dim=1)
     min_distance_index = torch.argmin(distances).reshape(1)

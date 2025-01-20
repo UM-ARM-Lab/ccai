@@ -21,8 +21,8 @@ def validate_pregrasp_pose(pregrasp_pose):
         return True
 
 loop_idx = 0
-prog_id = 'b'
-trials_per_save = 20
+prog_id = 'c'
+trials_per_save = 10
 perception_noise = 0.0
 pregrasp_iters = 80
 regrasp_iters = 100
@@ -30,7 +30,7 @@ delete_imgs()
 
 while True:
     pose_tuples = []
-    visualize = True
+    visualize = False
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
 
     trials_done = 0
@@ -63,7 +63,6 @@ while True:
             torch.cuda.empty_cache()
             continue
         
-
         regrasp_pose, regrasp_traj = regrasp(env, config, chain, state2ee_pos_partial, perception_noise=perception_noise, 
                                 image_path = img_save_dir, initialization = pregrasp_pose, mode='no_vf', iters = regrasp_iters)
         
@@ -78,6 +77,11 @@ while True:
         pose_tuples.append((pregrasp_pose, regrasp_pose, regrasp_traj, turn_pose, turn_traj))
         trials_done += 1
 
+        gym.destroy_viewer(viewer)
+        gym.destroy_sim(sim)
+        del env, sim_env, viewer
+        torch.cuda.empty_cache()
+
         # print(f"Allocated memory: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
         # print(torch.cuda.memory_summary(device='cuda', abbreviated=False))
 
@@ -89,9 +93,5 @@ while True:
     pkl.dump(pose_tuples, open(savepath, 'wb'))
 
     loop_idx += 1
-    gym.destroy_viewer(viewer)
-    gym.destroy_sim(sim)
-    del env, sim_env, viewer
-    torch.cuda.empty_cache()
 
 emailer().send()
