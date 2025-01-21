@@ -31,8 +31,8 @@ def test(prediction_only=False):
 
 
     # Define grid bounds
-    vf_bounds = [1, 100000] 
-    other_weight_bounds = [0.001, 1000] 
+    vf_bounds = [1, 10000] 
+    other_weight_bounds = [0.001, 100] 
     variance_ratio_bounds = [1,100]
 
     # Initialize grids
@@ -122,6 +122,7 @@ def test(prediction_only=False):
 
         iteration += 1
 
+    print("finished adaptive grid search.")
     pkl.dump(results, open(f'{fpath}/vf_weight_sweep/results.pkl', 'wb'))
     print("results:")
     print(results)

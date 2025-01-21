@@ -430,6 +430,9 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         
         # need to confirm that xu is only fingers of interest
         q = xu[:, :self.num_fingers * 4 + 3]
+
+        # print("screwdriver state:")
+        # print(q[0][-3:])
         
         delta_q = partial_to_full_state(xu[:, self.dx:self.dx + 4 * self.num_fingers], self.fingers)
         
@@ -828,14 +831,14 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         if self.num_regrasps == 0:
             return 0.0
         q = partial_to_full_state(xu[:, :self.num_fingers * 4], self.fingers)  # [:, self.regrasp_idx]
-        theta = xu[:, self.num_fingers * 4:self.num_fingers * 4 + self.obj_dof]
+        # theta = xu[:, self.num_fingers * 4:self.num_fingers * 4 + self.obj_dof]
 
-        # ignore the rotation of the screwdriver
-        if self.obj_dof == 3:
-            mask = torch.tensor([1.0, 1.0, 0.0], device=xu.device)
-            theta = theta * mask.reshape(1, 3)
-        else:
-            theta = theta * 0
+        # # ignore the rostation of the screwdriver
+        # if self.obj_dof == 3:
+        #     mask = torch.tensor([1.0, 1.0, 0.0], device=xu.device)
+        #     theta = theta * mask.reshape(1, 3)
+        # else:
+        #     theta = theta * 0
         # print('--')
         # print(self._ee_locations_in_screwdriver(q, theta))
         # print(self.default_ee_locs)
