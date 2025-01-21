@@ -19,9 +19,8 @@ def validate_pregrasp_pose(pregrasp_pose):
         return False
     else:
         return True
-
-loop_idx = 0
-prog_id = 'i'
+    
+prog_id = 0
 trials_per_save = 10
 perception_noise = 0.0
 pregrasp_iters = 80
@@ -79,11 +78,18 @@ while True:
         trials_done += 1
 
     if perception_noise == 0:
-        savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_dataset_{prog_id}_{loop_idx}.pkl'
+        savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_dataset_{prog_id}.pkl'
     else:
-        savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_regrasp_to_turn_dataset_{prog_id}_{loop_idx}.pkl'
-    pkl.dump(pose_tuples, open(savepath, 'wb'))
+        savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_regrasp_to_turn_dataset_{prog_id}.pkl'
 
-    loop_idx += 1
+    while Path(savepath).exists():
+        prog_id += 1
+
+        if perception_noise == 0:
+            savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_dataset_{prog_id}.pkl'
+        else:
+            savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_regrasp_to_turn_dataset_{prog_id}.pkl'
+
+    pkl.dump(pose_tuples, open(savepath, 'wb'))
 
 emailer().send()
