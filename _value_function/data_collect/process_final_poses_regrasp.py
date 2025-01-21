@@ -42,7 +42,8 @@ def calculate_turn_cost(initial_pose, final_pose):
     distance2goal = tf.so3_relative_angle(screwdriver_mat, screwdriver_goal_mat, cos_angle=False).detach().cpu()
 
     final_distance_to_goal = torch.min(distance2goal.abs())
-    if final_distance_to_goal < 30 / 180 * np.pi:
+    # if final_distance_to_goal < 30 / 180 * np.pi:
+    if final_distance_to_goal < 45 / 180 * np.pi:
         succ = True
     else:
         succ = False

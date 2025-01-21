@@ -844,20 +844,22 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             return 0.0
         
         elif self.mode == 'baseline1':
-            from _value_function.nearest_neighbor import find_nn
+            from _value_function.nearest_neighbor import find_nn_1
             from _value_function.screwdriver_problem import convert_partial_to_full_config
             # start_full = convert_partial_to_full_config(start.reshape(1,-1).detach().cpu()).flatten()
-            current = q.clone()[-1, :].reshape(1, -1)#.detach().cpu().numpy()
+            current = q.clone()#.detach().cpu().numpy()
 
+            insertion_vector = torch.tensor([0., 0.5, 0.65, 0.65], dtype=torch.float32)
             current_full = torch.cat((
-                current[:, :8],
-                torch.tensor([[0., 0.5, 0.65, 0.65]]).to(device=self.device),
+                current[:, :8],  
+                insertion_vector.expand(current.shape[0], -1),  
                 current[:, 8:]
-            ), axis=1)
+            ), dim=-1)
 
-            _, nn = find_nn(current_full) # q or start?
+            _, nn = find_nn_1(current_full) # q or start?
             nn = nn.to(device=self.device)
-            return 1000 * torch.sum((nn - current_full.to(device=self.device)) ** 2)
+            cost = 1000 * torch.sum((nn - current_full.to(device=self.device)) ** 2)
+            return cost
 
         elif self.mode == 'no_vf':
             return 0.0

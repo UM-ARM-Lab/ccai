@@ -21,8 +21,8 @@ def validate_pregrasp_pose(pregrasp_pose):
         return True
 
 loop_idx = 0
-prog_id = 'f'
-trials_per_save = 10
+prog_id = 'g'
+trials_per_save = 5
 perception_noise = 0.0
 pregrasp_iters = 80
 regrasp_iters = 100
@@ -35,6 +35,7 @@ sim_device = config['sim_device']
 
 
 while True:
+
     pose_tuples = []
     
     trials_done = 0

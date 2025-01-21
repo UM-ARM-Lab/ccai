@@ -23,7 +23,7 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 sys.path.append(str(CCAI_PATH))
 from examples.allegro_valve_roll import PositionControlConstrainedSVGDMPC
 from examples.allegro_screwdriver import AllegroScrewdriver
-from _value_function.nearest_neighbor import find_nn
+from _value_function.nearest_neighbor import find_nn_0, find_nn_1
 from tqdm import tqdm
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -176,7 +176,7 @@ def pregrasp(env, config, chain, deterministic=True, initialization=None, percep
 
     # If mode == 'baseline0', do a quick NN-based action
     if mode == 'baseline0':
-        full_initial, full_action = find_nn(start)
+        full_initial, full_action = find_nn_0(start)
         action = np.concatenate((full_action[:, :8], full_action[:, 12:16]), axis=1)
         action = torch.tensor(action).to(device=device).reshape(1, 12)
         env.step(action.to(device=sim_device), path_override=image_path)
