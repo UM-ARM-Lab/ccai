@@ -11,12 +11,13 @@ def restart_on_crash(script_path):
         process = subprocess.run([sys.executable, script_path])
         exit_code = process.returncode
 
-        if exit_code == 139:  # Segmentation fault exit code
-            print("Segmentation fault detected. Restarting...")
-            time.sleep(1)  # Optional delay before restarting
-        else:
-            print(f"Program exited with code: {exit_code}")
-            break  # Exit the loop if it exits normally
+        # if exit_code == 139:  # Segmentation fault exit code
+        
+        print("Program died or finished. Restarting... exit code:", exit_code)
+        time.sleep(1)  # Optional delay before restarting
+        # else:
+        #     print(f"Program exited with code: {exit_code}")
+        #     break  # Exit the loop if it exits normally
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}')

@@ -7,7 +7,7 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 sys.path.append(str(CCAI_PATH))
 from tqdm import tqdm
 from pathlib import Path
-from _value_function.screwdriver_problem import init_env, do_turn, pregrasp, emailer, convert_partial_to_full_config, delete_imgs
+from _value_function.screwdriver_problem import init_env, do_turn, pregrasp, regrasp, emailer, convert_partial_to_full_config, delete_imgs
 import torch
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
@@ -46,74 +46,119 @@ def get_initialization(env, sim_device, max_screwdriver_tilt, screwdriver_noise_
                 return solved_initialization
         
 
-def get_initializations(env, sim_device, n_samples, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save = False):
+def get_initializations(env, config, chain, sim_device, n_samples, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save = False, do_pregrasp=False, name = "unnamed"):
     
     initializations = []
     for _ in range(n_samples):
         initialization = get_initialization(env, sim_device, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag)
         initializations.append(initialization)
 
-    pkl.dump(initializations, open(f'{fpath}/vf_weight_sweep/initializations.pkl', 'wb'))
-    return initializations
-
+    if do_pregrasp == False:
+        if save == True:
+            pkl.dump(initializations, open(f'{fpath}/test/initializations/{name}.pkl', 'wb'))
+        return initializations
+    
+    else:
+        pregrasps = []
+        for init in initializations:
+            pregrasp_pose, _ = pregrasp(
+                    env, config, chain, deterministic=True, perception_noise=0,
+                    image_path=None, initialization=init, mode='no_vf',
+                    iters=80
+                )
+            pregrasps.append(pregrasp_pose)
+        if save == True:
+            pkl.dump(pregrasps, open(f'{fpath}/test/initializations/{name}.pkl', 'wb'))
+        return pregrasps
 
 if __name__ == '__main__':
 
     test_name = 'multi_step'
-    n_trials = 5
+    n_trials = 3
     n_repeat = 1
     perception_noise = 0.0
     calc_novf = True
 
+    max_screwdriver_tilt = 0.015
+    screwdriver_noise_mag = 0.015
+    finger_noise_mag = 0.25
+
+    pregrasp_iters = 80
+    regrasp_iters = 100
+    turn_iters = 200
+
+    vf_weight = 273.8419634264361
+    other_weight = 11.547819846894582
+    variance_ratio = 1.0
+
     tuples = []
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
 
-    # initializations = get_initializations(config['sim_device'], env, n_trials, 
-    #                 max_screwdriver_tilt=0.03, screwdriver_noise_mag=0.03, finger_noise_mag=0.3)
-    # pkl.dump(initializations, open('/home/newuser/Desktop/Honda/ccai/_value_function/test/gravity_test/inits.pkl', 'wb'))
+    pregrasp_path = fpath /'test'/'initializations'/'test_method_pregrasps.pkl'
 
-    # exit()
-    initializations = pkl.load(open('/home/newuser/Desktop/Honda/ccai/_value_function/test/gravity_test/inits.pkl', 'rb'))
-
+    if pregrasp_path.exists() == False or len(pkl.load(open(pregrasp_path, 'rb'))) != n_trials:
+        print("Generating new pregrasp initializations...")
+        get_initializations(env, config, chain, config['sim_device'], n_trials,
+                            max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save=True,
+                            do_pregrasp=True, name='weight_sweep_pregrasps')
+    
+    pregrasps = pkl.load(open(pregrasp_path, 'rb'))
     delete_imgs()
 
     for i in tqdm(range(n_trials)):
         for j in tqdm(range(n_repeat)):
 
-            # img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/imgs/trial_{i}')
             img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/imgs/trial_{i+1}')
             pathlib.Path.mkdir(img_save_dir, parents=True, exist_ok=True)  
             env.frame_fpath = img_save_dir
             env.frame_id = 0
-            pregrasp_iters = 200
-
-            # Our method
-
-            pregrasp_pose_vf, planned_pregrasp_pose = pregrasp(env, config, chain, deterministic=True, perception_noise=perception_noise, 
-                            image_path = img_save_dir, initialization = initializations[i], 
-                            model_name = 'ensemble', mode='vf', iters = pregrasp_iters,
-                            vf_weight = 10.0, other_weight = 0.1, variance_ratio = 5)
             
-            _, turn_pose_vf, turn_succ, turn_trajectory_vf = do_turn(pregrasp_pose_vf, config, env, 
-                            sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, 
-                            perception_noise=perception_noise, image_path = img_save_dir)
+            pregrasp_pose = pregrasps[i]
+            env.reset(dof_pos= pregrasp_pose)
             
-            # no vf
+            regrasp_pose_vf, regrasp_traj_vf = regrasp(
+                    env, config, chain, state2ee_pos_partial, perception_noise=0,
+                    image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters,
+                    vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio
+                    )
+            
+            # SET TO NO VF FOR NOW
+            _, turn_pose_vf, succ_vf, turn_traj_vf = do_turn(
+                regrasp_pose_vf, config, env,
+                sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
+                perception_noise=0, image_path=img_save_dir, iters=turn_iters,mode='no_vf', 
+                # vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio
+                )
+            # turn_cost, _ = calculate_turn_cost(regrasp_pose.numpy(), turn_pose)
 
             if calc_novf:
-                pregrasp_pose_no_vf, no_vf_plan = pregrasp(env, config, chain, deterministic=True, perception_noise=perception_noise, 
-                                image_path = img_save_dir, initialization = initializations[i], mode='no_vf', iters = pregrasp_iters)
+
+                env.reset(dof_pos= pregrasp_pose)
                 
-                _, turn_pose_no_vf, turn_succ, turn_trajectory_no_vf = do_turn(pregrasp_pose_no_vf, config, env, 
-                                sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, 
-                                perception_noise=perception_noise, image_path = img_save_dir)
+                regrasp_pose_novf, regrasp_traj_novf = regrasp(
+                    env, config, chain, state2ee_pos_partial, perception_noise=0,
+                    image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
+                    # vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio
+                    )
+            
+                _, turn_pose_novf, succ_novf, turn_traj_novf = do_turn(
+                    regrasp_pose_novf, config, env,
+                    sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
+                    perception_noise=0, image_path=img_save_dir, iters=turn_iters,mode='no_vf', 
+                    # vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio
+                    )
+
                 
-                tuples.append((initializations[i], 
-                               pregrasp_pose_vf, planned_pregrasp_pose, turn_pose_vf, turn_trajectory_vf,
-                               pregrasp_pose_no_vf, no_vf_plan, turn_pose_no_vf, turn_trajectory_no_vf))
+                tuples.append((
+                               pregrasp_pose, 
+                               regrasp_pose_vf, regrasp_traj_vf, turn_pose_vf, turn_traj_vf,
+                               regrasp_pose_novf, regrasp_traj_novf, turn_pose_novf, turn_traj_novf
+                               ))
 
             else:
-                tuples.append((initializations[i], pregrasp_pose_vf, planned_pregrasp_pose, turn_pose_vf, turn_trajectory_vf))
+                tuples.append((
+                               pregrasp_pose, 
+                               regrasp_pose_vf, regrasp_traj_vf, turn_pose_vf, turn_traj_vf))
             
 
 

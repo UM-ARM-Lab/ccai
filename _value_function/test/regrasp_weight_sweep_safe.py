@@ -33,9 +33,9 @@ def load_or_create_checkpoint():
     else:
         print(f"No checkpoint found. Creating a new one at {checkpoint_path}")
         # Initial bounding ranges
-        vf_bounds = [1, 1000]
-        other_bounds = [0.001, 100]
-        variance_ratio_bounds = [1, 100]
+        vf_bounds = [100, 400]
+        other_bounds = [8, 16]
+        variance_ratio_bounds = [1, 10]
         grid_size = 3
         
         # Create initial search grids
@@ -97,10 +97,10 @@ def save_checkpoint(checkpoint):
         pkl.dump(checkpoint, f)
 
 
-def test():
+def test(n_samples):
 
     # Load the data or environment objects once upfront
-    initializations = pkl.load(open(f'{fpath}/vf_weight_sweep/initializations.pkl', 'rb'))
+    pregrasps = pkl.load(open(f'{fpath}/test/initializations/weight_sweep_pregrasps.pkl', 'rb'))
     models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble(model_name="ensemble")
     
     # Load or create the checkpoint
@@ -141,8 +141,6 @@ def test():
             checkpoint['tested_combinations'][iteration] = set()
 
         # n_samples, etc. can be adjusted or passed as parameters
-        n_samples = 3
-        pregrasp_iters = 80
         regrasp_iters = 100
         turn_iters = 100
 
@@ -157,12 +155,8 @@ def test():
             combo_tuple = (vf_weight, other_weight, variance_ratio)
 
             if combo_tuple in checkpoint['tested_combinations'][iteration]:
-                # Already tested this combo in a previous run, skip it
+                # Already finished testing this combo in a previous run, skip it
                 continue
-
-            # Mark this combo as tested
-            checkpoint['tested_combinations'][iteration].add(combo_tuple)
-            save_checkpoint(checkpoint)  # save so we don't re-test if we crash now
 
             # Evaluate total cost for this combination
             total_cost = 0.0
@@ -173,11 +167,8 @@ def test():
                 env.frame_fpath = img_save_dir
                 env.frame_id = 0
 
-                pregrasp_pose, planned_pose = pregrasp(
-                    env, config, chain, deterministic=True, perception_noise=0,
-                    image_path=img_save_dir, initialization=initializations[i], mode='no_vf',
-                    iters=pregrasp_iters
-                )
+                pregrasp_pose = pregrasps[i]
+                env.reset(dof_pos=pregrasp_pose)
 
                 regrasp_pose, regrasp_traj = regrasp(
                     env, config, chain, state2ee_pos_partial, perception_noise=0,
@@ -196,6 +187,11 @@ def test():
                 turn_cost, _ = calculate_turn_cost(regrasp_pose.numpy(), turn_pose)
                 total_cost += turn_cost
                 print(f"Sample {i} -> turn cost: {turn_cost}")
+            
+            # Mark this combo as tested
+            checkpoint['tested_combinations'][iteration].add(combo_tuple)
+            checkpoint['results'].append((vf_weight, other_weight, variance_ratio, total_cost))
+            save_checkpoint(checkpoint)  # save so we don't re-test if we crash now
                 
             print(f"Total combinations tested so far: {sum(len(v) for v in checkpoint['tested_combinations'].values())}")
             print(f"[Iteration {iteration+1}] vf_weight: {vf_weight}, "
@@ -290,7 +286,7 @@ def test():
 
 
 if __name__ == "__main__":
-    n_samples = 5
+
     max_screwdriver_tilt = 0.015
     screwdriver_noise_mag = 0.015
     finger_noise_mag = 0.25
@@ -298,6 +294,14 @@ if __name__ == "__main__":
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
     sim_device = config['sim_device']
     
-    # get_initializations(env, sim_device, n_samples,
-                        # max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save=True)
-    test()
+    n_samples = 4
+
+    pregrasp_path = fpath /'test'/'initializations'/'weight_sweep_pregrasps.pkl'
+
+    if pregrasp_path.exists() == False or len(pkl.load(open(pregrasp_path, 'rb'))) != n_samples:
+        print("Generating new pregrasp initializations...")
+        get_initializations(env, config, chain, sim_device, n_samples,
+                            max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save=True,
+                            do_pregrasp=True, name='weight_sweep_pregrasps')
+    
+    test(n_samples)
