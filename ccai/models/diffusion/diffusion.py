@@ -254,6 +254,7 @@ class GaussianDiffusion(nn.Module):
             B, N, _ = context.shape
         guidance_weights = torch.tensor([0.5, 0.5], device=x.device)
         w_total = 1.2
+        # w_total = 2.4
         unconditional, _ = self.model.compiled_unconditional_test(t, x)
         if not (context is None or self.unconditional):
             num_constraints = context.shape[1]
@@ -488,7 +489,7 @@ class GaussianDiffusion(nn.Module):
 
             if self.classifier is not None:
                 likelihood = self.classifier(
-                    torch.zeros(B *N * factor, device=sample.device),
+                    # torch.zeros(B *N * factor, device=sample.device),
                     sample.reshape(-1, self.horizon, self.xu_dim),
                     context=context.reshape(-1, self.context_dim)
                 ).reshape(B*N, factor)
@@ -511,7 +512,7 @@ class GaussianDiffusion(nn.Module):
         if not skip_likelihood:
             if self.classifier is not None:
                 likelihood = self.classifier(
-                    torch.zeros(B * N, device=sample.device),
+                    # torch.zeros(B * N, device=sample.device),
                     sample.reshape(-1, self.horizon, self.xu_dim),
                     context=context.reshape(-1, self.context_dim) if context is not None else None
                 )
@@ -726,30 +727,38 @@ class GaussianDiffusion(nn.Module):
         b = x_start.shape[0]
         x = x_start.reshape(b, -1, self.xu_dim)
         device = x.device
-        t = torch.randint(0, self.num_timesteps, (b,), device=device).long()
-        noise = default(noise, lambda: torch.randn_like(x_start))
+        # t = torch.randint(0, self.num_timesteps, (b,), device=device).long()
+        # noise = default(noise, lambda: torch.randn_like(x_start))
 
-        x = self.q_sample(x_start=x_start, t=t, noise=noise)
-        # mask defines in-painting, model should receive un-noised copy of masked states
-        # note -- only mask states, not controls
-        masked_idx = (mask == 0).nonzero()
-        x[masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]] = x_start[
-            masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]]
+        # x = self.q_sample(x_start=x_start, t=t, noise=noise)
+        # # mask defines in-painting, model should receive un-noised copy of masked states
+        # # note -- only mask states, not controls
+        # masked_idx = (mask == 0).nonzero()
+        # x[masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]] = x_start[
+        #     masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]]
 
         # get weights
         #eps, h = self.model(t, x, context, dropout=False)
-        pred_label = self.classifier(t, x, context)
+        pred_label = self.classifier(x, context)
 
         #print(torch.where(torch.isnan(h)))
         #print(torch.where(torch.isnan(x)))
 
         loss = loss_fn(pred_label, label)
-        loss = torch.mean(extract(torch.sqrt(self.betas), t, loss.shape) * loss)
+
+        # 5363/(7987-5363)
+        x = (128614+28214)/2
+        y = 128614-x
+        weight = torch.where(context[:, 0] == 1, x/y, 1.)
+        loss_scaled = (loss *weight).mean()
+
+        loss_scaled = loss.mean()
+        # loss = torch.mean(extract(torch.sqrt(self.betas), t, loss.shape) * loss)
 
         # accuracy
         pred = torch.round(pred_label)
         accuracy = torch.mean(torch.where(pred == label, 1.0, 0.0))
-        return loss, accuracy
+        return loss_scaled, accuracy
 
 class JointDiffusion(GaussianDiffusion):
     """

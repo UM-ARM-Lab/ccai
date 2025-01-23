@@ -259,7 +259,7 @@ class AllegroScrewDriverDataset(Dataset):
                         if not exec_only:
                             # combine traj and starts
                             if use_actual_traj:
-                                traj = np.concatenate(actual_traj + [traj], axis=2)[..., :1 , :,:]
+                                traj = np.concatenate(actual_traj + [traj], axis=2)#[..., :1 , :,:]
                                 masks.append(np.ones((traj.shape[0], traj.shape[1], traj.shape[2])))
                             else:
                                 zeros = [np.zeros_like(actual_traj[0])] * (len(actual_traj) - 1)
@@ -372,8 +372,8 @@ class AllegroScrewDriverDataset(Dataset):
             # randomly choose an index to un-mask
             mask[np.random.randint(0, final_idx)] = 1
         # print(mask)
-        # return self.masks[idx] * (traj - self.mean) / self.std, self.trajectory_type[idx], mask
-        return self.masks[idx] * (traj), self.trajectory_type[idx], mask
+        return self.masks[idx] * (traj - self.mean) / self.std, self.trajectory_type[idx], mask
+        # return self.masks[idx] * (traj), self.trajectory_type[idx], mask
 
     def compute_norm_constants(self):
         # compute norm constants not including the zero padding

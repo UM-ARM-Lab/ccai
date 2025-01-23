@@ -89,7 +89,7 @@ def train_model(trajectory_sampler, train_loader, config):
     for epoch in pbar:
         train_loss = 0.0
         trajectory_sampler.train()
-        for trajectories, traj_class, masks in tqdm.tqdm(train_loader):
+        for trajectories, traj_class, masks in (train_loader):
             trajectories = trajectories.to(device=config['device'])
             masks = masks.to(device=config['device'])
             B, T, dxu = trajectories.shape
@@ -382,7 +382,6 @@ def generate_simulated_data(model, loader, config, name=None):
         else:
             dx = 15
 
-
         B = trajectories.shape[0]
         trajectories = trajectories.to(device=config['device'])
         traj_class = traj_class.to(device=config['device'])
@@ -421,18 +420,23 @@ def train_classifier(model, train_loader, val_loader, config):
     pathlib.Path.mkdir(pathlib.Path(fpath), parents=True, exist_ok=True)
 
     # add classifier
-    model.model.diffusion_model.add_classifier()
+    model.model.diffusion_model.add_classifier(dim_mults=(1,2,4))
     model.model.diffusion_model.classifier = model.model.diffusion_model.classifier.to(device=config['device'])
     optimizer = torch.optim.Adam(model.model.diffusion_model.classifier.parameters(), lr=config['lr'])
 
     step = 0
+
+    best_val_loss = np.inf
     epochs = config['classifier_epochs']
     pbar = tqdm.tqdm(range(epochs))
     for epoch in pbar:
         train_loss = 0.0
         train_accuracy = 0.0
         model.train()
+        class_sum = 0
         for real_traj, real_class, real_masks, fake_traj, fake_class, fake_masks in train_loader:
+
+            class_sum += real_class.sum(0)
             B1, B2 = real_traj.shape[0], fake_traj.shape[0]
             trajectories = torch.cat((real_traj, fake_traj), dim=0).to(device=config['device'])
             context = torch.cat((real_class, fake_class), dim=0).to(device=config['device'])
@@ -451,7 +455,7 @@ def train_classifier(model, train_loader, val_loader, config):
 
         train_loss /= len(train_loader)
         train_accuracy /= len(train_loader)
-
+        print('class_sum', class_sum, len(train_loader.dataset))
         pbar.set_description(
             f'Train loss {train_loss:.3f}')
 
@@ -474,12 +478,16 @@ def train_classifier(model, train_loader, val_loader, config):
         val_loss /= len(val_loader)
 
         print(f'Epoch {epoch + 1} Train loss: {train_loss:.3f} Train accuracy: {train_accuracy:.3f} Val loss: {val_loss:.3f} Val accuracy: {val_accuracy:.3f}')
-        if (epoch + 1) % config['save_every'] == 0:
+        # if (epoch + 1) % config['save_every'] == 0:
+        if val_loss < best_val_loss:
             torch.save(model.state_dict(),
                        f'{fpath}/allegro_screwdriver_{config["model_type"]}_w_classifier.pt')
+            best_val_loss = val_loss
+            print('Model saved')
+            d = model.state_dict()
 
-    torch.save(model.state_dict(),
-               f'{fpath}/allegro_screwdriver_{config["model_type"]}_w_classifier.pt')
+    # torch.save(model.state_dict(),
+    #            f'{fpath}/allegro_screwdriver_{config["model_type"]}_w_classifier.pt')
 
 def eval_classifier(model, train_loader, config):
     step = 0
@@ -1121,7 +1129,6 @@ if __name__ == "__main__":
                                 shuffle=False)
 
     model = model.to(device=config['device'])
-    # model.model.diffusion_model.add_classifier(dim_mults=(1,2,4))
     # i = np.random.randint(low=0, high=len(train_dataset))
     # visualize_trajectory(train_dataset[i] * train_dataset.std + train_dataset.mean,
     #                     scene, scene_fpath=f'{CCAI_PATH}/examples', headless=False)

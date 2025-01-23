@@ -1,5 +1,5 @@
 ---
-model_name: 'allegro_screwdriver_recovery_new_best_traj_only'
+model_name: 'allegro_screwdriver_recovery_new_best_traj_only_2'
 T: 13
 dx: 15
 du: 21
@@ -11,7 +11,7 @@ eval_classifier: False
 plot: False
 vis_dataset: False
 epochs: 10000
-classifier_epochs: 55
+classifier_epochs: 15
 batch_size: 256
 lr: 1.0e-4
 model_type: 'diffusion'
