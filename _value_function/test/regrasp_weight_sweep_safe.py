@@ -6,7 +6,7 @@ import os
 from itertools import product
 from _value_function.screwdriver_problem import (
     init_env, pregrasp, regrasp, do_turn,
-    convert_partial_to_full_config, convert_full_to_partial_config
+    convert_partial_to_full_config, convert_full_to_partial_config, emailer
 )
 from _value_function.train_value_function import (
     Net, query_ensemble, load_ensemble
@@ -18,11 +18,8 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 import torch
 
-checkpoint_path = fpath /'test'/'weight_sweep'/'checkpoint.pkl'
-checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-
-def load_or_create_checkpoint():
+def load_or_create_checkpoint(starting_values):
     """
     Loads the checkpoint if it exists, otherwise creates a new default checkpoint.
     """
@@ -33,10 +30,10 @@ def load_or_create_checkpoint():
     else:
         print(f"No checkpoint found. Creating a new one at {checkpoint_path}")
         # Initial bounding ranges
-        vf_bounds = [100, 400]
-        other_bounds = [8, 16]
-        variance_ratio_bounds = [1, 10]
-        grid_size = 3
+        vf_bounds = starting_values['vf_bounds']
+        other_bounds = starting_values['other_bounds']
+        variance_ratio_bounds = starting_values['variance_ratio_bounds']
+        grid_size = starting_values['grid_size']
         
         # Create initial search grids
         vf_weights_init = np.logspace(
@@ -90,21 +87,16 @@ def load_or_create_checkpoint():
         }
     return checkpoint
 
-
 def save_checkpoint(checkpoint):
     """Saves the checkpoint to file."""
     with open(checkpoint_path, 'wb') as f:
         pkl.dump(checkpoint, f)
 
-
-def test(n_samples):
+def test(checkpoint, n_samples, which_weights): 
 
     # Load the data or environment objects once upfront
     pregrasps = pkl.load(open(f'{fpath}/test/initializations/weight_sweep_pregrasps.pkl', 'rb'))
     models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble(model_name="ensemble")
-    
-    # Load or create the checkpoint
-    checkpoint = load_or_create_checkpoint()
 
     # We extract frequently used fields from checkpoint for convenience
     iteration = checkpoint['iteration']
@@ -120,10 +112,6 @@ def test(n_samples):
         best_other_weight = checkpoint['best_other_weight']
         best_variance_ratio = checkpoint['best_variance_ratio']
         lowest_total_cost = checkpoint['lowest_total_cost']
-        
-        vf_range = checkpoint['vf_range']
-        other_range = checkpoint['other_range']
-        variance_ratio_range = checkpoint['variance_ratio_range']
         
         print("==========================================")
         print(f"Iteration {iteration+1} / {max_iterations}")
@@ -169,20 +157,36 @@ def test(n_samples):
 
                 pregrasp_pose = pregrasps[i]
                 env.reset(dof_pos=pregrasp_pose)
+                
+                if which_weights == "regrasp":
+                    regrasp_pose, regrasp_traj = regrasp(
+                        env, config, chain, state2ee_pos_partial, perception_noise=0,
+                        image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters,
+                        vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio
+                    )
 
-                regrasp_pose, regrasp_traj = regrasp(
-                    env, config, chain, state2ee_pos_partial, perception_noise=0,
-                    image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters,
-                    vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio
-                )
+                    _, turn_pose, succ, turn_traj = do_turn(
+                        regrasp_pose, config, env,
+                        sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
+                        perception_noise=0, image_path=img_save_dir, iters=turn_iters,
+                        mode='no_vf'
+                    )
 
-                # SET TO NO VF FOR NOW
-                _, turn_pose, succ, turn_traj = do_turn(
-                    regrasp_pose, config, env,
-                    sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
-                    perception_noise=0, image_path=img_save_dir, iters=turn_iters,
-                    mode='no_vf', vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio
-                )
+                elif which_weights == "turn":
+                    regrasp_pose, regrasp_traj = regrasp(
+                        env, config, chain, state2ee_pos_partial, perception_noise=0,
+                        image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
+                    )
+
+                    # SET TO NO VF FOR NOW
+                    _, turn_pose, succ, turn_traj = do_turn(
+                        regrasp_pose, config, env,
+                        sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
+                        perception_noise=0, image_path=img_save_dir, iters=turn_iters,
+                        mode='vf', vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio
+                    )
+                else:
+                    raise ValueError("which_weights must be either 'regrasp' or 'turn'")
 
                 turn_cost, _ = calculate_turn_cost(regrasp_pose.numpy(), turn_pose)
                 total_cost += turn_cost
@@ -271,6 +275,7 @@ def test(n_samples):
         
         # Save the refined checkpoint
         save_checkpoint(checkpoint)
+        emailer().send()
         
     # -- End while loop --
 
@@ -294,7 +299,11 @@ if __name__ == "__main__":
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
     sim_device = config['sim_device']
     
-    n_samples = 4
+    n_samples = 3
+    which_weights = "regrasp"
+
+    checkpoint_path = fpath /'test'/'weight_sweep'/f'checkpoint_{which_weights}.pkl'
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
     pregrasp_path = fpath /'test'/'initializations'/'weight_sweep_pregrasps.pkl'
 
@@ -303,5 +312,14 @@ if __name__ == "__main__":
         get_initializations(env, config, chain, sim_device, n_samples,
                             max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save=True,
                             do_pregrasp=True, name='weight_sweep_pregrasps')
+
+    starting_values = {
+        'vf_bounds': [50, 300],
+        'other_bounds': [5, 15],
+        'variance_ratio_bounds': [1, 10],
+        'grid_size': 3
+    }
+
+    initial_checkpoint = load_or_create_checkpoint(starting_values)
     
-    test(n_samples)
+    test(initial_checkpoint, n_samples, which_weights)

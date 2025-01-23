@@ -17,8 +17,8 @@ import time
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
-experiment_name = 'test_method_visualize_vf'
-calc_novf = False
+experiment_name = 'test_method_multi_step'
+calc_novf = True
 
 filename = f'test/{experiment_name}.pkl'
 with open(f'{fpath.resolve()}/{filename}', 'rb') as file:

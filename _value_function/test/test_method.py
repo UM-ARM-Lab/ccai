@@ -87,8 +87,8 @@ if __name__ == '__main__':
     regrasp_iters = 100
     turn_iters = 200
 
-    vf_weight = 273.8419634264361
-    other_weight = 11.547819846894582
+    vf_weight = 50
+    other_weight = 8
     variance_ratio = 1.0
 
     tuples = []
@@ -102,6 +102,7 @@ if __name__ == '__main__':
                             max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save=True,
                             do_pregrasp=True, name='weight_sweep_pregrasps')
     
+    pregrasp_path = fpath /'test'/'initializations'/'weight_sweep_pregrasps.pkl'
     pregrasps = pkl.load(open(pregrasp_path, 'rb'))
     delete_imgs()
 
@@ -168,4 +169,4 @@ if __name__ == '__main__':
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)
 
-    # emailer().send()
+    emailer().send()

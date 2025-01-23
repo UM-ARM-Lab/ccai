@@ -21,7 +21,7 @@ def validate_pregrasp_pose(pregrasp_pose):
         return True
     
 prog_id = 0
-trials_per_save = 10
+trials_per_save = 5
 perception_noise = 0.0
 pregrasp_iters = 80
 regrasp_iters = 100

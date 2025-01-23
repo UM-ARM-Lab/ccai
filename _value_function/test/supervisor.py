@@ -27,14 +27,23 @@ if __name__ == "__main__":
     parser.add_argument(
         "filename",
         type=str,
-        help="The final filename of the Python script to be monitored and restarted."
+        help="The Python script to be monitored and restarted."
     )
     args = parser.parse_args()
-    script_path = fpath / "_value_function/test" / args.filename
+
+    if args.filename == "data":
+        script_path = fpath / "_value_function/data_collect/get_regrasp_to_turning_dataset.py"
+    elif args.filename == "test_method":
+        script_path = fpath / "_value_function/test/test_method.py"
+    elif args.filename == "sweep":
+        script_path = fpath / "_value_function/test/regrasp_weight_sweep_safe.py"
+    else:
+        print(f"Error: Not a valid argument.")
+        exit()
 
     # Check if the constructed script path exists
     if not script_path.exists():
-        print(f"Error: The script file '{script_path}' does not exist.")
+        print(f"Error: Not a valid argument.")
         sys.exit(1)
 
     # Start monitoring and restarting on crash
