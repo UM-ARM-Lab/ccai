@@ -17,7 +17,7 @@ import time
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
-experiment_name = 'test_method_0'
+experiment_name = 'test_method_1'
 calc_novf = True
 
 filename = f'test/{experiment_name}.pkl'
@@ -26,16 +26,19 @@ with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
     # and results["vf"][(pregrasp_idx, repeat_idx)] -> [poses...], etc.
     results = pkl.load(file)
 
+    # print(results['vf'].keys())
+
 if __name__ == "__main__":
 
-    n_repeat = 2
-    n_trials = 2
+    method_names = list(results.keys())
+    first_method = method_names[0]
+    all_pairs = results[first_method].keys()  # e.g. {(0,0), (0,1), (1,0), (1,1), ...}
+    n_trials = max(k[0] for k in all_pairs) + 1
+    n_repeat = max(k[1] for k in all_pairs) + 1
 
-    # If your saved file has keys like "no_vf", "vf",
-    # define them here. If you have multiple VF keys
-    # (e.g. "vf_1_samples", "vf_2_samples", etc.),
-    # include them in this list:
-    method_names = ['vf', "no_vf"]
+    print(f"Inferred n_trials = {n_trials}, n_repeat = {n_repeat}")
+    print(f"Method names found: {method_names}")
+
     if calc_novf and "no_vf" in results:
         method_names.append("no_vf")
     # If you just have a single "vf" method:
@@ -59,7 +62,7 @@ if __name__ == "__main__":
                     results[method_name][(pregrasp_index, repeat_index)]
 
                 # Example function to compute "cost"
-                cost, _ = calculate_turn_cost(regrasp_pose, turn_pose)
+                cost, _ = calculate_turn_cost(regrasp_pose.numpy(), turn_pose)
                 all_costs.append(cost)
 
             # Average cost across the repeats for this pregrasp index
