@@ -416,7 +416,7 @@ def regrasp(env, config, chain, state2ee_pos_partial, perception_noise = 0, init
 
 
 def solve_turn(env, gym, viewer, params, fpath, initial_pose, state2ee_pos_partial, perception_noise = 0, 
-               image_path = None, sim_viz_env=None, ros_copy_node=None, iters = 200,
+               image_path = None, sim_viz_env=None, ros_copy_node=None, model_name = "ensemble", iters = 200,
                mode='vf', vf_weight = 100.0, other_weight = 0.1, variance_ratio = 5):
 
     obj_dof = 3
@@ -452,6 +452,7 @@ def solve_turn(env, gym, viewer, params, fpath, initial_pose, state2ee_pos_parti
             turn=True,
             obj_gravity=params.get('obj_gravity', False),
             min_force_dict=min_force_dict,
+            model_name=model_name,
             mode = mode,
             vf_weight=vf_weight,
             other_weight=other_weight,

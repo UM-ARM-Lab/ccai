@@ -12,12 +12,12 @@ def restart_on_crash(script_path):
         exit_code = process.returncode
 
         # if exit_code == 139:  # Segmentation fault exit code
-        
-        print("Program died or finished. Restarting... exit code:", exit_code)
-        time.sleep(1)  # Optional delay before restarting
-        # else:
-        #     print(f"Program exited with code: {exit_code}")
-        #     break  # Exit the loop if it exits normally
+        if exit_code == 0:  
+            print("Program exited normally.")
+            break
+        else:
+            print("Program died. Restarting... exit code:", exit_code)
+            time.sleep(1)  # Optional delay before restarting
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}')
@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     if args.filename == "data":
         script_path = fpath / "_value_function/data_collect/get_regrasp_to_turning_dataset.py"
-    elif args.filename == "test_method":
+    elif args.filename == "test":
         script_path = fpath / "_value_function/test/test_method.py"
     elif args.filename == "sweep":
         script_path = fpath / "_value_function/test/regrasp_weight_sweep_safe.py"

@@ -30,7 +30,7 @@ def index_and_sort_regrasp_and_turn_trajs(regrasp_trajs, turn_trajs):
 
     return poses
 
-def load_data(batch_size = 64, noisy = False):
+def load_data(batch_size = 64, noisy = False, dataset_size = None):
     if noisy:
         filename = '/regrasp_to_turn_datasets/noisy_combined_regrasp_to_turn_dataset.pkl'
     else:
@@ -41,6 +41,12 @@ def load_data(batch_size = 64, noisy = False):
     with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
         pose_cost_tuples  = pkl.load(file)
         regrasp_trajs, regrasp_costs, turn_trajs, turn_costs = zip(*pose_cost_tuples)
+    
+    if dataset_size is not None:
+        regrasp_trajs = regrasp_trajs[:dataset_size]
+        regrasp_costs = regrasp_costs[:dataset_size]
+        turn_trajs = turn_trajs[:dataset_size]
+        turn_costs = turn_costs[:dataset_size]
     
     T_rg = regrasp_trajs[0].shape[0]
     T_t = turn_trajs[0].shape[0]
@@ -185,7 +191,7 @@ def train(batch_size = 100, lr = 0.01, epochs = 205, neurons = 12, noisy = False
 def save(model_to_save, path):
     torch.save(model_to_save, path)
 
-def load_ensemble(device='cpu', model_name = "ensemble_throwerror"):
+def load_ensemble(device='cpu', model_name = "throwerror"):
     shape = (16,1)
     checkpoints = torch.load(f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
     models = []
@@ -338,5 +344,20 @@ if __name__ == "__main__":
         ensemble.append(net)
     torch.save(ensemble, path)
     eval(model_name = model_name, ensemble = True)
+
+    ######################################################
+    # Training networks with different dataset sizes
+
+    # for dataset_size in [100, 500, 1000, 5000]:
+    #     path = f'{fpath.resolve()}/value_functions/value_function_ensemble_{dataset_size}_samples.pkl'
+    #     # model_name = f'ensemble_{dataset_size}_samples'
+    #     ensemble = []
+    #     for i in range(16):
+    #         net, _ = train(noisy=noisy, epochs=61)
+    #         ensemble.append(net)
+    #     torch.save(ensemble, path)
+        
+
+
 
 

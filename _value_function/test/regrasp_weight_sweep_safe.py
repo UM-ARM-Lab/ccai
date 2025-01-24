@@ -18,7 +18,6 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 import torch
 
-
 def load_or_create_checkpoint(starting_values):
     """
     Loads the checkpoint if it exists, otherwise creates a new default checkpoint.
@@ -289,7 +288,6 @@ def test(checkpoint, n_samples, which_weights):
           f"best_variance_ratio={checkpoint['best_variance_ratio']}")
     print(f"  lowest_total_cost={checkpoint['lowest_total_cost']}")
 
-
 if __name__ == "__main__":
 
     max_screwdriver_tilt = 0.015
@@ -314,9 +312,9 @@ if __name__ == "__main__":
                             do_pregrasp=True, name='weight_sweep_pregrasps')
 
     starting_values = {
-        'vf_bounds': [50, 300],
-        'other_bounds': [5, 15],
-        'variance_ratio_bounds': [1, 10],
+        'vf_bounds': [20, 50, 100],
+        'other_bounds': [8, 12],
+        'variance_ratio_bounds': [0.5, 3],
         'grid_size': 3
     }
 

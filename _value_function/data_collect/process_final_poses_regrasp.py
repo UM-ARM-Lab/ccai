@@ -12,18 +12,8 @@ from scipy.spatial.transform import Rotation as R
 import pytorch_kinematics.transforms as tf
 import time
 from pathlib import Path
-
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
-
-noisy = False
-filenames = []
-if noisy:
-    for file in Path(f'{fpath.resolve()}/regrasp_to_turn_datasets').glob("noisy_regrasp_to_turn_dataset*.pkl"):
-        filenames.append(file)
-else:
-    for file in Path(f'{fpath.resolve()}/regrasp_to_turn_datasets').glob("regrasp_to_turn_dataset*.pkl"):
-        filenames.append(file)
 
 def calculate_turn_cost(initial_pose, final_pose):
     turn_angle = np.pi/2
@@ -65,8 +55,16 @@ def calculate_regrasp_cost(q):
 
     return total_cost
 
-
 if __name__ == "__main__":
+
+    noisy = False
+    filenames = []
+    if noisy:
+        for file in Path(f'{fpath.resolve()}/regrasp_to_turn_datasets').glob("noisy_regrasp_to_turn_dataset*.pkl"):
+            filenames.append(file)
+    else:
+        for file in Path(f'{fpath.resolve()}/regrasp_to_turn_datasets').glob("regrasp_to_turn_dataset*.pkl"):
+            filenames.append(file)
 
     combined_regrasp_poses = np.empty((0, 20))
     combined_regrasp_trajs = np.empty((0, 13, 20))
