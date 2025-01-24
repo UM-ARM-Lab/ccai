@@ -64,7 +64,7 @@ def load_data(batch_size = 64, noisy = False, dataset_size = None):
     poses_norm = (poses - poses_mean) / poses_std
 
     cost_weight = 1.0
-    discount_factor = 0.99
+    discount_factor = 1.0
     turn_costs = np.array(turn_costs).flatten()
     regrasp_costs = np.array(regrasp_costs).flatten()
     costs = regrasp_costs + turn_costs * cost_weight

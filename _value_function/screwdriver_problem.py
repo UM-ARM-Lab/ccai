@@ -322,17 +322,17 @@ def regrasp(env, config, chain, state2ee_pos_partial, perception_noise = 0, init
 
     actual_trajectory = []
 
-    fig = plt.figure()
-    axes = {params['fingers'][i]: fig.add_subplot(int(f'1{num_fingers}{i+1}'), projection='3d') for i in range(num_fingers)}
-    for finger in params['fingers']:
-        axes[finger].set_title(finger)
-        axes[finger].set_aspect('equal')
-        axes[finger].set_xlabel('x', labelpad=20)
-        axes[finger].set_ylabel('y', labelpad=20)
-        axes[finger].set_zlabel('z', labelpad=20)
-        axes[finger].set_xlim3d(-0.05, 0.1)
-        axes[finger].set_ylim3d(-0.06, 0.04)
-        axes[finger].set_zlim3d(1.32, 1.43)
+    # fig = plt.figure()
+    # axes = {params['fingers'][i]: fig.add_subplot(int(f'1{num_fingers}{i+1}'), projection='3d') for i in range(num_fingers)}
+    # for finger in params['fingers']:
+    #     axes[finger].set_title(finger)
+    #     axes[finger].set_aspect('equal')
+    #     axes[finger].set_xlabel('x', labelpad=20)
+    #     axes[finger].set_ylabel('y', labelpad=20)
+    #     axes[finger].set_zlabel('z', labelpad=20)
+    #     axes[finger].set_xlim3d(-0.05, 0.1)
+    #     axes[finger].set_ylim3d(-0.06, 0.04)
+    #     axes[finger].set_zlim3d(1.32, 1.43)
     finger_traj_history = {}
     for finger in params['fingers']:
         finger_traj_history[finger] = []

@@ -62,9 +62,9 @@ if __name__ == '__main__':
     screwdriver_noise_mag = 0.015
     finger_noise_mag = 0.25
 
-    pregrasp_iters = 1  # 80
-    regrasp_iters = 1   # 100
-    turn_iters = 1      # 200
+    pregrasp_iters = 80
+    regrasp_iters = 80
+    turn_iters = 100
 
     vf_weight_rg = 50
     other_weight_rg = 8

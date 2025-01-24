@@ -4,50 +4,33 @@ from _value_function.train_value_function import Net, query_ensemble, load_ensem
 import pathlib
 import numpy as np
 import pickle as pkl
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import random_split, DataLoader
-import wandb
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MultipleLocator
-from sklearn.decomposition import PCA
-import time
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
-experiment_name = 'test_method_1'
+experiment_name = 'test_method_2'
 calc_novf = True
 
 filename = f'test/{experiment_name}.pkl'
 with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
-    # 'results' is a dict: results["no_vf"][(pregrasp_idx, repeat_idx)] -> [poses...]
-    # and results["vf"][(pregrasp_idx, repeat_idx)] -> [poses...], etc.
     results = pkl.load(file)
-
-    # print(results['vf'].keys())
 
 if __name__ == "__main__":
 
-    method_names = list(results.keys())
+    # Get unique method names from the results dictionary
+    method_names = list(results.keys())  # Start with all keys in the results dict
+
+    # Automatically infer n_trials and n_repeat from the first method's data
     first_method = method_names[0]
-    all_pairs = results[first_method].keys()  # e.g. {(0,0), (0,1), (1,0), (1,1), ...}
+    all_pairs = results[first_method].keys()  # e.g., {(0,0), (0,1), ...}
     n_trials = max(k[0] for k in all_pairs) + 1
     n_repeat = max(k[1] for k in all_pairs) + 1
 
     print(f"Inferred n_trials = {n_trials}, n_repeat = {n_repeat}")
     print(f"Method names found: {method_names}")
 
-    if calc_novf and "no_vf" in results:
-        method_names.append("no_vf")
-    # If you just have a single "vf" method:
-    if "vf" in results:
-        method_names.append("vf")
-    # Otherwise, if you had many like "vf_1_samples", "vf_2_samples", ...
-    # you could gather them: 
-    #   method_names.extend(k for k in results.keys() if k.startswith("vf_"))
-
+    # Dictionary to hold data for plotting
     data = {}
     for method_name in method_names:
         data[method_name] = {
@@ -61,11 +44,11 @@ if __name__ == "__main__":
                 pregrasp_pose, regrasp_pose, regrasp_traj, turn_pose, turn_traj = \
                     results[method_name][(pregrasp_index, repeat_index)]
 
-                # Example function to compute "cost"
+                # Compute "cost"
                 cost, _ = calculate_turn_cost(regrasp_pose.numpy(), turn_pose)
                 all_costs.append(cost)
 
-            # Average cost across the repeats for this pregrasp index
+            # Average cost and standard deviation across repeats
             data[method_name]['costs'].append(np.mean(all_costs))
             data[method_name]['stds'].append(np.std(all_costs))
 

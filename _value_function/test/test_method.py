@@ -105,7 +105,7 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = '2'
+    test_name = '3'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -119,8 +119,8 @@ if __name__ == '__main__':
     finger_noise_mag = 0.25
 
     pregrasp_iters = 80
-    regrasp_iters = 100
-    turn_iters = 200
+    regrasp_iters = 80
+    turn_iters = 100
 
     vf_weight_rg = 50
     other_weight_rg = 8
