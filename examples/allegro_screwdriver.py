@@ -134,11 +134,11 @@ class AllegroScrewdriver(AllegroManipulationProblem):
         self.contact_points = None
         # if regrasp_fingers == ['index']:
         # if not test_recovery_trajectory:
-        self.contact_points = {
-            'index': (torch.tensor([0.00563815, -0.01147131,  0.20851198], device=device), 0.01),
-            'middle': (torch.tensor([ 0.02000177, -0.00662838,  0.16340923], device=device), 0.01),
-            'thumb': (torch.tensor([-0.02152098,  0.00736444,  0.13183959], device=device), 0.01),
-        }
+        # self.contact_points = {
+        #     'index': (torch.tensor([0.00563815, -0.01147131,  0.20851198], device=device), 0.01),
+        #     'middle': (torch.tensor([ 0.02000177, -0.00662838,  0.16340923], device=device), 0.01),
+        #     'thumb': (torch.tensor([-0.02152098,  0.00736444,  0.13183959], device=device), 0.01),
+        # }
         if len(regrasp_fingers) > 0 and self.contact_points is not None:
             contact_points_object = torch.stack([self.contact_points[finger][0] for finger in regrasp_fingers], dim=0)
         else:
@@ -238,53 +238,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             optimize_force=pregrasp_params['optimize_force'],
             default_dof_pos=env.default_dof_pos[:, :16],
             obj_gravity=pregrasp_params.get('obj_gravity', False),
-            full_dof_goal=pregrasp_params.get('compute_recovery_trajectory', False),
+            full_dof_goal=False,
             proj_path=proj_path,
-        )
-        # finger gate index
-        index_regrasp_problem = AllegroScrewdriver(
-            start=start[:4 * num_fingers + obj_dof],
-            goal=goal,
-            T=params['T'],
-            chain=params['chain'],
-            device=params['device'],
-            object_asset_pos=env.table_pose,
-            object_location=params['object_location'],
-            object_type=params['object_type'],
-            world_trans=env.world_trans,
-            regrasp_fingers=['index'],
-            contact_fingers=['middle', 'thumb'],
-            obj_dof=obj_dof,
-            obj_joint_dim=1,
-            optimize_force=params['optimize_force'],
-            default_dof_pos=env.default_dof_pos[:, :16],
-            obj_gravity=params.get('obj_gravity', False),
-            min_force_dict=min_force_dict,
-            full_dof_goal=params.get('compute_recovery_trajectory', False) or params.get('test_recovery_trajectory', False),
-            proj_path=proj_path,
-            project=params.get('compute_recovery_trajectory', False) or params.get('test_recovery_trajectory', False),
-        )
-        thumb_and_middle_regrasp_problem = AllegroScrewdriver(
-            start=start[:4 * num_fingers + obj_dof],
-            goal=goal,
-            T=params['T'],
-            chain=params['chain'],
-            device=params['device'],
-            object_asset_pos=env.table_pose,
-            object_location=params['object_location'],
-            object_type=params['object_type'],
-            world_trans=env.world_trans,
-            contact_fingers=['index'],
-            regrasp_fingers=['middle', 'thumb'],
-            obj_dof=obj_dof,
-            obj_joint_dim=1,
-            optimize_force=params['optimize_force'],
-            default_dof_pos=env.default_dof_pos[:, :16],
-            obj_gravity=params.get('obj_gravity', False),
-            min_force_dict=min_force_dict,
-            full_dof_goal=params.get('compute_recovery_trajectory', False) or params.get('test_recovery_trajectory', False),
-            proj_path=proj_path,
-            project=params.get('compute_recovery_trajectory', False) or params.get('test_recovery_trajectory', False),
         )
         turn_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
@@ -354,8 +309,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             proj_path=proj_path,
         )
         pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, pregrasp_params)
-        index_regrasp_planner = PositionControlConstrainedSVGDMPC(index_regrasp_problem, params)
-        thumb_and_middle_regrasp_planner = PositionControlConstrainedSVGDMPC(thumb_and_middle_regrasp_problem, params)
         turn_planner = PositionControlConstrainedSVGDMPC(turn_problem, params)
 
         thumb_regrasp_planner = PositionControlConstrainedSVGDMPC(thumb_regrasp_problem, params)
@@ -763,6 +716,57 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             contact[:, 0] = 1
             contact[:, 2] = 1
 
+        if mode == 'index':
+            # finger gate index
+            index_regrasp_problem = AllegroScrewdriver(
+                start=state[:4 * num_fingers + obj_dof],
+                goal=goal,
+                T=params['T'],
+                chain=params['chain'],
+                device=params['device'],
+                object_asset_pos=env.table_pose,
+                object_location=params['object_location'],
+                object_type=params['object_type'],
+                world_trans=env.world_trans,
+                regrasp_fingers=['index'],
+                contact_fingers=['middle', 'thumb'],
+                obj_dof=3,
+                obj_joint_dim=1,
+                optimize_force=params['optimize_force'],
+                default_dof_pos=env.default_dof_pos[:, :16],
+                obj_gravity=params.get('obj_gravity', False),
+                min_force_dict=None,
+                full_dof_goal=params.get('compute_recovery_trajectory', False) or params.get('test_recovery_trajectory', False) or params.get('live_recovery', False),
+                proj_path=None,
+                project=params.get('compute_recovery_trajectory', False) or params.get('test_recovery_trajectory', False) or params.get('live_recovery', False),
+            )
+            planner = PositionControlConstrainedSVGDMPC(index_regrasp_problem, params)
+
+        elif mode == 'thumb_middle':
+            thumb_and_middle_regrasp_problem = AllegroScrewdriver(
+                start=state[:4 * num_fingers + obj_dof],
+                goal=goal,
+                T=params['T'],
+                chain=params['chain'],
+                device=params['device'],
+                object_asset_pos=env.table_pose,
+                object_location=params['object_location'],
+                object_type=params['object_type'],
+                world_trans=env.world_trans,
+                contact_fingers=['index'],
+                regrasp_fingers=['middle', 'thumb'],
+                obj_dof=3,
+                obj_joint_dim=1,
+                optimize_force=params['optimize_force'],
+                default_dof_pos=env.default_dof_pos[:, :16],
+                obj_gravity=params.get('obj_gravity', False),
+                min_force_dict=None,
+                full_dof_goal=params.get('compute_recovery_trajectory', False) or params.get('test_recovery_trajectory', False) or params.get('live_recovery', False),
+                proj_path=None,
+                project=params.get('compute_recovery_trajectory', False) or params.get('test_recovery_trajectory', False) or params.get('live_recovery', False),
+            )
+            planner = PositionControlConstrainedSVGDMPC(thumb_and_middle_regrasp_problem, params)
+
         # contact = -torch.ones(params['N'], 3).to(device=params['device'])
         # contact[:, 0] = 1
         # contact[:, 1] = 1
@@ -974,8 +978,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             else:
                 action = best_traj
             if params.get('perturb_action', False) and mode == 'turn':
-                if np.random.rand() < .25:
-                    action[:, :4 * num_fingers_to_plan] += .15 * torch.randn_like(action[:, :4 * num_fingers_to_plan])
+                if np.random.rand() < .2:
+                    action[:, :4 * num_fingers_to_plan] += .1 * torch.randn_like(action[:, :4 * num_fingers_to_plan])
                 # action[:, :4 * 1] += .08 * torch.randn_like(action[:, :4 * 1])
             xu = torch.cat((state[:-1].cpu(), action[0].cpu()))
             actual_trajectory.append(xu)
@@ -1190,13 +1194,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         torch.cuda.empty_cache()
         return contact_sequence, next_node, initial_samples, goal_config
 
-    mode_planner_dict = {
-        'index': index_regrasp_planner,
-        'thumb_middle': thumb_and_middle_regrasp_planner,
-        'turn': turn_planner,
-        'thumb': thumb_regrasp_planner,
-        'middle': middle_regrasp_planner,
-    }
+    # mode_planner_dict = {
+    #     'index': index_regrasp_planner,
+    #     'thumb_middle': thumb_and_middle_regrasp_planner,
+    #     'turn': turn_planner,
+    #     'thumb': thumb_regrasp_planner,
+    #     'middle': middle_regrasp_planner,
+    # }
 
     def plan_recovery_contacts(state, stage):
         distances = []
@@ -1378,7 +1382,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # contact_sequence = ['thumb_middle']
     elif not sample_contact:
         contact_sequence = ['turn'] * 100
-        num_stages = len(contact_sequence)
+        num_stages = params['num_stages']
         # contact_sequence = ['turn']
         # for k in range(params['num_turns'] - 1):
         #     contact_options = ['index', 'thumb_middle']
@@ -1404,7 +1408,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     stage = 0
     all_stage = 0
     # for stage in range(num_stages):
-    while stage < num_stages:
+    while all_stage < num_stages:
         sample_contact = params['sample_contact'] and not recover
         initial_samples = None
         state = env.get_state()
@@ -1566,10 +1570,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         pre_recover = recover
         if contact == 'index':
             _goal = torch.tensor([0, 0, state[-1]]).to(device=params['device'])
-            if params.get('test_recovery_trajectory', False):
+            if params.get('test_recovery_trajectory', False) or params.get('live_recovery', False):
                 _goal = goal_config
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = execute_traj(
-                index_regrasp_planner, mode='index', goal=_goal, fname=f'index_regrasp_{all_stage}', initial_samples=initial_samples, recover=recover)
+                None, mode='index', goal=_goal, fname=f'index_regrasp_{all_stage}', initial_samples=initial_samples, recover=recover)
 
             if not recover:
                 plans = [torch.cat((plan[..., :-6],
@@ -1580,10 +1584,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                                 traj[..., -6:]), dim=-1)
         elif contact == 'thumb_middle':
             _goal = torch.tensor([0, 0, state[-1]]).to(device=params['device'])
-            if params.get('test_recovery_trajectory', False):
+            if params.get('test_recovery_trajectory', False) or params.get('live_recovery', False):
                 _goal = goal_config
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = execute_traj(
-                thumb_and_middle_regrasp_planner, mode='thumb_middle',
+                None, mode='thumb_middle',
                 goal=_goal, fname=f'thumb_middle_regrasp_{all_stage}', initial_samples=initial_samples, recover=recover)
             if not recover:
                 plans = [torch.cat((plan,
@@ -1716,7 +1720,8 @@ if __name__ == "__main__":
     # get config
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_only.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_live_recovery.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_live_recovery.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_recovery_as_contact_mode_planning.yaml').read_text())
 
     from tqdm import tqdm
 

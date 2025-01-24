@@ -1011,17 +1011,17 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                                                                             compute_hess=compute_hess,
                                                                             projected_diffusion=projected_diffusion)
         
-        h_patch, grad_h_contact, hess_h_contact, t_mask_contact = self._contact_patch_constraint(xu=xu.reshape(N, T, -1)[:, :, :self.dx + self.du],
-                                                                            compute_grads=compute_grads,
-                                                                            compute_hess=compute_hess,
-                                                                            projected_diffusion=projected_diffusion)
-        h = torch.cat((h, h_patch), dim=1)
-        t_mask = torch.cat((t_mask, t_mask_contact), dim=1)
+        # h_patch, grad_h_contact, hess_h_contact, t_mask_contact = self._contact_patch_constraint(xu=xu.reshape(N, T, -1)[:, :, :self.dx + self.du],
+        #                                                                     compute_grads=compute_grads,
+        #                                                                     compute_hess=compute_hess,
+        #                                                                     projected_diffusion=projected_diffusion)
+        # h = torch.cat((h, h_patch), dim=1)
+        # t_mask = torch.cat((t_mask, t_mask_contact), dim=1)
 
-        if compute_grads:
-            grad_h = torch.cat((grad_h, grad_h_contact), dim=1)
-        else:
-            grad_h = None
+        # if compute_grads:
+        #     grad_h = torch.cat((grad_h, grad_h_contact), dim=1)
+        # else:
+        #     grad_h = None
         if compute_hess:
             hess_h = torch.cat((hess_h, hess_h_contact), dim=1)
         else:
