@@ -978,8 +978,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             else:
                 action = best_traj
             if params.get('perturb_action', False) and mode == 'turn':
-                if np.random.rand() < .2:
-                    action[:, :4 * num_fingers_to_plan] += .1 * torch.randn_like(action[:, :4 * num_fingers_to_plan])
+                if np.random.rand() < .15:
+                    action[:, :4 * num_fingers_to_plan] += .17 * torch.randn_like(action[:, :4 * num_fingers_to_plan])
                 # action[:, :4 * 1] += .08 * torch.randn_like(action[:, :4 * 1])
             xu = torch.cat((state[:-1].cpu(), action[0].cpu()))
             actual_trajectory.append(xu)
@@ -1317,8 +1317,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # return likelihood, mean_obj_config, resampled_samples, resampled_likelihoods
 
     def plan_recovery_contacts_w_model(state):
-        likelihoods= []
-        mean_obj_configs = []
+
         modes = ['index', 'thumb_middle']
         # modes = ['thumb_middle']
         if params['sine_cosine']:
@@ -1330,19 +1329,27 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         contact_thumb_middle[:, 0] = 1
         contact_index[:, 1] = 1
         contact_index[:, 2] = 1
-
+        likelihoods= []
+        mean_obj_configs = []
         all_samples_ = {}
         all_likelihoods_ = {}
 
-        for mode in modes:
-            likelihood, mean_obj_config, all_samples, all_likelihoods = calc_samples_likeilhoods(mode, start_for_diff)
-            likelihoods.append(likelihood)
-            mean_obj_configs.append(mean_obj_config)
-            all_samples_[mode] = all_samples.detach().cpu()
-            all_likelihoods_[mode] = all_likelihoods.detach().cpu()
-            print(f'Likelihood for {mode}:', likelihood)
+        max_likelihood = 0
+        iter = 0
+        while max_likelihood < .5 and iter < 3:
+            likelihood_list = []
+            for mode in modes:
+                likelihood, mean_obj_config, all_samples, all_likelihoods = calc_samples_likeilhoods(mode, start_for_diff)
+                likelihoods.append(likelihood)
+                mean_obj_configs.append(mean_obj_config)
+                all_samples_[mode] = all_samples.detach().cpu()
+                all_likelihoods_[mode] = all_likelihoods.detach().cpu()
+                print(f'Likelihood for {mode}:', likelihood)
+                likelihood_list.append(likelihood)
+            iter += 1
+            max_likelihood = max(likelihood_list)
 
-        return [modes[np.argmax(likelihoods)]], mean_obj_configs[np.argmax(likelihoods)], all_samples_, all_likelihoods_
+        return [modes[np.argmax(likelihoods) % len(modes)]], mean_obj_configs[np.argmax(likelihoods)], all_samples_, all_likelihoods_
 
         # Repeat for thumb and middle
     def get_next_node(contact_sequence):
@@ -1720,8 +1727,8 @@ if __name__ == "__main__":
     # get config
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_only.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_live_recovery.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_recovery_as_contact_mode_planning.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_live_recovery.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_recovery_as_contact_mode_planning.yaml').read_text())
 
     from tqdm import tqdm
 
@@ -1890,8 +1897,8 @@ if __name__ == "__main__":
         print(f'\nTrial {i+1}')
     # for i in tqdm([1, 2, 4, 7]):
         if config['mode'] != 'hardware':
-            torch.manual_seed(i)
-            np.random.seed(i)
+            torch.manual_seed(i+100)
+            np.random.seed(i+100)
         # 8709 11200
 
         if config['compute_recovery_trajectory'] or config['test_recovery_trajectory'] or config['viz_states']:
@@ -1948,7 +1955,7 @@ if __name__ == "__main__":
             succ = False
             while not succ:
                 final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node,
-                                                seed=i, proj_path=None)
+                                                seed=i+100, proj_path=None)
                 succ = True
                 # try:
                 #     final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node,
