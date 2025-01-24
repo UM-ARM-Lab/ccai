@@ -1,5 +1,5 @@
 ---
-data_collection_id : "abhi"
+data_collection_id : "adam"
 T: 12
 use_arm: False
 receding_horizon: False
