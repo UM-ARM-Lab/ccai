@@ -19,7 +19,7 @@ def validate_pregrasp_pose(pregrasp_pose):
         return False
     else:
         return True
-    
+
 prog_id = 0
 trials_per_save = 5
 perception_noise = 0.0
@@ -31,6 +31,7 @@ delete_imgs()
 visualize = False
 config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
 sim_device = config['sim_device']
+computer_id = config['data_collection_id']
 
 
 while True:
@@ -78,17 +79,17 @@ while True:
         trials_done += 1
 
     if perception_noise == 0:
-        savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_dataset_{prog_id}.pkl'
+        savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_dataset_{computer_id}_{prog_id}.pkl'
     else:
-        savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_regrasp_to_turn_dataset_{prog_id}.pkl'
+        savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_regrasp_to_turn_dataset_{computer_id}_{prog_id}.pkl'
 
     while Path(savepath).exists():
         prog_id += 1
 
         if perception_noise == 0:
-            savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_dataset_{prog_id}.pkl'
+            savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_dataset_{computer_id}_{prog_id}.pkl'
         else:
-            savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_regrasp_to_turn_dataset_{prog_id}.pkl'
+            savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_regrasp_to_turn_dataset__{computer_id}_{prog_id}.pkl'
 
     pkl.dump(pose_tuples, open(savepath, 'wb'))
 
