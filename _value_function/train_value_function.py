@@ -114,7 +114,7 @@ class Net(nn.Module):
         return output.squeeze()
     
 
-def train(batch_size = 100, lr = 0.01, epochs = 205, neurons = 12, noisy = False, verbose=False):
+def train(batch_size = 100, lr = 0.01, epochs = 205, neurons = 12, noisy = False, verbose="normal"):
     shape = (16,1)
     
     # Initialize W&B
@@ -126,7 +126,10 @@ def train(batch_size = 100, lr = 0.01, epochs = 205, neurons = 12, noisy = False
     
     train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std = load_data(batch_size=batch_size, noisy = noisy)
 
-    model = Net(shape[0], shape[1], neurons = neurons)  # Instantiate the neural network model
+    # CHANGED FOR GPU: set device
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    model = Net(shape[0], shape[1], neurons = neurons).to(device)  # CHANGED FOR GPU: move model to device
     optimizer = torch.optim.Adam(model.parameters(), lr=lr) 
     criterion = nn.MSELoss()
 
@@ -137,6 +140,10 @@ def train(batch_size = 100, lr = 0.01, epochs = 205, neurons = 12, noisy = False
         running_loss = 0.0
         
         for inputs, labels in train_loader:
+            # CHANGED FOR GPU: move inputs/labels to device
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+
             # forward pass
             predicted_costs = model(inputs)
             loss = criterion(predicted_costs, labels)
@@ -149,15 +156,20 @@ def train(batch_size = 100, lr = 0.01, epochs = 205, neurons = 12, noisy = False
             running_loss += loss.item()
 
         # Eval
-        if verbose:
+        if verbose == "very":
             freq = 1
-        else:
+        elif verbose == "normal":
             freq = epochs // 3
+        else:
+            freq = epochs + 1
         if epoch == 0 or (epoch+1) % freq == 0:
             model.eval()
             test_loss = 0.0
             with torch.no_grad():
                 for inputs, labels in test_loader:
+                    # CHANGED FOR GPU: move inputs/labels to device
+                    inputs = inputs.to(device)
+                    labels = labels.to(device)
                     predicted_costs = model(inputs)
                     loss = criterion(predicted_costs, labels)
                     test_loss += loss.item()
@@ -191,12 +203,12 @@ def train(batch_size = 100, lr = 0.01, epochs = 205, neurons = 12, noisy = False
 def save(model_to_save, path):
     torch.save(model_to_save, path)
 
-def load_ensemble(device='cpu', model_name = "throwerror"):
+def load_ensemble(device='cpu', model_name = "throwerror", neurons = 512):
     shape = (16,1)
     checkpoints = torch.load(f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
     models = []
     for checkpoint in checkpoints:
-        model = Net(shape[0], shape[1])
+        model = Net(shape[0], shape[1], neurons = neurons)
         model.load_state_dict(checkpoint['model_state'])
         models.append(model.to(device))
 
@@ -302,10 +314,11 @@ if __name__ == "__main__":
     # eval(model_name = "2") 
     # exit()
 
-    # epoch_vals = [100, 130, 160]
+
+    # epoch_vals = [150]
     # lr_vals = [0.01]
     # batch_size_vals = [100]
-    # neuron_vals = [12]
+    # neuron_vals = [700, 800, 900]
     # results = []
     # total_epochs = np.sum(np.array(epoch_vals)) * len(lr_vals) * len(batch_size_vals) * len(neuron_vals)
     # epochs_completed = 0
@@ -315,7 +328,7 @@ if __name__ == "__main__":
     #         for batch_size in batch_size_vals:
     #             for neurons in neuron_vals:
     #                 print(f'On Epoch {epochs_completed}/{total_epochs}')
-    #                 model_to_save, test_loss = train(batch_size = batch_size, lr = lr, epochs = epoch, neurons = neurons)
+    #                 model_to_save, test_loss = train(batch_size = batch_size, lr = lr, epochs = epoch, neurons = neurons, verbose = "very")
     #                 results.append(f'Epochs: {epoch}, LR: {lr}, Batch Size: {batch_size}, Neurons: {neurons}, Test Loss: {test_loss}')
     #                 if test_loss < min_test_loss:
     #                     min_test_loss = test_loss
@@ -327,9 +340,6 @@ if __name__ == "__main__":
     # print(f'Best result: {best_result}')
     # exit()
 
-    # net, _ = train(noisy=False, epochs=200, verbose=True)
-    # exit()
-
     noisy = False
     if noisy:
         path = f'{fpath.resolve()}/value_functions/value_function_ensemble_noisy.pkl'
@@ -339,8 +349,8 @@ if __name__ == "__main__":
         model_name = "ensemble"
 
     ensemble = []
-    for i in range(16):
-        net, _ = train(noisy=noisy, epochs=61)
+    for i in range(8):
+        net, _ = train(noisy=noisy, epochs=151, neurons = 512, verbose='normal')
         ensemble.append(net)
     torch.save(ensemble, path)
     eval(model_name = model_name, ensemble = True)
@@ -356,8 +366,3 @@ if __name__ == "__main__":
     #         net, _ = train(noisy=noisy, epochs=61)
     #         ensemble.append(net)
     #     torch.save(ensemble, path)
-        
-
-
-
-

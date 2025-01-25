@@ -127,10 +127,6 @@ def test(checkpoint, n_samples, which_weights):
         if iteration not in checkpoint['tested_combinations']:
             checkpoint['tested_combinations'][iteration] = set()
 
-        # n_samples, etc. can be adjusted or passed as parameters
-        regrasp_iters = 100
-        turn_iters = 100
-
         # We'll do a fresh pass at finding the best combination in this iteration
         iteration_best_cost = float('inf')
         iteration_best_combo = (None, None, None)
@@ -294,10 +290,14 @@ if __name__ == "__main__":
     screwdriver_noise_mag = 0.015
     finger_noise_mag = 0.25
 
-    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=False)
+    regrasp_iters = 50
+    turn_iters = 100
+    visualize = True   
+
+    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
     sim_device = config['sim_device']
     
-    n_samples = 3
+    n_samples = 5
     which_weights = "regrasp"
 
     checkpoint_path = fpath /'test'/'weight_sweep'/f'checkpoint_{which_weights}.pkl'
@@ -312,7 +312,7 @@ if __name__ == "__main__":
                             do_pregrasp=True, name='weight_sweep_pregrasps')
 
     starting_values = {
-        'vf_bounds': [20, 50, 100],
+        'vf_bounds': [20, 80],
         'other_bounds': [8, 12],
         'variance_ratio_bounds': [0.5, 3],
         'grid_size': 3
