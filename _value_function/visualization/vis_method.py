@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
-experiment_name = 'test_method_2'
+experiment_name = 'test_method_sanity3'
 calc_novf = True
 
 filename = f'test/{experiment_name}.pkl'
