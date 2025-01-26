@@ -47,14 +47,16 @@ if __name__ == '__main__':
     checkpoint_path = fpath / 'test' / 'compare_sizes' / f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    vf_sizes = [1, 2, 4, 8]
-    vf_names = []
-    # (Original loop adjusted slightly so it actually uses vf_sizes[i] for the label)
-    for i in range(len(vf_sizes)):
-        vf_names.append(f"vf_{vf_sizes[i]}_samples")
+    # vf_sizes = [1, 2, 4, 8]
+    # vf_names = []
+    # # (Original loop adjusted slightly so it actually uses vf_sizes[i] for the label)
+    # for i in range(len(vf_sizes)):
+    #     vf_names.append(f"vf_{vf_sizes[i]}_samples")
 
-    n_trials = 2
-    n_repeat = 2
+    vf_names = ["ensemble", "ensemble_big"]
+
+    n_trials = 5
+    n_repeat = 1
     perception_noise = 0.0
     calc_novf = True
 
@@ -63,16 +65,16 @@ if __name__ == '__main__':
     finger_noise_mag = 0.25
 
     pregrasp_iters = 80
-    regrasp_iters = 80
+    regrasp_iters = 50
     turn_iters = 100
 
-    vf_weight_rg = 50
+    vf_weight_rg = 12
     other_weight_rg = 8
-    variance_ratio_rg = 1.0
+    variance_ratio_rg = 2
 
-    vf_weight_t = 50
+    vf_weight_t = 12
     other_weight_t = 8
-    variance_ratio_t = 1.0
+    variance_ratio_t = 2
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
 
@@ -130,14 +132,13 @@ if __name__ == '__main__':
                     env, config, chain, state2ee_pos_partial, perception_noise=0,
                     image_path=img_save_dir, initialization=pregrasp_pose,
                     mode='no_vf', iters=regrasp_iters
-                    # (vf_weight, other_weight, variance_ratio not needed in no_vf)
                 )
 
                 _, turn_pose_novf, succ_novf, turn_traj_novf = do_turn(
                     regrasp_pose_novf, config, env,
                     sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                     perception_noise=0, image_path=img_save_dir, iters=turn_iters,
-                    mode='no_vf'  # likewise
+                    mode='no_vf'  
                 )
 
                 result_novf = [

@@ -203,9 +203,11 @@ def train(batch_size = 100, lr = 0.01, epochs = 205, neurons = 12, noisy = False
 def save(model_to_save, path):
     torch.save(model_to_save, path)
 
-def load_ensemble(device='cpu', model_name = "throwerror", neurons = 512):
+def load_ensemble(device='cpu', model_name = "throwerror"):
+
     shape = (16,1)
     checkpoints = torch.load(f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
+    neurons = checkpoints[0]["model_state"]["fc1.weight"].shape[0]
     models = []
     for checkpoint in checkpoints:
         model = Net(shape[0], shape[1], neurons = neurons)
@@ -349,8 +351,9 @@ if __name__ == "__main__":
         model_name = "ensemble"
 
     ensemble = []
-    for i in range(8):
+    for i in range(16):
         net, _ = train(noisy=noisy, epochs=151, neurons = 512, verbose='normal')
+        # net, _ = train(noisy=noisy, epochs=31, neurons = 12, verbose='normal')
         ensemble.append(net)
     torch.save(ensemble, path)
     eval(model_name = model_name, ensemble = True)

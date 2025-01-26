@@ -35,6 +35,8 @@ if __name__ == "__main__":
         script_path = fpath / "_value_function/data_collect/get_regrasp_to_turning_dataset.py"
     elif args.filename == "test":
         script_path = fpath / "_value_function/test/test_method.py"
+    elif args.filename == "test2":
+        script_path = fpath / "_value_function/test/compare_dataset_sizes.py"
     elif args.filename == "sweep":
         script_path = fpath / "_value_function/test/regrasp_weight_sweep_safe.py"
     else:
