@@ -290,7 +290,7 @@ if __name__ == "__main__":
     screwdriver_noise_mag = 0.015
     finger_noise_mag = 0.25
 
-    regrasp_iters = 50
+    regrasp_iters = 100
     turn_iters = 100
     visualize = True   
 
@@ -312,9 +312,9 @@ if __name__ == "__main__":
                             do_pregrasp=True, name='weight_sweep_pregrasps')
 
     starting_values = {
-        'vf_bounds': [20, 80],
-        'other_bounds': [8, 12],
-        'variance_ratio_bounds': [0.5, 3],
+        'vf_bounds': [5, 50],
+        'other_bounds': [1, 15],
+        'variance_ratio_bounds': [1.0, 3.0],
         'grid_size': 3
     }
 

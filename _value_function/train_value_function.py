@@ -352,8 +352,9 @@ if __name__ == "__main__":
 
     ensemble = []
     for i in range(16):
-        net, _ = train(noisy=noisy, epochs=151, neurons = 512, verbose='normal')
+        # net, _ = train(noisy=noisy, epochs=151, neurons = 512, verbose='normal')
         # net, _ = train(noisy=noisy, epochs=31, neurons = 12, verbose='normal')
+        net, _ = train(noisy=noisy, epochs=50, neurons = 32, verbose='very')
         ensemble.append(net)
     torch.save(ensemble, path)
     eval(model_name = model_name, ensemble = True)

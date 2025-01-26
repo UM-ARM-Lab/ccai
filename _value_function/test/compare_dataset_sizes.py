@@ -65,8 +65,8 @@ if __name__ == '__main__':
     finger_noise_mag = 0.25
 
     pregrasp_iters = 80
-    regrasp_iters = 50
-    turn_iters = 100
+    regrasp_iters = 100
+    turn_iters = 200
 
     vf_weight_rg = 12
     other_weight_rg = 8
