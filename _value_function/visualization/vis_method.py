@@ -8,13 +8,16 @@ import matplotlib.pyplot as plt
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
+import torch
 
-experiment_name = 'test_method_sanity3'
+experiment_name = 'test_method_sanity5'
 calc_novf = True
 
 filename = f'test/{experiment_name}.pkl'
 with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
     results = pkl.load(file)
+
+models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble(model_name = "ensemble")
 
 if __name__ == "__main__":
 
@@ -35,10 +38,15 @@ if __name__ == "__main__":
     for method_name in method_names:
         data[method_name] = {
             'costs': [],
-            'stds': []
+            'stds': [],
+            'pred_costs': [],
+            'pred_stds': []
         }
         for pregrasp_index in range(n_trials):
             all_costs = []
+            all_pred_costs = []
+            all_pred_stds = []
+
             for repeat_index in range(n_repeat):
                 # Retrieve the stored poses for this method and (pregrasp_index, repeat_index)
                 pregrasp_pose, regrasp_pose, regrasp_traj, turn_pose, turn_traj = \
@@ -48,34 +56,69 @@ if __name__ == "__main__":
                 cost, _ = calculate_turn_cost(regrasp_pose.numpy(), turn_pose)
                 all_costs.append(cost)
 
+                # Query the value-function ensemble
+                input_norm = ((convert_full_to_partial_config(regrasp_pose) - poses_mean) / poses_std).flatten().float()
+                input_norm = torch.cat([input_norm, torch.tensor([0.0], dtype=torch.float32)], dim=0)
+
+                vf_output_norm = query_ensemble(input_norm, models)
+                vf_output = vf_output_norm * cost_std + cost_mean
+
+                pred_mean = torch.mean(vf_output)
+                pred_std = torch.std(vf_output)
+
+                all_pred_costs.append(pred_mean.item())
+                all_pred_stds.append(pred_std.item())
+
             # Average cost and standard deviation across repeats
             data[method_name]['costs'].append(np.mean(all_costs))
             data[method_name]['stds'].append(np.std(all_costs))
 
+            data[method_name]['pred_costs'].append(np.mean(all_pred_costs))
+            data[method_name]['pred_stds'].append(np.mean(all_pred_stds))
+
     # ---- Plotting ----
     plt.figure(figsize=(10, 5))
-    method_offset = 0.03  # spacing offset for each method
 
-    for method_name in method_names:
-        # x positions for the bars/points
-        x = np.arange(len(data[method_name]['costs'])) + (method_names.index(method_name) * method_offset)
+    # These offsets help shift the actual cost vs the predicted cost horizontally
+    # so that they don't overlap exactly on top of each other.
+    method_offset = 0.15  # spacing offset for each method group
+    pred_offset = 0.05    # spacing offset for predicted bars within the same method group
+
+    for method_i, method_name in enumerate(method_names):
+        # x positions for the actual cost
+        x_actual = np.arange(len(data[method_name]['costs'])) + method_i * method_offset
+        # x positions for predicted cost (shift from x_actual by pred_offset)
+        x_pred = x_actual + pred_offset
+
+        # Plot actual costs with error bars
         plt.errorbar(
-            x, 
+            x_actual, 
             data[method_name]['costs'], 
             yerr=data[method_name]['stds'], 
-            fmt='.', 
-            label=f'Cost, {method_name.upper()}', 
+            fmt='o',  # marker shape
+            label=f'Cost ({method_name.upper()})', 
             linestyle='None', 
             capsize=3
         )
-    
+
+        # Plot predicted costs with error bars
+        plt.errorbar(
+            x_pred,
+            data[method_name]['pred_costs'],
+            yerr=data[method_name]['pred_stds'],
+            fmt='x',   # different marker shape
+            label=f'Predicted ({method_name.upper()})',
+            linestyle='None',
+            capsize=3
+        )
+
     ts = 16
     plt.xlabel('Pregrasp Index', fontsize=ts)
     plt.ylabel('Cost Value', fontsize=ts)
     plt.title('Turning Costs by Method', fontsize=ts)
     plt.xticks(fontsize=ts-2)
     plt.yticks(fontsize=ts-2)
-    plt.legend(loc='upper right', fontsize=ts)
+    plt.legend(loc='upper right', fontsize=ts-2)
 
     # If you have both "no_vf" and "vf", compute the average cost difference
     if calc_novf and "no_vf" in data and "vf" in data:

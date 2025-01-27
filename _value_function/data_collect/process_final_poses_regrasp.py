@@ -97,19 +97,6 @@ if __name__ == "__main__":
                     processed_turn_trajectories.append(traj)
 
             turn_trajs= np.array(processed_turn_trajectories).reshape(turn_poses.shape[0], -1, 20)
-
-            # processed_regrasp_trajectories = []
-            # for traj in regrasp_trajs:
-            #     if traj.shape[0] < 12:
-            #         rows_to_add = 12 - traj.shape[0]
-            #         last_row = traj[-1]
-            #         padding = np.tile(last_row, (rows_to_add, 1))
-            #         padded_traj = np.vstack((traj, padding))
-            #         processed_regrasp_trajectories.append(padded_traj)
-            #     else:
-            #         processed_regrasp_trajectories.append(traj)
-
-            # regrasp_trajs= np.array(processed_regrasp_trajectories).reshape(regrasp_poses.shape[0], -1, 20)
             
             combined_turn_trajs = np.concatenate((combined_turn_trajs, turn_trajs), axis=0)
             combined_regrasp_trajs = np.concatenate((combined_regrasp_trajs, regrasp_trajs), axis=0)

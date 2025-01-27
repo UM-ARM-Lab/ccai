@@ -19,16 +19,9 @@ def index_and_sort_regrasp_and_turn_trajs(regrasp_trajs, turn_trajs):
     regrasp_poses = regrasp_stacked.reshape(-1, 20)
     regrasp_poses = convert_full_to_partial_config(regrasp_poses)
 
-    turn_stacked = np.stack(turn_trajs, axis=0)
-    turn_poses = turn_stacked.reshape(-1, 20)
-    turn_poses = convert_full_to_partial_config(turn_poses)
+    # poses = np.empty((regrasp_poses.shape[0], regrasp_poses.shape[1]), dtype=regrasp_poses.dtype)
 
-    poses = np.empty((regrasp_poses.shape[0] + turn_poses.shape[0], regrasp_poses.shape[1]), dtype=regrasp_poses.dtype)
-    assert(regrasp_poses.shape == turn_poses.shape)
-    poses[0::2] = regrasp_poses  # Fill even indices with elements from array1
-    poses[1::2] = turn_poses  # Fill odd indices with elements from array2
-
-    return poses
+    return regrasp_poses
 
 def load_data(batch_size = 64, noisy = False, dataset_size = None):
     if noisy:
@@ -49,8 +42,7 @@ def load_data(batch_size = 64, noisy = False, dataset_size = None):
         turn_costs = turn_costs[:dataset_size]
     
     T_rg = regrasp_trajs[0].shape[0]
-    T_t = turn_trajs[0].shape[0]
-    T = T_rg + T_t
+    T = T_rg
     n_trajs = len(regrasp_trajs)
     print(f'Loaded {n_trajs} trials, which will create {n_trajs*T} samples')
 
@@ -63,15 +55,16 @@ def load_data(batch_size = 64, noisy = False, dataset_size = None):
     poses_mean, poses_std = np.mean(poses[:split_idx], axis=0), np.std(poses[:split_idx], axis=0)
     poses_norm = (poses - poses_mean) / poses_std
 
-    cost_weight = 1.0
-    discount_factor = 1.0
     turn_costs = np.array(turn_costs).flatten()
-    regrasp_costs = np.array(regrasp_costs).flatten()
-    costs = regrasp_costs + turn_costs * cost_weight
-    costs = np.repeat(costs, T)
-    powers = np.arange(T-1, -1, -1)
-    discounts = np.repeat(np.power(discount_factor, powers), n_trajs)
-    costs = costs * discounts
+    # cost_weight = 1.0
+    # discount_factor = 1.0
+    # regrasp_costs = np.array(regrasp_costs).flatten()
+    # costs = regrasp_costs + turn_costs * cost_weight
+    # costs = np.repeat(costs, T)
+    # powers = np.arange(T-1, -1, -1)
+    # discounts = np.repeat(np.power(discount_factor, powers), n_trajs)
+    # costs = costs * discounts
+    costs = np.repeat(turn_costs, T)
     
     cost_mean, cost_std = np.mean(costs[:split_idx]), np.std(costs[:split_idx])
     costs_norm = (costs - cost_mean) / cost_std
@@ -80,7 +73,7 @@ def load_data(batch_size = 64, noisy = False, dataset_size = None):
     indices = np.tile(np.arange(T), n_trajs).reshape(-1, 1)
     poses_norm = np.hstack([poses_norm, indices])
 
-    # Convert to tensorss
+    # Convert to tensors
     poses_tensor = torch.from_numpy(poses_norm).float()
     costs_tensor = torch.from_numpy(costs_norm).float()
 
@@ -114,7 +107,7 @@ class Net(nn.Module):
         return output.squeeze()
     
 
-def train(batch_size = 100, lr = 0.01, epochs = 205, neurons = 12, noisy = False, verbose="normal"):
+def train(batch_size = 100, lr = 0.001, epochs = 205, neurons = 12, noisy = False, verbose="normal"):
     shape = (16,1)
     
     # Initialize W&B
@@ -162,11 +155,14 @@ def train(batch_size = 100, lr = 0.01, epochs = 205, neurons = 12, noisy = False
             freq = epochs // 3
         else:
             freq = epochs + 1
+
         if epoch == 0 or (epoch+1) % freq == 0:
             model.eval()
             test_loss = 0.0
             with torch.no_grad():
                 for inputs, labels in test_loader:
+                    if np.isnan(inputs).any() or np.isnan(labels).any():
+                        print("issue")
                     # CHANGED FOR GPU: move inputs/labels to device
                     inputs = inputs.to(device)
                     labels = labels.to(device)
@@ -248,6 +244,8 @@ def eval(model_name, ensemble=False):
             predicted_values = []
 
             for inputs, labels in loader:
+                if np.isnan(inputs).any() or np.isnan(labels).any():
+                    print("issue")
                 if not ensemble:
                     predictions = model(inputs)
                 else:
@@ -256,6 +254,8 @@ def eval(model_name, ensemble=False):
                     prediction_std = ensemble_predictions.std(dim=0)  # Calculate standard deviation for error bars
                     prediction_stds.append(prediction_std.numpy())
 
+                if np.isnan(predictions).any():
+                    print("issue")
                 predicted_values.append(predictions.numpy())
                 actual_values.append(labels.numpy())
 
@@ -353,8 +353,8 @@ if __name__ == "__main__":
     ensemble = []
     for i in range(16):
         # net, _ = train(noisy=noisy, epochs=151, neurons = 512, verbose='normal')
-        # net, _ = train(noisy=noisy, epochs=31, neurons = 12, verbose='normal')
-        net, _ = train(noisy=noisy, epochs=50, neurons = 32, verbose='very')
+        net, _ = train(noisy=noisy, epochs=301, neurons = 512, verbose='very')
+        # net, _ = train(noisy=noisy, epochs=30, neurons = 32, verbose='very')
         ensemble.append(net)
     torch.save(ensemble, path)
     eval(model_name = model_name, ensemble = True)
