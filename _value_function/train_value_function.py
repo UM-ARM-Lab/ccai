@@ -5,7 +5,7 @@ import pickle as pkl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import random_split, DataLoader
+from torch.utils.data import random_split, DataLoader, TensorDataset, Subset
 import wandb
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
@@ -18,8 +18,6 @@ def index_and_sort_regrasp_and_turn_trajs(regrasp_trajs, turn_trajs):
     regrasp_stacked = np.stack(regrasp_trajs, axis=0)
     regrasp_poses = regrasp_stacked.reshape(-1, 20)
     regrasp_poses = convert_full_to_partial_config(regrasp_poses)
-
-    # poses = np.empty((regrasp_poses.shape[0], regrasp_poses.shape[1]), dtype=regrasp_poses.dtype)
 
     return regrasp_poses
 
@@ -51,45 +49,51 @@ def load_data(batch_size = 64, noisy = False, dataset_size = None):
     num_samples = len(poses)
     split_idx = int(num_samples * (1 - validation_proportion))
 
-    # normalize
-    poses_mean, poses_std = np.mean(poses[:split_idx], axis=0), np.std(poses[:split_idx], axis=0)
-    poses_norm = (poses - poses_mean) / poses_std
-
     turn_costs = np.array(turn_costs).flatten()
-    # cost_weight = 1.0
-    # discount_factor = 1.0
-    # regrasp_costs = np.array(regrasp_costs).flatten()
-    # costs = regrasp_costs + turn_costs * cost_weight
-    # costs = np.repeat(costs, T)
-    # powers = np.arange(T-1, -1, -1)
-    # discounts = np.repeat(np.power(discount_factor, powers), n_trajs)
-    # costs = costs * discounts
     costs = np.repeat(turn_costs, T)
-    
-    cost_mean, cost_std = np.mean(costs[:split_idx]), np.std(costs[:split_idx])
+
+    # --------------------------------------------------
+    # FIX: Shuffle once, then split for train/test stats
+    # --------------------------------------------------
+    indices = np.random.permutation(num_samples)
+    train_indices = indices[:split_idx]
+    test_indices = indices[split_idx:]
+
+    # Compute statistics from the *training* subset only
+    poses_mean, poses_std = np.mean(poses[train_indices], axis=0), np.std(poses[train_indices], axis=0)
+    cost_mean, cost_std = np.mean(costs[train_indices]), np.std(costs[train_indices])
+
+    # Normalize entire dataset with train-only stats
+    min_std_threshold = 1e-5
+    poses_std = np.where(poses_std < min_std_threshold, min_std_threshold, poses_std)
+    cost_std = max(cost_std, min_std_threshold)
+
+    poses_norm = (poses - poses_mean) / poses_std
     costs_norm = (costs - cost_mean) / cost_std
 
-    # add indices
-    indices = np.tile(np.arange(T), n_trajs).reshape(-1, 1)
-    poses_norm = np.hstack([poses_norm, indices])
+    # Add indices as before
+    # (repeats the same indexing logic from original code)
+    T_array = np.tile(np.arange(T), n_trajs).reshape(-1, 1)
+    poses_norm = np.hstack([poses_norm, T_array])
 
     # Convert to tensors
     poses_tensor = torch.from_numpy(poses_norm).float()
     costs_tensor = torch.from_numpy(costs_norm).float()
 
-    # Split the dataset into training and test sets
-    dataset = torch.utils.data.TensorDataset(poses_tensor, costs_tensor)
-    train_size = int((1-validation_proportion) * len(dataset))
-    test_size = len(dataset) - train_size
+    # Build final dataset
+    dataset = TensorDataset(poses_tensor, costs_tensor)
+
+    # Subset the dataset for training and test
+    train_dataset = Subset(dataset, train_indices)
+    test_dataset = Subset(dataset, test_indices)
+
+    train_size = len(train_dataset)
+    test_size = len(test_dataset)
     print(f'Train size: {train_size}, Test size: {test_size}')
-    train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 
     # Create data loaders
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
-    min_std_threshold = 1e-5
-    poses_std = np.where(poses_std < min_std_threshold, min_std_threshold, poses_std)
 
     return train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std
 
@@ -227,8 +231,7 @@ def query_ensemble(poses, models, device='cpu'):
 def eval(model_name, ensemble=False):
     shape = (16, 1)
     
-    #model_name = input("Enter model name: ")
-    train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std = load_data()
+    train_loader, test_loader, _,_,_,_ = load_data()
     if not ensemble:
         model = Net(shape[0], shape[1])
         checkpoint = torch.load(f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
@@ -288,6 +291,7 @@ def eval(model_name, ensemble=False):
             if ensemble:
                 plt.errorbar(range(num_samples), predicted_values, yerr=prediction_stds, fmt='o', 
                              label='Predicted Values', color='blue', elinewidth=2, capsize=3)
+                print(prediction_stds)
             else:
                 plt.scatter(range(num_samples), predicted_values, label='Predicted Values', color='blue')
 
@@ -305,42 +309,10 @@ def eval(model_name, ensemble=False):
             plt.tight_layout()
             plt.show()
     
-    plot_loader(train_loader, 50, 'Training Set')
-    plot_loader(test_loader, 50, 'Test Set')
+    plot_loader(train_loader, 100, 'Training Set')
+    plot_loader(test_loader, 10, 'Test Set')
 
 if __name__ == "__main__":
-
-    # model_name = "2"#input("Enter model name: ")
-    # model_to_save, _ = train()
-    # save(model_to_save, f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
-    # eval(model_name = "2") 
-    # exit()
-
-
-    # epoch_vals = [150]
-    # lr_vals = [0.01]
-    # batch_size_vals = [100]
-    # neuron_vals = [700, 800, 900]
-    # results = []
-    # total_epochs = np.sum(np.array(epoch_vals)) * len(lr_vals) * len(batch_size_vals) * len(neuron_vals)
-    # epochs_completed = 0
-    # min_test_loss = float('inf')
-    # for epoch in epoch_vals:
-    #     for lr in lr_vals:
-    #         for batch_size in batch_size_vals:
-    #             for neurons in neuron_vals:
-    #                 print(f'On Epoch {epochs_completed}/{total_epochs}')
-    #                 model_to_save, test_loss = train(batch_size = batch_size, lr = lr, epochs = epoch, neurons = neurons, verbose = "very")
-    #                 results.append(f'Epochs: {epoch}, LR: {lr}, Batch Size: {batch_size}, Neurons: {neurons}, Test Loss: {test_loss}')
-    #                 if test_loss < min_test_loss:
-    #                     min_test_loss = test_loss
-    #                     best_result = results[-1]
-    #                 epochs_completed += epoch
-    
-    # for result in results:
-    #     print(result)
-    # print(f'Best result: {best_result}')
-    # exit()
 
     noisy = False
     if noisy:
@@ -350,25 +322,27 @@ if __name__ == "__main__":
         path = f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl'
         model_name = "ensemble"
 
-    # ensemble = []
-    # for i in range(16):
-    #     # net, _ = train(noisy=noisy, epochs=151, neurons = 512, verbose='normal')
-    #     net, _ = train(noisy=noisy, epochs=301, neurons = 512, verbose='very')
-    #     # net, _ = train(noisy=noisy, epochs=30, neurons = 32, verbose='very')
-    #     ensemble.append(net)
-    # torch.save(ensemble, path)
-    # eval(model_name = model_name, ensemble = True)
+    # model_name = "ensemble_accurate"
+    ensemble = []
+    for i in range(16):
+        # net, _ = train(noisy=noisy, epochs=151, neurons = 512, verbose='normal')
+        # net, _ = train(noisy=noisy, epochs=301, neurons = 512, verbose='normal')
+        net, _ = train(noisy=noisy, epochs=61, neurons = 512, verbose='normal')
+        ensemble.append(net)
+    torch.save(ensemble, path)
+    eval(model_name = model_name, ensemble = True)
+    
 
     ######################################################
     # Training networks with different dataset sizes
 
-    for dataset_size in [800]:
-        path = f'{fpath.resolve()}/value_functions/value_function_ensemble_{dataset_size}_samples.pkl'
-        model_name = f'ensemble_{dataset_size}_samples'
-        ensemble = []
-        for i in range(16):
-            net, _ = train(noisy=noisy, epochs=61, neurons = 12, dataset_size = dataset_size)
-            ensemble.append(net)
+    # for dataset_size in [800]:
+    #     path = f'{fpath.resolve()}/value_functions/value_function_ensemble_{dataset_size}_samples.pkl'
+    #     model_name = f'ensemble_{dataset_size}_samples'
+    #     ensemble = []
+    #     for i in range(16):
+    #         net, _ = train(noisy=noisy, epochs=61, neurons = 12, dataset_size = dataset_size)
+    #         ensemble.append(net)
 
-        torch.save(ensemble, path)
-        eval(model_name = model_name, ensemble = True)
+    #     torch.save(ensemble, path)
+    #     eval(model_name = model_name, ensemble = True)

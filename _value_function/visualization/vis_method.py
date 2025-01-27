@@ -10,7 +10,7 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 import torch
 
-experiment_name = 'test_method_recov'
+experiment_name = 'test_method_sanity3'
 calc_novf = True
 
 filename = f'test/{experiment_name}.pkl'
@@ -58,7 +58,7 @@ if __name__ == "__main__":
 
                 # Query the value-function ensemble
                 input_norm = ((convert_full_to_partial_config(regrasp_pose) - poses_mean) / poses_std).flatten().float()
-                input_norm = torch.cat([input_norm, torch.tensor([0.0], dtype=torch.float32)], dim=0)
+                input_norm = torch.cat([input_norm, torch.tensor([12.0], dtype=torch.float32)], dim=0)
 
                 vf_output_norm = query_ensemble(input_norm, models)
                 vf_output = vf_output_norm * cost_std + cost_mean
