@@ -107,7 +107,7 @@ class Net(nn.Module):
         return output.squeeze()
     
 
-def train(batch_size = 100, lr = 0.001, epochs = 205, neurons = 12, noisy = False, verbose="normal"):
+def train(batch_size = 100, lr = 0.001, epochs = 205, neurons = 12, noisy = False, verbose="normal", dataset_size = None):
     shape = (16,1)
     
     # Initialize W&B
@@ -117,7 +117,7 @@ def train(batch_size = 100, lr = 0.001, epochs = 205, neurons = 12, noisy = Fals
     #     "learning_rate": lr,
     # })
     
-    train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std = load_data(batch_size=batch_size, noisy = noisy)
+    train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std = load_data(batch_size=batch_size, noisy = noisy, dataset_size= dataset_size)
 
     # CHANGED FOR GPU: set device
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -350,23 +350,25 @@ if __name__ == "__main__":
         path = f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl'
         model_name = "ensemble"
 
-    ensemble = []
-    for i in range(16):
-        # net, _ = train(noisy=noisy, epochs=151, neurons = 512, verbose='normal')
-        net, _ = train(noisy=noisy, epochs=301, neurons = 512, verbose='very')
-        # net, _ = train(noisy=noisy, epochs=30, neurons = 32, verbose='very')
-        ensemble.append(net)
-    torch.save(ensemble, path)
-    eval(model_name = model_name, ensemble = True)
+    # ensemble = []
+    # for i in range(16):
+    #     # net, _ = train(noisy=noisy, epochs=151, neurons = 512, verbose='normal')
+    #     net, _ = train(noisy=noisy, epochs=301, neurons = 512, verbose='very')
+    #     # net, _ = train(noisy=noisy, epochs=30, neurons = 32, verbose='very')
+    #     ensemble.append(net)
+    # torch.save(ensemble, path)
+    # eval(model_name = model_name, ensemble = True)
 
     ######################################################
     # Training networks with different dataset sizes
 
-    # for dataset_size in [100, 500, 1000, 5000]:
-    #     path = f'{fpath.resolve()}/value_functions/value_function_ensemble_{dataset_size}_samples.pkl'
-    #     # model_name = f'ensemble_{dataset_size}_samples'
-    #     ensemble = []
-    #     for i in range(16):
-    #         net, _ = train(noisy=noisy, epochs=61)
-    #         ensemble.append(net)
-    #     torch.save(ensemble, path)
+    for dataset_size in [800]:
+        path = f'{fpath.resolve()}/value_functions/value_function_ensemble_{dataset_size}_samples.pkl'
+        model_name = f'ensemble_{dataset_size}_samples'
+        ensemble = []
+        for i in range(16):
+            net, _ = train(noisy=noisy, epochs=61, neurons = 12, dataset_size = dataset_size)
+            ensemble.append(net)
+
+        torch.save(ensemble, path)
+        eval(model_name = model_name, ensemble = True)

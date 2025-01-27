@@ -1,6 +1,9 @@
 import cv2
 import os
 from natsort import natsorted
+import pathlib
+CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
+fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
 def display_and_save_video(image_dir, output_video_path=None, frame_rate=30):
 
@@ -59,6 +62,6 @@ def convert_dirs_to_videos(source_dir, output_dir, frame_rate):
         display_and_save_video(subdir, output_video_path, frame_rate=frame_rate)
 
 
-source_dir = '/home/newuser/Desktop/Honda/ccai/data/experiments/imgs'
-output_dir = '/home/newuser/Desktop/Honda/ccai/data/plots/test_method_vids'
+source_dir = f'{fpath.resolve()}/experiments/imgs'
+output_dir = f'{fpath.resolve()}/plots/test_method_vids'
 convert_dirs_to_videos(source_dir, output_dir, frame_rate=50)
