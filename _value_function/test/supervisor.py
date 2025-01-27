@@ -4,14 +4,13 @@ import time
 import pathlib
 import argparse
 
-def restart_on_crash(script_path):
+def restart_on_crash(script_path, *args):
     while True:
-        print(f"Starting program: {script_path}...")
-        # Run the script as a subprocess
-        process = subprocess.run([sys.executable, script_path])
+        print(f"Starting program: {script_path} with arguments: {args}...")
+        # Run the script as a subprocess with additional arguments
+        process = subprocess.run([sys.executable, script_path, *args])
         exit_code = process.returncode
 
-        # if exit_code == 139:  # Segmentation fault exit code
         if exit_code == 0:  
             print("Program exited normally.")
             break
@@ -29,10 +28,20 @@ if __name__ == "__main__":
         type=str,
         help="The Python script to be monitored and restarted."
     )
+    parser.add_argument(
+        "config_path",
+        type=str,
+        help="The config path to use."
+    )
     args = parser.parse_args()
 
     if args.filename == "data":
         script_path = fpath / "_value_function/data_collect/get_regrasp_to_turning_dataset.py"
+        if args.config_path:
+            restart_on_crash(str(script_path), args.config_path)
+        else:
+            restart_on_crash(str(script_path))
+
     elif args.filename == "test":
         script_path = fpath / "_value_function/test/test_method.py"
     elif args.filename == "test2":
@@ -42,11 +51,7 @@ if __name__ == "__main__":
     else:
         print(f"Error: Not a valid argument.")
         exit()
-
-    # Check if the constructed script path exists
-    if not script_path.exists():
-        print(f"Error: Not a valid argument.")
-        sys.exit(1)
-
-    # Start monitoring and restarting on crash
+        
     restart_on_crash(str(script_path))
+
+    

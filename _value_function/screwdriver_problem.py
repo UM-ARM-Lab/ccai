@@ -71,9 +71,9 @@ def convert_partial_to_full_config(partial_config):
 
     return full_config.reshape(-1,20)
 
-def init_env(visualize=False):
+def init_env(visualize=False, config_path = 'allegro_screwdriver_adam0.yaml'):
     CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_adam0.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{config_path}').read_text())
     sim_env = None
     ros_copy_node = None
     env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',

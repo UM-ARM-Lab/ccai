@@ -28,8 +28,13 @@ regrasp_iters = 100
 turn_iters = 200
 delete_imgs()
 
+if len(sys.argv) == 2:
+    config_path = f'allegro_screwdriver_adam{sys.argv[1]}.yaml'
+else:
+    config_path = 'allegro_screwdriver_adam0.yaml'
+
 visualize = False
-config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
+config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize, config_path=config_path)
 sim_device = config['sim_device']
 computer_id = config['data_collection_id']
 
