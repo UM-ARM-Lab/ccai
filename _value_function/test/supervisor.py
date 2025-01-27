@@ -31,7 +31,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "config_path",
         type=str,
-        help="The config path to use."
+        nargs="?",  # Makes this argument optional
+        default=None,  # Default value if not provided
+        help="The config path to use (optional)."
     )
     args = parser.parse_args()
 
@@ -51,7 +53,7 @@ if __name__ == "__main__":
     else:
         print(f"Error: Not a valid argument.")
         exit()
-        
+
     restart_on_crash(str(script_path))
 
     
