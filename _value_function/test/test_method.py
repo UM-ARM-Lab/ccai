@@ -105,13 +105,13 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'partial'
+    test_name = 'monday'
     model_name = "ensemble"
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    n_trials = 3
-    n_repeat = 1
+    n_trials = 10
+    n_repeat = 2
     perception_noise = 0.0
     calc_novf = True
 
@@ -121,11 +121,11 @@ if __name__ == '__main__':
 
     pregrasp_iters = 80
     regrasp_iters = 100
-    turn_iters = 200
+    turn_iters = 100
 
-    vf_weight_rg = 50.0
-    other_weight_rg = 8.0
-    variance_ratio_rg = 2.0
+    vf_weight_rg = 43.0
+    other_weight_rg = 10.0
+    variance_ratio_rg = .30
 
     vf_weight_t = 12
     other_weight_t = 8
@@ -134,6 +134,7 @@ if __name__ == '__main__':
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
 
     pregrasp_path = fpath /'test'/'initializations'/'test_method_pregrasps.pkl'
+    pregrasp_path = fpath /'test'/'initializations'/'weight_sweep_pregrasps.pkl'
 
     if pregrasp_path.exists() == False or len(pkl.load(open(pregrasp_path, 'rb'))) != n_trials:
         print("Generating new pregrasp initializations...")
