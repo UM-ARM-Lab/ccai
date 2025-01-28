@@ -16,21 +16,24 @@ fpath = pathlib.Path(f'{CCAI_PATH}/data')
 def index_and_sort_regrasp_and_turn_trajs(regrasp_trajs, turn_trajs):
 
     regrasp_stacked = np.stack(regrasp_trajs, axis=0)
+    # regrasp_poses = regrasp_stacked[:,-1,:]
     regrasp_poses = regrasp_stacked.reshape(-1, 20)
     regrasp_poses = convert_full_to_partial_config(regrasp_poses)
 
     return regrasp_poses
 
-def load_data(batch_size = 64, noisy = False, dataset_size = None):
+def save_train_test_splits(noisy=False, dataset_size=None, validation_proportion=0.1, seed=None):
+
     if noisy:
         filename = '/regrasp_to_turn_datasets/noisy_combined_regrasp_to_turn_dataset.pkl'
     else:
         filename = '/regrasp_to_turn_datasets/combined_regrasp_to_turn_dataset.pkl'
-
-    validation_proportion = 0.1
+    
+    if seed is not None:
+        np.random.seed(seed)
     
     with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
-        pose_cost_tuples  = pkl.load(file)
+        pose_cost_tuples = pkl.load(file)
         regrasp_trajs, regrasp_costs, turn_trajs, turn_costs = zip(*pose_cost_tuples)
     
     if dataset_size is not None:
@@ -38,60 +41,71 @@ def load_data(batch_size = 64, noisy = False, dataset_size = None):
         regrasp_costs = regrasp_costs[:dataset_size]
         turn_trajs = turn_trajs[:dataset_size]
         turn_costs = turn_costs[:dataset_size]
-    
+
     T_rg = regrasp_trajs[0].shape[0]
     T = T_rg
     n_trajs = len(regrasp_trajs)
     print(f'Loaded {n_trajs} trials, which will create {n_trajs*T} samples')
 
     poses = index_and_sort_regrasp_and_turn_trajs(regrasp_trajs, turn_trajs)
-    
-    num_samples = len(poses)
-    split_idx = int(num_samples * (1 - validation_proportion))
 
     turn_costs = np.array(turn_costs).flatten()
     costs = np.repeat(turn_costs, T)
+    
+    split_idx = int(n_trajs * (1 - validation_proportion)*13)
+    
+    poses_train = poses[:split_idx]
+    costs_train = costs[:split_idx]
+    poses_test = poses[split_idx:]
+    costs_test = costs[split_idx:]
 
-    # --------------------------------------------------
-    # FIX: Shuffle once, then split for train/test stats
-    # --------------------------------------------------
-    indices = np.random.permutation(num_samples)
-    train_indices = indices[:split_idx]
-    test_indices = indices[split_idx:]
+    # Compute stats from TRAIN only
+    poses_mean = np.mean(poses_train, axis=0)
+    poses_std = np.std(poses_train, axis=0)
+    cost_mean = np.mean(costs_train)
+    cost_std = np.std(costs_train)
 
-    # Compute statistics from the *training* subset only
-    poses_mean, poses_std = np.mean(poses[train_indices], axis=0), np.std(poses[train_indices], axis=0)
-    cost_mean, cost_std = np.mean(costs[train_indices]), np.std(costs[train_indices])
-
-    # Normalize entire dataset with train-only stats
     min_std_threshold = 1e-5
     poses_std = np.where(poses_std < min_std_threshold, min_std_threshold, poses_std)
     cost_std = max(cost_std, min_std_threshold)
 
-    poses_norm = (poses - poses_mean) / poses_std
-    costs_norm = (costs - cost_mean) / cost_std
+    # Normalize
+    poses_train_norm = (poses_train - poses_mean) / poses_std
+    costs_train_norm = (costs_train - cost_mean) / cost_std
+    poses_test_norm = (poses_test - poses_mean) / poses_std
+    costs_test_norm = (costs_test - cost_mean) / cost_std
 
-    # Add indices as before
-    # (repeats the same indexing logic from original code)
-    T_array = np.tile(np.arange(T), n_trajs).reshape(-1, 1)
-    poses_norm = np.hstack([poses_norm, T_array])
+    # Add the time-index column just like in load_data
+    # (We assume that data was stacked in order, so we replicate the logic)
+    n_trajs_train = len(costs_train)
+    n_trajs_test = len(costs_test)
+    T_array_train = np.tile(np.arange(T), n_trajs_train // T).reshape(-1, 1)
+    T_array_test = np.tile(np.arange(T), n_trajs_test // T).reshape(-1, 1)
+
+    poses_train_norm = np.hstack([poses_train_norm, T_array_train])
+    poses_test_norm = np.hstack([poses_test_norm, T_array_test])
 
     # Convert to tensors
-    poses_tensor = torch.from_numpy(poses_norm).float()
-    costs_tensor = torch.from_numpy(costs_norm).float()
+    poses_train_tensor = torch.from_numpy(poses_train_norm).float()
+    costs_train_tensor = torch.from_numpy(costs_train_norm).float()
+    poses_test_tensor = torch.from_numpy(poses_test_norm).float()
+    costs_test_tensor = torch.from_numpy(costs_test_norm).float()
 
-    # Build final dataset
-    dataset = TensorDataset(poses_tensor, costs_tensor)
+    path = f'{fpath.resolve()}/value_functions/dataloader.pkl'
 
-    # Subset the dataset for training and test
-    train_dataset = Subset(dataset, train_indices)
-    test_dataset = Subset(dataset, test_indices)
+    pkl.dump((poses_train_tensor, costs_train_tensor, poses_test_tensor, costs_test_tensor, poses_mean, poses_std, cost_mean, cost_std), open(path, 'wb'))
 
-    train_size = len(train_dataset)
-    test_size = len(test_dataset)
-    print(f'Train size: {train_size}, Test size: {test_size}')
 
-    # Create data loaders
+def load_data_from_saved_splits(batch_size = 100):
+
+    path = f'{fpath.resolve()}/value_functions/dataloader.pkl'
+    poses_train_tensor, costs_train_tensor, poses_test_tensor, costs_test_tensor, poses_mean, poses_std, cost_mean, cost_std = pkl.load(open(path, 'rb'))
+    
+    train_dataset = TensorDataset(poses_train_tensor, costs_train_tensor)
+    test_dataset = TensorDataset(poses_test_tensor, costs_test_tensor)
+
+    print(f"Train size: {len(train_dataset)}, Test size: {len(test_dataset)}")
+
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
@@ -110,18 +124,10 @@ class Net(nn.Module):
         output = self.fc3(f2)
         return output.squeeze()
     
-
-def train(batch_size = 100, lr = 0.001, epochs = 205, neurons = 12, noisy = False, verbose="normal", dataset_size = None):
+def train(batch_size = 100, lr = 0.001, epochs = 205, neurons = 12, verbose="normal"):
     shape = (16,1)
     
-    # Initialize W&B
-    # wandb.init(project="value-function-training", config={
-    #     "epochs": epochs,
-    #     "batch_size": batch_size,
-    #     "learning_rate": lr,
-    # })
-    
-    train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std = load_data(batch_size=batch_size, noisy = noisy, dataset_size= dataset_size)
+    train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std = load_data_from_saved_splits(batch_size=batch_size)
 
     # CHANGED FOR GPU: set device
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -165,8 +171,6 @@ def train(batch_size = 100, lr = 0.001, epochs = 205, neurons = 12, noisy = Fals
             test_loss = 0.0
             with torch.no_grad():
                 for inputs, labels in test_loader:
-                    if np.isnan(inputs).any() or np.isnan(labels).any():
-                        print("issue")
                     # CHANGED FOR GPU: move inputs/labels to device
                     inputs = inputs.to(device)
                     labels = labels.to(device)
@@ -180,15 +184,6 @@ def train(batch_size = 100, lr = 0.001, epochs = 205, neurons = 12, noisy = Fals
             unnormalized_loss = train_loss * (cost_std**2)  # Scale the loss back to original cost scale
             print(f"Epoch [{epoch+1}/{num_epochs}], Training Loss: {train_loss:.8f}, Test Loss: {test_loss:.8f}, Unnormalized Train Loss: {unnormalized_loss:.8f}")
 
-            # wandb.log({
-            #     "epoch": epoch + 1,
-            #     "train_loss": train_loss,
-            #     "test_loss": test_loss,
-            #     "unnormalized_train_loss": unnormalized_loss
-            # })
-
-    # save
-    # wandb.finish()
     model_to_save = {
         'model_state': model.state_dict(),
         'poses_mean': poses_mean,
@@ -228,17 +223,10 @@ def query_ensemble(poses, models, device='cpu'):
     costs = torch.stack(costs)
     return costs
 
-def eval(model_name, ensemble=False):
-    shape = (16, 1)
+def eval(model_name):
     
-    train_loader, test_loader, _,_,_,_ = load_data()
-    if not ensemble:
-        model = Net(shape[0], shape[1])
-        checkpoint = torch.load(f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
-        model.load_state_dict(checkpoint['model_state'])
-        model.eval()
-    else:
-        models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble(model_name=model_name)
+    train_loader, test_loader, _,_,_,_ = load_data_from_saved_splits()
+    models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble(model_name=model_name)
     
     def plot_loader(loader, n_samples, title=''):
         with torch.no_grad():
@@ -247,18 +235,12 @@ def eval(model_name, ensemble=False):
             predicted_values = []
 
             for inputs, labels in loader:
-                if np.isnan(inputs).any() or np.isnan(labels).any():
-                    print("issue")
-                if not ensemble:
-                    predictions = model(inputs)
-                else:
-                    ensemble_predictions = query_ensemble(inputs, models)
-                    predictions = ensemble_predictions.mean(dim=0)
-                    prediction_std = ensemble_predictions.std(dim=0)  # Calculate standard deviation for error bars
-                    prediction_stds.append(prediction_std.numpy())
 
-                if np.isnan(predictions).any():
-                    print("issue")
+                ensemble_predictions = query_ensemble(inputs, models)
+                predictions = ensemble_predictions.mean(dim=0)
+                prediction_std = ensemble_predictions.std(dim=0)  # Calculate standard deviation for error bars
+                prediction_stds.append(prediction_std.numpy())
+
                 predicted_values.append(predictions.numpy())
                 actual_values.append(labels.numpy())
 
@@ -272,9 +254,8 @@ def eval(model_name, ensemble=False):
             actual_values = actual_values[indices]
             predicted_values = predicted_values[indices]
 
-            if ensemble:
-                prediction_stds = np.concatenate(prediction_stds).flatten() * cost_std  # Scale by cost_std
-                prediction_stds = prediction_stds[indices]
+            prediction_stds = np.concatenate(prediction_stds).flatten() * cost_std  # Scale by cost_std
+            prediction_stds = prediction_stds[indices]
 
             print(f'Actual values: {[f"{val:.4f}" for val in actual_values[:10]]}')
             print(f'Predicted values: {[f"{val:.4f}" for val in predicted_values[:10]]}')
@@ -286,15 +267,8 @@ def eval(model_name, ensemble=False):
 
             num_samples = len(actual_values)
             plt.figure(figsize=(10, 6))
-
-            # Plot with error bars if ensemble is True
-            if ensemble:
-                plt.errorbar(range(num_samples), predicted_values, yerr=prediction_stds, fmt='o', 
-                             label='Predicted Values', color='blue', elinewidth=2, capsize=3)
-                print(prediction_stds)
-            else:
-                plt.scatter(range(num_samples), predicted_values, label='Predicted Values', color='blue')
-
+            plt.errorbar(range(num_samples), predicted_values, yerr=prediction_stds, fmt='o', 
+                            label='Predicted Values', color='blue', elinewidth=2, capsize=3)
             plt.scatter(range(num_samples), actual_values, label='Actual Values', color='green')
             
             # Draw lines between corresponding actual and predicted values
@@ -310,7 +284,7 @@ def eval(model_name, ensemble=False):
             plt.show()
     
     plot_loader(train_loader, 100, 'Training Set')
-    plot_loader(test_loader, 10, 'Test Set')
+    plot_loader(test_loader, 100, 'Test Set')
 
 if __name__ == "__main__":
 
@@ -323,14 +297,18 @@ if __name__ == "__main__":
         model_name = "ensemble"
 
     # model_name = "ensemble_accurate"
+
+    # save_train_test_splits(noisy=noisy, dataset_size=None, validation_proportion=0.1, seed=1)
+    # exit()
+
     ensemble = []
     for i in range(16):
         # net, _ = train(noisy=noisy, epochs=151, neurons = 512, verbose='normal')
         # net, _ = train(noisy=noisy, epochs=301, neurons = 512, verbose='normal')
-        net, _ = train(noisy=noisy, epochs=61, neurons = 512, verbose='normal')
+        net, _ = train(epochs=21, neurons = 12, verbose='very', lr=1e-3, batch_size=64)
         ensemble.append(net)
     torch.save(ensemble, path)
-    eval(model_name = model_name, ensemble = True)
+    eval(model_name = model_name)
     
 
     ######################################################
@@ -346,3 +324,51 @@ if __name__ == "__main__":
 
     #     torch.save(ensemble, path)
     #     eval(model_name = model_name, ensemble = True)
+
+    
+
+    def hyperparam_search(
+        lr_candidates=[1e-4, 5e-4, 1e-3, 1e-2],
+        epochs_candidates=[30, 100],
+        neurons_candidates=[10, 12, 16, 32],
+        batch_size=100,
+        verbose="normal"
+    ):
+        """
+        Perform a grid search over the given hyperparameter candidates and 
+        return the best combination (lowest test loss) along with the trained model.
+        """
+
+        lowest_test_loss = float('inf')
+        best_hparams = None
+        best_model = None  # This will store the best model state dict
+
+        # Iterate over all combinations of the hyperparameter candidates
+        for lr in lr_candidates:
+            for epochs in epochs_candidates:
+                for neurons in neurons_candidates:
+                    print(f"\nTraining with lr={lr}, epochs={epochs}, neurons={neurons}")
+                    # Train your model
+                    model_to_save, test_loss = train(
+                        batch_size=batch_size,
+                        lr=lr,
+                        epochs=epochs,
+                        neurons=neurons,
+                        verbose=verbose
+                    )
+
+                    # Compare test_loss to see if it is the best so far
+                    if test_loss < lowest_test_loss:
+                        lowest_test_loss = test_loss
+                        best_hparams = (lr, epochs, neurons)
+                        best_model = model_to_save
+
+        print("\n=====================================")
+        print("Finished hyperparameter search.")
+        print(f"Best hyperparameters found: LR={best_hparams[0]}, "
+            f"Epochs={best_hparams[1]}, "
+            f"Neurons={best_hparams[2]}")
+        print(f"Best (lowest) test loss: {lowest_test_loss:.8f}")
+        print("=====================================\n")
+
+    # hyperparam_search()

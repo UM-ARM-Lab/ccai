@@ -64,4 +64,4 @@ def convert_dirs_to_videos(source_dir, output_dir, frame_rate):
 
 source_dir = f'{fpath.resolve()}/experiments/imgs'
 output_dir = f'{fpath.resolve()}/plots/test_method_vids'
-convert_dirs_to_videos(source_dir, output_dir, frame_rate=50)
+convert_dirs_to_videos(source_dir, output_dir, frame_rate=200)
