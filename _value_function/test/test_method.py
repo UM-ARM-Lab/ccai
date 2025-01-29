@@ -110,7 +110,7 @@ if __name__ == '__main__':
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    n_trials = 10
+    n_trials = 8
     n_repeat = 2
     perception_noise = 0.0
     calc_novf = True
@@ -119,13 +119,12 @@ if __name__ == '__main__':
     screwdriver_noise_mag = 0.015
     finger_noise_mag = 0.25
 
-    pregrasp_iters = 80
     regrasp_iters = 100
     turn_iters = 100
 
-    vf_weight_rg = 43.0
-    other_weight_rg = 10.0
-    variance_ratio_rg = .30
+    vf_weight_rg = 40.0
+    other_weight_rg = 8.0
+    variance_ratio_rg = 1.5
 
     vf_weight_t = 12
     other_weight_t = 8

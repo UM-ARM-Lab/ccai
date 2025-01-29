@@ -51,13 +51,20 @@ def save_train_test_splits(noisy=False, dataset_size=None, validation_proportion
 
     turn_costs = np.array(turn_costs).flatten()
     costs = np.repeat(turn_costs, T)
-    
-    split_idx = int(n_trajs * (1 - validation_proportion)*13)
-    
-    poses_train = poses[:split_idx]
-    costs_train = costs[:split_idx]
-    poses_test = poses[split_idx:]
-    costs_test = costs[split_idx:]
+
+
+    indices = np.arange(len(poses))
+    np.random.shuffle(indices)
+
+    split_idx = int(n_trajs * (1 - validation_proportion))*T
+
+    train_indices = indices[:split_idx]
+    test_indices = indices[split_idx:]
+
+    poses_train = poses[train_indices]
+    poses_test  = poses[test_indices]
+    costs_train = costs[train_indices]
+    costs_test  = costs[test_indices]
 
     # Compute stats from TRAIN only
     poses_mean = np.mean(poses_train, axis=0)
@@ -283,8 +290,8 @@ def eval(model_name):
             plt.tight_layout()
             plt.show()
     
-    plot_loader(train_loader, 100, 'Training Set')
-    plot_loader(test_loader, 100, 'Test Set')
+    plot_loader(train_loader, 1000, 'Training Set')
+    plot_loader(test_loader, 1000, 'Test Set')
 
 if __name__ == "__main__":
 
@@ -298,14 +305,13 @@ if __name__ == "__main__":
 
     # model_name = "ensemble_accurate"
 
-    # save_train_test_splits(noisy=noisy, dataset_size=None, validation_proportion=0.1, seed=1)
+    # save_train_test_splits(noisy=noisy, dataset_size=None, validation_proportion=0.05, seed=1)
     # exit()
 
     ensemble = []
     for i in range(16):
-        # net, _ = train(noisy=noisy, epochs=151, neurons = 512, verbose='normal')
-        # net, _ = train(noisy=noisy, epochs=301, neurons = 512, verbose='normal')
-        net, _ = train(epochs=21, neurons = 12, verbose='very', lr=1e-3, batch_size=64)
+        print(f"Training network {i+1}/16")
+        net, _ = train(epochs=31, neurons = 16, verbose='very', lr=1e-3, batch_size=64)
         ensemble.append(net)
     torch.save(ensemble, path)
     eval(model_name = model_name)
@@ -324,13 +330,12 @@ if __name__ == "__main__":
 
     #     torch.save(ensemble, path)
     #     eval(model_name = model_name, ensemble = True)
-
     
 
     def hyperparam_search(
-        lr_candidates=[1e-4, 5e-4, 1e-3, 1e-2],
-        epochs_candidates=[30, 100],
-        neurons_candidates=[10, 12, 16, 32],
+        lr_candidates=[1e-3],
+        epochs_candidates=[50],
+        neurons_candidates=[12, 14, 16],
         batch_size=100,
         verbose="normal"
     ):
