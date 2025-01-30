@@ -15,7 +15,10 @@ from pathlib import Path
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
+falls = 0
+
 def calculate_turn_cost(initial_pose, final_pose):
+    global falls
     turn_angle = np.pi/2
 
     screwdriver_pose = initial_pose.flatten()[-4:-1]
@@ -40,9 +43,21 @@ def calculate_turn_cost(initial_pose, final_pose):
 
     # we're only actually using the screwdriver values
     state = final_pose.flatten()[-4:-1]
+
     # upright_cost = 20 * np.sum((state[-3:-1]) ** 2) # the screwdriver should only rotate in z direction
-    goal_cost = np.sum((1 * (state[-3:] - screwdriver_goal) ** 2)).reshape(-1)
-    total_cost = np.minimum(goal_cost, 5.0)
+    # upright_cost = 50 * np.sum((state[-3:-1] - np.array([0, 0])) ** 2) 
+
+    if np.any(state[-3:-1] > 0.4):
+        upright_cost = 100.0
+        falls += 1
+    else:
+        upright_cost = 0.0
+
+    goal_cost = np.sum(((state[-1] - screwdriver_goal[-1]) ** 2)).reshape(-1)
+    # goal_cost = np.sum(((state[-3:] - screwdriver_goal) ** 2)).reshape(-1)
+    # print(goal_cost)
+    # 90 degrees away should be 2.56
+    total_cost = np.minimum(goal_cost+upright_cost, 5.0)
 
     return total_cost, succ
 
@@ -74,6 +89,8 @@ if __name__ == "__main__":
     combined_turn_costs = []
     combined_regrasp_costs = []
 
+    # config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
+
     for filename in filenames:
         with open(filename, 'rb') as file:
             pose_tuples = pkl.load(file)
@@ -103,8 +120,14 @@ if __name__ == "__main__":
             
             turn_costs = []
             regrasp_costs = []
+
             for i in range(len(regrasp_poses)):
                 cost, succ = calculate_turn_cost(regrasp_poses[i], turn_poses[i])
+
+                # if cost > 90:
+                #     env.reset(torch.from_numpy(turn_poses[i]).reshape(1,20).float())
+                #     time.sleep(2.0)
+
                 regrasp_cost = calculate_regrasp_cost(regrasp_trajs[i])
                 turn_costs.append(cost)
                 regrasp_costs.append(regrasp_cost)
@@ -129,6 +152,7 @@ if __name__ == "__main__":
     pkl.dump(regrasp_cost_dataset, open(regrasp_cost_savepath, 'wb'))
     pkl.dump(combined_succ_regrasp_tuples, open(succ_regrasp_savepath, 'wb'))
 
+    print("num falls: ", falls)
     print("num successes: ", len(combined_succ_regrasp_tuples), "num total: ", len(combined_turn_costs))
     
     plt.figure(figsize=(10, 6))

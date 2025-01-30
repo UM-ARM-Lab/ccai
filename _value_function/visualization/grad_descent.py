@@ -19,10 +19,25 @@ with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
     pose_cost_tuples = pkl.load(file)
     regrasp_trajs, regrasp_costs, turn_trajs, turn_costs = zip(*pose_cost_tuples)
 
+# regrasp_stacked = np.stack(regrasp_trajs, axis=0)
+# regrasp_poses = regrasp_stacked[:,-1,:]
+# regrasp_poses = regrasp_poses.reshape(-1, 20)[:100,:]
+
+# config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
+# for i in range(regrasp_poses.shape[0]):
+#     env.reset(torch.from_numpy(regrasp_poses[i]).reshape(1,20).float())
+#     # if i == 0 or i == regrasp_poses.shape[0]-1:
+#     #     time.sleep(1.0)
+#     print(f'Setpoint {i}')
+#     time.sleep(0.3)
+
+# exit()
+
 regrasp_stacked = np.stack(regrasp_trajs, axis=0)
 regrasp_poses = regrasp_stacked[:,-1,:]
-regrasp_poses = regrasp_stacked.reshape(-1, 20)[:10,:]
+regrasp_poses = regrasp_poses.reshape(-1, 20)[20:30,:]
 regrasp_poses = convert_full_to_partial_config(regrasp_poses)
+
 
 def grad_descent(lr = 0.2358):
     models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble(model_name="ensemble")
@@ -40,9 +55,8 @@ def grad_descent(lr = 0.2358):
 
     poses_norm.requires_grad_(True)
 
-    optimizer = optim.Adam([poses_norm], lr=0.2358)
-    iterations = 500
-
+    optimizer = optim.SGD([poses_norm], lr=0.1)
+    iterations = 10000
 
     for model in models:
         model.eval()
@@ -61,11 +75,12 @@ def grad_descent(lr = 0.2358):
 
         mse = torch.mean((predictions - target_value) ** 2)
         mean_squared_variance = torch.mean((ensemble_predictions - predictions) ** 2)
-        loss = mse + mean_squared_variance
+        variance_weight = 2.0
+        loss = mse + mean_squared_variance * variance_weight
         loss.backward()
 
         # Set gradients of the last four values of each pose to 0
-        # poses_norm.grad[:, -4:] = 0
+        poses_norm.grad[:, -4:] = 0
 
         optimizer.step()
 
@@ -117,16 +132,15 @@ if __name__ == "__main__":
     full_semi_optimized_poses = np.array(full_semi_optimized_poses)
     semi_optimized_poses = np.array(semi_optimized_poses)
     
-    vis_so_poses = True
-    if vis_so_poses:
-        config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
-        for j in range(full_semi_optimized_poses.shape[1]):
-            for i in range(full_semi_optimized_poses.shape[0]):
-                env.reset(torch.from_numpy(full_semi_optimized_poses[i,j,:]).reshape(1,20).float())
-                if i == 0 or i == full_semi_optimized_poses.shape[0]-1:
-                    time.sleep(1.0)
-                print(f'Setpoint {i}')
-                time.sleep(0.03)
+
+    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
+    for j in range(full_semi_optimized_poses.shape[1]):
+        for i in range(full_semi_optimized_poses.shape[0]):
+            env.reset(torch.from_numpy(full_semi_optimized_poses[i,j,:]).reshape(1,20).float())
+            if i == 0 or i == full_semi_optimized_poses.shape[0]-1:
+                time.sleep(1.0)
+            print(f'Setpoint {i}')
+            time.sleep(0.03)
 
 
     # Fit PCA on the 10k_poses data to get axes
