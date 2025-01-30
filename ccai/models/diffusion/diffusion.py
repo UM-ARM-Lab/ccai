@@ -488,11 +488,19 @@ class GaussianDiffusion(nn.Module):
                                               return_all_timesteps=return_all_timesteps)
 
             if self.classifier is not None:
-                likelihood = self.classifier(
+                real_pred, class_pred = self.classifier(
                     # torch.zeros(B *N * factor, device=sample.device),
                     sample.reshape(-1, self.horizon, self.xu_dim),
                     context=context.reshape(-1, self.context_dim)
-                ).reshape(B*N, factor)
+                )
+                real_pred = real_pred.reshape(B*N, factor)
+                class_pred = class_pred.reshape(B*N, factor)
+                class_pred = nn.functional.softmax(class_pred)
+                class_label = (context.sum(1) + 1)/2
+
+                correct_class_prob = class_pred.gather(1, class_label)
+
+                likelihood = real_pred * correct_class_prob
             else:
                 likelihood = self.approximate_likelihood(sample.reshape(-1, self.horizon, self.xu_dim)).reshape(B*N, factor)
 
@@ -511,11 +519,18 @@ class GaussianDiffusion(nn.Module):
         likelihood = None
         if not skip_likelihood:
             if self.classifier is not None:
-                likelihood = self.classifier(
-                    # torch.zeros(B * N, device=sample.device),
+                real_pred, class_pred = self.classifier(
+                    # torch.zeros(B *N * factor, device=sample.device),
                     sample.reshape(-1, self.horizon, self.xu_dim),
-                    context=context.reshape(-1, self.context_dim) if context is not None else None
+                    context=context.reshape(-1, self.context_dim)
                 )
+                class_pred = nn.functional.softmax(class_pred, dim=1)
+                class_label = (context.sum(1) + 1)/2
+
+                correct_class_prob = class_pred.gather(1, class_label.long().reshape(-1, 1))
+
+                likelihood = real_pred * correct_class_prob
+                # likelihood = correct_class_prob
             else:
                 # return sample, None
                 if not no_grad:
@@ -623,8 +638,8 @@ class GaussianDiffusion(nn.Module):
         t = torch.arange(1, self.num_timesteps, device=device).long()
         # t = torch.arange(1, self.num_timesteps, 8, device=device).long()
         # t = torch.arange(5, 30, 2, device=device).long()
-
-        # t = torch.tensor([5, 10, 15], device=device).long()
+        if hasattr(self, 'subsampled_t'):
+            t = torch.tensor([5, 10, 15], device=device).long()
 
         N = t.shape[0]
         t = t[None, :].repeat(B, 1).reshape(B * N)
@@ -739,16 +754,24 @@ class GaussianDiffusion(nn.Module):
 
         # get weights
         #eps, h = self.model(t, x, context, dropout=False)
-        pred_label = self.classifier(x, context)
+        real_pred, class_pred = self.classifier(x)
+
+        class_label = (context.sum(1) + 1)/2
 
         #print(torch.where(torch.isnan(h)))
         #print(torch.where(torch.isnan(x)))
 
-        loss = loss_fn(pred_label, label)
+        loss = loss_fn(real_pred, label)
 
-        # 5363/(7987-5363)
-        x = (128614+28214)/2
-        y = 128614-x
+        loss += self.classifier.class_loss(class_pred, class_label.long())
+
+        # x = 5363
+        # y = 7987-5363
+        # x = (128614+28214)/2
+        # y = 128614-x
+
+        x = 1
+        y = 1
         weight = torch.where(context[:, 0] == 1, x/y, 1.)
         loss_scaled = (loss *weight).mean()
 
@@ -756,9 +779,14 @@ class GaussianDiffusion(nn.Module):
         # loss = torch.mean(extract(torch.sqrt(self.betas), t, loss.shape) * loss)
 
         # accuracy
-        pred = torch.round(pred_label)
-        accuracy = torch.mean(torch.where(pred == label, 1.0, 0.0))
-        return loss_scaled, accuracy
+        pred_real = torch.round(real_pred)
+        pred_class = class_pred.argmax(1)
+        real_label_match = (pred_real == label)
+        class_label_match = (pred_class == class_label)
+        full_accuracy = torch.mean(torch.where(real_label_match & class_label_match, 1.0, 0.0))
+        real_accuracy = torch.mean(torch.where(real_label_match, 1.0, 0.0))
+        class_accuracy = torch.mean(torch.where(class_label_match, 1.0, 0.0))
+        return loss_scaled, full_accuracy, real_accuracy, class_accuracy
 
 class JointDiffusion(GaussianDiffusion):
     """

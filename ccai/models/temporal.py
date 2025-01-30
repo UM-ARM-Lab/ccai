@@ -28,13 +28,14 @@ class ResidualTemporalBlock(nn.Module):
             Conv1dBlock(inp_channels, out_channels, kernel_size),
             Conv1dBlock(out_channels, out_channels, kernel_size),
         ])
-
-        self.time_mlp = nn.Sequential(
-            nn.Linear(256, embed_dim),
-            Mish(),
-            nn.Linear(embed_dim, out_channels),
-            Rearrange('batch t -> batch t 1'),
-        )
+        if embed_dim > 0:
+            self.time_mlp = nn.Sequential(
+                nn.Linear(256, embed_dim),
+                Mish(),
+                nn.Linear(embed_dim, out_channels),
+                Rearrange('batch t -> batch t 1'),
+            )
+        self.embed_dim = embed_dim
 
         self.residual_conv = nn.Conv1d(inp_channels, out_channels, 1) \
             if inp_channels != out_channels else nn.Identity()
@@ -46,11 +47,12 @@ class ResidualTemporalBlock(nn.Module):
             returns:
             out : [ batch_size x out_channels x horizon ]
         '''
-
-        embed = self.time_mlp(t)
+        if self.embed_dim > 0:
+            embed = self.time_mlp(t)
         out = self.blocks[0](x)
         # print(x.shape, out.shape)
-        out = out + embed
+        if self.embed_dim > 0:
+            out = out + embed
         out = self.blocks[1](out)
         out = out + self.residual_conv(x)
         return out
@@ -910,17 +912,17 @@ class UnetClassifier(nn.Module):
         in_out = list(zip(dims[:-1], dims[1:]))
         print(f'[ models/temporal ] Channel dimensions: {in_out}')
 
-        self.constraint_type_embed = nn.Sequential(
-            nn.Linear(cond_dim, 32),
-            Mish()
-        )
-        # self.constraint_type_embed = SinusoidalPosEmb(32)
-        self.time_mlp = nn.Sequential(
-            nn.Linear(32, 256),
-            Mish()
-        )
+        # self.constraint_type_embed = nn.Sequential(
+        #     nn.Linear(cond_dim, 32),
+        #     Mish()
+        # )
+        # # self.constraint_type_embed = SinusoidalPosEmb(32)
+        # self.time_mlp = nn.Sequential(
+        #     nn.Linear(32, 256),
+        #     Mish()
+        # )
 
-        time_dim = 256
+        # time_dim = 256
 
         self.downs = nn.ModuleList([])
         num_resolutions = len(in_out)
@@ -929,8 +931,8 @@ class UnetClassifier(nn.Module):
             is_last = ind >= (num_resolutions - 1)
             feature_dims.append(np.ceil(feature_dims[-1] / 2))
             self.downs.append(nn.ModuleList([
-                ResidualTemporalBlock(dim_in, dim_out, embed_dim=time_dim, horizon=horizon),
-                ResidualTemporalBlock(dim_out, dim_out, embed_dim=time_dim, horizon=horizon),
+                ResidualTemporalBlock(dim_in, dim_out, embed_dim=0, horizon=horizon),
+                ResidualTemporalBlock(dim_out, dim_out, embed_dim=0, horizon=horizon),
                 Residual(PreNorm(dim_out, LinearAttention(dim_out))) if attention else nn.Identity(),
                 Downsample1d(dim_out) if not is_last else nn.Identity()
                 # nn.Identity()
@@ -940,14 +942,16 @@ class UnetClassifier(nn.Module):
                 horizon = horizon // 2
 
         mid_dim = dims[-1]
-        self.mid_block1 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
+        self.mid_block1 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=0, horizon=horizon)
         self.mid_attn = Residual(PreNorm(mid_dim, LinearAttention(mid_dim))) if attention else nn.Identity()
-        self.mid_block2 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
-        self.mid_block3 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
-        self.mid_block4 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
+        self.mid_block2 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=0, horizon=horizon)
+        self.mid_block3 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=0, horizon=horizon)
+        self.mid_block4 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=0, horizon=horizon)
         self.pooling = nn.AdaptiveAvgPool1d(1)
         self.output_layer = nn.Linear(mid_dim, 1)
         self.output_act_fn = nn.Sigmoid()
+
+        self.class_layer = nn.Linear(mid_dim, 2)
 
     def vmapped_fwd(self, t, x, context=None):
         return self(t.reshape(1), x.unsqueeze(0), context.unsqueeze(0)).squeeze(0)
@@ -964,35 +968,35 @@ class UnetClassifier(nn.Module):
         x = x.permute(0, 2, 1)
         x = pad_to_multiple(x, m=2 ** len(self.downs))
 
-        if context is not None:
-            # constraint_type = context[:, -2:]
-            # context = context[:, :-2]
-            context = context.reshape(B, -1)
-            c = self.constraint_type_embed(context)
-            # c = context
-            # c = torch.cat((context, ctype_embed), dim=-1)
-            # need to do dropout on context embedding to train unconditional model alongside conditional
-            if dropout:
-                mask_dist = Bernoulli(probs=1 - self.context_dropout_p)
-                mask = mask_dist.sample((B,))  # .to(device=context.device)
-                c = mask * c
-        else:
-            c = torch.zeros(B, 32, device=t.device)
+        # if context is not None:
+        #     # constraint_type = context[:, -2:]
+        #     # context = context[:, :-2]
+        #     context = context.reshape(B, -1)
+        #     c = self.constraint_type_embed(context)
+        #     # c = context
+        #     # c = torch.cat((context, ctype_embed), dim=-1)
+        #     # need to do dropout on context embedding to train unconditional model alongside conditional
+        #     if dropout:
+        #         mask_dist = Bernoulli(probs=1 - self.context_dropout_p)
+        #         mask = mask_dist.sample((B,))  # .to(device=context.device)
+        #         c = mask * c
+        # else:
+        #     c = torch.zeros(B, 32, device=t.device)
 
-        t = self.time_mlp(c)
+        # t = self.time_mlp(c)
         h = []
         for resnet, resnet2, attn, downsample in self.downs:
-            x = resnet(x, t)
-            x = resnet2(x, t)
+            x = resnet(x, None)
+            x = resnet2(x, None)
             # x = attn(x)
             h.append(x)
             x = downsample(x)
 
-        x = self.mid_block1(x, t)
+        x = self.mid_block1(x, None)
         # x = self.mid_attn(x)
-        x = self.mid_block2(x, t)
-        x = self.mid_block3(x, t)
-        x = self.mid_block4(x, t)
+        x = self.mid_block2(x, None)
+        x = self.mid_block3(x, None)
+        x = self.mid_block4(x, None)
         x = self.pooling(x).reshape(B, -1)
         
-        return self.output_act_fn(self.output_layer(x))
+        return self.output_act_fn(self.output_layer(x)), self.class_layer(x)

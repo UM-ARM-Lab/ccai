@@ -238,11 +238,18 @@ class AllegroScrewDriverDataset(Dataset):
                         print('Fail')
                         continue
                     actual_traj = []
-                    # if len(data[t]['starts']) == 0: 
-                    #     print('No starts')
-                    #     continue
-                    if len(data['final_likelihoods']) == 1 and data['final_likelihoods'][0] < -50:
-                        print('No Data')
+
+                    need_to_continue = False
+                    for t in range(max_T, min_t - 1, -1):
+                        if len(data[t]['starts']) == 0:
+                            print('No starts')
+                            need_to_continue = True
+                            break
+                        if len(data['final_likelihoods']) == 1 and data['final_likelihoods'][0] < -50:
+                            print('No Data')
+                            need_to_continue = True
+                            break
+                    if need_to_continue:
                         continue
                     for t in range(max_T, min_t - 1, -1):
                         actual_traj.append(data[t]['starts'][:, :, None, :])
@@ -255,11 +262,11 @@ class AllegroScrewDriverDataset(Dataset):
                                 zero_pad = np.zeros(21)
                                 end_states.append(np.concatenate((traj_data[i], zero_pad)))
                         # print(traj.shape)
-                        classes.append(data[t]['contact_state'][:, None, :].repeat(traj.shape[1], axis=1))
+                        classes.append(data[t]['contact_state'][:, None, :])#.repeat(traj.shape[1], axis=1))
                         if not exec_only:
                             # combine traj and starts
                             if use_actual_traj:
-                                traj = np.concatenate(actual_traj + [traj], axis=2)#[..., :1 , :,:]
+                                traj = np.concatenate(actual_traj + [traj], axis=2)[..., :1 , :,:]
                                 masks.append(np.ones((traj.shape[0], traj.shape[1], traj.shape[2])))
                             else:
                                 zeros = [np.zeros_like(actual_traj[0])] * (len(actual_traj) - 1)
@@ -473,6 +480,7 @@ class AllegroScrewDriverStateDataset(Dataset):
                 with open(p, 'rb') as f:
                     try:
                         data = pickle.load(f)
+                        data[max_T]['starts'][:, :, None, :]
                     except:
                         print('Fail')
                         continue
