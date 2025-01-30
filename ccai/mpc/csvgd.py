@@ -64,6 +64,7 @@ class Constrained_SVGD_MPC:
         self.warmed_up = False
         self.iter = 0
         self.proj_path = proj_path
+        self.path = []
         if initial_x is not None:
             self.x = initial_x
         else:

@@ -40,8 +40,9 @@ class ConstrainedSteinTrajOpt:
         self.reset()
 
     def reset(self):
-        self.dual = torch.zeros((self.N, self.dg+self.dh, 1), device=self.problem.device, dtype=torch.float32)
-        self.dual_history = [self.dual.cpu().detach().numpy()]
+        # self.dual = torch.zeros((self.N, self.dg+self.dh, 1), device=self.problem.device, dtype=torch.float32)
+        # self.dual_history = [self.dual.cpu().detach().numpy()]
+        pass
 
     def compute_update(self, xuz):
         N = xuz.shape[0]

@@ -1,0 +1,2 @@
+python train_allegro_screwdriver.py --config allegro_screwdriver_diffusion_id_ood_states.yaml
+python train_allegro_screwdriver.py --config allegro_screwdriver_diffusion_project_ood_states.yaml

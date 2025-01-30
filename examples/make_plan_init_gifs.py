@@ -29,13 +29,46 @@ def add_text_to_imgs(imgs, labels):
         imgs_with_txt.append(np.asarray(img))
     return imgs_with_txt
 
-# for trial_num in range(0, 3):
-for trial_num in [6]:
-    fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/csvgd/trial_{trial_num + 1}')
+# for trial_num in range(10):
 
+#CPC
+# for trial_num in [1, 2, 3, 4, 8]:
+for trial_num in [8]:
+
+#Ind
+# for trial_num in [4, 9]:
+
+#Full
+# for trial_num in [8, 9]:
+    fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/csvgd/trial_{trial_num + 1}')
 
     isaac_imgs = [fpath / img for img in sorted(os.listdir(fpath)) if img[-3:] == 'png'][6:]
     isaac_imgs = [imageio.imread(img) for img in isaac_imgs]
+
+    text = 'turn'
+    if trial_num == 1:
+        pause_inds = [(0, 'turn'), (len(isaac_imgs)-1, ''), (21-6, 'thumb_middle'), (33-6, 'thumb_middle'), (45-6, 'turn')]
+    elif trial_num == 2:
+        pause_inds = [(0, 'turn'), (len(isaac_imgs)-1, ''), (9-6, 'index'), (21-6, 'index'), (33-6, 'turn')]
+    elif trial_num == 3:
+        pause_inds = [(0, 'turn'), (len(isaac_imgs)-1, ''), (36-6, 'index')]
+    elif trial_num == 4:
+        pause_inds = [(0, 'turn'), (len(isaac_imgs)-1, ''), (12-6, 'thumb_middle'), (24-6, 'index'), (36-6, 'turn')]
+    elif trial_num == 8:
+        pause_inds = [(0, 'turn'), (len(isaac_imgs)-1, ''), (15-6, 'index'), (27-6, 'index'), (42-6, 'index'), (54-6, 'index')]
+
+
+    # if trial_num == 4:
+    #     pause_inds = [(0, 'turn'), (len(isaac_imgs)-1, ''), (27-6, 'index'), (45-6, 'thumb_middle'), (57-6, 'turn')]
+    # elif trial_num == 9:
+    #     pause_inds = [(0, 'turn'), (len(isaac_imgs)-1, ''), (30-6, 'index'), (45-6, 'thumb_middle'), (57-6, 'turn')]
+
+    # if trial_num == 8:
+    #     pause_inds = [(0, 'turn'), (len(isaac_imgs)-1, ''), (9-6, 'thumb_middle'), (21-6, 'turn')]
+    # elif trial_num == 9:
+    #     pause_inds = [(0, 'turn'), (len(isaac_imgs)-1, ''), (30-6, 'index'), (42-6, 'index'), (54-6, 'turn')]
+    
+    pause_inds = dict(pause_inds)
 
     x0 = 675
     y0 = 750
@@ -47,21 +80,32 @@ for trial_num in [6]:
 
     for j in range(len(isaac_imgs)):
         img = isaac_imgs[j]
-        num_adds = start_end_buffer if (j == 0 or j == len(isaac_imgs) - 1) else 1
+        num_adds = start_end_buffer if (j in pause_inds) else 1
         for _ in range(num_adds):
             new_isaac_imgs.append((j, img))
 
     for i in range(len(new_isaac_imgs)):
         idx, img = new_isaac_imgs[i]
+        if idx in pause_inds and pause_inds[idx] != '':
+            text = pause_inds[idx]
+        shape = img.shape
         # Add progress bar to image. Should be green rectangle that grows depending on i
         img = Image.fromarray(img)
         draw = ImageDraw.Draw(img)
         draw.rectangle([x0, y0, x0 + width * idx /(len(isaac_imgs)), y0 + 20], fill='green')
+        font = ImageFont.load_default()
+        color = (255, 255, 255) if text == 'turn' else (255, 0, 0)
+        draw.text(((x0+y0)//2-10, shape[1]//2-510), text, color, font_size=30, align='center')
         img = np.asarray(img).copy()
         img[0, 0] = np.random.randint(0, 255, 4)
         imgs_with_progress_bar.append(img)
     if len(imgs_with_progress_bar) > 0:
-        imageio.mimsave(f'{fpath}/isaac.gif', imgs_with_progress_bar, loop=0)
+        imageio.mimsave(f'{fpath}/isaac_extra_pause_text.gif', imgs_with_progress_bar, loop=0)
+
+    writer = imageio.get_writer(f'{fpath}/isaac_extra_pause_text.mp4', fps=10)
+    for img in imgs_with_progress_bar:
+        writer.append_data(np.array(img, np.uint8))
+    writer.close()
     # Get names of directories in fpath
     for c_plan in range(4):
         fpath_cind = fpath / f'c{c_plan}'
