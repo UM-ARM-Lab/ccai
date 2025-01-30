@@ -299,7 +299,7 @@ if __name__ == "__main__":
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
     sim_device = config['sim_device']
     
-    n_samples = 3
+    n_samples = 4
     which_weights = "regrasp"
     name = "rgo"
 
@@ -315,9 +315,9 @@ if __name__ == "__main__":
                             do_pregrasp=True, name='weight_sweep_pregrasps')
 
     starting_values = {
-        'vf_bounds': [5, 50],
+        'vf_bounds': [10, 100],
         'other_bounds': [10, 10],
-        'variance_ratio_bounds': [.5, 2.0],
+        'variance_ratio_bounds': [.5, 5.0],
         'grid_size': 3
     }
 
