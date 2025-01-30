@@ -24,8 +24,8 @@ def get_initialization(env, sim_device, max_screwdriver_tilt, screwdriver_noise_
         middle_thumb_noise_mag = torch.tensor([finger_noise_mag]*4)
         middle_thumb_noise = middle_thumb_noise_mag * (2 * torch.rand(4) - 1)
         screwdriver_noise = torch.tensor([
-            np.random.uniform(-screwdriver_noise_mag, screwdriver_noise_mag),  # Random value between -0.05 and 0.05
-            np.random.uniform(-screwdriver_noise_mag, screwdriver_noise_mag),  # Random value between -0.05 and 0.05
+            np.random.normal(0, screwdriver_noise_mag),  # Random value between -0.05 and 0.05
+            np.random.normal(0, screwdriver_noise_mag),  # Random value between -0.05 and 0.05
             np.random.uniform(0, 2 * np.pi),  # Random value between 0 and 2π
             0.0  
         ])

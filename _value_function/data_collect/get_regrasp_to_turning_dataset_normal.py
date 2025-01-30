@@ -20,22 +20,32 @@ def validate_pregrasp_pose(pregrasp_pose):
     else:
         return True
 
-loop_idx = 0
-prog_id = 'c'
-trials_per_save = 10
+prog_id = 0
+trials_per_save = 5
 perception_noise = 0.0
 pregrasp_iters = 80
 regrasp_iters = 100
-visualize = False
+turn_iters = 200
 delete_imgs()
 
+if len(sys.argv) == 2:
+    config_path = f'allegro_screwdriver_adam{sys.argv[1]}.yaml'
+else:
+    config_path = 'allegro_screwdriver_adam0.yaml'
+
+visualize = False
+config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize, config_path=config_path)
+sim_device = config['sim_device']
+computer_id = config['data_collection_id']
+
+
 while True:
+
     pose_tuples = []
+    
     trials_done = 0
 
     while trials_done < trials_per_save:
-
-        print(f"Starting Trial {trials_done+1}")
 
         if visualize:
             img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/imgs/regrasp_trial_{trials_done+1}')
@@ -43,12 +53,13 @@ while True:
         else:
             img_save_dir = None
 
-        initialization = get_initialization(max_screwdriver_tilt=0.015, screwdriver_noise_mag=0.015, finger_noise_mag=0.25)
-        
-        config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
         env.frame_fpath = img_save_dir
         env.frame_id = 0
 
+        print(f"Starting Trial {trials_done+1}")
+
+        initialization = get_initialization(env, sim_device, max_screwdriver_tilt=0.015, screwdriver_noise_mag=0.015, finger_noise_mag=0.1)
+        
         pregrasp_pose, planned_pose = pregrasp(env, config, chain, deterministic=True, perception_noise=perception_noise, 
                         image_path = img_save_dir, initialization = initialization, mode='no_vf', iters = pregrasp_iters)
 
@@ -57,10 +68,6 @@ while True:
             print("done pregrasp")
         else:
             print("pregrasp failed")
-            gym.destroy_viewer(viewer)
-            gym.destroy_sim(sim)
-            del config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial
-            torch.cuda.empty_cache()
             continue
         
         regrasp_pose, regrasp_traj = regrasp(env, config, chain, state2ee_pos_partial, perception_noise=perception_noise, 
@@ -70,28 +77,25 @@ while True:
         
         _, turn_pose, succ, turn_traj = do_turn(regrasp_pose, config, env, 
                         sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, 
-                        perception_noise=perception_noise, image_path = img_save_dir)
+                        iters = turn_iters, perception_noise=perception_noise, image_path = img_save_dir)
         
         print("done turn")
-        
         pose_tuples.append((pregrasp_pose, regrasp_pose, regrasp_traj, turn_pose, turn_traj))
         trials_done += 1
 
-        gym.destroy_viewer(viewer)
-        gym.destroy_sim(sim)
-        del config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial
-        torch.cuda.empty_cache()
-
-        # print(f"Allocated memory: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
-        # print(torch.cuda.memory_summary(device='cuda', abbreviated=False))
-
     if perception_noise == 0:
-        savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_dataset_{prog_id}_{loop_idx}.pkl'
+        savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_dataset_{computer_id}_{prog_id}.pkl'
     else:
-        savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_regrasp_to_turn_dataset_{prog_id}_{loop_idx}.pkl'
+        savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_regrasp_to_turn_dataset_{computer_id}_{prog_id}.pkl'
+
+    while Path(savepath).exists():
+        prog_id += 1
+
+        if perception_noise == 0:
+            savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_dataset_{computer_id}_{prog_id}.pkl'
+        else:
+            savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_regrasp_to_turn_dataset__{computer_id}_{prog_id}.pkl'
 
     pkl.dump(pose_tuples, open(savepath, 'wb'))
-
-    loop_idx += 1
 
 emailer().send()
