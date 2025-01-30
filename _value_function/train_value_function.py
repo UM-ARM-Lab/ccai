@@ -290,8 +290,8 @@ def eval(model_name):
             plt.tight_layout()
             plt.show()
     
-    plot_loader(train_loader, 1000, 'Training Set')
-    plot_loader(test_loader, 1000, 'Test Set')
+    plot_loader(train_loader, 100, 'Training Set')
+    plot_loader(test_loader, 100, 'Test Set')
 
 if __name__ == "__main__":
 
@@ -311,7 +311,7 @@ if __name__ == "__main__":
     ensemble = []
     for i in range(16):
         print(f"Training network {i+1}/16")
-        net, _ = train(epochs=31, neurons = 16, verbose='very', lr=1e-3, batch_size=64)
+        net, _ = train(epochs=25, neurons = 16, verbose='very', lr=1e-3, batch_size=64)
         ensemble.append(net)
     torch.save(ensemble, path)
     eval(model_name = model_name)

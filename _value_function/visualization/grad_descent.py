@@ -56,7 +56,7 @@ def grad_descent(lr = 0.2358):
     poses_norm.requires_grad_(True)
 
     optimizer = optim.SGD([poses_norm], lr=0.1)
-    iterations = 5000
+    iterations = 10000
 
     for model in models:
         model.eval()
