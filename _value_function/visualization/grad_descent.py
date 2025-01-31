@@ -35,7 +35,7 @@ with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
 
 regrasp_stacked = np.stack(regrasp_trajs, axis=0)
 regrasp_poses = regrasp_stacked[:,-1,:]
-regrasp_poses = regrasp_poses.reshape(-1, 20)[20:30,:]
+regrasp_poses = regrasp_poses.reshape(-1, 20)[:30,:]
 regrasp_poses = convert_full_to_partial_config(regrasp_poses)
 
 
@@ -55,7 +55,7 @@ def grad_descent(lr = 0.2358):
 
     poses_norm.requires_grad_(True)
 
-    optimizer = optim.SGD([poses_norm], lr=0.1)
+    optimizer = optim.SGD([poses_norm], lr=0.2)
     iterations = 10000
 
     for model in models:

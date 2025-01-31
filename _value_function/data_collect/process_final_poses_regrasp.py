@@ -59,7 +59,7 @@ def calculate_turn_cost(initial_pose, final_pose):
     # 90 degrees away should be 2.56
     total_cost = np.minimum(goal_cost+upright_cost, 5.0)
 
-    return total_cost, succ
+    return total_cost
 
 def calculate_regrasp_cost(q):
     delta_q = q[1:] - q[:-1]
@@ -81,11 +81,8 @@ if __name__ == "__main__":
         for file in Path(f'{fpath.resolve()}/regrasp_to_turn_datasets').glob("regrasp_to_turn_dataset*.pkl"):
             filenames.append(file)
 
-    combined_regrasp_poses = np.empty((0, 20))
     combined_regrasp_trajs = np.empty((0, 13, 20))
-    combined_turn_poses = np.empty((0, 20))
     combined_turn_trajs = np.empty((0, 13, 20))
-    combined_succ_regrasp_tuples = []
     combined_turn_costs = []
     combined_regrasp_costs = []
 
@@ -99,21 +96,6 @@ if __name__ == "__main__":
             
             regrasp_poses = np.array([t.numpy() for t in regrasp_poses]).reshape(-1, 20)
             turn_poses = np.array(turn_poses).reshape(-1, 20)
-            combined_turn_poses = np.concatenate((combined_turn_poses, turn_poses), axis=0)
-            
-            # pad because some trajectories are shorter than 13
-            processed_turn_trajectories = []
-            for traj in turn_trajs:
-                if traj.shape[0] < 13:
-                    rows_to_add = 13 - traj.shape[0]
-                    last_row = traj[-1]
-                    padding = np.tile(last_row, (rows_to_add, 1))
-                    padded_traj = np.vstack((traj, padding))
-                    processed_turn_trajectories.append(padded_traj)
-                else:
-                    processed_turn_trajectories.append(traj)
-
-            turn_trajs= np.array(processed_turn_trajectories).reshape(turn_poses.shape[0], -1, 20)
             
             combined_turn_trajs = np.concatenate((combined_turn_trajs, turn_trajs), axis=0)
             combined_regrasp_trajs = np.concatenate((combined_regrasp_trajs, regrasp_trajs), axis=0)
@@ -122,7 +104,7 @@ if __name__ == "__main__":
             regrasp_costs = []
 
             for i in range(len(regrasp_poses)):
-                cost, succ = calculate_turn_cost(regrasp_poses[i], turn_poses[i])
+                cost = calculate_turn_cost(regrasp_poses[i], turn_poses[i])
 
                 # if cost > 90:
                 #     env.reset(torch.from_numpy(turn_poses[i]).reshape(1,20).float())
@@ -131,8 +113,6 @@ if __name__ == "__main__":
                 regrasp_cost = calculate_regrasp_cost(regrasp_trajs[i])
                 turn_costs.append(cost)
                 regrasp_costs.append(regrasp_cost)
-                if succ:
-                    combined_succ_regrasp_tuples.append((regrasp_trajs[i].reshape(13, 20), turn_trajs[i].reshape(13, 20)))
             
             combined_turn_costs.extend(turn_costs)
             combined_regrasp_costs.extend(regrasp_costs)
@@ -144,16 +124,13 @@ if __name__ == "__main__":
     
     if noisy:
         regrasp_cost_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_combined_regrasp_to_turn_dataset.pkl'
-        succ_regrasp_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_regrasp_to_turn_succ_dataset.pkl'
     else:
         regrasp_cost_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/combined_regrasp_to_turn_dataset.pkl'
-        succ_regrasp_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_succ_dataset.pkl'
    
     pkl.dump(regrasp_cost_dataset, open(regrasp_cost_savepath, 'wb'))
-    pkl.dump(combined_succ_regrasp_tuples, open(succ_regrasp_savepath, 'wb'))
 
+    print("num samples: ", len(combined_regrasp_costs))
     print("num falls: ", falls)
-    print("num successes: ", len(combined_succ_regrasp_tuples), "num total: ", len(combined_turn_costs))
     
     plt.figure(figsize=(10, 6))
     plt.hist(combined_turn_costs.flatten(), bins=20, color='blue', label='Costs')
