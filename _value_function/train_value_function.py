@@ -307,13 +307,13 @@ if __name__ == "__main__":
     # save_train_test_splits(noisy=noisy, dataset_size=None, validation_proportion=0.05, seed=1)
     # exit()
 
-    # ensemble = []
-    # for i in range(8):
-    #     print(f"Training network {i+1}/16")
-    #     net, _ = train(epochs=500, neurons = 1028, verbose='very', lr=1e-3, batch_size=100)
-    #     ensemble.append(net)
-    # torch.save(ensemble, path)
-    # emailer().send()
+    ensemble = []
+    for i in range(16):
+        print(f"Training network {i+1}/16")
+        net, _ = train(epochs=800, neurons = 2056, verbose='very', lr=1e-3, batch_size=100)
+        ensemble.append(net)
+    torch.save(ensemble, path)
+    emailer().send()
     eval(model_name = model_name)
     exit()
     

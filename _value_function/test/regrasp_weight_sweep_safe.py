@@ -136,7 +136,7 @@ def test(checkpoint, n_samples, which_weights):
         # Search over the entire grid but skip combos we've tested already
         for vf_weight, other_weight, variance_ratio in product(*hyperparameters):
             # combo_tuple = (vf_weight, other_weight, variance_ratio)
-            combo_tuple = (vf_weight, 10.0, variance_ratio)
+            combo_tuple = (vf_weight, other_weight, variance_ratio)
            
 
             if combo_tuple in checkpoint['tested_combinations'][iteration]:
@@ -299,9 +299,9 @@ if __name__ == "__main__":
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
     sim_device = config['sim_device']
     
-    n_samples = 3
+    n_samples = 8
     which_weights = "regrasp"
-    name = "1kvf"
+    name = "2kvf"
 
     checkpoint_path = fpath /'test'/'weight_sweep'/f'checkpoint_{which_weights}_{name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -315,8 +315,8 @@ if __name__ == "__main__":
                             do_pregrasp=True, name='weight_sweep_pregrasps')
 
     starting_values = {
-        'vf_bounds': [10, 100],
-        'other_bounds': [10, 10],
+        'vf_bounds': [20, 200],
+        'other_bounds': [1.0, 20],
         'variance_ratio_bounds': [.5, 5.0],
         'grid_size': 3
     }
