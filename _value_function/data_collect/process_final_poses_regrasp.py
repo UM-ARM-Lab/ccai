@@ -47,17 +47,18 @@ def calculate_turn_cost(initial_pose, final_pose):
     # upright_cost = 20 * np.sum((state[-3:-1]) ** 2) # the screwdriver should only rotate in z direction
     # upright_cost = 50 * np.sum((state[-3:-1] - np.array([0, 0])) ** 2) 
 
-    if np.any(state[-3:-1] > 0.4):
-        upright_cost = 100.0
-        falls += 1
-    else:
-        upright_cost = 0.0
+    ######################### REWARD SHAPING
+    # if np.any(state[-3:-1] > 0.3):
+    #     upright_cost = 100.0
+    #     falls += 1
+    # else:
+    #     upright_cost = 0.0
+    # goal_cost = np.sum(((state[-1] - screwdriver_goal[-1]) ** 2)).reshape(-1)
+    # total_cost = np.minimum(goal_cost+upright_cost, 5.0)
+    ###########################################################################
 
-    goal_cost = np.sum(((state[-1] - screwdriver_goal[-1]) ** 2)).reshape(-1)
-    # goal_cost = np.sum(((state[-3:] - screwdriver_goal) ** 2)).reshape(-1)
-    # print(goal_cost)
-    # 90 degrees away should be 2.56
-    total_cost = np.minimum(goal_cost+upright_cost, 5.0)
+    goal_cost = np.sum(((state[-3:] - screwdriver_goal) ** 2)).reshape(-1)
+    total_cost = np.minimum(goal_cost, 5.0)
 
     return total_cost
 

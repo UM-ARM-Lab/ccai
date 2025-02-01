@@ -32,7 +32,7 @@ if __name__ == "__main__":
     combined_regrasp_trajs = np.empty((0, 13, 20))
     combined_turn_trajs = np.empty((0, 13, 20))
 
-    # config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
+    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
 
     for filename in filenames:
         with open(filename, 'rb') as file:
@@ -53,6 +53,18 @@ if __name__ == "__main__":
                     succ_regrasp_poses = np.concatenate((succ_regrasp_poses, regrasp_poses[i].reshape(1,20)), axis=0)
                     succ_regrasp_trajs = np.concatenate((succ_regrasp_trajs, regrasp_trajs[i].reshape(1,13,20)), axis=0)
                     succ_turn_trajs = np.concatenate((succ_turn_trajs, turn_trajs[i].reshape(1,13,20)), axis=0)
+
+                    # if cost > 0.8:
+                    #     vis_trajs = turn_trajs[i].reshape(13,20)
+                    #     for j in range(13):
+                    #         env.reset(torch.from_numpy(vis_trajs[j]).reshape(1,20).float())
+                    #     time.sleep(.2)
+
+                elif cost > 3.0 and cost < 5.0:
+                        vis_trajs = turn_trajs[i].reshape(13,20)
+                        for j in range(13):
+                            env.reset(torch.from_numpy(vis_trajs[j]).reshape(1,20).float())
+                        time.sleep(.2)
 
             combined_pregrasp_poses = np.concatenate((combined_pregrasp_poses, succ_pregrasp_poses), axis=0)
             combined_regrasp_poses = np.concatenate((combined_regrasp_poses, succ_regrasp_poses), axis=0)

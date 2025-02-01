@@ -1,4 +1,4 @@
-from _value_function.screwdriver_problem import convert_full_to_partial_config
+from _value_function.screwdriver_problem import convert_full_to_partial_config, init_env, emailer
 import pathlib
 import numpy as np
 import pickle as pkl
@@ -9,6 +9,7 @@ from torch.utils.data import random_split, DataLoader, TensorDataset, Subset
 import wandb
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
+
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
@@ -290,8 +291,8 @@ def eval(model_name):
             plt.tight_layout()
             plt.show()
     
-    plot_loader(train_loader, 100, 'Training Set')
-    plot_loader(test_loader, 100, 'Test Set')
+    plot_loader(train_loader, 300, 'Training Set')
+    plot_loader(test_loader, 300, 'Test Set')
 
 if __name__ == "__main__":
 
@@ -303,18 +304,18 @@ if __name__ == "__main__":
         path = f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl'
         model_name = "ensemble"
 
-    # model_name = "ensemble_accurate"
-
     # save_train_test_splits(noisy=noisy, dataset_size=None, validation_proportion=0.05, seed=1)
     # exit()
 
-    ensemble = []
-    for i in range(16):
-        print(f"Training network {i+1}/16")
-        net, _ = train(epochs=30, neurons = 30, verbose='very', lr=1e-3, batch_size=100)
-        ensemble.append(net)
-    torch.save(ensemble, path)
+    # ensemble = []
+    # for i in range(8):
+    #     print(f"Training network {i+1}/16")
+    #     net, _ = train(epochs=500, neurons = 1028, verbose='very', lr=1e-3, batch_size=100)
+    #     ensemble.append(net)
+    # torch.save(ensemble, path)
+    # emailer().send()
     eval(model_name = model_name)
+    exit()
     
 
     ######################################################
@@ -334,8 +335,8 @@ if __name__ == "__main__":
 
     def hyperparam_search(
         lr_candidates=[1e-3],
-        epochs_candidates=[50],
-        neurons_candidates=[12, 14, 16],
+        epochs_candidates=[800],
+        neurons_candidates=[512, 1028, 2056, 4112],
         batch_size=100,
         verbose="normal"
     ):
@@ -376,4 +377,4 @@ if __name__ == "__main__":
         print(f"Best (lowest) test loss: {lowest_test_loss:.8f}")
         print("=====================================\n")
 
-    # hyperparam_search()
+    hyperparam_search()
