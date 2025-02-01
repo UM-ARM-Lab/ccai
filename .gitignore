@@ -9,6 +9,7 @@ examples/wandb/*
 wandb/*
 data/experiments/imgs
 data/experiments
+data/value_functions
 data/plots
 examples/config/
 data/test/initializations
