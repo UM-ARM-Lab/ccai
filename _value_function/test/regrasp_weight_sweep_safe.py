@@ -301,7 +301,7 @@ if __name__ == "__main__":
     
     n_samples = 8
     which_weights = "regrasp"
-    name = "2kvf"
+    name = "2k"
 
     checkpoint_path = fpath /'test'/'weight_sweep'/f'checkpoint_{which_weights}_{name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)

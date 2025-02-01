@@ -310,7 +310,7 @@ if __name__ == "__main__":
     ensemble = []
     for i in range(16):
         print(f"Training network {i+1}/16")
-        net, _ = train(epochs=800, neurons = 2056, verbose='very', lr=1e-3, batch_size=100)
+        net, _ = train(epochs=200, neurons = 2056, verbose='very', lr=1e-3, batch_size=100)
         ensemble.append(net)
     torch.save(ensemble, path)
     emailer().send()
