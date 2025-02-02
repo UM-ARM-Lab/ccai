@@ -415,12 +415,11 @@ def regrasp(env, config, chain, state2ee_pos_partial, perception_noise = 0, init
     return final_state, full_trajectory
 
 
-def solve_turn(env, gym, viewer, params, fpath, initial_pose, state2ee_pos_partial, perception_noise = 0, 
+def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, perception_noise = 0, 
                image_path = None, sim_viz_env=None, ros_copy_node=None, model_name = "ensemble", iters = 200,
                mode='vf', vf_weight = 100.0, other_weight = 0.1, variance_ratio = 5):
 
     obj_dof = 3
-    fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
     "only turn the screwdriver once"
     screwdriver_goal = params['screwdriver_goal'].cpu()
@@ -581,8 +580,6 @@ def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym,
     params = config.copy()
     controller = 'csvgd'
     succ = False
-    fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/{controller}/trial_0')
-    pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
     # set up params
     params.pop('controllers')
     params.update(config['controllers'][controller])
@@ -596,7 +593,7 @@ def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym,
     object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
     params['object_location'] = object_location
 
-    final_distance_to_goal, final_pose, full_trajectory = solve_turn(env, gym, viewer, params, fpath, initial_pose, state2ee_pos_partial, image_path = None,
+    final_distance_to_goal, final_pose, full_trajectory = solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, image_path = image_path,
                                                                      sim_viz_env=sim_env, ros_copy_node=ros_copy_node, perception_noise=perception_noise, iters=iters,
                                                                      mode=mode, model_name=model_name, vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio)
     
@@ -654,23 +651,30 @@ if __name__ == "__main__":
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
     
-    img_save_dir = None
-    pregrasp_iters = 80#200
-    regrasp_iters = 100
+    # img_save_dir = None
+    pregrasp_iters = 50#200
+    regrasp_iters = 80
+    turn_iters = 100
     perception_noise = 0.0
 
-    pregrasp_pose, planned_pose = pregrasp(env, config, chain, deterministic=True, perception_noise=perception_noise, 
-                        image_path = img_save_dir, initialization = None, mode='no_vf', iters = pregrasp_iters)
+    img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/imgs/regrasp_trial_test')
+    pathlib.Path.mkdir(img_save_dir, parents=True, exist_ok=True)  
 
-    regrasp_pose, regrasp_traj = regrasp(env, config, chain, state2ee_pos_partial, perception_noise=perception_noise, 
-                            image_path = img_save_dir, initialization = pregrasp_pose, mode='no_vf', iters = regrasp_iters,
-                            vf_weight = 100.0, other_weight = 0.1, variance_ratio = 5)
-    
-    _, turn_pose, succ, turn_traj = do_turn(regrasp_pose, config, env, 
-                    sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, 
-                    perception_noise=perception_noise, image_path = img_save_dir, iters = regrasp_iters,
-                    mode='vf', vf_weight = 100.0, other_weight = 0.1, variance_ratio = 5)
-    
+
+    for i in range(1):
+        
+        pregrasp_pose, planned_pose = pregrasp(env, config, chain, deterministic=True, perception_noise=perception_noise, 
+                            image_path = img_save_dir, initialization = None, mode='no_vf', iters = pregrasp_iters)
+
+        regrasp_pose, regrasp_traj = regrasp(env, config, chain, state2ee_pos_partial, perception_noise=perception_noise, 
+                                image_path = img_save_dir, initialization = pregrasp_pose, mode='no_vf', iters = regrasp_iters,
+                                vf_weight = 100.0, other_weight = 0.1, variance_ratio = 5)
+        
+        _, turn_pose, succ, turn_traj = do_turn(regrasp_pose, config, env, 
+                        sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, 
+                        perception_noise=perception_noise, image_path = img_save_dir, iters = turn_iters,
+                        mode='no_vf', vf_weight = 100.0, other_weight = 0.1, variance_ratio = 5)
+        
 
     # print("done regrasp")
     # while True:
