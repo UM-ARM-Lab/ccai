@@ -113,6 +113,7 @@ def test(checkpoint, n_samples):
         lowest_total_cost = checkpoint['lowest_total_cost']
         
         print("==========================================")
+        print("PREDPREDPREDPRED.")    
         print(f"Iteration {iteration+1} / {max_iterations}")
         print(f"Current search for vf_weights: {vf_weights}")
         print(f"Current search for other_weights: {other_weights}")
@@ -136,7 +137,7 @@ def test(checkpoint, n_samples):
         # Search over the entire grid but skip combos we've tested already
         for vf_weight, other_weight, variance_ratio in product(*hyperparameters):
             # combo_tuple = (vf_weight, other_weight, variance_ratio)
-            combo_tuple = (vf_weight, other_weight, variance_ratio)
+            combo_tuple = (vf_weight, 5.0, 2.0)
            
 
             if combo_tuple in checkpoint['tested_combinations'][iteration]:
@@ -165,7 +166,11 @@ def test(checkpoint, n_samples):
                 if use_predictions is True:
                     vf_pose = convert_full_to_partial_config(regrasp_pose.reshape(1,20))
                     vf_pose_norm = (vf_pose - poses_mean) / poses_std
-                    vf_pose_norm = vf_pose_norm.float()
+                    vf_pose_norm = vf_pose_norm.float().flatten()
+
+
+                    vf_pose_norm = torch.cat([vf_pose_norm, torch.tensor([12.0], dtype=torch.float32)], dim=0)
+
                     vf = query_ensemble(vf_pose_norm, models)
                     prediction_vf_norm = vf.mean(dim=0)
                     prediction_vf = prediction_vf_norm * cost_std + cost_mean
@@ -295,11 +300,11 @@ if __name__ == "__main__":
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
     sim_device = config['sim_device']
     
-    n_samples = 8
+    n_samples = 5
 
-    name = "2k"
+    name = "vf_only4"
 
-    checkpoint_path = fpath /'test'/'weight_sweep'/f'checkpoint_{name}.pkl'
+    checkpoint_path = fpath /'test'/'weight_sweep'/f'checkpoint_pred_{name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
     pregrasp_path = fpath /'test'/'initializations'/'weight_sweep_pregrasps.pkl'
@@ -311,9 +316,9 @@ if __name__ == "__main__":
                             do_pregrasp=True, name='weight_sweep_pregrasps')
 
     starting_values = {
-        'vf_bounds': [20, 200],
-        'other_bounds': [1.0, 20],
-        'variance_ratio_bounds': [1.0, 5.0],
+        'vf_bounds': [10, 1000],
+        'other_bounds': [5.0, 5.0],
+        'variance_ratio_bounds': [2.0, 2.0],
         'grid_size': 3
     }
 

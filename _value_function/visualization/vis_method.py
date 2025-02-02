@@ -10,7 +10,7 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 import torch
 
-experiment_name = 'test_method_new'
+experiment_name = 'test_method_6055'
 calc_novf = True
 
 filename = f'test/{experiment_name}.pkl'
@@ -84,6 +84,8 @@ if __name__ == "__main__":
     method_offset = 0.15  # spacing offset for each method group
     pred_offset = 0.05    # spacing offset for predicted bars within the same method group
 
+    colors = ['blue', 'red', 'green', 'purple', 'orange', 'cyan', 'magenta', 'yellow']
+
     for method_i, method_name in enumerate(method_names):
         # x positions for the actual cost
         x_actual = np.arange(len(data[method_name]['costs'])) + method_i * method_offset
@@ -98,7 +100,8 @@ if __name__ == "__main__":
             fmt='o',  # marker shape
             label=f'Cost ({method_name.upper()})', 
             linestyle='None', 
-            capsize=3
+            capsize=3,
+            color=colors[method_i]
         )
 
         # Plot predicted costs with error bars
@@ -109,7 +112,8 @@ if __name__ == "__main__":
             fmt='x',   # different marker shape
             label=f'Predicted ({method_name.upper()})',
             linestyle='None',
-            capsize=3
+            capsize=3,
+            color=colors[method_i]
         )
 
     ts = 16

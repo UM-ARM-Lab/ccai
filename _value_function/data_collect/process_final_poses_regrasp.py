@@ -89,6 +89,7 @@ if __name__ == "__main__":
 
     # config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
 
+    # filenames = filenames[:1]
     for filename in filenames:
         with open(filename, 'rb') as file:
             pose_tuples = pkl.load(file)

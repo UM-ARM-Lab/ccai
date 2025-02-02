@@ -53,9 +53,8 @@ def save_train_test_splits(noisy=False, dataset_size=None, validation_proportion
     turn_costs = np.array(turn_costs).flatten()
     costs = np.repeat(turn_costs, T)
 
-
     indices = np.arange(len(poses))
-    np.random.shuffle(indices)
+    # np.random.shuffle(indices)
 
     split_idx = int(n_trajs * (1 - validation_proportion))*T
 
@@ -291,8 +290,8 @@ def eval(model_name):
             plt.tight_layout()
             plt.show()
     
-    plot_loader(train_loader, 300, 'Training Set')
-    plot_loader(test_loader, 300, 'Test Set')
+    plot_loader(train_loader, 50, 'Training Set')
+    plot_loader(test_loader, 10, 'Test Set')
 
 if __name__ == "__main__":
 
@@ -307,10 +306,12 @@ if __name__ == "__main__":
     # save_train_test_splits(noisy=noisy, dataset_size=None, validation_proportion=0.05, seed=1)
     # exit()
 
+    path = f'{fpath.resolve()}/value_functions/value_function_ensemble_test.pkl'
+    model_name = "ensemble_test"
+
     ensemble = []
     for i in range(16):
-        print(f"Training network {i+1}/16")
-        net, _ = train(epochs=200, neurons = 2056, verbose='very', lr=1e-3, batch_size=100)
+        net, _ = train(epochs=200, neurons = 128, verbose='very', lr=1e-3, batch_size=100)
         ensemble.append(net)
     torch.save(ensemble, path)
     emailer().send()
