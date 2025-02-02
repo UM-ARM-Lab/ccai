@@ -58,7 +58,7 @@ while True:
 
         print(f"Starting Trial {trials_done+1}")
 
-        initialization = get_initialization(env, sim_device, max_screwdriver_tilt=0.015, screwdriver_noise_mag=0.015, finger_noise_mag=0.1)
+        initialization = get_initialization(env, sim_device, max_screwdriver_tilt=0.015, screwdriver_noise_mag=0.015, finger_noise_mag=0.15)
         
         pregrasp_pose, planned_pose = pregrasp(env, config, chain, deterministic=True, perception_noise=perception_noise, 
                         image_path = img_save_dir, initialization = initialization, mode='no_vf', iters = pregrasp_iters)
@@ -76,7 +76,7 @@ while True:
         print("done regrasp")
         
         _, turn_pose, succ, turn_traj = do_turn(regrasp_pose, config, env, 
-                        sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, 
+                        sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, mode = 'no_vf',
                         iters = turn_iters, perception_noise=perception_noise, image_path = img_save_dir)
         
         print("done turn")

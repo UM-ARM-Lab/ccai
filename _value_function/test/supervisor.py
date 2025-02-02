@@ -45,6 +45,10 @@ if __name__ == "__main__":
             restart_on_crash(str(script_path))
     if args.filename == "data_normal":
         script_path = fpath / "_value_function/data_collect/get_regrasp_to_turning_dataset_normal.py"
+        if args.config_path:
+            restart_on_crash(str(script_path), args.config_path)
+        else:
+            restart_on_crash(str(script_path))
 
     elif args.filename == "test":
         script_path = fpath / "_value_function/test/test_method.py"
