@@ -450,6 +450,9 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             indices = torch.arange(n_steps).unsqueeze(1).to(self.device) + 1
             input_norm = torch.cat([q, indices], dim=1)
 
+            # LAST STEP ONLY
+            # input_norm = input_norm[-1, :].reshape(1, -1)
+
             vf_output_norm = self.query_ensemble(input_norm, self.models, device=self.device)
             vf_output = vf_output_norm * self.cost_std + self.cost_mean
 
@@ -462,10 +465,10 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             smoothness_cost = torch.sum((q[1:] - q[-1]) ** 2)
             action_cost = torch.sum(delta_q ** 2)
 
-            vf_cost = mean[-1] + mean_squared_variance[-1] * self.variance_ratio
+            # vf_cost = mean[-1] + mean_squared_variance[-1] * self.variance_ratio
 
             # print(f'vf_cost: {vf_cost.reshape(1)}')
-            print(f'last step prediction: {mean[-1].reshape(1)}')
+            # print(f'last step prediction: {mean[-1].reshape(1)}')
             return self.vf_weight*vf_cost + self.other_weight * smoothness_cost + self.other_weight * action_cost
         
         else:
