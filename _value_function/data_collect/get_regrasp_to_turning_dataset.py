@@ -23,9 +23,9 @@ def validate_pregrasp_pose(pregrasp_pose):
 prog_id = 0
 trials_per_save = 5
 perception_noise = 0.0
-pregrasp_iters = 80
-regrasp_iters = 100
-turn_iters = 200
+pregrasp_iters = 50
+regrasp_iters = 80
+turn_iters = 100
 delete_imgs()
 
 if len(sys.argv) == 2:
