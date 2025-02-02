@@ -395,8 +395,8 @@ if __name__ == "__main__":
     # save_train_test_splits(noisy=noisy, dataset_size=None, validation_proportion=0.05, seed=1)
     # exit()
 
-    path = f'{fpath.resolve()}/value_functions/value_function_ensemble_test.pkl'
-    model_name = "ensemble_test"
+    # path = f'{fpath.resolve()}/value_functions/value_function_ensemble_test.pkl'
+    # model_name = "ensemble_test"
 
     ensemble = []
     for i in range(16):
