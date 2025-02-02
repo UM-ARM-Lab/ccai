@@ -76,7 +76,7 @@ while True:
         print("done regrasp")
         
         _, turn_pose, succ, turn_traj = do_turn(regrasp_pose, config, env, 
-                        sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, 
+                        sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, mode = 'no_vf',
                         iters = turn_iters, perception_noise=perception_noise, image_path = img_save_dir)
         
         print("done turn")
