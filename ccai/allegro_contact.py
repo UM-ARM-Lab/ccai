@@ -451,7 +451,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             input_norm = torch.cat([q, indices], dim=1)
 
             # LAST STEP ONLY
-            # input_norm = input_norm[-1, :].reshape(1, -1)
+            input_norm = input_norm[-1, :].reshape(1, -1)
 
             vf_output_norm = self.query_ensemble(input_norm, self.models, device=self.device)
             vf_output = vf_output_norm * self.cost_std + self.cost_mean
