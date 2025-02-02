@@ -230,6 +230,7 @@ def query_ensemble(poses, models, device='cpu'):
     costs = torch.stack(costs)
     return costs
 
+
 def eval(model_name):
     
     train_loader, test_loader, _,_,_,_ = load_data_from_saved_splits()
@@ -290,8 +291,96 @@ def eval(model_name):
             plt.tight_layout()
             plt.show()
     
-    plot_loader(train_loader, 50, 'Training Set')
-    plot_loader(test_loader, 10, 'Test Set')
+    plot_loader(train_loader, 100, 'Training Set')
+    plot_loader(test_loader, 50, 'Test Set')
+
+    # New: t-SNE plot
+    from sklearn.manifold import TSNE
+    
+    def plot_tsne(loader, n_samples, title='t-SNE of Input Features (Color by Actual Cost)'):
+        """Reduce the 16-dimensional input features to 2D using t-SNE and 
+        color-code the points by their actual cost values."""
+        all_inputs = []
+        all_labels = []
+        
+        # Gather all data from the loader
+        for inputs, labels in loader:
+            # Move to CPU numpy arrays if they're not already
+            if isinstance(inputs, torch.Tensor):
+                inputs = inputs.cpu().numpy()
+            if isinstance(labels, torch.Tensor):
+                labels = labels.cpu().numpy()
+            all_inputs.append(inputs)
+            all_labels.append(labels)
+        
+        all_inputs = np.concatenate(all_inputs, axis=0)
+        all_labels = np.concatenate(all_labels, axis=0).flatten()
+        
+        # De-normalize the labels (costs)
+        actual_values = all_labels * cost_std + cost_mean
+        
+        # (Optional) If you have a very large dataset, consider sub-sampling here for speed:
+        subset_indices = np.random.choice(len(all_inputs), size=n_samples, replace=False)
+        all_inputs = all_inputs[subset_indices]
+        actual_values = actual_values[subset_indices]
+        
+        # Apply t-SNE to reduce inputs to 2D
+        tsne = TSNE(n_components=2, random_state=42, perplexity=30)
+        inputs_2d = tsne.fit_transform(all_inputs)
+        
+        # Create the scatter plot
+        plt.figure(figsize=(8,6))
+        sc = plt.scatter(inputs_2d[:,0], inputs_2d[:,1], c=actual_values, cmap='viridis', s=30)
+        plt.colorbar(sc, label='Actual Cost')
+        plt.xlabel('t-SNE Dimension 1')
+        plt.ylabel('t-SNE Dimension 2')
+        plt.title(title)
+        plt.show()
+
+    # Plot t-SNE for the training set
+    # plot_tsne(train_loader, 5000, title='t-SNE of Training Set (Color by Actual Cost)')
+    # Plot t-SNE for the test set
+    # plot_tsne(test_loader, 100, title='t-SNE of Test Set (Color by Actual Cost)')
+
+    def plot_error_vs_actual(loader, n_samples, title='Error vs Actual Cost'):
+        """Scatters the absolute prediction error (y-axis) against the actual cost (x-axis)."""
+        with torch.no_grad():
+            all_preds = []
+            all_labels = []
+
+            for inputs, labels in loader:
+                ensemble_preds = query_ensemble(inputs, models)
+                preds = ensemble_preds.mean(dim=0)
+                all_preds.append(preds.numpy())
+                all_labels.append(labels.numpy())
+
+            # Convert and flatten
+            all_preds = np.concatenate(all_preds).flatten()
+            all_labels = np.concatenate(all_labels).flatten()
+
+            # Denormalize
+            all_preds = all_preds * cost_std + cost_mean
+            all_labels = all_labels * cost_std + cost_mean
+
+            # Random subsample
+            indices = np.random.choice(len(all_labels), n_samples, replace=False)
+            actual_values = all_labels[indices]
+            predicted_values = all_preds[indices]
+            
+            # Calculate absolute error
+            errors = np.abs(predicted_values - actual_values)
+
+            # Plot
+            plt.figure(figsize=(8,6))
+            plt.scatter(actual_values, errors, alpha=0.6)
+            plt.xlabel('Actual Cost')
+            plt.ylabel('Absolute Error (|Predicted - Actual|)')
+            plt.title(title)
+            plt.show()
+
+    # Plot error vs. actual cost for training and test sets
+    # plot_error_vs_actual(train_loader, 300, 'Error vs. Actual Cost (Training Set)')
+    # plot_error_vs_actual(test_loader, 300, 'Error vs. Actual Cost (Test Set)')
 
 if __name__ == "__main__":
 
