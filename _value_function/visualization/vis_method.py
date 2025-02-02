@@ -1,5 +1,5 @@
 from _value_function.screwdriver_problem import init_env, convert_full_to_partial_config
-from _value_function.data_collect.process_final_poses_pregrasp import calculate_turn_cost
+from _value_function.data_collect.process_final_poses_regrasp import calculate_turn_cost
 from _value_function.train_value_function import Net, query_ensemble, load_ensemble
 import pathlib
 import numpy as np
@@ -10,7 +10,7 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 import torch
 
-experiment_name = 'test_method_6055'
+experiment_name = 'test_method_30'
 calc_novf = True
 
 filename = f'test/{experiment_name}.pkl'
@@ -53,7 +53,7 @@ if __name__ == "__main__":
                     results[method_name][(pregrasp_index, repeat_index)]
 
                 # Compute "cost"
-                cost, _ = calculate_turn_cost(regrasp_pose.numpy(), turn_pose)
+                cost = calculate_turn_cost(regrasp_pose.numpy(), turn_pose)
                 all_costs.append(cost)
 
                 # Query the value-function ensemble

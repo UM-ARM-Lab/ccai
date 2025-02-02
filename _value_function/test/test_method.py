@@ -105,13 +105,13 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = '6055'
+    test_name = 'laststep'
     model_name = "ensemble"
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    n_trials = 8
-    n_repeat = 2
+    n_trials = 5
+    n_repeat = 1
     perception_noise = 0.0
     calc_novf = True
 

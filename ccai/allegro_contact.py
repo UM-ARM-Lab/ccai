@@ -447,21 +447,25 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             n_steps = q.shape[0]
 
             input_norm = ((q - self.poses_mean) / self.poses_std).float()
-            indices = torch.arange(n_steps).unsqueeze(1).to(self.device)
+            indices = torch.arange(n_steps).unsqueeze(1).to(self.device) + 1
             input_norm = torch.cat([q, indices], dim=1)
 
             vf_output_norm = self.query_ensemble(input_norm, self.models, device=self.device)
             vf_output = vf_output_norm * self.cost_std + self.cost_mean
 
-            mean = torch.mean(vf_output)
-            mse = torch.mean(vf_output ** 2)
-            mean_squared_variance = torch.mean((vf_output - mean) ** 2)
+            mean = torch.mean(vf_output, dim=0)
+            mse = torch.mean(vf_output ** 2, dim=0)
+            mean_squared_variance = torch.mean((vf_output - mean) ** 2, dim=0)
 
-            vf_cost = mse + mean_squared_variance * self.variance_ratio
+            vf_cost = torch.mean(mse) + torch.mean(mean_squared_variance) * self.variance_ratio
 
             smoothness_cost = torch.sum((q[1:] - q[-1]) ** 2)
             action_cost = torch.sum(delta_q ** 2)
+
+            vf_cost = mean[-1] + mean_squared_variance[-1] * self.variance_ratio
+
             # print(f'vf_cost: {vf_cost.reshape(1)}')
+            print(f'last step prediction: {mean[-1].reshape(1)}')
             return self.vf_weight*vf_cost + self.other_weight * smoothness_cost + self.other_weight * action_cost
         
         else:
