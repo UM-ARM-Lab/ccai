@@ -576,7 +576,7 @@ def solve_turn(env, gym, viewer, params, fpath, initial_pose, state2ee_pos_parti
     return final_distance_to_goal.cpu().detach().item(), final_state, full_trajectory
 
 def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, image_path = None, 
-            iters = 200, perception_noise = 0, turn_angle = np.pi/2, model_name = "ensemble", mode='vf', vf_weight = 100.0, other_weight = 0.1, variance_ratio = 5):
+            iters = 200, perception_noise = 0, turn_angle = np.pi/2, model_name = "ensemble", mode='no_vf', vf_weight = 100.0, other_weight = 0.1, variance_ratio = 5):
 
     params = config.copy()
     controller = 'csvgd'

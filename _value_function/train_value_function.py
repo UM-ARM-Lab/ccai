@@ -14,7 +14,7 @@ from matplotlib.ticker import MultipleLocator
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
-def index_and_sort_regrasp_and_turn_trajs(regrasp_trajs, turn_trajs):
+def stack_trajs(regrasp_trajs, turn_trajs):
 
     regrasp_stacked = np.stack(regrasp_trajs, axis=0)
     # regrasp_poses = regrasp_stacked[:,-1,:]
@@ -48,7 +48,7 @@ def save_train_test_splits(noisy=False, dataset_size=None, validation_proportion
     n_trajs = len(regrasp_trajs)
     print(f'Loaded {n_trajs} trials, which will create {n_trajs*T} samples')
 
-    poses = index_and_sort_regrasp_and_turn_trajs(regrasp_trajs, turn_trajs)
+    poses = stack_trajs(regrasp_trajs, turn_trajs)
 
     turn_costs = np.array(turn_costs).flatten()
     costs = np.repeat(turn_costs, T)
@@ -392,18 +392,18 @@ if __name__ == "__main__":
         path = f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl'
         model_name = "ensemble"
 
-    # save_train_test_splits(noisy=noisy, dataset_size=None, validation_proportion=0.05, seed=1)
+    # save_train_test_splits(noisy=noisy, dataset_size=None, validation_proportion=0.1, seed=1)
     # exit()
 
     # path = f'{fpath.resolve()}/value_functions/value_function_ensemble_test.pkl'
     # model_name = "ensemble_test"
 
-    ensemble = []
-    for i in range(16):
-        net, _ = train(epochs=20, neurons = 16, verbose='very', lr=1e-3, batch_size=100)
-        ensemble.append(net)
-    torch.save(ensemble, path)
-    emailer().send()
+    # ensemble = []
+    # for i in range(16):
+    #     net, _ = train(epochs=20, neurons = 16, verbose='very', lr=1e-3, batch_size=100)
+    #     ensemble.append(net)
+    # torch.save(ensemble, path)
+    # emailer().send()
     eval(model_name = model_name)
     exit()
     
