@@ -98,6 +98,10 @@ if __name__ == "__main__":
             
             regrasp_poses = np.array([t.numpy() for t in regrasp_poses]).reshape(-1, 20)
             turn_poses = np.array(turn_poses).reshape(-1, 20)
+
+            if turn_trajs[0].shape[0] != 13:
+                print("broken trajectory")
+                continue
             
             combined_turn_trajs = np.concatenate((combined_turn_trajs, turn_trajs), axis=0)
             combined_regrasp_trajs = np.concatenate((combined_regrasp_trajs, regrasp_trajs), axis=0)

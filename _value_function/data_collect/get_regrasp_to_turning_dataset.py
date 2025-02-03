@@ -42,7 +42,6 @@ computer_id = config['data_collection_id']
 while True:
 
     pose_tuples = []
-    
     trials_done = 0
 
     while trials_done < trials_per_save:
