@@ -397,7 +397,8 @@ if __name__ == "__main__":
 
     ensemble = []
     for i in range(16):
-        net, _ = train(epochs=10, neurons = 24, verbose='very', lr=1e-3, batch_size=100)
+        print(f"Training model {i}")
+        net, _ = train(epochs=50, neurons = 16, verbose='very', lr=1e-3, batch_size=100)
         ensemble.append(net)
     torch.save(ensemble, path)
     # emailer().send()
