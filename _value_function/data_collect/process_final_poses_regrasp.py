@@ -87,7 +87,7 @@ if __name__ == "__main__":
     combined_turn_costs = []
     combined_regrasp_costs = []
 
-    # config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
+    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
 
     # filenames = filenames[:1]
     for filename in filenames:
@@ -108,9 +108,11 @@ if __name__ == "__main__":
             for i in range(len(regrasp_poses)):
                 cost = calculate_turn_cost(regrasp_poses[i], turn_poses[i])
 
-                # if cost > 90:
-                #     env.reset(torch.from_numpy(turn_poses[i]).reshape(1,20).float())
-                #     time.sleep(2.0)
+                if cost < 1.0:# and cost < 2.0:
+                    for j in range(13):
+                        env.reset(torch.from_numpy(turn_trajs[i][j]).reshape(1,20).float())
+                        time.sleep(.10)
+                    time.sleep(2.0)
 
                 regrasp_cost = calculate_regrasp_cost(regrasp_trajs[i])
                 turn_costs.append(cost)

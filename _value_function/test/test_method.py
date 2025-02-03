@@ -105,7 +105,7 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'laststep'
+    test_name = 'fixed'
     model_name = "ensemble"
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -117,14 +117,14 @@ if __name__ == '__main__':
 
     max_screwdriver_tilt = 0.015
     screwdriver_noise_mag = 0.015
-    finger_noise_mag = 0.25
+    finger_noise_mag = 0.15
 
-    regrasp_iters = 100
+    regrasp_iters = 80
     turn_iters = 100
 
-    vf_weight_rg = 60.0
+    vf_weight_rg = 50.0
     other_weight_rg = 5.0
-    variance_ratio_rg = 5.0
+    variance_ratio_rg = 3.0
 
     vf_weight_t = 12
     other_weight_t = 8
