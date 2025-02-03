@@ -291,8 +291,8 @@ def eval(model_name):
             plt.tight_layout()
             plt.show()
     
-    plot_loader(train_loader, 100, 'Training Set')
-    plot_loader(test_loader, 50, 'Test Set')
+    plot_loader(train_loader, 200, 'Training Set')
+    plot_loader(test_loader, 200, 'Test Set')
 
     # New: t-SNE plot
     from sklearn.manifold import TSNE
@@ -395,14 +395,11 @@ if __name__ == "__main__":
     # save_train_test_splits(noisy=noisy, dataset_size=None, validation_proportion=0.1, seed=1)
     # exit()
 
-    # path = f'{fpath.resolve()}/value_functions/value_function_ensemble_test.pkl'
-    # model_name = "ensemble_test"
-
-    # ensemble = []
-    # for i in range(16):
-    #     net, _ = train(epochs=20, neurons = 16, verbose='very', lr=1e-3, batch_size=100)
-    #     ensemble.append(net)
-    # torch.save(ensemble, path)
+    ensemble = []
+    for i in range(16):
+        net, _ = train(epochs=10, neurons = 24, verbose='very', lr=1e-3, batch_size=100)
+        ensemble.append(net)
+    torch.save(ensemble, path)
     # emailer().send()
     eval(model_name = model_name)
     exit()
