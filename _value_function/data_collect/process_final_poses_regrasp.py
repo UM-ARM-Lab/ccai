@@ -90,7 +90,6 @@ if __name__ == "__main__":
     combined_regrasp_trajs = np.empty((0, 13, 20))
     combined_turn_trajs = np.empty((0, 13, 20))
     combined_turn_costs = []
-    combined_regrasp_costs = []
 
     vis = False
     if vis:
@@ -101,25 +100,34 @@ if __name__ == "__main__":
         with open(filename, 'rb') as file:
             pose_tuples = pkl.load(file)
 
-            pregrasp_poses, regrasp_poses, regrasp_trajs, turn_poses, turn_trajs = zip(*pose_tuples)
+            _, regrasp_poses, regrasp_trajs, turn_poses, turn_trajs = zip(*pose_tuples)
             
             regrasp_poses = np.array([t.numpy() for t in regrasp_poses]).reshape(-1, 20)
             turn_poses = np.array(turn_poses).reshape(-1, 20)
+
+            regrasp_trajs = list(regrasp_trajs)
+            turn_trajs = list(turn_trajs)
 
             # for i in range(turn_trajs[0].shape[0]):
             #     env.reset(torch.from_numpy(turn_trajs[0][i]).reshape(1,20).float())
 
             original_length = len(turn_trajs)
-            turn_trajs = [traj for traj in turn_trajs if traj.shape[0] == 13]
-            if len(turn_trajs) < original_length:
-                print("Broken trajectory removed")
+            # turn_trajs = [traj for traj in turn_trajs if traj.shape[0] == 13]
+
+            for i in range(original_length - 1, -1, -1):
+                if turn_trajs[i].shape[0] != 13 or regrasp_trajs[i].shape[0] != 13:
+                    print("Broken trajectory removed")
+
+                    regrasp_poses = np.delete(regrasp_poses, i, axis=0)
+                    turn_poses = np.delete(turn_poses, i, axis=0)
+
+                    regrasp_trajs.pop(i)
+                    turn_trajs.pop(i)
             
             combined_turn_trajs = np.concatenate((combined_turn_trajs, turn_trajs), axis=0)
             combined_regrasp_trajs = np.concatenate((combined_regrasp_trajs, regrasp_trajs), axis=0)
             
             turn_costs = []
-            regrasp_costs = []
-
             
             for i in range(len(regrasp_poses)):
                 cost = calculate_turn_cost(regrasp_poses[i], turn_poses[i])
@@ -131,17 +139,13 @@ if __name__ == "__main__":
                             time.sleep(.10)
                         time.sleep(2.0)
 
-                regrasp_cost = calculate_regrasp_cost(regrasp_trajs[i])
                 turn_costs.append(cost)
-                regrasp_costs.append(regrasp_cost)
             
             combined_turn_costs.extend(turn_costs)
-            combined_regrasp_costs.extend(regrasp_costs)
 
     combined_turn_costs = np.array(combined_turn_costs)
-    combined_regrasp_costs = np.array(combined_regrasp_costs)
 
-    regrasp_cost_dataset = zip(combined_regrasp_trajs, combined_regrasp_costs, combined_turn_trajs, combined_turn_costs)
+    regrasp_cost_dataset = zip(combined_regrasp_trajs, combined_turn_trajs, combined_turn_costs)
     
     if noisy:
         regrasp_cost_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_combined_regrasp_to_turn_dataset.pkl'
@@ -150,8 +154,7 @@ if __name__ == "__main__":
    
     pkl.dump(regrasp_cost_dataset, open(regrasp_cost_savepath, 'wb'))
 
-    print("num samples: ", len(combined_regrasp_costs))
-    print("num falls: ", falls)
+    print("num samples: ", len(combined_turn_costs))
     
     plt.figure(figsize=(10, 6))
     plt.hist(combined_turn_costs.flatten(), bins=20, color='blue', label='Costs')

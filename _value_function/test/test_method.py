@@ -74,7 +74,7 @@ def get_initializations(env, config, chain, sim_device, n_samples, max_screwdriv
             pkl.dump(pregrasps, open(f'{fpath}/test/initializations/{name}.pkl', 'wb'))
         return pregrasps
 
-def load_or_create_checkpoint(checkpoint_path, n_methods, n_trials, n_repeat):
+def load_or_create_checkpoint(checkpoint_path, method_names):
     """
     Changed so that 'results' is a dict with 'vf' and 'no_vf' keys
     instead of a triple nested list.
@@ -90,12 +90,12 @@ def load_or_create_checkpoint(checkpoint_path, n_methods, n_trials, n_repeat):
         
         # Dictionary-based approach
         checkpoint = {
-            'results': {
-                'vf': {},
-                'no_vf': {}
-            },
+            'results': {},
             'tested_combinations': set()
         }
+        for m in method_names:
+            checkpoint['results'][m] = {}
+
     return checkpoint
 
 def save_checkpoint(checkpoint):
@@ -105,16 +105,23 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'a2'
+    test_name = 'b1'
     model_name = "ensemble"
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    n_trials = 8
+    n_trials = 5
     n_repeat = 1
     perception_noise = 0.0
+
     calc_novf = True
     calc_last_step = True
+
+    method_names = ['vf']
+    if calc_novf:
+        method_names.append("no_vf")
+    if calc_last_step:
+        method_names.append("last_step")
 
     max_screwdriver_tilt = 0.015
     screwdriver_noise_mag = 0.015
@@ -125,7 +132,7 @@ if __name__ == '__main__':
 
     vf_weight_rg = 10.0
     other_weight_rg = 1.0
-    variance_ratio_rg = 5.0
+    variance_ratio_rg = 3.0
 
     # vf_weight_t = 12
     # other_weight_t = 8
@@ -148,7 +155,7 @@ if __name__ == '__main__':
     repeat_indices = list(range(n_repeat))
     args = [pregrasp_indices, repeat_indices]
 
-    checkpoint = load_or_create_checkpoint(checkpoint_path=checkpoint_path, n_methods=2, n_trials=n_trials, n_repeat=n_repeat)
+    checkpoint = load_or_create_checkpoint(checkpoint_path=checkpoint_path, method_names=method_names)
 
     for pregrasp_index, repeat_index in product(*args):
         combo_tuple = (pregrasp_index, repeat_index)

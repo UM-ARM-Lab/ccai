@@ -36,7 +36,7 @@ def save_train_test_splits(noisy=False, dataset_size=None, validation_proportion
     
     with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
         pose_cost_tuples = pkl.load(file)
-        regrasp_trajs, regrasp_costs, turn_trajs, turn_costs = zip(*pose_cost_tuples)
+        regrasp_trajs, turn_trajs, turn_costs = zip(*pose_cost_tuples)
     
     if dataset_size is not None:
         regrasp_trajs = regrasp_trajs[:dataset_size]
@@ -457,7 +457,6 @@ if __name__ == "__main__":
 
     # Set this flag to True to perform hyperparameter tuning via K-Fold CV.
     tune_hyperparams = False
-
     if tune_hyperparams:
         # Define a grid of hyperparameters to search over.
         hyperparameter_grid = [
@@ -495,11 +494,11 @@ if __name__ == "__main__":
             model_name = "ensemble"
 
         ensemble = []
-        # for i in range(16):
-        #     print(f"Training model {i}")
-        #     net, _ = train(epochs=30, neurons=16, verbose='very', lr=1e-3, batch_size=100)
-        #     ensemble.append(net)
-        # torch.save(ensemble, path)
+        for i in range(16):
+            print(f"Training model {i}")
+            net, _ = train(epochs=25, neurons=22, verbose='very', lr=1e-3, batch_size=100)
+            ensemble.append(net)
+        torch.save(ensemble, path)
         eval(model_name=model_name)
 
 
@@ -542,48 +541,48 @@ if __name__ == "__main__":
     #     eval(model_name = model_name, ensemble = True)
     
 
-    # def hyperparam_search(
-    #     lr_candidates=[1e-3],
-    #     epochs_candidates=[800],
-    #     neurons_candidates=[512, 1028, 2056, 4112],
-    #     batch_size=100,
-    #     verbose="normal"
-    # ):
-    #     """
-    #     Perform a grid search over the given hyperparameter candidates and 
-    #     return the best combination (lowest test loss) along with the trained model.
-    #     """
+    def hyperparam_search(
+        lr_candidates=[1e-3],
+        epochs_candidates=[50],
+        neurons_candidates=[22],
+        batch_size_candidates=[50,100,150],
+        verbose="very"
+    ):
+        """
+        Perform a grid search over the given hyperparameter candidates and 
+        return the best combination (lowest test loss) along with the trained model.
+        """
 
-    #     lowest_test_loss = float('inf')
-    #     best_hparams = None
-    #     best_model = None  # This will store the best model state dict
+        lowest_test_loss = float('inf')
+        best_hparams = None
 
-    #     # Iterate over all combinations of the hyperparameter candidates
-    #     for lr in lr_candidates:
-    #         for epochs in epochs_candidates:
-    #             for neurons in neurons_candidates:
-    #                 print(f"\nTraining with lr={lr}, epochs={epochs}, neurons={neurons}")
-    #                 # Train your model
-    #                 model_to_save, test_loss = train(
-    #                     batch_size=batch_size,
-    #                     lr=lr,
-    #                     epochs=epochs,
-    #                     neurons=neurons,
-    #                     verbose=verbose
-    #                 )
+        # Iterate over all combinations of the hyperparameter candidates
+        for lr in lr_candidates:
+            for epochs in epochs_candidates:
+                for neurons in neurons_candidates:
+                    for batch_size in batch_size_candidates:
+                        print(f"\nTraining with lr={lr}, epochs={epochs}, neurons={neurons}, batch_size={batch_size}")
+                        # Train your model
+                        model_to_save, test_loss = train(
+                            batch_size=batch_size,
+                            lr=lr,
+                            epochs=epochs,
+                            neurons=neurons,
+                            verbose=verbose
+                        )
 
-    #                 # Compare test_loss to see if it is the best so far
-    #                 if test_loss < lowest_test_loss:
-    #                     lowest_test_loss = test_loss
-    #                     best_hparams = (lr, epochs, neurons)
-    #                     best_model = model_to_save
+                        # Compare test_loss to see if it is the best so far
+                        if test_loss < lowest_test_loss:
+                            lowest_test_loss = test_loss
+                            best_hparams = (lr, epochs, neurons, batch_size)
 
-    #     print("\n=====================================")
-    #     print("Finished hyperparameter search.")
-    #     print(f"Best hyperparameters found: LR={best_hparams[0]}, "
-    #         f"Epochs={best_hparams[1]}, "
-    #         f"Neurons={best_hparams[2]}")
-    #     print(f"Best (lowest) test loss: {lowest_test_loss:.8f}")
-    #     print("=====================================\n")
+        print("\n=====================================")
+        print("Finished hyperparameter search.")
+        print(f"Best hyperparameters found: LR={best_hparams[0]}, "
+            f"Epochs={best_hparams[1]}, "
+            f"Neurons={best_hparams[2]}"
+            f"Batch Size={best_hparams[3]}")
+        print(f"Best (lowest) test loss: {lowest_test_loss:.8f}")
+        print("=====================================\n")
 
     # hyperparam_search()

@@ -10,8 +10,7 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 import torch
 
-experiment_name = 'test_method_fixed4'
-calc_novf = True
+experiment_name = 'test_method_b1'
 
 filename = f'test/{experiment_name}.pkl'
 with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
@@ -125,7 +124,7 @@ if __name__ == "__main__":
     plt.legend(loc='upper right', fontsize=ts-2)
 
     # If you have both "no_vf" and "vf", compute the average cost difference
-    if calc_novf and "no_vf" in data and "vf" in data:
+    if "no_vf" in data and "vf" in data:
         mean_diff = np.mean(data["no_vf"]["costs"]) - np.mean(data["vf"]["costs"])
         print(f'Average cost difference (no_vf - vf): {mean_diff}')
 

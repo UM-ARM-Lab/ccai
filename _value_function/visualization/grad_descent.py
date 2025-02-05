@@ -17,7 +17,7 @@ fpath = pathlib.Path(f'{CCAI_PATH}/data')
 filename = '/regrasp_to_turn_datasets/combined_regrasp_to_turn_dataset.pkl'
 with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
     pose_cost_tuples = pkl.load(file)
-    regrasp_trajs, regrasp_costs, turn_trajs, turn_costs = zip(*pose_cost_tuples)
+    regrasp_trajs, turn_trajs, turn_costs = zip(*pose_cost_tuples)
 
 # regrasp_stacked = np.stack(regrasp_trajs, axis=0)
 # regrasp_poses = regrasp_stacked[:,-1,:]

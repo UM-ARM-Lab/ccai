@@ -191,7 +191,7 @@ def test(checkpoint, n_samples, which_weights):
             
             # Mark this combo as tested
             checkpoint['tested_combinations'][iteration].add(combo_tuple)
-            checkpoint['results'].append((vf_weight, other_weight, variance_ratio, total_cost))
+            # checkpoint['results'].append((vf_weight, other_weight, variance_ratio, total_cost))
             save_checkpoint(checkpoint)  # save so we don't re-test if we crash now
                 
             print(f"Total combinations tested so far: {sum(len(v) for v in checkpoint['tested_combinations'].values())}")
@@ -299,9 +299,9 @@ if __name__ == "__main__":
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
     sim_device = config['sim_device']
     
-    n_samples = 5
+    n_samples = 4
     which_weights = "regrasp"
-    name = "a2"
+    name = "b0"
 
     checkpoint_path = fpath /'test'/'weight_sweep'/f'checkpoint_{which_weights}_{name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -316,7 +316,7 @@ if __name__ == "__main__":
 
     starting_values = {
         'vf_bounds': [10, 100],
-        'other_bounds': [0.5, 5.0],
+        'other_bounds': [0.5, 10.0],
         'variance_ratio_bounds': [3.0, 10.0],
         'grid_size': 3
     }
