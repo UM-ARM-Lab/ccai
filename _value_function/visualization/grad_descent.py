@@ -34,12 +34,15 @@ with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
 # exit()
 
 regrasp_stacked = np.stack(regrasp_trajs, axis=0)
+
 regrasp_poses = regrasp_stacked[:,-1,:]
-regrasp_poses = regrasp_poses.reshape(-1, 20)[25:30,:]
+regrasp_poses = regrasp_poses.reshape(-1, 20)[0:10,:]
 regrasp_poses = convert_full_to_partial_config(regrasp_poses)
 
+regrasp_traj = regrasp_stacked[0,:,:].reshape(13,20)
 
-def grad_descent(lr = 0.2358):
+
+def grad_descent(lr = 0.3, iters = 1000):
     models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble(model_name="ensemble")
     
     poses = torch.from_numpy(regrasp_poses)
@@ -55,8 +58,8 @@ def grad_descent(lr = 0.2358):
 
     poses_norm.requires_grad_(True)
 
-    optimizer = optim.SGD([poses_norm], lr=0.2)
-    iterations = 1001
+    optimizer = optim.SGD([poses_norm], lr=lr)
+    iterations = iters
 
     for model in models:
         model.eval()
@@ -75,7 +78,7 @@ def grad_descent(lr = 0.2358):
 
         mse = torch.mean((predictions - target_value) ** 2)
         mean_squared_variance = torch.mean((ensemble_predictions - predictions) ** 2)
-        variance_weight = 2.0
+        variance_weight = 5.0
         loss = mse + mean_squared_variance * variance_weight
         loss.backward()
 
@@ -97,27 +100,9 @@ def grad_descent(lr = 0.2358):
     optimized_poses = optimized_poses_norm * poses_std + poses_mean
     optimized_costs = optimized_costs_norm * cost_std + cost_mean
 
-    full_initial = convert_partial_to_full_config(poses.numpy())
-    full_optimized = convert_partial_to_full_config(optimized_poses)
-
-    initial_pose_tuples = [(initial, optimized) for initial, optimized in zip(full_initial, full_optimized)]
-    # predicted_cost_tuples = [(initial, optimized) for initial, optimized in zip(original_costs, optimized_costs)]
-
     print("mean of new predicted costs: ", optimized_costs.mean())
     print("original costs: ", original_costs)
     print("optimized costs: ", optimized_costs)
-
-    vis = False
-    if vis:
-        config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
-        for initial, optimized in initial_pose_tuples:
-
-            env.reset(torch.from_numpy(initial).reshape(1,20).float())
-            time.sleep(0.5)
-            # input("Press Enter to continue...")
-            env.reset(torch.from_numpy(optimized).reshape(1,20).float())
-            time.sleep(2.0)
-            # input("Press Enter to continue...")
 
     return poses.numpy(), optimized_poses, pose_optimization_trajectory, optimized_costs.mean()
 
@@ -142,62 +127,63 @@ if __name__ == "__main__":
             print(f'Setpoint {i}')
             time.sleep(0.03)
 
+    pca = False
+    if pca:
+        # Fit PCA on the 10k_poses data to get axes
+        pca = PCA(n_components=3)
+        pca.fit(regrasp_poses)
 
-    # Fit PCA on the 10k_poses data to get axes
-    pca = PCA(n_components=3)
-    pca.fit(regrasp_poses)
+        # Transform poses and optimized_poses based on the PCA axes from 10k_poses
+        poses_pca = pca.transform(poses)
+        optimized_poses_pca = pca.transform(optimized_poses)
 
-    # Transform poses and optimized_poses based on the PCA axes from 10k_poses
-    poses_pca = pca.transform(poses)
-    optimized_poses_pca = pca.transform(optimized_poses)
+        # Transform semi_optimized_poses based on the PCA axes
+        semi_optimized_poses_pca = [pca.transform(np.array(soposes)) for soposes in semi_optimized_poses]
 
-    # Transform semi_optimized_poses based on the PCA axes
-    semi_optimized_poses_pca = [pca.transform(np.array(soposes)) for soposes in semi_optimized_poses]
+        # Create 3D plot
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
 
-    # Create 3D plot
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+        plot_intermediate = True
+        for i in range(len(semi_optimized_poses_pca)):
+            if i == 0:
+                color = 'r'
+                label = 'Initial Pose'
+            elif i == len(semi_optimized_poses_pca) - 1:
+                color = 'b'
+                label = 'Optimized Pose'
+            else:
+                color = 'g'
+                label = None
+                if not plot_intermediate:
+                    continue
+            # Add label only once for each type
+            ax.scatter(semi_optimized_poses_pca[i][:, 0], 
+                    semi_optimized_poses_pca[i][:, 1], 
+                    semi_optimized_poses_pca[i][:, 2], 
+                    c=color, label=label if i in [0, len(semi_optimized_poses_pca) - 1] or plot_intermediate else "")
 
-    plot_intermediate = True
-    for i in range(len(semi_optimized_poses_pca)):
-        if i == 0:
-            color = 'r'
-            label = 'Initial Pose'
-        elif i == len(semi_optimized_poses_pca) - 1:
-            color = 'b'
-            label = 'Optimized Pose'
-        else:
-            color = 'g'
-            label = None
-            if not plot_intermediate:
-                continue
-        # Add label only once for each type
-        ax.scatter(semi_optimized_poses_pca[i][:, 0], 
-                semi_optimized_poses_pca[i][:, 1], 
-                semi_optimized_poses_pca[i][:, 2], 
-                c=color, label=label if i in [0, len(semi_optimized_poses_pca) - 1] or plot_intermediate else "")
+        # Draw dotted lines connecting initial -> semi_optimized -> optimized for each point
+        for i in range(len(semi_optimized_poses_pca[0])):
+            
+            # Start with the initial pose
+            line_points = [poses_pca[i]]
+            # Append each semi-optimized pose
+            for j in range(len(semi_optimized_poses_pca)):
+                if j != 0 and j != len(semi_optimized_poses_pca) - 1 and not plot_intermediate:
+                    continue
+                line_points.append(semi_optimized_poses_pca[j][i])
+            # Add the optimized pose at the end
+            line_points.append(optimized_poses_pca[i])
+            
+            # Convert line points to x, y, z for plotting
+            line_points = np.array(line_points)
+            ax.plot(line_points[:, 0], line_points[:, 1], line_points[:, 2], 'k--', label='Path' if i == 0 else "")
 
-    # Draw dotted lines connecting initial -> semi_optimized -> optimized for each point
-    for i in range(len(semi_optimized_poses_pca[0])):
-        
-        # Start with the initial pose
-        line_points = [poses_pca[i]]
-        # Append each semi-optimized pose
-        for j in range(len(semi_optimized_poses_pca)):
-            if j != 0 and j != len(semi_optimized_poses_pca) - 1 and not plot_intermediate:
-                continue
-            line_points.append(semi_optimized_poses_pca[j][i])
-        # Add the optimized pose at the end
-        line_points.append(optimized_poses_pca[i])
-        
-        # Convert line points to x, y, z for plotting
-        line_points = np.array(line_points)
-        ax.plot(line_points[:, 0], line_points[:, 1], line_points[:, 2], 'k--', label='Path' if i == 0 else "")
+        # Add labels and legend
+        ax.set_xlabel('PCA1')
+        ax.set_ylabel('PCA2')
+        ax.set_zlabel('PCA3')
+        ax.legend(loc='best')
 
-    # Add labels and legend
-    ax.set_xlabel('PCA1')
-    ax.set_ylabel('PCA2')
-    ax.set_zlabel('PCA3')
-    ax.legend(loc='best')
-
-    plt.show()
+        plt.show()

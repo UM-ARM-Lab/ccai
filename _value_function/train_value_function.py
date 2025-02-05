@@ -9,6 +9,7 @@ from torch.utils.data import random_split, DataLoader, TensorDataset, Subset
 import wandb
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
+from sklearn.model_selection import KFold  
 
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
@@ -53,8 +54,15 @@ def save_train_test_splits(noisy=False, dataset_size=None, validation_proportion
     turn_costs = np.array(turn_costs).flatten()
     costs = np.repeat(turn_costs, T)
 
-    indices = np.arange(len(poses))
-    # np.random.shuffle(indices)
+    assert(len(poses)%T == 0)
+
+    # indices = np.arange(len(poses)//T)
+
+    indices = np.arange(len(poses)//T)
+    np.random.shuffle(indices)
+    indices = np.repeat(indices, T).astype(np.int64)
+    add = np.tile(list(range(T)), int(len(indices)/T))
+    indices = indices*T + add
 
     split_idx = int(n_trajs * (1 - validation_proportion))*T
 
@@ -129,7 +137,7 @@ class Net(nn.Module):
         f1 = F.relu(self.fc1(input))
         f2 = F.relu(self.fc2(f1))
         output = self.fc3(f2)
-        return output.squeeze()
+        return output.squeeze(-1)
     
 def train(batch_size = 100, lr = 0.001, epochs = 205, neurons = 12, verbose="normal"):
     shape = (16,1)
@@ -291,8 +299,8 @@ def eval(model_name):
             plt.tight_layout()
             plt.show()
     
-    plot_loader(train_loader, 200, 'Training Set')
-    plot_loader(test_loader, 200, 'Test Set')
+    plot_loader(train_loader, 100, 'Training Set')
+    plot_loader(test_loader, 100, 'Test Set')
 
     # New: t-SNE plot
     from sklearn.manifold import TSNE
@@ -382,28 +390,141 @@ def eval(model_name):
     # plot_error_vs_actual(train_loader, 300, 'Error vs. Actual Cost (Training Set)')
     # plot_error_vs_actual(test_loader, 300, 'Error vs. Actual Cost (Test Set)')
 
+def k_fold_cv_train(k=5, batch_size=100, lr=0.001, epochs=20, neurons=12):
+    """
+    Perform K-Fold cross-validation using the training data loaded from saved splits.
+    For each fold, a new model is initialized and trained, and the validation loss is computed.
+    Returns the average validation loss across all folds.
+    """
+    # Load training data
+    train_loader, _, _, _, _, _ = load_data_from_saved_splits(batch_size=batch_size)
+    # Get the underlying TensorDataset from the train_loader
+    train_dataset = train_loader.dataset
+    num_samples = len(train_dataset)
+    indices = np.arange(num_samples)
+    
+    kf = KFold(n_splits=k, shuffle=True, random_state=42)
+    fold_validation_losses = []
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    shape = (16, 1)
+    criterion = nn.MSELoss()
+
+    for fold, (train_idx, val_idx) in enumerate(kf.split(indices)):
+        print(f"\n--- Fold {fold+1}/{k} ---")
+        # Create subset datasets for this fold
+        train_subset = Subset(train_dataset, train_idx)
+        val_subset = Subset(train_dataset, val_idx)
+        
+        train_fold_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
+        val_fold_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
+        
+        # Initialize a new model and optimizer for this fold
+        model = Net(shape[0], shape[1], neurons=neurons).to(device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+        
+        # Train for the specified number of epochs
+        for epoch in range(epochs):
+            model.train()
+            for inputs, labels in train_fold_loader:
+                inputs, labels = inputs.to(device), labels.to(device)
+                optimizer.zero_grad()
+                outputs = model(inputs)
+                loss = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
+        
+        # Evaluate on the validation fold
+        model.eval()
+        fold_val_loss = 0.0
+        with torch.no_grad():
+            for inputs, labels in val_fold_loader:
+                inputs, labels = inputs.to(device), labels.to(device)
+                outputs = model(inputs)
+                loss = criterion(outputs, labels)
+                fold_val_loss += loss.item()
+        fold_val_loss /= len(val_fold_loader)
+        print(f"Fold {fold+1} validation loss: {fold_val_loss:.8f}")
+        fold_validation_losses.append(fold_val_loss)
+    
+    avg_val_loss = np.mean(fold_validation_losses)
+    print(f"\nAverage validation loss over {k} folds: {avg_val_loss:.8f}\n")
+    return avg_val_loss
+
 if __name__ == "__main__":
-
-    noisy = False
-    if noisy:
-        path = f'{fpath.resolve()}/value_functions/value_function_ensemble_noisy.pkl'
-        model_name = "ensemble_noisy"
-    else:
-        path = f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl'
-        model_name = "ensemble"
-
-    # save_train_test_splits(noisy=noisy, dataset_size=None, validation_proportion=0.1, seed=1)
+    # Uncomment the following line to generate and save train/test splits if needed.
+    # save_train_test_splits(noisy=False, dataset_size=None, validation_proportion=0.1, seed=None)
     # exit()
 
-    ensemble = []
-    for i in range(16):
-        print(f"Training model {i}")
-        net, _ = train(epochs=50, neurons = 16, verbose='very', lr=1e-3, batch_size=100)
-        ensemble.append(net)
-    torch.save(ensemble, path)
-    # emailer().send()
-    eval(model_name = model_name)
-    exit()
+    # Set this flag to True to perform hyperparameter tuning via K-Fold CV.
+    tune_hyperparams = False
+
+    if tune_hyperparams:
+        # Define a grid of hyperparameters to search over.
+        hyperparameter_grid = [
+
+            {"lr": 1e-3, "neurons": 24, "epochs": 60, "batch_size": 100},
+            {"lr": 1e-3, "neurons": 16, "epochs": 60, "batch_size": 100},
+            {"lr": 1e-3, "neurons": 22, "epochs": 60, "batch_size": 100}, 
+
+        ]
+
+        best_params = None
+        best_loss = float("inf")
+        for params in hyperparameter_grid:
+            print(f"Evaluating hyperparameters: {params}")
+            avg_loss = k_fold_cv_train(k=5,
+                                       batch_size=params["batch_size"],
+                                       lr=params["lr"],
+                                       epochs=params["epochs"],
+                                       neurons=params["neurons"],
+                                       )
+            if avg_loss < best_loss:
+                best_loss = avg_loss
+                best_params = params
+
+        print(f"Best hyperparameters: {best_params} with average validation loss: {best_loss:.8f}\n")
+
+    else:
+
+        noisy = False
+        if noisy:
+            path = f'{fpath.resolve()}/value_functions/value_function_ensemble_noisy.pkl'
+            model_name = "ensemble_noisy"
+        else:
+            path = f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl'
+            model_name = "ensemble"
+
+        ensemble = []
+        # for i in range(16):
+        #     print(f"Training model {i}")
+        #     net, _ = train(epochs=30, neurons=16, verbose='very', lr=1e-3, batch_size=100)
+        #     ensemble.append(net)
+        # torch.save(ensemble, path)
+        eval(model_name=model_name)
+
+
+# if __name__ == "__main__":
+
+#     noisy = False
+#     if noisy:
+#         path = f'{fpath.resolve()}/value_functions/value_function_ensemble_noisy.pkl'
+#         model_name = "ensemble_noisy"
+#     else:
+#         path = f'{fpath.resolve()}/value_functions/value_function_ensemble.pkl'
+#         model_name = "ensemble"
+
+#     # save_train_test_splits(noisy=noisy, dataset_size=None, validation_proportion=0.1, seed=1)
+#     # exit()
+
+#     ensemble = []
+#     for i in range(16):
+#         print(f"Training model {i}")
+#         net, _ = train(epochs=20, neurons = 12, verbose='very', lr=1e-3, batch_size=100)
+#         ensemble.append(net)
+#     torch.save(ensemble, path)
+#     # emailer().send()
+#     eval(model_name = model_name)
+#     exit()
     
 
     ######################################################
@@ -421,48 +542,48 @@ if __name__ == "__main__":
     #     eval(model_name = model_name, ensemble = True)
     
 
-    def hyperparam_search(
-        lr_candidates=[1e-3],
-        epochs_candidates=[800],
-        neurons_candidates=[512, 1028, 2056, 4112],
-        batch_size=100,
-        verbose="normal"
-    ):
-        """
-        Perform a grid search over the given hyperparameter candidates and 
-        return the best combination (lowest test loss) along with the trained model.
-        """
+    # def hyperparam_search(
+    #     lr_candidates=[1e-3],
+    #     epochs_candidates=[800],
+    #     neurons_candidates=[512, 1028, 2056, 4112],
+    #     batch_size=100,
+    #     verbose="normal"
+    # ):
+    #     """
+    #     Perform a grid search over the given hyperparameter candidates and 
+    #     return the best combination (lowest test loss) along with the trained model.
+    #     """
 
-        lowest_test_loss = float('inf')
-        best_hparams = None
-        best_model = None  # This will store the best model state dict
+    #     lowest_test_loss = float('inf')
+    #     best_hparams = None
+    #     best_model = None  # This will store the best model state dict
 
-        # Iterate over all combinations of the hyperparameter candidates
-        for lr in lr_candidates:
-            for epochs in epochs_candidates:
-                for neurons in neurons_candidates:
-                    print(f"\nTraining with lr={lr}, epochs={epochs}, neurons={neurons}")
-                    # Train your model
-                    model_to_save, test_loss = train(
-                        batch_size=batch_size,
-                        lr=lr,
-                        epochs=epochs,
-                        neurons=neurons,
-                        verbose=verbose
-                    )
+    #     # Iterate over all combinations of the hyperparameter candidates
+    #     for lr in lr_candidates:
+    #         for epochs in epochs_candidates:
+    #             for neurons in neurons_candidates:
+    #                 print(f"\nTraining with lr={lr}, epochs={epochs}, neurons={neurons}")
+    #                 # Train your model
+    #                 model_to_save, test_loss = train(
+    #                     batch_size=batch_size,
+    #                     lr=lr,
+    #                     epochs=epochs,
+    #                     neurons=neurons,
+    #                     verbose=verbose
+    #                 )
 
-                    # Compare test_loss to see if it is the best so far
-                    if test_loss < lowest_test_loss:
-                        lowest_test_loss = test_loss
-                        best_hparams = (lr, epochs, neurons)
-                        best_model = model_to_save
+    #                 # Compare test_loss to see if it is the best so far
+    #                 if test_loss < lowest_test_loss:
+    #                     lowest_test_loss = test_loss
+    #                     best_hparams = (lr, epochs, neurons)
+    #                     best_model = model_to_save
 
-        print("\n=====================================")
-        print("Finished hyperparameter search.")
-        print(f"Best hyperparameters found: LR={best_hparams[0]}, "
-            f"Epochs={best_hparams[1]}, "
-            f"Neurons={best_hparams[2]}")
-        print(f"Best (lowest) test loss: {lowest_test_loss:.8f}")
-        print("=====================================\n")
+    #     print("\n=====================================")
+    #     print("Finished hyperparameter search.")
+    #     print(f"Best hyperparameters found: LR={best_hparams[0]}, "
+    #         f"Epochs={best_hparams[1]}, "
+    #         f"Neurons={best_hparams[2]}")
+    #     print(f"Best (lowest) test loss: {lowest_test_loss:.8f}")
+    #     print("=====================================\n")
 
-    hyperparam_search()
+    # hyperparam_search()

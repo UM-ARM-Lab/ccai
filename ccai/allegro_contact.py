@@ -436,7 +436,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         
         delta_q = partial_to_full_state(xu[:, self.dx:self.dx + 4 * self.num_fingers], self.fingers)
         
-        if self.mode == 'vf':
+        if self.mode == 'vf' or self.mode == "last_step":
 
             # last_state = q[-1,:]
             # screwdriver = self.full_start[-3:]
@@ -451,7 +451,8 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             input_norm = torch.cat([q, indices], dim=1)
 
             # LAST STEP ONLY
-            input_norm = input_norm[-1, :].reshape(1, -1)
+            if self.mode == "last_step":
+                input_norm = input_norm[-1, :].reshape(1, -1)
 
             vf_output_norm = self.query_ensemble(input_norm, self.models, device=self.device)
             vf_output = vf_output_norm * self.cost_std + self.cost_mean
@@ -850,7 +851,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         # print(self._ee_locations_in_screwdriver(q, theta))
         # print(self.default_ee_locs)
 
-        if self.mode == 'vf':
+        if self.mode == 'vf' or self.mode == "last_step":
             return 0.0
         
         elif self.mode == 'baseline1':

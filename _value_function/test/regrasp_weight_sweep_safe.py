@@ -11,7 +11,7 @@ from _value_function.screwdriver_problem import (
 from _value_function.train_value_function import (
     Net, query_ensemble, load_ensemble
 )
-from _value_function.data_collect.process_final_poses_pregrasp import calculate_turn_cost
+from _value_function.data_collect.process_final_poses_regrasp import calculate_turn_cost
 from _value_function.test.test_method import get_initialization, get_initializations
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
@@ -185,7 +185,7 @@ def test(checkpoint, n_samples, which_weights):
                 else:
                     raise ValueError("which_weights must be either 'regrasp' or 'turn'")
 
-                turn_cost, _ = calculate_turn_cost(regrasp_pose.numpy(), turn_pose)
+                turn_cost = calculate_turn_cost(regrasp_pose.numpy(), turn_pose)
                 total_cost += turn_cost
                 print(f"Sample {i} -> turn cost: {turn_cost}")
             
@@ -290,18 +290,18 @@ if __name__ == "__main__":
 
     max_screwdriver_tilt = 0.015
     screwdriver_noise_mag = 0.015
-    finger_noise_mag = 0.25
+    finger_noise_mag = 0.15
 
-    regrasp_iters = 100
+    regrasp_iters = 80
     turn_iters = 100
     visualize = False   
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
     sim_device = config['sim_device']
     
-    n_samples = 8
+    n_samples = 5
     which_weights = "regrasp"
-    name = "2k"
+    name = "a2"
 
     checkpoint_path = fpath /'test'/'weight_sweep'/f'checkpoint_{which_weights}_{name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -315,9 +315,9 @@ if __name__ == "__main__":
                             do_pregrasp=True, name='weight_sweep_pregrasps')
 
     starting_values = {
-        'vf_bounds': [20, 200],
-        'other_bounds': [1.0, 20],
-        'variance_ratio_bounds': [.5, 5.0],
+        'vf_bounds': [10, 100],
+        'other_bounds': [0.5, 5.0],
+        'variance_ratio_bounds': [3.0, 10.0],
         'grid_size': 3
     }
 

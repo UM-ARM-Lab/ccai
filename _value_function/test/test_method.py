@@ -105,15 +105,16 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'fixed2'
+    test_name = 'a2'
     model_name = "ensemble"
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    n_trials = 5
+    n_trials = 8
     n_repeat = 1
     perception_noise = 0.0
     calc_novf = True
+    calc_last_step = True
 
     max_screwdriver_tilt = 0.015
     screwdriver_noise_mag = 0.015
@@ -122,13 +123,13 @@ if __name__ == '__main__':
     regrasp_iters = 80
     turn_iters = 100
 
-    vf_weight_rg = 50.0
-    other_weight_rg = 5.0
-    variance_ratio_rg = 3.0
+    vf_weight_rg = 10.0
+    other_weight_rg = 1.0
+    variance_ratio_rg = 5.0
 
-    vf_weight_t = 12
-    other_weight_t = 8
-    variance_ratio_t = 2
+    # vf_weight_t = 12
+    # other_weight_t = 8
+    # variance_ratio_t = 2
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
 
@@ -200,7 +201,26 @@ if __name__ == '__main__':
             
             result_novf = [pregrasp_pose, regrasp_pose_novf, regrasp_traj_novf, turn_pose_novf, turn_traj_novf]
             checkpoint['results']['no_vf'][combo_tuple] = result_novf
+
         
+        if calc_last_step:
+
+            env.reset(dof_pos= pregrasp_pose)
+            
+            regrasp_pose_novf, regrasp_traj_novf = regrasp(
+                env, config, chain, state2ee_pos_partial, perception_noise=0,
+                image_path=img_save_dir, initialization=pregrasp_pose, mode='last_step', iters=regrasp_iters,
+            )
+        
+            _, turn_pose_novf, succ_novf, turn_traj_novf = do_turn(
+                regrasp_pose_novf, config, env,
+                sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
+                perception_noise=0, image_path=img_save_dir, iters=turn_iters,mode='last_step',
+            )
+            
+            result_novf = [pregrasp_pose, regrasp_pose_novf, regrasp_traj_novf, turn_pose_novf, turn_traj_novf]
+            checkpoint['results']['last_step'][combo_tuple] = result_novf
+
         checkpoint['tested_combinations'].add(combo_tuple)
         save_checkpoint(checkpoint)
 

@@ -57,7 +57,12 @@ def calculate_turn_cost(initial_pose, final_pose):
     # total_cost = np.minimum(goal_cost+upright_cost, 5.0)
     ###########################################################################
 
-    goal_cost = np.sum(((state[-3:] - screwdriver_goal) ** 2)).reshape(-1)
+    goal_cost = ((state[-3:] - screwdriver_goal) ** 2).flatten()
+    goal_cost = sum(goal_cost)
+
+    # if np.any(abs(state[-3:-1]) > 0.2):
+    #     goal_cost = 100.0
+
     total_cost = np.minimum(goal_cost, 5.0)
 
     return total_cost
@@ -87,7 +92,9 @@ if __name__ == "__main__":
     combined_turn_costs = []
     combined_regrasp_costs = []
 
-    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
+    vis = False
+    if vis:
+        config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
 
     # filenames = filenames[:1]
     for filename in filenames:
@@ -99,9 +106,13 @@ if __name__ == "__main__":
             regrasp_poses = np.array([t.numpy() for t in regrasp_poses]).reshape(-1, 20)
             turn_poses = np.array(turn_poses).reshape(-1, 20)
 
-            if turn_trajs[0].shape[0] != 13:
-                print("broken trajectory")
-                continue
+            # for i in range(turn_trajs[0].shape[0]):
+            #     env.reset(torch.from_numpy(turn_trajs[0][i]).reshape(1,20).float())
+
+            original_length = len(turn_trajs)
+            turn_trajs = [traj for traj in turn_trajs if traj.shape[0] == 13]
+            if len(turn_trajs) < original_length:
+                print("Broken trajectory removed")
             
             combined_turn_trajs = np.concatenate((combined_turn_trajs, turn_trajs), axis=0)
             combined_regrasp_trajs = np.concatenate((combined_regrasp_trajs, regrasp_trajs), axis=0)
@@ -109,14 +120,16 @@ if __name__ == "__main__":
             turn_costs = []
             regrasp_costs = []
 
+            
             for i in range(len(regrasp_poses)):
                 cost = calculate_turn_cost(regrasp_poses[i], turn_poses[i])
 
-                if cost < 1.0:# and cost < 2.0:
-                    for j in range(13):
-                        env.reset(torch.from_numpy(turn_trajs[i][j]).reshape(1,20).float())
-                        time.sleep(.10)
-                    time.sleep(2.0)
+                if vis:
+                    if cost > 4.0 and cost < 5.0:
+                        for j in range(13):
+                            env.reset(torch.from_numpy(turn_trajs[i][j]).reshape(1,20).float())
+                            time.sleep(.10)
+                        time.sleep(2.0)
 
                 regrasp_cost = calculate_regrasp_cost(regrasp_trajs[i])
                 turn_costs.append(cost)
