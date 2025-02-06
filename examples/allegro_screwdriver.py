@@ -202,6 +202,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                 (state[:, -self.obj_dof:-1] + goal[-self.obj_dof:-1]) ** 2)  # the screwdriver should only rotate in z direction
         return smoothness_cost + upright_cost + super()._cost(xu, start, goal)
 
+
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noise=None, noise_noise=None, sim=None, seed=None,
              proj_path=None, perturb_this_trial=False):
     has_recovered = False
@@ -216,202 +217,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         env.frame_id = None
     start = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
     # start = torch.cat((state['q'].reshape(10), torch.zeros(1).to(state['q'].device))).to(device=params['device'])
-    if 'csvgd' in params['controller']:
-        # index finger is used for stability
-        if 'index' in params['fingers']:
-            fingers = params['fingers']
-        else:
-            fingers = ['index'] + params['fingers']
-
-        # if params['mode'] == 'hardware':
-        #     min_force_dict = {
-        #         'thumb': 1,
-        #         'middle': 1,
-        #         'index': .0,
-        #     }
-        # else:
-        min_force_dict = None
-
-        # min_force_dict = {
-        #     'thumb': 0,
-        #     'middle': 0,
-        #     'index': 0,
-        # }
-        # initial grasp
-        if params.get('compute_recovery_trajectory', False):
-            goal_pregrasp = start[-4: -1]
-        else:
-            goal_pregrasp = params['valve_goal']
-        pregrasp_params = copy.deepcopy(params)
-        pregrasp_params['warmup_iters'] = 80
-        pregrasp_problem = AllegroScrewdriver(
-            start=start[:4 * num_fingers + obj_dof],
-            goal=goal_pregrasp,
-            T=2,
-            chain=pregrasp_params['chain'],
-            device=pregrasp_params['device'],
-            object_asset_pos=env.table_pose,
-            object_location=pregrasp_params['object_location'],
-            object_type=pregrasp_params['object_type'],
-            world_trans=env.world_trans,
-            regrasp_fingers=fingers,
-            contact_fingers=[],
-            obj_dof=obj_dof,
-            obj_joint_dim=1,
-            optimize_force=pregrasp_params['optimize_force'],
-            default_dof_pos=env.default_dof_pos[:, :16],
-            obj_gravity=pregrasp_params.get('obj_gravity', False),
-            full_dof_goal=False,
-            proj_path=proj_path,
-        )
-
-        thumb_regrasp_problem = AllegroScrewdriver(
-            start=start[:4 * num_fingers + obj_dof],
-            goal=params['valve_goal'],
-            T=params['T'],
-            chain=params['chain'],
-            device=params['device'],
-            object_asset_pos=env.table_pose,
-            object_location=params['object_location'],
-            object_type=params['object_type'],
-            world_trans=env.world_trans,
-            contact_fingers=['index', 'middle'],
-            regrasp_fingers=['thumb'],
-            obj_dof=obj_dof,
-            obj_joint_dim=1,
-            optimize_force=params['optimize_force'],
-            default_dof_pos=env.default_dof_pos[:, :16],
-            turn=False,
-            obj_gravity=params.get('obj_gravity', False),
-            min_force_dict=min_force_dict,
-            full_dof_goal=params.get('compute_recovery_trajectory', False),
-            proj_path=proj_path,
-        )
-
-        middle_regrasp_problem = AllegroScrewdriver(
-            start=start[:4 * num_fingers + obj_dof],
-            goal=params['valve_goal'],
-            T=params['T'],
-            chain=params['chain'],
-            device=params['device'],
-            object_asset_pos=env.table_pose,
-            object_location=params['object_location'],
-            object_type=params['object_type'],
-            world_trans=env.world_trans,
-            contact_fingers=['middle'],
-            regrasp_fingers=['index', 'thumb'],
-            obj_dof=obj_dof,
-            obj_joint_dim=1,
-            optimize_force=params['optimize_force'],
-            default_dof_pos=env.default_dof_pos[:, :16],
-            turn=False,
-            obj_gravity=params.get('obj_gravity', False),
-            min_force_dict=min_force_dict,
-            full_dof_goal=params.get('compute_recovery_trajectory', False),
-            proj_path=proj_path,
-        )
-        pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, pregrasp_params)
-
-        thumb_regrasp_planner = PositionControlConstrainedSVGDMPC(thumb_regrasp_problem, params)
-        middle_regrasp_planner = PositionControlConstrainedSVGDMPC(middle_regrasp_problem, params)
-        turn_problem = AllegroScrewdriver(
-            start=start[:4 * num_fingers + obj_dof],
-            goal=params['valve_goal'],
-            T=params['T'],
-            chain=params['chain'],
-            device=params['device'],
-            object_asset_pos=env.table_pose,
-            object_location=params['object_location'],
-            object_type=params['object_type'],
-            world_trans=env.world_trans,
-            contact_fingers=['index', 'middle', 'thumb'],
-            obj_dof=3,
-            obj_joint_dim=1,
-            optimize_force=params['optimize_force'],
-            default_dof_pos=env.default_dof_pos[:, :16],
-            turn=True,
-            obj_gravity=params.get('obj_gravity', False),
-            min_force_dict=None,
-            full_dof_goal=params.get('compute_recovery_trajectory', False),
-            proj_path=proj_path,
-            project=params.get('compute_recovery_trajectory', False) or params.get('test_recovery_trajectory', False) or params.get('live_recovery', False),
-        )
-
-        index_regrasp_planner = None
-        thumb_and_middle_regrasp_planner = None
-        turn_planner = None
-        if not params.get('live_recovery', False):
-            # finger gate index
-            index_regrasp_problem = AllegroScrewdriver(
-                start=start[:4 * num_fingers + obj_dof],
-                goal=params['valve_goal'],
-                T=params['T'],
-                chain=params['chain'],
-                device=params['device'],
-                object_asset_pos=env.table_pose,
-                object_location=params['object_location'],
-                object_type=params['object_type'],
-                world_trans=env.world_trans,
-                regrasp_fingers=['index'],
-                contact_fingers=['middle', 'thumb'],
-                obj_dof=3,
-                obj_joint_dim=1,
-                optimize_force=params['optimize_force'],
-                default_dof_pos=env.default_dof_pos[:, :16],
-                obj_gravity=params.get('obj_gravity', False),
-                min_force_dict=None,
-                full_dof_goal=params.get('compute_recovery_trajectory', False) or params.get('test_recovery_trajectory', False) or params.get('live_recovery', False) and (len(goal) > 3),
-                proj_path=None,
-                project=params.get('compute_recovery_trajectory', False) or params.get('test_recovery_trajectory', False) or params.get('live_recovery', False),
-            )
-            index_regrasp_planner = PositionControlConstrainedSVGDMPC(index_regrasp_problem, params)
-
-            thumb_and_middle_regrasp_problem = AllegroScrewdriver(
-                start=start[:4 * num_fingers + obj_dof],
-                goal=params['valve_goal'],
-                T=params['T'],
-                chain=params['chain'],
-                device=params['device'],
-                object_asset_pos=env.table_pose,
-                object_location=params['object_location'],
-                object_type=params['object_type'],
-                world_trans=env.world_trans,
-                contact_fingers=['index'],
-                regrasp_fingers=['middle', 'thumb'],
-                obj_dof=3,
-                obj_joint_dim=1,        
-                optimize_force=params['optimize_force'],
-                default_dof_pos=env.default_dof_pos[:, :16],
-                obj_gravity=params.get('obj_gravity', False),
-                min_force_dict=None,
-                full_dof_goal=params.get('compute_recovery_trajectory', False) or params.get('test_recovery_trajectory', False) or params.get('live_recovery', False) and (len(goal) > 3),
-                proj_path=None,
-                project=params.get('compute_recovery_trajectory', False) or params.get('test_recovery_trajectory', False) or params.get('live_recovery', False),
-            )
-            thumb_and_middle_regrasp_planner = PositionControlConstrainedSVGDMPC(thumb_and_middle_regrasp_problem, params)
-            tp = AllegroScrewdriver(
-                start=start[:4 * num_fingers + obj_dof],
-                goal=params['valve_goal'],
-                T=params['T'],
-                chain=params['chain'],
-                device=params['device'],
-                object_asset_pos=env.table_pose,
-                object_location=params['object_location'],
-                object_type=params['object_type'],
-                world_trans=env.world_trans,
-                contact_fingers=['index', 'middle', 'thumb'],
-                obj_dof=3,
-                obj_joint_dim=1,
-                optimize_force=params['optimize_force'],
-                default_dof_pos=env.default_dof_pos[:, :16],
-                turn=True,
-                obj_gravity=params.get('obj_gravity', False),
-                min_force_dict=None,
-                full_dof_goal=params.get('compute_recovery_trajectory', False),
-                proj_path=proj_path,
-                project=params.get('compute_recovery_trajectory', False) or params.get('test_recovery_trajectory', False) or params.get('live_recovery', False),
-            )
-            turn_planner = PositionControlConstrainedSVGDMPC(tp, params)
 
     # elif params['controller'] == 'ipopt':
     #     # index finger is used for stability
@@ -495,7 +300,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     # else:
     #     raise ValueError('Invalid controller')
 
-    elif params['controller'] == 'diffusion_policy':
+    if params['controller'] == 'diffusion_policy':
         if 'index' in params['fingers']:
             fingers = params['fingers']
         else:
