@@ -84,9 +84,9 @@ while True:
         trials_done += 1
 
     if perception_noise == 0:
-        savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_dataset_{computer_id}_{prog_id}.pkl'
+        savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_dataset_narrow_{computer_id}_{prog_id}.pkl'
     else:
-        savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_regrasp_to_turn_dataset_{computer_id}_{prog_id}.pkl'
+        savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_regrasp_to_turn_dataset_narrow_{computer_id}_{prog_id}.pkl'
 
     while Path(savepath).exists():
         prog_id += 1
