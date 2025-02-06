@@ -20,6 +20,7 @@ sys.path.append('..')
 
 # sys.stdout = open('./logs/live_recovery_shorcut_honda_meeting_full_dof_noise_train_indexing_fix_6500_.08_std_.75_pct_diff_likelihood_no_resample_no_cpc_on_pregrasp.log', 'w', buffering=1)
 # sys.stdout = open('./examples/logs/recovery_as_contact_search.log', 'w', buffering=1)
+sys.stdout = open('./examples/logs/recovery_th_m_fix.log', 'w', buffering=1)
 
 import pytorch_volumetric as pv
 import pytorch_kinematics as pk
@@ -472,7 +473,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             trajectory_sampler.to(device=params['device'])
             trajectory_sampler.send_norm_constants_to_submodels()
             if params['project_state'] or params['compute_recovery_trajectory'] or params['test_recovery_trajectory']:
-                trajectory_sampler.model.diffusion_model.cutoff = -16
+                trajectory_sampler.model.diffusion_model.cutoff = -16#params['likelihood_threshold']
 
             return trajectory_sampler
         trajectory_sampler = load_sampler(model_path, dim_mults=(1,2,4), T=params['T'] if not params['compute_recovery_trajectory'] else params['T_orig'])
@@ -486,23 +487,23 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     if params['compute_recovery_trajectory']:
         start_sine_cosine = convert_yaw_to_sine_cosine(start[:4 * num_fingers + obj_dof])
         projected_samples, _, _, _, (all_losses, all_samples, all_likelihoods) = trajectory_sampler_orig.sample(16, H=trajectory_sampler_orig.T, start=start_sine_cosine.reshape(1, -1), project=True,
-                constraints=-torch.ones(16, 3).to(device=params['device']))
+                constraints=torch.ones(16, 3).to(device=params['device']))
         print('Final likelihood:', all_likelihoods[-1])
         if all_likelihoods[-1].mean().item() < params.get('likelihood_threshold', -15):
             print('1 mode projection failed, trying anyway')
         else:
             print('1 mode projection succeeded')
-            goal = convert_sine_cosine_to_yaw(projected_samples[-1][0])[:15]
-            goal[-1] = start[-2]
+        goal = convert_sine_cosine_to_yaw(projected_samples[-1][0])[:15]
+        goal[-1] = start[-2]
             # index_regrasp_planner.reset(start, goal=goal)
             # thumb_and_middle_regrasp_planner.reset(start, goal=goal)
             # turn_planner.reset(start, goal=goal)
             # thumb_regrasp_planner.reset(start, goal=goal)
             # middle_regrasp_planner.reset(start, goal=goal)
 
-            params['valve_goal'] = goal
+        params['valve_goal'] = goal
 
-            print('New goal:', goal)
+        print('New goal:', goal)
     if 'csvgd' in params['controller']:
         # index finger is used for stability
         if 'index' in params['fingers']:
@@ -1408,7 +1409,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             start = x[-1]
             start_sine_cosine = convert_yaw_to_sine_cosine(start)
             samples, _, likelihood = trajectory_sampler_orig.sample(N=params['N'], H=trajectory_sampler_orig.T, start=start_sine_cosine.reshape(1, -1),
-                    constraints=-torch.ones(params['N'], 3).to(device=params['device']))
+                    constraints=torch.ones(params['N'], 3).to(device=params['device']))
             likelihood = likelihood.mean().item()
             distances.append(-likelihood)
             viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fpath}/recovery_stage_{all_stage}/{mode}")
@@ -1836,7 +1837,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             start = state[:4 * num_fingers + obj_dof]
             start_sine_cosine = convert_yaw_to_sine_cosine(start)
             samples, _, likelihood = trajectory_sampler_orig.sample(N=params['N'], H=trajectory_sampler_orig.T, start=start_sine_cosine.reshape(1, -1),
-                    constraints=-torch.ones(params['N'], 3).to(device=params['device']))
+                    constraints=torch.ones(params['N'], 3).to(device=params['device']))
             likelihood = likelihood.reshape(params['N']).mean().item()
             # samples = samples.cpu().numpy()
             print('Likelihood:', likelihood)
@@ -1855,18 +1856,19 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 # Project the state back into distribution if we are computing recovery trajectories
                 if params['compute_recovery_trajectory']:
                     projected_samples, _, _, _, (all_losses, all_samples, all_likelihoods) = trajectory_sampler_orig.sample(16, H=trajectory_sampler_orig.T, start=start_sine_cosine.reshape(1, -1), project=True,
-                            constraints=-torch.ones(16, 3).to(device=params['device']))
+                            constraints=torch.ones(16, 3).to(device=params['device']))
                     print('Final likelihood:', all_likelihoods[-1])
                     if all_likelihoods[-1].mean().item() < params.get('likelihood_threshold', -15):
                         print('1 mode projection failed, trying anyway')
                     else:
                         print('1 mode projection succeeded')
-                        goal = convert_sine_cosine_to_yaw(projected_samples[-1][0])[:15]
-                        index_regrasp_planner.reset(start, goal=goal)
-                        thumb_and_middle_regrasp_planner.reset(start, goal=goal)
-                        turn_planner.reset(start, goal=goal)
-                        # thumb_regrasp_planner.reset(start, goal=goal)
-                        # middle_regrasp_planner.reset(start, goal=goal)
+                    goal = convert_sine_cosine_to_yaw(projected_samples[-1][0])[:15]
+                    index_regrasp_planner.reset(start, goal=goal)
+                    thumb_and_middle_regrasp_planner.reset(start, goal=goal)
+                    turn_planner.reset(start, goal=goal)
+                    # thumb_regrasp_planner.reset(start, goal=goal)
+                    # middle_regrasp_planner.reset(start, goal=goal)
+                    print('New goal:', goal)
         if add:
             _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance,
                             contact_state=contact_state_dict[contact])
@@ -1922,12 +1924,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_only.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_perturbed_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_recovery_as_contact_mode_planning.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_live_recovery_shortcut.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID.yaml').read_text())
 
     from tqdm import tqdm
 
@@ -2071,7 +2073,7 @@ if __name__ == "__main__":
     
     if config['compute_recovery_trajectory'] or config['test_recovery_trajectory']:
         step_size = 2
-        start_ind = config['parity']
+        start_ind = config['parity'] + 30
     else:
         start_ind = 0
         step_size = 1
