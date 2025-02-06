@@ -21,9 +21,9 @@ goal: -1.5
 prior: 1
 multi_particle_search: True
 replan: False
-visualize_plan: True
-visualize_recovery_plan: True
-visualize_contact_plan: True
+visualize_plan: False
+visualize_recovery_plan: False
+visualize_contact_plan: False
 optimize_force: True
 exclude_index: False
 projected: False

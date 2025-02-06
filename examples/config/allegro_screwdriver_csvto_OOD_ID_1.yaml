@@ -1,12 +1,13 @@
 ---
-T: 12
+T: 8
+T_orig: 12
 receding_horizon: False
-num_steps: 12
+num_steps: 8
 num_turns: 1
 max_recovery_stages: 4
 num_trials: 10
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_data_turn_only_likelihood'
+experiment_name: 'allegro_screwdriver_recovery_data_turn_only_likelihood_new'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -43,6 +44,8 @@ type: 'diffusion'
 model_dir: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion'
 model_path: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
 likelihood_threshold: -22.618363952636717
+# likelihood_threshold: -16
+# likelihood_threshold: -136.6758056640625
 parity: 1
 controllers:
   csvgd:
@@ -54,7 +57,7 @@ controllers:
     momentum: 0.
     device: 'cuda:1'
     online_iters: 35
-    warmup_iters: 100
+    warmup_iters: 50
     resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1
