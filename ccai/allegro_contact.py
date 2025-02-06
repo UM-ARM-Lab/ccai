@@ -672,6 +672,36 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.T = T
             self.dh = self.dh_per_t * T + self.dh_constant  # inequality
             self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
+        if self.full_dof_goal and len(self.regrasp_fingers) > 0:
+            self.default_dof_pos = self.goal[: self.num_fingers * 4]
+            # Pad to length 16
+            # self.default_dof_pos = torch.cat((self.default_dof_pos, torch.tensor([-.4, 0.3, 0.2, 1.]).float().to(device=self.device)))
+            self.default_dof_pos = torch.cat((self.default_dof_pos[:8], torch.tensor([0., 0.5, 0.65, 0.65]).float().to(device=self.device), self.default_dof_pos[8:]))
+
+            self.goal_theta = self.goal[self.num_fingers * 4:]
+
+            self._preprocess_fingers(self.goal[: self.num_fingers * 4][None, None], self.goal_theta[None, None], compute_closest_obj_point=True)
+
+            self.contact_points = {}
+
+            for finger in self.regrasp_fingers:
+                self.contact_points[finger] = (self.data[finger]['closest_obj_pt_scene_frame'], .015)
+
+            contact_points_object = torch.stack([self.contact_points[finger][0] for finger in self.regrasp_fingers], dim=1)
+
+        if self.num_regrasps > 0:
+            if contact_points_object is not None:
+                self.default_ee_locs = contact_points_object
+                self.default_ee_locs_constraint = True
+            else:
+                self.default_ee_locs = self._ee_locations_in_screwdriver(self.default_dof_pos,
+                                                                    torch.zeros(self.obj_dof, device=self.device))
+                self.default_ee_locs_constraint = False
+            # add a small amount of noise to ee loc default
+        else:
+            self.default_ee_locs = None
+            self.default_ee_locs_constraint = False
+
 
     def get_initial_xu(self, N):
         """
@@ -957,7 +987,6 @@ class AllegroRegraspProblem(AllegroObjectProblem):
     def _terminal_contact_constraint(self, xu, finger_name, compute_grads=True, compute_hess=False, projected_diffusion=False):
         g, grad_g, hess_g, t_mask = self._contact_constraints(xu, finger_name, compute_grads, compute_hess, terminal=True, projected_diffusion=projected_diffusion)
         return g, grad_g, hess_g, t_mask
-    # def _contact_patch_constraint
 
     @regrasp_finger_constraints
     def _free_dynamics_constraints(self, q, delta_q, finger_name, compute_grads=True, compute_hess=False):
@@ -1191,33 +1220,49 @@ class AllegroContactProblem(AllegroObjectProblem):
         # u_from_proj_path = x[:, 1:] - x[:, :-1]
         # x = x[:, 1:]
         # u[:, :, :self.num_fingers * 4] = u_from_proj_path[:, :, :self.num_fingers * 4]
-
         u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
         if self.optimize_force:
             for i, finger in enumerate(self.contact_fingers):
                 idx = self.contact_force_indices_dict[finger]
-                if finger != 'index' and self.turn:
+                std = .05 if not self.full_dof_goal else .15
+                std = .05 if self.turn else std
+                if finger != 'index' and self.turn and not self.full_dof_goal:
                     u[..., idx] = 1.5 * torch.randn(N, self.T, 3, device=self.device)
                 else:
-                    u[..., idx] = .05 * torch.randn(N, self.T, 3, device=self.device)
+                    u[..., idx] = std * torch.randn(N, self.T, 3, device=self.device)
+        if not self.full_dof_goal:
+            x = [self.start.reshape(1, self.dx).repeat(N, 1)]
+            for t in range(self.T):
+                next_q = x[-1][:, :4 * self.num_fingers] + u[:, t, :4 * self.num_fingers]
+                x.append(next_q)
 
-        x = [self.start.reshape(1, self.dx).repeat(N, 1)]
-        for t in range(self.T):
-            next_q = x[-1][:, :4 * self.num_fingers] + u[:, t, :4 * self.num_fingers]
-            x.append(next_q)
+            x = torch.stack(x[1:], dim=1)
 
-        x = torch.stack(x[1:], dim=1)
+            # if valve angle in state
+            if self.dx == (4 * self.num_fingers + self.obj_dof):
+                theta = np.linspace(self.start[-self.obj_dof:].cpu().numpy(), self.goal[-self.obj_dof:].cpu().numpy(), self.T + 1)[:-1]
+                theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
+                theta = theta.unsqueeze(0).repeat((N, 1, 1))
+                # theta = self.start[-self.obj_dof:].unsqueeze(0).repeat((N, self.T, 1))
+                theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
+                x = torch.cat((x, theta), dim=-1)
 
-        # if valve angle in state
-        if self.dx == (4 * self.num_fingers + self.obj_dof):
-            theta = np.linspace(self.start[-self.obj_dof:].cpu().numpy(), self.goal[-self.obj_dof:].cpu().numpy(), self.T + 1)[:-1]
-            theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
-            theta = theta.unsqueeze(0).repeat((N, 1, 1))
-            # theta = self.start[-self.obj_dof:].unsqueeze(0).repeat((N, self.T, 1))
-            theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
-            x = torch.cat((x, theta), dim=-1)
+            xu = torch.cat((x, u), dim=2)
+        else:
+            # The initialization should be an interpolation from the initial state to the goal state, perturbed by random noise.
+            x_all = torch.nn.functional.interpolate(torch.stack([self.start, self.goal]).unsqueeze(0).permute(0, 2, 1), 
+                                                  size=self.T+1, 
+                                                  mode='linear', 
+                                                  align_corners=True).permute(0, 2, 1)
 
-        xu = torch.cat((x, u), dim=2)
+            jitter = jitter_std * torch.randn(N, self.T+1, self.num_fingers * 4, device=self.device)
+            jitter[:, 0] = 0
+            x = x_all.repeat(N, 1, 1)
+            x[:, :, :self.num_fingers * 4] += jitter
+            u_from_proj_path = x[:, 1:] - x[:, :-1]
+            x = x[:, 1:]
+            u[:, :, :self.num_fingers * 4] = u_from_proj_path[:, :, :self.num_fingers * 4]
+            xu = torch.cat((x, u), dim=2)
         return xu
 
     def _cost(self, xu, start, goal):
