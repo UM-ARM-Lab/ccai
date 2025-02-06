@@ -251,6 +251,8 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                                      use_collision_geometry=False)
         elif 'screwdriver' in object_type:
             object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver',
+                                     use_collision_geometry=True)
+            object_sdf_for_viz = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver',
                                      use_collision_geometry=False)
         elif 'card' in object_type:
             object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/card',
@@ -265,6 +267,11 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         # contact checking
         collision_check_links = [self.ee_names[finger] for finger in self.fingers]
         self.contact_scenes = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
+                                            collision_check_links=collision_check_links,
+                                            softmin_temp=1.0e3,
+                                            points_per_link=1000,
+                                            )
+        self.contact_scenes_for_viz = pv.RobotScene(robot_sdf, object_sdf_for_viz, scene_trans,
                                             collision_check_links=collision_check_links,
                                             softmin_temp=1.0e3,
                                             points_per_link=1000,
