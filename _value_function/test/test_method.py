@@ -110,12 +110,12 @@ if __name__ == '__main__':
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    n_trials = 5
+    n_trials = 10
     n_repeat = 1
     perception_noise = 0.0
 
     calc_novf = True
-    calc_last_step = True
+    calc_last_step = False
 
     method_names = ['vf']
     if calc_novf:
@@ -130,9 +130,9 @@ if __name__ == '__main__':
     regrasp_iters = 80
     turn_iters = 100
 
-    vf_weight_rg = 10.0
-    other_weight_rg = 1.0
-    variance_ratio_rg = 3.0
+    vf_weight_rg = 18.0
+    other_weight_rg = 7.0
+    variance_ratio_rg = 6.0
 
     # vf_weight_t = 12
     # other_weight_t = 8
