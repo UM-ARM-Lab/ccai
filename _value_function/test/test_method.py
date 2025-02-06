@@ -105,7 +105,7 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'easy3'
+    test_name = 'easy4'
     model_name = "ensemble"
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -130,9 +130,9 @@ if __name__ == '__main__':
     regrasp_iters = 80
     turn_iters = 100
 
-    vf_weight_rg = 18.0
+    vf_weight_rg = 10.0
     other_weight_rg = 7.0
-    variance_ratio_rg = 6.0
+    variance_ratio_rg = 5.0
 
     # vf_weight_t = 12
     # other_weight_t = 8

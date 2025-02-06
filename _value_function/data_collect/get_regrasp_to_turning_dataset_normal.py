@@ -26,7 +26,7 @@ perception_noise = 0.0
 pregrasp_iters = 80
 regrasp_iters = 100
 turn_iters = 200
-delete_imgs()
+# delete_imgs()
 
 if len(sys.argv) == 2:
     config_path = f'allegro_screwdriver_adam{sys.argv[1]}.yaml'
