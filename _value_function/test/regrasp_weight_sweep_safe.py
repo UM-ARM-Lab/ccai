@@ -299,9 +299,9 @@ if __name__ == "__main__":
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
     sim_device = config['sim_device']
     
-    n_samples = 4
+    n_samples = 2
     which_weights = "regrasp"
-    name = "b0"
+    name = "n2"
 
     checkpoint_path = fpath /'test'/'weight_sweep'/f'checkpoint_{which_weights}_{name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
