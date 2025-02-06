@@ -78,7 +78,7 @@ def grad_descent(lr = 0.3, iters = 1000):
 
         mse = torch.mean((predictions - target_value) ** 2)
         mean_squared_variance = torch.mean((ensemble_predictions - predictions) ** 2)
-        variance_weight = 5.0
+        variance_weight = 6.0
         loss = mse + mean_squared_variance * variance_weight
         loss.backward()
 
