@@ -94,6 +94,28 @@ def euler_to_angular_velocity(current_euler, next_euler):
     return omega
 
 
+def convert_yaw_to_sine_cosine(xu):
+    """
+    xu is shape (N, T, 36)
+    Replace the yaw in xu with sine and cosine and return the new xu
+    """
+    yaw = xu[14]
+    sine = torch.sin(yaw)
+    cosine = torch.cos(yaw)
+    xu_new = torch.cat([xu[:14], cosine.unsqueeze(-1), sine.unsqueeze(-1), xu[15:]], dim=-1)
+    return xu_new
+
+def convert_sine_cosine_to_yaw(xu):
+    """
+    xu is shape (N, T, 37)
+    Replace the sine and cosine in xu with yaw and return the new xu
+    """
+    sine = xu[..., 15]
+    cosine = xu[..., 14]
+    yaw = torch.atan2(sine, cosine)
+    xu_new = torch.cat([xu[..., :14], yaw.unsqueeze(-1), xu[..., 16:]], dim=-1)
+    return xu_new
+    
 class AllegroScrewdriver(AllegroManipulationProblem):
     def __init__(self,
                  start,
