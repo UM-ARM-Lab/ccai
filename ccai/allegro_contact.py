@@ -685,13 +685,14 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.contact_points = {}
 
             for finger in self.regrasp_fingers:
-                self.contact_points[finger] = (self.data[finger]['closest_obj_pt_scene_frame'], .015)
+                self.contact_points[finger] = (self.data[finger]['closest_obj_pt_scene_frame'].detach(), .01)
 
             contact_points_object = torch.stack([self.contact_points[finger][0] for finger in self.regrasp_fingers], dim=1)
 
         if self.num_regrasps > 0:
             if contact_points_object is not None:
-                self.default_ee_locs = contact_points_object
+                self.default_ee_locs = self._ee_locations_in_screwdriver(self.default_dof_pos,
+                                                                    self.goal_theta).detach()
                 self.default_ee_locs_constraint = True
             else:
                 self.default_ee_locs = self._ee_locations_in_screwdriver(self.default_dof_pos,
@@ -821,7 +822,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             self.contact_points = {}
 
             for finger in regrasp_fingers:
-                self.contact_points[finger] = (self.data[finger]['closest_obj_pt_scene_frame'], .015)
+                self.contact_points[finger] = (self.data[finger]['closest_obj_pt_scene_frame'].detach(), .01)
 
             contact_points_object = torch.stack([self.contact_points[finger][0] for finger in regrasp_fingers], dim=1)
             self._regrasp_dz += self.num_regrasps  # Contact region constraint
@@ -836,7 +837,8 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             if contact_points_object is not None and contact_points_robot is not None:
                 raise ValueError("Cannot specify contact points in both object and robot frame")
             if contact_points_object is not None:
-                self.default_ee_locs = contact_points_object
+                self.default_ee_locs = self._ee_locations_in_screwdriver(self.default_dof_pos,
+                                                                    self.goal_theta).detach()
                 self.default_ee_locs_constraint = True
             elif contact_points_robot is not None:
                 self.default_ee_locs = contact_points_robot
@@ -2506,7 +2508,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
             x_last = xu[-1, :self.num_fingers * 4 + self.obj_dof]
             goal_cost = 1 * (x_last - goal).pow(2)
             goal_cost += 1 * (xu[:-1, :self.num_fingers * 4 + self.obj_dof] - goal).pow(2).sum(0)
-            goal_cost_weight = torch.ones_like(goal_cost) * .0 
+            goal_cost_weight = torch.ones_like(goal_cost) * .1
             goal_cost_weight[-self.obj_dof:] = 1
             goal_cost = goal_cost * goal_cost_weight
             goal_cost = goal_cost.sum()
