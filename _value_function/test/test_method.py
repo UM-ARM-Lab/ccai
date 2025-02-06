@@ -105,7 +105,7 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'b2'
+    test_name = 'easy3'
     model_name = "ensemble"
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -125,7 +125,7 @@ if __name__ == '__main__':
 
     max_screwdriver_tilt = 0.015
     screwdriver_noise_mag = 0.015
-    finger_noise_mag = 0.15
+    finger_noise_mag = 0.05
 
     regrasp_iters = 80
     turn_iters = 100

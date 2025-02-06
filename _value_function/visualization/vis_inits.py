@@ -40,7 +40,7 @@ computer_id = config['data_collection_id']
 
 while True:
 
-    initialization = get_initialization(env, sim_device, max_screwdriver_tilt=0.015, screwdriver_noise_mag=0.015, finger_noise_mag=0.15)
+    initialization = get_initialization(env, sim_device, max_screwdriver_tilt=0.015, screwdriver_noise_mag=0.015, finger_noise_mag=0.087)
     
     env.reset(dof_pos=initialization)
 

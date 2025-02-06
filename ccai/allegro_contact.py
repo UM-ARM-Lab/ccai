@@ -462,6 +462,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             mean_squared_variance = torch.mean((vf_output - mean) ** 2, dim=0)
 
             vf_cost = torch.mean(mse) + torch.mean(mean_squared_variance) * self.variance_ratio
+            # vf_cost = torch.mean(mean_squared_variance) * self.variance_ratio
 
             smoothness_cost = torch.sum((q[1:] - q[-1]) ** 2)
             action_cost = torch.sum(delta_q ** 2)
