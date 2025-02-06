@@ -2503,15 +2503,19 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
 
         goal_cost = 0
         if self.full_dof_goal:
-            # x_last = xu[-1, :self.num_fingers * 4 + self.obj_dof-1]
-            # goal_cost = 10 * (x_last - goal[:-1]).pow(2).sum(dim=-1)#.sum(dim=-1)
-            # goal_cost += 3 * (xu[:-1, :self.num_fingers * 4 + self.obj_dof-1] - goal[:-1]).pow(2).sum(dim=-1).sum(dim=-1)
-            # goal_cost *= 100
-
-            x_last = xu[-1, self.num_fingers * 4: self.num_fingers * 4 + self.obj_dof-1]
-            goal_cost = 10 * (x_last - goal[-self.obj_dof:-1]).pow(2).sum(dim=-1)#.sum(dim=-1)
-            goal_cost += 3 * (xu[:-1, -self.obj_dof:-1] - goal[-self.obj_dof:-1]).pow(2).sum(dim=-1).sum(dim=-1)
+            x_last = xu[-1, :self.num_fingers * 4 + self.obj_dof]
+            goal_cost = 1 * (x_last - goal).pow(2)
+            goal_cost += 1 * (xu[:-1, :self.num_fingers * 4 + self.obj_dof] - goal).pow(2).sum(0)
+            goal_cost_weight = torch.ones_like(goal_cost) * .0 
+            goal_cost_weight[-self.obj_dof:] = 1
+            goal_cost = goal_cost * goal_cost_weight
+            goal_cost = goal_cost.sum()
             goal_cost *= 100
+
+            # x_last = xu[-1, self.num_fingers * 4: self.num_fingers * 4 + self.obj_dof]
+            # goal_cost = 10 * (x_last - goal[-self.obj_dof:]).pow(2).sum(dim=-1)#.sum(dim=-1)
+            # goal_cost += 3 * (xu[:-1, -self.obj_dof:] - goal[-self.obj_dof:]).pow(2).sum(dim=-1).sum(dim=-1)
+            # goal_cost *= 100
         cost += goal_cost
         # if self.project:
         #     _, T = xu.shape[:2]
