@@ -6,7 +6,7 @@ num_turns: 1
 max_recovery_stages: 4
 num_trials: 10
 visualize: True
-experiment_name: 'allegro_screwdriver_csvto_OOD_ID_full_multi_depth_plan_fixed_likelihood_stochastic_likelihood_adj_variable_traj_start'
+experiment_name: 'allegro_screwdriver_csvto_viz_states_all_t_likelihood_calc_turn_only_likelihood'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -36,8 +36,8 @@ test_recovery_trajectory: False
 viz_states: True
 diff_init: False
 type: 'diffusion'
-model_dir: 'data/training/allegro_screwdriver/allegro_variable_traj_start_diffusion_old'
-model_path: 'data/training/allegro_screwdriver/allegro_variable_traj_start_diffusion_old/allegro_screwdriver_diffusion_w_classifier.pt'
+model_dir: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion'
+model_path: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
 controllers:
   csvgd:
     # N: 16

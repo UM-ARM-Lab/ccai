@@ -20,7 +20,7 @@ lr: 1.0e-4
 model_type: 'diffusion'
 discriminator_guidance: True
 inverse_dynamics: False
-data_directory: 'allegro_ood_gen_2'
+data_directory: 'allegro_ood_gen'
 device: 'cuda:1'
 test_every: 10001
 save_every: 10

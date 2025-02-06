@@ -33,29 +33,35 @@ def add_text_to_imgs(imgs, labels):
 
 #CPC
 # for trial_num in [1, 2, 3, 4, 8]:
-for trial_num in [8]:
+# for trial_num in [8]:
 
 #Ind
 # for trial_num in [4, 9]:
-
+# allegro_screwdriver_recovery_data_no_cpc
 #Full
 # for trial_num in [8, 9]:
+
+for trial_num in [0]:
     fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/csvgd/trial_{trial_num + 1}')
 
     isaac_imgs = [fpath / img for img in sorted(os.listdir(fpath)) if img[-3:] == 'png'][6:]
     isaac_imgs = [imageio.imread(img) for img in isaac_imgs]
 
-    text = 'turn'
-    if trial_num == 1:
-        pause_inds = [(0, 'turn'), (len(isaac_imgs)-1, ''), (21-6, 'thumb_middle'), (33-6, 'thumb_middle'), (45-6, 'turn')]
-    elif trial_num == 2:
-        pause_inds = [(0, 'turn'), (len(isaac_imgs)-1, ''), (9-6, 'index'), (21-6, 'index'), (33-6, 'turn')]
-    elif trial_num == 3:
-        pause_inds = [(0, 'turn'), (len(isaac_imgs)-1, ''), (36-6, 'index')]
-    elif trial_num == 4:
-        pause_inds = [(0, 'turn'), (len(isaac_imgs)-1, ''), (12-6, 'thumb_middle'), (24-6, 'index'), (36-6, 'turn')]
-    elif trial_num == 8:
-        pause_inds = [(0, 'turn'), (len(isaac_imgs)-1, ''), (15-6, 'index'), (27-6, 'index'), (42-6, 'index'), (54-6, 'index')]
+    text = 'thumb_middle'
+    if trial_num == 0:
+        pause_inds = [(0, 'thumb_middle'), (len(isaac_imgs)-1, ''), (36-6, 'index'), (72-6, 'turn')]
+
+
+    # if trial_num == 1:
+    #     pause_inds = [(0, 'turn'), (len(isaac_imgs)-1, ''), (21-6, 'thumb_middle'), (33-6, 'thumb_middle'), (45-6, 'turn')]
+    # elif trial_num == 2:
+    #     pause_inds = [(0, 'turn'), (len(isaac_imgs)-1, ''), (9-6, 'index'), (21-6, 'index'), (33-6, 'turn')]
+    # elif trial_num == 3:
+    #     pause_inds = [(0, 'turn'), (len(isaac_imgs)-1, ''), (36-6, 'index')]
+    # elif trial_num == 4:
+    #     pause_inds = [(0, 'turn'), (len(isaac_imgs)-1, ''), (12-6, 'thumb_middle'), (24-6, 'index'), (36-6, 'turn')]
+    # elif trial_num == 8:
+    #     pause_inds = [(0, 'turn'), (len(isaac_imgs)-1, ''), (15-6, 'index'), (27-6, 'index'), (42-6, 'index'), (54-6, 'index')]
 
 
     # if trial_num == 4:
@@ -94,7 +100,8 @@ for trial_num in [8]:
         draw = ImageDraw.Draw(img)
         draw.rectangle([x0, y0, x0 + width * idx /(len(isaac_imgs)), y0 + 20], fill='green')
         font = ImageFont.load_default()
-        color = (255, 255, 255) if text == 'turn' else (255, 0, 0)
+        # color = (255, 255, 255) if text == 'turn' else (255, 0, 0)
+        color = (255, 0, 0)
         draw.text(((x0+y0)//2-10, shape[1]//2-510), text, color, font_size=30, align='center')
         img = np.asarray(img).copy()
         img[0, 0] = np.random.randint(0, 255, 4)

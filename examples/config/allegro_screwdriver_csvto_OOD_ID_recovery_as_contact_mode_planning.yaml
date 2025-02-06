@@ -19,7 +19,7 @@ heuristic: 1000
 max_depth: 11
 goal: -1.5
 prior: 1
-# likelihood_threshold: -24.739238929748534
+# likelihood_threshold: -22.618363952636717
 likelihood_threshold: -17
 # likelihood_threshold: -30
 multi_particle_search: True
