@@ -89,6 +89,10 @@ if __name__ == "__main__":
 
     combined_regrasp_trajs = np.empty((0, 13, 20))
     combined_turn_trajs = np.empty((0, 13, 20))
+    
+    combined_regrasp_plans = np.empty((0, 13, 20))
+    combined_turn_plans = np.empty((0, 13, 20))
+    
     combined_turn_costs = []
 
     vis = False
@@ -100,7 +104,14 @@ if __name__ == "__main__":
         with open(filename, 'rb') as file:
             pose_tuples = pkl.load(file)
 
-            _, regrasp_poses, regrasp_trajs, turn_poses, turn_trajs = zip(*pose_tuples)
+            _, regrasp_poses, regrasp_trajs, turn_poses, turn_trajs, *extra = zip(*pose_tuples)
+
+            if len(extra) > 0:
+                regrasp_plan = extra[0]
+                turn_plan = extra[1]
+            else:
+                regrasp_plan = np.empty((0, 13, 20))
+                turn_plan = np.empty((0, 13, 20))
             
             regrasp_poses = np.array([t.numpy() for t in regrasp_poses]).reshape(-1, 20)
             turn_poses = np.array(turn_poses).reshape(-1, 20)
@@ -126,6 +137,9 @@ if __name__ == "__main__":
             
             combined_turn_trajs = np.concatenate((combined_turn_trajs, turn_trajs), axis=0)
             combined_regrasp_trajs = np.concatenate((combined_regrasp_trajs, regrasp_trajs), axis=0)
+
+            combined_turn_plans = np.concatenate((combined_turn_plans, turn_plan), axis=0)
+            combined_regrasp_plans = np.concatenate((combined_regrasp_plans, regrasp_plan), axis=0)
             
             turn_costs = []
             
@@ -145,14 +159,18 @@ if __name__ == "__main__":
 
     combined_turn_costs = np.array(combined_turn_costs)
 
-    regrasp_cost_dataset = zip(combined_regrasp_trajs, combined_turn_trajs, combined_turn_costs)
+    regrasp_to_turn_dataset = zip(combined_regrasp_trajs, combined_turn_trajs, combined_turn_costs, combined_regrasp_plans)
+    turn_to_turn_dataset = zip(combined_turn_trajs, combined_turn_costs, combined_turn_plans)
     
     if noisy:
-        regrasp_cost_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_combined_regrasp_to_turn_dataset.pkl'
+        regrasp_to_turn_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_combined_regrasp_to_turn_dataset.pkl'
+        turn_to_turn_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_combined_turn_to_turn_costs.pkl'
     else:
-        regrasp_cost_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/combined_regrasp_to_turn_dataset.pkl'
+        regrasp_to_turn_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/combined_regrasp_to_turn_dataset.pkl'
+        turn_to_turn_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/combined_turn_to_turn_dataset.pkl'
    
-    pkl.dump(regrasp_cost_dataset, open(regrasp_cost_savepath, 'wb'))
+    pkl.dump(regrasp_to_turn_dataset, open(regrasp_to_turn_savepath, 'wb'))
+    pkl.dump(turn_to_turn_dataset, open(turn_to_turn_savepath, 'wb'))
 
     print("num samples: ", len(combined_turn_costs))
     

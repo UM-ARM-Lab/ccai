@@ -343,6 +343,8 @@ def regrasp(env, config, chain, state2ee_pos_partial, perception_noise = 0, init
 
     num_fingers_to_plan = num_fingers
 
+    all_regrasp_plans = []
+
     for k in range(params['num_steps']):
         state = env.get_state()
         start = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
@@ -365,7 +367,9 @@ def regrasp(env, config, chain, state2ee_pos_partial, perception_noise = 0, init
             env.reset()
             break
         # get plan here
-        regrasp_plan = best_traj.clone()
+        single_regrasp_plan = best_traj.clone()
+        single_regrasp_plan = single_regrasp_plan[:, :regrasp_problem.dx+regrasp_problem.du]
+        all_regrasp_plans.append(single_regrasp_plan)
 
         x = best_traj[0, :regrasp_problem.dx+regrasp_problem.du]
         x = x.reshape(1, regrasp_problem.dx+regrasp_problem.du)
@@ -414,7 +418,7 @@ def regrasp(env, config, chain, state2ee_pos_partial, perception_noise = 0, init
                     torch.zeros(actual_trajectory.shape[0], 1)
                     ), dim=1).numpy()
     
-    return final_state, full_trajectory, regrasp_plan
+    return final_state, full_trajectory, all_regrasp_plans
 
 
 def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, perception_noise = 0, 
@@ -670,11 +674,11 @@ if __name__ == "__main__":
         pregrasp_pose, planned_pose = pregrasp(env, config, chain, deterministic=True, perception_noise=perception_noise, 
                             image_path = img_save_dir, initialization = None, mode='no_vf', iters = pregrasp_iters)
 
-        regrasp_pose, regrasp_traj = regrasp(env, config, chain, state2ee_pos_partial, perception_noise=perception_noise, 
+        regrasp_pose, regrasp_traj, rg_plan = regrasp(env, config, chain, state2ee_pos_partial, perception_noise=perception_noise, 
                                 image_path = img_save_dir, initialization = pregrasp_pose, mode='no_vf', iters = regrasp_iters,
                                 vf_weight = 100.0, other_weight = 0.1, variance_ratio = 5)
         
-        _, turn_pose, succ, turn_traj = do_turn(regrasp_pose, config, env, 
+        _, turn_pose, succ, turn_traj, t_plan = do_turn(regrasp_pose, config, env, 
                         sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, 
                         perception_noise=perception_noise, image_path = img_save_dir, iters = turn_iters,
                         mode='no_vf', vf_weight = 100.0, other_weight = 0.1, variance_ratio = 5)
