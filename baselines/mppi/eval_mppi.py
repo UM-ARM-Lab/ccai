@@ -68,11 +68,11 @@ def do_trial(env, params, fpath, sim_viz_env=None):
 
     # setup the pregrasp problem
     pregrasp_flag = False
-    if config['task'] == 'peg_turning' or config['task'] == 'reorientation' or config['task'] == 'peg_alignment':
-        pass
-        # action = torch.cat((env.default_dof_pos[:,:8], env.default_dof_pos[:, 12:16]), dim=-1)
-        # env.step(action) # step one step to resolve penetration
-    else:
+    if config['task'] == 'screwdriver_turning' or config['task'] == 'valve_turning':
+        pregrasp_flag = True
+    if config['mode'] == 'hardware':
+        pregrasp_flag = False
+    if pregrasp_flag:
         pregrasp_succ = False
         while pregrasp_succ == False:
             pregrasp_dx = pregrasp_du = robot_dof

@@ -4,13 +4,13 @@ receding_horizon: False
 num_steps: 8
 num_trials: 20
 visualize: True
-experiment_name: 'allegro_reorientation'
+experiment_name: 'allegro_reorientation_hardware_1'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 simulator: "isaac_gym" # choose from 'isaac_sim', 'isaac_gym'
 fingers: ['index', 'middle', 'thumb']
 object_type: 'batarang'
 sim_device: 'cpu'
-device: 'cuda:1'
+device: 'cuda:0'
 friction_coefficient: 0.95
 kp: 3.0
 visualize_plan: False

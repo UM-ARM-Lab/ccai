@@ -33,10 +33,10 @@ img_save_dir = None
    
 if __name__ == "__main__":
     # get config
-    # task = 'screwdriver_turning'
+    task = 'screwdriver_turning'
     # task = 'valve_turning'
     # task = 'reorientation'
-    task = 'peg_alignment'
+    # task = 'peg_alignment'
     # task = 'peg_turning'
 
     method = 'csvgd'
@@ -138,5 +138,5 @@ if __name__ == "__main__":
     while True:
         set_state = env.get_state(return_dict=True)['q'].to(device=env.device)
         if task == 'screwdriver_turning':
-            set_state = torch.cat((set_state, torch.zeros(1).float().to(env.device)), dim=0)
+            set_state = torch.cat((set_state, torch.zeros(1).unsqueeze(0).float().to(env.device)), dim=-1)
         sim_env.set_pose(set_state)
