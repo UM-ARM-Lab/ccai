@@ -70,17 +70,17 @@ while True:
             print("pregrasp failed")
             continue
         
-        regrasp_pose, regrasp_traj = regrasp(env, config, chain, state2ee_pos_partial, perception_noise=perception_noise, 
+        regrasp_pose, regrasp_traj, regrasp_plan = regrasp(env, config, chain, state2ee_pos_partial, perception_noise=perception_noise, 
                                 image_path = img_save_dir, initialization = pregrasp_pose, mode='no_vf', iters = regrasp_iters)
         
         print("done regrasp")
         
-        _, turn_pose, succ, turn_traj = do_turn(regrasp_pose, config, env, 
+        _, turn_pose, succ, turn_traj, turn_plan = do_turn(regrasp_pose, config, env, 
                         sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, mode = 'no_vf',
                         iters = turn_iters, perception_noise=perception_noise, image_path = img_save_dir)
         
         print("done turn")
-        pose_tuples.append((pregrasp_pose, regrasp_pose, regrasp_traj, turn_pose, turn_traj))
+        pose_tuples.append((pregrasp_pose, regrasp_pose, regrasp_traj, turn_pose, turn_traj, regrasp_plan, turn_plan))
         trials_done += 1
 
     if perception_noise == 0:
@@ -92,9 +92,9 @@ while True:
         prog_id += 1
 
         if perception_noise == 0:
-            savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_dataset_narrow_{computer_id}_{prog_id}.pkl'
+            savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_dataset_narrow_plan_{computer_id}_{prog_id}.pkl'
         else:
-            savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_regrasp_to_turn_dataset_narrow_{computer_id}_{prog_id}.pkl'
+            savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_regrasp_to_turn_dataset_narrow_plan_{computer_id}_{prog_id}.pkl'
 
     pkl.dump(pose_tuples, open(savepath, 'wb'))
 

@@ -10,7 +10,8 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 import torch
 
-experiment_name = 'test_method_var'
+experiment_name = 'test_method_easyshortbig'
+# experiment_name = 'test_method_easybig2'
 
 filename = f'test/{experiment_name}.pkl'
 with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
@@ -97,7 +98,7 @@ if __name__ == "__main__":
             data[method_name]['costs'], 
             yerr=data[method_name]['stds'], 
             fmt='o',  # marker shape
-            label=f'Cost ({method_name.upper()})', 
+            label=f'Rollout Cost (method name: {method_name.upper()})', 
             linestyle='None', 
             capsize=3,
             color=colors[method_i]
@@ -109,7 +110,7 @@ if __name__ == "__main__":
             data[method_name]['pred_costs'],
             yerr=data[method_name]['pred_stds'],
             fmt='x',   # different marker shape
-            label=f'Predicted ({method_name.upper()})',
+            label=f'Predicted Cost (method name: {method_name.upper()})',
             linestyle='None',
             capsize=3,
             color=colors[method_i]
@@ -125,8 +126,14 @@ if __name__ == "__main__":
 
     # If you have both "no_vf" and "vf", compute the average cost difference
     if "no_vf" in data and "vf" in data:
-        mean_diff = np.mean(data["no_vf"]["costs"]) - np.mean(data["vf"]["costs"])
+        mean_no_vf = np.mean(data["no_vf"]["costs"])
+        mean_vf = np.mean(data["vf"]["costs"])
+
+        mean_diff = mean_no_vf - mean_vf
+        percent_decrease = (mean_diff / mean_no_vf) * 100
+
         print(f'Average cost difference (no_vf - vf): {mean_diff}')
+        print(f'Percent decrease in cost: {percent_decrease:.2f}%')
 
     plt.tight_layout()
     plt.show()

@@ -364,6 +364,8 @@ def regrasp(env, config, chain, state2ee_pos_partial, perception_noise = 0, init
         if torch.isnan(best_traj).any().item():
             env.reset()
             break
+        # get plan here
+        regrasp_plan = best_traj.clone()
 
         x = best_traj[0, :regrasp_problem.dx+regrasp_problem.du]
         x = x.reshape(1, regrasp_problem.dx+regrasp_problem.du)
@@ -412,7 +414,7 @@ def regrasp(env, config, chain, state2ee_pos_partial, perception_noise = 0, init
                     torch.zeros(actual_trajectory.shape[0], 1)
                     ), dim=1).numpy()
     
-    return final_state, full_trajectory
+    return final_state, full_trajectory, regrasp_plan
 
 
 def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, perception_noise = 0, 
@@ -505,6 +507,8 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, per
         if torch.isnan(best_traj).any().item():
             env.reset()
             break
+        # get plan here
+        turn_plan = best_traj.clone()
 
         x = best_traj[0, :turn_problem.dx+turn_problem.du]
         x = x.reshape(1, turn_problem.dx+turn_problem.du)
@@ -572,7 +576,7 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, per
                     torch.zeros(actual_trajectory.shape[0], 1)
                     ), dim=1).numpy()
     
-    return final_distance_to_goal.cpu().detach().item(), final_state, full_trajectory
+    return final_distance_to_goal.cpu().detach().item(), final_state, full_trajectory, turn_plan
 
 def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, image_path = None, 
             iters = 200, perception_noise = 0, turn_angle = np.pi/2, model_name = "ensemble", mode='no_vf', vf_weight = 0.0, other_weight = 10.0, variance_ratio = 0.0):
@@ -593,14 +597,14 @@ def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym,
     object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
     params['object_location'] = object_location
 
-    final_distance_to_goal, final_pose, full_trajectory = solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, image_path = image_path,
+    final_distance_to_goal, final_pose, full_trajectory, turn_plan = solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, image_path = image_path,
                                                                      sim_viz_env=sim_env, ros_copy_node=ros_copy_node, perception_noise=perception_noise, iters=iters,
                                                                      mode=mode, model_name=model_name, vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio)
     
     if final_distance_to_goal < 30 / 180 * np.pi:
         succ = True
 
-    return initial_pose, final_pose, succ, full_trajectory
+    return initial_pose, final_pose, succ, full_trajectory, turn_plan
 
 class emailer():
     def __init__(self):

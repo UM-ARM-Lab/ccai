@@ -105,13 +105,13 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'easy4'
+    test_name = 'easybig2'
     model_name = "ensemble"
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    n_trials = 10
-    n_repeat = 1
+    n_trials = 5
+    n_repeat = 2
     perception_noise = 0.0
 
     calc_novf = True
@@ -130,9 +130,20 @@ if __name__ == '__main__':
     regrasp_iters = 80
     turn_iters = 100
 
-    vf_weight_rg = 10.0
-    other_weight_rg = 7.0
-    variance_ratio_rg = 5.0
+    # EASYSHORTBIG
+    # vf_weight_rg = 10.0
+    # other_weight_rg = 1.0
+    # variance_ratio_rg = 8.0
+
+    # optimized easyshort
+    # vf_weight_rg = 7.0
+    # other_weight_rg = 3.0
+    # variance_ratio_rg = 11.0
+
+    # easybigoptimized
+    vf_weight_rg = 8.0
+    other_weight_rg = 2.0
+    variance_ratio_rg = 8.0
 
     # vf_weight_t = 12
     # other_weight_t = 8
@@ -173,14 +184,14 @@ if __name__ == '__main__':
         pregrasp_pose = pregrasps[pregrasp_index]
         env.reset(dof_pos= pregrasp_pose)
         
-        regrasp_pose_vf, regrasp_traj_vf = regrasp(
+        regrasp_pose_vf, regrasp_traj_vf, regrasp_plan = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=0,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters, model_name = model_name,
                 vf_weight=vf_weight_rg, other_weight=other_weight_rg, variance_ratio=variance_ratio_rg
         )
         
         # SET TO NO VF FOR NOW
-        _, turn_pose_vf, succ_vf, turn_traj_vf = do_turn(
+        _, turn_pose_vf, succ_vf, turn_traj_vf, turn_plan = do_turn(
             regrasp_pose_vf, config, env,
             sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
             perception_noise=0, image_path=img_save_dir, iters=turn_iters,mode='no_vf', 
@@ -195,12 +206,12 @@ if __name__ == '__main__':
 
             env.reset(dof_pos= pregrasp_pose)
             
-            regrasp_pose_novf, regrasp_traj_novf = regrasp(
+            regrasp_pose_novf, regrasp_traj_novf, regrasp_plan = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=0,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
             )
         
-            _, turn_pose_novf, succ_novf, turn_traj_novf = do_turn(
+            _, turn_pose_novf, succ_novf, turn_traj_novf, turn_plan = do_turn(
                 regrasp_pose_novf, config, env,
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                 perception_noise=0, image_path=img_save_dir, iters=turn_iters,mode='no_vf',
@@ -214,18 +225,18 @@ if __name__ == '__main__':
 
             env.reset(dof_pos= pregrasp_pose)
             
-            regrasp_pose_novf, regrasp_traj_novf = regrasp(
+            regrasp_pose_last, regrasp_traj_last, regrasp_plan_last = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=0,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='last_step', iters=regrasp_iters,
             )
         
-            _, turn_pose_novf, succ_novf, turn_traj_novf = do_turn(
+            _, turn_pose_last, succ_last, turn_traj_last, turn_plan_last = do_turn(
                 regrasp_pose_novf, config, env,
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                 perception_noise=0, image_path=img_save_dir, iters=turn_iters,mode='last_step',
             )
             
-            result_novf = [pregrasp_pose, regrasp_pose_novf, regrasp_traj_novf, turn_pose_novf, turn_traj_novf]
+            result_novf = [pregrasp_pose, regrasp_pose_last, regrasp_traj_last, turn_pose_last, turn_traj_last]
             checkpoint['results']['last_step'][combo_tuple] = result_novf
 
         checkpoint['tested_combinations'].add(combo_tuple)
