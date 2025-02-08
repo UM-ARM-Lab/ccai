@@ -90,8 +90,8 @@ if __name__ == "__main__":
     combined_regrasp_trajs = np.empty((0, 13, 20))
     combined_turn_trajs = np.empty((0, 13, 20))
     
-    combined_regrasp_plans = np.empty((0, 13, 20))
-    combined_turn_plans = np.empty((0, 13, 20))
+    combined_regrasp_plans = np.empty((0, 12, 13, 20))
+    combined_turn_plans = np.empty((0, 12, 13, 20))
     
     combined_turn_costs = []
 
@@ -109,9 +109,12 @@ if __name__ == "__main__":
             if len(extra) > 0:
                 regrasp_plan = extra[0]
                 turn_plan = extra[1]
+                regrasp_plan = np.empty((0, 12, 13, 20))
+                turn_plan = np.empty((0, 12, 13, 20))
+                # turn these into the right shape by padding with 0s? or just repeat the last step 13-N times?
             else:
-                regrasp_plan = np.empty((0, 13, 20))
-                turn_plan = np.empty((0, 13, 20))
+                regrasp_plan = np.empty((0, 12, 13, 20))
+                turn_plan = np.empty((0, 12, 13, 20))
             
             regrasp_poses = np.array([t.numpy() for t in regrasp_poses]).reshape(-1, 20)
             turn_poses = np.array(turn_poses).reshape(-1, 20)
@@ -159,15 +162,14 @@ if __name__ == "__main__":
 
     combined_turn_costs = np.array(combined_turn_costs)
 
-    regrasp_to_turn_dataset = zip(combined_regrasp_trajs, combined_turn_trajs, combined_turn_costs, combined_regrasp_plans)
-    turn_to_turn_dataset = zip(combined_turn_trajs, combined_turn_costs, combined_turn_plans)
+    regrasp_to_turn_dataset = zip(combined_regrasp_trajs, combined_turn_trajs, combined_turn_costs)
+    turn_to_turn_dataset = zip(combined_turn_trajs, combined_turn_costs)
+
+    regrasp_plan_dataset = combined_regrasp_plans
+    turn_plan_dataset = combined_turn_plans
     
-    if noisy:
-        regrasp_to_turn_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_combined_regrasp_to_turn_dataset.pkl'
-        turn_to_turn_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_combined_turn_to_turn_costs.pkl'
-    else:
-        regrasp_to_turn_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/combined_regrasp_to_turn_dataset.pkl'
-        turn_to_turn_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/combined_turn_to_turn_dataset.pkl'
+    regrasp_to_turn_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/combined_regrasp_to_turn_dataset.pkl'
+    turn_to_turn_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/combined_turn_to_turn_dataset.pkl'
    
     pkl.dump(regrasp_to_turn_dataset, open(regrasp_to_turn_savepath, 'wb'))
     pkl.dump(turn_to_turn_dataset, open(turn_to_turn_savepath, 'wb'))

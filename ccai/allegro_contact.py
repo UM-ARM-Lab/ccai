@@ -152,7 +152,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                  device='cuda:0',
                  moveable_object=False,
                  min_force_dict=None,
-                 model_name='ensemble',
+                 model_name=None,
                  mode='no_vf',
                  vf_weight = 0,
                  other_weight = 0,
@@ -160,7 +160,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                  *args, **kwargs):
         
         self.mode=mode
-        from _value_function.train_value_function import load_ensemble, query_ensemble 
+        from _value_function.train_value_function_regrasp import load_ensemble, query_ensemble 
         self.query_ensemble = query_ensemble
         self.vf_weight = vf_weight
         self.other_weight = other_weight
@@ -717,7 +717,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                  default_dof_pos=None,
                  desired_ee_in_world_frame=False,
                  obj_dof_type=None,
-                 model_name='ensemble',
+                 model_name=None,
                  mode='no_vf', 
                  vf_weight=0, 
                  other_weight=0,
@@ -2380,7 +2380,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                  env_contact=False,
                  min_force_dict=None,
                  device='cuda:0', 
-                 model_name='ensemble',
+                 model_name=None,
                  mode='no_vf',
                  vf_weight = 0,
                  other_weight = 0,

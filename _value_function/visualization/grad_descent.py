@@ -1,5 +1,5 @@
 from _value_function.screwdriver_problem import init_env, convert_full_to_partial_config, convert_partial_to_full_config
-from _value_function.train_value_function import Net, query_ensemble, load_ensemble
+from _value_function.train_value_function_regrasp import Net, query_ensemble, load_ensemble
 import pathlib
 import numpy as np
 import pickle as pkl

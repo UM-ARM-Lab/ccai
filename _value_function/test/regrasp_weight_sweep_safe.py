@@ -8,7 +8,7 @@ from _value_function.screwdriver_problem import (
     init_env, pregrasp, regrasp, do_turn,
     convert_partial_to_full_config, convert_full_to_partial_config, emailer
 )
-from _value_function.train_value_function import (
+from _value_function.train_value_function_regrasp import (
     Net, query_ensemble, load_ensemble
 )
 from _value_function.data_collect.process_final_poses_regrasp import calculate_turn_cost

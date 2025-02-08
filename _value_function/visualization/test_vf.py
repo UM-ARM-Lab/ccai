@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from _value_function.screwdriver_problem import init_env, convert_full_to_partial_config
 from _value_function.data_collect.process_final_poses_regrasp import calculate_turn_cost, \
     calculate_regrasp_cost
-from _value_function.train_value_function import Net, query_ensemble, load_ensemble, index_and_sort_regrasp_and_turn_trajs
+from _value_function.train_value_function_regrasp import Net, query_ensemble, load_ensemble, index_and_sort_regrasp_and_turn_trajs
 import torch
 
 # Paths

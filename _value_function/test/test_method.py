@@ -105,12 +105,11 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'easybig2'
-    model_name = "ensemble"
+    test_name = 'turn0'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    n_trials = 5
+    n_trials = 20
     n_repeat = 2
     perception_noise = 0.0
 
@@ -127,8 +126,8 @@ if __name__ == '__main__':
     screwdriver_noise_mag = 0.015
     finger_noise_mag = 0.05
 
-    regrasp_iters = 80
-    turn_iters = 100
+    regrasp_iters = 40
+    turn_iters = 40
 
     # EASYSHORTBIG
     # vf_weight_rg = 10.0
@@ -136,18 +135,18 @@ if __name__ == '__main__':
     # variance_ratio_rg = 8.0
 
     # optimized easyshort
-    # vf_weight_rg = 7.0
-    # other_weight_rg = 3.0
-    # variance_ratio_rg = 11.0
+    vf_weight_rg = 7.0
+    other_weight_rg = 3.0
+    variance_ratio_rg = 11.0
 
     # easybigoptimized
-    vf_weight_rg = 8.0
-    other_weight_rg = 2.0
-    variance_ratio_rg = 8.0
+    # vf_weight_rg = 8.0
+    # other_weight_rg = 2.0
+    # variance_ratio_rg = 8.0
 
-    # vf_weight_t = 12
-    # other_weight_t = 8
-    # variance_ratio_t = 2
+    vf_weight_t = 7
+    other_weight_t = 3
+    variance_ratio_t = 11
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
 
@@ -186,16 +185,15 @@ if __name__ == '__main__':
         
         regrasp_pose_vf, regrasp_traj_vf, regrasp_plan = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=0,
-                image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters, model_name = model_name,
+                image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters, model_name = "ensemble_rg",
                 vf_weight=vf_weight_rg, other_weight=other_weight_rg, variance_ratio=variance_ratio_rg
         )
         
-        # SET TO NO VF FOR NOW
         _, turn_pose_vf, succ_vf, turn_traj_vf, turn_plan = do_turn(
             regrasp_pose_vf, config, env,
             sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
-            perception_noise=0, image_path=img_save_dir, iters=turn_iters,mode='no_vf', 
-            # model_name=model_name, vf_weight=vf_weight_t, other_weight=other_weight_t, variance_ratio=variance_ratio_t
+            perception_noise=0, image_path=img_save_dir, iters=turn_iters,mode='vf', 
+            model_name="ensemble_t", vf_weight=vf_weight_t, other_weight=other_weight_t, variance_ratio=variance_ratio_t
         )
 
         # Store the VF approach result

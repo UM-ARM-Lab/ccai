@@ -256,7 +256,7 @@ def pregrasp(env, config, chain, deterministic=True, initialization=None, percep
 
 
 def regrasp(env, config, chain, state2ee_pos_partial, perception_noise = 0, initialization = None, 
-             model_name = 'ensemble', mode='no_vf', vf_weight = 0, other_weight = 10, variance_ratio = 1,
+             model_name = 'ensemble_rg', mode='no_vf', vf_weight = 0, other_weight = 10, variance_ratio = 1,
             image_path = None, vis_plan = False, iters = 200):
     
     params = config.copy()
@@ -422,7 +422,7 @@ def regrasp(env, config, chain, state2ee_pos_partial, perception_noise = 0, init
 
 
 def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, perception_noise = 0, 
-               image_path = None, sim_viz_env=None, ros_copy_node=None, model_name = "ensemble", iters = 200,
+               image_path = None, sim_viz_env=None, ros_copy_node=None, model_name = "ensemble_t", iters = 200,
                mode='vf', vf_weight = 100.0, other_weight = 0.1, variance_ratio = 5):
 
     obj_dof = 3
