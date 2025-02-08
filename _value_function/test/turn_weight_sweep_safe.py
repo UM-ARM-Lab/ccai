@@ -18,6 +18,39 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 import torch
 
+def get_turn_initializations(env, sim_device, n_samples, save=False):
+
+    max_screwdriver_tilt = 0.015
+    screwdriver_noise_mag = 0.015
+    finger_noise_mag = 0.05
+    
+    vf_weight_rg = 10.0
+    other_weight_rg = 1.0
+    variance_ratio_rg = 8.0
+
+    regrasp_path = fpath /'test'/'initializations'/'weight_sweep_regrasps.pkl'
+
+    if regrasp_path.exists() == False or len(pkl.load(open(regrasp_path, 'rb'))) != n_samples:
+        print("Generating new regrasp initializations...")
+        pregrasps = get_initializations(env, config, chain, sim_device, n_samples,
+                            max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save=False,
+                            do_pregrasp=True, name='error')
+    
+    regrasps = []
+    for pregrasp in pregrasps:
+        regrasp_pose, regrasp_traj, regrasp_plan = regrasp(
+                env, config, chain, state2ee_pos_partial, perception_noise=0,
+                image_path=None, initialization=pregrasp, mode='vf', iters=regrasp_iters, model_name = "ensemble_rg",
+                vf_weight=vf_weight_rg, other_weight=other_weight_rg, variance_ratio=variance_ratio_rg
+        )
+        regrasps.append(regrasp_pose)
+    
+    if save:
+        with open(regrasp_path, 'wb') as f:
+            pkl.dump(regrasps, f)
+
+
+
 def load_or_create_checkpoint(starting_values):
     """
     Loads the checkpoint if it exists, otherwise creates a new default checkpoint.
@@ -94,8 +127,8 @@ def save_checkpoint(checkpoint):
 def test(checkpoint, n_samples): 
 
     # Load the data or environment objects once upfront
-    pregrasps = pkl.load(open(f'{fpath}/test/initializations/weight_sweep_pregrasps.pkl', 'rb'))
-    models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble(model_name="ensemble")
+    regrasps = pkl.load(open(f'{fpath}/test/initializations/weight_sweep_regrasps.pkl', 'rb'))
+    models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble(model_name="ensemble_t")
 
     # We extract frequently used fields from checkpoint for convenience
     iteration = checkpoint['iteration']
@@ -152,22 +185,16 @@ def test(checkpoint, n_samples):
                 env.frame_fpath = img_save_dir
                 env.frame_id = 0
 
-                pregrasp_pose = pregrasps[i]
-                env.reset(dof_pos=pregrasp_pose)
+                regrasp_pose = regrasps[i]
+                env.reset(dof_pos=regrasp_pose)
                 
-                regrasp_pose, regrasp_traj, regrasp_plan = regrasp(
-                    env, config, chain, state2ee_pos_partial, perception_noise=0,
-                    image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters,
-                    vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio
-                )
-
                 _, turn_pose, succ, turn_traj, turn_plan = do_turn(
                     regrasp_pose, config, env,
                     sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                     perception_noise=0, image_path=img_save_dir, iters=turn_iters,
-                    mode='no_vf'
+                    mode='vf', vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio
                 )
-
+        
                 turn_cost = calculate_turn_cost(regrasp_pose.numpy(), turn_pose)
                 total_cost += turn_cost
                 print(f"Sample {i} -> turn cost: {turn_cost}")
@@ -276,25 +303,19 @@ if __name__ == "__main__":
     finger_noise_mag = 0.05
 
     regrasp_iters = 40
-    turn_iters = 100
+    turn_iters = 40
     visualize = False   
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
     sim_device = config['sim_device']
     
     n_samples = 3
-    name = "lowiter"
+    name = "0"
 
-    checkpoint_path = fpath /'test'/'weight_sweep'/f'checkpoint_sweep_regrasp_{name}.pkl'
+    checkpoint_path = fpath /'test'/'weight_sweep'/f'checkpoint_sweep_turning_{name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    pregrasp_path = fpath /'test'/'initializations'/'weight_sweep_pregrasps.pkl'
-
-    if pregrasp_path.exists() == False or len(pkl.load(open(pregrasp_path, 'rb'))) != n_samples:
-        print("Generating new pregrasp initializations...")
-        get_initializations(env, config, chain, sim_device, n_samples,
-                            max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save=True,
-                            do_pregrasp=True, name='weight_sweep_pregrasps')
+    get_turn_initializations(env, sim_device, n_samples, save=False)
 
     starting_values = {
         'vf_bounds': [10, 100],

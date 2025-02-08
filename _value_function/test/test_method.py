@@ -105,11 +105,11 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'turn3'
+    test_name = 'test100'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    n_trials = 3
+    n_trials = 2
     n_repeat = 1
     perception_noise = 0.0
 
@@ -127,7 +127,7 @@ if __name__ == '__main__':
     finger_noise_mag = 0.05
 
     regrasp_iters = 40
-    turn_iters = 40
+    turn_iters = 100
 
     # EASYSHORTBIG
     vf_weight_rg = 10.0
@@ -144,9 +144,9 @@ if __name__ == '__main__':
     # other_weight_rg = 2.0
     # variance_ratio_rg = 8.0
 
-    vf_weight_t = 10
-    other_weight_t = 1
-    variance_ratio_t = 8
+    vf_weight_t = 8.0
+    other_weight_t = 2.0
+    variance_ratio_t = 8.0
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
 
@@ -185,7 +185,7 @@ if __name__ == '__main__':
        
         regrasp_pose_vf, regrasp_traj_vf, regrasp_plan = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=0,
-                image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters, model_name = "ensemble_old",
+                image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters, model_name = "ensemble_rg",
                 vf_weight=vf_weight_rg, other_weight=other_weight_rg, variance_ratio=variance_ratio_rg
         )
        
