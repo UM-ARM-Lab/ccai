@@ -104,7 +104,7 @@ def init_env(visualize=False, config_path = 'allegro_screwdriver_adam0.yaml'):
     config['ee_names'] = ee_names
     config['obj_dof_code'] = [0, 0, 0, 1, 1, 1]
     config['obj_dof'] = np.sum(config['obj_dof_code'])
-    
+   
     chain = pk.build_chain_from_urdf(open(asset).read())
     frame_indices = [chain.frame_to_idx[ee_names[finger]] for finger in config['fingers']]    # combined chain
     frame_indices = torch.tensor(frame_indices)
@@ -112,8 +112,8 @@ def init_env(visualize=False, config_path = 'allegro_screwdriver_adam0.yaml'):
 
     return config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial
 
-def pregrasp(env, config, chain, deterministic=True, initialization=None, perception_noise=0, 
-             model_name='ensemble', mode='no_vf', vf_weight=0, other_weight=10, variance_ratio=1,
+def pregrasp(env, config, chain, deterministic=True, initialization=None, perception_noise=0,
+             model_name=None, mode='no_vf', vf_weight=0, other_weight=10, variance_ratio=1,
              vis_plan=False, image_path=None, iters=80):
     if mode == 'vf':
         print("mode 'vf' is not supported for pregrasp")
@@ -131,7 +131,7 @@ def pregrasp(env, config, chain, deterministic=True, initialization=None, percep
     num_fingers = len(params['fingers'])
     device = params['device']
     sim_device = params['sim_device']
-    
+   
     # Random initialization of DOF positions if none are provided
     if initialization is None:
         if deterministic is False:
@@ -181,11 +181,11 @@ def pregrasp(env, config, chain, deterministic=True, initialization=None, percep
         action = torch.tensor(action).to(device=device).reshape(1, 12)
         env.step(action.to(device=sim_device), path_override=image_path)
         end_state = env.get_state()['q'].reshape(4 * num_fingers + obj_dof + 1)
-        end_state = end_state.unsqueeze(0) 
+        end_state = end_state.unsqueeze(0)
         end_state_full = torch.cat((
-            end_state.clone()[:, :8], 
-            torch.tensor([[0., 0.5, 0.65, 0.65]]), 
-            end_state.clone()[:, 8:], 
+            end_state.clone()[:, :8],
+            torch.tensor([[0., 0.5, 0.65, 0.65]]),
+            end_state.clone()[:, 8:],
         ), dim=1)
         return end_state_full.cpu()
 
@@ -212,7 +212,7 @@ def pregrasp(env, config, chain, deterministic=True, initialization=None, percep
         other_weight=other_weight,
         variance_ratio=variance_ratio,
     )
-    
+   
     # Initialize planner
     pregrasp_planner = PositionControlConstrainedSVGDMPC(pregrasp_problem, params)
     pregrasp_planner.warmup_iters = iters
@@ -241,9 +241,9 @@ def pregrasp(env, config, chain, deterministic=True, initialization=None, percep
     end_state_full = torch.cat((
         end_state.clone()[:, :8],
         torch.tensor([[0., 0.5, 0.65, 0.65]]),
-        end_state.clone()[:, 8:], 
+        end_state.clone()[:, 8:],
     ), dim=1)
-    
+   
     # Add the screwdriver dof back to action for final record
     action = torch.cat((
         action.clone()[:, :8],
@@ -255,10 +255,10 @@ def pregrasp(env, config, chain, deterministic=True, initialization=None, percep
     return end_state_full.cpu(), action.cpu()
 
 
-def regrasp(env, config, chain, state2ee_pos_partial, perception_noise = 0, initialization = None, 
+def regrasp(env, config, chain, state2ee_pos_partial, perception_noise = 0, initialization = None,
              model_name = 'ensemble_rg', mode='no_vf', vf_weight = 0, other_weight = 10, variance_ratio = 1,
             image_path = None, vis_plan = False, iters = 200):
-    
+   
     params = config.copy()
     controller = 'csvgd'
     params.pop('controllers')
@@ -278,7 +278,7 @@ def regrasp(env, config, chain, state2ee_pos_partial, perception_noise = 0, init
     if initialization is not None:
         default_dof_pos = initialization
         env.reset(dof_pos= default_dof_pos)
-        
+       
     start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=device)
     # print("start: ", start)
 
@@ -312,7 +312,7 @@ def regrasp(env, config, chain, state2ee_pos_partial, perception_noise = 0, init
             other_weight=other_weight,
             variance_ratio=variance_ratio,
         )
-    
+   
     regrasp_planner = PositionControlConstrainedSVGDMPC(regrasp_problem, params)
     regrasp_planner.warmup_iters = iters
     # regrasp_planner.online_iters = online_iters
@@ -381,10 +381,10 @@ def regrasp(env, config, chain, state2ee_pos_partial, perception_noise = 0, init
         action = x[:, regrasp_problem.dx:regrasp_problem.dx+regrasp_problem.du].to(device=env.device)
         action = action[:, :4 * num_fingers_to_plan]
         action = action + start.unsqueeze(0)[:, :4 * num_fingers].to(env.device) # NOTE: this is required since we define action as delta action
-        
+       
         env.step(action, path_override = image_path)
         regrasp_problem._preprocess(best_traj.unsqueeze(0))
-        
+       
         # gym.clear_lines(viewer)
         # state = env.get_state()
         # start = state['q'][:,:4 * num_fingers + obj_dof].squeeze(0).to(device=params['device'])
@@ -406,22 +406,22 @@ def regrasp(env, config, chain, state2ee_pos_partial, perception_noise = 0, init
 
     state = env.get_state()['q']
     final_state = torch.cat((
-                    state.clone()[:, :8], 
-                    torch.tensor([[0., 0.5, 0.65, 0.65]]), 
-                    state.clone()[:, 8:], 
+                    state.clone()[:, :8],
+                    torch.tensor([[0., 0.5, 0.65, 0.65]]),
+                    state.clone()[:, 8:],
                     ), dim=1).detach().cpu()
      
     full_trajectory = torch.cat((
-                    actual_trajectory.clone()[:, :8].detach().cpu(), 
+                    actual_trajectory.clone()[:, :8].detach().cpu(),
                     torch.tensor([[0., 0.5, 0.65, 0.65]]) * torch.ones(actual_trajectory.shape[0], 1),
-                    actual_trajectory.clone()[:, 8:].detach().cpu(), 
+                    actual_trajectory.clone()[:, 8:].detach().cpu(),
                     torch.zeros(actual_trajectory.shape[0], 1)
                     ), dim=1).numpy()
-    
+   
     return final_state, full_trajectory, all_regrasp_plans
 
 
-def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, perception_noise = 0, 
+def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, perception_noise = 0,
                image_path = None, sim_viz_env=None, ros_copy_node=None, model_name = "ensemble_t", iters = 200,
                mode='vf', vf_weight = 100.0, other_weight = 0.1, variance_ratio = 5):
 
@@ -524,11 +524,11 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, per
         action = x[:, turn_problem.dx:turn_problem.dx+turn_problem.du].to(device=env.device)
         action = action[:, :4 * num_fingers_to_plan]
         action = action + start.unsqueeze(0)[:, :4 * num_fingers].to(env.device) # NOTE: this is required since we define action as delta action
-        
+       
         env.step(action, path_override = image_path)
         action_list.append(action)
         turn_problem._preprocess(best_traj.unsqueeze(0))
-        
+       
         screwdriver_state = env.get_state()['q'][:, -obj_dof-1: -1].cpu()
         screwdriver_mat = R.from_euler('xyz', screwdriver_state).as_matrix()
         distance2goal = tf.so3_relative_angle(torch.tensor(screwdriver_mat), \
@@ -568,22 +568,22 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, per
 
     state = env.get_state()['q']
     final_state = torch.cat((
-                    state.clone()[:, :8], 
-                    torch.tensor([[0., 0.5, 0.65, 0.65]]), 
-                    state.clone()[:, 8:], 
+                    state.clone()[:, :8],
+                    torch.tensor([[0., 0.5, 0.65, 0.65]]),
+                    state.clone()[:, 8:],
                     ), dim=1).detach().cpu().numpy()
      
     full_trajectory = torch.cat((
-                    actual_trajectory.clone()[:, :8].detach().cpu(), 
+                    actual_trajectory.clone()[:, :8].detach().cpu(),
                     torch.tensor([[0., 0.5, 0.65, 0.65]]) * torch.ones(actual_trajectory.shape[0], 1),
-                    actual_trajectory.clone()[:, 8:].detach().cpu(), 
+                    actual_trajectory.clone()[:, 8:].detach().cpu(),
                     torch.zeros(actual_trajectory.shape[0], 1)
                     ), dim=1).numpy()
-    
+   
     return final_distance_to_goal.cpu().detach().item(), final_state, full_trajectory, turn_plan
 
-def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, image_path = None, 
-            iters = 200, perception_noise = 0, turn_angle = np.pi/2, model_name = "ensemble", mode='no_vf', vf_weight = 0.0, other_weight = 10.0, variance_ratio = 0.0):
+def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, image_path = None,
+            iters = 200, perception_noise = 0, turn_angle = np.pi/2, model_name = "ensemble_t", mode='no_vf', vf_weight = 0.0, other_weight = 10.0, variance_ratio = 0.0):
 
     params = config.copy()
     controller = 'csvgd'
@@ -604,7 +604,7 @@ def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym,
     final_distance_to_goal, final_pose, full_trajectory, turn_plan = solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, image_path = image_path,
                                                                      sim_viz_env=sim_env, ros_copy_node=ros_copy_node, perception_noise=perception_noise, iters=iters,
                                                                      mode=mode, model_name=model_name, vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio)
-    
+   
     if final_distance_to_goal < 30 / 180 * np.pi:
         succ = True
 
@@ -658,11 +658,11 @@ if __name__ == "__main__":
 
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
-    
+   
     # img_save_dir = None
     pregrasp_iters = 50#200
-    regrasp_iters = 80
-    turn_iters = 100
+    regrasp_iters = 40
+    turn_iters = 40
     perception_noise = 0.0
 
     img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/imgs/regrasp_trial_test')
@@ -670,19 +670,19 @@ if __name__ == "__main__":
 
 
     for i in range(1):
-        
-        pregrasp_pose, planned_pose = pregrasp(env, config, chain, deterministic=True, perception_noise=perception_noise, 
+       
+        pregrasp_pose, planned_pose = pregrasp(env, config, chain, deterministic=True, perception_noise=perception_noise,
                             image_path = img_save_dir, initialization = None, mode='no_vf', iters = pregrasp_iters)
 
-        regrasp_pose, regrasp_traj, rg_plan = regrasp(env, config, chain, state2ee_pos_partial, perception_noise=perception_noise, 
-                                image_path = img_save_dir, initialization = pregrasp_pose, mode='no_vf', iters = regrasp_iters,
-                                vf_weight = 100.0, other_weight = 0.1, variance_ratio = 5)
-        
-        _, turn_pose, succ, turn_traj, t_plan = do_turn(regrasp_pose, config, env, 
-                        sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, 
-                        perception_noise=perception_noise, image_path = img_save_dir, iters = turn_iters,
-                        mode='no_vf', vf_weight = 100.0, other_weight = 0.1, variance_ratio = 5)
-        
+        regrasp_pose, regrasp_traj, rg_plan = regrasp(env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
+                                image_path = img_save_dir, initialization = pregrasp_pose, mode='vf', iters = regrasp_iters, model_name = 'ensemble_rg',
+                                vf_weight = 10.0, other_weight = 1.0, variance_ratio = 8)
+       
+        _, turn_pose, succ, turn_traj, t_plan = do_turn(regrasp_pose, config, env,
+                        sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
+                        perception_noise=perception_noise, image_path = img_save_dir, iters = turn_iters, model_name= 'ensemble_t',
+                        mode='vf', vf_weight = 10.0, other_weight = 1.0, variance_ratio = 8)
+       
 
     # print("done regrasp")
     # while True:
@@ -690,7 +690,7 @@ if __name__ == "__main__":
     #         print(f"step {idx}")
     #         env.reset(dof_pos=torch.tensor(state).reshape(1,20))
     #         time.sleep(0.1)
-    
+   
     # print("enter to continue")
     # wait = input()
     # while True:

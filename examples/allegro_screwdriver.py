@@ -94,7 +94,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                  obj_gravity=False,
                  min_force_dict=None,
                  device='cuda:0', 
-                model_name=None,
+                model_name='None3',
                 mode='no_vf',
                 vf_weight = 0,
                 other_weight = 0,
