@@ -152,7 +152,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                  device='cuda:0',
                  moveable_object=False,
                  min_force_dict=None,
-                 model_name=None,
+                 model_name='None0',
                  mode='no_vf',
                  vf_weight = 0,
                  other_weight = 0,
@@ -165,11 +165,13 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         self.vf_weight = vf_weight
         self.other_weight = other_weight
         self.variance_ratio = variance_ratio
-        self.models, self.poses_mean, self.poses_std, self.cost_mean, self.cost_std = load_ensemble(device=device, model_name=model_name)
-        self.poses_mean = torch.tensor(self.poses_mean).to(device)
-        self.poses_std = torch.tensor(self.poses_std).to(device)
-        self.cost_mean = torch.tensor([self.cost_mean]).to(device)
-        self.cost_std = torch.tensor([self.cost_std]).to(device)
+        if mode == 'vf' or mode == "last_step":
+            # print(model_name)
+            self.models, self.poses_mean, self.poses_std, self.cost_mean, self.cost_std = load_ensemble(device=device, model_name=model_name)
+            self.poses_mean = torch.tensor(self.poses_mean).to(device)
+            self.poses_std = torch.tensor(self.poses_std).to(device)
+            self.cost_mean = torch.tensor([self.cost_mean]).to(device)
+            self.cost_std = torch.tensor([self.cost_std]).to(device)
         self.full_start = start
 
         """
@@ -717,7 +719,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                  default_dof_pos=None,
                  desired_ee_in_world_frame=False,
                  obj_dof_type=None,
-                 model_name=None,
+                 model_name='None1',
                  mode='no_vf', 
                  vf_weight=0, 
                  other_weight=0,
@@ -1060,7 +1062,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                  obj_gravity=False,
                  device='cuda:0',
                  min_force_dict=None,
-                 model_name='ensemble',
+                 model_name='None2',
                  mode='no_vf',
                  vf_weight = 0,
                  other_weight = 0,
@@ -2380,7 +2382,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                  env_contact=False,
                  min_force_dict=None,
                  device='cuda:0', 
-                 model_name=None,
+                 model_name="None4",
                  mode='no_vf',
                  vf_weight = 0,
                  other_weight = 0,
@@ -2406,6 +2408,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                                         optimize_force=optimize_force, device=device, 
                                         desired_ee_in_world_frame=desired_ee_in_world_frame,
                                         min_force_dict=min_force_dict,
+                                        model_name=model_name,
                                         mode=mode, vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio,
                                         **kwargs)
 

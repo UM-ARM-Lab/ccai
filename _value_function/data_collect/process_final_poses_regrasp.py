@@ -84,14 +84,15 @@ if __name__ == "__main__":
         for file in Path(f'{fpath.resolve()}/regrasp_to_turn_datasets').glob("noisy_regrasp_to_turn_dataset*.pkl"):
             filenames.append(file)
     else:
-        for file in Path(f'{fpath.resolve()}/regrasp_to_turn_datasets').glob("regrasp_to_turn_dataset*.pkl"):
+        for file in Path(f'{fpath.resolve()}/regrasp_to_turn_datasets').glob("regrasp_to_turn_dataset_narrow*.pkl"):
             filenames.append(file)
+            # if not file.name.startswith("regrasp_to_turn_dataset_narrow"):
+            #     filenames.append(file)
+            # else:   
+            #     print("Skipping narrow dataset")
 
     combined_regrasp_trajs = np.empty((0, 13, 20))
     combined_turn_trajs = np.empty((0, 13, 20))
-    
-    combined_regrasp_plans = np.empty((0, 12, 13, 20))
-    combined_turn_plans = np.empty((0, 12, 13, 20))
     
     combined_turn_costs = []
 
@@ -105,16 +106,6 @@ if __name__ == "__main__":
             pose_tuples = pkl.load(file)
 
             _, regrasp_poses, regrasp_trajs, turn_poses, turn_trajs, *extra = zip(*pose_tuples)
-
-            if len(extra) > 0:
-                regrasp_plan = extra[0]
-                turn_plan = extra[1]
-                regrasp_plan = np.empty((0, 12, 13, 20))
-                turn_plan = np.empty((0, 12, 13, 20))
-                # turn these into the right shape by padding with 0s? or just repeat the last step 13-N times?
-            else:
-                regrasp_plan = np.empty((0, 12, 13, 20))
-                turn_plan = np.empty((0, 12, 13, 20))
             
             regrasp_poses = np.array([t.numpy() for t in regrasp_poses]).reshape(-1, 20)
             turn_poses = np.array(turn_poses).reshape(-1, 20)
@@ -140,9 +131,6 @@ if __name__ == "__main__":
             
             combined_turn_trajs = np.concatenate((combined_turn_trajs, turn_trajs), axis=0)
             combined_regrasp_trajs = np.concatenate((combined_regrasp_trajs, regrasp_trajs), axis=0)
-
-            combined_turn_plans = np.concatenate((combined_turn_plans, turn_plan), axis=0)
-            combined_regrasp_plans = np.concatenate((combined_regrasp_plans, regrasp_plan), axis=0)
             
             turn_costs = []
             
@@ -164,12 +152,10 @@ if __name__ == "__main__":
 
     regrasp_to_turn_dataset = zip(combined_regrasp_trajs, combined_turn_trajs, combined_turn_costs)
     turn_to_turn_dataset = zip(combined_turn_trajs, combined_turn_costs)
-
-    regrasp_plan_dataset = combined_regrasp_plans
-    turn_plan_dataset = combined_turn_plans
     
-    regrasp_to_turn_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/combined_regrasp_to_turn_dataset.pkl'
-    turn_to_turn_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/combined_turn_to_turn_dataset.pkl'
+    name = ""
+    regrasp_to_turn_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/combined_regrasp_to_turn_dataset{name}.pkl'
+    turn_to_turn_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/combined_turn_to_turn_dataset{name}.pkl'
    
     pkl.dump(regrasp_to_turn_dataset, open(regrasp_to_turn_savepath, 'wb'))
     pkl.dump(turn_to_turn_dataset, open(turn_to_turn_savepath, 'wb'))

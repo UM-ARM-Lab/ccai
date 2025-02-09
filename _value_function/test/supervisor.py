@@ -49,11 +49,11 @@ if __name__ == "__main__":
     elif args.filename == "test2":
         script_path = fpath / "_value_function/test/compare_dataset_sizes.py"
         
-    elif args.filename == "sweep":
+    elif args.filename == "sweep_rg":
         script_path = fpath / "_value_function/test/regrasp_weight_sweep_safe.py"
 
-    elif args.filename == "sweep_pred":
-        script_path = fpath / "_value_function/test/regrasp_weight_sweep_pred.py"
+    elif args.filename == "sweep_t":
+        script_path = fpath / "_value_function/test/turn_weight_sweep_safe.py"
 
     else:
         print(f"Error: Not a valid argument.")

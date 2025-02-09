@@ -37,7 +37,7 @@ def get_initialization(env, sim_device, max_screwdriver_tilt, screwdriver_noise_
             torch.tensor([[1.3, 0.3, 0.2, 1.1]]).float().to(device=sim_device) + middle_thumb_noise,
             torch.tensor([[0.0, 0.0, 0.0, 0.0]]).float().to(device=sim_device) + screwdriver_noise
         ), dim=1).to(sim_device)
-        
+       
         env.reset(dof_pos= initialization)
         for _ in range(64):
             env._step_sim()
@@ -50,7 +50,7 @@ def get_initialization(env, sim_device, max_screwdriver_tilt, screwdriver_noise_
             return solved_initialization
 
 def get_initializations(env, config, chain, sim_device, n_samples, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save = False, do_pregrasp=False, name = "unnamed"):
-    
+   
     initializations = []
     for _ in range(n_samples):
         initialization = get_initialization(env, sim_device, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag)
@@ -60,7 +60,7 @@ def get_initializations(env, config, chain, sim_device, n_samples, max_screwdriv
         if save == True:
             pkl.dump(initializations, open(f'{fpath}/test/initializations/{name}.pkl', 'wb'))
         return initializations
-    
+   
     else:
         pregrasps = []
         for init in initializations:
@@ -87,7 +87,7 @@ def load_or_create_checkpoint(checkpoint_path, method_names):
         print(f"No checkpoint found. Creating a new one at {checkpoint_path}. Also deleting imgs because we're starting a new test")
 
         delete_imgs()
-        
+       
         # Dictionary-based approach
         checkpoint = {
             'results': {},
@@ -105,15 +105,15 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'turn0'
+    test_name = 'please'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    n_trials = 20
-    n_repeat = 2
+    n_trials = 3
+    n_repeat = 1
     perception_noise = 0.0
 
-    calc_novf = True
+    calc_novf = False
     calc_last_step = False
 
     method_names = ['vf']
@@ -127,26 +127,26 @@ if __name__ == '__main__':
     finger_noise_mag = 0.05
 
     regrasp_iters = 40
-    turn_iters = 40
+    turn_iters = 100
 
     # EASYSHORTBIG
-    # vf_weight_rg = 10.0
-    # other_weight_rg = 1.0
-    # variance_ratio_rg = 8.0
+    vf_weight_rg = 10.0
+    other_weight_rg = 1.0
+    variance_ratio_rg = 8.0
 
     # optimized easyshort
-    vf_weight_rg = 7.0
-    other_weight_rg = 3.0
-    variance_ratio_rg = 11.0
+    # vf_weight_rg = 7.0
+    # other_weight_rg = 3.0
+    # variance_ratio_rg = 11.0
 
     # easybigoptimized
     # vf_weight_rg = 8.0
     # other_weight_rg = 2.0
     # variance_ratio_rg = 8.0
 
-    vf_weight_t = 7
-    other_weight_t = 3
-    variance_ratio_t = 11
+    vf_weight_t = 0#8.0
+    other_weight_t = 10#2.0
+    variance_ratio_t = 8.0
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
 
@@ -158,9 +158,9 @@ if __name__ == '__main__':
         get_initializations(env, config, chain, config['sim_device'], n_trials,
                             max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save=True,
                             do_pregrasp=True, name='test_method_pregrasps')
-    
+   
     pregrasps = pkl.load(open(pregrasp_path, 'rb'))
-    
+   
     pregrasp_indices = list(range(n_trials))
     repeat_indices = list(range(n_repeat))
     args = [pregrasp_indices, repeat_indices]
@@ -179,20 +179,20 @@ if __name__ == '__main__':
         pathlib.Path.mkdir(img_save_dir, parents=True, exist_ok=True)  
         env.frame_fpath = img_save_dir
         env.frame_id = 0
-        
+       
         pregrasp_pose = pregrasps[pregrasp_index]
         env.reset(dof_pos= pregrasp_pose)
-        
+       
         regrasp_pose_vf, regrasp_traj_vf, regrasp_plan = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=0,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters, model_name = "ensemble_rg",
                 vf_weight=vf_weight_rg, other_weight=other_weight_rg, variance_ratio=variance_ratio_rg
         )
-        
+       
         _, turn_pose_vf, succ_vf, turn_traj_vf, turn_plan = do_turn(
             regrasp_pose_vf, config, env,
             sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
-            perception_noise=0, image_path=img_save_dir, iters=turn_iters,mode='vf', 
+            perception_noise=0, image_path=img_save_dir, iters=turn_iters,mode='vf',
             model_name="ensemble_t", vf_weight=vf_weight_t, other_weight=other_weight_t, variance_ratio=variance_ratio_t
         )
 
@@ -203,37 +203,37 @@ if __name__ == '__main__':
         if calc_novf:
 
             env.reset(dof_pos= pregrasp_pose)
-            
+           
             regrasp_pose_novf, regrasp_traj_novf, regrasp_plan = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=0,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
             )
-        
+       
             _, turn_pose_novf, succ_novf, turn_traj_novf, turn_plan = do_turn(
                 regrasp_pose_novf, config, env,
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                 perception_noise=0, image_path=img_save_dir, iters=turn_iters,mode='no_vf',
             )
-            
+           
             result_novf = [pregrasp_pose, regrasp_pose_novf, regrasp_traj_novf, turn_pose_novf, turn_traj_novf]
             checkpoint['results']['no_vf'][combo_tuple] = result_novf
 
-        
+       
         if calc_last_step:
 
             env.reset(dof_pos= pregrasp_pose)
-            
+           
             regrasp_pose_last, regrasp_traj_last, regrasp_plan_last = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=0,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='last_step', iters=regrasp_iters,
             )
-        
+       
             _, turn_pose_last, succ_last, turn_traj_last, turn_plan_last = do_turn(
                 regrasp_pose_novf, config, env,
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                 perception_noise=0, image_path=img_save_dir, iters=turn_iters,mode='last_step',
             )
-            
+           
             result_novf = [pregrasp_pose, regrasp_pose_last, regrasp_traj_last, turn_pose_last, turn_traj_last]
             checkpoint['results']['last_step'][combo_tuple] = result_novf
 

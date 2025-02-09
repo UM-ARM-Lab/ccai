@@ -26,7 +26,8 @@ def stack_trajs(turn_trajs):
 
 def save_train_test_splits(noisy=False, dataset_size=None, validation_proportion=0.1, seed=None):
 
-    filename = 'regrasp_to_turn_datasets/combined_turn_to_turn_dataset.pkl'
+    name = ''
+    filename = f'regrasp_to_turn_datasets/combined_turn_to_turn_dataset{name}.pkl'
     
     if seed is not None:
         np.random.seed(seed)
@@ -486,16 +487,16 @@ if __name__ == "__main__":
         ensemble = []
         for i in range(16):
             print(f"Training model {i}")
-            net, _ = train(epochs=5, neurons=22, verbose='very', lr=1e-3, batch_size=100)
+            net, _ = train(epochs=80, neurons=32, verbose='very', lr=1e-3, batch_size=100)
             ensemble.append(net)
         torch.save(ensemble, path)
         eval(model_name=model_name)
 
     def hyperparam_search(
         lr_candidates=[1e-3],
-        epochs_candidates=[50],
-        neurons_candidates=[22],
-        batch_size_candidates=[50,100,150],
+        epochs_candidates=[100, 60],
+        neurons_candidates=[32, 48, 64],
+        batch_size_candidates=[50],
         verbose="very"
     ):
         """
@@ -534,4 +535,4 @@ if __name__ == "__main__":
             f"Batch Size={best_hparams[3]}")
         print(f"Best (lowest) test loss: {lowest_test_loss:.8f}")
         print("=====================================\n")
-    # hyperparam_search()
+    hyperparam_search()

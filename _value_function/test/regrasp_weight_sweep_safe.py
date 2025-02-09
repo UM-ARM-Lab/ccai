@@ -91,7 +91,7 @@ def save_checkpoint(checkpoint):
     with open(checkpoint_path, 'wb') as f:
         pkl.dump(checkpoint, f)
 
-def test(checkpoint, n_samples, which_weights): 
+def test(checkpoint, n_samples): 
 
     # Load the data or environment objects once upfront
     pregrasps = pkl.load(open(f'{fpath}/test/initializations/weight_sweep_pregrasps.pkl', 'rb'))
@@ -155,35 +155,18 @@ def test(checkpoint, n_samples, which_weights):
                 pregrasp_pose = pregrasps[i]
                 env.reset(dof_pos=pregrasp_pose)
                 
-                if which_weights == "regrasp":
-                    regrasp_pose, regrasp_traj, regrasp_plan = regrasp(
-                        env, config, chain, state2ee_pos_partial, perception_noise=0,
-                        image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters,
-                        vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio
-                    )
+                regrasp_pose, regrasp_traj, regrasp_plan = regrasp(
+                    env, config, chain, state2ee_pos_partial, perception_noise=0,
+                    image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters,
+                    vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio
+                )
 
-                    _, turn_pose, succ, turn_traj, turn_plan = do_turn(
-                        regrasp_pose, config, env,
-                        sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
-                        perception_noise=0, image_path=img_save_dir, iters=turn_iters,
-                        mode='no_vf'
-                    )
-
-                elif which_weights == "turn":
-                    regrasp_pose, regrasp_traj, regrasp_plan = regrasp(
-                        env, config, chain, state2ee_pos_partial, perception_noise=0,
-                        image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
-                    )
-
-                    # SET TO NO VF FOR NOW
-                    _, turn_pose, succ, turn_traj, turn_plan = do_turn(
-                        regrasp_pose, config, env,
-                        sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
-                        perception_noise=0, image_path=img_save_dir, iters=turn_iters,
-                        mode='vf', vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio
-                    )
-                else:
-                    raise ValueError("which_weights must be either 'regrasp' or 'turn'")
+                _, turn_pose, succ, turn_traj, turn_plan = do_turn(
+                    regrasp_pose, config, env,
+                    sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
+                    perception_noise=0, image_path=img_save_dir, iters=turn_iters,
+                    mode='no_vf'
+                )
 
                 turn_cost = calculate_turn_cost(regrasp_pose.numpy(), turn_pose)
                 total_cost += turn_cost
@@ -300,10 +283,9 @@ if __name__ == "__main__":
     sim_device = config['sim_device']
     
     n_samples = 3
-    which_weights = "regrasp"
     name = "lowiter"
 
-    checkpoint_path = fpath /'test'/'weight_sweep'/f'checkpoint_{which_weights}_{name}.pkl'
+    checkpoint_path = fpath /'test'/'weight_sweep'/f'checkpoint_sweep_regrasp_{name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
     pregrasp_path = fpath /'test'/'initializations'/'weight_sweep_pregrasps.pkl'
@@ -323,4 +305,4 @@ if __name__ == "__main__":
 
     initial_checkpoint = load_or_create_checkpoint(starting_values)
     
-    test(initial_checkpoint, n_samples, which_weights)
+    test(initial_checkpoint, n_samples)
