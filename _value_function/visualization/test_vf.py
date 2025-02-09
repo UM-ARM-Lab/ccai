@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from _value_function.screwdriver_problem import init_env, convert_full_to_partial_config
 from _value_function.data_collect.process_final_poses_regrasp import calculate_turn_cost, \
     calculate_regrasp_cost
-from _value_function.train_value_function_regrasp import Net, query_ensemble, load_ensemble, index_and_sort_regrasp_and_turn_trajs
+from _value_function.train_value_function_regrasp import Net, query_ensemble, load_ensemble, stack_trajs
 import torch
 
 # Paths
@@ -20,11 +20,10 @@ filename = '/regrasp_to_turn_datasets/combined_regrasp_to_turn_dataset.pkl'
 
 with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
     pose_cost_tuples  = pkl.load(file)
-    regrasp_trajs, regrasp_costs, turn_trajs, turn_costs = zip(*pose_cost_tuples)
+    regrasp_trajs, turn_trajs, turn_costs = zip(*pose_cost_tuples)
 
 if dataset_size is not None:
     regrasp_trajs = regrasp_trajs[:dataset_size]
-    regrasp_costs = regrasp_costs[:dataset_size]
     turn_trajs = turn_trajs[:dataset_size]
     turn_costs = turn_costs[:dataset_size]
 
@@ -33,7 +32,7 @@ T = T_rg
 n_trajs = len(regrasp_trajs)
 print(f'Loaded {n_trajs} trials, which will create {n_trajs*T} samples')
 
-poses = index_and_sort_regrasp_and_turn_trajs(regrasp_trajs, turn_trajs)
+poses = stack_trajs(regrasp_trajs, turn_trajs)
 
 num_samples = len(poses)
 

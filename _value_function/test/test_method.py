@@ -105,11 +105,11 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'test100'
+    test_name = 'please'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    n_trials = 2
+    n_trials = 3
     n_repeat = 1
     perception_noise = 0.0
 
@@ -144,8 +144,8 @@ if __name__ == '__main__':
     # other_weight_rg = 2.0
     # variance_ratio_rg = 8.0
 
-    vf_weight_t = 8.0
-    other_weight_t = 2.0
+    vf_weight_t = 0#8.0
+    other_weight_t = 10#2.0
     variance_ratio_t = 8.0
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)

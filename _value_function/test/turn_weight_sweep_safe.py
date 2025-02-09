@@ -36,18 +36,18 @@ def get_turn_initializations(env, sim_device, n_samples, save=False):
                             max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save=False,
                             do_pregrasp=True, name='error')
     
-    regrasps = []
-    for pregrasp in pregrasps:
-        regrasp_pose, regrasp_traj, regrasp_plan = regrasp(
-                env, config, chain, state2ee_pos_partial, perception_noise=0,
-                image_path=None, initialization=pregrasp, mode='vf', iters=regrasp_iters, model_name = "ensemble_rg",
-                vf_weight=vf_weight_rg, other_weight=other_weight_rg, variance_ratio=variance_ratio_rg
-        )
-        regrasps.append(regrasp_pose)
-    
-    if save:
-        with open(regrasp_path, 'wb') as f:
-            pkl.dump(regrasps, f)
+        regrasps = []
+        for pregrasp in pregrasps:
+            regrasp_pose, regrasp_traj, regrasp_plan = regrasp(
+                    env, config, chain, state2ee_pos_partial, perception_noise=0,
+                    image_path=None, initialization=pregrasp, mode='vf', iters=regrasp_iters, model_name = "ensemble_rg",
+                    vf_weight=vf_weight_rg, other_weight=other_weight_rg, variance_ratio=variance_ratio_rg
+            )
+            regrasps.append(regrasp_pose)
+        
+        if save:
+            with open(regrasp_path, 'wb') as f:
+                pkl.dump(regrasps, f)
 
 
 
@@ -191,7 +191,7 @@ def test(checkpoint, n_samples):
                 _, turn_pose, succ, turn_traj, turn_plan = do_turn(
                     regrasp_pose, config, env,
                     sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
-                    perception_noise=0, image_path=img_save_dir, iters=turn_iters,
+                    perception_noise=0, image_path=img_save_dir, iters=turn_iters, model_name="ensemble_t",
                     mode='vf', vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio
                 )
         
@@ -309,18 +309,18 @@ if __name__ == "__main__":
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
     sim_device = config['sim_device']
     
-    n_samples = 3
+    n_samples = 4
     name = "0"
 
     checkpoint_path = fpath /'test'/'weight_sweep'/f'checkpoint_sweep_turning_{name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    get_turn_initializations(env, sim_device, n_samples, save=False)
+    get_turn_initializations(env, sim_device, n_samples, save=True)
 
     starting_values = {
-        'vf_bounds': [10, 100],
-        'other_bounds': [1.0, 10.0],
-        'variance_ratio_bounds': [1.0, 8.0],
+        'vf_bounds': [5, 20],
+        'other_bounds': [1.0, 8.0],
+        'variance_ratio_bounds': [1.0, 10.0],
         'grid_size': 3
     }
 

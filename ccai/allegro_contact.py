@@ -166,7 +166,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         self.other_weight = other_weight
         self.variance_ratio = variance_ratio
         if mode == 'vf' or mode == "last_step":
-            print(model_name)
+            # print(model_name)
             self.models, self.poses_mean, self.poses_std, self.cost_mean, self.cost_std = load_ensemble(device=device, model_name=model_name)
             self.poses_mean = torch.tensor(self.poses_mean).to(device)
             self.poses_std = torch.tensor(self.poses_std).to(device)
