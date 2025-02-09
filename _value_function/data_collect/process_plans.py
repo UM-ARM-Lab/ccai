@@ -14,82 +14,16 @@ import time
 from pathlib import Path
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
+from _value_function.data_collect.process_final_poses_regrasp import calculate_turn_cost 
 
-falls = 0
-
-def calculate_turn_cost(initial_pose, final_pose):
-    global falls
-    turn_angle = np.pi/2
-
-    screwdriver_pose = initial_pose.flatten()[-4:-1]
-    screwdriver_goal = np.array([0, 0, -turn_angle]) + screwdriver_pose
-    screwdriver_goal_mat = R.from_euler('xyz', screwdriver_goal).as_matrix()
-
-    screwdriver_state = final_pose.flatten()[-4:-1]
-    screwdriver_mat = R.from_euler('xyz', screwdriver_state).as_matrix()
-
-    # make both matrices 3D (batch_size, 3, 3)
-    screwdriver_mat = torch.tensor(screwdriver_mat).unsqueeze(0)
-    screwdriver_goal_mat = torch.tensor(screwdriver_goal_mat).unsqueeze(0).repeat(screwdriver_mat.shape[0], 1, 1)
-
-    distance2goal = tf.so3_relative_angle(screwdriver_mat, screwdriver_goal_mat, cos_angle=False).detach().cpu()
-
-    final_distance_to_goal = torch.min(distance2goal.abs())
-    # if final_distance_to_goal < 30 / 180 * np.pi:
-    if final_distance_to_goal < 45 / 180 * np.pi:
-        succ = True
-    else:
-        succ = False
-
-    # we're only actually using the screwdriver values
-    state = final_pose.flatten()[-4:-1]
-
-    # upright_cost = 20 * np.sum((state[-3:-1]) ** 2) # the screwdriver should only rotate in z direction
-    # upright_cost = 50 * np.sum((state[-3:-1] - np.array([0, 0])) ** 2) 
-
-    ######################### REWARD SHAPING
-    # if np.any(state[-3:-1] > 0.3):
-    #     upright_cost = 100.0
-    #     falls += 1
-    # else:
-    #     upright_cost = 0.0
-    # goal_cost = np.sum(((state[-1] - screwdriver_goal[-1]) ** 2)).reshape(-1)
-    # total_cost = np.minimum(goal_cost+upright_cost, 5.0)
-    ###########################################################################
-
-    goal_cost = ((state[-3:] - screwdriver_goal) ** 2).flatten()
-    goal_cost = sum(goal_cost)
-
-    # if np.any(abs(state[-3:-1]) > 0.2):
-    #     goal_cost = 100.0
-
-    total_cost = np.minimum(goal_cost, 5.0)
-
-    return total_cost
-
-def calculate_regrasp_cost(q):
-    delta_q = q[1:] - q[:-1]
-    smoothness_cost = np.sum((q[1:] - q[-1]) ** 2)
-    action_cost = np.sum(delta_q ** 2)
-
-    total_cost = np.minimum(smoothness_cost + action_cost, 5.0)
-
-    return total_cost
 
 if __name__ == "__main__":
 
     noisy = False
     filenames = []
-    if noisy:
-        for file in Path(f'{fpath.resolve()}/regrasp_to_turn_datasets').glob("noisy_regrasp_to_turn_dataset*.pkl"):
-            filenames.append(file)
-    else:
-        for file in Path(f'{fpath.resolve()}/regrasp_to_turn_datasets').glob("regrasp_to_turn_dataset*.pkl"):
-            filenames.append(file)
-            # if not file.name.startswith("regrasp_to_turn_dataset_narrow"):
-            #     filenames.append(file)
-            # else:   
-            #     print("Skipping narrow dataset")
+
+    for file in Path(f'{fpath.resolve()}/regrasp_to_turn_datasets').glob("regrasp_to_turn_dataset_narrow_plan*.pkl"):
+        filenames.append(file)
 
     combined_regrasp_trajs = np.empty((0, 13, 20))
     combined_turn_trajs = np.empty((0, 13, 20))

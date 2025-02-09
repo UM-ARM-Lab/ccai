@@ -80,6 +80,9 @@ if __name__ == "__main__":
 
     noisy = False
     filenames = []
+
+    name = "narrow"
+
     if noisy:
         for file in Path(f'{fpath.resolve()}/regrasp_to_turn_datasets').glob("noisy_regrasp_to_turn_dataset*.pkl"):
             filenames.append(file)
@@ -153,7 +156,6 @@ if __name__ == "__main__":
     regrasp_to_turn_dataset = zip(combined_regrasp_trajs, combined_turn_trajs, combined_turn_costs)
     turn_to_turn_dataset = zip(combined_turn_trajs, combined_turn_costs)
     
-    name = ""
     regrasp_to_turn_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/combined_regrasp_to_turn_dataset{name}.pkl'
     turn_to_turn_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/combined_turn_to_turn_dataset{name}.pkl'
    

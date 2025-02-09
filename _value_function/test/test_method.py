@@ -109,8 +109,8 @@ if __name__ == '__main__':
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    n_trials = 3
-    n_repeat = 1
+    n_trials = 10
+    n_repeat = 2
     perception_noise = 0.0
 
     calc_novf = False
@@ -127,26 +127,15 @@ if __name__ == '__main__':
     finger_noise_mag = 0.05
 
     regrasp_iters = 40
-    turn_iters = 100
+    turn_iters = 50
 
-    # EASYSHORTBIG
     vf_weight_rg = 10.0
     other_weight_rg = 1.0
     variance_ratio_rg = 8.0
 
-    # optimized easyshort
-    # vf_weight_rg = 7.0
-    # other_weight_rg = 3.0
-    # variance_ratio_rg = 11.0
-
-    # easybigoptimized
-    # vf_weight_rg = 8.0
-    # other_weight_rg = 2.0
-    # variance_ratio_rg = 8.0
-
-    vf_weight_t = 0#8.0
-    other_weight_t = 10#2.0
-    variance_ratio_t = 8.0
+    vf_weight_t = 5.0
+    other_weight_t = 5.0
+    variance_ratio_t = 1.0
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
 
