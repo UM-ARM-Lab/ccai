@@ -114,6 +114,7 @@ if __name__ == '__main__':
     perception_noise = 0.0
 
     calc_novf = True
+    calc_novf = True
     calc_last_step = False
 
     method_names = ['vf']

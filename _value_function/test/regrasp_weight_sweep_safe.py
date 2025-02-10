@@ -95,7 +95,6 @@ def test(checkpoint, n_samples):
 
     # Load the data or environment objects once upfront
     pregrasps = pkl.load(open(f'{fpath}/test/initializations/weight_sweep_pregrasps.pkl', 'rb'))
-    models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble(model_name="ensemble")
 
     # We extract frequently used fields from checkpoint for convenience
     iteration = checkpoint['iteration']
@@ -157,7 +156,7 @@ def test(checkpoint, n_samples):
                 
                 regrasp_pose, regrasp_traj, regrasp_plan = regrasp(
                     env, config, chain, state2ee_pos_partial, perception_noise=0,
-                    image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters,
+                    image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters, model_name = "ensemble_rg",
                     vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio
                 )
 
@@ -275,15 +274,15 @@ if __name__ == "__main__":
     screwdriver_noise_mag = 0.015
     finger_noise_mag = 0.05
 
-    regrasp_iters = 40
+    regrasp_iters = 30
     turn_iters = 100
     visualize = False   
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
     sim_device = config['sim_device']
     
-    n_samples = 3
-    name = "lowiter"
+    n_samples = 6
+    name = "sun9"
 
     checkpoint_path = fpath /'test'/'weight_sweep'/f'checkpoint_sweep_regrasp_{name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -297,9 +296,9 @@ if __name__ == "__main__":
                             do_pregrasp=True, name='weight_sweep_pregrasps')
 
     starting_values = {
-        'vf_bounds': [10, 100],
-        'other_bounds': [1.0, 10.0],
-        'variance_ratio_bounds': [1.0, 8.0],
+        'vf_bounds': [3, 12],
+        'other_bounds': [1.0, 7.0],
+        'variance_ratio_bounds': [5.0, 20.0],
         'grid_size': 3
     }
 

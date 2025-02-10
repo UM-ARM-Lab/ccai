@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
+torch.serialization.default_restore_location = lambda storage, loc: storage.cpu()
 
 falls = 0
 
@@ -81,13 +82,13 @@ if __name__ == "__main__":
     noisy = False
     filenames = []
 
-    name = "narrow"
+    name = ""
 
     if noisy:
         for file in Path(f'{fpath.resolve()}/regrasp_to_turn_datasets').glob("noisy_regrasp_to_turn_dataset*.pkl"):
             filenames.append(file)
     else:
-        for file in Path(f'{fpath.resolve()}/regrasp_to_turn_datasets').glob("regrasp_to_turn_dataset_narrow*.pkl"):
+        for file in Path(f'{fpath.resolve()}/regrasp_to_turn_datasets').glob("regrasp_to_turn_dataset*.pkl"):
             filenames.append(file)
             # if not file.name.startswith("regrasp_to_turn_dataset_narrow"):
             #     filenames.append(file)
