@@ -490,6 +490,8 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, per
     num_fingers_to_plan = num_fingers
     # info_list = []
 
+    all_turn_plans = []
+
     for k in range(params['num_steps']):
         state = env.get_state()
         start = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
@@ -512,7 +514,9 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, per
             env.reset()
             break
         # get plan here
-        turn_plan = best_traj.clone()
+        single_turn_plan = best_traj.clone()
+        single_turn_plan = single_turn_plan[:, :turn_problem.dx+turn_problem.du]
+        all_turn_plans.append(single_turn_plan)
 
         x = best_traj[0, :turn_problem.dx+turn_problem.du]
         x = x.reshape(1, turn_problem.dx+turn_problem.du)
@@ -580,7 +584,7 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, per
                     torch.zeros(actual_trajectory.shape[0], 1)
                     ), dim=1).numpy()
    
-    return final_distance_to_goal.cpu().detach().item(), final_state, full_trajectory, turn_plan
+    return final_distance_to_goal.cpu().detach().item(), final_state, full_trajectory, all_turn_plans
 
 def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, image_path = None,
             iters = 200, perception_noise = 0, turn_angle = np.pi/2, model_name = "ensemble_t", mode='no_vf', vf_weight = 0.0, other_weight = 10.0, variance_ratio = 0.0):
