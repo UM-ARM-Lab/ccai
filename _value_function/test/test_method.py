@@ -105,7 +105,7 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'please'
+    test_name = 'both_modes'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -113,7 +113,7 @@ if __name__ == '__main__':
     n_repeat = 2
     perception_noise = 0.0
 
-    calc_novf = False
+    calc_novf = True
     calc_last_step = False
 
     method_names = ['vf']
@@ -126,15 +126,15 @@ if __name__ == '__main__':
     screwdriver_noise_mag = 0.015
     finger_noise_mag = 0.05
 
-    regrasp_iters = 40
-    turn_iters = 50
+    regrasp_iters = 30
+    turn_iters = 40
 
-    vf_weight_rg = 10.0
-    other_weight_rg = 1.0
-    variance_ratio_rg = 8.0
+    vf_weight_rg = 6.0
+    other_weight_rg = 2.6
+    variance_ratio_rg = 15.0
 
-    vf_weight_t = 5.0
-    other_weight_t = 5.0
+    vf_weight_t = 3.0
+    other_weight_t = 8.0
     variance_ratio_t = 1.0
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
