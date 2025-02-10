@@ -109,4 +109,4 @@ if __name__ == "__main__":
     pkl.dump(regrasp_plan_dataset, open(regrasp_plan_savepath, 'wb'))
     pkl.dump(turn_plan_dataset, open(turn_plan_savepath, 'wb'))
 
-    print("num samples: ", len(regrasp_pose_inputs))
+    print("num samples: ", len(regrasp_pose_inputs)//12)

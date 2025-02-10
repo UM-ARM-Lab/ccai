@@ -105,7 +105,7 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'please'
+    test_name = 'full_test'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -113,7 +113,7 @@ if __name__ == '__main__':
     n_repeat = 2
     perception_noise = 0.0
 
-    calc_novf = False
+    calc_novf = True
     calc_last_step = False
 
     method_names = ['vf']

@@ -488,16 +488,16 @@ if __name__ == "__main__":
         ensemble = []
         for i in range(16):
             print(f"Training model {i}")
-            net, _ = train(epochs=50, neurons=16, verbose='very', lr=1e-3, batch_size=50)
+            net, _ = train(epochs=60, neurons=16, verbose='very', lr=1e-3, batch_size=50)
             ensemble.append(net)
         torch.save(ensemble, path)
         eval(model_name=model_name)
 
     def hyperparam_search(
         lr_candidates=[1e-3],
-        epochs_candidates=[50, 30, 20, 60],
-        neurons_candidates=[16, 18, 20, 22],
-        batch_size_candidates=[50,100,150],
+        epochs_candidates=[50,100],
+        neurons_candidates=[16, 18],
+        batch_size_candidates=[50],
         verbose="very"
     ):
         """
