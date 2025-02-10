@@ -58,7 +58,7 @@ while True:
 
         print(f"Starting Trial {trials_done+1}")
 
-        initialization = get_initialization(env, sim_device, max_screwdriver_tilt=0.015, screwdriver_noise_mag=0.015, finger_noise_mag=0.087)#finger_noise_mag=0.15)
+        initialization = get_initialization(env, sim_device, max_screwdriver_tilt=0.015, screwdriver_noise_mag=0.015, finger_noise_mag=0.15)#finger_noise_mag=0.087)#
         
         pregrasp_pose, planned_pose = pregrasp(env, config, chain, deterministic=True, perception_noise=perception_noise, 
                         image_path = img_save_dir, initialization = initialization, mode='no_vf', iters = pregrasp_iters)
@@ -84,17 +84,17 @@ while True:
         trials_done += 1
 
     if perception_noise == 0:
-        savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_dataset_narrow_{computer_id}_{prog_id}.pkl'
+        savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_dataset_wide_plan__{computer_id}_{prog_id}.pkl'
     else:
-        savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_regrasp_to_turn_dataset_narrow_{computer_id}_{prog_id}.pkl'
+        savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_regrasp_to_turn_dataset_wide_plan_{computer_id}_{prog_id}.pkl'
 
     while Path(savepath).exists():
         prog_id += 1
 
         if perception_noise == 0:
-            savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_dataset_narrow_plan_{computer_id}_{prog_id}.pkl'
+            savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/regrasp_to_turn_dataset_wide_plan_{computer_id}_{prog_id}.pkl'
         else:
-            savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_regrasp_to_turn_dataset_narrow_plan_{computer_id}_{prog_id}.pkl'
+            savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/noisy_regrasp_to_turn_dataset_wide_plan_{computer_id}_{prog_id}.pkl'
 
     pkl.dump(pose_tuples, open(savepath, 'wb'))
 
