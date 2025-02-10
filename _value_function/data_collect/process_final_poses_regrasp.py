@@ -89,9 +89,9 @@ if __name__ == "__main__":
             filenames.append(file)
     else:
         for file in Path(f'{fpath.resolve()}/regrasp_to_turn_datasets').glob("regrasp_to_turn_dataset*.pkl"):
-            filenames.append(file)
-            # if not file.name.startswith("regrasp_to_turn_dataset_narrow"):
-            #     filenames.append(file)
+            # filenames.append(file)
+            if not file.name.startswith("regrasp_to_turn_dataset_narrow"):
+                filenames.append(file)
             # else:   
             #     print("Skipping narrow dataset")
 

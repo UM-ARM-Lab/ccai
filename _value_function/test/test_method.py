@@ -105,15 +105,14 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'both_modes'
+    test_name = 'widebig'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    n_trials = 10
-    n_repeat = 2
+    n_trials = 15
+    n_repeat = 1
     perception_noise = 0.0
 
-    calc_novf = True
     calc_novf = True
     calc_last_step = False
 
@@ -127,16 +126,20 @@ if __name__ == '__main__':
     screwdriver_noise_mag = 0.015
     finger_noise_mag = 0.05
 
-    regrasp_iters = 30
-    turn_iters = 40
+    regrasp_iters = 40
+    turn_iters = 50
 
-    vf_weight_rg = 6.0
-    other_weight_rg = 2.6
-    variance_ratio_rg = 15.0
+    vf_weight_rg = 10.0
+    other_weight_rg = 1.0
+    variance_ratio_rg = 8.0
 
-    vf_weight_t = 3.0
-    other_weight_t = 8.0
-    variance_ratio_t = 1.0
+    # vf_weight_rg = 0.0
+    # other_weight_rg = 10.0
+    # variance_ratio_rg = 0.0
+
+    vf_weight_t = 0.0#3.0
+    other_weight_t = 10.0#8.0
+    variance_ratio_t = 0.0#1.0
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
 
@@ -175,7 +178,7 @@ if __name__ == '__main__':
        
         regrasp_pose_vf, regrasp_traj_vf, regrasp_plan = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=0,
-                image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters, model_name = "ensemble_rg",
+                image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters, model_name = "ensemble_rg_wide",
                 vf_weight=vf_weight_rg, other_weight=other_weight_rg, variance_ratio=variance_ratio_rg
         )
        

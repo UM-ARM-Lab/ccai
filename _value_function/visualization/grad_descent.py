@@ -43,7 +43,7 @@ regrasp_traj = regrasp_stacked[0,:,:].reshape(13,20)
 
 
 def grad_descent(lr = 0.3, iters = 1000):
-    models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble(model_name="ensemble_old")
+    models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble(model_name="ensemble_rg_wide")
     
     poses = torch.from_numpy(regrasp_poses)
 

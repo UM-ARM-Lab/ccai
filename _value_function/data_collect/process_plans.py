@@ -60,34 +60,46 @@ if __name__ == "__main__":
             regrasp_poses = np.array([t.numpy() for t in regrasp_poses]).reshape(-1, 20)
             turn_poses = np.array(turn_poses).reshape(-1, 20)
 
+            good_turn_trajs = np.empty((0, 13, 20))
+            good_regrasp_trajs = np.empty((0, 13, 20))
+            good_regrasp_plans = []
+            good_turn_plans = []
+
+
             for i in range(len(regrasp_poses)):
                 cost = calculate_turn_cost(regrasp_poses[i], turn_poses[i])
 
-                if cost < 1:
-                    pass
+                if cost < 1.0:
+                    good_turn_trajs = np.vstack([good_turn_trajs, turn_trajs[i].reshape(1,13,20)])
+                    good_regrasp_trajs = np.vstack([good_regrasp_trajs, regrasp_trajs[i].reshape(1,13,20)])
 
+                    good_regrasp_plans.extend(regrasp_plan[i])
+                    good_turn_plans.extend(turn_plan[i])
             ###########################################################
 
-            # Add time dimension
-            # convert to partial first
+            # Convert to 15 dim and then add time dimension
 
-            rg_inputs = regrasp_trajs[:,:-1,:].reshape(-1, 20)
-            rg_inputs = convert_full_to_partial_config(rg_inputs)
-            assert(rg_inputs.shape[0]%12 == 0)
-            T_array = np.tile(np.arange(12), rg_inputs.shape[0]//12).reshape(-1, 1)
-            rg_inputs = np.hstack([rg_inputs, T_array])
-            rg_inputs = list(rg_inputs)
-            regrasp_pose_inputs.extend(rg_inputs)
-
-            t_inputs = turn_trajs[:,:-1,:].reshape(-1, 20)
-            t_inputs = convert_full_to_partial_config(t_inputs)
-            assert(t_inputs.shape[0]%12 == 0)
-            t_inputs = np.hstack([t_inputs, T_array])
-            t_inputs = list(t_inputs)
-            turn_pose_inputs.extend(t_inputs)
+            if good_regrasp_trajs.shape[0] == 0:
+                continue
             
-            regrasp_plan_outputs.extend(regrasp_plan)
-            turn_plan_outputs.extend(turn_plan)
+            else:
+                rg_inputs = good_regrasp_trajs[:,:-1,:].reshape(-1, 20)
+                rg_inputs = convert_full_to_partial_config(rg_inputs)
+                assert(rg_inputs.shape[0]%12 == 0)
+                T_array = np.tile(np.arange(12), rg_inputs.shape[0]//12).reshape(-1, 1)
+                rg_inputs = np.hstack([rg_inputs, T_array])
+                rg_inputs = list(rg_inputs)
+                regrasp_pose_inputs.extend(rg_inputs)
+
+                t_inputs = good_turn_trajs[:,:-1,:].reshape(-1, 20)
+                t_inputs = convert_full_to_partial_config(t_inputs)
+                assert(t_inputs.shape[0]%12 == 0)
+                t_inputs = np.hstack([t_inputs, T_array])
+                t_inputs = list(t_inputs)
+                turn_pose_inputs.extend(t_inputs)
+                
+                regrasp_plan_outputs.extend(good_regrasp_plans)
+                turn_plan_outputs.extend(good_turn_plans)
 
     regrasp_plan_dataset = zip(regrasp_pose_inputs, regrasp_plan_outputs)
     turn_plan_dataset = zip(turn_pose_inputs, turn_plan_outputs)
@@ -98,8 +110,8 @@ if __name__ == "__main__":
     # Each element is a pose tensor of shape (16,), where the last index is the time dimension.
     
     # The outputs are lists of length equal to the number of low cost trials. 
-    # Each element is a list of length 12, where each element is a tensor of shape (X, 30), 
-    # where X goes from 12 to 1 as the horizon receds.
+    # Each element is a list of length 12, where each element is a tensor of shape (X, L), 
+    # where X goes from 12 to 1 as the horizon receds, and L is 30 for regrasp, 36 for turning.
 
     ###############################################################################################
 
@@ -109,4 +121,4 @@ if __name__ == "__main__":
     pkl.dump(regrasp_plan_dataset, open(regrasp_plan_savepath, 'wb'))
     pkl.dump(turn_plan_dataset, open(turn_plan_savepath, 'wb'))
 
-    print("num samples: ", len(regrasp_pose_inputs)//12)
+    print("num good samples: ", len(regrasp_pose_inputs)//12)

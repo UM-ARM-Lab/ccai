@@ -15,7 +15,7 @@ from sklearn.model_selection import KFold
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
-def stack_trajs(regrasp_trajs, turn_trajs):
+def stack_trajs(regrasp_trajs):
 
     regrasp_stacked = np.stack(regrasp_trajs, axis=0)
     # regrasp_poses = regrasp_stacked[:,-1,:]
@@ -24,7 +24,7 @@ def stack_trajs(regrasp_trajs, turn_trajs):
 
     return regrasp_poses
 
-def save_train_test_splits(noisy=False, dataset_size=None, validation_proportion=0.1, seed=None):
+def save_train_test_splits(validation_proportion=0.1, seed=None):
 
     name = ''
     filename = f'regrasp_to_turn_datasets/combined_regrasp_to_turn_dataset{name}.pkl'
@@ -36,25 +36,17 @@ def save_train_test_splits(noisy=False, dataset_size=None, validation_proportion
         pose_cost_tuples = pkl.load(file)
         regrasp_trajs, turn_trajs, turn_costs = zip(*pose_cost_tuples)
     
-    if dataset_size is not None:
-        regrasp_trajs = regrasp_trajs[:dataset_size]
-        regrasp_costs = regrasp_costs[:dataset_size]
-        turn_trajs = turn_trajs[:dataset_size]
-        turn_costs = turn_costs[:dataset_size]
-
     T_rg = regrasp_trajs[0].shape[0]
     T = T_rg
     n_trajs = len(regrasp_trajs)
     print(f'Loaded {n_trajs} trials, which will create {n_trajs*T} samples')
 
-    poses = stack_trajs(regrasp_trajs, turn_trajs)
+    poses = stack_trajs(regrasp_trajs)
 
     turn_costs = np.array(turn_costs).flatten()
     costs = np.repeat(turn_costs, T)
 
     assert(len(poses)%T == 0)
-
-    # indices = np.arange(len(poses)//T)
 
     indices = np.arange(len(poses)//T)
     np.random.shuffle(indices)
@@ -450,7 +442,7 @@ def k_fold_cv_train(k=5, batch_size=100, lr=0.001, epochs=20, neurons=12):
 
 if __name__ == "__main__":
     # Uncomment the following line to generate and save train/test splits if needed.
-    # save_train_test_splits(noisy=False, dataset_size=None, validation_proportion=0.1, seed=None)
+    # save_train_test_splits(validation_proportion=0.1, seed=None)
     # exit()
 
     # Set this flag to True to perform hyperparameter tuning via K-Fold CV.
@@ -485,10 +477,18 @@ if __name__ == "__main__":
         path = f'{fpath.resolve()}/value_functions/value_function_ensemble_rg.pkl'
         model_name = "ensemble_rg"
 
+        # ensemble = []
+        # for i in range(16):
+        #     print(f"Training model {i}")
+        #     net, _ = train(epochs=60, neurons=16, verbose='very', lr=1e-3, batch_size=50)
+        #     ensemble.append(net)
+        # torch.save(ensemble, path)
+        # eval(model_name=model_name)
+
         ensemble = []
         for i in range(16):
             print(f"Training model {i}")
-            net, _ = train(epochs=60, neurons=16, verbose='very', lr=1e-3, batch_size=50)
+            net, _ = train(epochs=40, neurons=20, verbose='very', lr=1e-3, batch_size=100)
             ensemble.append(net)
         torch.save(ensemble, path)
         eval(model_name=model_name)

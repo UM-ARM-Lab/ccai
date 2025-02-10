@@ -10,14 +10,14 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 import torch
 
-experiment_name = 'test_method_please'
+experiment_name = 'test_method_wideo1'
 # experiment_name = 'test_method_easybig2'
 
 filename = f'test/{experiment_name}.pkl'
 with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
     results = pkl.load(file)
 
-models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble(model_name = "ensemble_rg")
+models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble(model_name = "ensemble_rg_wide")
 
 if __name__ == "__main__":
 

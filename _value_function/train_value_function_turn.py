@@ -535,4 +535,4 @@ if __name__ == "__main__":
             f"Batch Size={best_hparams[3]}")
         print(f"Best (lowest) test loss: {lowest_test_loss:.8f}")
         print("=====================================\n")
-    hyperparam_search()
+    # hyperparam_search()
