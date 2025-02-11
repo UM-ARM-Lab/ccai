@@ -208,6 +208,7 @@ def load_ensemble(device='cpu', model_name = "throwerror"):
     shape = (16,1)
     checkpoints = torch.load(f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
     neurons = checkpoints[0]["model_state"]["fc1.weight"].shape[0]
+    # print("neurons: ",neurons)
     models = []
     for checkpoint in checkpoints:
         model = Net(shape[0], shape[1], neurons = neurons)
@@ -488,7 +489,7 @@ if __name__ == "__main__":
         ensemble = []
         for i in range(16):
             print(f"Training model {i}")
-            net, _ = train(epochs=40, neurons=20, verbose='very', lr=1e-3, batch_size=100)
+            net, _ = train(epochs=18, neurons=22, verbose='very', lr=1e-3, batch_size=100)
             ensemble.append(net)
         torch.save(ensemble, path)
         eval(model_name=model_name)

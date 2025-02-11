@@ -105,11 +105,11 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'widebig'
+    test_name = 'lowepoch'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    n_trials = 15
+    n_trials = 10
     n_repeat = 1
     perception_noise = 0.0
 
@@ -178,7 +178,7 @@ if __name__ == '__main__':
        
         regrasp_pose_vf, regrasp_traj_vf, regrasp_plan = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=0,
-                image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters, model_name = "ensemble_rg_wide",
+                image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters, model_name = "ensemble_rg",
                 vf_weight=vf_weight_rg, other_weight=other_weight_rg, variance_ratio=variance_ratio_rg
         )
        
@@ -186,7 +186,7 @@ if __name__ == '__main__':
             regrasp_pose_vf, config, env,
             sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
             perception_noise=0, image_path=img_save_dir, iters=turn_iters,mode='vf',
-            model_name="ensemble_t", vf_weight=vf_weight_t, other_weight=other_weight_t, variance_ratio=variance_ratio_t
+            model_name="ensemble_t_wide", vf_weight=vf_weight_t, other_weight=other_weight_t, variance_ratio=variance_ratio_t
         )
 
         # Store the VF approach result

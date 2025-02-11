@@ -10,14 +10,14 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 import torch
 
-experiment_name = 'test_method_wideo1'
+experiment_name = 'test_method_widebig'
 # experiment_name = 'test_method_easybig2'
 
 filename = f'test/{experiment_name}.pkl'
 with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
     results = pkl.load(file)
 
-models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble(model_name = "ensemble_rg_wide")
+models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble(model_name = "ensemble_old")
 
 if __name__ == "__main__":
 
@@ -105,16 +105,16 @@ if __name__ == "__main__":
         )
 
         # Plot predicted costs with error bars
-        # plt.errorbar(
-        #     x_pred,
-        #     data[method_name]['pred_costs'],
-        #     yerr=data[method_name]['pred_stds'],
-        #     fmt='x',   # different marker shape
-        #     label=f'Predicted Cost (method name: {method_name.upper()})',
-        #     linestyle='None',
-        #     capsize=3,
-        #     color=colors[method_i]
-        # )
+        plt.errorbar(
+            x_pred,
+            data[method_name]['pred_costs'],
+            yerr=data[method_name]['pred_stds'],
+            fmt='x',   # different marker shape
+            label=f'Predicted Cost (method name: {method_name.upper()})',
+            linestyle='None',
+            capsize=3,
+            color=colors[method_i]
+        )
 
     ts = 16
     plt.xlabel('Pregrasp Index', fontsize=ts)

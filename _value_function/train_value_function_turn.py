@@ -448,8 +448,8 @@ def k_fold_cv_train(k=5, batch_size=100, lr=0.001, epochs=20, neurons=12):
 
 if __name__ == "__main__":
     # Uncomment the following line to generate and save train/test splits if needed.
-    # save_train_test_splits(noisy=False, dataset_size=None, validation_proportion=0.1, seed=None)
-    # exit()
+    save_train_test_splits(noisy=False, dataset_size=None, validation_proportion=0.1, seed=None)
+    exit()
 
     # Set this flag to True to perform hyperparameter tuning via K-Fold CV.
     tune_hyperparams = False
