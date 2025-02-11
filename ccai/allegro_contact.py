@@ -260,6 +260,9 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         scene_trans = world_trans.inverse().compose(
             pk.Transform3d(device=device).translate(object_asset_pos[0], object_asset_pos[1], object_asset_pos[2]))
 
+        # Get transform from object to robot
+        self.object_to_robot = scene_trans.inverse().compose(world_trans)
+        print('object to robot', self.object_to_robot.get_matrix())
         # contact checking
         collision_check_links = [self.ee_names[finger] for finger in self.fingers]
         self.contact_scenes = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
