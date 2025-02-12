@@ -5,7 +5,7 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 import torch
 
-checkpoint_path = fpath /'test'/'weight_sweep'/'checkpoint_regrasp.pkl'
+checkpoint_path = fpath /'test'/'weight_sweep'/'checkpoint_sweep_turning_5samples.pkl'
 
 def print_checkpoint():
     """Loads and prints the contents of the checkpoint file."""

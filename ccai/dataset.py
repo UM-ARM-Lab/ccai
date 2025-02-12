@@ -210,54 +210,74 @@ class AllegroValveDataset(Dataset):
 
 class AllegroScrewDriverDataset(Dataset):
 
-    def __init__(self, folders, max_T, cosine_sine=False, states_only=False, 
+    def __init__(self, folders, cosine_sine=False, states_only=False, 
                  skip_pregrasp=False, type='diffusion'):
         super().__init__()
         self.cosine_sine = cosine_sine
         self.skip_pregrasp = skip_pregrasp
         # TODO: only using trajectories for now, also includes closest points and their sdf values
-        starts = []
-        trajectories = []
-        classes = []
-        masks = []
+        
+        if False:
+            starts = []
+            trajectories = []
+            classes = []
+            masks = []
+            min_t = 1
+            use_actual_traj = True
+            for fpath in folders:
+                path = pathlib.Path(fpath)
+                plans = []
+                for p in path.rglob('*traj_data.p'):
+                    with open(p, 'rb') as f:
+                        data = pickle.load(f)
+                        actual_traj = []
+                        for t in range(max_T, min_t - 1, -1):
+                            actual_traj.append(data[t]['starts'][:, :, None, :])
+                            traj = data[t]['plans']
+                            classes.append(data[t]['contact_state'][:, None, :].repeat(traj.shape[1], axis=1))
 
-        min_t = 1
+                            # combine traj and starts
+                            if use_actual_traj:
+                                traj = np.concatenate(actual_traj + [traj], axis=2)
+                                masks.append(np.ones((traj.shape[0], traj.shape[1], traj.shape[2])))
+                            else:
+                                zeros = [np.zeros_like(actual_traj[0])] * (len(actual_traj) - 1)
+                                traj = np.concatenate([actual_traj[-1]] + [traj] + zeros, axis=2)
+                                mask = np.zeros((traj.shape[0], traj.shape[1], traj.shape[2]))
+                                mask[:, :, :t + 1] = 1
+                                masks.append(mask)
+                            if type == 'diffusion':
+                                # duplicated first control, rearrange so that it is (x_0, u_0, x_1, u_1, ..., x_{T-1}, u_{T-1}, x_T, 0)
+                                traj[:, :, :-1, 15:] = traj[:, :, 1:, 15:]
+                                traj[:, :, -1, 15:] = 0
+                            elif type == 'cnf':
+                                traj[:, :, 0, 15:] = 0
+                            trajectories.append(traj)
 
-        use_actual_traj = True
-        for fpath in folders:
-            path = pathlib.Path(fpath)
-            plans = []
-            for p in path.rglob('*traj_data.p'):
-                with open(p, 'rb') as f:
-                    data = pickle.load(f)
-                    actual_traj = []
-                    for t in range(max_T, min_t - 1, -1):
-                        actual_traj.append(data[t]['starts'][:, :, None, :])
-                        traj = data[t]['plans']
-                        classes.append(data[t]['contact_state'][:, None, :].repeat(traj.shape[1], axis=1))
+        import pickle as pkl
+        CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
+        fpath = pathlib.Path(f'{CCAI_PATH}/data')
+        filename = 'diffusion_datasets/regrasp_diffusion_dataset.pkl'
+        filaname2 = 'diffusion_datasets/turn_diffusion_dataset.pkl'
+        with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
+            rg_trajs = pkl.load(file)
+        with open(f'{fpath.resolve()}/{filaname2}', 'rb') as file:
+            turn_trajs = pkl.load(file)
 
-                        # combine traj and starts
-                        if use_actual_traj:
-                            traj = np.concatenate(actual_traj + [traj], axis=2)
-                            masks.append(np.ones((traj.shape[0], traj.shape[1], traj.shape[2])))
-                        else:
-                            zeros = [np.zeros_like(actual_traj[0])] * (len(actual_traj) - 1)
-                            traj = np.concatenate([actual_traj[-1]] + [traj] + zeros, axis=2)
-                            mask = np.zeros((traj.shape[0], traj.shape[1], traj.shape[2]))
-                            mask[:, :, :t + 1] = 1
-                            masks.append(mask)
+        self.trajectories = np.concatenate((turn_trajs, rg_trajs), axis=0)
 
-                        if type == 'diffusion':
-                            # duplicated first control, rearrange so that it is (x_0, u_0, x_1, u_1, ..., x_{T-1}, u_{T-1}, x_T, 0)
-                            traj[:, :, :-1, 15:] = traj[:, :, 1:, 15:]
-                            traj[:, :, -1, 15:] = 0
-                        elif type == 'cnf':
-                            traj[:, :, 0, 15:] = 0
-                        trajectories.append(traj)
+        rg_traj_type = np.array([1,0,0])
+        rg_traj_type = np.tile(rg_traj_type, (rg_trajs.shape[0], 1))
+        turn_traj_type = np.array([1,1,1])
+        turn_traj_type = np.tile(turn_traj_type, (turn_trajs.shape[0], 1))
 
-        self.trajectories = np.concatenate(trajectories, axis=0)
-        self.masks = np.concatenate(masks, axis=0)
-        self.trajectory_type = np.concatenate(classes, axis=0).reshape(-1, 3)
+        self.trajectory_type = np.concatenate((turn_traj_type, rg_traj_type), axis=0)
+        
+        self.masks = np.ones((self.trajectories.shape[0], 1, self.trajectories.shape[1]))
+
+        # self.trajectories = np.concatenate(trajectories, axis=0)
+        # self.masks = np.concatenate(masks, axis=0)
+        # self.trajectory_type = np.concatenate(classes, axis=0).reshape(-1, 3)
         # traj type is Nx3, 0 for no contact, 1 for contact - index middle thumb
 
         self.trajectories = self.trajectories.reshape(-1, self.trajectories.shape[-2], self.trajectories.shape[-1])
@@ -381,6 +401,7 @@ class AllegroScrewDriverDataset(Dataset):
 
         mask = self.masks[:, :, 0].reshape(-1)
         mean = x.sum(dim=0) / mask.sum()
+        # std = np.sqrt(np.average((x - mean) ** 2, axis=0))
         std = np.sqrt(np.average((x - mean) ** 2, weights=mask, axis=0))
 
         if self.states_only:
@@ -525,7 +546,6 @@ class FakeDataset(Dataset):
 
         # print(mask)
         return (traj - self.mean) / self.std, self.contact[idx], mask
-
 
 class RealAndFakeDataset(Dataset):
 

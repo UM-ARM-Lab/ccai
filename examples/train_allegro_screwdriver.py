@@ -26,6 +26,9 @@ import time
 
 import wandb
 
+import torch._dynamo
+torch._dynamo.config.suppress_errors = True
+
 TORCH_LOGS = "+dynamo"
 TORCHDYNAMO_VERBOSE = 1
 fingers = ['index', 'middle', 'thumb']
@@ -33,7 +36,7 @@ fingers = ['index', 'middle', 'thumb']
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='adam_allegro_screwdriver_cnf_state_control_only.yaml')
+    parser.add_argument('--config', type=str, default='adam_allegro_screwdriver_diffusion.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion.yaml')
     return parser.parse_args()
 
@@ -57,7 +60,7 @@ def visualize_trajectories(trajectories, scene, fpath, headless=False):
 def train_model(trajectory_sampler, train_loader, config):
     fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}'
     pathlib.Path.mkdir(pathlib.Path(fpath), parents=True, exist_ok=True)
-    run = wandb.init(project='ccai-screwdriver', entity='abhinavk99', config=config)
+    run = wandb.init(project='ccai-screwdriver', config=config)
 
     if config['use_ema']:
         ema = EMA(beta=config['ema_decay'])
@@ -78,7 +81,7 @@ def train_model(trajectory_sampler, train_loader, config):
 
     epochs = config['epochs']
     pbar = tqdm.tqdm(range(epochs))
-    for epoch in range(epochs):
+    for epoch in pbar:
         train_loss = 0.0
         trajectory_sampler.train()
         for trajectories, traj_class, masks in (train_loader):
@@ -447,6 +450,7 @@ def train_classifier(model, train_loader, config):
     epochs = config['classifier_epochs']
     pbar = tqdm.tqdm(range(epochs))
     for epoch in pbar:
+        
         train_loss = 0.0
         model.train()
         for real_traj, real_class, real_masks, fake_traj, fake_class, fake_masks in train_loader:
@@ -668,7 +672,7 @@ if __name__ == "__main__":
 
     data_path = pathlib.Path(f'{CCAI_PATH}/data/training_data/{config["data_directory"]}')
     train_dataset = AllegroScrewDriverDataset([p for p in data_path.glob('*train_data*')],
-                                              config['T']-1,
+                                            #   config['T']-1,
                                               cosine_sine=config['sine_cosine'],
                                               states_only=config['du'] == 0,
                                               skip_pregrasp=config['skip_pregrasp'],

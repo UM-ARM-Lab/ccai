@@ -23,8 +23,8 @@ if __name__ == "__main__":
     for file in Path(f'{fpath.resolve()}/regrasp_to_turn_datasets').glob("regrasp_to_turn_dataset_narrow_plan*.pkl"):
         filenames.append(file)
 
-    dataset_trajs_regrasp = np.empty((0, 12, 30))
-    dataset_trajs_turn = np.empty((0, 12, 36))
+    dataset_trajs_regrasp = np.empty((0, 13, 30))
+    dataset_trajs_turn = np.empty((0, 13, 36))
     total_samples = 0
 
     for filename in filenames:
@@ -86,53 +86,53 @@ if __name__ == "__main__":
             
             else:
                 
-                actual_regrasp_state_trajs = good_regrasp_trajs[:,1:,:].reshape(-1,20) 
-                actual_regrasp_state_trajs = convert_full_to_partial_config(actual_regrasp_state_trajs).reshape(-1,12,15)
-                actual_regrasp_trajs = np.empty((n_good_trials, 12, 30))
+                actual_regrasp_state_trajs = good_regrasp_trajs.reshape(-1,20) 
+                actual_regrasp_state_trajs = convert_full_to_partial_config(actual_regrasp_state_trajs).reshape(-1,13,15)
+                actual_regrasp_trajs = np.empty((n_good_trials, 13, 30))
                 
-
-                actual_turn_state_trajs = good_turn_trajs[:,1:,:].reshape(-1,20) 
-                actual_turn_state_trajs = convert_full_to_partial_config(actual_turn_state_trajs).reshape(-1,12,15)
-                actual_turn_trajs = np.empty((n_good_trials, 12, 36))
-                
+                actual_turn_state_trajs = good_turn_trajs.reshape(-1,20) 
+                actual_turn_state_trajs = convert_full_to_partial_config(actual_turn_state_trajs).reshape(-1,13,15)
+                actual_turn_trajs = np.empty((n_good_trials, 13, 36))
 
                 for trial in range(len(good_regrasp_plans)):
 
                     # regrasp
 
                     regrasp_plans = good_regrasp_plans[trial]
-                    actual_action_traj_regrasp = np.empty((12, 30-15))
+                    actual_action_traj_regrasp = np.empty((13, 30-15))
                     for step in range(12):
                         action = regrasp_plans[step][0,15:]
                         actual_action_traj_regrasp[step] = action
-                    actual_traj = np.hstack((actual_regrasp_state_trajs[trial], actual_action_traj_regrasp)).reshape(12, 30)
+                    actual_action_traj_regrasp[12] = np.zeros(30-15)
+                    actual_traj = np.hstack((actual_regrasp_state_trajs[trial], actual_action_traj_regrasp)).reshape(13, 30)
                     actual_regrasp_trajs[trial] = actual_traj
 
                     # turn
 
                     turn_plans = good_turn_plans[trial]
-                    actual_action_traj_turn = np.empty((12, 36-15))
+                    actual_action_traj_turn = np.empty((13, 36-15))
                     for step in range(12):
                         action = turn_plans[step][0,15:]
                         actual_action_traj_turn[step] = action
-                    actual_traj = np.hstack((actual_turn_state_trajs[trial], actual_action_traj_turn)).reshape(12, 36)
+                    actual_action_traj_turn[12] = np.zeros(36-15)
+                    actual_traj = np.hstack((actual_turn_state_trajs[trial], actual_action_traj_turn)).reshape(13, 36)
                     actual_turn_trajs[trial] = actual_traj
 
-                    for idx in range(12):
+                    for idx in range(1,12):
 
                         # regrasp
 
-                        traj = np.empty((12, 30))
+                        traj = np.empty((13, 30))
                         traj[:idx] = actual_regrasp_trajs[trial,:idx,:]
-                        traj[idx:] = regrasp_plans[idx]
-                        dataset_trajs_regrasp = np.vstack((dataset_trajs_regrasp, traj.reshape(1,12,30)))
+                        traj[idx:] = regrasp_plans[idx-1]
+                        dataset_trajs_regrasp = np.vstack((dataset_trajs_regrasp, traj.reshape(1,13,30)))
 
                         # turn
 
-                        traj = np.empty((12, 36))
+                        traj = np.empty((13, 36))
                         traj[:idx] = actual_turn_trajs[trial,:idx,:]
-                        traj[idx:] = turn_plans[idx]
-                        dataset_trajs_turn = np.vstack((dataset_trajs_turn, traj.reshape(1,12,36)))
+                        traj[idx:] = turn_plans[idx-1]
+                        dataset_trajs_turn = np.vstack((dataset_trajs_turn, traj.reshape(1,13,36)))
 
     ###############################################################################################
     
@@ -141,7 +141,7 @@ if __name__ == "__main__":
     ###############################################################################################
 
     # pad regrasp trajs with 0s
-    padding = np.zeros((dataset_trajs_regrasp.shape[0],12,6))
+    padding = np.zeros((dataset_trajs_regrasp.shape[0],13,6))
     dataset_trajs_regrasp = np.concatenate((dataset_trajs_regrasp, padding), axis=2)
 
     regrasp_plan_savepath = f'{fpath.resolve()}/diffusion_datasets/regrasp_diffusion_dataset.pkl'
