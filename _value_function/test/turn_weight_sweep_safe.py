@@ -191,7 +191,7 @@ def test(checkpoint, n_samples):
                 _, turn_pose, succ, turn_traj, turn_plan = do_turn(
                     regrasp_pose, config, env,
                     sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
-                    perception_noise=0, image_path=img_save_dir, iters=turn_iters, model_name="ensemble_t",
+                    perception_noise=0, image_path=img_save_dir, iters=turn_iters, model_name="ensemble_t", initial_yaw = regrasp_pose[0, -2],
                     mode='vf', vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio
                 )
         
@@ -303,14 +303,14 @@ if __name__ == "__main__":
     finger_noise_mag = 0.05
 
     regrasp_iters = 40
-    turn_iters = 40
+    turn_iters = 50
     visualize = False   
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
     sim_device = config['sim_device']
     
-    n_samples = 8
-    name = "8_samples"
+    n_samples = 5
+    name = "5samples"
 
     checkpoint_path = fpath /'test'/'weight_sweep'/f'checkpoint_sweep_turning_{name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -320,7 +320,7 @@ if __name__ == "__main__":
     starting_values = {
         'vf_bounds': [2, 10],
         'other_bounds': [1.0, 8.0],
-        'variance_ratio_bounds': [0.5, 5.0],
+        'variance_ratio_bounds': [.5, 5.0],
         'grid_size': 3
     }
 
