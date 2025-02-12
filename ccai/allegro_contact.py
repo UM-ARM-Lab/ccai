@@ -154,6 +154,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                  min_force_dict=None,
                  model_name='None0',
                  mode='no_vf',
+                 initial_yaw=None,
                  vf_weight = 0,
                  other_weight = 0,
                  variance_ratio = 1,
@@ -172,6 +173,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.poses_std = torch.tensor(self.poses_std).to(device)
             self.cost_mean = torch.tensor([self.cost_mean]).to(device)
             self.cost_std = torch.tensor([self.cost_std]).to(device)
+            self.initial_yaw = initial_yaw
         self.full_start = start
 
         """
@@ -448,6 +450,10 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             # print("input: ", input)
             n_steps = q.shape[0]
 
+            if self.initial_yaw is not None:
+                yaws = self.initial_yaw.to(device=self.device).repeat(n_steps, 1)
+                q = torch.cat([q, yaws], dim=1)
+
             input_norm = ((q - self.poses_mean) / self.poses_std).float()
             indices = torch.arange(n_steps).unsqueeze(1).to(self.device) + 1
             input_norm = torch.cat([q, indices], dim=1)
@@ -721,6 +727,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                  obj_dof_type=None,
                  model_name='None1',
                  mode='no_vf', 
+                 initial_yaw=None,
                  vf_weight=0, 
                  other_weight=0,
                  *args, **kwargs):
@@ -753,7 +760,8 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                          contact_fingers=contact_fingers,
                          regrasp_fingers=regrasp_fingers, default_dof_pos=default_dof_pos, *args, 
                          model_name=model_name,
-                         mode=mode, vf_weight=vf_weight, other_weight=other_weight,
+                         mode=mode, initial_yaw=initial_yaw,
+                         vf_weight=vf_weight, other_weight=other_weight,
                          **kwargs)
 
         self.regrasp_fingers = regrasp_fingers
@@ -1064,6 +1072,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                  min_force_dict=None,
                  model_name='None2',
                  mode='no_vf',
+                 initial_yaw=None,
                  vf_weight = 0,
                  other_weight = 0,
                  **kwargs):
@@ -2384,6 +2393,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                  device='cuda:0', 
                  model_name="None4",
                  mode='no_vf',
+                 initial_yaw = None,
                  vf_weight = 0,
                  other_weight = 0,
                  variance_ratio = 1,
@@ -2409,7 +2419,8 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                                         desired_ee_in_world_frame=desired_ee_in_world_frame,
                                         min_force_dict=min_force_dict,
                                         model_name=model_name,
-                                        mode=mode, vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio,
+                                        mode=mode, initial_yaw=initial_yaw,
+                                        vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio,
                                         **kwargs)
 
         AllegroRegraspProblem.__init__(self, start=start, goal=goal, T=T, chain=chain,
@@ -2422,7 +2433,8 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                                        device=device, optimize_force=optimize_force, moveable_object=moveable_object,
                                        desired_ee_in_world_frame=desired_ee_in_world_frame,
                                        model_name=model_name,
-                                       mode=mode, vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio,
+                                       mode=mode, initial_yaw=initial_yaw,
+                                       vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio,
                                        **kwargs)
         self.dg, self.dz, self.dh = 0, 0, 0
         if self.num_regrasps > 0:

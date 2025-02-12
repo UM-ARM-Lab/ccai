@@ -10,7 +10,7 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 import torch
 
-experiment_name = 'test_method_widebig'
+experiment_name = 'test_method_bothmodes'
 # experiment_name = 'test_method_easybig2'
 
 filename = f'test/{experiment_name}.pkl'

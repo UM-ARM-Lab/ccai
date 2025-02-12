@@ -1,6 +1,6 @@
 ---
-model_name: 'allegro_high_force_no_gravity'
-T: 16
+model_name: 'allegro_recovery_model_fix_norm_constant_all_data'
+T: 13
 dx: 15
 du: 21
 load_checkpoint: False
@@ -17,7 +17,7 @@ lr: 1.0e-4
 model_type: 'diffusion'
 discriminator_guidance: True
 inverse_dynamics: False
-data_directory: 'allegro_screwdriver_high_force_no_gravity'
+data_directory: 'allegro_recovery_and_orig'
 device: 'cuda:1'
 test_every: 10001
 save_every: 10
@@ -28,7 +28,7 @@ guided: False
 timesteps: 256
 hidden_dim: 128
 unconditional: True
-sine_cosine: False
+sine_cosine: True
 use_class: True
 diffuse_class: False
 # Only applies to using EMA for training
@@ -36,6 +36,8 @@ use_ema: True
 ema_decay: 0.995
 ema_warmup_steps: 1000
 ema_update_every: 10
+
+skip_pregrasp: True
 
 test_directory: 'quadrotor_compose'
 test_samples: False

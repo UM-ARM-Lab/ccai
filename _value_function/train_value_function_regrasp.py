@@ -205,10 +205,16 @@ def save(model_to_save, path):
 
 def load_ensemble(device='cpu', model_name = "throwerror"):
 
-    shape = (16,1)
     checkpoints = torch.load(f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
     neurons = checkpoints[0]["model_state"]["fc1.weight"].shape[0]
     # print("neurons: ",neurons)
+
+    # +1 because time dim is not in mean
+    input_dim = checkpoints[0]['poses_mean'].shape[0] + 1
+    output_dim = 1
+    shape = (input_dim, output_dim)
+    # print(f"shape: {shape}")
+
     models = []
     for checkpoint in checkpoints:
         model = Net(shape[0], shape[1], neurons = neurons)

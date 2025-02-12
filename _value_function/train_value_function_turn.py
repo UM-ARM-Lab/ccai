@@ -1,4 +1,5 @@
 from _value_function.screwdriver_problem import convert_full_to_partial_config, init_env, emailer
+from _value_function.train_value_function_regrasp import Net, query_ensemble, load_ensemble
 import pathlib
 import numpy as np
 import pickle as pkl
@@ -15,12 +16,16 @@ from sklearn.model_selection import KFold
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
-def stack_trajs(turn_trajs):
+def stack_trajs(turn_trajs, start_yaws):
 
     turn_stacked = np.stack(turn_trajs, axis=0)
     # regrasp_poses = regrasp_stacked[:,-1,:]
     turn_poses = turn_stacked.reshape(-1, 20)
     turn_poses = convert_full_to_partial_config(turn_poses)
+
+    start_yaws = np.array(start_yaws).reshape(-1,1)
+    start_yaws = start_yaws.repeat(turn_stacked.shape[1], axis=0)
+    turn_poses = np.hstack([turn_poses, start_yaws])
 
     return turn_poses
 
@@ -34,7 +39,7 @@ def save_train_test_splits(noisy=False, dataset_size=None, validation_proportion
     
     with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
         pose_cost_tuples = pkl.load(file)
-        turn_trajs, turn_costs = zip(*pose_cost_tuples)
+        turn_trajs, turn_costs, start_yaws = zip(*pose_cost_tuples)
     
     if dataset_size is not None:
         turn_trajs = turn_trajs[:dataset_size]
@@ -45,7 +50,7 @@ def save_train_test_splits(noisy=False, dataset_size=None, validation_proportion
     n_trajs = len(turn_trajs)
     print(f'Loaded {n_trajs} trials, which will create {n_trajs*T} samples')
 
-    poses = stack_trajs(turn_trajs)
+    poses = stack_trajs(turn_trajs, start_yaws)
 
     turn_costs = np.array(turn_costs).flatten()
     costs = np.repeat(turn_costs, T)
@@ -136,7 +141,7 @@ class Net(nn.Module):
         return output.squeeze(-1)
     
 def train(batch_size = 100, lr = 0.001, epochs = 205, neurons = 12, verbose="normal"):
-    shape = (16,1)
+    shape = (17,1)
     
     train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std = load_data_from_saved_splits(batch_size=batch_size)
 
@@ -204,36 +209,6 @@ def train(batch_size = 100, lr = 0.001, epochs = 205, neurons = 12, verbose="nor
     }
 
     return model_to_save, test_loss
-    
-
-def save(model_to_save, path):
-    torch.save(model_to_save, path)
-
-def load_ensemble(device='cpu', model_name = "throwerror"):
-
-    shape = (16,1)
-    checkpoints = torch.load(f'{fpath.resolve()}/value_functions/value_function_{model_name}.pkl')
-    neurons = checkpoints[0]["model_state"]["fc1.weight"].shape[0]
-    models = []
-    for checkpoint in checkpoints:
-        model = Net(shape[0], shape[1], neurons = neurons)
-        model.load_state_dict(checkpoint['model_state'])
-        models.append(model.to(device))
-
-    poses_mean = checkpoints[0]['poses_mean']
-    poses_std = checkpoints[0]['poses_std']
-    cost_mean = checkpoints[0]['cost_mean']
-    cost_std = checkpoints[0]['cost_std']
-
-    return models, poses_mean, poses_std, cost_mean, cost_std
-
-def query_ensemble(poses, models, device='cpu'):
-    costs = []
-    for model in models:
-        costs.append(model(poses.to(device)))
-    costs = torch.stack(costs)
-    return costs
-
 
 def eval(model_name):
     
@@ -295,202 +270,24 @@ def eval(model_name):
             plt.tight_layout()
             plt.show()
     
-    plot_loader(train_loader, 100, 'Training Set')
-    plot_loader(test_loader, 100, 'Test Set')
-
-    # New: t-SNE plot
-    from sklearn.manifold import TSNE
-    
-    def plot_tsne(loader, n_samples, title='t-SNE of Input Features (Color by Actual Cost)'):
-        """Reduce the 16-dimensional input features to 2D using t-SNE and 
-        color-code the points by their actual cost values."""
-        all_inputs = []
-        all_labels = []
-        
-        # Gather all data from the loader
-        for inputs, labels in loader:
-            # Move to CPU numpy arrays if they're not already
-            if isinstance(inputs, torch.Tensor):
-                inputs = inputs.cpu().numpy()
-            if isinstance(labels, torch.Tensor):
-                labels = labels.cpu().numpy()
-            all_inputs.append(inputs)
-            all_labels.append(labels)
-        
-        all_inputs = np.concatenate(all_inputs, axis=0)
-        all_labels = np.concatenate(all_labels, axis=0).flatten()
-        
-        # De-normalize the labels (costs)
-        actual_values = all_labels * cost_std + cost_mean
-        
-        # (Optional) If you have a very large dataset, consider sub-sampling here for speed:
-        subset_indices = np.random.choice(len(all_inputs), size=n_samples, replace=False)
-        all_inputs = all_inputs[subset_indices]
-        actual_values = actual_values[subset_indices]
-        
-        # Apply t-SNE to reduce inputs to 2D
-        tsne = TSNE(n_components=2, random_state=42, perplexity=30)
-        inputs_2d = tsne.fit_transform(all_inputs)
-        
-        # Create the scatter plot
-        plt.figure(figsize=(8,6))
-        sc = plt.scatter(inputs_2d[:,0], inputs_2d[:,1], c=actual_values, cmap='viridis', s=30)
-        plt.colorbar(sc, label='Actual Cost')
-        plt.xlabel('t-SNE Dimension 1')
-        plt.ylabel('t-SNE Dimension 2')
-        plt.title(title)
-        plt.show()
-
-    # Plot t-SNE for the training set
-    # plot_tsne(train_loader, 5000, title='t-SNE of Training Set (Color by Actual Cost)')
-    # Plot t-SNE for the test set
-    # plot_tsne(test_loader, 100, title='t-SNE of Test Set (Color by Actual Cost)')
-
-    def plot_error_vs_actual(loader, n_samples, title='Error vs Actual Cost'):
-        """Scatters the absolute prediction error (y-axis) against the actual cost (x-axis)."""
-        with torch.no_grad():
-            all_preds = []
-            all_labels = []
-
-            for inputs, labels in loader:
-                ensemble_preds = query_ensemble(inputs, models)
-                preds = ensemble_preds.mean(dim=0)
-                all_preds.append(preds.numpy())
-                all_labels.append(labels.numpy())
-
-            # Convert and flatten
-            all_preds = np.concatenate(all_preds).flatten()
-            all_labels = np.concatenate(all_labels).flatten()
-
-            # Denormalize
-            all_preds = all_preds * cost_std + cost_mean
-            all_labels = all_labels * cost_std + cost_mean
-
-            # Random subsample
-            indices = np.random.choice(len(all_labels), n_samples, replace=False)
-            actual_values = all_labels[indices]
-            predicted_values = all_preds[indices]
-            
-            # Calculate absolute error
-            errors = np.abs(predicted_values - actual_values)
-
-            # Plot
-            plt.figure(figsize=(8,6))
-            plt.scatter(actual_values, errors, alpha=0.6)
-            plt.xlabel('Actual Cost')
-            plt.ylabel('Absolute Error (|Predicted - Actual|)')
-            plt.title(title)
-            plt.show()
-
-    # Plot error vs. actual cost for training and test sets
-    # plot_error_vs_actual(train_loader, 300, 'Error vs. Actual Cost (Training Set)')
-    # plot_error_vs_actual(test_loader, 300, 'Error vs. Actual Cost (Test Set)')
-
-def k_fold_cv_train(k=5, batch_size=100, lr=0.001, epochs=20, neurons=12):
-    """
-    Perform K-Fold cross-validation using the training data loaded from saved splits.
-    For each fold, a new model is initialized and trained, and the validation loss is computed.
-    Returns the average validation loss across all folds.
-    """
-    # Load training data
-    train_loader, _, _, _, _, _ = load_data_from_saved_splits(batch_size=batch_size)
-    # Get the underlying TensorDataset from the train_loader
-    train_dataset = train_loader.dataset
-    num_samples = len(train_dataset)
-    indices = np.arange(num_samples)
-    
-    kf = KFold(n_splits=k, shuffle=True, random_state=42)
-    fold_validation_losses = []
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    shape = (16, 1)
-    criterion = nn.MSELoss()
-
-    for fold, (train_idx, val_idx) in enumerate(kf.split(indices)):
-        print(f"\n--- Fold {fold+1}/{k} ---")
-        # Create subset datasets for this fold
-        train_subset = Subset(train_dataset, train_idx)
-        val_subset = Subset(train_dataset, val_idx)
-        
-        train_fold_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
-        val_fold_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
-        
-        # Initialize a new model and optimizer for this fold
-        model = Net(shape[0], shape[1], neurons=neurons).to(device)
-        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-        
-        # Train for the specified number of epochs
-        for epoch in range(epochs):
-            model.train()
-            for inputs, labels in train_fold_loader:
-                inputs, labels = inputs.to(device), labels.to(device)
-                optimizer.zero_grad()
-                outputs = model(inputs)
-                loss = criterion(outputs, labels)
-                loss.backward()
-                optimizer.step()
-        
-        # Evaluate on the validation fold
-        model.eval()
-        fold_val_loss = 0.0
-        with torch.no_grad():
-            for inputs, labels in val_fold_loader:
-                inputs, labels = inputs.to(device), labels.to(device)
-                outputs = model(inputs)
-                loss = criterion(outputs, labels)
-                fold_val_loss += loss.item()
-        fold_val_loss /= len(val_fold_loader)
-        print(f"Fold {fold+1} validation loss: {fold_val_loss:.8f}")
-        fold_validation_losses.append(fold_val_loss)
-    
-    avg_val_loss = np.mean(fold_validation_losses)
-    print(f"\nAverage validation loss over {k} folds: {avg_val_loss:.8f}\n")
-    return avg_val_loss
+    plot_loader(train_loader, 200, 'Training Set')
+    plot_loader(test_loader, 200, 'Test Set')
 
 if __name__ == "__main__":
     # Uncomment the following line to generate and save train/test splits if needed.
-    save_train_test_splits(noisy=False, dataset_size=None, validation_proportion=0.1, seed=None)
-    exit()
+    # save_train_test_splits(noisy=False, dataset_size=None, validation_proportion=0.1, seed=None)
+    # exit()
 
-    # Set this flag to True to perform hyperparameter tuning via K-Fold CV.
-    tune_hyperparams = False
-    if tune_hyperparams:
-        # Define a grid of hyperparameters to search over.
-        hyperparameter_grid = [
+    path = f'{fpath.resolve()}/value_functions/value_function_ensemble_t.pkl'
+    model_name = "ensemble_t"
 
-            {"lr": 1e-3, "neurons": 24, "epochs": 60, "batch_size": 100},
-            {"lr": 1e-3, "neurons": 16, "epochs": 60, "batch_size": 100},
-            {"lr": 1e-3, "neurons": 22, "epochs": 60, "batch_size": 100}, 
-
-        ]
-
-        best_params = None
-        best_loss = float("inf")
-        for params in hyperparameter_grid:
-            print(f"Evaluating hyperparameters: {params}")
-            avg_loss = k_fold_cv_train(k=5,
-                                       batch_size=params["batch_size"],
-                                       lr=params["lr"],
-                                       epochs=params["epochs"],
-                                       neurons=params["neurons"],
-                                       )
-            if avg_loss < best_loss:
-                best_loss = avg_loss
-                best_params = params
-
-        print(f"Best hyperparameters: {best_params} with average validation loss: {best_loss:.8f}\n")
-
-    else:
-
-        path = f'{fpath.resolve()}/value_functions/value_function_ensemble_t.pkl'
-        model_name = "ensemble_t"
-
-        ensemble = []
-        for i in range(16):
-            print(f"Training model {i}")
-            net, _ = train(epochs=80, neurons=32, verbose='very', lr=1e-3, batch_size=100)
-            ensemble.append(net)
-        torch.save(ensemble, path)
-        eval(model_name=model_name)
+    ensemble = []
+    for i in range(16):
+        print(f"Training model {i}")
+        net, _ = train(epochs=18, neurons=32, verbose='very', lr=1e-3, batch_size=100)
+        ensemble.append(net)
+    torch.save(ensemble, path)
+    eval(model_name=model_name)
 
     def hyperparam_search(
         lr_candidates=[1e-3],

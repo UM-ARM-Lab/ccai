@@ -258,6 +258,7 @@ class AllegroScrewDriverDataset(Dataset):
         self.trajectories = np.concatenate(trajectories, axis=0)
         self.masks = np.concatenate(masks, axis=0)
         self.trajectory_type = np.concatenate(classes, axis=0).reshape(-1, 3)
+        # traj type is Nx3, 0 for no contact, 1 for contact - index middle thumb
 
         self.trajectories = self.trajectories.reshape(-1, self.trajectories.shape[-2], self.trajectories.shape[-1])
         self.masks = self.masks.reshape(-1, self.masks.shape[-1])
@@ -280,10 +281,10 @@ class AllegroScrewDriverDataset(Dataset):
         self.std = 1
 
         # Filter out all non-turn modes 
-        turn_mask = self.trajectory_type.sum(1) == 3
-        self.trajectories = self.trajectories[turn_mask]
-        self.trajectory_type = self.trajectory_type[turn_mask]
-        self.masks = self.masks[turn_mask]
+        # turn_mask = self.trajectory_type.sum(1) == 3
+        # self.trajectories = self.trajectories[turn_mask]
+        # self.trajectory_type = self.trajectory_type[turn_mask]
+        # self.masks = self.masks[turn_mask]
 
         self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.75)
         self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.5)

@@ -423,7 +423,7 @@ def regrasp(env, config, chain, state2ee_pos_partial, perception_noise = 0, init
 
 def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, perception_noise = 0,
                image_path = None, sim_viz_env=None, ros_copy_node=None, model_name = "ensemble_t", iters = 200,
-               mode='vf', vf_weight = 100.0, other_weight = 0.1, variance_ratio = 5):
+               mode='vf', initial_yaw = None, vf_weight = 100.0, other_weight = 0.1, variance_ratio = 5):
 
     obj_dof = 3
 
@@ -459,6 +459,7 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, per
             min_force_dict=min_force_dict,
             model_name=model_name,
             mode = mode,
+            initial_yaw = initial_yaw,
             vf_weight=vf_weight,
             other_weight=other_weight,
             variance_ratio=variance_ratio,
@@ -587,7 +588,8 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, per
     return final_distance_to_goal.cpu().detach().item(), final_state, full_trajectory, all_turn_plans
 
 def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, image_path = None,
-            iters = 200, perception_noise = 0, turn_angle = np.pi/2, model_name = "ensemble_t", mode='no_vf', vf_weight = 0.0, other_weight = 10.0, variance_ratio = 0.0):
+            iters = 200, perception_noise = 0, turn_angle = np.pi/2, model_name = "ensemble_t", mode='no_vf', initial_yaw = None,
+            vf_weight = 0.0, other_weight = 10.0, variance_ratio = 0.0):
 
     params = config.copy()
     controller = 'csvgd'
@@ -607,7 +609,7 @@ def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym,
 
     final_distance_to_goal, final_pose, full_trajectory, turn_plan = solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, image_path = image_path,
                                                                      sim_viz_env=sim_env, ros_copy_node=ros_copy_node, perception_noise=perception_noise, iters=iters,
-                                                                     mode=mode, model_name=model_name, vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio)
+                                                                     mode=mode, model_name=model_name, initial_yaw = initial_yaw, vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio)
    
     if final_distance_to_goal < 30 / 180 * np.pi:
         succ = True

@@ -33,7 +33,8 @@ fingers = ['index', 'middle', 'thumb']
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='allegro_screwdriver_cnf_state_control_only.yaml')
+    parser.add_argument('--config', type=str, default='adam_allegro_screwdriver_cnf_state_control_only.yaml')
+    # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion.yaml')
     return parser.parse_args()
 
 
@@ -77,10 +78,10 @@ def train_model(trajectory_sampler, train_loader, config):
 
     epochs = config['epochs']
     pbar = tqdm.tqdm(range(epochs))
-    for epoch in pbar:
+    for epoch in range(epochs):
         train_loss = 0.0
         trajectory_sampler.train()
-        for trajectories, traj_class, masks in tqdm.tqdm(train_loader):
+        for trajectories, traj_class, masks in (train_loader):
             trajectories = trajectories.to(device=config['device'])
             masks = masks.to(device=config['device'])
             B, T, dxu = trajectories.shape
@@ -137,15 +138,15 @@ def train_model(trajectory_sampler, train_loader, config):
 
         if (epoch + 1) % config['save_every'] == 0:
             if config['use_ema']:
-                torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}_{train_loss:.4f}.pt')
+                torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
             else:
                 torch.save(model.state_dict(),
-                           f'{fpath}/allegro_screwdriver_{config["model_type"]}_{train_loss:.4f}.pt')
+                           f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
     if config['use_ema']:
-        torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}_{train_loss:.4f}.pt')
+        torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
     else:
         torch.save(model.state_dict(),
-                   f'{fpath}/allegro_screwdriver_{config["model_type"]}_{train_loss:.4f}.pt')
+                   f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
 
 def train_model_state_only(trajectory_sampler, train_loader, config):
     fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}'
@@ -171,14 +172,18 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
     optimizer = torch.optim.Adam(trajectory_sampler.parameters(), lr=config['lr'])
 
     step = 0
-
+    init_time = time.perf_counter()
     epochs = config['epochs']
     # pbar = tqdm.tqdm(range(epochs))
     # for epoch in pbar:
-    for epoch in range(epochs):
+    for epoch in tqdm.tqdm(range(epochs)):
         train_loss = 0.0
         flow_loss = 0.0
+        flow_loss_v = 0.0
+        flow_loss_a = 0.0
+        state_loss = 0.0
         action_loss = 0.0
+        kl_loss = 0.0
         trajectory_sampler.train()
         # for trajectories, traj_class, masks in tqdm.tqdm(train_loader):
         for trajectories, traj_class, masks in (train_loader):
@@ -200,7 +205,11 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
             optimizer.zero_grad()
             train_loss += loss.item()
             flow_loss += sampler_loss['flow_loss'].item()
+            flow_loss_v += sampler_loss['flow_loss_v'].item()
+            flow_loss_a += sampler_loss['flow_loss_a'].item()
+            state_loss += sampler_loss['state_loss'].item()
             action_loss += sampler_loss['action_loss'].item()
+            kl_loss += sampler_loss['kl_loss'].item()
             step += 1
             if config['use_ema']:
                 if step % 10 == 0:
@@ -208,23 +217,35 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
 
         train_loss /= len(train_loader)
         flow_loss /= len(train_loader)
+        flow_loss_v /= len(train_loader)
+        flow_loss_a /= len(train_loader)
+        state_loss /= len(train_loader)
         action_loss /= len(train_loader)
+        kl_loss /= len(train_loader)
         # pbar.set_description(
         #     f'Train loss {train_loss:.3f}')
         try:
             wandb.log({
                     'train_loss_epoch': train_loss,
                     'flow_loss_epoch': flow_loss,
+                    'flow_loss_v_epoch': flow_loss_v,
+                    'flow_loss_a_epoch': flow_loss_a,
+                    'state_loss_epoch': state_loss,
                     'action_loss_epoch': action_loss,
-                    'time': time.time()
+                    'kl_loss_epoch': kl_loss,
+                    'time': time.perf_counter() - init_time
                 })
         except:
             print('Could not log to wandb')
             print({
                     'train_loss_epoch': train_loss,
                     'flow_loss_epoch': flow_loss,
+                    'flow_loss_v_epoch': flow_loss_v,
+                    'flow_loss_a_epoch': flow_loss_a,
+                    'state_loss_epoch': state_loss,
                     'action_loss_epoch': action_loss,
-                    'time': time.time()
+                    'kl_loss_epoch': kl_loss,
+                    'time': time.perf_counter() - init_time
             })
 
         if (epoch + 1) % config['save_every'] == 0:
@@ -232,7 +253,7 @@ def train_model_state_only(trajectory_sampler, train_loader, config):
                 torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
             else:
                 torch.save(model.state_dict(),
-                           f'{fpath}/allegro_screwdriver_{config["model_type"]}_state_only_{train_loss:.4f}.pt')
+                           f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
     if config['use_ema']:
         torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
     else:
@@ -512,6 +533,10 @@ if __name__ == "__main__":
     #         time.sleep(0.1)
     # except KeyboardInterrupt:
     #     pass
+    if 'state_control_only' not in config:
+        config['state_control_only'] = False
+    if 'state_only' not in config:
+        config['state_only'] = False
     if config['train_diffusion'] and config['state_control_only']:
         # set up pytorch volumetric for rendering
         asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'

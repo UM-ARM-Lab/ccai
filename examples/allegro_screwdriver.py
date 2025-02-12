@@ -96,6 +96,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                  device='cuda:0', 
                 model_name='None3',
                 mode='no_vf',
+                initial_yaw = None,
                 vf_weight = 0,
                 other_weight = 0,
                 variance_ratio = 1,
@@ -123,7 +124,8 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                                                  turn=turn, obj_gravity=obj_gravity,
                                                  min_force_dict=min_force_dict, 
                                                 model_name=model_name,
-                                                 mode=mode, vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio,
+                                                 mode=mode, initial_yaw=initial_yaw,
+                                                 vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio,
                                                  **kwargs)
         self.friction_coefficient = friction_coefficient
 

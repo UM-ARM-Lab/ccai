@@ -24,24 +24,21 @@ def calculate_turn_cost(initial_pose, final_pose):
 
     screwdriver_pose = initial_pose.flatten()[-4:-1]
     screwdriver_goal = np.array([0, 0, -turn_angle]) + screwdriver_pose
-    screwdriver_goal_mat = R.from_euler('xyz', screwdriver_goal).as_matrix()
 
-    screwdriver_state = final_pose.flatten()[-4:-1]
-    screwdriver_mat = R.from_euler('xyz', screwdriver_state).as_matrix()
-
-    # make both matrices 3D (batch_size, 3, 3)
-    screwdriver_mat = torch.tensor(screwdriver_mat).unsqueeze(0)
-    screwdriver_goal_mat = torch.tensor(screwdriver_goal_mat).unsqueeze(0).repeat(screwdriver_mat.shape[0], 1, 1)
-
-    distance2goal = tf.so3_relative_angle(screwdriver_mat, screwdriver_goal_mat, cos_angle=False).detach().cpu()
-
-    final_distance_to_goal = torch.min(distance2goal.abs())
-    # if final_distance_to_goal < 30 / 180 * np.pi:
-    if final_distance_to_goal < 45 / 180 * np.pi:
-        succ = True
-    else:
-        succ = False
-
+    # screwdriver_goal_mat = R.from_euler('xyz', screwdriver_goal).as_matrix()
+    # screwdriver_state = final_pose.flatten()[-4:-1]
+    # screwdriver_mat = R.from_euler('xyz', screwdriver_state).as_matrix()
+    # # make both matrices 3D (batch_size, 3, 3)
+    # screwdriver_mat = torch.tensor(screwdriver_mat).unsqueeze(0)
+    # screwdriver_goal_mat = torch.tensor(screwdriver_goal_mat).unsqueeze(0).repeat(screwdriver_mat.shape[0], 1, 1)
+    # distance2goal = tf.so3_relative_angle(screwdriver_mat, screwdriver_goal_mat, cos_angle=False).detach().cpu()
+    # final_distance_to_goal = torch.min(distance2goal.abs())
+    # # if final_distance_to_goal < 30 / 180 * np.pi:
+    # if final_distance_to_goal < 45 / 180 * np.pi:
+    #     succ = True
+    # else:
+    #     succ = False
+    
     # we're only actually using the screwdriver values
     state = final_pose.flatten()[-4:-1]
 
@@ -97,6 +94,7 @@ if __name__ == "__main__":
 
     combined_regrasp_trajs = np.empty((0, 13, 20))
     combined_turn_trajs = np.empty((0, 13, 20))
+    combined_start_yaws = []
     
     combined_turn_costs = []
 
@@ -140,6 +138,7 @@ if __name__ == "__main__":
             
             for i in range(len(regrasp_poses)):
                 cost = calculate_turn_cost(regrasp_poses[i], turn_poses[i])
+                combined_start_yaws.append(regrasp_poses[i][-2])
 
                 if vis:
                     if cost > 4.0 and cost < 5.0:
@@ -153,9 +152,10 @@ if __name__ == "__main__":
             combined_turn_costs.extend(turn_costs)
 
     combined_turn_costs = np.array(combined_turn_costs)
+    combined_start_yaws = np.array(combined_start_yaws)
 
     regrasp_to_turn_dataset = zip(combined_regrasp_trajs, combined_turn_trajs, combined_turn_costs)
-    turn_to_turn_dataset = zip(combined_turn_trajs, combined_turn_costs)
+    turn_to_turn_dataset = zip(combined_turn_trajs, combined_turn_costs, combined_start_yaws)
     
     regrasp_to_turn_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/combined_regrasp_to_turn_dataset{name}.pkl'
     turn_to_turn_savepath = f'{fpath.resolve()}/regrasp_to_turn_datasets/combined_turn_to_turn_dataset{name}.pkl'
