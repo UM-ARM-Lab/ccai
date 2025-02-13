@@ -18,7 +18,7 @@ img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 
 class ObjectPoseReader:
     def __init__(self, obj='valve', mode='relative', device='cpu') -> None:
-        rospy.init_node('object_pose_reader')
+        # rospy.init_node('object_pose_reader')
         self.mode = mode
         self.obj = obj
         self.device=device
@@ -57,8 +57,7 @@ class ObjectPoseReader:
     def get_state(self):
         return self.obj_trans_, self.obj_euler_
     
-    def get_target_IK_pose(self):
-        # Create pk Transform3D from self obj_trans and obj_euler
+    def get_state_world_frame_pos(self):
         self.obj_to_mocap_world_trans = pk.Transform3d(pos=torch.tensor(self.obj_trans_, device=self.device, dtype=self.object_to_hand_trans.dtype), rot=torch.tensor(np.zeros_like(self.obj_euler_), device=self.device, dtype=self.object_to_hand_trans.dtype))
         
         self.arm_base_euler, self.arm_base_trans = self.euler_trans_from_segment(self.arm_base.segments[0])
@@ -70,11 +69,29 @@ class ObjectPoseReader:
         self.obj_to_arm_mocap_trans = self.arm_mocap_to_mocap_world_trans.inverse().compose(self.obj_to_mocap_world_trans)
         self.obj_trans_robot_frame = self.obj_to_arm_mocap_trans.get_matrix()[0][:3, 3]
         self.obj_euler_robot_frame_for_IK = self.obj_to_arm_mocap_trans.get_matrix()[0][:3, :3]
-        hand_to_arm_mocap = self.obj_to_arm_mocap_trans.compose(self.hand_to_object_trans)
+        self.hand_to_arm_mocap = self.obj_to_arm_mocap_trans.compose(self.hand_to_object_trans)
+
+        self.hand_to_mocap_world_trans = self.arm_mocap_to_mocap_world_trans.compose(self.hand_to_arm_mocap)
+        self.hand_to_mocap_world_position = self.hand_to_mocap_world_trans.get_matrix()[0][:3, 3].cpu().numpy()
+
+        # Object trans is difference between object position and hand position
+
+        print('obj_trans pre', self.obj_trans_)
+        self.obj_trans_[-1] -= .1 + 0.412*2.54/100
+        print('obj_trans post z offset', self.obj_trans_)
+        self.obj_trans_ = self.obj_trans_ - self.hand_to_mocap_world_position
+        print('obj_trans post hand offset', self.obj_trans_)
+        print('hand to mocap world position', self.hand_to_mocap_world_position)
+
+        return self.obj_trans_, self.obj_euler_
+    
+    def get_target_IK_pose(self):
+        # Create pk Transform3D from self obj_trans and obj_euler
+
         #    C to A                 = B to A * C to B
         # C=hand, A=arm_victor, B=arm_mocap
         # C to A = hand_to_arm_victor, B to A = arm_mocap_to_arm_victor, C to B = hand_to_arm_mocap
-        hand_to_arm_victor = self.arm_mocap_to_arm_victor_trans.compose(hand_to_arm_mocap)
+        hand_to_arm_victor = self.arm_mocap_to_arm_victor_trans.compose(self.hand_to_arm_mocap)
 
         return (hand_to_arm_victor)
 
@@ -98,7 +115,11 @@ class HardwareEnv:
     
     def get_state(self):
         rospy.sleep(0.5)
-        robot_state = self.__ros_node.allegro_joint_pos.float()
+        try:
+            robot_state = self.__ros_node.allegro_joint_pos.float()
+        except:
+            print('No robot state received. Using default state.')
+            robot_state = self.default_dof_pos.clone().squeeze(0)
         robot_state = robot_state.to(self.device)
         index, mid, ring, thumb = torch.chunk(robot_state, chunks=4, dim=-1)
         state = {}

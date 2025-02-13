@@ -695,7 +695,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             contact_points_object = torch.stack([self.contact_points[finger][0] for finger in self.regrasp_fingers], dim=1)
 
         if self.num_regrasps > 0:
-            if contact_points_object is not None:
+            if self.full_dof_goal and contact_points_object is not None:
                 self.default_ee_locs = self._ee_locations_in_screwdriver(self.default_dof_pos,
                                                                     self.goal_theta).detach()
                 self.default_ee_locs_constraint = True
@@ -1464,6 +1464,9 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         h = self.min_force_constr(force_list.reshape(-1, num_forces, 3),)
         h = h.reshape(N, T, -1)
+        t_mask = torch.ones_like(h, dtype=torch.bool)
+        t_mask[:, 0] = False
+        t_mask = t_mask.reshape(N, -1)
         # dh_dforce = dh_dforce.reshape(N, T, -1, 3)
         if compute_grads:
 
@@ -1494,11 +1497,11 @@ class AllegroContactProblem(AllegroObjectProblem):
             grad_h = grad_h.reshape(N, -1, T * d)
 
         else:
-            return h.reshape(N, -1), None, None
+            return h.reshape(N, -1), None, None, t_mask
         if compute_hess:
             hess_h = torch.zeros(N, h.shape[1], T * 3, T * 3, device=self.device)
-            return h.reshape(N, -1), grad_h, hess_h
-        return h.reshape(N, -1), grad_h, None
+            return h.reshape(N, -1), grad_h, hess_h, t_mask
+        return h.reshape(N, -1), grad_h, None, t_mask
                 
     def _force_equlibrium_constr_w_force(self, q, u, next_q, force_list, contact_jac_list, contact_point_list):
         # NOTE: the constriant is defined in the robot frame
@@ -1964,11 +1967,6 @@ class AllegroContactProblem(AllegroObjectProblem):
         dnormal_dq = self.data[finger_name]['dnormal_dq'].reshape(N, T + T_offset, 3, 16)[
                      :, :T, :, self.contact_state_indices]
         dnormal_dtheta = self.data[finger_name]['dnormal_denv_q'].reshape(N, T + T_offset, 3, self.obj_dof)[:, :T]
-
-        if self.min_force_dict is not None and finger_name in self.min_force_dict:
-            min_force = self.min_force_dict[finger_name]
-        else:
-            min_force = None
         
         if force is None:
             # compute constraint value

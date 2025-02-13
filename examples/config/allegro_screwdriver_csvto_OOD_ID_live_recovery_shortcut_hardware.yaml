@@ -1,15 +1,16 @@
 ---
 T: 12
+T_orig: 12
 receding_horizon: False
 num_steps: 12
 num_turns: 1
-num_stages: 5
+num_stages: 10
 max_recovery_stages: 4
 num_trials: 10
 visualize: True
 # experiment_name: 'allegro_screwdriver_csvto_live_OOD_recovery_best_traj_data_shortcut_lower_threshold'
-experiment_name: 'allegro_screwdriver_csvto_live_OOD_recovery_shortcut_honda_meeting_28_thresh_full_dof_noise_.08_noise_pct_.75_6500_diff_likelihood_no_resample'
-mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
+experiment_name: 'allegro_screwdriver_csvto_live_OOD_recovery_hardware_min_force'
+mode: 'hardware'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
 object_type: 'screwdriver'
@@ -22,11 +23,12 @@ goal: -1.5
 prior: 1
 # likelihood_threshold: -22.618363952636717
 # likelihood_threshold: -25
-likelihood_threshold: -28
+likelihood_threshold: -35
 multi_particle_search: True
 replan: False
 visualize_plan: False
-visualize_recovery_plan: False
+visualize_recovery_plan: True
+visualize_contact_plan: True
 optimize_force: True
 exclude_index: False
 projected: False
@@ -44,7 +46,7 @@ viz_states: False
 diff_init: True
 randomize_obj_start: False
 randomize_rob_start: False
-perturb_action: True
+perturb_action: False
 live_recovery: True
 type: 'diffusion'
 model_dir: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion'
