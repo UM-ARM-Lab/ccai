@@ -43,9 +43,9 @@ live_recovery: False
 type: 'diffusion'
 model_dir: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion'
 model_path: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
-likelihood_threshold: -22.618363952636717
+# likelihood_threshold: -22.618363952636717
 # likelihood_threshold: -16
-# likelihood_threshold: -136.6758056640625
+likelihood_threshold: -136.6758056640625
 parity: 0
 controllers:
   csvgd:
