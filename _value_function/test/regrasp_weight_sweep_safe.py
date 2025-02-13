@@ -274,15 +274,15 @@ if __name__ == "__main__":
     screwdriver_noise_mag = 0.015
     finger_noise_mag = 0.05
 
-    regrasp_iters = 30
-    turn_iters = 100
+    regrasp_iters = 40
+    turn_iters = 50
     visualize = False   
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
     sim_device = config['sim_device']
     
     n_samples = 6
-    name = "sun9"
+    name = "6samps"
 
     checkpoint_path = fpath /'test'/'weight_sweep'/f'checkpoint_sweep_regrasp_{name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -296,9 +296,9 @@ if __name__ == "__main__":
                             do_pregrasp=True, name='weight_sweep_pregrasps')
 
     starting_values = {
-        'vf_bounds': [3, 12],
-        'other_bounds': [1.0, 7.0],
-        'variance_ratio_bounds': [5.0, 20.0],
+        'vf_bounds': [5, 20],
+        'other_bounds': [.5, 3.0],
+        'variance_ratio_bounds': [4.0, 16.0],
         'grid_size': 3
     }
 

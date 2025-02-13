@@ -309,8 +309,8 @@ if __name__ == "__main__":
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
     sim_device = config['sim_device']
     
-    n_samples = 5
-    name = "5samples"
+    n_samples = 6
+    name = "6samples"
 
     checkpoint_path = fpath /'test'/'weight_sweep'/f'checkpoint_sweep_turning_{name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -318,9 +318,9 @@ if __name__ == "__main__":
     get_turn_initializations(env, sim_device, n_samples, save=True)
 
     starting_values = {
-        'vf_bounds': [2, 10],
-        'other_bounds': [1.0, 8.0],
-        'variance_ratio_bounds': [.5, 5.0],
+        'vf_bounds': [3, 14],
+        'other_bounds': [2.5, 10.0],
+        'variance_ratio_bounds': [2.0, 8.0],
         'grid_size': 3
     }
 
