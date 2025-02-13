@@ -261,9 +261,14 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models',
                                 use_collision_geometry=False)
 
-        scene_trans = world_trans.inverse().compose(
-            pk.Transform3d(device=device).translate(object_asset_pos[0], object_asset_pos[1], object_asset_pos[2]))
+        obj_to_world_trans = pk.Transform3d(device='cpu').translate(object_asset_pos[0], object_asset_pos[1], object_asset_pos[2])
+        screwdriver_origin_to_world_trans = pk.Transform3d(device='cpu').translate(object_asset_pos[0], object_asset_pos[1], object_asset_pos[2] + .1 + 0.412*2.54/100)
+        scene_trans = world_trans.inverse().compose(obj_to_world_trans)
+        object_to_hand_trans = world_trans.inverse().compose(screwdriver_origin_to_world_trans)
 
+        # Object to robot transform
+        # robot_minus_object = world_trans.to(device=device).compose(obj_to_world_trans.to(device=device).inverse())
+        # print(robot_minus_object.get_matrix())
         # contact checking
         collision_check_links = [self.ee_names[finger] for finger in self.fingers]
         self.contact_scenes = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
