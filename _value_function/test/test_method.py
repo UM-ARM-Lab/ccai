@@ -129,17 +129,17 @@ if __name__ == '__main__':
     regrasp_iters = 40
     turn_iters = 50
 
-    vf_weight_rg = 10.0
-    other_weight_rg = 1.0
-    variance_ratio_rg = 8.0
+    vf_weight_rg = 5.0
+    other_weight_rg = 1.9
+    variance_ratio_rg = 10.0
 
     # vf_weight_rg = 0.0
     # other_weight_rg = 10.0
     # variance_ratio_rg = 0.0
 
-    vf_weight_t = 7.0
-    other_weight_t = 5.0
-    variance_ratio_t = 4.0
+    vf_weight_t = 3.3
+    other_weight_t = 1.9
+    variance_ratio_t = 1.625
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
 
