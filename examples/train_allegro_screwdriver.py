@@ -40,9 +40,9 @@ def get_args():
     parser = argparse.ArgumentParser()
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_eval_train_likelihood.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_id_ood_states.yaml')
-    # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_project_ood_states.yaml')
+    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_project_ood_states.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_id_ood_states.yaml')
-    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion.yaml')
+    # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion.yaml')
     return parser.parse_args()
 
 
@@ -591,9 +591,9 @@ def eval_train_likelihood(model, train_loader, config):
     # plt.legend()
     # plt.savefig(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/gen_train_likelihood_hist_fit_all_states.png')
 
-
-
     N = 16
+    contact = torch.ones(N, 3).to(device=config['device'])
+
     # Loop through the dataset and evaluate the likelihood of the training data
     model.model.diffusion_model.classifier = None
     model.eval()
@@ -608,7 +608,8 @@ def eval_train_likelihood(model, train_loader, config):
             # print(likelihood)
             # start = trajectories[:, 0, :15]
             start_sine_cosine = trajectories[:, :16]
-            _, _, likelihood = model.sample(N*trajectories.shape[0], H=config['T'], start=start_sine_cosine.repeat_interleave(N, 0))
+            _, _, likelihood = model.sample(N*trajectories.shape[0], H=config['T'], start=start_sine_cosine.repeat_interleave(N, 0),
+                                            constraints=contact.repeat_interleave(trajectories.shape[0], 0))
             likelihood = likelihood.reshape(-1, N).mean(1)
             print(likelihood)
 
@@ -630,22 +631,22 @@ def eval_train_likelihood(model, train_loader, config):
     # plt.title('Histogram of training likelihoods')
     # plt.savefig(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/train_likelihood_hist.png')
     # Fit the data to the lognormal distribution
-    alpha, loc, beta = scipy.stats.gamma.fit((train_likelihoods))
-    lognorm = scipy.stats.gamma(alpha, loc=loc, scale=beta)
-    print(f'Fitted alpha: {alpha}, loc: {loc}, beta: {beta}')
+    # alpha, loc, beta = scipy.stats.gamma.fit((train_likelihoods))
+    # lognorm = scipy.stats.gamma(alpha, loc=loc, scale=beta)
+    # print(f'Fitted alpha: {alpha}, loc: {loc}, beta: {beta}')
     # Plot the histogram
     plt.hist(train_likelihoods, bins=75, density=True, alpha=0.6, color='g')
     # Plot the PDF.
     x_min = min(train_likelihoods)
     x_max = max(train_likelihoods)
     x = np.linspace(x_min, x_max, 1000)
-    p = lognorm.pdf(x)
-    c = lognorm.cdf(x)
+    # p = lognorm.pdf(x)
+    # c = lognorm.cdf(x)
     # p = p[::-1]
-    plt.plot(x, p, 'k', linewidth=2, label='PDF')
-    plt.plot(x, c, 'r', linewidth=2, label='CDF')
-    title = "Gamma fit results: alpha = %.2f, loc = %.2f, beta = %.2f" % (alpha, loc, beta)
-    plt.title(title)
+    # plt.plot(x, p, 'k', linewidth=2, label='PDF')
+    # plt.plot(x, c, 'r', linewidth=2, label='CDF')
+    # title = "Gamma fit results: alpha = %.2f, loc = %.2f, beta = %.2f" % (alpha, loc, beta)
+    # plt.title(title)
     plt.legend()
     plt.savefig(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/gen_train_likelihood_hist_fit_all_states.png')
     #     import sys
@@ -665,8 +666,9 @@ def identify_OOD_states(model, train_loader, config):
     all_trajectories = []
     all_likelihoods = []
     all_inds = []
-    for i, (trajectories, ind) in enumerate(tqdm.tqdm(train_loader)):
+    for i, (trajectories, ind, contact) in enumerate(tqdm.tqdm(train_loader)):
         trajectories = trajectories.to(device=config['device'])
+        contact = contact.to(device=config['device'])
         B, T, dxu = trajectories.shape
         trajectories = trajectories.flatten(0, 1)
         # if config['use_class']:
@@ -678,7 +680,8 @@ def identify_OOD_states(model, train_loader, config):
             # likelihood = model.model.diffusion_model.approximate_likelihood(trajectories, context=traj_class)
             start_sine_cosine = trajectories[:, :16]
             start_yaw = convert_sine_cosine_to_yaw(start_sine_cosine)
-            samples, _, likelihood = model.sample(N*trajectories.shape[0], H=config['T'], start=start_sine_cosine.repeat_interleave(N, 0))
+            samples, _, likelihood = model.sample(N*trajectories.shape[0], H=config['T'], start=start_sine_cosine.repeat_interleave(N, 0),
+                                                  constraints=contact.repeat_interleave(N, 0))
             likelihood = likelihood.reshape(-1, N).mean(1)
             samples = samples.cpu().numpy()
             all_trajectories.append(samples)
@@ -724,25 +727,25 @@ def identify_OOD_states(model, train_loader, config):
 def project_OOD_states(model, config):
     # ood_states = np.load(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/ood_states.npy')
     N = 16
-    print(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/gen_train_likelihoods_all_states.pkl')
-    train_likelihoods = np.load(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/gen_train_likelihoods_all_states.pkl', allow_pickle=True)
+    print(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/gen_train_likelihoods_all_states.pkl')
+    train_likelihoods = np.load(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/gen_train_likelihoods_all_states.pkl', allow_pickle=True)
     
     # plt.hist(train_likelihoods, bins=750)
     # plt.xlabel('likelihood')
     # plt.ylabel('Frequency')
     # plt.title('Histogram of training likelihoods (No Outliers)')
     # plt.xlim([-25, 0])
-    # plt.savefig(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/train_likelihood_hist_no_outliers.png')
+    # plt.savefig(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/train_likelihood_hist_no_outliers.png')
 
-    ood_likelihoods = np.load(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/candidate_ood_likelihoods.npy')
-    ood_states = np.load(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/ood_states.npy')
+    ood_likelihoods = np.load(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/candidate_ood_likelihoods.npy')
+    ood_states = np.load(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/ood_states.npy')
 
     quantile = np.quantile(train_likelihoods, config['quantile'])
     print(quantile)
 
     model.model.diffusion_model.cutoff = quantile
-    ood_states = ood_states[(ood_likelihoods < quantile) & (ood_likelihoods > -50)]
-    # ood_states = ood_states[(ood_likelihoods < quantile) & (ood_likelihoods > -75) & (ood_likelihoods < -50)]
+    ood_states = ood_states[(ood_likelihoods < quantile) & (ood_likelihoods > -250)]
+    # ood_states = ood_states[(ood_likelihoods < quantile) & (ood_likelihoods > -75) & (ood_likelihoods < -45)]
 
     # project the ood states to the manifold
     model.model.diffusion_model.classifier = None
@@ -761,7 +764,9 @@ def project_OOD_states(model, config):
         # ood_likelihoods_batch = torch.tensor(ood_likelihoods[i:i+bs]).to(device=config['device'])
         # ood_trajectories_batch = torch.tensor(ood_trajectories[i:i+bs]).to(device=config['device'])
         # with torch.no_grad():
-        projected_samples, _, _, _, (all_losses, all_samples, all_likelihoods) = model.sample(N*bs, H=config['T'], start=ood_states_batch, project=True)
+        projected_samples, _, _, _, (all_losses, all_samples, all_likelihoods) = model.sample(N*bs, H=config['T'], start=ood_states_batch, 
+                constraints=torch.ones(N*bs, 3).to(device=config['device']), 
+                project=True)
         all_projected_samples.append(projected_samples.cpu().numpy())
         all_all_losses.append(all_losses)
         all_all_samples.append([i.numpy() for i in all_samples])
@@ -773,55 +778,55 @@ def project_OOD_states(model, config):
             # all_all_samples_save = np.concatenate(all_all_samples, axis=0)
             # all_all_likelihoods_save = np.concatenate(all_all_likelihoods, axis=0)
 
-            np.save(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/projected_samples.npy', all_projected_states_save)
-            # np.save(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/all_losses.npy', all_all_losses_save)
-            # np.save(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/all_samples.npy', all_all_samples_save)
-            # np.save(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/all_likelihoods.npy', all_all_likelihoods_save)
-            pickle.dump(all_all_losses, open(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/all_losses.pkl', 'wb'))
-            pickle.dump(all_all_samples, open(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/all_samples.pkl', 'wb'))
-            pickle.dump(all_all_likelihoods, open(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/all_likelihoods.pkl', 'wb'))
+            np.save(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/projected_samples.npy', all_projected_states_save)
+            # np.save(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/all_losses.npy', all_all_losses_save)
+            # np.save(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/all_samples.npy', all_all_samples_save)
+            # np.save(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/all_likelihoods.npy', all_all_likelihoods_save)
+            pickle.dump(all_all_losses, open(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/all_losses.pkl', 'wb'))
+            pickle.dump(all_all_samples, open(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/all_samples.pkl', 'wb'))
+            pickle.dump(all_all_likelihoods, open(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/all_likelihoods.pkl', 'wb'))
 
 def visualize_ood_projection(model, config):
     N = 16
-    fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/ood_projection'
-    projected_samples = np.load(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/projected_samples.npy')
-    all_losses = pickle.load(open(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/all_losses.pkl', 'rb'))
-    all_samples = pickle.load(open(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/all_samples.pkl', 'rb'))
-    all_likelihoods = pickle.load(open(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/all_likelihoods.pkl', 'rb'))
+    fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/ood_projection'
+    projected_samples = np.load(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/projected_samples.npy')
+    all_losses = pickle.load(open(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/all_losses.pkl', 'rb'))
+    all_samples = pickle.load(open(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/all_samples.pkl', 'rb'))
+    all_likelihoods = pickle.load(open(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/all_likelihoods.pkl', 'rb'))
 
-    # train_likelihoods = np.load(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/gen_train_likelihoods_all_states.pkl', allow_pickle=True)
+    # train_likelihoods = np.load(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/gen_train_likelihoods_all_states.pkl', allow_pickle=True)
     
     # plt.hist(train_likelihoods, bins=125)
     # plt.xlabel('likelihood')
     # plt.ylabel('Frequency')
     # plt.title('Histogram of training likelihoods')
     # # plt.xlim([-40, 0])
-    # # plt.savefig(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/train_likelihood_hist_no_outliers.png')
-    # plt.savefig(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/train_likelihood_hist_all_states_no_gamma_possible_outliers.png')
+    # # plt.savefig(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/train_likelihood_hist_no_outliers.png')
+    # plt.savefig(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/train_likelihood_hist_all_states_no_gamma_possible_outliers.png')
     # sys.exit()
     # plot the losses
     # plt.hist(all_losses, bins=100)
     # plt.xlabel('loss')
     # plt.ylabel('Frequency')
     # plt.title('Histogram of losses')
-    # plt.savefig(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/loss_hist.png')
+    # plt.savefig(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/loss_hist.png')
 
     # # plot the likelihoods
     # plt.hist(all_likelihoods, bins=100)
     # plt.xlabel('likelihood')
     # plt.ylabel('Frequency')
     # plt.title('Histogram of likelihoods')
-    # plt.savefig(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/likelihood_hist.png')
+    # plt.savefig(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/likelihood_hist.png')
 
     # # plot the samples
     # for i in range(10):
-    #     visualize_trajectories(all_samples[i], config['scene'], f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/ood_samples_{i}', headless=False)
+    #     visualize_trajectories(all_samples[i], config['scene'], f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/ood_samples_{i}', headless=False)
 
     # # plot the projected samples
     # for i in range(10):
-    #     visualize_trajectories(projected_samples[i], config['scene'], f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/ood_projected_samples_{i}', headless=False)
+    #     visualize_trajectories(projected_samples[i], config['scene'], f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/5_10_15/ood_projected_samples_{i}', headless=False)
     if config['model_name'] == 'allegro_high_force_high_eps_pi_6':
-        min_likelihood = -24.739238929748534
+        min_likelihood = -22.618363952636717
         # min_likelihood = -30
     else:
         raise ValueError('Model name not recognized')
@@ -1146,17 +1151,21 @@ if __name__ == "__main__":
             train_dataset.compute_norm_constants()
             model.set_norm_constants(*train_dataset.get_norm_constants())
 
-        print('Dset size', len(train_dataset))
-        
-        print(train_dataset.mean)
-        classes = train_dataset.trajectory_type
-        weights = torch.where(classes[:, 0] == 1, 6636/4668, 1.)
+            print('Dset size', len(train_dataset))
+            
+            print(train_dataset.mean)
+        if 'recovery' in config['data_directory']:
+            classes = train_dataset.trajectory_type
+            # There are three unique classes, defined by the sum of their digits in dim 1. We can use this to weight the sampler
+            weights = [1/(classes.sum(1)).tolist().count(classes[i].sum().item()) for i in range(classes.shape[0])]
 
-        train_sampler = WeightedRandomSampler(weights, len(train_dataset), replacement=True)
+            train_sampler = WeightedRandomSampler(weights, len(train_dataset), replacement=True)
+        else:
+            train_sampler = RandomSampler(train_dataset)
         # train_sampler = None
         train_loader = DataLoader(train_dataset, batch_size=config['batch_size'],
                                 sampler=train_sampler, num_workers=4, pin_memory=True, drop_last=True,
-                                shuffle=False)
+                                )
 
     model = model.to(device=config['device'])
     # i = np.random.randint(low=0, high=len(train_dataset))

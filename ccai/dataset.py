@@ -245,10 +245,10 @@ class AllegroScrewDriverDataset(Dataset):
                             print('No starts')
                             need_to_continue = True
                             break
-                        if len(data['final_likelihoods']) == 1 and data['final_likelihoods'][0] < -50:
-                            print('No Data')
-                            need_to_continue = True
-                            break
+                        # if len(data['final_likelihoods']) == 1 and data['final_likelihoods'][0] < -45:
+                        #     print('No Data')
+                        #     need_to_continue = True
+                        #     break
                     if need_to_continue:
                         continue
                     for t in range(max_T, min_t - 1, -1):
@@ -262,7 +262,7 @@ class AllegroScrewDriverDataset(Dataset):
                                 zero_pad = np.zeros(21)
                                 end_states.append(np.concatenate((traj_data[i], zero_pad)))
                         # print(traj.shape)
-                        classes.append(data[t]['contact_state'][:, None, :])#.repeat(traj.shape[1], axis=1))
+                        classes.append(data[t]['contact_state'][:, None, :])#.repeat(traj.shape[1], axis=1)
                         if not exec_only:
                             # combine traj and starts
                             if use_actual_traj:
@@ -489,7 +489,8 @@ class AllegroScrewDriverStateDataset(Dataset):
                         actual_traj.append(data[t]['starts'][:, :, None, :])
                         traj = data[t]['plans']
                         # print(traj.shape)
-                        classes.append(data[t]['contact_state'][:, None, :].repeat(traj.shape[1], axis=1))
+                        classes.append(data[t]['contact_state'][:, None, :])
+                    classes.append(data[t]['contact_state'][:, None, :])
 
                     # combine traj and starts
                     if use_actual_traj:
@@ -513,10 +514,13 @@ class AllegroScrewDriverStateDataset(Dataset):
         self.trajectories = np.concatenate(trajectories, axis=0)
         self.trajectory_type = np.concatenate(classes, axis=0).reshape(-1, 3)
 
-        # self.trajectories = self.trajectories.reshape(-1, self.trajectories.shape[-2], self.trajectories.shape[-1])
-        self.traj_indices = np.arange(self.trajectories.shape[0]).reshape(-1, 1).repeat(self.trajectories.shape[2], axis=1).reshape(-1, 1)
+        turn_bool = self.trajectory_type.mean(axis=1) == 1
+
         self.trajectories = self.trajectories.reshape(-1, 1, self.trajectories.shape[-1])
-        
+        self.trajectories = self.trajectories[turn_bool]
+
+        self.traj_indices = np.arange(self.trajectories.shape[0]).reshape(-1, 1).repeat(self.trajectories.shape[2], axis=1).reshape(-1, 1)
+
         self.trajectories, self.unique_indices = np.unique(self.trajectories, return_index=True, axis=0)
 
         self.trajectories = torch.from_numpy(self.trajectories).float()
@@ -532,6 +536,9 @@ class AllegroScrewDriverStateDataset(Dataset):
             self.trajectories = self.trajectories[:, :, :15]
         self.trajectory_type = torch.from_numpy(self.trajectory_type)
         self.trajectory_type = 2 * (self.trajectory_type - 0.5)  # scale to be [-1, 1]
+
+        self.trajectory_type = self.trajectory_type[self.unique_traj_indices.squeeze()]
+
 
         print(self.trajectories.shape)
         # TODO consider alternative SO3 representation that is better for learning
@@ -557,6 +564,7 @@ class AllegroScrewDriverStateDataset(Dataset):
     def __getitem__(self, idx):
         traj = self.trajectories[idx]
         ind = self.unique_traj_indices[idx]
+        contact = self.trajectory_type[ind]
 
         # TODO: figure out how to do data augmentation on screwdriver angle
         # a little more complex due to rotation representation
@@ -572,7 +580,7 @@ class AllegroScrewDriverStateDataset(Dataset):
                 dx = dx + 1
                 traj = torch.cat((traj_q, torch.cos(traj_theta), torch.sin(traj_theta), traj_u), dim=1)
 
-        return traj, ind
+        return traj, ind, contact
 
     def compute_norm_constants(self):
         # compute norm constants not including the zero padding

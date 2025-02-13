@@ -18,6 +18,8 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
 config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
 
+
+
 def add_text_to_imgs(imgs, labels):
     imgs_with_txt = []
     for i, img in enumerate(imgs):
@@ -28,6 +30,8 @@ def add_text_to_imgs(imgs, labels):
         # Show image
         imgs_with_txt.append(np.asarray(img))
     return imgs_with_txt
+
+dirpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/csvgd')
 
 # for trial_num in range(10):
 
@@ -41,16 +45,35 @@ def add_text_to_imgs(imgs, labels):
 #Full
 # for trial_num in [8, 9]:
 
-for trial_num in [0]:
-    fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/csvgd/trial_{trial_num + 1}')
+# Get all possible trial_inds by reading the names of all directories in dirpath. Structure is trial_{trial_ind}
+trial_inds = [int(d.split('_')[-1]) for d in os.listdir(dirpath) if d[:5] == 'trial']
 
-    isaac_imgs = [fpath / img for img in sorted(os.listdir(fpath)) if img[-3:] == 'png'][6:]
+# for trial_num in trial_inds:
+for trial_num in [32]:
+    fpath = dirpath / f'trial_{trial_num}'
+
+    offset_ind = 6 if config['live_recovery'] else 0
+    isaac_imgs = [fpath / img for img in sorted(os.listdir(fpath)) if img[-3:] == 'png'][offset_ind:]
     isaac_imgs = [imageio.imread(img) for img in isaac_imgs]
 
-    text = 'thumb_middle'
-    if trial_num == 0:
-        pause_inds = [(0, 'thumb_middle'), (len(isaac_imgs)-1, ''), (36-6, 'index'), (72-6, 'turn')]
+    # Read the names of all directories in fpath
+    c_mode_dirs = [str(d) for d in fpath.iterdir() if d.is_dir() and 'turn' in str(d).split('/')[-1] or 'thumb_middle' in str(d).split('/')[-1] or 'index' in str(d).split('/')[-1]]
+    # Each element of c_mode_dirs has structure mode_ind. We want to sort by ind
+    c_mode_dirs = sorted([(int(dir_n.split('_')[-1]), dir_n) for dir_n in c_mode_dirs if dir_n[-2] == '_' or dir_n[-3] == '_'])
 
+    # Construct pause_inds. This is a dictionary where the key is the index of the image to pause at and the value is the text to display. Use c_mode_dirs to construct this. Each c_mode is 24 images long
+    pause_inds_name_dict = {
+        'turn': 'all',
+        'thumb_middle_regrasp': 'index',
+        'index_regrasp': 'thumb_middle'
+    }
+    
+    pause_inds = []
+    for i, (ind, dir_n) in enumerate(c_mode_dirs):
+        pause_inds.append((ind*24-offset_ind, pause_inds_name_dict[dir_n.split('/')[-1][:-2]]))
+
+    # Add final pause
+    pause_inds.append((len(isaac_imgs)-1, ''))
 
     # if trial_num == 1:
     #     pause_inds = [(0, 'turn'), (len(isaac_imgs)-1, ''), (21-6, 'thumb_middle'), (33-6, 'thumb_middle'), (45-6, 'turn')]
@@ -79,6 +102,9 @@ for trial_num in [0]:
     x0 = 675
     y0 = 750
     width = 300
+    text_y = y0 - 450  # Adjust text position relative to progress bar
+    progress_bar_y = y0 + 20
+    progress_bar_x = x0 + width
     # Add a progress bar to the gif by editing each image. Overwrite the original images
     imgs_with_progress_bar = []
     start_end_buffer = 15
@@ -94,18 +120,31 @@ for trial_num in [0]:
         idx, img = new_isaac_imgs[i]
         if idx in pause_inds and pause_inds[idx] != '':
             text = pause_inds[idx]
-        shape = img.shape
-        # Add progress bar to image. Should be green rectangle that grows depending on i
+            
+        # Add elements to full image
         img = Image.fromarray(img)
         draw = ImageDraw.Draw(img)
-        draw.rectangle([x0, y0, x0 + width * idx /(len(isaac_imgs)), y0 + 20], fill='green')
-        font = ImageFont.load_default()
-        # color = (255, 255, 255) if text == 'turn' else (255, 0, 0)
-        color = (255, 0, 0)
-        draw.text(((x0+y0)//2-10, shape[1]//2-510), text, color, font_size=30, align='center')
+        
+        # Draw progress bar
+        draw.rectangle([x0, y0, x0 + width * (idx)/(len(isaac_imgs)-1), y0 + 20], 
+                      fill='green')
+        
+        # Draw text
+        font = ImageFont.load_default(size=30)
+        draw.text((x0 + width//2, text_y), text, (255, 0, 0), 
+                 font=font, anchor="mm")
+                 
+        # Convert to numpy
         img = np.asarray(img).copy()
-        img[0, 0] = np.random.randint(0, 255, 4)
+        
+        # Crop after adding elements
+        crop_top = text_y - 40  # Above text
+        crop_bottom = y0 + 20  # Below progress bar
+        img = img[crop_top:crop_bottom, x0:x0+width]
+        
+        img[0, 0] += np.array([0, 0, 0, 2 * (i % 2) - 1]).astype(np.uint8)
         imgs_with_progress_bar.append(img)
+
     if len(imgs_with_progress_bar) > 0:
         imageio.mimsave(f'{fpath}/isaac_extra_pause_text.gif', imgs_with_progress_bar, loop=0)
 
