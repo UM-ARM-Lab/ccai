@@ -2508,7 +2508,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
             x_last = xu[-1, :self.num_fingers * 4 + self.obj_dof]
             goal_cost = 1 * (x_last - goal).pow(2)
             goal_cost += 1 * (xu[:-1, :self.num_fingers * 4 + self.obj_dof] - goal).pow(2).sum(0)
-            goal_cost_weight = torch.ones_like(goal_cost) * .1
+            goal_cost_weight = torch.ones_like(goal_cost) * .3
             goal_cost_weight[-self.obj_dof:] = 1
             goal_cost = goal_cost * goal_cost_weight
             goal_cost = goal_cost.sum()
