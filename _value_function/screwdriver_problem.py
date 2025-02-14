@@ -381,20 +381,20 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, per
 
         if params['visualize_plan']:
             pass
-            # iter_set = [('initial_samples', initial_samples)]
-            # for (name, traj_set) in iter_set:
-            #     for k in range(params['N']):
-            #         traj_for_viz = traj_set[k, :, :planner.problem.dx]
-            #         tmp = torch.zeros((traj_for_viz.shape[0], 1),
-            #                         device=traj_for_viz.device)  # add the joint for the screwdriver cap
-            #         traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
-            #         viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/{name}/{k}")
-            #         img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
-            #         gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
-            #         pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
-            #         pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-            #         visualize_trajectory(traj_for_viz, turn_problem.contact_scenes, viz_fpath,
-            #                             turn_problem.fingers, turn_problem.obj_dof + 1)
+            iter_set = [('initial_samples', initial_samples)]
+            for (name, traj_set) in iter_set:
+                for k in range(params['N']):
+                    traj_for_viz = traj_set[k, :, :planner.problem.dx]
+                    tmp = torch.zeros((traj_for_viz.shape[0], 1),
+                                    device=traj_for_viz.device)  # add the joint for the screwdriver cap
+                    traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
+                    viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/{name}/{k}")
+                    img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
+                    gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
+                    pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
+                    pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
+                    visualize_trajectory(traj_for_viz, regrasp_problem.contact_scenes, viz_fpath,
+                                        regrasp_problem.fingers, regrasp_problem.obj_dof + 1)
 
         torch.cuda.empty_cache()
 
@@ -568,20 +568,20 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
 
         if params['visualize_plan']:
             pass
-            # iter_set = [('initial_samples', initial_samples)]
-            # for (name, traj_set) in iter_set:
-            #     for k in range(params['N']):
-            #         traj_for_viz = traj_set[k, :, :planner.problem.dx]
-            #         tmp = torch.zeros((traj_for_viz.shape[0], 1),
-            #                         device=traj_for_viz.device)  # add the joint for the screwdriver cap
-            #         traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
-            #         viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/{name}/{k}")
-            #         img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
-            #         gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
-            #         pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
-            #         pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-            #         visualize_trajectory(traj_for_viz, turn_problem.contact_scenes, viz_fpath,
-            #                             turn_problem.fingers, turn_problem.obj_dof + 1)
+            iter_set = [('initial_samples', initial_samples)]
+            for (name, traj_set) in iter_set:
+                for k in range(params['N']):
+                    traj_for_viz = traj_set[k, :, :planner.problem.dx]
+                    tmp = torch.zeros((traj_for_viz.shape[0], 1),
+                                    device=traj_for_viz.device)  # add the joint for the screwdriver cap
+                    traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
+                    viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/{name}/{k}")
+                    img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
+                    gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
+                    pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
+                    pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
+                    visualize_trajectory(traj_for_viz, turn_problem.contact_scenes, viz_fpath,
+                                        turn_problem.fingers, turn_problem.obj_dof + 1)
 
         torch.cuda.empty_cache()
 
