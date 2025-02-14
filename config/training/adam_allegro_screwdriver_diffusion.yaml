@@ -1,5 +1,5 @@
 ---
-model_name: 'adam_diffusion'
+model_name: 'adam'
 T: 13
 dx: 15
 du: 21
@@ -10,7 +10,7 @@ train_classifier: False
 eval_classifier: False
 plot: False
 vis_dataset: False
-epochs: 10000
+epochs: 5000 #10000
 classifier_epochs: 100
 batch_size: 256
 lr: 1.0e-4
@@ -20,7 +20,7 @@ inverse_dynamics: False
 data_directory: 'allegro_recovery_and_orig'
 device: 'cuda:0'
 test_every: 10001
-save_every: 10
+save_every: 500
 normalize_data: True
 constraint_embedding_dim: 64
 constrained: False

@@ -10,7 +10,7 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 import torch
 
-experiment_name = 'test_method_both02'
+experiment_name = 'test_method_bothtuned'
 # experiment_name = 'test_method_easybig2'
 
 filename = f'test/{experiment_name}.pkl'
@@ -134,6 +134,8 @@ if __name__ == "__main__":
 
         print(f'Average cost difference (no_vf - vf): {mean_diff}')
         print(f'Percent decrease in cost: {percent_decrease:.2f}%')
+        print(f'Average cost (no_vf): {mean_no_vf}')
+        print(f'Average cost (vf): {mean_vf}')
 
     plt.tight_layout()
     plt.show()

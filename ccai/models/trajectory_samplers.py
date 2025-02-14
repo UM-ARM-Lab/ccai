@@ -177,7 +177,7 @@ class TrajectoryDiffusionModel(nn.Module):
             condition = None
         return condition
     
-    def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None, project=False):
+    def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None, project=False, no_grad=True, skip_likelihood=False):
         # B, N, _ = constraints.shape
         context = self.construct_context(constraints)
 
@@ -185,10 +185,11 @@ class TrajectoryDiffusionModel(nn.Module):
 
         if project:
             samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.diffusion_model.project(N=N, H=H, context=context, condition=condition)
+            return samples, samples_0, (all_losses, all_samples, all_likelihoods)
         else:
-            samples = self.diffusion_model.sample(N=N, H=H, context=context, condition=condition)  # .reshape(-1, H#,
+            samples = self.diffusion_model.sample(N=N, H=H, context=context, condition=condition, no_grad=no_grad, skip_likelihood=skip_likelihood)  # .reshape(-1, H#,
         #         self.dx + self.du)
-        return samples, samples_0, (all_losses, all_samples, all_likelihoods)
+            return samples
 
     def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
         B = trajectories.shape[0]
@@ -276,11 +277,10 @@ class TrajectoryCNFModel(TrajectoryCNF):
 
         if project:
             samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.project(H=H, context=context, condition=condition)
-            return samples, samples_0, (all_losses, all_samples, all_likelihoods)
         else:
             samples = self._sample(H=H, context=context, condition=condition)  # .reshape(-1, H#,
         #         self.dx + self.du)
-            return samples
+        return samples, samples_0, (all_losses, all_samples, all_likelihoods)
 
 
     def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
@@ -337,7 +337,7 @@ class TrajectorySampler(nn.Module):
     def send_norm_constants_to_submodels(self):
         self.model.set_norm_constants(self.x_mean, self.x_std)
 
-    def sample(self, N, H=10, start=None, goal=None, constraints=None, past=None, project=False):
+    def sample(self, N, H=10, start=None, goal=None, constraints=None, past=None, project=False, no_grad=True, skip_likelihood=False):
         norm_start = None
         norm_past = None
         if start is not None and self.type != 'latent_diffusion':
@@ -348,11 +348,10 @@ class TrajectorySampler(nn.Module):
             norm_past = (past - self.x_mean) / self.x_std
         else:
             norm_past = past
-
         if project:
             samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project)
         else:
-            samples = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project)
+            samples = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project, no_grad=no_grad, skip_likelihood=skip_likelihood)
         # if len(samples) == N:
         #     x = samples
         #     c = None
@@ -367,6 +366,8 @@ class TrajectorySampler(nn.Module):
         if self.type != 'latent_diffusion':
             if project:
                 return x * self.x_std + self.x_mean, c, likelihood, samples_0 * self.x_std + self.x_mean, (all_losses, all_samples, all_likelihoods)
+            elif not no_grad:
+                return x, c, likelihood
             else:
                 return x * self.x_std + self.x_mean, c, likelihood
         else:

@@ -209,9 +209,10 @@ class GaussianDiffusion(nn.Module):
 
         self.classifier_guidance = torch.vmap(torch.func.jacrev(self._classifier_guidance, argnums=1))
 
-    def add_classifier(self):
+    def add_classifier(self, dim_mults=(1,2)):
         #self.classifier = BinaryClassifier()
-        self.classifier = UnetClassifier(self.horizon, self.xu_dim, cond_dim=self.context_dim, dim=self.hidden_dim)
+        self.classifier = UnetClassifier(self.horizon, self.xu_dim, cond_dim=self.context_dim, dim=self.hidden_dim,
+                                         dim_mults=dim_mults)
 
     def predict_start_from_noise(self, x_t, t, noise):
         return (
@@ -253,6 +254,7 @@ class GaussianDiffusion(nn.Module):
             B, N, _ = context.shape
         guidance_weights = torch.tensor([0.5, 0.5], device=x.device)
         w_total = 1.2
+        # w_total = 2.4
         unconditional, _ = self.model.compiled_unconditional_test(t, x)
         if not (context is None or self.unconditional):
             num_constraints = context.shape[1]
@@ -333,7 +335,8 @@ class GaussianDiffusion(nn.Module):
 
         torch.clip_(x[:, :, :len(lb)], min=lb, max=ub)
         for t, (start_idx, val) in condition.items():
-            val = val.reshape(val.shape[0], -1, val.shape[-1])
+            num_repeats = x.shape[0] // val.shape[0]
+            val = val.reshape(val.shape[0], -1, val.shape[-1]).repeat_interleave(num_repeats, 0)
             n, h, d = val.shape
             x[:, t:t + h, start_idx:start_idx + d] = val.clone()
         return x
@@ -460,7 +463,7 @@ class GaussianDiffusion(nn.Module):
         ret = img if not return_all_timesteps else torch.stack(imgs, dim=1)
         return ret
 
-    def sample(self, N, H=None, condition=None, context=None, return_all_timesteps=False, no_grad=True):
+    def sample(self, N, H=None, condition=None, context=None, return_all_timesteps=False, no_grad=True, skip_likelihood=False):
         B = 1
         if H is None:
             H = self.horizon
@@ -468,7 +471,7 @@ class GaussianDiffusion(nn.Module):
         if context is not None:
             N2, num_constraints, dc = context.shape
             assert N2 == N
-
+            context = context.squeeze(1)
             # context = context.reshape(B, 1, num_constraints, dc).repeat(1, N, 1, 1).reshape(B * N, num_constraints, -1)
 
         sample_fn = self.p_sample_loop if not self.is_ddim_sampling else self.ddim_sample
@@ -485,11 +488,19 @@ class GaussianDiffusion(nn.Module):
                                               return_all_timesteps=return_all_timesteps)
 
             if self.classifier is not None:
-                likelihood = self.classifier(
-                    torch.zeros(B *N * factor, device=sample.device),
+                real_pred, class_pred = self.classifier(
+                    # torch.zeros(B *N * factor, device=sample.device),
                     sample.reshape(-1, self.horizon, self.xu_dim),
                     context=context.reshape(-1, self.context_dim)
-                ).reshape(B*N, factor)
+                )
+                real_pred = real_pred.reshape(B*N, factor)
+                class_pred = class_pred.reshape(B*N, factor)
+                class_pred = nn.functional.softmax(class_pred)
+                class_label = (context.sum(1) + 1)/2
+
+                correct_class_prob = class_pred.gather(1, class_label)
+
+                likelihood = real_pred * correct_class_prob
             else:
                 likelihood = self.approximate_likelihood(sample.reshape(-1, self.horizon, self.xu_dim)).reshape(B*N, factor)
 
@@ -503,20 +514,28 @@ class GaussianDiffusion(nn.Module):
             # sample = torch.cat(combined_samples, dim=1)
             return sample, likelihood
 
-        sample = sample_fn((B * N, H, self.xu_dim), condition=condition, context=context.squeeze(1),
+        sample = sample_fn((B * N, H, self.xu_dim), condition=condition, context=context,
                          return_all_timesteps=return_all_timesteps)
+        likelihood = None
+        if not skip_likelihood:
+            if self.classifier is not None:
+                real_pred, class_pred = self.classifier(
+                    # torch.zeros(B *N * factor, device=sample.device),
+                    sample.reshape(-1, self.horizon, self.xu_dim),
+                    context=context.reshape(-1, self.context_dim)
+                )
+                class_pred = nn.functional.softmax(class_pred, dim=1)
+                class_label = (context.sum(1) + 1)/2
 
-        if self.classifier is not None:
-            likelihood = self.classifier(
-                torch.zeros(B * N, device=sample.device),
-                sample.reshape(-1, self.horizon, self.xu_dim),
-                context=context.reshape(-1, self.context_dim)
-            )
-        else:
-            # return sample, None
-            if not no_grad:
-                sample.requires_grad = True
-            likelihood = self.approximate_likelihood(sample.reshape(-1, self.horizon, self.xu_dim), context=context.reshape(-1, self.context_dim))
+                correct_class_prob = class_pred.gather(1, class_label.long().reshape(-1, 1))
+
+                likelihood = real_pred * correct_class_prob
+                # likelihood = correct_class_prob
+            else:
+                # return sample, None
+                if not no_grad:
+                    sample.requires_grad = True
+                likelihood = self.approximate_likelihood(sample.reshape(-1, self.horizon, self.xu_dim), context=context.reshape(-1, self.context_dim) if context is not None else None)
 
         return sample, likelihood
 
@@ -619,6 +638,8 @@ class GaussianDiffusion(nn.Module):
         t = torch.arange(1, self.num_timesteps, device=device).long()
         # t = torch.arange(1, self.num_timesteps, 8, device=device).long()
         # t = torch.arange(5, 30, 2, device=device).long()
+        # if hasattr(self, 'subsampled_t'):
+        # t = torch.tensor([5, 10, 15], device=device).long()
 
         N = t.shape[0]
         t = t[None, :].repeat(B, 1).reshape(B * N)
@@ -630,15 +651,17 @@ class GaussianDiffusion(nn.Module):
         # compute the posterior q(t-1 | t, 0)
         q_next_x = self.q_posterior(x_start=x_0, x_t=x_t, t=t)
 
-        context = context.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1)
+        context = context.reshape(B, 1, -1).repeat(1, N, 1).reshape(B * N, -1) if context is not None else None
 
         # Compute our diffusing step from t to t-1
         # p_next_x = self.p_mean_variance(x=x_t, t=t, context=context)
-        batch_size = 256
+        batch_size = 2048
+        # batch_size = 8
+        # batch_size = 1
         all_p_next_x = []
-        for i in range(0, B * N, batch_size):
-            p_next_x = self.p_mean_variance(x=x_t[i:i + batch_size], t=t[i:i + batch_size], context=context[i:i + batch_size])
-            all_p_next_x.append(p_next_x)
+        for i in (range(0, B * N, batch_size)):
+            p_next_x = self.p_mean_variance(x=x_t[i:i + batch_size], t=t[i:i + batch_size], context=context[i:i + batch_size] if context is not None else None)
+            all_p_next_x.append((p_next_x[0], p_next_x[1]))
         # p_next_x = {k: torch.cat([p[k] for p in p_next_x], dim=0) for k in all_p_next_x[0].keys()}
         p_next_x = [torch.cat([p[k] for p in all_p_next_x], dim=0) for k in range(2)]
 
@@ -646,42 +669,60 @@ class GaussianDiffusion(nn.Module):
             kl_x = self._gaussian_kl(p_next_x[0], p_next_x[1], q_next_x[0], q_next_x[1])
         else:
             kl_x = self._gaussian_kl(q_next_x[0], q_next_x[1], p_next_x[0], p_next_x[1])
-        overall_kl = kl_x.reshape(B, N).mean(dim=1)
+        overall_kl = kl_x.reshape(B, N).mean(dim=1).to(x.device)
         return -overall_kl
-    
+ 
     def project(self, N, H=None, condition=None, context=None):
+
+        min_likelihood = self.cutoff
+
         x = condition[0][1]
+        B = x.shape[0]
         x.requires_grad = True
-        optimizer = torch.optim.SGD([x], lr=3.5, momentum=0.5)
+        grad_mask = torch.ones_like(x)
+        optimizer = torch.optim.SGD([x], lr=1, momentum=0.5)
         all_samples = []
         all_losses = []
         all_likelihoods = []
-        for proj_t in tqdm(range(25)):
+        broke = False
+        for proj_t in tqdm(range(15)):
             optimizer.zero_grad()
             # Sample N trajectories
             samples, likelihoods = self.sample(N, H, condition=condition, context=context, no_grad=False)
-            all_samples.append(samples.clone().detach())
-            all_likelihoods.append(likelihoods.clone().detach())
+            all_samples.append(samples.clone().detach().cpu())
+            all_likelihoods.append(likelihoods.clone().detach().cpu())
+            likelihood_reshape = likelihoods.reshape(B, -1).mean(1)
+            grad_mask[likelihood_reshape >= min_likelihood] = 0.0
+
             if proj_t == 0:
                 samples_0 = samples.clone().detach()
+            if grad_mask.sum() == 0:
+                likelihoods_loss = -likelihoods.mean()
+                likelihoods_loss.backward()
+                broke = True
+                break
             likelihoods_loss = -likelihoods.mean()
             all_losses.append(likelihoods_loss.item())
-            print(f'Projection step: {proj_t}, Loss: {likelihoods_loss.item()}')
+            print(f'Projection step: {proj_t}, Loss: {-likelihoods.mean(0)}')
             likelihoods_loss.backward()
-            x.grad = samples.grad[:, 0, :self.dx].mean(0).reshape(x.shape)
+            x.grad = samples.grad.reshape(B, 16, self.horizon, -1)[:, :, 0, :self.dx].mean(1) * grad_mask
             print(x.grad)
             # x.grad[:, -2:] = 0.0
 
             optimizer.step()
-        samples, likelihoods = self.sample(N, H, condition=condition, context=context, no_grad=False)
-        all_samples.append(samples.clone().detach())
-        all_likelihoods.append(likelihoods.clone().detach())
-        likelihoods_loss = -likelihoods.mean(0)
-        all_losses.append(likelihoods_loss.item())
-        print(f'Projection step: {proj_t+1}, Loss: {likelihoods_loss.item()}')
-        likelihoods_loss.backward()
-        best_sample = all_samples[np.argmin(all_losses)]
-        best_likelihood = all_likelihoods[np.argmin(all_losses)]
+            condition[0][1] = x.detach()
+
+        if not broke:
+            samples, likelihoods = self.sample(N, H, condition=condition, context=context, no_grad=False)
+            all_samples.append(samples.clone().detach().cpu())
+            all_likelihoods.append(likelihoods.clone().detach().cpu())
+            likelihoods_loss = -likelihoods.mean(0)
+            all_losses.append(likelihoods_loss.item())
+            likelihoods_loss.backward()
+
+        print(f'Projection step: {proj_t+1}, Loss: {-likelihoods.mean(0)}')
+        best_sample = all_samples[-1].to(x.device)
+        best_likelihood = all_likelihoods[-1].to(x.device)
         return (best_sample, best_likelihood), samples_0, (all_losses, all_samples, all_likelihoods)
 
     @staticmethod
@@ -700,30 +741,51 @@ class GaussianDiffusion(nn.Module):
         b = x_start.shape[0]
         x = x_start.reshape(b, -1, self.xu_dim)
         device = x.device
-        t = torch.randint(0, self.num_timesteps, (b,), device=device).long()
-        noise = default(noise, lambda: torch.randn_like(x_start))
+        # t = torch.randint(0, self.num_timesteps, (b,), device=device).long()
+        # noise = default(noise, lambda: torch.randn_like(x_start))
 
-        x = self.q_sample(x_start=x_start, t=t, noise=noise)
-        # mask defines in-painting, model should receive un-noised copy of masked states
-        # note -- only mask states, not controls
-        masked_idx = (mask == 0).nonzero()
-        x[masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]] = x_start[
-            masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]]
+        # x = self.q_sample(x_start=x_start, t=t, noise=noise)
+        # # mask defines in-painting, model should receive un-noised copy of masked states
+        # # note -- only mask states, not controls
+        # masked_idx = (mask == 0).nonzero()
+        # x[masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]] = x_start[
+        #     masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]]
 
         # get weights
         #eps, h = self.model(t, x, context, dropout=False)
-        pred_label = self.classifier(t, x, context)
+        real_pred, class_pred = self.classifier(x)
+
+        class_label = (context.sum(1) + 1)/2
 
         #print(torch.where(torch.isnan(h)))
         #print(torch.where(torch.isnan(x)))
 
-        loss = loss_fn(pred_label, label)
-        loss = torch.mean(extract(torch.sqrt(self.betas), t, loss.shape) * loss)
+        loss = loss_fn(real_pred, label)
+
+        loss += self.classifier.class_loss(class_pred, class_label.long())
+
+        # x = 5363
+        # y = 7987-5363
+        # x = (128614+28214)/2
+        # y = 128614-x
+
+        x = 1
+        y = 1
+        weight = torch.where(context[:, 0] == 1, x/y, 1.)
+        loss_scaled = (loss *weight).mean()
+
+        loss_scaled = loss.mean()
+        # loss = torch.mean(extract(torch.sqrt(self.betas), t, loss.shape) * loss)
 
         # accuracy
-        pred = torch.round(pred_label)
-        accuracy = torch.mean(torch.where(pred == label, 1.0, 0.0))
-        return loss, accuracy
+        pred_real = torch.round(real_pred)
+        pred_class = class_pred.argmax(1)
+        real_label_match = (pred_real == label)
+        class_label_match = (pred_class == class_label)
+        full_accuracy = torch.mean(torch.where(real_label_match & class_label_match, 1.0, 0.0))
+        real_accuracy = torch.mean(torch.where(real_label_match, 1.0, 0.0))
+        class_accuracy = torch.mean(torch.where(class_label_match, 1.0, 0.0))
+        return loss_scaled, full_accuracy, real_accuracy, class_accuracy
 
 class JointDiffusion(GaussianDiffusion):
     """

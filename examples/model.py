@@ -1,7 +1,7 @@
 from collections import namedtuple
 
 # from controller import QPControllerLayer
-from vae import VAE
+from examples.vae import VAE
 import torch
 import numpy as np
 import matplotlib.pyplot as plt

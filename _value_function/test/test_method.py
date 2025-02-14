@@ -105,22 +105,25 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'both02'
+    test_name = 'diff'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    n_trials = 8
+    n_trials = 3
     n_repeat = 1
-    perception_noise = 0.0
+    perception_noise = 0.015
 
+    calc_vf = True
+    calc_diffusion = True
     calc_novf = True
-    calc_last_step = False
 
-    method_names = ['vf']
+    method_names = []
+    if calc_vf:
+        method_names.append("vf")
     if calc_novf:
         method_names.append("no_vf")
-    if calc_last_step:
-        method_names.append("last_step")
+    if calc_diffusion:
+        method_names.append("diffusion")
 
     max_screwdriver_tilt = 0.015
     screwdriver_noise_mag = 0.015
@@ -132,10 +135,6 @@ if __name__ == '__main__':
     vf_weight_rg = 5.0
     other_weight_rg = 1.9
     variance_ratio_rg = 10.0
-
-    # vf_weight_rg = 0.0
-    # other_weight_rg = 10.0
-    # variance_ratio_rg = 0.0
 
     vf_weight_t = 3.3
     other_weight_t = 1.9
@@ -174,63 +173,66 @@ if __name__ == '__main__':
         env.frame_id = 0
        
         pregrasp_pose = pregrasps[pregrasp_index]
-        env.reset(dof_pos= pregrasp_pose)
-       
-        regrasp_pose_vf, regrasp_traj_vf, regrasp_plan = regrasp(
-                env, config, chain, state2ee_pos_partial, perception_noise=0,
-                image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters, model_name = "ensemble_rg",
-                vf_weight=vf_weight_rg, other_weight=other_weight_rg, variance_ratio=variance_ratio_rg
-        )
-       
-        _, turn_pose_vf, succ_vf, turn_traj_vf, turn_plan = do_turn(
-            regrasp_pose_vf, config, env,
-            sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
-            perception_noise=0, image_path=img_save_dir, iters=turn_iters,mode='vf',
-            model_name="ensemble_t", initial_yaw = regrasp_pose_vf[0, -2],
-            vf_weight=vf_weight_t, other_weight=other_weight_t, variance_ratio=variance_ratio_t
-        )
 
-        # Store the VF approach result
-        result_vf = [pregrasp_pose, regrasp_pose_vf, regrasp_traj_vf, turn_pose_vf, turn_traj_vf]
-        checkpoint['results']['vf'][combo_tuple] = result_vf
+        if calc_vf:
+            env.reset(dof_pos= pregrasp_pose)
+        
+            regrasp_pose_vf, regrasp_traj_vf, regrasp_plan = regrasp(
+                    env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
+                    image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters, model_name = "ensemble_rg",
+                    vf_weight=vf_weight_rg, other_weight=other_weight_rg, variance_ratio=variance_ratio_rg
+            )
+        
+            _, turn_pose_vf, succ_vf, turn_traj_vf, turn_plan = do_turn(
+                regrasp_pose_vf, config, env,
+                sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
+                perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='vf',
+                model_name="ensemble_t", initial_yaw = regrasp_pose_vf[0, -2],
+                vf_weight=vf_weight_t, other_weight=other_weight_t, variance_ratio=variance_ratio_t
+            )
+
+            # Store the VF approach result
+            result_vf = [pregrasp_pose, regrasp_pose_vf, regrasp_traj_vf, turn_pose_vf, turn_traj_vf]
+            checkpoint['results']['vf'][combo_tuple] = result_vf
+
+        if calc_diffusion:
+
+            env.reset(dof_pos= pregrasp_pose)
+           
+            regrasp_pose_diffusion, regrasp_traj_diffusion, regrasp_plan = regrasp(
+                env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
+                use_diffusion=True,
+                image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
+            )
+       
+            _, turn_pose_diffusion, succ_diffusion, turn_traj_diffusion, turn_plan = do_turn(
+                regrasp_pose_diffusion, config, env,
+                sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
+                use_diffusion=True,
+                perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf',
+            )
+           
+            result_diffusion = [pregrasp_pose, regrasp_pose_diffusion, regrasp_traj_diffusion, turn_pose_diffusion, turn_traj_diffusion]
+            checkpoint['results']['diffusion'][combo_tuple] = result_diffusion
 
         if calc_novf:
 
             env.reset(dof_pos= pregrasp_pose)
            
             regrasp_pose_novf, regrasp_traj_novf, regrasp_plan = regrasp(
-                env, config, chain, state2ee_pos_partial, perception_noise=0,
+                env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
             )
        
             _, turn_pose_novf, succ_novf, turn_traj_novf, turn_plan = do_turn(
                 regrasp_pose_novf, config, env,
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
-                perception_noise=0, image_path=img_save_dir, iters=turn_iters,mode='no_vf',
+                perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf',
             )
            
             result_novf = [pregrasp_pose, regrasp_pose_novf, regrasp_traj_novf, turn_pose_novf, turn_traj_novf]
             checkpoint['results']['no_vf'][combo_tuple] = result_novf
-
-       
-        if calc_last_step:
-
-            env.reset(dof_pos= pregrasp_pose)
-           
-            regrasp_pose_last, regrasp_traj_last, regrasp_plan_last = regrasp(
-                env, config, chain, state2ee_pos_partial, perception_noise=0,
-                image_path=img_save_dir, initialization=pregrasp_pose, mode='last_step', iters=regrasp_iters,
-            )
-       
-            _, turn_pose_last, succ_last, turn_traj_last, turn_plan_last = do_turn(
-                regrasp_pose_novf, config, env,
-                sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
-                perception_noise=0, image_path=img_save_dir, iters=turn_iters,mode='last_step',
-            )
-           
-            result_novf = [pregrasp_pose, regrasp_pose_last, regrasp_traj_last, turn_pose_last, turn_traj_last]
-            checkpoint['results']['last_step'][combo_tuple] = result_novf
-
+            
         checkpoint['tested_combinations'].add(combo_tuple)
         save_checkpoint(checkpoint)
 
