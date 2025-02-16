@@ -38,6 +38,9 @@ if __name__ == "__main__":
             regrasp_plan = list(regrasp_plan)
             turn_plan = list(turn_plan)
 
+            regrasp_poses = [t.numpy() for t in regrasp_poses]
+            turn_poses = list(turn_poses)
+        
             ########### Remove corrupted data ##########
 
             original_length = len(turn_trajs)
@@ -45,20 +48,22 @@ if __name__ == "__main__":
                 if turn_trajs[i].shape[0] != 13 or regrasp_trajs[i].shape[0] != 13:
                     print("Broken trajectory removed")
 
+                    regrasp_poses.pop(i)
+                    turn_poses.pop(i)
+
                     regrasp_trajs.pop(i)
                     turn_trajs.pop(i)
 
                     regrasp_plan.pop(i)
                     turn_plan.pop(i)
             
+            regrasp_poses = np.array(regrasp_poses)
+            turn_poses = np.array(turn_poses)
             turn_trajs = np.array(turn_trajs)
             regrasp_trajs = np.array(regrasp_trajs)
             
             ###### Calculate turn costs to filter out bad trials ######
-
-            regrasp_poses = np.array([t.numpy() for t in regrasp_poses]).reshape(-1, 20)
-            turn_poses = np.array(turn_poses).reshape(-1, 20)
-
+            
             good_turn_trajs = np.empty((0, 13, 20))
             good_regrasp_trajs = np.empty((0, 13, 20))
             good_regrasp_plans = []
@@ -133,12 +138,6 @@ if __name__ == "__main__":
                         traj[:idx] = actual_turn_trajs[trial,:idx,:]
                         traj[idx:] = turn_plans[idx-1]
                         dataset_trajs_turn = np.vstack((dataset_trajs_turn, traj.reshape(1,13,36)))
-
-    ###############################################################################################
-    
-    # 
-
-    ###############################################################################################
 
     # pad regrasp trajs with 0s
     padding = np.zeros((dataset_trajs_regrasp.shape[0],13,6))

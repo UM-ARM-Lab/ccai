@@ -146,7 +146,7 @@ def train_model(trajectory_sampler, train_loader, config):
                 torch.save(model.state_dict(),
                            f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
     if config['use_ema']:
-        torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
+        torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}_{epoch}_epoch.pt')
     else:
         torch.save(model.state_dict(),
                    f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')

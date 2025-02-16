@@ -10,7 +10,7 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 import torch
 
-experiment_name = 'test_method_diff'
+experiment_name = 'test_method_diff1'
 # experiment_name = 'test_method_easybig2'
 
 filename = f'test/{experiment_name}.pkl'
@@ -105,16 +105,16 @@ if __name__ == "__main__":
         )
 
         # Plot predicted costs with error bars
-        plt.errorbar(
-            x_pred,
-            data[method_name]['pred_costs'],
-            yerr=data[method_name]['pred_stds'],
-            fmt='x',   # different marker shape
-            label=f'Predicted Cost (method name: {method_name.upper()})',
-            linestyle='None',
-            capsize=3,
-            color=colors[method_i]
-        )
+        # plt.errorbar(
+        #     x_pred,
+        #     data[method_name]['pred_costs'],
+        #     yerr=data[method_name]['pred_stds'],
+        #     fmt='x',   # different marker shape
+        #     label=f'Predicted Cost (method name: {method_name.upper()})',
+        #     linestyle='None',
+        #     capsize=3,
+        #     color=colors[method_i]
+        # )
 
     ts = 16
     plt.xlabel('Pregrasp Index', fontsize=ts)
@@ -134,8 +134,10 @@ if __name__ == "__main__":
 
         print(f'Average cost difference (no_vf - vf): {mean_diff}')
         print(f'Percent decrease in cost: {percent_decrease:.2f}%')
-        print(f'Average cost (no_vf): {mean_no_vf}')
-        print(f'Average cost (vf): {mean_vf}')
+
+    for method in data:
+        print(f'{method} mean cost: {np.mean(data[method]["costs"])}')
+
 
     plt.tight_layout()
     plt.show()

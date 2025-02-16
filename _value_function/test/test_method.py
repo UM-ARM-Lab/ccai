@@ -10,6 +10,7 @@ sys.path.append(str(CCAI_PATH))
 from tqdm import tqdm
 from pathlib import Path
 from _value_function.screwdriver_problem import init_env, do_turn, pregrasp, regrasp, emailer, convert_partial_to_full_config, delete_imgs
+from _value_function.data_collect.process_final_poses_regrasp import calculate_turn_cost
 import torch
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 from itertools import product
@@ -105,11 +106,11 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'diff'
+    test_name = 'diff1'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    n_trials = 3
+    n_trials = 10
     n_repeat = 1
     perception_noise = 0.015
 
@@ -195,6 +196,9 @@ if __name__ == '__main__':
             result_vf = [pregrasp_pose, regrasp_pose_vf, regrasp_traj_vf, turn_pose_vf, turn_traj_vf]
             checkpoint['results']['vf'][combo_tuple] = result_vf
 
+            turn_cost = calculate_turn_cost(regrasp_pose_vf.numpy(), turn_pose_vf)
+            print(f"VF cost: {turn_cost}")
+
         if calc_diffusion:
 
             env.reset(dof_pos= pregrasp_pose)
@@ -214,6 +218,8 @@ if __name__ == '__main__':
            
             result_diffusion = [pregrasp_pose, regrasp_pose_diffusion, regrasp_traj_diffusion, turn_pose_diffusion, turn_traj_diffusion]
             checkpoint['results']['diffusion'][combo_tuple] = result_diffusion
+            turn_cost = calculate_turn_cost(regrasp_pose_diffusion.numpy(), turn_pose_diffusion)
+            print(f"Diffusion cost: {turn_cost}")
 
         if calc_novf:
 
@@ -232,6 +238,9 @@ if __name__ == '__main__':
            
             result_novf = [pregrasp_pose, regrasp_pose_novf, regrasp_traj_novf, turn_pose_novf, turn_traj_novf]
             checkpoint['results']['no_vf'][combo_tuple] = result_novf
+
+            turn_cost = calculate_turn_cost(regrasp_pose_novf.numpy(), turn_pose_novf)
+            print(f"No VF cost: {turn_cost}")
             
         checkpoint['tested_combinations'].add(combo_tuple)
         save_checkpoint(checkpoint)

@@ -374,10 +374,11 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, per
                                                                     constraints=contact,
                                                                     project=params['project_state'],)
         fname = 'diffusion'
-        mode_fpath = f'{fpath}/{fname}'
-        pathlib.Path.mkdir(pathlib.Path(mode_fpath), parents=True, exist_ok=True)
+        # mode_fpath = f'{fpath}/{fname}'
+        # pathlib.Path.mkdir(pathlib.Path(mode_fpath), parents=True, exist_ok=True)
     
         initial_samples = convert_sine_cosine_to_yaw(initial_samples)
+        pkl.dump(initial_samples, open(f'{fpath}/diffusion/initial_samples/raw/regrasp_init.pkl', 'wb'))
 
         if params['visualize_plan']:
             pass
@@ -561,10 +562,11 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
                                                                     constraints=contact,
                                                                     project=params['project_state'],)
         fname = 'diffusion'
-        mode_fpath = f'{fpath}/{fname}'
-        pathlib.Path.mkdir(pathlib.Path(mode_fpath), parents=True, exist_ok=True)
+        # mode_fpath = f'{fpath}/{fname}'
+        # pathlib.Path.mkdir(pathlib.Path(mode_fpath), parents=True, exist_ok=True)
     
         initial_samples = convert_sine_cosine_to_yaw(initial_samples)
+        pkl.dump(initial_samples, open(f'{fpath}/diffusion/initial_samples/raw/turn_init.pkl', 'wb'))
 
         if params['visualize_plan']:
             pass
@@ -750,6 +752,7 @@ def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym,
 
     final_distance_to_goal, final_pose, full_trajectory, turn_plan = solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, image_path = image_path,
                                                                      sim_viz_env=sim_env, ros_copy_node=ros_copy_node, perception_noise=perception_noise, iters=iters,
+                                                                     use_diffusion=use_diffusion,
                                                                      mode=mode, model_name=model_name, initial_yaw = initial_yaw, vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio)
    
     if final_distance_to_goal < 30 / 180 * np.pi:
@@ -828,7 +831,7 @@ if __name__ == "__main__":
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
    
-    pregrasp_iters = 1#50
+    pregrasp_iters = 50
     regrasp_iters = 40
     turn_iters = 50
     perception_noise = 0.0
