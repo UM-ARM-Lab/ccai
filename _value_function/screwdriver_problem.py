@@ -854,13 +854,13 @@ if __name__ == "__main__":
         #                 mode='vf', vf_weight = vf_weight_t, other_weight = other_weight_t, variance_ratio = variance_ratio_t)
         
         regrasp_pose, regrasp_traj, rg_plan = regrasp(env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
-                                use_diffusion=True,
+                                use_diffusion=True, diffusion_path = 'data/training/allegro_screwdriver/adam_diffusion/allegro_screwdriver_diffusion_4999.pt',
                                 image_path = img_save_dir, initialization = pregrasp_pose, mode='no_vf', iters = regrasp_iters, model_name = 'ensemble_rg',
                                 )
        
         _, turn_pose, succ, turn_traj, t_plan = do_turn(regrasp_pose, config, env,
                         sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
-                        use_diffusion = True, 
+                        use_diffusion = True, diffusion_path = 'data/training/allegro_screwdriver/adam_diffusion/allegro_screwdriver_diffusion_4999.pt',
                         perception_noise=perception_noise, image_path = img_save_dir, iters = turn_iters, initial_yaw = regrasp_pose[0, -2], model_name= 'ensemble_t',
                         mode='no_vf')
        

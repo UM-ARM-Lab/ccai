@@ -280,6 +280,7 @@ if __name__ == '__main__':
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                 use_diffusion=True, 
                 diffusion_path = diffusion_path,
+                initial_yaw = regrasp_pose_combined[0, -2],
                 perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf',
             )
            
