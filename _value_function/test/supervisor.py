@@ -46,6 +46,9 @@ if __name__ == "__main__":
     elif args.filename == "test":
         script_path = fpath / "_value_function/test/test_method.py"
 
+    elif args.filename == "official":
+        script_path = fpath / "_value_function/test/test_method_official.py"
+
     elif args.filename == "test2":
         script_path = fpath / "_value_function/test/compare_dataset_sizes.py"
         
