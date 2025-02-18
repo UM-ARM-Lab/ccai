@@ -290,7 +290,7 @@ def pregrasp(env, config, chain, deterministic=True, initialization=None, percep
 
 def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, diffusion_path = None, perception_noise = 0, initialization = None,
              model_name = 'ensemble_rg', mode='no_vf', use_contact_cost = False, vf_weight = 0, other_weight = 10, variance_ratio = 1,
-            image_path = None, vis_plan = False, iters = 200):
+            image_path = None, vis_plan = False, iters = 200, sim_viz_env = None):
    
     params = config.copy()
     controller = 'csvgd'
@@ -464,6 +464,18 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, dif
         action = action[:, :4 * num_fingers_to_plan]
         action = action + start.unsqueeze(0)[:, :4 * num_fingers].to(env.device) # NOTE: this is required since we define action as delta action
        
+        ####################################################################################################
+        # update sim_viz_env for hardware experiments
+        ####################################################################################################
+
+        if params['mode'] == 'hardware':
+                set_state = env.get_state()['q'].to(device=env.device)
+                sim_viz_env.set_pose(set_state)
+                state = sim_viz_env.get_state()['q'].reshape(-1).to(device=params['device'])
+                print(state[:15][-3:])
+
+        ####################################################################################################
+
         env.step(action, path_override = image_path)
         regrasp_problem._preprocess(best_traj.unsqueeze(0))
 
@@ -492,8 +504,8 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, dif
 
 
 def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use_diffusion = False, diffusion_path=None, perception_noise = 0,
-               image_path = None, sim_viz_env=None, ros_copy_node=None, model_name = "ensemble_t", iters = 200,
-               mode='vf', initial_yaw = None, vf_weight = 100.0, other_weight = 0.1, variance_ratio = 5):
+               image_path = None, ros_copy_node=None, model_name = "ensemble_t", iters = 200,
+               mode='vf', initial_yaw = None, vf_weight = 100.0, other_weight = 0.1, variance_ratio = 5, sim_viz_env=None):
 
     obj_dof = 3
 
@@ -602,18 +614,6 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
         turn_planner.reset(state, T=params['T'], initial_x=initial_samples)
 
     actual_trajectory = []
-
-    # fig = plt.figure()
-    # axes = {params['fingers'][i]: fig.add_subplot(int(f'1{num_fingers}{i+1}'), projection='3d') for i in range(num_fingers)}
-    # for finger in params['fingers']:
-    #     axes[finger].set_title(finger)
-    #     axes[finger].set_aspect('equal')
-    #     axes[finger].set_xlabel('x', labelpad=20)
-    #     axes[finger].set_ylabel('y', labelpad=20)
-    #     axes[finger].set_zlabel('z', labelpad=20)
-    #     axes[finger].set_xlim3d(-0.05, 0.1)
-    #     axes[finger].set_ylim3d(-0.06, 0.04)
-    #     axes[finger].set_zlim3d(1.32, 1.43)
     finger_traj_history = {}
     for finger in params['fingers']:
         finger_traj_history[finger] = []
@@ -662,7 +662,20 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
         action = x[:, turn_problem.dx:turn_problem.dx+turn_problem.du].to(device=env.device)
         action = action[:, :4 * num_fingers_to_plan]
         action = action + start.unsqueeze(0)[:, :4 * num_fingers].to(env.device) # NOTE: this is required since we define action as delta action
-       
+
+        ####################################################################################################
+        # update sim_viz_env for hardware experiments
+        ####################################################################################################
+
+        if params['mode'] == 'hardware':
+                set_state = env.get_state()['q'].to(device=env.device)
+                sim_viz_env.set_pose(set_state)
+                state = sim_viz_env.get_state()['q'].reshape(-1).to(device=params['device'])
+                print(state[:15][-3:])
+
+        ####################################################################################################
+
+
         env.step(action, path_override = image_path)
         action_list.append(action)
         turn_problem._preprocess(best_traj.unsqueeze(0))
@@ -678,18 +691,6 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
         if torch.isnan(distance2goal).any().item():
             env.reset()
             break
-
-        # gym.clear_lines(viewer)
-        # state = env.get_state()
-        # start = state['q'][:,:4 * num_fingers + obj_dof].squeeze(0).to(device=params['device'])
-        # for finger in params['fingers']:
-        #     ee = state2ee_pos_partial(start[:4 * num_fingers], turn_problem.ee_names[finger])
-        #     finger_traj_history[finger].append(ee.detach().cpu().numpy())
-        # for finger in params['fingers']:
-        #     traj_history = finger_traj_history[finger]
-        #     temp_for_plot = np.stack(traj_history, axis=0)
-        #     if k >= 2:
-        #         axes[finger].plot3D(temp_for_plot[:, 0], temp_for_plot[:, 1], temp_for_plot[:, 2], 'gray', label='actual')
 
     state = env.get_state()
     state = state['q'].reshape(4 * num_fingers + obj_dof + 1).to(device=params['device'])
@@ -724,7 +725,7 @@ def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym,
             use_diffusion = False, diffusion_path = None,
             image_path = None,
             iters = 200, perception_noise = 0, turn_angle = np.pi/2, model_name = "ensemble_t", mode='no_vf', initial_yaw = None,
-            vf_weight = 0.0, other_weight = 10.0, variance_ratio = 0.0):
+            vf_weight = 0.0, other_weight = 10.0, variance_ratio = 0.0, sim_viz_env=None):
 
     params = config.copy()
     controller = 'csvgd'
@@ -743,9 +744,11 @@ def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym,
     params['object_location'] = object_location
 
     final_distance_to_goal, final_pose, full_trajectory, turn_plan = solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, image_path = image_path,
-                                                                     sim_viz_env=sim_env, ros_copy_node=ros_copy_node, perception_noise=perception_noise, iters=iters,
-                                                                     use_diffusion=use_diffusion, diffusion_path=None,
-                                                                     mode=mode, model_name=model_name, initial_yaw = initial_yaw, vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio)
+                                                                     ros_copy_node=ros_copy_node, perception_noise=perception_noise, iters=iters,
+                                                                     use_diffusion=use_diffusion, diffusion_path=diffusion_path,
+                                                                     mode=mode, model_name=model_name, initial_yaw = initial_yaw, 
+                                                                     vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio,
+                                                                     sim_viz_env=sim_viz_env)
    
     if final_distance_to_goal < 30 / 180 * np.pi:
         succ = True

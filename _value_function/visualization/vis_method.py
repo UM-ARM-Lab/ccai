@@ -11,7 +11,7 @@ fpath = pathlib.Path(f'{CCAI_PATH}/data')
 import torch
 
 # make sure tests have the same number of trials and repeats
-experiment_names = ['test_method_testcwc2']
+experiment_names = ['test_method_c7']
 
 results = {}
 
@@ -149,5 +149,51 @@ if __name__ == "__main__":
         print(f'{method} mean cost: {np.mean(data[method]["costs"])}')
 
 
+    plt.tight_layout()
+    plt.show()
+
+
+    # ---- New Boxplot for Cost Values ----
+    # Create a new figure for the boxplot
+    plt.figure(figsize=(10, 5))
+
+    # Prepare data for boxplot: a list of cost lists (one per method)
+    boxplot_data = [data[method]['costs'] for method in method_names]
+
+    # Create the boxplot; patch_artist=True allows us to color the boxes.
+    bp = plt.boxplot(
+        boxplot_data, 
+        labels=[method.upper() for method in method_names], 
+        patch_artist=True, 
+        showmeans=False, 
+        meanprops=dict(marker='D', markeredgecolor='black', markerfacecolor='black', markersize=8),
+        boxprops=dict(color='black', linewidth=2),
+        medianprops=dict(color='black', linewidth=2)
+    )
+
+    # Color the boxes using the same colors as before
+    for patch, color in zip(bp['boxes'], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.5)
+
+    # Annotate each box with its mean value
+    for i, method in enumerate(method_names):
+        median_val = np.median(data[method]['costs'])
+        # Boxplot positions are at x=1, 2, ... so i+1.
+        plt.text(
+            i + 1 - 0.15, 
+            median_val - 0.02, 
+            f"{median_val:.2f}", 
+            horizontalalignment='center', 
+            verticalalignment='bottom',
+            fontsize=12,
+            color='black'
+        )
+
+    plt.xlabel('Method', fontsize=ts)
+    plt.ylabel('Cost Value', fontsize=ts)
+    plt.title('Boxplot of Turning Costs by Method', fontsize=ts)
+    plt.xticks(fontsize=ts-2)
+    plt.yticks(fontsize=ts-2)
     plt.tight_layout()
     plt.show()

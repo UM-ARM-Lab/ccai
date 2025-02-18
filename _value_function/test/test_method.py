@@ -114,7 +114,7 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'c7'
+    test_name = 'xx0'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -123,10 +123,10 @@ if __name__ == '__main__':
     perception_noise = 0.0
 
     calc_vf = True
-    calc_diffusion_no_contact_cost = False
-    calc_diffusion_w_contact_cost = False
+    calc_diffusion_no_contact_cost = True
+    calc_diffusion_w_contact_cost = True
     calc_novf = True
-    calc_combined = False
+    calc_combined = True
 
     method_names = []
     if calc_vf:
@@ -213,7 +213,6 @@ if __name__ == '__main__':
             turn_cost = calculate_turn_cost(regrasp_pose_vf.numpy(), turn_pose_vf)
             print('---------------------------------')
             print(f"VF cost: {turn_cost}")
-            print('---------------------------------')
 
         if calc_diffusion_no_contact_cost:
 
@@ -239,7 +238,6 @@ if __name__ == '__main__':
             turn_cost = calculate_turn_cost(regrasp_pose_diffusion.numpy(), turn_pose_diffusion)
             print('---------------------------------')
             print(f"Diffusion no contact cost: {turn_cost}")
-            print('---------------------------------')
 
         if calc_diffusion_w_contact_cost:
 
@@ -265,7 +263,6 @@ if __name__ == '__main__':
             turn_cost = calculate_turn_cost(regrasp_pose_diffusion_wc.numpy(), turn_pose_diffusion_wc)
             print('---------------------------------')
             print(f"Diffusion with contact cost: {turn_cost}")
-            print('---------------------------------')
 
         if calc_combined:
 
@@ -288,11 +285,10 @@ if __name__ == '__main__':
             )
            
             result_combined = [pregrasp_pose, regrasp_pose_combined, regrasp_traj_combined, turn_pose_combined, turn_traj_combined]
-            checkpoint['results']['VF_and_diffusion_cost'][combo_tuple] = result_combined
+            checkpoint['results']['combined'][combo_tuple] = result_combined
             turn_cost = calculate_turn_cost(regrasp_pose_combined.numpy(), turn_pose_combined)
             print('---------------------------------')
             print(f"Combined method cost: {turn_cost}")
-            print('---------------------------------')
 
         if calc_novf:
 
@@ -315,13 +311,11 @@ if __name__ == '__main__':
             turn_cost = calculate_turn_cost(regrasp_pose_novf.numpy(), turn_pose_novf)
             print('---------------------------------')
             print(f"No VF cost: {turn_cost}")
-            print('---------------------------------')
             
         checkpoint['tested_combinations'].add(combo_tuple)
         save_checkpoint(checkpoint)
-
-    savepath = f'{fpath.resolve()}/test/test_method_{test_name}.pkl'
-    pkl.dump(checkpoint['results'], open(savepath, 'wb'))
+        savepath = f'{fpath.resolve()}/test/test_method_{test_name}.pkl'
+        pkl.dump(checkpoint['results'], open(savepath, 'wb'))
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)
