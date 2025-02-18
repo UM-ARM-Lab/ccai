@@ -315,7 +315,7 @@ if __name__ == "__main__":
     sim_device = config['sim_device']
     
     n_samples = 6
-    name = "6samples"
+    name = "xxx"
 
     checkpoint_path = fpath /'test'/'weight_sweep'/f'checkpoint_sweep_turning_{name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -323,9 +323,9 @@ if __name__ == "__main__":
     get_turn_initializations(env, sim_device, n_samples, save=True)
 
     starting_values = {
-        'vf_bounds': [3, 14],
-        'other_bounds': [2.5, 10.0],
-        'variance_ratio_bounds': [2.0, 8.0],
+        'vf_bounds': [3.3/3, 3.3*3],
+        'other_bounds': [1.9/3, 1.9*3],
+        'variance_ratio_bounds': [1.625/3, 1.625*3],
         'grid_size': 3
     }
 

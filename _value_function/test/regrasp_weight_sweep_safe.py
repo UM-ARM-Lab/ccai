@@ -287,7 +287,7 @@ if __name__ == "__main__":
     sim_device = config['sim_device']
     
     n_samples = 6
-    name = "6samps"
+    name = "xxx"
 
     checkpoint_path = fpath /'test'/'weight_sweep'/f'checkpoint_sweep_regrasp_{name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -301,9 +301,9 @@ if __name__ == "__main__":
                             do_pregrasp=True, name='weight_sweep_pregrasps')
 
     starting_values = {
-        'vf_bounds': [5, 20],
-        'other_bounds': [.5, 3.0],
-        'variance_ratio_bounds': [4.0, 16.0],
+        'vf_bounds': [5.0/3, 5.0*3],
+        'other_bounds': [1.9/3, 1.9*3],
+        'variance_ratio_bounds': [10.0/3, 10.0*2],
         'grid_size': 3
     }
 
