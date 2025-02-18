@@ -17,6 +17,11 @@ from _value_function.test.test_method import get_initialization, get_initializat
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 import torch
+import sys
+if len(sys.argv) == 2:
+    config_path = f'allegro_screwdriver_adam{sys.argv[1]}.yaml'
+else:
+    config_path = 'allegro_screwdriver_adam0.yaml'
 
 def get_turn_initializations(env, sim_device, n_samples, save=False):
 
@@ -306,7 +311,7 @@ if __name__ == "__main__":
     turn_iters = 50
     visualize = False   
 
-    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize)
+    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize, config_path=config_path)
     sim_device = config['sim_device']
     
     n_samples = 6

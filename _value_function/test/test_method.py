@@ -20,6 +20,10 @@ warnings.filterwarnings(
     message="You are using `torch.load` with `weights_only=False`",
     category=FutureWarning
 )
+if len(sys.argv) == 2:
+    config_path = f'allegro_screwdriver_adam{sys.argv[1]}.yaml'
+else:
+    config_path = 'allegro_screwdriver_adam0.yaml'
 
 def get_initialization(env, sim_device, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag):
 
@@ -110,7 +114,7 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'c4'
+    test_name = 'c7'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -151,7 +155,7 @@ if __name__ == '__main__':
     other_weight_t = 1.9
     variance_ratio_t = 1.625
 
-    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
+    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True, config_path=config_path)
 
     pregrasp_path = fpath /'test'/'initializations'/'test_method_pregrasps.pkl'
     diffusion_path = 'data/training/allegro_screwdriver/adam_diffusion/allegro_screwdriver_diffusion_4999.pt'
