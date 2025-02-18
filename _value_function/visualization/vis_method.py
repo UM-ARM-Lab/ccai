@@ -10,12 +10,22 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 import torch
 
-experiment_name = 'test_method_testcwc'
-# experiment_name = 'test_method_easybig2'
+# make sure tests have the same number of trials and repeats
+experiment_names = ['test_method_testcwc2']
 
-filename = f'test/{experiment_name}.pkl'
-with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
-    results = pkl.load(file)
+results = {}
+
+for name in experiment_names:
+    file_path = fpath / 'test' / f'{name}.pkl'
+    with open(file_path, 'rb') as file:
+        single_results = pkl.load(file)
+    
+    for method, method_results in single_results.items():
+        if method not in results:
+            results[method] = method_results
+        else:
+            print(f"Warning: method {method} already exists in combined_results. Exiting.")
+            exit()
 
 models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble(model_name = "ensemble_rg")
 

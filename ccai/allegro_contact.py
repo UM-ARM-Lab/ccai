@@ -800,14 +800,15 @@ class AllegroRegraspProblem(AllegroObjectProblem):
 
                 #adamadamadam
                 if last_diffused_q is not None:
-                #     # for all 16 diffused guys, calc this, replace self.obj_dof with diffused screwdriver dofs
+                #for all 16 diffused guys, calc this, replace self.obj_dof with diffused screwdriver dofs
                     particles = last_diffused_q.shape[0]
-
                     all_locs = torch.empty(particles, 2, 3).to(device=self.device)
 
                     for i in range(particles):
-                        # from 15 to 16
+                        
                         obj_dof = last_diffused_q[i][-3:]
+
+                        # from 4x3 finger joints to 4x4 finger joints
                         partial_12 = last_diffused_q[i][:-3].reshape(1, -1).clone().float()
                         dof_pos = torch.cat((
                             partial_12[:,:8],
@@ -815,13 +816,10 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                             partial_12[:,8:],
                             ), dim=1)
 
-                        # only 4x4 finger joints go in here
                         all_locs[i] = self._ee_locations_in_screwdriver(dof_pos, obj_dof)   
 
                     self.default_ee_locs =  torch.mean(all_locs, dim=0).reshape(1, 2, 3)
 
-            # add a small amount of noise to ee loc default
-            #self.default_ee_locs = self.default_ee_locs #+ 0.01 * torch.randn_like(self.default_ee_locs)
         else:
             self.default_ee_locs = None
         if self.obj_dof == 3:
