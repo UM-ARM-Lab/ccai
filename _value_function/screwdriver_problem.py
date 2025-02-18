@@ -30,15 +30,6 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-def _partial_to_full(traj, mode):
-    if mode == 'index':
-        traj = torch.cat((traj[..., :-6], torch.zeros(*traj.shape[:-1], 3).to(device=params['device']),
-                            traj[..., -6:]), dim=-1)
-    if mode == 'thumb_middle':
-        traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 6).to(device=params['device'])), dim=-1)
-    if mode == 'pregrasp':
-        traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 9).to(device=params['device'])), dim=-1)
-    return traj
 def _full_to_partial(traj, mode):
     if mode == 'index':
         traj = torch.cat((traj[..., :-9], traj[..., -6:]), dim=-1)
@@ -291,8 +282,8 @@ def pregrasp(env, config, chain, deterministic=True, initialization=None, percep
 
     return end_state_full.cpu(), action.cpu()
 
-def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, perception_noise = 0, initialization = None,
-             model_name = 'ensemble_rg', mode='no_vf', vf_weight = 0, other_weight = 10, variance_ratio = 1,
+def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, diffusion_path = None, perception_noise = 0, initialization = None,
+             model_name = 'ensemble_rg', mode='no_vf', use_contact_cost = False, vf_weight = 0, other_weight = 10, variance_ratio = 1,
             image_path = None, vis_plan = False, iters = 200):
    
     params = config.copy()
@@ -314,7 +305,53 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, per
     if initialization is not None:
         default_dof_pos = initialization
         env.reset(dof_pos= default_dof_pos)
-       
+
+    last_diffused_q = None
+    # diffusion ############################################################################################################
+    
+    if use_diffusion:
+
+        state = env.get_state()
+        state = state['q'].reshape(-1)[:15].to(device=params['device'])
+
+        contact = -torch.ones(params['N'], 3).to(device=params['device'])
+        contact[:, 0] = 1
+        # contact[:, :] = 1 # THIS ONE FOR TURNING
+        start = state.clone()
+
+        trajectory_sampler = get_diffusion(params, diffusion_path)
+    
+        start_for_diff = convert_yaw_to_sine_cosine(start)
+
+        initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
+                                                                    H=params['T'] + 1,
+                                                                    constraints=contact,
+                                                                    project=params['project_state'],)
+    
+        initial_samples = convert_sine_cosine_to_yaw(initial_samples)
+        fpath = pathlib.Path(f'{CCAI_PATH}/data')
+        pkl.dump(initial_samples, open(f'{fpath}/diffusion/initial_samples/raw/regrasp_init.pkl', 'wb'))
+
+        if initial_samples is not None:
+    
+            initial_samples = _full_to_partial(initial_samples, mode)
+            initial_x = initial_samples[:, 1:, :15]#:planner.problem.dx]
+            initial_u = initial_samples[:, :-1, -15:]#-planner.problem.du:]
+            initial_samples = torch.cat((initial_x, initial_u), dim=-1)
+
+
+        state = env.get_state()
+        state = state['q'].reshape(-1).to(device=params['device'])
+        state = state[:15]#planner.problem.dx]
+
+        state = env.get_state()
+        state = state['q'].reshape(-1).to(device=params['device'])
+        state = state[:15]#planner.problem.dx]
+
+    ############################################################################################################
+    
+        last_diffused_q = initial_samples[:, -1, :15].clone()
+
     start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=device)
 
     screwdriver = start.clone()[-4:-1]
@@ -346,80 +383,34 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, per
             vf_weight=vf_weight,
             other_weight=other_weight,
             variance_ratio=variance_ratio,
+            last_diffused_q=last_diffused_q,
+            use_contact_cost = use_contact_cost,
         )
    
     regrasp_planner = PositionControlConstrainedSVGDMPC(regrasp_problem, params)
     regrasp_planner.warmup_iters = iters
 
-    # diffusion ############################################################################################################
-
-    if use_diffusion:
-
-        planner = regrasp_planner
-
-        state = env.get_state()
-        state = state['q'].reshape(-1)[:15].to(device=params['device'])
-
-        contact = -torch.ones(params['N'], 3).to(device=params['device'])
-        contact[:, 0] = 1
-        # contact[:, :] = 1 # THIS ONE FOR TURNING
-        start = state.clone()
-
-        trajectory_sampler = get_diffusion(config)
-    
-        start_for_diff = convert_yaw_to_sine_cosine(start)
-
-        initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
-                                                                    H=params['T'] + 1,
-                                                                    constraints=contact,
-                                                                    project=params['project_state'],)
+    if params['visualize_plan'] and use_diffusion:
         fname = 'diffusion'
-        # mode_fpath = f'{fpath}/{fname}'
-        # pathlib.Path.mkdir(pathlib.Path(mode_fpath), parents=True, exist_ok=True)
+        iter_set = [('initial_samples', initial_samples)]
+        for (name, traj_set) in iter_set:
+            for k in range(params['N']):
+                traj_for_viz = traj_set[k, :, :15]#:planner.problem.dx]
+                tmp = torch.zeros((traj_for_viz.shape[0], 1),
+                                device=traj_for_viz.device)  # add the joint for the screwdriver cap
+                traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
+                viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/{name}/{k}")
+                img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
+                gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
+                pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
+                pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
+                visualize_trajectory(traj_for_viz, regrasp_problem.contact_scenes, viz_fpath,
+                                    regrasp_problem.fingers, regrasp_problem.obj_dof + 1)
+
+    torch.cuda.empty_cache()
     
-        initial_samples = convert_sine_cosine_to_yaw(initial_samples)
-        pkl.dump(initial_samples, open(f'{fpath}/diffusion/initial_samples/raw/regrasp_init.pkl', 'wb'))
-
-        if params['visualize_plan']:
-            pass
-            iter_set = [('initial_samples', initial_samples)]
-            for (name, traj_set) in iter_set:
-                for k in range(params['N']):
-                    traj_for_viz = traj_set[k, :, :planner.problem.dx]
-                    tmp = torch.zeros((traj_for_viz.shape[0], 1),
-                                    device=traj_for_viz.device)  # add the joint for the screwdriver cap
-                    traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
-                    viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/{name}/{k}")
-                    img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
-                    gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
-                    pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
-                    pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-                    visualize_trajectory(traj_for_viz, regrasp_problem.contact_scenes, viz_fpath,
-                                        regrasp_problem.fingers, regrasp_problem.obj_dof + 1)
-
-        torch.cuda.empty_cache()
-
-        if initial_samples is not None:
-    
-            initial_samples = _full_to_partial(initial_samples, mode)
-            initial_x = initial_samples[:, 1:, :planner.problem.dx]
-            initial_u = initial_samples[:, :-1, -planner.problem.du:]
-            initial_samples = torch.cat((initial_x, initial_u), dim=-1)
-
-
-        state = env.get_state()
-        state = state['q'].reshape(-1).to(device=params['device'])
-        state = state[:planner.problem.dx]
-
-        state = env.get_state()
-        state = state['q'].reshape(-1).to(device=params['device'])
-        state = state[:planner.problem.dx]
-
-        planner.reset(state, T=params['T'], initial_x=initial_samples)
-        # planner.reset(state, T=params['T'], goal=goal, initial_x=initial_samples)
-
-    
-    ############################################################################################################
+    if use_diffusion:
+        regrasp_planner.reset(state, T=params['T'], initial_x=initial_samples)
 
     actual_trajectory = []
     finger_traj_history = {}
@@ -494,7 +485,7 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, per
     return final_state, full_trajectory, all_regrasp_plans
 
 
-def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use_diffusion = False, perception_noise = 0,
+def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use_diffusion = False, diffusion_path=None, perception_noise = 0,
                image_path = None, sim_viz_env=None, ros_copy_node=None, model_name = "ensemble_t", iters = 200,
                mode='vf', initial_yaw = None, vf_weight = 100.0, other_weight = 0.1, variance_ratio = 5):
 
@@ -508,8 +499,50 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
 
     env.reset(dof_pos = initial_pose)
 
-    state = env.get_state()
-    start = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
+
+    # diffusion setup ############################################################################################################
+
+    if use_diffusion:
+
+        state = env.get_state()
+        state = state['q'].reshape(-1)[:15].to(device=params['device'])
+
+        contact = -torch.ones(params['N'], 3).to(device=params['device'])
+        contact[:, :] = 1
+        start = state.clone()
+
+        trajectory_sampler = get_diffusion(params, diffusion_path)
+    
+        start_for_diff = convert_yaw_to_sine_cosine(start)
+
+        initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
+                                                                    H=params['T'] + 1,
+                                                                    constraints=contact,
+                                                                    project=params['project_state'],)
+    
+        initial_samples = convert_sine_cosine_to_yaw(initial_samples)
+        fpath = pathlib.Path(f'{CCAI_PATH}/data') 
+        pkl.dump(initial_samples, open(f'{fpath}/diffusion/initial_samples/raw/turn_init.pkl', 'wb'))
+
+        if initial_samples is not None:
+    
+            initial_samples = _full_to_partial(initial_samples, mode)
+            initial_x = initial_samples[:, 1:, :15]#:planner.problem.dx]
+            initial_u = initial_samples[:, :-1, -21:]#-planner.problem.du:]
+            initial_samples = torch.cat((initial_x, initial_u), dim=-1)
+
+
+        state = env.get_state()
+        state = state['q'].reshape(-1).to(device=params['device'])
+        state = state[:15]#:planner.problem.dx]
+
+        state = env.get_state()
+        state = state['q'].reshape(-1).to(device=params['device'])
+        state = state[:15]#:planner.problem.dx]
+    
+    ############################################################################################################
+
+    start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
     min_force_dict = None
     turn_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
@@ -540,73 +573,27 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
     turn_planner = PositionControlConstrainedSVGDMPC(turn_problem, params)
     turn_planner.warmup_iters = iters
 
-    # diffusion setup ############################################################################################################
-
-    if use_diffusion:
-
-        planner = turn_planner
-
-        state = env.get_state()
-        state = state['q'].reshape(-1)[:15].to(device=params['device'])
-
-        contact = -torch.ones(params['N'], 3).to(device=params['device'])
-        contact[:, :] = 1
-        start = state.clone()
-
-        trajectory_sampler = get_diffusion(config)
-    
-        start_for_diff = convert_yaw_to_sine_cosine(start)
-
-        initial_samples, _, _ = trajectory_sampler.sample(N=params['N'], start=start_for_diff.reshape(1, -1),
-                                                                    H=params['T'] + 1,
-                                                                    constraints=contact,
-                                                                    project=params['project_state'],)
+    if params['visualize_plan'] and use_diffusion:
         fname = 'diffusion'
-        # mode_fpath = f'{fpath}/{fname}'
-        # pathlib.Path.mkdir(pathlib.Path(mode_fpath), parents=True, exist_ok=True)
+        iter_set = [('initial_samples', initial_samples)]
+        for (name, traj_set) in iter_set:
+            for k in range(params['N']):
+                traj_for_viz = traj_set[k, :, :15]#planner.problem.dx]
+                tmp = torch.zeros((traj_for_viz.shape[0], 1),
+                                device=traj_for_viz.device)  # add the joint for the screwdriver cap
+                traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
+                viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/{name}/{k}")
+                img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
+                gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
+                pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
+                pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
+                visualize_trajectory(traj_for_viz, turn_problem.contact_scenes, viz_fpath,
+                                    turn_problem.fingers, turn_problem.obj_dof + 1)
+
+    torch.cuda.empty_cache()
     
-        initial_samples = convert_sine_cosine_to_yaw(initial_samples)
-        pkl.dump(initial_samples, open(f'{fpath}/diffusion/initial_samples/raw/turn_init.pkl', 'wb'))
-
-        if params['visualize_plan']:
-            pass
-            iter_set = [('initial_samples', initial_samples)]
-            for (name, traj_set) in iter_set:
-                for k in range(params['N']):
-                    traj_for_viz = traj_set[k, :, :planner.problem.dx]
-                    tmp = torch.zeros((traj_for_viz.shape[0], 1),
-                                    device=traj_for_viz.device)  # add the joint for the screwdriver cap
-                    traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
-                    viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/{name}/{k}")
-                    img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
-                    gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
-                    pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
-                    pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-                    visualize_trajectory(traj_for_viz, turn_problem.contact_scenes, viz_fpath,
-                                        turn_problem.fingers, turn_problem.obj_dof + 1)
-
-        torch.cuda.empty_cache()
-
-        if initial_samples is not None:
-    
-            initial_samples = _full_to_partial(initial_samples, mode)
-            initial_x = initial_samples[:, 1:, :planner.problem.dx]
-            initial_u = initial_samples[:, :-1, -planner.problem.du:]
-            initial_samples = torch.cat((initial_x, initial_u), dim=-1)
-
-
-        state = env.get_state()
-        state = state['q'].reshape(-1).to(device=params['device'])
-        state = state[:planner.problem.dx]
-
-        state = env.get_state()
-        state = state['q'].reshape(-1).to(device=params['device'])
-        state = state[:planner.problem.dx]
-
-        planner.reset(state, T=params['T'], initial_x=initial_samples)
-    
-    ############################################################################################################
-
+    if use_diffusion:
+        turn_planner.reset(state, T=params['T'], initial_x=initial_samples)
 
     actual_trajectory = []
 
@@ -630,7 +617,6 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
         finger_traj_history[finger].append(ee.detach().cpu().numpy())
 
     num_fingers_to_plan = num_fingers
-    # info_list = []
 
     all_turn_plans = []
 
@@ -729,7 +715,7 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
     return final_distance_to_goal.cpu().detach().item(), final_state, full_trajectory, all_turn_plans
 
 def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, 
-            use_diffusion = False, 
+            use_diffusion = False, diffusion_path = None,
             image_path = None,
             iters = 200, perception_noise = 0, turn_angle = np.pi/2, model_name = "ensemble_t", mode='no_vf', initial_yaw = None,
             vf_weight = 0.0, other_weight = 10.0, variance_ratio = 0.0):
@@ -752,7 +738,7 @@ def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym,
 
     final_distance_to_goal, final_pose, full_trajectory, turn_plan = solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, image_path = image_path,
                                                                      sim_viz_env=sim_env, ros_copy_node=ros_copy_node, perception_noise=perception_noise, iters=iters,
-                                                                     use_diffusion=use_diffusion,
+                                                                     use_diffusion=use_diffusion, diffusion_path=None,
                                                                      mode=mode, model_name=model_name, initial_yaw = initial_yaw, vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio)
    
     if final_distance_to_goal < 30 / 180 * np.pi:
@@ -760,9 +746,12 @@ def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym,
 
     return initial_pose, final_pose, succ, full_trajectory, turn_plan
 
-def get_diffusion(params):
+def get_diffusion(params, path = None):
 
-    model_path = params.get('model_path', None)
+    if path is None:
+        model_path = params.get('model_path', None)
+    else:
+        model_path = path
 
     trajectory_sampler = TrajectorySampler(T=params['T'] + 1, dx=(15 + (1 if params['sine_cosine'] else 0)), du=21, type=params['type'],
                                                timesteps=256, hidden_dim=128,
@@ -780,7 +769,7 @@ def get_diffusion(params):
     trajectory_sampler.load_state_dict(d, strict=False)
     trajectory_sampler.to(device=params['device'])
     trajectory_sampler.send_norm_constants_to_submodels()
-    print('Loaded trajectory sampler')
+    # print('Loaded trajectory sampler')
 
     return trajectory_sampler
     
@@ -853,16 +842,27 @@ if __name__ == "__main__":
         pregrasp_pose, planned_pose = pregrasp(env, config, chain, deterministic=True, perception_noise=perception_noise,
                             image_path = img_save_dir, initialization = None, mode='no_vf', iters = pregrasp_iters)
 
+        # regrasp_pose, regrasp_traj, rg_plan = regrasp(env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
+        #                         use_diffusion=False,
+        #                         image_path = img_save_dir, initialization = pregrasp_pose, mode='vf', iters = regrasp_iters, model_name = 'ensemble_rg',
+        #                         vf_weight = vf_weight_rg, other_weight = other_weight_rg, variance_ratio = variance_ratio_rg)
+       
+        # _, turn_pose, succ, turn_traj, t_plan = do_turn(regrasp_pose, config, env,
+        #                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
+        #                 use_diffusion = False, 
+        #                 perception_noise=perception_noise, image_path = img_save_dir, iters = turn_iters, initial_yaw = regrasp_pose[0, -2], model_name= 'ensemble_t',
+        #                 mode='vf', vf_weight = vf_weight_t, other_weight = other_weight_t, variance_ratio = variance_ratio_t)
+        
         regrasp_pose, regrasp_traj, rg_plan = regrasp(env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
                                 use_diffusion=True,
                                 image_path = img_save_dir, initialization = pregrasp_pose, mode='no_vf', iters = regrasp_iters, model_name = 'ensemble_rg',
-                                vf_weight = vf_weight_rg, other_weight = other_weight_rg, variance_ratio = variance_ratio_rg)
+                                )
        
         _, turn_pose, succ, turn_traj, t_plan = do_turn(regrasp_pose, config, env,
                         sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                         use_diffusion = True, 
                         perception_noise=perception_noise, image_path = img_save_dir, iters = turn_iters, initial_yaw = regrasp_pose[0, -2], model_name= 'ensemble_t',
-                        mode='vf', vf_weight = vf_weight_t, other_weight = other_weight_t, variance_ratio = variance_ratio_t)
+                        mode='no_vf')
        
 
     # print("done regrasp")

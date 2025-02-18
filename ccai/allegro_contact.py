@@ -730,6 +730,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                  initial_yaw=None,
                  vf_weight=0, 
                  other_weight=0,
+                 last_diffused_q = None,
                  *args, **kwargs):
 
         # object_location is different from object_asset_pos. object_asset_pos is 
@@ -795,6 +796,30 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                 self.default_ee_locs = self._ee_locations_in_screwdriver(self.default_dof_pos,
                                                                      torch.zeros(self.obj_dof, device=self.device))
 
+                # get diffused contact point goals here
+
+                #adamadamadam
+                if last_diffused_q is not None:
+                #     # for all 16 diffused guys, calc this, replace self.obj_dof with diffused screwdriver dofs
+                    particles = last_diffused_q.shape[0]
+
+                    all_locs = torch.empty(particles, 2, 3).to(device=self.device)
+
+                    for i in range(particles):
+                        # from 15 to 16
+                        obj_dof = last_diffused_q[i][-3:]
+                        partial_12 = last_diffused_q[i][:-3].reshape(1, -1).clone().float()
+                        dof_pos = torch.cat((
+                            partial_12[:,:8],
+                            (torch.tensor([[0., 0.5, 0.65, 0.65]]) * torch.ones(partial_12.shape[0], 1)).to(device=self.device),
+                            partial_12[:,8:],
+                            ), dim=1)
+
+                        # only 4x4 finger joints go in here
+                        all_locs[i] = self._ee_locations_in_screwdriver(dof_pos, obj_dof)   
+
+                    self.default_ee_locs =  torch.mean(all_locs, dim=0).reshape(1, 2, 3)
+
             # add a small amount of noise to ee loc default
             #self.default_ee_locs = self.default_ee_locs #+ 0.01 * torch.randn_like(self.default_ee_locs)
         else:
@@ -850,45 +875,30 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         if self.num_regrasps == 0:
             return 0.0
         q = partial_to_full_state(xu[:, :self.num_fingers * 4], self.fingers)  # [:, self.regrasp_idx]
-        # theta = xu[:, self.num_fingers * 4:self.num_fingers * 4 + self.obj_dof]
+        
+        #@adamadamadam
+        if self.use_diffusion and self.use_contact_cost:
 
-        # # ignore the rostation of the screwdriver
-        # if self.obj_dof == 3:
-        #     mask = torch.tensor([1.0, 1.0, 0.0], device=xu.device)
-        #     theta = theta * mask.reshape(1, 3)
-        # else:
-        #     theta = theta * 0
-        # print('--')
-        # print(self._ee_locations_in_screwdriver(q, theta))
-        # print(self.default_ee_locs)
+            theta = xu[:, self.num_fingers * 4:self.num_fingers * 4 + self.obj_dof]
+            if self.obj_dof == 3:
+                mask = torch.tensor([1.0, 1.0, 0.0], device=xu.device)
+                theta = theta * mask.reshape(1, 3)
+            else:
+                theta = theta * 0
 
-        if self.mode == 'vf' or self.mode == "last_step":
+            if self.desired_ee_in_world_frame:
+                return 1000 * torch.sum((self.default_ee_locs - self._ee_locations_in_world(q)) ** 2)
+            else:
+                return 1000 * torch.sum((self.default_ee_locs - self._ee_locations_in_screwdriver(q, theta)) ** 2)
+        
+        else:
             return 0.0
         
-        elif self.mode == 'baseline1':
-            from _value_function.nearest_neighbor import find_nn_1
-            from _value_function.screwdriver_problem import convert_partial_to_full_config
-            # start_full = convert_partial_to_full_config(start.reshape(1,-1).detach().cpu()).flatten()
-            current = q.clone()#.detach().cpu().numpy()
-
-            insertion_vector = torch.tensor([0., 0.5, 0.65, 0.65], dtype=torch.float32)
-            current_full = torch.cat((
-                current[:, :8],  
-                insertion_vector.expand(current.shape[0], -1),  
-                current[:, 8:]
-            ), dim=-1)
-
-            _, nn = find_nn_1(current_full) # q or start?
-            nn = nn.to(device=self.device)
-            cost = 1000 * torch.sum((nn - current_full.to(device=self.device)) ** 2)
-            return cost
-
-        elif self.mode == 'no_vf':
-            return 0.0
-            # if self.desired_ee_in_world_frame:
-            #     return 1000 * torch.sum((self.default_ee_locs - self._ee_locations_in_world(q)) ** 2)
-            # else:
-            #     return 1000 * torch.sum((self.default_ee_locs - self._ee_locations_in_screwdriver(q, theta)) ** 2)
+        # elif self.mode == 'vf' or self.mode == "last_step":
+        #     return 0.0
+        
+        # elif self.mode == 'no_vf':
+        #     return 0.0
 
     @regrasp_finger_constraints
     def _contact_avoidance(self, xu, finger_name, compute_grads=True, compute_hess=False, projected_diffusion=False):
@@ -2397,7 +2407,19 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                  vf_weight = 0,
                  other_weight = 0,
                  variance_ratio = 1,
+                 last_diffused_q = None,
+                 use_contact_cost = False,
                  **kwargs):
+
+        if last_diffused_q is not None:
+            self.use_diffusion = True
+        else:
+            self.use_diffusion = False
+
+        if use_contact_cost:
+            self.use_contact_cost = True
+        else:
+            self.use_contact_cost = False
 
         # super(AllegroManipulationProblem, self).__init__(start=start, goal=goal, T=T, chain=chain,
         #                                                  object_location=object_location, object_type=object_type,
@@ -2435,6 +2457,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                                        model_name=model_name,
                                        mode=mode, initial_yaw=initial_yaw,
                                        vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio,
+                                       last_diffused_q = last_diffused_q,
                                        **kwargs)
         self.dg, self.dz, self.dh = 0, 0, 0
         if self.num_regrasps > 0:

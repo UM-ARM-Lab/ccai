@@ -484,14 +484,6 @@ if __name__ == "__main__":
         path = f'{fpath.resolve()}/value_functions/value_function_ensemble_rg.pkl'
         model_name = "ensemble_rg"
 
-        # ensemble = []
-        # for i in range(16):
-        #     print(f"Training model {i}")
-        #     net, _ = train(epochs=60, neurons=16, verbose='very', lr=1e-3, batch_size=50)
-        #     ensemble.append(net)
-        # torch.save(ensemble, path)
-        # eval(model_name=model_name)
-
         ensemble = []
         for i in range(16):
             print(f"Training model {i}")

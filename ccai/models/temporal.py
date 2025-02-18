@@ -102,7 +102,7 @@ class TemporalUnet(nn.Module):
 
         dims = [transition_dim, *map(lambda m: dim * m, dim_mults)]
         in_out = list(zip(dims[:-1], dims[1:]))
-        print(f'[ models/temporal ] Channel dimensions: {in_out}')
+        # print(f'[ models/temporal ] Channel dimensions: {in_out}')
 
         self.time_embedding = SinusoidalPosEmb(32)
         self.constraint_type_embed = nn.Sequential(
@@ -277,7 +277,7 @@ class TemporalUnetDynamics(nn.Module):
 
         dims = [transition_dim, *map(lambda m: dim * m, dim_mults)]
         in_out = list(zip(dims[:-1], dims[1:]))
-        print(f'[ models/temporal ] Channel dimensions: {in_out}')
+        # print(f'[ models/temporal ] Channel dimensions: {in_out}')
 
         self.time_embedding = SinusoidalPosEmb(32)
         self.constraint_type_embed = nn.Sequential(
@@ -464,7 +464,7 @@ class TemporalUnetStateAction(nn.Module):
 
         dims = [transition_dim, *map(lambda m: dim * m, dim_mults)]
         in_out = list(zip(dims[:-1], dims[1:]))
-        print(f'[ models/temporal ] Channel dimensions: {in_out}')
+        # print(f'[ models/temporal ] Channel dimensions: {in_out}')
 
         self.time_embedding = SinusoidalPosEmb(32)
         self.constraint_type_embed = nn.Sequential(
@@ -910,7 +910,7 @@ class UnetClassifier(nn.Module):
 
         dims = [transition_dim, *map(lambda m: dim * m, dim_mults)]
         in_out = list(zip(dims[:-1], dims[1:]))
-        print(f'[ models/temporal ] Channel dimensions: {in_out}')
+        # print(f'[ models/temporal ] Channel dimensions: {in_out}')
 
         # self.constraint_type_embed = nn.Sequential(
         #     nn.Linear(cond_dim, 32),

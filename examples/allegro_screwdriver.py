@@ -1,6 +1,9 @@
 from isaac_victor_envs.utils import get_assets_dir
 from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
-# from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
+try:
+    from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
+except:
+    print("RosAllegroScrewdriverTurningEnv not available")
 
 import numpy as np
 import pickle as pkl

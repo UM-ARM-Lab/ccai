@@ -154,6 +154,12 @@ if __name__ == "__main__":
     combined_turn_costs = np.array(combined_turn_costs)
     combined_start_yaws = np.array(combined_start_yaws)
 
+    if combined_regrasp_trajs.shape[0] > 10000:
+        combined_regrasp_trajs = combined_regrasp_trajs[:10000]
+        combined_turn_trajs = combined_turn_trajs[:10000]
+        combined_turn_costs = combined_turn_costs[:10000]
+        combined_start_yaws = combined_start_yaws[:10000]
+
     regrasp_to_turn_dataset = zip(combined_regrasp_trajs, combined_turn_trajs, combined_turn_costs)
     turn_to_turn_dataset = zip(combined_turn_trajs, combined_turn_costs, combined_start_yaws)
     

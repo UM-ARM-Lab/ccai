@@ -26,6 +26,7 @@ if __name__ == "__main__":
     dataset_trajs_regrasp = np.empty((0, 13, 30))
     dataset_trajs_turn = np.empty((0, 13, 36))
     total_samples = 0
+    total_good_samples = 0
 
     for filename in filenames:
         with open(filename, 'rb') as file:
@@ -45,8 +46,13 @@ if __name__ == "__main__":
 
             original_length = len(turn_trajs)
             for i in range(original_length - 1, -1, -1):
-                if turn_trajs[i].shape[0] != 13 or regrasp_trajs[i].shape[0] != 13:
-                    print("Broken trajectory removed")
+                if total_samples >= 10000 or turn_trajs[i].shape[0] != 13 or regrasp_trajs[i].shape[0] != 13:
+
+                    if total_samples >= 10000:
+                        print("Max samples reached")
+                        pass
+                    else:
+                        print("Broken trajectory removed")
 
                     regrasp_poses.pop(i)
                     turn_poses.pop(i)
@@ -56,6 +62,9 @@ if __name__ == "__main__":
 
                     regrasp_plan.pop(i)
                     turn_plan.pop(i)
+                    
+                else:
+                    total_samples += 1
             
             regrasp_poses = np.array(regrasp_poses)
             turn_poses = np.array(turn_poses)
@@ -68,7 +77,6 @@ if __name__ == "__main__":
             good_regrasp_trajs = np.empty((0, 13, 20))
             good_regrasp_plans = []
             good_turn_plans = []
-
 
             for i in range(len(regrasp_poses)):
                 cost = calculate_turn_cost(regrasp_poses[i], turn_poses[i])
@@ -84,7 +92,7 @@ if __name__ == "__main__":
 
             # Convert to 15 dim and then add time dimension
             n_good_trials = good_regrasp_trajs.shape[0]
-            total_samples += n_good_trials
+            total_good_samples += n_good_trials
 
             if n_good_trials == 0:
                 continue
@@ -149,4 +157,4 @@ if __name__ == "__main__":
     pkl.dump(dataset_trajs_regrasp, open(regrasp_plan_savepath, 'wb'))
     pkl.dump(dataset_trajs_turn, open(turn_plan_savepath, 'wb'))
 
-    print("num good samples: ", total_samples)
+    print("num good samples: ", total_good_samples)
