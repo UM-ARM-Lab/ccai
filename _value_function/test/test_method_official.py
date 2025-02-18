@@ -14,6 +14,12 @@ from _value_function.data_collect.process_final_poses_regrasp import calculate_t
 import torch
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 from itertools import product
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    message="You are using `torch.load` with `weights_only=False`",
+    category=FutureWarning
+)
 
 def get_initialization(env, sim_device, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag):
 

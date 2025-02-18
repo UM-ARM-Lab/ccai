@@ -29,6 +29,12 @@ from tqdm import tqdm
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    message="You are using `torch.load` with `weights_only=False`",
+    category=FutureWarning
+)
 
 def _full_to_partial(traj, mode):
     if mode == 'index':
