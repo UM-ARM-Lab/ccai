@@ -11,7 +11,7 @@ fpath = pathlib.Path(f'{CCAI_PATH}/data')
 import torch
 
 # make sure tests have the same number of trials and repeats
-experiment_names = ['test_method_test_official_diffusion']
+experiment_names = ['test_method_test_official_all']
 
 results = {}
 

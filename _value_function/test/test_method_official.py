@@ -112,7 +112,7 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'test_official_diffusion'
+    test_name = 'test_official_all'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -120,12 +120,11 @@ if __name__ == '__main__':
     n_repeat = 1
     perception_noise = 0.0
 
-    calc_vf = False
+    calc_vf = True
     calc_diffusion_no_contact_cost = True
     calc_diffusion_w_contact_cost = True
-    calc_novf = False
-    calc_combined = False
-    calc_combined = False
+    calc_novf = True
+    calc_combined = True
 
     method_names = []
     if calc_vf:
@@ -139,7 +138,6 @@ if __name__ == '__main__':
     if calc_combined:
         method_names.append("combined")
 
-    diffusion_path = 'data/training/allegro_screwdriver/adam_diffusion/allegro_screwdriver_diffusion_4999.pt'
     diffusion_path = 'data/training/allegro_screwdriver/adam_diffusion/allegro_screwdriver_diffusion_4999.pt'
 
     max_screwdriver_tilt = 0.015
