@@ -1464,7 +1464,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             return [modes[np.argmin(distances)]], initial_samples[np.argmin(distances)]
     
     def calc_samples_likeilhoods(mode, start_for_diff, state):
-        N_ = params['N']# * 3
+        N_ = params['N'] * 1
         contact = -torch.ones(N_, 3).to(device=params['device'])
         if mode == 'thumb_middle':
             contact[:, 0] = 1
@@ -1492,10 +1492,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         _, _, _likelihoods_t_c = trajectory_sampler.sample(N=N_,
                                                             H=trajectory_sampler.T,
                                                             constraints=contact)
-        _, _, _likelihoods_no_cond = trajectory_sampler.sample(N=N_, H=trajectory_sampler.T)
+        # _, _, _likelihoods_no_cond = trajectory_sampler.sample(N=N_, H=trajectory_sampler.T)
         samples = samples.detach()
 
-        norm_constant = 50 # Prevent floating point error underflow
+        norm_constant = 1 # Prevent floating point error underflow
         _likelihoods_t_x_c = norm_constant / -_likelihoods_t_x_c.detach()
         _likelihoods_t_x = norm_constant / -_likelihoods_t_x.detach()
         _likelihoods_t_c = norm_constant / -_likelihoods_t_c.detach()
@@ -1589,10 +1589,18 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             all_samples_[mode] = all_samples.detach().cpu()
             all_likelihoods_[mode] = all_likelihoods.detach().cpu()
 
-            print(f'Likelihood for {mode}:', likelihood)
             likelihood_list.append(likelihood)
         iter += 1
         # max_likelihood = max(likelihood_list)
+        pcts = torch.tensor([3584, 1928, 2592.])/torch.tensor([3584, 1928, 2592.]).sum()
+
+        # KL Divergence between likelihoods and prior
+        likelihood_normalized = torch.tensor(likelihoods) / sum(likelihoods)
+        for mode in modes:
+            print(f'Normalized likelihood for {mode}:', likelihood_normalized[modes.index(mode)].item())
+        prior = pcts
+        kl_div = torch.sum(likelihood_normalized * torch.log(likelihood_normalized / prior))
+        print('KL Divergence:', kl_div)
 
         return [modes[np.argmax(likelihoods) % len(modes)]], mean_obj_configs[np.argmax(likelihoods)], all_samples_, all_likelihoods_
 
