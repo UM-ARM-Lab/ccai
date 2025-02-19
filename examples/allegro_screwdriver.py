@@ -20,7 +20,7 @@ sys.path.append('..')
 
 # sys.stdout = open('./logs/live_recovery_shorcut_honda_meeting_full_dof_noise_train_indexing_fix_6500_.08_std_.75_pct_diff_likelihood_no_resample_no_cpc_on_pregrasp.log', 'w', buffering=1)
 # sys.stdout = open('./examples/logs/recovery_as_contact_search.log', 'w', buffering=1)
-sys.stdout = open('./examples/logs/live_recovery_hardware.log', 'w', buffering=1)
+sys.stdout = open('./examples/logs/live_recovery_hardware_5_10_15_200_no_terminal_theta_cost.log', 'w', buffering=1)
 
 import pytorch_volumetric as pv
 import pytorch_kinematics as pk
@@ -213,6 +213,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     if params['visualize']:
         env.frame_fpath = fpath
         env.frame_id = 0
+        if params['mode'] == 'hardware':
+            sim_viz_env.frame_fpath = fpath
+            sim_viz_env.frame_id = 0
     else:
         env.frame_fpath = None
         env.frame_id = None
@@ -516,8 +519,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # min_force_dict = None
         # if params['mode'] == 'hardware':
         min_force_dict = {
-            'thumb': 1,
-            'middle': 1,
+            'thumb': .5,
+            'middle': .5,
             'index': .0,
         }
 
@@ -802,6 +805,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # reset planner
         state = env.get_state()
         state = state['q'].reshape(-1)[:15].to(device=params['device'])
+        if params.get('test_recovery_trajectory', False) or (params.get('live_recovery', False) and recover):
+                goal[-1] = state[-1]
 
         # generate context from mode
         contact = -torch.ones(params['N'], 3).to(device=params['device'])
@@ -1143,11 +1148,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 action = torch.cat((state.unsqueeze(0)[:, :4], action), dim=1)  # add the index finger back
             else:
                 action = action.to(device=env.device) + state.unsqueeze(0)[:, :4 * num_fingers].to(device=env.device)
-
+            #@adam read dofs from hardware and replicate in sim
             if params['mode'] == 'hardware':
                 set_state = env.get_state()['q'].to(device=env.device)
                 # print(set_state.shape)
                 sim_viz_env.set_pose(set_state)
+                sim_viz_env.write_image()
+
                 # sim_viz_env.step(action)
                 # for _ in range(3):
                 #     sim_viz_env.step(action)
@@ -1984,6 +1991,7 @@ if __name__ == "__main__":
     ros_copy_node = None
 
     if config['mode'] == 'hardware':
+        # roslaunch allegro_hand allegro_hand_modified.launch
         from hardware.hardware_env import HardwareEnv
         default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
                                     torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float(),
