@@ -1,6 +1,9 @@
 from isaac_victor_envs.utils import get_assets_dir
 from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
-from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
+try:
+    from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
+except:
+    print('No ROS install found, continuing')
 
 import numpy as np
 import pickle as pkl
@@ -20,7 +23,7 @@ sys.path.append('..')
 
 # sys.stdout = open('./logs/live_recovery_shorcut_honda_meeting_full_dof_noise_train_indexing_fix_6500_.08_std_.75_pct_diff_likelihood_no_resample_no_cpc_on_pregrasp.log', 'w', buffering=1)
 # sys.stdout = open('./examples/logs/recovery_as_contact_search.log', 'w', buffering=1)
-sys.stdout = open('./examples/logs/live_recovery_hardware_5_10_15_200_no_terminal_theta_cost.log', 'w', buffering=1)
+sys.stdout = open('./examples/logs/live_recovery_hardware_5_10_15_200_MC_contact_selection.log', 'w', buffering=1)
 
 import pytorch_volumetric as pv
 import pytorch_kinematics as pk
@@ -476,12 +479,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             trajectory_sampler.to(device=params['device'])
             trajectory_sampler.send_norm_constants_to_submodels()
             if params['project_state'] or params['compute_recovery_trajectory'] or params['test_recovery_trajectory']:
-                trajectory_sampler.model.diffusion_model.cutoff = -75#params['likelihood_threshold']
-
+                trajectory_sampler.model.diffusion_model.cutoff = params['project_threshold']
+            trajectory_sampler.model.diffusion_model.subsampled_t = '5_10_15' in params['experiment_name']
+            trajectory_sampler.model.diffusion_model.classifier = None
             return trajectory_sampler
         trajectory_sampler = load_sampler(model_path, dim_mults=(1,2,4), T=params['T'] if not params['compute_recovery_trajectory'] else params['T_orig'])
-        trajectory_sampler.subsampled_t = True
-        trajectory_sampler.model.diffusion_model.classifier = None
+
         if model_path_orig is not None:
             trajectory_sampler_orig = load_sampler(model_path_orig, dim_mults=(1,2,4), T=params['T_orig'])
         else:
@@ -740,18 +743,18 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     actual_trajectory = []
     duration = 0
 
-    fig = plt.figure()
-    axes = {params['fingers'][i]: fig.add_subplot(int(f'1{num_fingers}{i + 1}'), projection='3d') for i in
-            range(num_fingers)}
-    for finger in params['fingers']:
-        axes[finger].set_title(finger)
-        axes[finger].set_aspect('equal')
-        axes[finger].set_xlabel('x', labelpad=20)
-        axes[finger].set_ylabel('y', labelpad=20)
-        axes[finger].set_zlabel('z', labelpad=20)
-        axes[finger].set_xlim3d(-0.05, 0.1)
-        axes[finger].set_ylim3d(-0.06, 0.04)
-        axes[finger].set_zlim3d(1.32, 1.43)
+    # fig = plt.figure()
+    # axes = {params['fingers'][i]: fig.add_subplot(int(f'1{num_fingers}{i + 1}'), projection='3d') for i in
+    #         range(num_fingers)}
+    # for finger in params['fingers']:
+    #     axes[finger].set_title(finger)
+    #     axes[finger].set_aspect('equal')
+    #     axes[finger].set_xlabel('x', labelpad=20)
+    #     axes[finger].set_ylabel('y', labelpad=20)
+    #     axes[finger].set_zlabel('z', labelpad=20)
+    #     axes[finger].set_xlim3d(-0.05, 0.1)
+    #     axes[finger].set_ylim3d(-0.06, 0.04)
+    #     axes[finger].set_zlim3d(1.32, 1.43)
 
     if params['exclude_index']:
         num_fingers_to_plan = num_fingers - 1
@@ -1029,7 +1032,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             if params['live_recovery']:
                 id_check = check_id(state) if not recover else True
             elif params.get('compute_recovery_trajectory', False) or params.get('test_recovery_trajectory', False):
-                id_check = check_id(state, threshold=-300)
+                id_check = check_id(state, threshold=params.get('drop_threshold', -300))
             else:
                 id_check = True
 
@@ -1224,6 +1227,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         return actual_trajectory, planned_trajectories, initial_samples, sim_rollouts, optimizer_paths, contact_points, contact_distance, recover
 
     data = {}
+    t_range = params['T']
+    if 'T_orig' in params and params['T_orig'] > t_range:
+        t_range = params['T_orig']
     for t in range(1, 1 + params['T']):
         data[t] = {'plans': [], 'starts': [], 'inits': [], 'init_sim_rollouts': [], 'optimizer_paths': [], 'contact_points': [], 'contact_distance': [], 'contact_state': []}
     data['final_likelihoods'] = []
@@ -1364,7 +1370,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     def plan_recovery_contacts(state, stage):
         distances = []
         # modes = ['index', 'thumb_middle', 'middle', 'thumb']
-        modes = ['thumb_middle', 'index', 'turn']
+        # modes = ['thumb_middle', 'index', 'turn']
+        modes = ['thumb_middle', 'index']
         # for planner in [index_regrasp_planner, thumb_and_middle_regrasp_planner]:
         goal = index_regrasp_planner.problem.goal.clone()
         goal[-1] = state[-1]
@@ -1463,7 +1470,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             return [modes[np.argmin(distances)]], initial_samples[np.argmin(distances)]
     
     def calc_samples_likeilhoods(mode, start_for_diff, state):
-        N_ = params['N']# * 3
+        N_ = params['N'] * 1
         contact = -torch.ones(N_, 3).to(device=params['device'])
         if mode == 'thumb_middle':
             contact[:, 0] = 1
@@ -1475,22 +1482,45 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             contact[:, 1] = 1
             contact[:, 2] = 1
 
-        samples, _, _likelihoods = trajectory_sampler.sample(N=N_, start=start_for_diff.reshape(1, -1),
+        pcts = torch.tensor([3584, 1928, 2592.])/torch.tensor([3584, 1928, 2592.]).sum()
+
+        p_c = {
+            'thumb_middle': pcts[0].item(),
+            'index': pcts[1].item(),
+            'turn': pcts[2].item(),
+        }
+
+        samples, _, _likelihoods_t_x_c = trajectory_sampler.sample(N=N_, start=start_for_diff.reshape(1, -1),
                                                             H=trajectory_sampler.T,
-                                                            constraints=contact,
-                                                            project=params['project_state'],)
+                                                            constraints=contact)
+        _, _, _likelihoods_t_x = trajectory_sampler.sample(N=N_, start=start_for_diff.reshape(1, -1),
+                                                            H=trajectory_sampler.T)
+        _, _, _likelihoods_t_c = trajectory_sampler.sample(N=N_,
+                                                            H=trajectory_sampler.T,
+                                                            constraints=contact)
+        # _, _, _likelihoods_no_cond = trajectory_sampler.sample(N=N_, H=trajectory_sampler.T)
         samples = samples.detach()
-        _likelihoods = _likelihoods.detach()
+
+        norm_constant = 1 # Prevent floating point error underflow
+        _likelihoods_t_x_c = norm_constant / -_likelihoods_t_x_c.detach()
+        _likelihoods_t_x = norm_constant / -_likelihoods_t_x.detach()
+        _likelihoods_t_c = norm_constant / -_likelihoods_t_c.detach()
+        # _likelihoods_no_cond = norm_constant / -_likelihoods_no_cond.detach()
+
+        _likelihoods = (norm_constant * p_c[mode]) * (_likelihoods_t_x * _likelihoods_t_c)/ (_likelihoods_t_x_c)
+        # _likelihoods = (_likelihoods_t_x * _likelihoods_t_c)/ (_likelihoods_t_x_c)
         samples = convert_sine_cosine_to_yaw(samples)
         # Weighted average of samples based on likelihoods
         # weights = torch.softmax(_likelihoods.flatten(), dim=0)
         # top_likelihoods = torch.multinomial(weights, N_, replacement=True)
 
-        top_likelihoods = torch.arange(N_)
-        highest_likelihood_idx = _likelihoods.flatten().argmax(0)
+        # top_likelihoods = torch.arange(N_)
+        # Sort likelhoods highest to lowest. Get indices
+        # top_likelihoods = torch.argsort(_likelihoods_t_c, dim=0, descending=True)
+        highest_likelihood_idx = _likelihoods_t_x_c.flatten().argmax(0)
 
-        resampled_samples = samples[top_likelihoods]
-        resampled_likelihoods = _likelihoods.flatten()[top_likelihoods]
+        resampled_samples = samples
+        resampled_likelihoods = _likelihoods.flatten()
 
         if params['visualize_contact_plan']:
             traj_for_viz = resampled_samples[highest_likelihood_idx, :, :15]
@@ -1516,14 +1546,15 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         # Choose weighted average terminal config
         # mean_sample = torch.sum(resampled_samples * resampled_weights.reshape(-1, 1, 1), dim=0)
-        # mean_obj_config = mean_sample[-1, :4 * num_fingers + obj_dof].detach()
+        # goal_obj_config = mean_sample[-1, :4 * num_fingers + obj_dof].detach()
 
         # Choose terminal config from highest likelihood particle
-        mean_obj_config = resampled_samples[resampled_likelihoods.argmax(0), -1, :4 * num_fingers + obj_dof].squeeze()
+        goal_obj_config = resampled_samples[highest_likelihood_idx, -1, :4 * num_fingers + obj_dof].squeeze()
         
         mean = torch.mean(resampled_likelihoods)
+        # max = torch.max(resampled_likelihoods)
 
-        return mean.item(), mean_obj_config, resampled_samples, resampled_likelihoods
+        return mean.item(), goal_obj_config, resampled_samples, resampled_likelihoods
 
         # start = mean_obj_config
         # start_sine_cosine = convert_yaw_to_sine_cosine(start)
@@ -1533,8 +1564,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # return likelihood, mean_obj_config, resampled_samples, resampled_likelihoods
 
     def plan_recovery_contacts_w_model(state):
-        N_ = params['N'] * 3
-        modes = ['thumb_middle', 'index']#, 'turn'] TODO: Add turn back in when switching to new model
+        modes = ['thumb_middle', 'index', 'turn'] 
         # modes = ['thumb_middle']
         if params['sine_cosine']:
             start_for_diff = convert_yaw_to_sine_cosine(state)
@@ -1565,10 +1595,18 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             all_samples_[mode] = all_samples.detach().cpu()
             all_likelihoods_[mode] = all_likelihoods.detach().cpu()
 
-            print(f'Likelihood for {mode}:', likelihood)
             likelihood_list.append(likelihood)
         iter += 1
         # max_likelihood = max(likelihood_list)
+        pcts = torch.tensor([3584, 1928, 2592.])/torch.tensor([3584, 1928, 2592.]).sum()
+
+        # KL Divergence between likelihoods and prior
+        likelihood_normalized = torch.tensor(likelihoods) / sum(likelihoods)
+        for mode in modes:
+            print(f'Normalized likelihood for {mode}:', likelihood_normalized[modes.index(mode)].item())
+        prior = pcts
+        kl_div = torch.sum(likelihood_normalized * torch.log(likelihood_normalized / prior))
+        print('KL Divergence:', kl_div)
 
         return [modes[np.argmax(likelihoods) % len(modes)]], mean_obj_configs[np.argmax(likelihoods)], all_samples_, all_likelihoods_
 
@@ -1901,7 +1939,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 done = True
                 recover = False
                 perturb_this_trial = False
-            elif likelihood < -300:
+            elif likelihood < params.get('drop_threshold', -300):
                 print('Probably dropped the object')
                 done = True
                 add = False
@@ -1919,7 +1957,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     goal = convert_sine_cosine_to_yaw(projected_samples[-1][0])[:15]
                     index_regrasp_planner.reset(start, goal=goal)
                     thumb_and_middle_regrasp_planner.reset(start, goal=goal)
-                    turn_planner.reset(start, goal=goal)
+                    # turn_planner.reset(start, goal=goal)
                     # thumb_regrasp_planner.reset(start, goal=goal)
                     # middle_regrasp_planner.reset(start, goal=goal)
                     print('New goal:', goal)
@@ -1982,8 +2020,8 @@ if __name__ == "__main__":
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_only.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_perturbed_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_recovery_as_contact_mode_planning.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_live_recovery_shortcut.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_live_recovery_shortcut_hardware.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_live_recovery_shortcut.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_live_recovery_shortcut_hardware.yaml').read_text())
 
     from tqdm import tqdm
 
@@ -2127,8 +2165,8 @@ if __name__ == "__main__":
         now = ''
     
     if config['compute_recovery_trajectory'] or config['test_recovery_trajectory']:
-        step_size = 2
-        start_ind = config['parity'] + 552
+        step_size = 1
+        start_ind = config['parity']
     else:
         start_ind = 0
         step_size = 1
