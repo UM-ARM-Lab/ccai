@@ -112,7 +112,7 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'test_official_vf_novf'
+    test_name = 'test_official_vf'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -124,7 +124,7 @@ if __name__ == '__main__':
     calc_diffusion_no_contact_cost = False
     calc_diffusion_w_contact_cost = False
     calc_novf = False
-    calc_combined = True
+    calc_combined = False
 
     method_names = []
     if calc_vf:
@@ -138,7 +138,7 @@ if __name__ == '__main__':
     if calc_combined:
         method_names.append("combined")
 
-    diffusion_path = 'data/training/allegro_screwdriver/adam_diffusion/allegro_screwdriver_diffusion_4999.pt',
+    diffusion_path = 'data/training/allegro_screwdriver/adam_diffusion/allegro_screwdriver_diffusion_4999.pt'
 
     max_screwdriver_tilt = 0.015
     screwdriver_noise_mag = 0.015
@@ -284,7 +284,7 @@ if __name__ == '__main__':
             )
            
             result_combined = [pregrasp_pose, regrasp_pose_combined, regrasp_traj_combined, turn_pose_combined, turn_traj_combined]
-            checkpoint['results']['VF_and_diffusion_cost'][combo_tuple] = result_combined
+            checkpoint['results']['combined'][combo_tuple] = result_combined
             turn_cost = calculate_turn_cost(regrasp_pose_combined.numpy(), turn_pose_combined)
             print('---------------------------------')
             print(f"Combined method cost: {turn_cost}")
