@@ -169,7 +169,8 @@ def test(checkpoint, n_samples):
                     regrasp_pose, config, env,
                     sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                     perception_noise=0, image_path=img_save_dir, iters=turn_iters,
-                    mode='no_vf'
+                    mode='vf', model_name="ensemble_t", initial_yaw = regrasp_pose[0, -2],
+                    vf_weight=vf_weight_t, other_weight=other_weight_t, variance_ratio=variance_ratio_t
                 )
 
                 turn_cost = calculate_turn_cost(regrasp_pose.numpy(), turn_pose)
@@ -283,11 +284,15 @@ if __name__ == "__main__":
     turn_iters = 50
     visualize = False   
 
+    vf_weight_t = 3.3
+    other_weight_t = 1.9
+    variance_ratio_t = 1.625
+
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize, config_path=config_path)
     sim_device = config['sim_device']
     
     n_samples = 6
-    name = "xxx"
+    name = "xxx2"
 
     checkpoint_path = fpath /'test'/'weight_sweep'/f'checkpoint_sweep_regrasp_{name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
