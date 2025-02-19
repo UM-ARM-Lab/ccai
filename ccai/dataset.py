@@ -1,3 +1,4 @@
+from typing import Optional
 import torch
 import pickle
 import pathlib
@@ -457,6 +458,50 @@ class AllegroScrewDriverDataset(Dataset):
 
     def get_norm_constants(self):
         return self.mean, self.std
+    
+class PerEpochBalancedSampler(torch.utils.data.Sampler):
+    """Samples equal number of samples from each class, resampling at the start of each epoch.
+    
+    Args:
+        dataset: Dataset containing trajectory_type attribute
+        samples_per_class: Optional fixed number of samples per class. If None, uses min class count
+    """
+    def __init__(self, dataset, samples_per_class: Optional[int] = None):
+        self.dataset = dataset
+        self.classes_np = dataset.trajectory_type.numpy()
+        self.unique_classes = np.unique(self.classes_np, axis=0)
+        
+        # Get counts per class
+        self.class_counts = {
+            tuple(c): np.sum(np.all(self.classes_np == c, axis=1)) 
+            for c in self.unique_classes
+        }
+        
+        # Set samples per class
+        self.samples_per_class = samples_per_class or min(self.class_counts.values())
+        
+    def __iter__(self):
+        # Reset indices each epoch
+        balanced_indices = []
+        
+        # Sample from each class
+        for c in self.unique_classes:
+            # Get all indices for this class
+            class_indices = np.where(np.all(self.classes_np == c, axis=1))[0]
+            # Sample with replacement if needed
+            sampled_indices = np.random.choice(
+                class_indices, 
+                size=self.samples_per_class,
+                replace=len(class_indices) < self.samples_per_class
+            )
+            balanced_indices.extend(sampled_indices)
+            
+        # Shuffle indices
+        return iter(torch.tensor(balanced_indices)[torch.randperm(len(balanced_indices))])
+
+    def __len__(self):
+        return len(self.unique_classes) * self.samples_per_class
+
 class AllegroScrewDriverStateDataset(Dataset):
 
     def __init__(self, folders, max_T, cosine_sine=False, states_only=False, 

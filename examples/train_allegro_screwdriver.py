@@ -15,7 +15,7 @@ import pytorch_volumetric as pv
 import matplotlib.pyplot as plt
 from ccai.models.training import EMA
 import pytorch_kinematics.transforms as tf
-from ccai.dataset import AllegroScrewDriverDataset, AllegroScrewDriverStateDataset, FakeDataset, RealAndFakeDataset
+from ccai.dataset import AllegroScrewDriverDataset, AllegroScrewDriverStateDataset, FakeDataset, RealAndFakeDataset, PerEpochBalancedSampler
 from isaac_victor_envs.utils import get_assets_dir
 from torch.utils.data import DataLoader, RandomSampler, WeightedRandomSampler
 from ccai.models.trajectory_samplers import TrajectorySampler
@@ -40,9 +40,9 @@ def get_args():
     parser = argparse.ArgumentParser()
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_eval_train_likelihood.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_id_ood_states.yaml')
-    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_project_ood_states.yaml')
+    # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_project_ood_states.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_id_ood_states.yaml')
-    # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion.yaml')
+    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion.yaml')
     return parser.parse_args()
 
 
@@ -147,15 +147,15 @@ def train_model(trajectory_sampler, train_loader, config):
 
         if (epoch + 1) % config['save_every'] == 0:
             if config['use_ema']:
-                torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
+                torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}_{epoch}.pt')
             else:
                 torch.save(model.state_dict(),
-                           f'{fpath}/allegro_screwdriver_{config["model_type"]}pt')
+                           f'{fpath}/allegro_screwdriver_{config["model_type"]}_{epoch}.pt')
     if config['use_ema']:
-        torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
+        torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}_{epoch}.pt')
     else:
         torch.save(model.state_dict(),
-                   f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
+                   f'{fpath}/allegro_screwdriver_{config["model_type"]}_{epoch}.pt')
 
 def train_model_state_only(trajectory_sampler, train_loader, config):
     fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}'
@@ -1156,10 +1156,47 @@ if __name__ == "__main__":
             print(train_dataset.mean)
         if 'recovery' in config['data_directory']:
             classes = train_dataset.trajectory_type
-            # There are three unique classes, defined by the sum of their digits in dim 1. We can use this to weight the sampler
-            weights = [1/(classes.sum(1)).tolist().count(classes[i].sum().item()) for i in range(classes.shape[0])]
+            if config['balance'] == 'weighted_random':
+                weights = [1/(classes.sum(1)).tolist().count(classes[i].sum().item()) for i in range(classes.shape[0])]
+                train_sampler = WeightedRandomSampler(weights, len(train_dataset), replacement=True)
 
-            train_sampler = WeightedRandomSampler(weights, len(train_dataset), replacement=True)
+            elif config['balance'] == 'once':
+                # Convert to numpy for easier manipulation
+                classes_np = classes.numpy()
+                
+                # Get unique class combinations and their counts
+                unique_classes = np.unique(classes_np, axis=0)
+                class_counts = {tuple(c): np.sum(np.all(classes_np == c, axis=1)) for c in unique_classes}
+                
+                # Find minimum class count
+                min_count = min(class_counts.values())
+                
+                # Create balanced indices
+                balanced_indices = []
+                for c in unique_classes:
+                    # Find indices for this class
+                    class_indices = np.where(np.all(classes_np == c, axis=1))[0]
+                    # Randomly sample min_count indices
+                    sampled_indices = np.random.choice(class_indices, size=min_count, replace=False)
+                    balanced_indices.extend(sampled_indices)
+                
+                # Convert to tensor and shuffle
+                balanced_indices = torch.tensor(balanced_indices)[torch.randperm(len(balanced_indices))]
+                
+                # Create subset dataset
+                train_dataset = Subset(train_dataset, balanced_indices)
+                
+                print(f"Balanced dataset size: {len(train_dataset)}")
+                print(f"Samples per class: {min_count}")
+                
+                train_sampler = RandomSampler(train_dataset)
+
+            elif config['balance'] == 'per_epoch':
+                    train_sampler = PerEpochBalancedSampler(train_dataset)
+                    print(f"Samples per class per epoch: {train_sampler.samples_per_class}")
+                    print(f"Total samples per epoch: {len(train_sampler)}")
+            else:
+                train_sampler = RandomSampler(train_dataset)
         else:
             train_sampler = RandomSampler(train_dataset)
         # train_sampler = None
