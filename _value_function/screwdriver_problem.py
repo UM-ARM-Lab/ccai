@@ -309,8 +309,13 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, dif
     #['index', 'middle', 'ring', 'thumb']
     # add random noise to each finger joint other than the ring finger
     if initialization is not None:
-        default_dof_pos = initialization
-        env.reset(dof_pos= default_dof_pos)
+        
+        if config['mode'] == 'hardware':
+            env.initial_dof_pos = initialization
+            env.reset()
+        else:
+            default_dof_pos = initialization
+            env.reset(dof_pos= default_dof_pos)
 
     last_diffused_q = None
     # diffusion ############################################################################################################
@@ -475,8 +480,10 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, dif
                 print(state[:15][-3:])
 
         ####################################################################################################
-
-        env.step(action, path_override = image_path)
+        if config['mode'] == 'hardware':
+            env.step(action)
+        else:
+            env.step(action, path_override = image_path)
         regrasp_problem._preprocess(best_traj.unsqueeze(0))
 
     state = env.get_state()
@@ -515,7 +522,11 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
     num_fingers = len(params['fingers'])
     action_list = []
 
-    env.reset(dof_pos = initial_pose)
+    if params['mode'] == 'hardware':
+        env.initial_dof_pos = initial_pose
+        env.reset()
+    else:
+        env.reset(dof_pos = initial_pose)
 
 
     # diffusion setup ############################################################################################################
@@ -674,9 +685,10 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
                 print(state[:15][-3:])
 
         ####################################################################################################
-
-
-        env.step(action, path_override = image_path)
+        if params['mode'] == 'hardware':
+            env.step(action)
+        else:
+            env.step(action, path_override = image_path)
         action_list.append(action)
         turn_problem._preprocess(best_traj.unsqueeze(0))
        

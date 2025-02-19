@@ -16,10 +16,8 @@ import pytorch_kinematics as pk
 from isaac_victor_envs.utils import get_assets_dir
 
 from ccai.utils.allegro_utils import state2ee_pos
-try:
-    from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
-except:
-    print("RosAllegroScrewdriverTurningEnv not available")
+from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
+
 import torch
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 from itertools import product
@@ -116,9 +114,11 @@ if __name__ == '__main__':
     diffusion_path = 'data/training/allegro_screwdriver/adam_diffusion/allegro_screwdriver_diffusion_4999.pt'
    
     print("input method:")
-    method = input()
+    # method = input()
+    method = "vf"
     print("input trial number:")
-    trial_number = int(input())
+    # trial_number = int(input())
+    trial_number = 0
 
     pregrasps = pkl.load(open(pregrasp_path, 'rb'))
     pregrasp_pose = pregrasps[trial_number]
@@ -130,7 +130,7 @@ if __name__ == '__main__':
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{config_path}').read_text())
 
     from hardware.hardware_env import HardwareEnv
-    default_dof_pos = pregrasp_pose
+    default_dof_pos = pregrasp_pose[:,:16]
     env = HardwareEnv(default_dof_pos[:, :16], 
                         finger_list=config['fingers'], 
                         kp=config['kp'], 
@@ -138,11 +138,8 @@ if __name__ == '__main__':
                         mode='relative',
                         gradual_control=True,
                         num_repeat=10)
-    
-    img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/imgs_official/hardware/{method}/trial_{trial_number}')
-    pathlib.Path.mkdir(img_save_dir, parents=True, exist_ok=True)  
-    env.frame_fpath = img_save_dir
-    env.frame_id = 0
+    env.initial_dof_pos = default_dof_pos
+    env.reset()
 
     env.get_state()
     for _ in range(5):
@@ -152,6 +149,10 @@ if __name__ == '__main__':
     root_coor = root_coor
     robot_p = np.array([0, -0.095, 1.33])
     root_coor = root_coor + robot_p
+
+    img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/imgs_official/hardware/{method}/trial_{trial_number}')
+    pathlib.Path.mkdir(img_save_dir, parents=True, exist_ok=True)  
+
     sim_env = RosAllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
                                 use_cartesian_controller=False,
                                 viewer=True,
@@ -165,10 +166,17 @@ if __name__ == '__main__':
                                 table_pose=None,
                                 gravity=False
                                 )
+    sim_env.frame_fpath = img_save_dir
+    sim_env.frame_id = 0
+    
+    sim_env.reset(dof_pos= pregrasp_pose)
+
+    print("Enter when done setting up screwdriver")
+    input()
     
     sim, gym, viewer = sim_env.get_sim()
     assert (np.array(sim_env.robot_p) == robot_p).all()
-    assert (sim_env.default_dof_pos[:, :16] == default_dof_pos.to(config['sim_device'])).all()
+    assert (sim_env.initial_dof_pos[:, :16] == default_dof_pos.to(config['sim_device'])).all()
     env.world_trans = sim_env.world_trans
     env.joint_stiffness = sim_env.joint_stiffness
     env.device = sim_env.device
@@ -195,8 +203,10 @@ if __name__ == '__main__':
 
     print(f"Testing {method} trial {trial_number} ...")
 
+
     if method == 'vf':
-        env.reset(dof_pos= pregrasp_pose)
+        env.initial_dof_pos = pregrasp_pose
+        env.reset()
     
         regrasp_pose_vf, regrasp_traj_vf, regrasp_plan = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
@@ -223,7 +233,8 @@ if __name__ == '__main__':
 
     elif method == 'diffusion_no_contact_cost':
 
-        env.reset(dof_pos= pregrasp_pose)
+        env.initial_dof_pos = pregrasp_pose
+        env.reset()
         
         regrasp_pose_diffusion, regrasp_traj_diffusion, regrasp_plan = regrasp(
             env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
@@ -250,7 +261,8 @@ if __name__ == '__main__':
 
     elif method == 'diffusion_w_contact_cost':
 
-        env.reset(dof_pos= pregrasp_pose)
+        env.initial_dof_pos = pregrasp_pose
+        env.reset()
         
         regrasp_pose_diffusion_wc, regrasp_traj_diffusion_wc, regrasp_plan = regrasp(
             env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
@@ -277,7 +289,8 @@ if __name__ == '__main__':
 
     elif method == 'combined':
 
-        env.reset(dof_pos= pregrasp_pose)
+        env.initial_dof_pos = pregrasp_pose
+        env.reset()
         
         regrasp_pose_combined, regrasp_traj_combined, regrasp_plan = regrasp(
             env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
@@ -304,8 +317,8 @@ if __name__ == '__main__':
         print('---------------------------------')
 
     elif method == 'novf':
-
-        env.reset(dof_pos= pregrasp_pose)
+        env.initial_dof_pos = pregrasp_pose
+        env.reset()
         
         regrasp_pose_novf, regrasp_traj_novf, regrasp_plan = regrasp(
             env, config, chain, state2ee_pos_partial, perception_noise=perception_noise, use_diffusion = False,
