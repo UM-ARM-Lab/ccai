@@ -11,7 +11,7 @@ fpath = pathlib.Path(f'{CCAI_PATH}/data')
 import torch
 
 # make sure tests have the same number of trials and repeats
-experiment_names = ['test_method_c7']
+experiment_names = ['test_method_test_official_diffusion']
 
 results = {}
 
@@ -189,7 +189,7 @@ if __name__ == "__main__":
             fontsize=12,
             color='black'
         )
-
+    plt.ylim(0, 5.1)
     plt.xlabel('Method', fontsize=ts)
     plt.ylabel('Cost Value', fontsize=ts)
     plt.title('Boxplot of Turning Costs by Method', fontsize=ts)

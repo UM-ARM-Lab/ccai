@@ -112,7 +112,7 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'test_official_vf_novf'
+    test_name = 'test_official_diffusion'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -120,11 +120,11 @@ if __name__ == '__main__':
     n_repeat = 1
     perception_noise = 0.0
 
-    calc_vf = True
-    calc_diffusion_no_contact_cost = False
-    calc_diffusion_w_contact_cost = False
+    calc_vf = False
+    calc_diffusion_no_contact_cost = True
+    calc_diffusion_w_contact_cost = True
     calc_novf = False
-    calc_combined = True
+    calc_combined = False
 
     method_names = []
     if calc_vf:
@@ -138,7 +138,7 @@ if __name__ == '__main__':
     if calc_combined:
         method_names.append("combined")
 
-    diffusion_path = 'data/training/allegro_screwdriver/adam_diffusion/allegro_screwdriver_diffusion_4999.pt',
+    diffusion_path = 'data/training/allegro_screwdriver/adam_diffusion/allegro_screwdriver_diffusion_4999.pt'
 
     max_screwdriver_tilt = 0.015
     screwdriver_noise_mag = 0.015
@@ -246,7 +246,7 @@ if __name__ == '__main__':
                 env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
                 use_diffusion=True, use_contact_cost=True,
                 diffusion_path = diffusion_path,
-                image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters,
+                image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
             )
        
             _, turn_pose_diffusion_wc, succ_diffusion_wc, turn_traj_diffusion_wc, turn_plan = do_turn(
@@ -254,7 +254,7 @@ if __name__ == '__main__':
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                 use_diffusion=True, 
                 diffusion_path = diffusion_path,
-                perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='vf',
+                perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf',
             )
            
             result_diffusion_wc = [pregrasp_pose, regrasp_pose_diffusion_wc, regrasp_traj_diffusion_wc, turn_pose_diffusion_wc, turn_traj_diffusion_wc]
@@ -271,7 +271,7 @@ if __name__ == '__main__':
                 env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
                 use_diffusion=True, use_contact_cost=True,
                 diffusion_path = diffusion_path,
-                image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
+                image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters,
             )
        
             _, turn_pose_combined, succ_combined, turn_traj_combined, turn_plan = do_turn(
@@ -280,7 +280,7 @@ if __name__ == '__main__':
                 use_diffusion=True, 
                 diffusion_path = diffusion_path,
                 initial_yaw = regrasp_pose_combined[0, -2],
-                perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf',
+                perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='vf',
             )
            
             result_combined = [pregrasp_pose, regrasp_pose_combined, regrasp_traj_combined, turn_pose_combined, turn_traj_combined]
