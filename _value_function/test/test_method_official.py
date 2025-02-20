@@ -91,9 +91,7 @@ def load_or_create_checkpoint(checkpoint_path, method_names):
         with open(checkpoint_path, 'rb') as f:
             checkpoint = pkl.load(f)
     else:
-        print(f"No checkpoint found. Creating a new one at {checkpoint_path}. Also deleting imgs because we're starting a new test")
-
-        delete_imgs()
+        print(f"No checkpoint found. Creating a new one at {checkpoint_path}.")
        
         # Dictionary-based approach
         checkpoint = {
@@ -112,7 +110,7 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'test_official_combined'
+    test_name = 'test_official_high_iter_singlevf'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -124,7 +122,8 @@ if __name__ == '__main__':
     calc_diffusion_no_contact_cost = False
     calc_diffusion_w_contact_cost = False
     calc_novf = False
-    calc_combined = True
+    calc_combined = False
+    calc_singlevf = True
 
     method_names = []
     if calc_vf:
@@ -144,8 +143,8 @@ if __name__ == '__main__':
     screwdriver_noise_mag = 0.015
     finger_noise_mag = 0.05
 
-    regrasp_iters = 40
-    turn_iters = 50
+    regrasp_iters = 80 #40
+    turn_iters = 100 #50
 
     vf_weight_rg = 5.0
     other_weight_rg = 1.9
@@ -212,6 +211,31 @@ if __name__ == '__main__':
             turn_cost = calculate_turn_cost(regrasp_pose_vf.numpy(), turn_pose_vf)
             print('---------------------------------')
             print(f"VF cost: {turn_cost}")
+
+        if calc_singlevf:
+            env.reset(dof_pos= pregrasp_pose)
+        
+            regrasp_pose_singlevf, regrasp_traj_singlevf, regrasp_plan = regrasp(
+                    env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
+                    image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters, model_name = "ensemble_rg_single",
+                    vf_weight=vf_weight_rg, other_weight=other_weight_rg, variance_ratio=variance_ratio_rg
+            )
+        
+            _, turn_pose_singlevf, succ_singlevf, turn_traj_singlevf, turn_plan = do_turn(
+                regrasp_pose_singlevf, config, env,
+                sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
+                perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='vf',
+                model_name="ensemble_t_single", initial_yaw = regrasp_pose_singlevf[0, -2],
+                vf_weight=vf_weight_t, other_weight=other_weight_t, variance_ratio=variance_ratio_t
+            )
+
+            # Store the VF approach result
+            result_singlevf = [pregrasp_pose, regrasp_pose_singlevf, regrasp_traj_singlevf, turn_pose_singlevf, turn_traj_singlevf]
+            checkpoint['results']['singlevf'][combo_tuple] = result_singlevf
+
+            turn_cost = calculate_turn_cost(regrasp_pose_singlevf.numpy(), turn_pose_singlevf)
+            print('---------------------------------')
+            print(f"Single VF cost: {turn_cost}")
 
         if calc_diffusion_no_contact_cost:
 

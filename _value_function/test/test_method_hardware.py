@@ -10,7 +10,7 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 sys.path.append(str(CCAI_PATH))
 from tqdm import tqdm
 from pathlib import Path
-from _value_function.screwdriver_problem import init_env, do_turn, pregrasp, regrasp, emailer, convert_partial_to_full_config, delete_imgs
+from _value_function.screwdriver_problem import init_env, do_turn, pregrasp, regrasp, emailer, convert_partial_to_full_config
 from _value_function.data_collect.process_final_poses_regrasp import calculate_turn_cost
 import pytorch_kinematics as pk
 from isaac_victor_envs.utils import get_assets_dir
@@ -97,8 +97,8 @@ if __name__ == '__main__':
     screwdriver_noise_mag = 0.015
     finger_noise_mag = 0.05
 
-    regrasp_iters = 40
-    turn_iters = 50
+    regrasp_iters = 80
+    turn_iters = 100
 
     vf_weight_rg = 5.0
     other_weight_rg = 1.9

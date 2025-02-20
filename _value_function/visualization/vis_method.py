@@ -12,7 +12,7 @@ fpath = pathlib.Path(f'{CCAI_PATH}/data')
 import torch
 
 # make sure tests have the same number of trials and repeats
-experiment_names = ['test_method_test_official_all']
+experiment_names = ['test_method_test_official_high_iter_all'] #['test_method_test_official_all']#
 results = {}
 
 for name in experiment_names:
@@ -28,7 +28,7 @@ for name in experiment_names:
             exit()
 
 if __name__ == "__main__":
-    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
+    # config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
 
     # Get unique method names from the results dictionary
     method_names = list(results.keys())  # Start with all keys in the results dict
@@ -74,141 +74,160 @@ if __name__ == "__main__":
 
                 yaw_delta = (pose_i[-1] - pose_f[-1]) 
                 if yaw_delta > 100 or yaw_delta < -100:
-                    
-                    for j in range(13):
-                        env.reset(torch.from_numpy(turn_traj[j]).reshape(1, 20).float())
-                        # print(max(abs(turn_traj[j][-4:-2]))*180/np.pi)
-                        time.sleep(0.1)
-
-                    print(f"Yaw delta: {yaw_delta}")
-
-                    cost = calculate_turn_cost(regrasp_pose.numpy(), turn_pose)
-
-                    
+                    print("bad")
+                    exit()
+                    # for j in range(13):
+                    #     env.reset(torch.from_numpy(turn_traj[j]).reshape(1, 20).float())
+                    #     # print(max(abs(turn_traj[j][-4:-2]))*180/np.pi)
+                    #     time.sleep(0.1)
+            
                 data[method_name]['tilt_angles'].append(tilt_angle)
                 data[method_name]['yaw_deltas'].append(yaw_delta)
-
-                # if tilt_angle > 5.0 and tilt_angle < 10.0:
-                #     print(tilt_angle)
-                #     for j in range(13):
-                #         env.reset(torch.from_numpy(turn_traj[j]).reshape(1, 20).float())
-                #         # print(max(abs(turn_traj[j][-4:-2]))*180/np.pi)
-                #         time.sleep(0.1)
-                #     # time.sleep(1)
 
             # Average cost and standard deviation across repeats
             data[method_name]['costs'].append(np.mean(all_costs))
             data[method_name]['stds'].append(np.std(all_costs))
-
-    plt.figure(figsize=(10, 5))
-
-    # These offsets help shift the actual cost vs the predicted cost horizontally
-    # so that they don't overlap exactly on top of each other.
-    method_offset = 0.15  # spacing offset for each method group
-
-    colors = ['blue', 'red', 'green', 'purple', 'orange', 'cyan', 'magenta', 'yellow']
-
-    for method_i, method_name in enumerate(method_names):
-        # x positions for the actual cost
-        x = np.arange(len(data[method_name]['costs'])) + method_i * method_offset
-
-        # Plot costs with error bars
-        plt.errorbar(
-            x, 
-            data[method_name]['costs'], 
-            yerr=data[method_name]['stds'], 
-            fmt='o',  # marker shape
-            label=f'Rollout Cost (method name: {method_name.upper()})', 
-            linestyle='None', 
-            capsize=3,
-            color=colors[method_i]
-        )
-
-    ts = 16
-    plt.xlabel('Pregrasp Index', fontsize=ts)
-    plt.ylabel('Cost Value', fontsize=ts)
-    plt.title('Turning Costs by Method', fontsize=ts)
-    plt.xticks(fontsize=ts-2)
-    plt.yticks(fontsize=ts-2)
-    plt.legend(loc='upper right', fontsize=ts-2)
-
+    
     if "no_vf" in data and "vf" in data:
-        mean_no_vf = np.mean(data["no_vf"]["costs"])
-        mean_vf = np.mean(data["vf"]["costs"])
+            mean_no_vf = np.mean(data["no_vf"]["costs"])
+            mean_vf = np.mean(data["vf"]["costs"])
 
-        mean_diff = mean_no_vf - mean_vf
-        percent_decrease = (mean_diff / mean_no_vf) * 100
+            mean_diff = mean_no_vf - mean_vf
+            percent_decrease = (mean_diff / mean_no_vf) * 100
 
-        print(f'Average cost difference (no_vf - vf): {mean_diff}')
-        print(f'Percent decrease in cost: {percent_decrease:.2f}%')
+            print(f'Average cost difference (no_vf - vf): {mean_diff}')
+            print(f'Percent decrease in cost: {percent_decrease:.2f}%')
 
     for method in data:
         print(f'{method} mean cost: {np.mean(data[method]["costs"])}')
 
-    plt.tight_layout()
-    plt.show()
+    colors = ['blue', 'red', 'green', 'purple', 'orange', 'cyan', 'magenta', 'yellow']
+    ts = 16
+    if False:
+        plt.figure(figsize=(10, 5))
+        method_offset = 0.15  # spacing offset for each method group
 
-    # ----  Boxplot ----
-    # Create a new figure for the boxplot
-    plt.figure(figsize=(10, 5))
+        for method_i, method_name in enumerate(method_names):
+            # x positions for the actual cost
+            x = np.arange(len(data[method_name]['costs'])) + method_i * method_offset
 
-    # Prepare data for boxplot: a list of cost lists (one per method)
-    boxplot_data = [data[method]['costs'] for method in method_names]
+            # Plot costs with error bars
+            plt.errorbar(
+                x, 
+                data[method_name]['costs'], 
+                yerr=data[method_name]['stds'], 
+                fmt='o',  # marker shape
+                label=f'Rollout Cost (method name: {method_name.upper()})', 
+                linestyle='None', 
+                capsize=3,
+                color=colors[method_i]
+            )
+        plt.xlabel('Pregrasp Index', fontsize=ts)
+        plt.ylabel('Cost Value', fontsize=ts)
+        plt.title('Turning Costs by Method', fontsize=ts)
+        plt.xticks(fontsize=ts-2)
+        plt.yticks(fontsize=ts-2)
+        plt.legend(loc='upper right', fontsize=ts-2)
 
-    # Create the boxplot; patch_artist=True allows us to color the boxes.
-    bp = plt.boxplot(
-        boxplot_data, 
-        labels=[method.upper() for method in method_names], 
-        patch_artist=True, 
-        showmeans=False, 
-        meanprops=dict(marker='D', markeredgecolor='black', markerfacecolor='black', markersize=8),
-        boxprops=dict(color='black', linewidth=2),
-        medianprops=dict(color='black', linewidth=2)
-    )
+        plt.tight_layout()
+        plt.show()
+    if True:
+        # ----  Boxplot ----
+        # Create a new figure for the boxplot
+        plt.figure(figsize=(10, 5))
 
-    # Color the boxes using the same colors as before
-    for patch, color in zip(bp['boxes'], colors):
-        patch.set_facecolor(color)
-        patch.set_alpha(0.5)
+        # Prepare data for boxplot: a list of cost lists (one per method)
+        boxplot_data = [data[method]['costs'] for method in method_names]
 
-    # Annotate each box with its median value
-    for i, method in enumerate(method_names):
-        median_val = np.median(data[method]['costs'])
-        plt.text(
-            i + 1 - 0.15, 
-            median_val - 0.02, 
-            f"{median_val:.2f}", 
-            horizontalalignment='center', 
-            verticalalignment='bottom',
-            fontsize=12,
-            color='black'
+        # Create the boxplot; patch_artist=True allows us to color the boxes.
+        bp = plt.boxplot(
+            boxplot_data, 
+            labels=[method.upper() for method in method_names], 
+            patch_artist=True, 
+            showmeans=False, 
+            meanprops=dict(marker='D', markeredgecolor='black', markerfacecolor='black', markersize=8),
+            boxprops=dict(color='black', linewidth=2),
+            medianprops=dict(color='black', linewidth=2)
         )
-    plt.ylim(0, 5.1)
-    plt.xlabel('Method', fontsize=ts)
-    plt.ylabel('Cost Value', fontsize=ts)
-    plt.title('Boxplot of Turning Costs by Method', fontsize=ts)
-    plt.xticks(fontsize=ts-2)
-    plt.yticks(fontsize=ts-2)
-    plt.tight_layout()
-    plt.show()
 
-    tilt_threshold = 10
-    for method_name, metrics in data.items():
-        tilt_angles = metrics['tilt_angles']
-        yaw_deltas = metrics['yaw_deltas']
-        
-        total_trials = len(tilt_angles)
-        # Count dropped trials
-        dropped_trials = sum(1 for angle in tilt_angles if angle > tilt_threshold)
-        drop_rate = dropped_trials / total_trials if total_trials > 0 else 0
-        
-        # Filter yaw_deltas for trials that are not dropped 
-        valid_yaw_deltas = [yaw for angle, yaw in zip(tilt_angles, yaw_deltas) if angle <= tilt_threshold]
-        if valid_yaw_deltas:
-            avg_yaw_delta = sum(valid_yaw_deltas) / len(valid_yaw_deltas)
-        else:
-            avg_yaw_delta = None  # or use float('nan') if preferred
-        
-        print(f"Method: {method_name}")
-        print(f"  Drop Rate: {drop_rate*100:.2f}%")
-        print(f"  Average Yaw Delta (non-dropped): {avg_yaw_delta:.2f}")
+        # Color the boxes using the same colors as before
+        for patch, color in zip(bp['boxes'], colors):
+            patch.set_facecolor(color)
+            patch.set_alpha(0.5)
+
+        # Annotate each box with its median value
+        for i, method in enumerate(method_names):
+            median_val = np.median(data[method]['costs'])
+            plt.text(
+                i + 1 - 0.15, 
+                median_val - 0.02, 
+                f"{median_val:.2f}", 
+                horizontalalignment='center', 
+                verticalalignment='bottom',
+                fontsize=12,
+                color='black'
+            )
+        plt.ylim(0, 5.1)
+        plt.xlabel('Method', fontsize=ts)
+        plt.ylabel('Cost Value', fontsize=ts)
+        plt.title('Boxplot of Turning Costs by Method', fontsize=ts)
+        plt.xticks(fontsize=ts-2)
+        plt.yticks(fontsize=ts-2)
+        plt.tight_layout()
+        plt.show()
+    if True:
+        # ----  Boxplot ----
+        # Create a new figure for the boxplot
+        plt.figure(figsize=(10, 5))
+
+        # Prepare data for boxplot: a list of cost lists (one per method)
+        boxplot_data = []
+
+        for method_name, metrics in data.items():
+            tilt_threshold = 10
+            tilt_angles = metrics['tilt_angles']
+            yaw_deltas = metrics['yaw_deltas']
+            
+            total_trials = len(tilt_angles)
+            # Count dropped trials
+            dropped_trials = sum(1 for angle in tilt_angles if angle > tilt_threshold)
+            drop_rate = dropped_trials / total_trials if total_trials > 0 else 0
+            
+            # Filter yaw_deltas for trials that are not dropped 
+            valid_yaw_deltas = [yaw for angle, yaw in zip(tilt_angles, yaw_deltas) if angle <= tilt_threshold]
+            if valid_yaw_deltas:
+                avg_yaw_delta = sum(valid_yaw_deltas) / len(valid_yaw_deltas)
+            else:
+                avg_yaw_delta = None  # or use float('nan') if preferred
+            
+            print(f"Method: {method_name}")
+            print(f"  Drop Rate: {drop_rate*100:.2f}%")
+            print(f"  Average Yaw Delta (non-dropped): {avg_yaw_delta:.2f}")
+
+            boxplot_data.append(valid_yaw_deltas)
+    
+        # Create the boxplot; patch_artist=True allows us to color the boxes.
+        bp = plt.boxplot(
+            boxplot_data, 
+            labels=[method.upper() for method in method_names], 
+            patch_artist=True, 
+            showmeans=False, 
+            meanprops=dict(marker='D', markeredgecolor='black', markerfacecolor='black', markersize=8),
+            boxprops=dict(color='black', linewidth=2),
+            medianprops=dict(color='black', linewidth=2)
+        )
+
+        # Color the boxes using the same colors as before
+        for patch, color in zip(bp['boxes'], colors):
+            patch.set_facecolor(color)
+            patch.set_alpha(0.5)
+
+        # plt.ylim(0, 5.1)
+        plt.xlabel('Method', fontsize=ts)
+        plt.ylabel('Degrees Turned', fontsize=ts)
+        plt.title('Boxplot of Task Completion (Degrees the screwdriver turned) for Method', fontsize=ts)
+        plt.xticks(fontsize=ts-2)
+        plt.yticks(fontsize=ts-2)
+        plt.tight_layout()
+        plt.show()
+    
