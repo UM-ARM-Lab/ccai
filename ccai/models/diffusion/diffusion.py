@@ -254,7 +254,7 @@ class GaussianDiffusion(nn.Module):
             B, N, _ = context.shape
         guidance_weights = torch.tensor([0.5, 0.5], device=x.device)
         w_total = 1.2
-        # w_total = 2.4
+        # w_total = 10
         unconditional, _ = self.model.compiled_unconditional_test(t, x)
         if not (context is None or self.unconditional):
             num_constraints = context.shape[1]
@@ -314,7 +314,7 @@ class GaussianDiffusion(nn.Module):
         pred_img = model_mean + alpha * (0.5 * model_log_variance).exp() * noise
         return pred_img, x_start
 
-    def _apply_conditioning(self, x, condition=None):
+    def _apply_conditioning(self, x, condition=None, t_=None):
         if condition is None:
             return x
         self.screwdriver_bounds = False
@@ -334,11 +334,14 @@ class GaussianDiffusion(nn.Module):
         ub = (ub - self.mu[:len(ub)]) / self.std[:len(ub)]
 
         torch.clip_(x[:, :, :len(lb)], min=lb, max=ub)
-        for t, (start_idx, val) in condition.items():
-            num_repeats = x.shape[0] // val.shape[0]
-            val = val.reshape(val.shape[0], -1, val.shape[-1]).repeat_interleave(num_repeats, 0)
-            n, h, d = val.shape
-            x[:, t:t + h, start_idx:start_idx + d] = val.clone()
+        if type(t_) != float:
+            for t, (start_idx, val) in condition.items():
+                num_repeats = x.shape[0] // val.shape[0]
+
+                val = val.reshape(val.shape[0], -1, val.shape[-1]).repeat_interleave(num_repeats, 0)
+                # noise = default(noise, lambda: torch.randn_like(val))
+                n, h, d = val.shape
+                x[:, t:t + h, start_idx:start_idx + d] = val.clone()
         return x
 
     @torch.no_grad()
@@ -360,10 +363,12 @@ class GaussianDiffusion(nn.Module):
         if start_timestep is None:
             start_timestep = self.num_timesteps
         # img.requires_grad = condition[0][1].requires_grad
+        # img = self._apply_conditioning(img, condition, t=0)
         img = self._apply_conditioning(img, condition)
         imgs = [img]
         for t in reversed(range(0, start_timestep)):
             img, x_start = self.p_sample_grad(img, t, context)
+            # img = self._apply_conditioning(img, condition, t=t)
             img = self._apply_conditioning(img, condition)
             # img[:, -1, 8] = img[:, 0, 8] + np.pi / 4.0
             imgs.append(img)
@@ -463,7 +468,7 @@ class GaussianDiffusion(nn.Module):
         ret = img if not return_all_timesteps else torch.stack(imgs, dim=1)
         return ret
 
-    def sample(self, N, H=None, condition=None, context=None, return_all_timesteps=False, no_grad=True, skip_likelihood=False):
+    def sample(self, N, H=None, condition=None, context=None, return_all_timesteps=False, no_grad=True, skip_likelihood=False, context_for_likelihood=True):
         B = 1
         if H is None:
             H = self.horizon
@@ -535,7 +540,7 @@ class GaussianDiffusion(nn.Module):
                 # return sample, None
                 if not no_grad:
                     sample.requires_grad = True
-                likelihood = self.approximate_likelihood(sample.reshape(-1, self.horizon, self.xu_dim), context=context.reshape(-1, self.context_dim) if context is not None else None)
+                likelihood = self.approximate_likelihood(sample.reshape(-1, self.horizon, self.xu_dim), context=context.reshape(-1, self.context_dim) if (context is not None and context_for_likelihood) else None)
 
         return sample, likelihood
 
@@ -638,8 +643,8 @@ class GaussianDiffusion(nn.Module):
         t = torch.arange(1, self.num_timesteps, device=device).long()
         # t = torch.arange(1, self.num_timesteps, 8, device=device).long()
         # t = torch.arange(5, 30, 2, device=device).long()
-        # if hasattr(self, 'subsampled_t'):
-        # t = torch.tensor([5, 10, 15], device=device).long()
+        if self.subsampled_t:
+            t = torch.tensor([5, 10, 15], device=device).long()
 
         N = t.shape[0]
         t = t[None, :].repeat(B, 1).reshape(B * N)
