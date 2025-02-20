@@ -23,7 +23,7 @@ sys.path.append('..')
 
 # sys.stdout = open('./logs/live_recovery_shorcut_honda_meeting_full_dof_noise_train_indexing_fix_6500_.08_std_.75_pct_diff_likelihood_no_resample_no_cpc_on_pregrasp.log', 'w', buffering=1)
 # sys.stdout = open('./examples/logs/recovery_as_contact_search.log', 'w', buffering=1)
-sys.stdout = open('./examples/logs/live_recovery_hardware_5_10_15_200_MC_contact_selection.log', 'w', buffering=1)
+sys.stdout = open('./examples/logs/live_recovery_hardware_5_10_15_200_MC_contact_selection_film.log', 'w', buffering=1)
 
 import pytorch_volumetric as pv
 import pytorch_kinematics as pk
@@ -519,13 +519,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 
         # else:
-        # min_force_dict = None
-        # if params['mode'] == 'hardware':
-        min_force_dict = {
-            'thumb': .5,
-            'middle': .5,
-            'index': .0,
-        }
+        min_force_dict = None
+        if params['mode'] == 'hardware':
+            min_force_dict = {
+                'thumb': 2.5,
+                'middle': 2.5,
+                'index': .0,
+            }
 
         # min_force_dict = {
         #     'thumb': 0,
@@ -1482,32 +1482,34 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             contact[:, 1] = 1
             contact[:, 2] = 1
 
-        pcts = torch.tensor([3584, 1928, 2592.])/torch.tensor([3584, 1928, 2592.]).sum()
+        # pcts = torch.tensor([3584, 1928, 2592.])/torch.tensor([3584, 1928, 2592.]).sum()
+        # pcts = torch.tensor([3112, 4424.])/torch.tensor([3112, 4424.]).sum()
+        pcts = torch.tensor([3112, 3112.])/torch.tensor([3112, 3112.]).sum() # Weighted training should technically have a uniform prior
 
         p_c = {
             'thumb_middle': pcts[0].item(),
             'index': pcts[1].item(),
-            'turn': pcts[2].item(),
+            # 'turn': pcts[2].item(),
         }
 
         samples, _, _likelihoods_t_x_c = trajectory_sampler.sample(N=N_, start=start_for_diff.reshape(1, -1),
                                                             H=trajectory_sampler.T,
                                                             constraints=contact)
-        _, _, _likelihoods_t_x = trajectory_sampler.sample(N=N_, start=start_for_diff.reshape(1, -1),
-                                                            H=trajectory_sampler.T)
+        # _, _, _likelihoods_t_x = trajectory_sampler.sample(N=N_, start=start_for_diff.reshape(1, -1),
+        #                                                     H=trajectory_sampler.T)
         _, _, _likelihoods_t_c = trajectory_sampler.sample(N=N_,
                                                             H=trajectory_sampler.T,
                                                             constraints=contact)
         # _, _, _likelihoods_no_cond = trajectory_sampler.sample(N=N_, H=trajectory_sampler.T)
         samples = samples.detach()
 
-        norm_constant = 1 # Prevent floating point error underflow
-        _likelihoods_t_x_c = norm_constant / -_likelihoods_t_x_c.detach()
-        _likelihoods_t_x = norm_constant / -_likelihoods_t_x.detach()
-        _likelihoods_t_c = norm_constant / -_likelihoods_t_c.detach()
-        # _likelihoods_no_cond = norm_constant / -_likelihoods_no_cond.detach()
+        _likelihoods_t_x_c = torch.exp(_likelihoods_t_x_c.detach()).mean()
+        _likelihoods_t_x = torch.exp(_likelihoods_t_x.detach()).mean()
+        _likelihoods_t_c = torch.exp(_likelihoods_t_c.detach()).mean()
 
-        _likelihoods = (norm_constant * p_c[mode]) * (_likelihoods_t_x * _likelihoods_t_c)/ (_likelihoods_t_x_c)
+        # likelihood_c_x = (p_c[mode]) * (_likelihoods_t_x.mean() * _likelihoods_t_c.mean())/ (_likelihoods_t_x_c.mean())
+        # log_likelihood_c_x = np.log(p_c[mode]) + torch.log(_likelihoods_t_x) + torch.log(_likelihoods_t_c) - torch.log(_likelihoods_t_x_c) # Logged for numerical stability
+        log_likelihood_c_x = np.log(p_c[mode]) + torch.log(_likelihoods_t_c) - torch.log(_likelihoods_t_x_c) # Logged for numerical stability
         # _likelihoods = (_likelihoods_t_x * _likelihoods_t_c)/ (_likelihoods_t_x_c)
         samples = convert_sine_cosine_to_yaw(samples)
         # Weighted average of samples based on likelihoods
@@ -1520,7 +1522,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         highest_likelihood_idx = _likelihoods_t_x_c.flatten().argmax(0)
 
         resampled_samples = samples
-        resampled_likelihoods = _likelihoods.flatten()
 
         if params['visualize_contact_plan']:
             traj_for_viz = resampled_samples[highest_likelihood_idx, :, :15]
@@ -1551,10 +1552,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # Choose terminal config from highest likelihood particle
         goal_obj_config = resampled_samples[highest_likelihood_idx, -1, :4 * num_fingers + obj_dof].squeeze()
         
-        mean = torch.mean(resampled_likelihoods)
         # max = torch.max(resampled_likelihoods)
 
-        return mean.item(), goal_obj_config, resampled_samples, resampled_likelihoods
+        return log_likelihood_c_x.item(), goal_obj_config, resampled_samples, _likelihoods_t_x_c
 
         # start = mean_obj_config
         # start_sine_cosine = convert_yaw_to_sine_cosine(start)
@@ -1564,7 +1564,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # return likelihood, mean_obj_config, resampled_samples, resampled_likelihoods
 
     def plan_recovery_contacts_w_model(state):
-        modes = ['thumb_middle', 'index', 'turn'] 
+        # modes = ['thumb_middle', 'index', 'turn'] 
+        modes = ['thumb_middle', 'index'] 
         # modes = ['thumb_middle']
         if params['sine_cosine']:
             start_for_diff = convert_yaw_to_sine_cosine(state)
@@ -1598,17 +1599,24 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             likelihood_list.append(likelihood)
         iter += 1
         # max_likelihood = max(likelihood_list)
-        pcts = torch.tensor([3584, 1928, 2592.])/torch.tensor([3584, 1928, 2592.]).sum()
+        # pcts = torch.tensor([3584, 1928, 2592.])/torch.tensor([3584, 1928, 2592.]).sum()
+        # pcts = torch.tensor([3112, 4424.])/torch.tensor([3112, 4424.]).sum()
+        pcts = torch.tensor([3112, 3112.])/torch.tensor([3112, 3112.]).sum() # Weighted training should technically have a uniform prior
 
         # KL Divergence between likelihoods and prior
-        likelihood_normalized = torch.tensor(likelihoods) / sum(likelihoods)
+        likelihood_normalized = torch.exp(torch.tensor(likelihoods)) / torch.exp(torch.tensor(likelihoods)).sum()
         for mode in modes:
             print(f'Normalized likelihood for {mode}:', likelihood_normalized[modes.index(mode)].item())
         prior = pcts
         kl_div = torch.sum(likelihood_normalized * torch.log(likelihood_normalized / prior))
         print('KL Divergence:', kl_div)
 
-        return [modes[np.argmax(likelihoods) % len(modes)]], mean_obj_configs[np.argmax(likelihoods)], all_samples_, all_likelihoods_
+
+        mode_override = input('Override mode? Blank for no: ')
+        if mode_override != '':
+            return [mode_override], mean_obj_configs[modes.index(mode_override)], all_samples_, all_likelihoods_
+        else:
+            return [modes[np.argmax(likelihoods) % len(modes)]], mean_obj_configs[np.argmax(likelihoods)], all_samples_, all_likelihoods_
 
         # Repeat for thumb and middle
     def get_next_node(contact_sequence):
@@ -2020,8 +2028,8 @@ if __name__ == "__main__":
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_only.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_perturbed_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_recovery_as_contact_mode_planning.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_live_recovery_shortcut.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_live_recovery_shortcut_hardware.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_live_recovery_shortcut.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_live_recovery_shortcut_hardware.yaml').read_text())
 
     from tqdm import tqdm
 
