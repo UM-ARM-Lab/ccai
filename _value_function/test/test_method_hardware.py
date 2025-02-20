@@ -110,15 +110,15 @@ if __name__ == '__main__':
 
     # config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True, config_path=config_path)
 
-    pregrasp_path = fpath /'test'/'initializations'/'test_method_pregrasps.pkl'
+    pregrasp_path = fpath /'test'/'official_initializations'/'test_method_pregrasps.pkl'
     diffusion_path = 'data/training/allegro_screwdriver/adam_diffusion/allegro_screwdriver_diffusion_4999.pt'
    
     print("input method:")
-    # method = input()
-    method = "vf"
+    method = input()
+    # method = "vf"
     print("input trial number:")
-    # trial_number = int(input())
-    trial_number = 0
+    trial_number = int(input())
+    # trial_number = 0
 
     pregrasps = pkl.load(open(pregrasp_path, 'rb'))
     pregrasp_pose = pregrasps[trial_number]
@@ -294,7 +294,7 @@ if __name__ == '__main__':
         
         regrasp_pose_combined, regrasp_traj_combined, regrasp_plan = regrasp(
             env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
-            use_diffusion=True, use_contact_cost=True,
+            use_diffusion=True,
             diffusion_path = diffusion_path,
             image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters,
             sim_viz_env=sim_env

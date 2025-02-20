@@ -4,6 +4,7 @@ from _value_function.train_value_function_regrasp import Net, query_ensemble, lo
 import pathlib
 import numpy as np
 import pickle as pkl
+import time
 import matplotlib.pyplot as plt
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
@@ -12,7 +13,6 @@ import torch
 
 # make sure tests have the same number of trials and repeats
 experiment_names = ['test_method_test_official_all']
-
 results = {}
 
 for name in experiment_names:
@@ -27,9 +27,8 @@ for name in experiment_names:
             print(f"Warning: method {method} already exists in combined_results. Exiting.")
             exit()
 
-models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble(model_name = "ensemble_rg")
-
 if __name__ == "__main__":
+    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
 
     # Get unique method names from the results dictionary
     method_names = list(results.keys())  # Start with all keys in the results dict
@@ -49,62 +48,73 @@ if __name__ == "__main__":
         data[method_name] = {
             'costs': [],
             'stds': [],
-            'pred_costs': [],
-            'pred_stds': []
+            'tilt_angles': [],
+            'yaw_deltas': [],
         }
         for pregrasp_index in range(n_trials):
             all_costs = []
-            all_pred_costs = []
-            all_pred_stds = []
 
             for repeat_index in range(n_repeat):
-                # Retrieve the stored poses for this method and (pregrasp_index, repeat_index)
+
                 pregrasp_pose, regrasp_pose, regrasp_traj, turn_pose, turn_traj = \
                     results[method_name][(pregrasp_index, repeat_index)]
 
-                # Compute "cost"
                 cost = calculate_turn_cost(regrasp_pose.numpy(), turn_pose)
+                            
                 all_costs.append(cost)
 
-                # Query the value-function ensemble
-                input_norm = ((convert_full_to_partial_config(regrasp_pose) - poses_mean) / poses_std).flatten().float()
-                input_norm = torch.cat([input_norm, torch.tensor([12.0], dtype=torch.float32)], dim=0)
+                pose_i = regrasp_pose.numpy().flatten()[-4:-1]*180/np.pi
+                pose_f = turn_pose.flatten()[-4:-1]*180/np.pi
+                if pose_i[-1] < -180:
+                    pose_i[-1] += 720
+                if pose_f[-1] < -180:
+                    pose_f[-1] += 720
 
-                vf_output_norm = query_ensemble(input_norm, models)
-                vf_output = vf_output_norm * cost_std + cost_mean
+                tilt_angle = max(abs(pose_f[:2]))
 
-                pred_mean = torch.mean(vf_output)
-                pred_std = torch.std(vf_output)
+                yaw_delta = (pose_i[-1] - pose_f[-1]) 
+                if yaw_delta > 100 or yaw_delta < -100:
+                    
+                    for j in range(13):
+                        env.reset(torch.from_numpy(turn_traj[j]).reshape(1, 20).float())
+                        # print(max(abs(turn_traj[j][-4:-2]))*180/np.pi)
+                        time.sleep(0.1)
 
-                all_pred_costs.append(pred_mean.item())
-                all_pred_stds.append(pred_std.item())
+                    print(f"Yaw delta: {yaw_delta}")
+
+                    cost = calculate_turn_cost(regrasp_pose.numpy(), turn_pose)
+
+                    
+                data[method_name]['tilt_angles'].append(tilt_angle)
+                data[method_name]['yaw_deltas'].append(yaw_delta)
+
+                # if tilt_angle > 5.0 and tilt_angle < 10.0:
+                #     print(tilt_angle)
+                #     for j in range(13):
+                #         env.reset(torch.from_numpy(turn_traj[j]).reshape(1, 20).float())
+                #         # print(max(abs(turn_traj[j][-4:-2]))*180/np.pi)
+                #         time.sleep(0.1)
+                #     # time.sleep(1)
 
             # Average cost and standard deviation across repeats
             data[method_name]['costs'].append(np.mean(all_costs))
             data[method_name]['stds'].append(np.std(all_costs))
 
-            data[method_name]['pred_costs'].append(np.mean(all_pred_costs))
-            data[method_name]['pred_stds'].append(np.mean(all_pred_stds))
-
-    # ---- Plotting ----
     plt.figure(figsize=(10, 5))
 
     # These offsets help shift the actual cost vs the predicted cost horizontally
     # so that they don't overlap exactly on top of each other.
     method_offset = 0.15  # spacing offset for each method group
-    pred_offset = 0.05    # spacing offset for predicted bars within the same method group
 
     colors = ['blue', 'red', 'green', 'purple', 'orange', 'cyan', 'magenta', 'yellow']
 
     for method_i, method_name in enumerate(method_names):
         # x positions for the actual cost
-        x_actual = np.arange(len(data[method_name]['costs'])) + method_i * method_offset
-        # x positions for predicted cost (shift from x_actual by pred_offset)
-        x_pred = x_actual + pred_offset
+        x = np.arange(len(data[method_name]['costs'])) + method_i * method_offset
 
-        # Plot actual costs with error bars
+        # Plot costs with error bars
         plt.errorbar(
-            x_actual, 
+            x, 
             data[method_name]['costs'], 
             yerr=data[method_name]['stds'], 
             fmt='o',  # marker shape
@@ -114,18 +124,6 @@ if __name__ == "__main__":
             color=colors[method_i]
         )
 
-        # Plot predicted costs with error bars
-        # plt.errorbar(
-        #     x_pred,
-        #     data[method_name]['pred_costs'],
-        #     yerr=data[method_name]['pred_stds'],
-        #     fmt='x',   # different marker shape
-        #     label=f'Predicted Cost (method name: {method_name.upper()})',
-        #     linestyle='None',
-        #     capsize=3,
-        #     color=colors[method_i]
-        # )
-
     ts = 16
     plt.xlabel('Pregrasp Index', fontsize=ts)
     plt.ylabel('Cost Value', fontsize=ts)
@@ -134,7 +132,6 @@ if __name__ == "__main__":
     plt.yticks(fontsize=ts-2)
     plt.legend(loc='upper right', fontsize=ts-2)
 
-    # If you have both "no_vf" and "vf", compute the average cost difference
     if "no_vf" in data and "vf" in data:
         mean_no_vf = np.mean(data["no_vf"]["costs"])
         mean_vf = np.mean(data["vf"]["costs"])
@@ -148,12 +145,10 @@ if __name__ == "__main__":
     for method in data:
         print(f'{method} mean cost: {np.mean(data[method]["costs"])}')
 
-
     plt.tight_layout()
     plt.show()
 
-
-    # ---- New Boxplot for Cost Values ----
+    # ----  Boxplot ----
     # Create a new figure for the boxplot
     plt.figure(figsize=(10, 5))
 
@@ -176,10 +171,9 @@ if __name__ == "__main__":
         patch.set_facecolor(color)
         patch.set_alpha(0.5)
 
-    # Annotate each box with its mean value
+    # Annotate each box with its median value
     for i, method in enumerate(method_names):
         median_val = np.median(data[method]['costs'])
-        # Boxplot positions are at x=1, 2, ... so i+1.
         plt.text(
             i + 1 - 0.15, 
             median_val - 0.02, 
@@ -197,3 +191,24 @@ if __name__ == "__main__":
     plt.yticks(fontsize=ts-2)
     plt.tight_layout()
     plt.show()
+
+    tilt_threshold = 10
+    for method_name, metrics in data.items():
+        tilt_angles = metrics['tilt_angles']
+        yaw_deltas = metrics['yaw_deltas']
+        
+        total_trials = len(tilt_angles)
+        # Count dropped trials
+        dropped_trials = sum(1 for angle in tilt_angles if angle > tilt_threshold)
+        drop_rate = dropped_trials / total_trials if total_trials > 0 else 0
+        
+        # Filter yaw_deltas for trials that are not dropped 
+        valid_yaw_deltas = [yaw for angle, yaw in zip(tilt_angles, yaw_deltas) if angle <= tilt_threshold]
+        if valid_yaw_deltas:
+            avg_yaw_delta = sum(valid_yaw_deltas) / len(valid_yaw_deltas)
+        else:
+            avg_yaw_delta = None  # or use float('nan') if preferred
+        
+        print(f"Method: {method_name}")
+        print(f"  Drop Rate: {drop_rate*100:.2f}%")
+        print(f"  Average Yaw Delta (non-dropped): {avg_yaw_delta:.2f}")

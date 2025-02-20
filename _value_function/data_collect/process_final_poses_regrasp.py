@@ -23,6 +23,10 @@ def calculate_turn_cost(initial_pose, final_pose):
     turn_angle = np.pi/2
 
     screwdriver_pose = initial_pose.flatten()[-4:-1]
+
+    if screwdriver_pose[2] < -np.pi:
+        screwdriver_pose[2] += 4 * np.pi
+
     screwdriver_goal = np.array([0, 0, -turn_angle]) + screwdriver_pose
 
     # screwdriver_goal_mat = R.from_euler('xyz', screwdriver_goal).as_matrix()
@@ -41,6 +45,9 @@ def calculate_turn_cost(initial_pose, final_pose):
     
     # we're only actually using the screwdriver values
     state = final_pose.flatten()[-4:-1]
+
+    if state[2] < -np.pi:
+        state[2] += 4 * np.pi
 
     # upright_cost = 20 * np.sum((state[-3:-1]) ** 2) # the screwdriver should only rotate in z direction
     # upright_cost = 50 * np.sum((state[-3:-1] - np.array([0, 0])) ** 2) 
