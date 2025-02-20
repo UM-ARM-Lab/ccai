@@ -242,33 +242,33 @@ class ConstrainedSteinTrajOpt:
         ########################################################################################################################
         # @adam New stuff to print constraints and costs after init
         ########################################################################################################################
-
-        initial_C, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1), compute_grads=False, compute_hess=False)
-        J = self.problem.get_cost(xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du])
-        avg_cost = float(torch.mean(J))
-        avg_constraint = float(torch.mean(torch.norm(initial_C, dim=1)))
-        print(f'Average cost of initialization: {torch.mean(J)}')
-        print(f'Average constraint violation of initialization: {torch.mean(torch.norm(initial_C, dim=1))}')
-        import os
-        # Define file paths for each statistic array
-        dir = '/home/newuser/Desktop/Honda/ccai/data/test/print'
-        cost_file = dir + '/cost_stats_diff.npy'
-        constraint_file = dir + '/constraint_stats_diff.npy'
-        # For the average cost array
-        if os.path.exists(cost_file):
-            cost_stats = np.load(cost_file)
-            cost_stats = np.append(cost_stats, avg_cost)
-        else:
-            cost_stats = np.array([avg_cost])
-        # For the average constraint violation array
-        if os.path.exists(constraint_file):
-            constraint_stats = np.load(constraint_file)
-            constraint_stats = np.append(constraint_stats, avg_constraint)
-        else:
-            constraint_stats = np.array([avg_constraint])
-        # Save the updated arrays back to their respective files
-        np.save(cost_file, cost_stats)
-        np.save(constraint_file, constraint_stats)
+        if True:
+            initial_C, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1), compute_grads=False, compute_hess=False)
+            J = self.problem.get_cost(xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du])
+            avg_cost = float(torch.mean(J))
+            avg_constraint = float(torch.mean(torch.norm(initial_C, dim=1)))
+            # print(f'Average cost of initialization: {torch.mean(J)}')
+            # print(f'Average constraint violation of initialization: {torch.mean(torch.norm(initial_C, dim=1))}')
+            import os
+            # Define file paths for each statistic array
+            dir = '/home/newuser/Desktop/Honda/ccai/data/test/print'
+            cost_file = dir + '/cost_stats_diff.npy'
+            constraint_file = dir + '/constraint_stats_diff.npy'
+            # For the average cost array
+            if os.path.exists(cost_file):
+                cost_stats = np.load(cost_file)
+                cost_stats = np.append(cost_stats, avg_cost)
+            else:
+                cost_stats = np.array([avg_cost])
+            # For the average constraint violation array
+            if os.path.exists(constraint_file):
+                constraint_stats = np.load(constraint_file)
+                constraint_stats = np.append(constraint_stats, avg_constraint)
+            else:
+                constraint_stats = np.array([avg_constraint])
+            # Save the updated arrays back to their respective files
+            np.save(cost_file, cost_stats)
+            np.save(constraint_file, constraint_stats)
 
         ########################################################################################################################
 

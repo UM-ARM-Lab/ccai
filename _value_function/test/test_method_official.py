@@ -110,7 +110,7 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'test_official_high_iter_singlevf'
+    test_name = 'test_official_high_iter_all'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -118,12 +118,12 @@ if __name__ == '__main__':
     n_repeat = 1
     perception_noise = 0.0
 
-    calc_vf = False
-    calc_diffusion_no_contact_cost = False
-    calc_diffusion_w_contact_cost = False
-    calc_novf = False
-    calc_combined = False
-    calc_singlevf = True
+    calc_vf = True
+    calc_diffusion_no_contact_cost = True
+    calc_diffusion_w_contact_cost = True
+    calc_novf = True
+    calc_combined = True
+    calc_singlevf = False
 
     method_names = []
     if calc_vf:
