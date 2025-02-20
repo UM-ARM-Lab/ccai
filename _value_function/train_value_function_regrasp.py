@@ -481,8 +481,9 @@ if __name__ == "__main__":
         print(f"Best hyperparameters: {best_params} with average validation loss: {best_loss:.8f}\n")
     else:
 
-        path = f'{fpath.resolve()}/value_functions/value_function_ensemble_rg.pkl'
-        model_name = "ensemble_rg"
+        name = '' #'_angle'
+        path = f'{fpath.resolve()}/value_functions/value_function_ensemble_rg{name}.pkl'
+        model_name = f"ensemble_rg{name}"
 
         ensemble = []
         for i in range(16):
