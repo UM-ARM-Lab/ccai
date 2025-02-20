@@ -7,7 +7,7 @@ num_turns: 1
 max_recovery_stages: 4
 num_trials: 10
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_data_turn_only_likelihood_new_5_10_15'
+experiment_name: 'allegro_screwdriver_recovery_data_turn_only_likelihood_no_turn_5_10_15'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -46,18 +46,19 @@ model_path: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_
 # likelihood_threshold: -22.618363952636717
 # likelihood_threshold: -16
 likelihood_threshold: -136.6758056640625
-parity: 1
+project_threshold: -75
+parity: 909
 controllers:
   csvgd:
     # N: 16
     N: 16
-    alpha_J: 5.0e-3
+    alpha_J: 1.0e-2
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
     device: 'cuda:1'
     online_iters: 35
-    warmup_iters: 50
+    warmup_iters: 100
     resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1

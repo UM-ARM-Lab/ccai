@@ -1,5 +1,5 @@
 ---
-model_name: 'allegro_screwdriver_recovery_best_traj_only_5_10_15_5000_training_per_epoch_downsample_balance'
+model_name: 'allegro_screwdriver_recovery_best_traj_only_5_10_15_15000_training_weighted_random_downsample_balance_bugfix'
 T: 9
 dx: 15
 du: 21
@@ -10,7 +10,7 @@ train_classifier: False
 eval_classifier: False
 plot: False
 vis_dataset: False
-epochs: 7000
+epochs: 15000
 balance: 'weighted_random'
 classifier_epochs: 100
 batch_size: 256
@@ -18,10 +18,10 @@ lr: 1.0e-4
 model_type: 'diffusion'
 discriminator_guidance: True
 inverse_dynamics: False
-data_directory: 'allegro_screwdriver_recovery_data_old'
+data_directory: 'allegro_screwdriver_recovery_data_bugfix_5_10_15'
 device: 'cuda:1'
 test_every: 9999999999
-save_every: 1000
+save_every: 500
 normalize_data: True
 constraint_embedding_dim: 64
 constrained: False
