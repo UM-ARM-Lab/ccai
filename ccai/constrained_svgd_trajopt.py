@@ -246,7 +246,7 @@ class ConstrainedSteinTrajOpt:
             initial_C, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1), compute_grads=False, compute_hess=False)
             J = self.problem.get_cost(xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du])
             avg_cost = float(torch.mean(J))
-            avg_constraint = float(torch.mean(torch.norm(initial_C, dim=1)))
+            avg_constraint = float(torch.mean(torch.sum(abs(initial_C), dim=1)))
             # print(f'Average cost of initialization: {torch.mean(J)}')
             # print(f'Average constraint violation of initialization: {torch.mean(torch.norm(initial_C, dim=1))}')
             import os
