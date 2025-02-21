@@ -25,7 +25,8 @@ sys.path.append('..')
 # sys.stdout = open('./logs/live_recovery_shorcut_honda_meeting_full_dof_noise_train_indexing_fix_6500_.08_std_.75_pct_diff_likelihood_no_resample_no_cpc_on_pregrasp.log', 'w', buffering=1)
 # sys.stdout = open('./examples/logs/recovery_as_contact_search.log', 'w', buffering=1)
 # sys.stdout = open('./examples/logs/live_recovery_hardware_5_10_15_200_MC_contact_selection_film.log', 'w', buffering=1)
-sys.stdout = open('./examples/logs/allegro_screwdriver_recovery_best_traj_only_15000_training_no_downsample_balance_bugfix_diffusion_split_t_x_samples_ecdf.log', 'w', buffering=1)
+# sys.stdout = open('./examples/logs/allegro_screwdriver_recovery_best_traj_only_15000_training_no_downsample_balance_bugfix_diffusion_split_t_x_samples_ecdf.log', 'w', buffering=1)
+sys.stdout = open('./examples/logs/allegro_screwdriver_demo.log', 'w', buffering=1)
 
 import pytorch_volumetric as pv
 import pytorch_kinematics as pk
@@ -161,17 +162,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
 
 
         self.contact_points = None
-
-        # if len(regrasp_fingers) == 3:
-        #     self.contact_points = {
-        #         'index': (torch.tensor([0.00563815, -0.01147131,  0.20851198], device=device), 0.01),
-        #         'middle': (torch.tensor([ 0.02000177, -0.00662838,  0.16340923], device=device), 0.02),
-        #         'thumb': (torch.tensor([-0.02152098,  0.00736444,  0.13183959], device=device), 0.02),
-        #     }
-        if len(regrasp_fingers) > 0 and self.contact_points is not None:
-            contact_points_object = torch.stack([self.contact_points[finger][0] for finger in regrasp_fingers], dim=0)
-        else:
-            contact_points_object = None
+        contact_points_object = None
         if proj_path is not None:
             self.proj_path = proj_path.to(device=device)
         else:
@@ -554,12 +545,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 'middle': 2.5,
                 'index': .0,
             }
-        else:
-            min_force_dict = {
-                'thumb': 1,
-                'middle': 1,
-                'index': 0
-            }
 
         # min_force_dict = {
         #     'thumb': 0,
@@ -914,7 +899,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # generate initial samples with diffusion model
         sim_rollouts = None
         initial_samples_0 = None
-        new_T = params['T']
+        new_T = params['T'] if recover else params['T_orig']
         if trajectory_sampler is not None and params.get('diff_init', True) and initial_samples is None:
 
             sampler = trajectory_sampler if recover else trajectory_sampler_orig
@@ -956,7 +941,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             if params['project_state']:
                 with open(mode_fpath+ '/projection_results.pkl', 'wb') as f:
                     pickle.dump((initial_samples, initial_samples_0, all_losses, all_samples, all_likelihoods), f)
-            if params.get('shortcut_trajectory', False):
+            if params.get('shortcut_trajectory', False) and mode != 'turn':
                 s = time.perf_counter()
                 # for traj_idx in range(initial_samples.shape[0]):
                 initial_samples = shortcut_trajectory(initial_samples, 4 * num_fingers, obj_dof, epsilon=.04)
@@ -1858,7 +1843,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 if contact_sequence[-1] == 'turn':
                     break
     elif not sample_contact:
-        contact_sequence = ['turn']
+        contact_sequence = ['turn', 'turn', 'thumb_middle', 'turn']
+        num_stages = len(contact_sequence)
     else:
         contact_sequence = None
 
@@ -2219,7 +2205,8 @@ if __name__ == "__main__":
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_only.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_perturbed_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_recovery_as_contact_mode_planning.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_live_recovery_shortcut_0.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_live_recovery_shortcut_0.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_demo.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_live_recovery_shortcut_hardware.yaml').read_text())
 
     from tqdm import tqdm

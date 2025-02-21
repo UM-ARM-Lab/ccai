@@ -814,6 +814,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         else:
             self.default_dof_pos = default_dof_pos.to(self.device)
 
+        self.do_contact_patch_constraint = False
         if self.full_dof_goal and len(self.regrasp_fingers) > 0:
             self.default_dof_pos = self.goal[: self.num_fingers * 4]
             # Pad to length 16
@@ -835,6 +836,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             # self._regrasp_dh += self.num_regrasps
             self._regrasp_dh_constant = 0
             self._regrasp_dh_per_t = self._regrasp_dz
+            self.do_contact_patch_constraint = True
                        
 
         self.desired_ee_in_world_frame = desired_ee_in_world_frame
@@ -1082,7 +1084,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                                                                             compute_grads=compute_grads,
                                                                             compute_hess=compute_hess,
                                                                             projected_diffusion=projected_diffusion)
-        if len(self.regrasp_fingers) != 3:
+        if len(self.regrasp_fingers) != 3 and self.do_contact_patch_constraint:
             h_patch, grad_h_contact, hess_h_contact, t_mask_contact = self._contact_patch_constraint(xu=xu.reshape(N, T, -1)[:, :, :self.dx + self.du],
                                                                                     compute_grads=compute_grads,
                                                                                     compute_hess=compute_hess,
