@@ -23,6 +23,7 @@ from ccai.utils.allegro_utils import partial_to_full_state, visualize_trajectory
 from ccai.allegro_screwdriver_problem_diffusion import AllegroScrewdriverDiff
 import pickle
 import sys
+from torch.utils.data import random_split
 
 import scipy
 
@@ -30,6 +31,7 @@ import datetime
 import time
 
 import wandb
+from sklearn.metrics import confusion_matrix
 
 TORCH_LOGS = "+dynamo"
 TORCHDYNAMO_VERBOSE = 1
@@ -42,7 +44,8 @@ def get_args():
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_id_ood_states.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_project_ood_states.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_id_ood_states.yaml')
-    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion.yaml')
+    # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion.yaml')
+    parser.add_argument('--config', type=str, default='allegro_screwdriver_classifier.yaml')
     return parser.parse_args()
 
 
@@ -416,103 +419,58 @@ def generate_simulated_data(model, loader, config, name=None):
 
     np.savez(f'{fpath}/simulated_trajectories_{name}.npz', trajectories=simulated_trajectories, contact=simulated_class)
 
-def train_classifier(model, train_loader, val_loader, config):
+def train_classifier(model, train_loader, config):
     fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}'
     pathlib.Path.mkdir(pathlib.Path(fpath), parents=True, exist_ok=True)
 
-    # add classifier
-    model.model.diffusion_model.add_classifier(dim_mults=(1,2,4))
-    model.model.diffusion_model.classifier = model.model.diffusion_model.classifier.to(device=config['device'])
-    optimizer = torch.optim.Adam(model.model.diffusion_model.classifier.parameters(), lr=config['lr'])
-
+    N = 16
     # x = 5336
     # y = 7987-5336
     # model.model.diffusion_model.classifier.class_loss = torch.nn.CrossEntropyLoss(torch.tensor([1, y/x]).to(device=config['device']))
-    model.model.diffusion_model.classifier.class_loss = torch.nn.CrossEntropyLoss()
 
-    step = 0
+    # Loop through the dataset and evaluate the likelihood of the training data
+    model.model.diffusion_model.classifier = None
+    model.eval()
 
-    best_val_loss = np.inf
-    epochs = config['classifier_epochs']
-    pbar = tqdm.tqdm(range(epochs))
-    for epoch in pbar:
-        train_loss = 0.0
-        train_full_accuracy = 0.0
-        train_real_accuracy = 0.0
-        train_class_accuracy = 0.0
-        model.train()
-        class_sum = 0
-        for real_traj, real_class, real_masks, fake_traj, fake_class, fake_masks in train_loader:
-
-            class_sum += real_class.sum(0)
-            B1, B2 = real_traj.shape[0], fake_traj.shape[0]
-            trajectories = torch.cat((real_traj, fake_traj), dim=0).to(device=config['device'])
-            context = torch.cat((real_class, fake_class), dim=0).to(device=config['device'])
-            masks = torch.cat((real_masks, fake_masks), dim=0).to(device=config['device'])
-            real_fake_labels = torch.cat((torch.ones(B1, 1), torch.zeros(B2, 1)), dim=0).to(device=config['device'])
-
-            # trajectories = torch.cat((trajectories, fake_traj.to(device=config['device'])), dim=0)
-            # context = torch.cat((context, -fake_class.to(device=config['device'])), dim=0)
-            # masks = torch.cat((masks, fake_masks.to(device=config['device'])), dim=0)
-            # labels = torch.cat((labels, torch.zeros(B2, 1).to(device=config['device'])), dim=0)
+    train_likelihoods = {
+        'index': [],
+        'thumb_middle': [],
+    }
 
 
-            loss, full_acc, real_acc, class_acc = model.classifier_loss(trajectories, mask=masks, label=real_fake_labels, context=context)
-            loss.backward()
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
-            # for param in trajectory_sampler.parameters():
-            #    print(param.grad)
-            optimizer.step()
-            optimizer.zero_grad()
-            train_loss += loss.item()
-            train_full_accuracy += full_acc.item()
-            train_real_accuracy += real_acc.item()
-            train_class_accuracy += class_acc.item()
+    for trajectories, traj_class, _ in tqdm.tqdm(train_loader):
 
-        train_loss /= len(train_loader)
-        train_full_accuracy /= len(train_loader)
-        train_real_accuracy /= len(train_loader)
-        train_class_accuracy /= len(train_loader)
-        print('class_sum', class_sum, len(train_loader.dataset))
-        pbar.set_description(
-            f'Train loss {train_loss:.3f}')
+        initial_state = trajectories[:, 0, :16]
+        initial_state = initial_state.to(device=config['device'])
+        traj_class = traj_class.to(device=config['device'])
 
-        # Validation
-        val_full_accuracy = 0.0
-        val_real_accuracy = 0.0
-        val_class_accuracy = 0.0
-        val_loss = 0.0  
-        model.eval()
-        for real_traj, real_class, real_masks, fake_traj, fake_class, fake_masks in val_loader:
-            B1, B2 = real_traj.shape[0], fake_traj.shape[0]
-            trajectories = torch.cat((real_traj, fake_traj), dim=0).to(device=config['device'])
-            context = torch.cat((real_class, fake_class), dim=0).to(device=config['device'])
-            masks = torch.cat((real_masks, fake_masks), dim=0).to(device=config['device'])
-            labels = torch.cat((torch.ones(B1, 1), torch.zeros(B2, 1)), dim=0).to(device=config['device'])
+        if traj_class.sum().item() == -1:
+            mode = 'thumb_middle'
+        else:
+            mode = 'index'
 
-            loss, full_acc, real_acc, class_acc = model.classifier_loss(trajectories, mask=masks, label=labels, context=context)
-            val_full_accuracy += full_acc.item()
-            val_real_accuracy += real_acc.item()
-            val_class_accuracy += class_acc.item()
-            val_loss += loss.item()
+        _, _, likelihood = model.sample(N*trajectories.shape[0], H=config['T'], start=initial_state.repeat_interleave(N, 0),
+                                        constraints=traj_class.repeat_interleave(N, 0))
+        likelihood = likelihood.reshape(-1, N).mean(1)
+        train_likelihoods[mode] += likelihood.tolist()
 
+        for mode in train_likelihoods.keys():
+            likelihood_mean = np.mean(train_likelihoods[mode])
+            likelihood_std = np.std(train_likelihoods[mode])
+            print(f'Mode {mode}: train likelihood mean: {likelihood_mean:.3f} std: {likelihood_std:.3f}')
 
-        val_full_accuracy /= len(val_loader)
-        val_real_accuracy /= len(val_loader)
-        val_class_accuracy /= len(val_loader)
-        val_loss /= len(val_loader)
+        # Get label for traj_class by summing across dim 1 and then looking up in mode_dict
+    with open(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/gen_train_likelihoods_by_mode.pkl', 'wb') as f:
+        pickle.dump(train_likelihoods, f)
 
-        print(f'Epoch {epoch + 1} Train loss: {train_loss:.3f} Train full accuracy: {train_full_accuracy:.3f} Train real accuracy: {train_real_accuracy:.3f} Train class accuracy: {train_class_accuracy:.3f}')
-        print(f'Epoch {epoch + 1} Val loss: {val_loss:.3f} Val full accuracy: {val_full_accuracy:.3f} Val real accuracy: {val_real_accuracy:.3f} Val class accuracy: {val_class_accuracy:.3f}')
-        print()
-        # if (epoch + 1) % config['save_every'] == 0:
-        if val_loss < best_val_loss:
-            torch.save(model.state_dict(),
-                       f'{fpath}/allegro_screwdriver_{config["model_type"]}_w_classifier.pt')
-            best_val_loss = val_loss
-            print('Model saved')
-            d = model.state_dict()
-
+    for mode in train_likelihoods.keys():
+        likelihoods = -np.array(train_likelihoods[mode])
+        plt.hist(likelihoods, bins=75)
+        plt.xlabel('likelihood')
+        plt.ylabel('Frequency')
+        plt.title(f'Histogram of training likelihoods for mode {mode}')
+        plt.savefig(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/train_likelihood_hist_{mode}.png')
+        plt.clf()
     # torch.save(model.state_dict(),
     #            f'{fpath}/allegro_screwdriver_{config["model_type"]}_w_classifier.pt')
 
@@ -559,7 +517,7 @@ def convert_sine_cosine_to_yaw(xu):
         xu_new = xu_new.numpy()
     return xu_new
 
-def eval_train_likelihood(model, train_loader, config):
+def eval_train_likelihood(model, train_loader, config, mode=None):
     # with open(f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/gen_train_likelihoods_all_states.pkl', 'rb') as f:
     #     train_likelihoods = pickle.load(f)
 
@@ -593,6 +551,11 @@ def eval_train_likelihood(model, train_loader, config):
 
     N = 16
     contact = torch.ones(N, 3).to(device=config['device'])
+    if mode == 'index':
+        contact[:, 0] = -1.0
+    elif mode == 'thumb_middle':
+        contact[:, 1] = -1.0
+        contact[:, 2] = -1.0
 
     # Loop through the dataset and evaluate the likelihood of the training data
     model.model.diffusion_model.classifier = None
@@ -1144,7 +1107,7 @@ if __name__ == "__main__":
                                                 states_only=config['du'] == 0,
                                                 skip_pregrasp=config['skip_pregrasp'],
                                                 type=config['model_type'],
-                                                exec_only=config.get('filter_recovery_trajectories', False),)
+                                                exec_only=config.get('train_classifier', False),)
     if not config.get('project_ood_states', False):
         if config['normalize_data']:
             # normalize data
@@ -1156,6 +1119,7 @@ if __name__ == "__main__":
             print(train_dataset.mean)
         if 'recovery' in config['data_directory']:
             classes = train_dataset.trajectory_type
+            print(torch.unique(classes, dim=0, return_counts=True))
             if config['balance'] == 'weighted_random':
                 weights = [1/(classes.sum(1)).tolist().count(classes[i].sum().item()) for i in range(classes.shape[0])]
                 train_sampler = WeightedRandomSampler(weights, len(train_dataset), replacement=True)
@@ -1255,10 +1219,10 @@ if __name__ == "__main__":
 
 
     if config['load_model']:
-        if config['discriminator_guidance']:
-            model_name = f'allegro_screwdriver_{config["model_type"]}_w_classifier.pt'
-        else:
-            model_name = f'allegro_screwdriver_{config["model_type"]}.pt'
+        # if config['discriminator_guidance']:
+        #     model_name = f'allegro_screwdriver_{config["model_type"]}_w_classifier.pt'
+        # else:
+        model_name = f'allegro_screwdriver_{config["model_type"]}.pt'
         d = torch.load(
                 f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/{model_name}'
             , map_location=config['device'])
@@ -1291,45 +1255,48 @@ if __name__ == "__main__":
     if config['train_classifier']:
         model.model.diffusion_model.classifier = None
         # generate dataset from trained diffusion model
-        generate_simulated_data(model, train_loader, config, name='')
-        train_loader.dataset.update_masks(p1=0.5, p2=0.75)
+        # generate_simulated_data(model, train_loader, config, name='')
+        train_loader.dataset.update_masks(p1=1., p2=1.)
 
-        fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/simulated_dataset/simulated_trajectories_.npz'
+        # fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}/simulated_dataset/simulated_trajectories_.npz'
 
-        fake_dataset = FakeDataset(fpath, config['sine_cosine'])
-        fake_dataset.set_norm_constants(train_dataset.mean, train_dataset.std)
-        train_loader = DataLoader(fake_dataset, batch_size=config['batch_size'])
+        # fake_dataset = FakeDataset(fpath, config['sine_cosine'])
+        # fake_dataset.set_norm_constants(train_dataset.mean, train_dataset.std)
+        # train_loader = DataLoader(fake_dataset, batch_size=config['batch_size'])
 
-        length = min(len(train_dataset), len(fake_dataset))
-        # Split train, val
-        train_size = int(0.9 * length)
-        val_size = length - train_size
+        # length = min(len(train_dataset), len(fake_dataset))
+        # # Split train, val
+        # train_size = int(0.9 * length)
+        # val_size = length - train_size
 
-        inds = torch.randperm(length)
-        train_inds = inds[:train_size]
-        val_inds = inds[train_size:]
+        # inds = torch.randperm(length)
+        # train_inds = inds[:train_size]
+        # val_inds = inds[train_size:]
 
-        train_real_dataset = Subset(train_dataset, train_inds)
-        val_real_dataset = Subset(train_dataset, val_inds)
+        # train_real_dataset = Subset(train_dataset, train_inds)
+        # val_real_dataset = Subset(train_dataset, val_inds)
 
-        train_fake_dataset = Subset(fake_dataset, train_inds)
-        val_fake_dataset = Subset(fake_dataset, val_inds)
+        # train_fake_dataset = Subset(fake_dataset, train_inds)
+        # val_fake_dataset = Subset(fake_dataset, val_inds)
 
-        train_classifier_dataset = RealAndFakeDataset(train_real_dataset, train_fake_dataset)
+        # train_classifier_dataset = RealAndFakeDataset(train_real_dataset, train_fake_dataset)
 
-        val_classifier_dataset = RealAndFakeDataset(val_real_dataset, val_fake_dataset)
+        # val_classifier_dataset = RealAndFakeDataset(val_real_dataset, val_fake_dataset)
 
-        # classes = train_dataset.trajectory_type[train_inds]
-        # weights = torch.where(classes[:, 0] == 1, 6636/4668, 1.)
+        # # classes = train_dataset.trajectory_type[train_inds]
+        # # weights = torch.where(classes[:, 0] == 1, 6636/4668, 1.)
 
-        # train_classifier_sampler = WeightedRandomSampler(weights, len(train_classifier_dataset), replacement=True)
+        # # train_classifier_sampler = WeightedRandomSampler(weights, len(train_classifier_dataset), replacement=True)
 
-        train_classifier_loader = DataLoader(train_classifier_dataset, batch_size=config['batch_size'],
+        # Train val split of train_dataset
+        # train_classifier_dataset, val_classifier_dataset = random_split(train_dataset, [0.9, .1])
+
+        train_classifier_loader = DataLoader(train_dataset, batch_size=1,
                                    shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
 
-        val_classifier_loader = DataLoader(val_classifier_dataset, batch_size=config['batch_size'],
-                                   shuffle=False, num_workers=4, pin_memory=True, drop_last=True)
-        train_classifier(model, train_classifier_loader, val_classifier_loader, config)
+        # val_classifier_loader = DataLoader(val_classifier_dataset, batch_size=config['batch_size'],
+        #                            shuffle=False, num_workers=4, pin_memory=True, drop_last=True)
+        train_classifier(model, train_classifier_loader, config)
         # eval trained classifier on training data
 
     if config['eval_classifier']:

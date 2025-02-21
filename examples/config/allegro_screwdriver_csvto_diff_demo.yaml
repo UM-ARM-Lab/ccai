@@ -1,0 +1,75 @@
+---
+T: 8
+T_orig: 12
+receding_horizon: False
+num_steps: 12
+num_turns: 1
+num_stages: 5
+max_recovery_stages: 4
+num_trials: 10
+visualize: True
+# experiment_name: 'allegro_screwdriver_csvto_live_OOD_recovery_best_traj_data_shortcut_lower_threshold'
+experiment_name: 'allegro_screwdriver_demo_sim'
+mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
+# fingers: ['index', 'thumb']
+fingers: ['index', 'middle', 'thumb']
+object_type: 'screwdriver'
+sim_device: 'cpu'
+friction_coefficient: 1.0
+kp: 3.0
+heuristic: 1000
+max_depth: 11
+goal: -1.5
+prior: 1
+# likelihood_threshold: -22.618363952636717
+likelihood_threshold: -25
+# likelihood_threshold: -35
+drop_threshold: -50
+multi_particle_search: True
+replan: False
+visualize_plan: False
+visualize_recovery_plan: True
+visualize_contact_plan: True
+optimize_force: True
+exclude_index: False
+projected: False
+use_saved_plans: True
+use_saved_noise: False
+use_guidance: False
+sample_contact: False
+use_partial_constraint: True
+sine_cosine: True
+project_state: False
+compute_recovery_trajectory: False
+test_recovery_trajectory: False
+shortcut_trajectory: True
+viz_states: False
+diff_init: True
+randomize_obj_start: False
+randomize_rob_start: False
+perturb_action: False
+live_recovery: False
+type: 'diffusion'
+recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_orig_15000_training_no_downsample_balance_bugfix_diffusion'
+model_dir: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion'
+model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_orig_15000_training_no_downsample_balance_bugfix_diffusion/allegro_screwdriver_diffusion.pt'
+classifier_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_orig_15000_training_no_downsample_balance_bugfix_diffusion/allegro_screwdriver_classifier.pt'
+# model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_new_2_fix_scale_more_data_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
+model_path_orig: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
+controllers:
+  csvgd:
+    # N: 16
+    N: 16
+    alpha_J: 1.0e-2
+    alpha_C: 1.0
+    step_size: 0.1
+    momentum: 0.
+    device: 'cuda:0'
+    online_iters: 35
+    warmup_iters: 100
+    resample_steps: 16
+    resample_sigma: 0.01
+    resample_temperature: 0.1
+    penalty: 1000000
+    collision_checking: False
+    joint_friction: 0.0

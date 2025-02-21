@@ -263,8 +263,8 @@ class AllegroScrewDriverDataset(Dataset):
                                 zero_pad = np.zeros(21)
                                 end_states.append(np.concatenate((traj_data[i], zero_pad)))
                         # print(traj.shape)
-                        classes.append(data[t]['contact_state'][:, None, :])#.repeat(traj.shape[1], axis=1)
-                        if not exec_only:
+                        if not exec_only or (exec_only and t == min_t):
+                            classes.append(data[t]['contact_state'][:, None, :])#.repeat(traj.shape[1], axis=1)
                             # combine traj and starts
                             if use_actual_traj:
                                 traj = np.concatenate(actual_traj + [traj], axis=2)[..., :1 , :,:]
@@ -284,30 +284,31 @@ class AllegroScrewDriverDataset(Dataset):
                                 traj[:, :, 0, 15:] = 0
                             trajectories.append(traj)
 
-                    if exec_only:
-                        end_states = np.stack(end_states, axis=0)
-                        end_states = end_states.reshape(end_states.shape[0], 1, 1, -1)
-                        end_states = end_states.repeat(traj.shape[1], axis=1)
-                        end_states = end_states[:traj.shape[0]]
-                        traj = np.concatenate([traj, end_states], axis=2)
-                        # combine traj and starts
-                        if use_actual_traj:
-                            traj = np.concatenate(actual_traj + [traj], axis=2)[..., :1 , :,:]
-                            masks.append(np.ones((traj.shape[0], traj.shape[1], traj.shape[2]))[..., :1, :])
-                        else:
-                            zeros = [np.zeros_like(actual_traj[0])] * (len(actual_traj) - 1)
-                            traj = np.concatenate([actual_traj[-1]] + [traj] + zeros, axis=2)
-                            mask = np.zeros((traj.shape[0], traj.shape[1], traj.shape[2]))
-                            mask[:, :, :t + 1] = 1
-                            masks.append(mask)
+                    # if exec_only:
+                    #     classes.append(data[t]['contact_state'][:, None, :])#.repeat(traj.shape[1], axis=1)
+                    #     end_states = np.stack(end_states, axis=0)
+                    #     end_states = end_states.reshape(end_states.shape[0], 1, 1, -1)
+                    #     end_states = end_states.repeat(traj.shape[1], axis=1)
+                    #     end_states = end_states[:traj.shape[0]]
+                    #     traj = np.concatenate([traj, end_states], axis=2)
+                    #     # combine traj and starts
+                    #     if use_actual_traj:
+                    #         traj = np.concatenate(actual_traj + [traj], axis=2)[..., :1 , :,:]
+                    #         masks.append(np.ones((traj.shape[0], traj.shape[1], traj.shape[2]))[..., :1, :])
+                    #     else:
+                    #         zeros = [np.zeros_like(actual_traj[0])] * (len(actual_traj) - 1)
+                    #         traj = np.concatenate([actual_traj[-1]] + [traj] + zeros, axis=2)
+                    #         mask = np.zeros((traj.shape[0], traj.shape[1], traj.shape[2]))
+                    #         mask[:, :, :t + 1] = 1
+                    #         masks.append(mask)
 
-                        if type == 'diffusion':
-                            # duplicated first control, rearrange so that it is (x_0, u_0, x_1, u_1, ..., x_{T-1}, u_{T-1}, x_T, 0)
-                            traj[:, :, :-1, 15:] = traj[:, :, 1:, 15:]
-                            traj[:, :, -1, 15:] = 0
-                        elif type == 'cnf':
-                            traj[:, :, 0, 15:] = 0
-                        trajectories.append(traj)
+                    #     if type == 'diffusion':
+                    #         # duplicated first control, rearrange so that it is (x_0, u_0, x_1, u_1, ..., x_{T-1}, u_{T-1}, x_T, 0)
+                    #         traj[:, :, :-1, 15:] = traj[:, :, 1:, 15:]
+                    #         traj[:, :, -1, 15:] = 0
+                    #     elif type == 'cnf':
+                    #         traj[:, :, 0, 15:] = 0
+                    #     trajectories.append(traj)
 
         self.trajectories = np.concatenate(trajectories, axis=0)
         self.masks = np.concatenate(masks, axis=0)

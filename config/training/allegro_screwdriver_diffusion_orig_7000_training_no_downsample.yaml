@@ -1,5 +1,5 @@
 ---
-model_name: 'allegro_screwdriver_recovery_best_traj_only_orig_15000_training_no_downsample_balance_bugfix'
+model_name: 'allegro_screwdriver_recovery_best_traj_only_orig_15000_training_no_downsample_balance_bugfix_context_dropout_p_.5'
 T: 9
 dx: 15
 du: 21
@@ -19,7 +19,7 @@ model_type: 'diffusion'
 discriminator_guidance: True
 inverse_dynamics: False
 data_directory: 'allegro_screwdriver_recovery_data_bugfix'
-device: 'cuda:0'
+device: 'cuda:1'
 test_every: 9999999999
 save_every: 500
 normalize_data: True
