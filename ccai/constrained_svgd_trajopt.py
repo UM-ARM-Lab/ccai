@@ -242,7 +242,7 @@ class ConstrainedSteinTrajOpt:
         ########################################################################################################################
         # @adam New stuff to print constraints and costs after init
         ########################################################################################################################
-        if True:
+        if False:
             initial_C, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1), compute_grads=False, compute_hess=False)
             J = self.problem.get_cost(xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du])
             avg_cost = float(torch.mean(J))
@@ -252,8 +252,8 @@ class ConstrainedSteinTrajOpt:
             import os
             # Define file paths for each statistic array
             dir = '/home/newuser/Desktop/Honda/ccai/data/test/print'
-            cost_file = dir + '/cost_stats_diff.npy'
-            constraint_file = dir + '/constraint_stats_diff.npy'
+            cost_file = dir + '/cost_stats_novf.npy'
+            constraint_file = dir + '/constraint_stats_novf.npy'
             # For the average cost array
             if os.path.exists(cost_file):
                 cost_stats = np.load(cost_file)

@@ -119,8 +119,8 @@ if __name__ == '__main__':
     n_repeat = 1
     perception_noise = 0.0
 
-    calc_diffusion_no_contact_cost = True
-    calc_novf = False
+    calc_diffusion_no_contact_cost = False
+    calc_novf = True
 
     method_names = []
     if calc_novf:
