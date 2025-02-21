@@ -1,0 +1,377 @@
+CCAI_PATH /home/abhinav/Documents/ccai
+joint command publisher initialized.
+ros listner initialized.
+obj_trans pre [0.02952235 0.29249164 0.12343484]
+obj_trans post z offset [0.02952235 0.29249164 0.01297004]
+obj_trans post hand offset [-3.04995232e-07  9.49999920e-02 -1.25000317e-01]
+hand to mocap world position [0.02952266 0.19749165 0.13797036]
+obj_trans pre [-3.04995232e-07  9.49999920e-02 -1.25000317e-01]
+obj_trans post z offset [0.02953862 0.29247557 0.01294153]
+obj_trans post hand offset [0.02953862 0.29247557 0.12340634]
+hand to mocap world position [ 0.          0.         -0.11046481]
+obj_trans pre [0.02953862 0.29247557 0.12340634]
+obj_trans post z offset [0.02953862 0.29247557 0.01294154]
+obj_trans post hand offset [-3.12468375e-07  9.50000169e-02 -1.25000264e-01]
+hand to mocap world position [0.02953893 0.19747555 0.13794181]
+obj_trans pre [-3.12468375e-07  9.50000169e-02 -1.25000264e-01]
+obj_trans post z offset [-3.12468375e-07  9.50000169e-02 -2.35465064e-01]
+obj_trans post hand offset [-2.52863730e-07  9.49999871e-02 -1.25000252e-01]
+hand to mocap world position [-5.9604645e-08  2.9802322e-08 -1.1046481e-01]
+obj_trans pre [-2.52863730e-07  9.49999871e-02 -1.25000252e-01]
+obj_trans post z offset [-2.52863730e-07  9.49999871e-02 -2.35465052e-01]
+obj_trans post hand offset [-2.52863730e-07  9.50000169e-02 -1.25000241e-01]
+hand to mocap world position [ 0.0000000e+00 -2.9802322e-08 -1.1046481e-01]
+Root coor: [-2.52863730e-07  9.50000169e-02 -1.25000241e-01]
+Root ori: [ 0.03634892  0.0272415  -0.04478525]
+joint command publisher initialized.
+joint state subscriber initialized.
+
+Trial 1
+No action perturbation this trial
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256)]
+Loaded trajectory sampler
+Current yaw: tensor([ 0.0369,  0.0282, -0.0692], device='cuda:0')
+tensor([ 0.0523,  0.0093, -0.0445], device='cuda:0')
+tensor([ 0.0459,  0.0211, -0.1023], device='cuda:0')
+Pregrasp complete. Ready to execute. Press <ENTER> to continue.Current yaw: tensor([ 0.0446,  0.0182, -0.1106], device='cuda:0')
+1 turn
+Sampling time 5.398042268119752
+tensor([0.1850, 0.3670, 0.2225, 0.2081, 0.2206, 0.2361, 0.1854, 0.2349, 0.2181,
+        0.3260, 0.1993, 0.4138, 0.2366, 0.2050, 0.2182, 0.2606],
+       device='cuda:0')
+tensor([0.0888, 0.1790, 0.0522, 0.1527, 0.0549, 0.0937, 0.0885, 0.0929, 0.0562,
+        0.1047, 0.0412, 0.1432, 0.1459, 0.1419, 0.0555, 0.1833],
+       device='cuda:0')
+tensor([0.1655, 0.0672, 0.0609, 0.1620, 0.0607, 0.1290, 0.1655, 0.1337, 0.0610,
+        0.1396, 0.0673, 0.0739, 0.0926, 0.1633, 0.0595, 0.2340],
+       device='cuda:0')
+skipped 1 states
+tensor([0.1146, 0.1036, 0.0656, 0.0853, 0.0655, 0.0796, 0.1148, 0.0810, 0.0661,
+        0.1782, 0.1135, 0.0998, 0.0463, 0.0848, 0.0662, 0.1429],
+       device='cuda:0')
+skipped 1 states
+tensor([0.1082, 0.0846, 0.1755, 0.1203, 0.1137, 0.1118, 0.1145, 0.1149, 0.1521,
+        0.1874, 0.1059, 0.1085, 0.0579, 0.0899, 0.1509, 0.1978],
+       device='cuda:0')
+skipped 3 states
+skipped 1 states
+Shortcut time 0.004550868179649115
+tensor([ 0.1370,  0.6278,  0.5383,  0.6010, -0.0945,  0.5169,  0.8964,  0.9196,
+         1.2115,  0.2811,  0.2651,  1.1396,  0.0443,  0.0185, -0.1088,  0.0000],
+       device='cuda:0')
+Likelihood: -27.807090759277344
+Solve time for step 1 20.683096507098526
+Current ori: tensor([ 0.0444,  0.0188, -0.1086], device='cuda:0')
+Middle force: tensor([1.5739, 1.5280, 1.5442, 1.5543, 1.5373, 1.5486], device='cuda:0')
+Thumb force: tensor([1.5795, 1.5225, 1.9577, 2.7412, 1.5843, 1.6249], device='cuda:0')
+Index force: tensor([0.3586, 0.3798, 0.5529, 0.9149, 0.8256, 0.1924], device='cuda:0')
+tensor([ 0.0438,  0.0189, -0.1085], device='cuda:0')
+tensor([ 0.1367,  0.6605,  0.5179,  0.5587, -0.0966,  0.5496,  0.8708,  0.9234,
+         1.2238,  0.2698,  0.2885,  1.0490,  0.0360,  0.0135, -0.1811,  0.0000],
+       device='cuda:0')
+Likelihood: -20.03066635131836
+Solve time for step 2 7.111844510305673
+Current ori: tensor([ 0.0356,  0.0133, -0.1803], device='cuda:0')
+Middle force: tensor([1.5213, 1.5317, 1.5387, 1.5241, 1.5367], device='cuda:0')
+Thumb force: tensor([1.5142, 1.8877, 2.6300, 1.5605, 1.6061], device='cuda:0')
+Index force: tensor([0.3632, 0.5200, 0.8889, 0.7893, 0.1942], device='cuda:0')
+tensor([ 0.0347,  0.0137, -0.1806], device='cuda:0')
+tensor([ 0.1370,  0.6793,  0.5163,  0.5192, -0.0988,  0.5517,  0.8603,  0.9349,
+         1.3005,  0.1647,  0.2856,  0.9601,  0.0215,  0.0102, -0.2696,  0.0000],
+       device='cuda:0')
+Likelihood: -30.251510620117188
+Solve time for step 3 6.850904127117246
+Current ori: tensor([ 0.0210,  0.0104, -0.2699], device='cuda:0')
+Middle force: tensor([1.5308, 1.5318, 1.5307, 1.5306], device='cuda:0')
+Thumb force: tensor([1.5289, 1.5509, 1.5423, 1.5622], device='cuda:0')
+Index force: tensor([0.8296, 0.4295, 0.9372, 0.6074], device='cuda:0')
+tensor([ 0.0210,  0.0103, -0.2701], device='cuda:0')
+tensor([ 0.1376,  0.6859,  0.5089,  0.5125, -0.0976,  0.5053,  0.9076,  0.9752,
+         1.3417,  0.1533,  0.3289,  0.7746, -0.0048,  0.0133, -0.4964,  0.0000],
+       device='cuda:0')
+Likelihood: -26.979106903076172
+Solve time for step 4 6.691475888248533
+Current ori: tensor([-0.0053,  0.0126, -0.4968], device='cuda:0')
+Middle force: tensor([1.5231, 1.5197, 1.5220], device='cuda:0')
+Thumb force: tensor([1.5318, 1.5264, 1.5474], device='cuda:0')
+Index force: tensor([0.4136, 0.8918, 0.5904], device='cuda:0')
+tensor([-0.0054,  0.0129, -0.4963], device='cuda:0')
+tensor([ 0.1390,  0.6859,  0.5089,  0.5157, -0.0972,  0.5044,  0.9102,  0.9763,
+         1.3507,  0.1349,  0.3414,  0.7471, -0.0102,  0.0113, -0.5165,  0.0000],
+       device='cuda:0')
+Likelihood: -27.89464569091797
+Solve time for step 5 6.588586695026606
+Current ori: tensor([ 0.0009,  0.0144, -0.5177], device='cuda:0')
+Middle force: tensor([1.5128, 1.5163], device='cuda:0')
+Thumb force: tensor([1.5170, 1.5352], device='cuda:0')
+Index force: tensor([0.8587, 0.5739], device='cuda:0')
+tensor([-0.0097,  0.0107, -0.5163], device='cuda:0')
+tensor([ 0.1455,  0.6857,  0.5167,  0.5168, -0.0972,  0.4994,  0.9254,  0.9764,
+         1.3599,  0.1180,  0.3438,  0.7247, -0.0093,  0.0072, -0.5408,  0.0000],
+       device='cuda:0')
+Likelihood: -32.50079345703125
+State is out of distribution
+Likelihood for thumb_middle: -6.727299213409424
+Likelihood for index: -6.686718463897705
+Current yaw: tensor([-0.0106,  0.0077, -0.5414], device='cuda:0')
+1 index
+tensor([0.2059, 0.4253, 0.2625, 0.1702, 0.2082, 0.2741, 0.1792, 0.2185, 0.2112,
+        0.2812, 0.2638, 0.2772, 0.2740, 0.1840, 0.2640, 0.2642],
+       device='cuda:0')
+tensor([0.0521, 0.1225, 0.1203, 0.0815, 0.0797, 0.1166, 0.0783, 0.0790, 0.1220,
+        0.1204, 0.1215, 0.1116, 0.1186, 0.0723, 0.1203, 0.1079],
+       device='cuda:0')
+skipped 3 states
+skipped 4 states
+skipped 1 states
+Shortcut time 0.002617158927023411
+tensor([ 0.1456,  0.6859,  0.5168,  0.5169, -0.0973,  0.4996,  0.9255,  0.9765,
+         1.3602,  0.1184,  0.3439,  0.7246, -0.0096,  0.0065, -0.5411,  0.0000],
+       device='cuda:0')
+Solve time for step 1 20.527741054072976
+Current ori: tensor([-0.0090,  0.0067, -0.5412], device='cuda:0')
+Middle force: tensor([1.5168, 1.5169, 1.5395, 1.5467], device='cuda:0')
+Thumb force: tensor([1.5272, 1.5386, 1.5693, 1.5339], device='cuda:0')
+tensor([-0.0105,  0.0079, -0.5416], device='cuda:0')
+tensor([ 0.2289,  0.5839,  0.5203,  0.5306, -0.0880,  0.5230,  0.9013,  0.9352,
+         1.3579,  0.0993,  0.3429,  0.7242, -0.0177,  0.0106, -0.4876,  0.0000],
+       device='cuda:0')
+Solve time for step 2 7.0863031591288745
+Current ori: tensor([-0.0185,  0.0107, -0.4877], device='cuda:0')
+Middle force: tensor([1.5131, 1.5321, 1.5388], device='cuda:0')
+Thumb force: tensor([1.5291, 1.5521, 1.5235], device='cuda:0')
+tensor([-0.0183,  0.0104, -0.4873], device='cuda:0')
+tensor([ 2.2794e-01,  5.8395e-01,  5.2033e-01,  5.4802e-01, -8.9107e-02,
+         5.1699e-01,  9.2122e-01,  9.3583e-01,  1.3446e+00,  1.4109e-01,
+         3.3507e-01,  7.2846e-01, -2.3518e-02,  9.0103e-04, -5.1475e-01,
+         0.0000e+00], device='cuda:0')
+Solve time for step 3 7.107454443816096
+Current ori: tensor([-0.0217,  0.0016, -0.5128], device='cuda:0')
+Middle force: tensor([1.5000, 1.5000], device='cuda:0')
+Thumb force: tensor([1.6200, 1.5545], device='cuda:0')
+tensor([-0.0217,  0.0015, -0.5117], device='cuda:0')
+tensor([ 0.2273,  0.5710,  0.5298,  0.5504, -0.0921,  0.5100,  0.9262,  0.9348,
+         1.3419,  0.1514,  0.3348,  0.7498, -0.0186,  0.0054, -0.5007,  0.0000],
+       device='cuda:0')
+Solve time for step 4 6.906652287114412
+Current ori: tensor([-0.0186,  0.0057, -0.5013], device='cuda:0')
+Middle force: tensor([1.5050], device='cuda:0')
+Thumb force: tensor([1.5037], device='cuda:0')
+tensor([-0.0195,  0.0056, -0.5011], device='cuda:0')
+Likelihood: -26.371604919433594
+State is in distribution
+Current yaw: tensor([-0.0198,  0.0040, -0.5063], device='cuda:0')
+1 turn
+Sampling time 5.057917352765799
+tensor([0.3839, 0.3892, 0.3077, 0.3580, 0.3082, 0.5090, 0.3347, 0.4017, 0.4040,
+        0.3674, 0.3627, 0.2785, 0.3677, 0.2771, 0.3505, 0.2859],
+       device='cuda:0')
+tensor([0.1846, 0.2301, 0.1338, 0.0627, 0.0847, 0.0750, 0.2615, 0.0540, 0.1269,
+        0.1714, 0.1330, 0.1255, 0.1800, 0.1247, 0.1663, 0.1450],
+       device='cuda:0')
+tensor([0.1401, 0.2049, 0.2126, 0.0737, 0.0615, 0.0629, 0.0865, 0.0526, 0.1265,
+        0.0765, 0.0637, 0.0903, 0.1400, 0.0902, 0.1024, 0.0606],
+       device='cuda:0')
+tensor([0.0952, 0.1836, 0.0978, 0.0587, 0.0705, 0.0625, 0.0471, 0.0571, 0.0698,
+        0.0708, 0.0558, 0.0914, 0.1808, 0.0931, 0.1039, 0.0723],
+       device='cuda:0')
+tensor([0.1055, 0.1254, 0.0998, 0.0729, 0.1506, 0.1108, 0.0480, 0.0584, 0.1102,
+        0.0854, 0.0924, 0.0779, 0.0757, 0.0766, 0.0698, 0.0833],
+       device='cuda:0')
+skipped 1 states
+tensor([0.0635, 0.1081, 0.1326, 0.1486, 0.1143, 0.1707, 0.0636, 0.0877, 0.0635,
+        0.0492, 0.0731, 0.0639, 0.0871, 0.0734, 0.0836, 0.0991],
+       device='cuda:0')
+skipped 2 states
+skipped 2 states
+Shortcut time 0.01974637806415558
+tensor([ 0.1700,  0.6164,  0.6060,  0.5856, -0.0920,  0.5109,  0.9303,  0.9347,
+         1.3428,  0.1459,  0.3318,  0.7499, -0.0198,  0.0036, -0.5065,  0.0000],
+       device='cuda:0')
+Likelihood: -27.00263214111328
+Solve time for step 1 22.035570630803704
+Current ori: tensor([-0.0195,  0.0037, -0.5068], device='cuda:0')
+Middle force: tensor([1.5073, 1.6062, 1.5688, 1.5496, 1.5623, 1.8358, 1.5730],
+       device='cuda:0')
+Thumb force: tensor([1.5684, 1.5559, 1.6145, 1.6054, 1.5281, 1.5134, 1.6221],
+       device='cuda:0')
+Index force: tensor([0.8296, 0.5833, 0.2292, 0.3093, 0.9439, 0.9420, 0.6610],
+       device='cuda:0')
+tensor([-0.0191,  0.0038, -0.5068], device='cuda:0')
+tensor([ 1.6962e-01,  6.4455e-01,  5.4539e-01,  6.3769e-01, -9.1086e-02,
+         5.0930e-01,  8.9484e-01,  9.9917e-01,  1.3479e+00,  1.5378e-01,
+         3.3293e-01,  7.3052e-01, -1.6005e-02, -1.6701e-04, -5.5347e-01,
+         0.0000e+00], device='cuda:0')
+Likelihood: -26.64673614501953
+Solve time for step 2 7.335036703851074
+Current ori: tensor([ 0.0178, -0.2068, -0.5638], device='cuda:0')
+Middle force: tensor([1.5860, 1.5482, 1.5354, 1.5494, 1.7903, 1.5587], device='cuda:0')
+Thumb force: tensor([1.5341, 1.5893, 1.5782, 1.5166, 1.5058, 1.5985], device='cuda:0')
+Index force: tensor([0.5470, 0.2312, 0.3033, 0.9370, 0.8976, 0.6361], device='cuda:0')
+tensor([ 0.0189, -0.2072, -0.5625], device='cuda:0')
+tensor([ 0.1645,  0.6450,  0.5299,  0.6547, -0.0991,  0.5048,  0.8907,  1.0777,
+         1.4178,  0.1179,  0.3172,  0.6112,  0.0179, -0.2080, -0.5630,  0.0000],
+       device='cuda:0')
+Likelihood: -36.19021987915039
+State is out of distribution
+Likelihood for thumb_middle: -15.66708755493164
+Likelihood for index: -16.012645721435547
+Current yaw: tensor([ 0.0051,  0.0210, -0.7391], device='cuda:0')
+1 thumb_middle
+tensor([0.3539, 0.3480, 0.4207, 0.3461, 0.4007, 0.3997, 0.3723, 0.3925, 0.3536,
+        0.3615, 0.3709, 0.3553, 0.3635, 0.3635, 0.3703, 0.3683],
+       device='cuda:0')
+tensor([0.1232, 0.0653, 0.0904, 0.0632, 0.0912, 0.0870, 0.1230, 0.0886, 0.1253,
+        0.0704, 0.1275, 0.0653, 0.1245, 0.1200, 0.1256, 0.1231],
+       device='cuda:0')
+tensor([0.0877, 0.0730, 0.1055, 0.0591, 0.0962, 0.0925, 0.0831, 0.0966, 0.0807,
+        0.0646, 0.0832, 0.0732, 0.0846, 0.0799, 0.0828, 0.0829],
+       device='cuda:0')
+tensor([0.0914, 0.1083, 0.0473, 0.1276, 0.0644, 0.0639, 0.0627, 0.0683, 0.0640,
+        0.1110, 0.0906, 0.1429, 0.0920, 0.0950, 0.0636, 0.0644],
+       device='cuda:0')
+tensor([0.0423, 0.1080, 0.0712, 0.0788, 0.1177, 0.1149, 0.0693, 0.1039, 0.0678,
+        0.0939, 0.0461, 0.0828, 0.0488, 0.0471, 0.0594, 0.0632],
+       device='cuda:0')
+skipped 1 states
+tensor([0.1236, 0.0611, 0.1184, 0.0668, 0.0797, 0.0790, 0.1104, 0.0769, 0.0920,
+        0.1123, 0.1295, 0.0714, 0.1288, 0.1122, 0.1237, 0.1127],
+       device='cuda:0')
+skipped 3 states
+skipped 1 states
+Shortcut time 0.005139651708304882
+tensor([ 0.1633,  0.6453,  0.5261,  0.6687, -0.1536,  0.5027,  0.8899,  1.0756,
+         1.4207,  0.1171,  0.3674,  0.6127,  0.0041,  0.0204, -0.7387,  0.0000],
+       device='cuda:0')
+Solve time for step 1 18.903094180859625
+Current ori: tensor([ 0.0026,  0.0217, -0.7399], device='cuda:0')
+Index force: tensor([0.0202, 0.0146, 0.0479, 0.0399, 0.1345, 0.4868, 0.3918],
+       device='cuda:0')
+tensor([ 0.0033,  0.0200, -0.7388], device='cuda:0')
+tensor([ 0.1643,  0.6120,  0.5950,  0.6322, -0.2560,  0.5024,  0.8204,  0.9756,
+         1.3091,  0.1803,  0.2439,  0.8729,  0.0026,  0.0181, -0.7492,  0.0000],
+       device='cuda:0')
+Solve time for step 2 6.6157194301486015
+Current ori: tensor([ 0.0036,  0.0199, -0.7502], device='cuda:0')
+Index force: tensor([0.0138, 0.0492, 0.0411, 0.1324, 0.4573, 0.3744], device='cuda:0')
+tensor([ 0.0045,  0.0195, -0.7497], device='cuda:0')
+tensor([ 0.1646,  0.6016,  0.6066,  0.6316, -0.2403,  0.5025,  0.8204,  0.9747,
+         1.3078,  0.1906,  0.2328,  0.9314,  0.0037,  0.0194, -0.7526,  0.0000],
+       device='cuda:0')
+Solve time for step 3 6.411840732209384
+Current ori: tensor([ 0.0053,  0.0213, -0.7511], device='cuda:0')
+Index force: tensor([0.0221, 0.0289, 0.1086, 0.2182, 0.1718], device='cuda:0')
+tensor([ 0.0058,  0.0220, -0.7521], device='cuda:0')
+tensor([ 0.1655,  0.5981,  0.6131,  0.6312, -0.2404,  0.5024,  0.8205,  0.9745,
+         1.3058,  0.1905,  0.2174,  0.9315,  0.0046,  0.0189, -0.7542,  0.0000],
+       device='cuda:0')
+Solve time for step 4 6.301534679718316
+Current ori: tensor([ 0.0048,  0.0189, -0.7546], device='cuda:0')
+Index force: tensor([0.0224, 0.0986, 0.1877, 0.2056], device='cuda:0')
+tensor([ 0.0064,  0.0187, -0.7543], device='cuda:0')
+tensor([ 0.1656,  0.5981,  0.6130,  0.6312, -0.2405,  0.5024,  0.8204,  0.9602,
+         1.2920,  0.1908,  0.2172,  0.9315,  0.0072,  0.0198, -0.7549,  0.0000],
+       device='cuda:0')
+Solve time for step 5 6.176394393667579
+Current ori: tensor([ 0.0062,  0.0199, -0.7546], device='cuda:0')
+Index force: tensor([0.0311, 0.1682, 0.1936], device='cuda:0')
+tensor([ 0.0073,  0.0203, -0.7550], device='cuda:0')
+tensor([ 0.1655,  0.5982,  0.6126,  0.6312, -0.2411,  0.5026,  0.8203,  0.9386,
+         1.2913,  0.1906,  0.2171,  0.9316,  0.0050,  0.0203, -0.7546,  0.0000],
+       device='cuda:0')
+Solve time for step 6 6.010389058850706
+Current ori: tensor([ 0.0072,  0.0193, -0.7543], device='cuda:0')
+Index force: tensor([0.0037, 0.1098], device='cuda:0')
+tensor([ 0.0057,  0.0197, -0.7542], device='cuda:0')
+tensor([ 0.1657,  0.5981,  0.6126,  0.6312, -0.2409,  0.5026,  0.8204,  0.9477,
+         1.2911,  0.1906,  0.2172,  0.9316,  0.0079,  0.0191, -0.7543,  0.0000],
+       device='cuda:0')
+Solve time for step 7 5.947106005158275
+Current ori: tensor([ 0.0067,  0.0203, -0.7548], device='cuda:0')
+Index force: tensor([0.0863], device='cuda:0')
+tensor([ 0.0066,  0.0199, -0.7547], device='cuda:0')
+Likelihood: -26.19521713256836
+State is in distribution
+Current yaw: tensor([ 0.0111,  0.0220, -0.7571], device='cuda:0')
+1 turn
+Sampling time 5.068619750905782
+tensor([0.2878, 0.2053, 0.2306, 0.1636, 0.2598, 0.2058, 0.2028, 0.1947, 0.2884,
+        0.1929, 0.2039, 0.1506, 0.1910, 0.1464, 0.2677, 0.2433],
+       device='cuda:0')
+tensor([0.1237, 0.0593, 0.1974, 0.0537, 0.1727, 0.0649, 0.0603, 0.2314, 0.1240,
+        0.2344, 0.1309, 0.0831, 0.2379, 0.0836, 0.2568, 0.2093],
+       device='cuda:0')
+tensor([0.0875, 0.0554, 0.2254, 0.0617, 0.0694, 0.0572, 0.0533, 0.0973, 0.0872,
+        0.1003, 0.0967, 0.1227, 0.0975, 0.1235, 0.1237, 0.1440],
+       device='cuda:0')
+skipped 1 states
+tensor([0.0786, 0.0637, 0.1652, 0.0623, 0.0636, 0.0809, 0.0644, 0.1101, 0.0802,
+        0.1092, 0.0681, 0.0644, 0.1109, 0.0641, 0.0449, 0.0692],
+       device='cuda:0')
+tensor([0.0627, 0.0549, 0.0622, 0.0971, 0.0544, 0.0780, 0.0569, 0.0755, 0.0637,
+        0.0763, 0.0627, 0.0587, 0.1528, 0.0594, 0.0873, 0.1083],
+       device='cuda:0')
+skipped 1 states
+skipped 4 states
+Shortcut time 0.018702488858252764
+tensor([ 0.1648,  0.5981,  0.6128,  0.6313, -0.1628,  0.5395,  0.8477,  0.9759,
+         1.3204,  0.2254,  0.2721,  0.9587,  0.0111,  0.0221, -0.7571,  0.0000],
+       device='cuda:0')
+Likelihood: -27.112743377685547
+Solve time for step 1 21.247186998836696
+Current ori: tensor([ 0.0109,  0.0240, -0.7580], device='cuda:0')
+Middle force: tensor([1.8221, 1.5549, 1.5507, 1.5417, 1.5713, 1.5138], device='cuda:0')
+Thumb force: tensor([1.5749, 1.5792, 1.6056, 1.6018, 1.6065, 1.8476], device='cuda:0')
+Index force: tensor([0.5130, 0.5734, 0.9155, 0.5070, 0.1102, 0.9696], device='cuda:0')
+tensor([ 0.0121,  0.0220, -0.7569], device='cuda:0')
+tensor([ 0.1677,  0.6061,  0.6088,  0.6224, -0.1678,  0.5181,  0.9039,  0.9998,
+         1.3218,  0.2247,  0.3048,  0.8743,  0.0065,  0.0228, -0.8679,  0.0000],
+       device='cuda:0')
+Likelihood: -26.922622680664062
+Solve time for step 2 7.153097939211875
+Current ori: tensor([ 0.0065,  0.0208, -0.8685], device='cuda:0')
+Middle force: tensor([1.5512, 1.5464, 1.5249, 1.5136, 1.5005], device='cuda:0')
+Thumb force: tensor([1.5374, 1.5279, 1.5661, 1.5397, 1.5262], device='cuda:0')
+Index force: tensor([0.5689, 0.6734, 0.3336, 0.3583, 0.8550], device='cuda:0')
+tensor([ 0.0065,  0.0219, -0.8688], device='cuda:0')
+tensor([ 0.1696,  0.6158,  0.6084,  0.5987, -0.1670,  0.5217,  0.9042,  0.9993,
+         1.3265,  0.2249,  0.3044,  0.8499,  0.0019,  0.0212, -0.8949,  0.0000],
+       device='cuda:0')
+Likelihood: -27.701250076293945
+Solve time for step 3 6.844295590184629
+Current ori: tensor([ 0.0017,  0.0214, -0.8955], device='cuda:0')
+Middle force: tensor([1.5298, 1.5160, 1.5086, 1.5000], device='cuda:0')
+Thumb force: tensor([1.5125, 1.5436, 1.5200, 1.5114], device='cuda:0')
+Index force: tensor([0.6472, 0.3187, 0.3227, 0.7956], device='cuda:0')
+tensor([ 0.0013,  0.0216, -0.8959], device='cuda:0')
+tensor([ 0.1685,  0.6207,  0.6085,  0.5810, -0.1670,  0.5105,  0.9118,  1.0198,
+         1.3399,  0.2121,  0.3251,  0.7940, -0.0100,  0.0210, -0.9616,  0.0000],
+       device='cuda:0')
+Likelihood: -27.585845947265625
+Solve time for step 4 6.688879486173391
+Current ori: tensor([-0.0094,  0.0203, -0.9614], device='cuda:0')
+Middle force: tensor([1.5082, 1.5078, 1.5000], device='cuda:0')
+Thumb force: tensor([1.5707, 1.5610, 1.9294], device='cuda:0')
+Index force: tensor([0.8062, 1.1394, 1.5641], device='cuda:0')
+tensor([-0.0094,  0.0204, -0.9617], device='cuda:0')
+tensor([ 0.1691,  0.6207,  0.6014,  0.5901, -0.1672,  0.5059,  0.9150,  1.0392,
+         1.3411,  0.1981,  0.3443,  0.7573, -0.0164,  0.0249, -0.9988,  0.0000],
+       device='cuda:0')
+Likelihood: -29.32541275024414
+Solve time for step 5 6.726159902755171
+Current ori: tensor([-0.0477,  0.0928, -1.2958], device='cuda:0')
+Middle force: tensor([1.5257, 1.5011], device='cuda:0')
+Thumb force: tensor([1.5296, 1.6664], device='cuda:0')
+Index force: tensor([0.0728, 0.7442], device='cuda:0')
+tensor([-0.0476,  0.0927, -1.2959], device='cuda:0')
+tensor([ 0.1964,  0.7029,  0.6434,  0.6146, -0.2819,  0.5362,  0.9908,  1.0637,
+         1.4159,  0.2242,  0.4282,  0.7061, -0.6932,  0.5846, -2.7621,  0.0000],
+       device='cuda:0')
+Likelihood: -607.5767211914062
+State is out of distribution
+Likelihood for thumb_middle: -58.18321990966797
