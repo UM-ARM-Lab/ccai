@@ -271,7 +271,7 @@ if __name__ == '__main__':
            
             regrasp_pose_combined, regrasp_traj_combined, regrasp_plan = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
-                use_diffusion=True, use_contact_cost=True,
+                use_diffusion=True, use_contact_cost=False,
                 diffusion_path = diffusion_path,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters,
             )

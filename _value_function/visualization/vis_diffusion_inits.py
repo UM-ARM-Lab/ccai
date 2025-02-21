@@ -24,7 +24,7 @@ t_traj = pkl.load(open(f'{fpath}/diffusion/initial_samples/raw/turn_init.pkl', '
 rg_traj = convert_partial_to_full_config(rg_traj[0,:,:15])
 t_traj = convert_partial_to_full_config(t_traj[0,:,:15])
 
-traj = t_traj
+traj = rg_traj
 
 while True:
 

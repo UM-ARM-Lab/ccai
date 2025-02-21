@@ -10,7 +10,7 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 sys.path.append(str(CCAI_PATH))
 from tqdm import tqdm
 from pathlib import Path
-from _value_function.screwdriver_problem import init_env, do_turn, pregrasp, regrasp, emailer, convert_partial_to_full_config, delete_imgs
+from _value_function.screwdriver_problem import init_env, do_turn, pregrasp, regrasp, emailer, convert_partial_to_full_config
 from _value_function.data_collect.process_final_poses_regrasp import calculate_turn_cost
 import pytorch_kinematics as pk
 from isaac_victor_envs.utils import get_assets_dir
@@ -97,8 +97,8 @@ if __name__ == '__main__':
     screwdriver_noise_mag = 0.015
     finger_noise_mag = 0.05
 
-    regrasp_iters = 40
-    turn_iters = 50
+    regrasp_iters = 80
+    turn_iters = 100
 
     vf_weight_rg = 5.0
     other_weight_rg = 1.9
@@ -110,12 +110,12 @@ if __name__ == '__main__':
 
     # config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True, config_path=config_path)
 
-    pregrasp_path = fpath /'test'/'initializations'/'test_method_pregrasps.pkl'
+    pregrasp_path = fpath /'test'/'official_initializations'/'test_method_pregrasps.pkl'
     diffusion_path = 'data/training/allegro_screwdriver/adam_diffusion/allegro_screwdriver_diffusion_4999.pt'
    
     print("input method:")
-    # method = input()
-    method = "vf"
+    method = input()
+    # method = "vf"
     print("input trial number:")
     trial_number = int(input())
     # trial_number = 0
@@ -294,7 +294,7 @@ if __name__ == '__main__':
         
         regrasp_pose_combined, regrasp_traj_combined, regrasp_plan = regrasp(
             env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
-            use_diffusion=True, use_contact_cost=True,
+            use_diffusion=True,
             diffusion_path = diffusion_path,
             image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
             sim_viz_env=sim_env
