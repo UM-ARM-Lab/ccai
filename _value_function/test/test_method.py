@@ -115,18 +115,19 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'xx1'
+    test_name = 'compare_epochs'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    n_trials = 50
+    n_trials = 20
     n_repeat = 1
     perception_noise = 0.0
 
-    calc_vf = True
-    calc_diffusion_no_contact_cost = False
+    calc_vf = False
+    calc_diffusion_no_contact_cost = True
+    calc_diffusion2 = True
     calc_diffusion_w_contact_cost = False
-    calc_novf = True
+    calc_novf = False
     calc_combined = False
 
     method_names = []
@@ -140,6 +141,8 @@ if __name__ == '__main__':
         method_names.append("diffusion_w_contact_cost")
     if calc_combined:
         method_names.append("combined")
+    if calc_diffusion2:
+        method_names.append("diffusion2")
 
     max_screwdriver_tilt = 0.015
     screwdriver_noise_mag = 0.015
@@ -160,6 +163,7 @@ if __name__ == '__main__':
 
     pregrasp_path = fpath /'test'/'initializations'/'test_method_pregrasps.pkl'
     diffusion_path = 'data/training/allegro_screwdriver/adam_diffusion/allegro_screwdriver_diffusion_4999.pt'
+    diffusion_path = 'data/training/allegro_screwdriver/adam_diffusion/allegro_screwdriver_diffusion_9999.pt'
 
     if pregrasp_path.exists() == False or len(pkl.load(open(pregrasp_path, 'rb'))) != n_trials:
         print("Generating new pregrasp initializations...")
@@ -239,6 +243,31 @@ if __name__ == '__main__':
             turn_cost = calculate_turn_cost(regrasp_pose_diffusion.numpy(), turn_pose_diffusion)
             print('---------------------------------')
             print(f"Diffusion no contact cost: {turn_cost}")
+
+        if calc_diffusion2:
+
+            env.reset(dof_pos= pregrasp_pose)
+           
+            regrasp_pose_diffusion2, regrasp_traj_diffusion2, regrasp_plan, initial_samples = regrasp(
+                env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
+                use_diffusion=True, use_contact_cost=False,
+                diffusion_path = diffusion_path2,
+                image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
+            )
+       
+            _, turn_pose_diffusion2, succ_diffusion2, turn_traj_diffusion2, turn_plan, initial_samples = do_turn(
+                regrasp_pose_diffusion2, config, env,
+                sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
+                use_diffusion=True,
+                diffusion_path = diffusion_path2,
+                perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf',
+            )
+           
+            result_diffusion2 = [pregrasp_pose, regrasp_pose_diffusion2, regrasp_traj_diffusion2, turn_pose_diffusion2, turn_traj_diffusion2, initial_samples]
+            checkpoint['results']['diffusion2'][combo_tuple] = result_diffusion2
+            turn_cost = calculate_turn_cost(regrasp_pose_diffusion2.numpy(), turn_pose_diffusion2)
+            print('---------------------------------')
+            print(f"Diffusion 2 cost: {turn_cost}")
 
         if calc_diffusion_w_contact_cost:
 
