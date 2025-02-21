@@ -24,7 +24,7 @@ sys.path.append('..')
 
 # sys.stdout = open('./logs/live_recovery_shorcut_honda_meeting_full_dof_noise_train_indexing_fix_6500_.08_std_.75_pct_diff_likelihood_no_resample_no_cpc_on_pregrasp.log', 'w', buffering=1)
 # sys.stdout = open('./examples/logs/recovery_as_contact_search.log', 'w', buffering=1)
-# sys.stdout = open('./examples/logs/live_recovery_hardware_5_10_15_200_MC_contact_selection_film.log', 'w', buffering=1)
+# sys.stdout = open('./examples/logs/live_recovery_hardware_orig_ecdf_contact_selection_film.log', 'a', buffering=1)
 # sys.stdout = open('./examples/logs/allegro_screwdriver_recovery_best_traj_only_15000_training_no_downsample_balance_bugfix_diffusion_split_t_x_samples_ecdf.log', 'w', buffering=1)
 sys.stdout = open('./examples/logs/allegro_screwdriver_demo.log', 'w', buffering=1)
 
@@ -541,9 +541,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         min_force_dict = None
         if params['mode'] == 'hardware':
             min_force_dict = {
-                'thumb': 2.5,
-                'middle': 2.5,
-                'index': .0,
+                'thumb': .5,
+                'middle': .5,
+                'index': .25,
             }
 
         # min_force_dict = {
@@ -1030,7 +1030,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             if not id_check:
                 # State is OOD. Return and move to recovery pipeline
                 planner.problem.data = {}
-                return torch.stack(actual_trajectory, dim=0).to(device=params['device']), planned_trajectories, initial_samples, None, None, None, None, True
+                if len(actual_trajectory) > 0:
+                    actual_trajectory = torch.stack(actual_trajectory, dim=0).to(device=params['device'])
+                return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, True
             state = state[:planner.problem.dx]
 
 
@@ -1248,7 +1250,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             data[t]['plans'].append(plan)
             data[t]['inits'].append(inits.cpu().numpy())
             data[t]['init_sim_rollouts'].append(init_sim_rollouts)
-            data[t]['optimizer_paths'].append([i.cpu().numpy() for i in optimizer_paths])
+            try:
+                data[t]['optimizer_paths'].append([i.cpu().numpy() for i in optimizer_paths])
+            except:
+                pass            
             data[t]['starts'].append(traj[i].reshape(1, -1).repeat(plan.shape[0], 1))
             try:
                 data[t]['contact_points'].append(contact_points[t])
@@ -1843,7 +1848,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 if contact_sequence[-1] == 'turn':
                     break
     elif not sample_contact:
-        contact_sequence = ['turn', 'turn', 'thumb_middle', 'turn']
+        # contact_sequence = ['turn', 'turn', 'thumb_middle', 'turn']
+        contact_sequence = ['turn', 'thumb_middle', 'turn', 'thumb_middle', 'turn']
         num_stages = len(contact_sequence)
     else:
         contact_sequence = None
@@ -2070,7 +2076,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 6).to(device=params['device'])), dim=-1)
 
         elif contact == 'turn':
-            _goal = torch.tensor([0, 0, state[-1] - np.pi / 6]).to(device=params['device'])
+            _goal = torch.tensor([0, 0, state[-1] - np.pi / 3]).to(device=params['device'])
             if params.get('live_recovery', False) and recover:
                 _goal = goal_config
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = execute_traj(

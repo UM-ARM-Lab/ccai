@@ -23,7 +23,7 @@ goal: -1.5
 prior: 1
 # likelihood_threshold: -22.618363952636717
 # likelihood_threshold: -25
-likelihood_threshold: -30
+likelihood_threshold: -31
 # likelihood_threshold: -190
 multi_particle_search: True
 replan: False
@@ -50,6 +50,7 @@ randomize_rob_start: False
 perturb_action: False
 live_recovery: True
 type: 'diffusion'
+recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_orig_15000_training_no_downsample_balance_bugfix_diffusion'
 model_dir: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion'
 model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_orig_15000_training_no_downsample_balance_bugfix_diffusion/allegro_screwdriver_diffusion.pt'
 # model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_new_2_fix_scale_more_data_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
