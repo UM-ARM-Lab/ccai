@@ -117,8 +117,8 @@ if __name__ == '__main__':
     # method = input()
     method = "vf"
     print("input trial number:")
-    # trial_number = int(input())
-    trial_number = 0
+    trial_number = int(input())
+    # trial_number = 0
 
     pregrasps = pkl.load(open(pregrasp_path, 'rb'))
     pregrasp_pose = pregrasps[trial_number]
@@ -296,7 +296,7 @@ if __name__ == '__main__':
             env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
             use_diffusion=True, use_contact_cost=True,
             diffusion_path = diffusion_path,
-            image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters,
+            image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
             sim_viz_env=sim_env
         )
     
@@ -305,8 +305,7 @@ if __name__ == '__main__':
             sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
             use_diffusion=True, 
             diffusion_path = diffusion_path,
-            initial_yaw = regrasp_pose_combined[0, -2],
-            perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='vf',
+            perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf',
             sim_viz_env=sim_env
         )
         
