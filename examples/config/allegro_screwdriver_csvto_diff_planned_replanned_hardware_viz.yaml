@@ -7,7 +7,7 @@ num_trials: 10
 visualize: True
 experiment_name: 'real_world_full_method_high_csvto_budget_acc'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
-mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
+mode: 'hardware'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
 object_type: 'screwdriver'
@@ -43,7 +43,7 @@ controllers:
     step_size: 0.1
     momentum: 0.
     device: 'cuda:0'
-    online_iters: 20
+    online_iters: 25
     warmup_iters: 100
     resample_steps: 16
     resample_sigma: 0.01

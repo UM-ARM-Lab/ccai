@@ -1202,7 +1202,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_planned_replanned_hardware_viz.yaml').read_text())
 
     from tqdm import tqdm
 
@@ -1210,6 +1211,7 @@ if __name__ == "__main__":
     ros_copy_node = None
 
     if config['mode'] == 'hardware':
+        # roslaunch allegro_hand allegro_hand_modified.launch
         from hardware.hardware_env import HardwareEnv
         default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
                                     torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float(),
@@ -1225,10 +1227,10 @@ if __name__ == "__main__":
                           num_repeat=10)
         env.get_state()
         for _ in range(5):
-            root_coor, root_ori = env.obj_reader.get_state()
+            root_coor, root_ori = env.obj_reader.get_state_world_frame_pos()
         print('Root coor:', root_coor)
         print('Root ori:', root_ori)
-        root_coor = root_coor / 1000 # convert to meters
+        root_coor = root_coor # convert to meters
         # robot_p = np.array([-0.025, -0.1, 1.33])
         robot_p = np.array([0, -0.095, 1.33])
         root_coor = root_coor + robot_p
@@ -1242,7 +1244,7 @@ if __name__ == "__main__":
                                  video_save_path=img_save_dir,
                                  joint_stiffness=config['kp'],
                                  fingers=config['fingers'],
-                                 table_pose=root_coor,
+                                 table_pose=None, # Since I ran the IK before the sim, I shouldn't need to set the table pose. 
                                  gravity=False
                                  )
         
