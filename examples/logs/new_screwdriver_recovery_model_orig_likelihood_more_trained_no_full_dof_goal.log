@@ -1,0 +1,95 @@
+Importing module 'gym_38' (/home/abhinav/Documents/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Documents/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.1+cu121
+Device count 2
+/home/abhinav/Documents/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+No ROS install found, continuing
+CCAI_PATH /home/abhinav/Documents/ccai
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+
+Trial 1
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256)]
+Loaded trajectory sampler
+Current yaw: tensor([-9.8306e-05,  1.2234e-02, -5.3800e-02], device='cuda:0')
+Current yaw: tensor([-0.0005,  0.0065, -0.0638], device='cuda:0')
+1 turn
+Sampling time 4.018575864029117
+tensor([0.3420, 0.2527, 0.2742, 0.3354, 0.2838, 0.2601, 0.2549, 0.2745, 0.3488,
+        0.2835, 0.2912, 0.2743, 0.2642, 0.2502, 0.3290, 0.2601],
+       device='cuda:0')
+tensor([0.1778, 0.0404, 0.1328, 0.1459, 0.0518, 0.0905, 0.0495, 0.1297, 0.1677,
+        0.0515, 0.1142, 0.1296, 0.0990, 0.1443, 0.1187, 0.0882],
+       device='cuda:0')
+tensor([0.0668, 0.0643, 0.1915, 0.0889, 0.0571, 0.0723, 0.1394, 0.1903, 0.0869,
+        0.0533, 0.1187, 0.1934, 0.1373, 0.1569, 0.0683, 0.0713],
+       device='cuda:0')
+skipped 1 states
+tensor([0.0996, 0.1121, 0.1089, 0.1359, 0.0618, 0.0597, 0.0683, 0.1090, 0.0678,
+        0.0636, 0.0914, 0.1078, 0.0759, 0.0858, 0.1202, 0.0598],
+       device='cuda:0')
+skipped 1 states
+tensor([0.0679, 0.0448, 0.1125, 0.0681, 0.0455, 0.0683, 0.0711, 0.1143, 0.0895,
+        0.0448, 0.1068, 0.1124, 0.0439, 0.0447, 0.0472, 0.0685],
+       device='cuda:0')
+tensor([0.0561, 0.0468, 0.0821, 0.0621, 0.0802, 0.1623, 0.0601, 0.0812, 0.0450,
+        0.0810, 0.0488, 0.0815, 0.0738, 0.0916, 0.0642, 0.1616],
+       device='cuda:0')
+skipped 1 states
+skipped 2 states
+Shortcut time 0.004988761036656797
+tensor([ 1.5378e-01,  6.1085e-01,  5.6972e-01,  6.0838e-01, -1.1800e-01,
+         5.3973e-01,  8.8594e-01,  9.3586e-01,  1.2578e+00,  2.2907e-01,
+         2.3360e-01,  1.2089e+00, -5.4361e-04,  6.4524e-03, -6.3850e-02,
+         1.6058e+00], device='cuda:0')
+Likelihood: -21.004173278808594
+Solve time for step 1 18.904343820991926
+Current ori: tensor([-0.0005,  0.0065, -0.0638], device='cuda:0')
+Middle force: tensor([1.0997, 1.0847, 1.0890, 2.4860, 1.0464, 1.0882, 1.0232],
+       device='cuda:0')
+Thumb force: tensor([1.0762, 1.1061, 1.6402, 2.7058, 1.1128, 1.1147, 1.2119],
+       device='cuda:0')
+Index force: tensor([0.5244, 0.8443, 0.4490, 0.9293, 0.6541, 0.6082, 0.1536],
+       device='cuda:0')
+tensor([ 0.2047,  0.7179,  0.5062,  0.5422, -0.1099,  0.4867,  0.9790,  0.8873,
+         1.3234,  0.2233,  0.2066,  1.0731, -0.0153,  0.0050, -0.2381,  1.5942],
+       device='cuda:0')
+Likelihood: -32.30414581298828
+State is out of distribution
+Likelihood for thumb_middle: -11.672454833984375
+Likelihood for index: -12.000394821166992
+Likelihood for turn: -12.516693115234375
+Current yaw: tensor([-0.0153,  0.0050, -0.2381], device='cuda:0')
+1 thumb_middle
+tensor([0.3672, 0.2701, 0.2630, 0.2486, 0.3401, 0.2432, 0.3014, 0.3007, 0.2475,
+        0.3215, 0.3141, 0.3523, 0.2989, 0.2496, 0.2453, 0.2839],
+       device='cuda:0')
+tensor([0.1178, 0.0913, 0.0593, 0.0731, 0.0947, 0.0769, 0.1088, 0.1088, 0.0721,
+        0.0781, 0.0809, 0.0786, 0.1073, 0.0745, 0.0716, 0.0905],
+       device='cuda:0')
+tensor([0.0875, 0.0750, 0.0448, 0.0615, 0.0690, 0.0752, 0.0655, 0.0654, 0.0733,
+        0.0586, 0.0701, 0.0626, 0.0840, 0.0657, 0.0735, 0.0805],
+       device='cuda:0')
+skipped 1 states
+tensor([0.1816, 0.1875, 0.1733, 0.1840, 0.1690, 0.1882, 0.1823, 0.1831, 0.1885,
+        0.1874, 0.1817, 0.1689, 0.1873, 0.1832, 0.1897, 0.1754],
+       device='cuda:0')
+skipped 3 states
+Shortcut time 0.004060324979946017
+tensor([ 0.2047,  0.7179,  0.5062,  0.5422, -0.1099,  0.4867,  0.9790,  0.8873,
+         1.3234,  0.2233,  0.2066,  1.0731, -0.0153,  0.0050, -0.2381,  1.5942],
+       device='cuda:0')
+failed
+failed

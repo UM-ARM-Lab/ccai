@@ -1,0 +1,4 @@
+# python train_allegro_screwdriver.py --config allegro_screwdriver_diffusion_orig_7000_training_once_downsample.yaml
+# python train_allegro_screwdriver.py --config allegro_screwdriver_diffusion_orig_7000_training_per_epoch_downsample.yaml
+python train_allegro_screwdriver.py --config allegro_screwdriver_diffusion_orig_7000_training_no_downsample.yaml
+python train_allegro_screwdriver.py --config allegro_screwdriver_diffusion_orig_7000_training_weighted_random_downsample.yaml
