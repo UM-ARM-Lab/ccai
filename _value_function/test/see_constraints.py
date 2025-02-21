@@ -89,38 +89,15 @@ def get_initializations(env, config, chain, sim_device, n_samples,
             pkl.dump(pregrasps, open(savepath, 'wb'))
         return pregrasps
 
-def load_or_create_checkpoint(checkpoint_path, method_names):
-
-    if checkpoint_path.exists():
-        print(f"Loading existing checkpoint from {checkpoint_path}")
-        with open(checkpoint_path, 'rb') as f:
-            checkpoint = pkl.load(f)
-    else:
-        print(f"No checkpoint found. Creating a new one at {checkpoint_path}. Also deleting imgs because we're starting a new test")
-        delete_imgs()
-       
-        checkpoint = {
-            'results': {},
-            'tested_combinations': set()
-        }
-        for m in method_names:
-            checkpoint['results'][m] = {}
-
-    return checkpoint
-
-def save_checkpoint(checkpoint):
-
-    with open(checkpoint_path, 'wb') as f:
-        pkl.dump(checkpoint, f)
 
 if __name__ == '__main__':
 
-    n_trials = 10
+    n_trials = 20
     n_repeat = 1
     perception_noise = 0.0
 
-    calc_diffusion_no_contact_cost = False
-    calc_novf = True
+    calc_diffusion_no_contact_cost = True
+    calc_novf = False
 
     method_names = []
     if calc_novf:
@@ -128,12 +105,14 @@ if __name__ == '__main__':
     if calc_diffusion_no_contact_cost:
         method_names.append("diffusion_no_contact_cost")
 
+    results = []
+
     max_screwdriver_tilt = 0.015
     screwdriver_noise_mag = 0.015
     finger_noise_mag = 0.05
 
     regrasp_iters = 40
-    turn_iters = 1
+    turn_iters = 50
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True, config_path=config_path)
 
@@ -169,19 +148,19 @@ if __name__ == '__main__':
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
             )
        
-            # _, turn_pose_diffusion, succ_diffusion, turn_traj_diffusion, turn_plan = do_turn(
-            #     regrasp_pose_diffusion, config, env,
-            #     sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
-            #     use_diffusion=True,
-            #     diffusion_path = diffusion_path,
-            #     perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf',
-            # )
+            _, turn_pose_diffusion, succ_diffusion, turn_traj_diffusion, turn_plan = do_turn(
+                regrasp_pose_diffusion, config, env,
+                sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
+                use_diffusion=True,
+                diffusion_path = diffusion_path,
+                perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf',
+            )
            
-            # result_diffusion = [pregrasp_pose, regrasp_pose_diffusion, regrasp_traj_diffusion, turn_pose_diffusion, turn_traj_diffusion]
-            # checkpoint['results']['diffusion_no_contact_cost'][combo_tuple] = result_diffusion
-            # turn_cost = calculate_turn_cost(regrasp_pose_diffusion.numpy(), turn_pose_diffusion)
-            # print('---------------------------------')
-            # print(f"Diffusion no contact cost: {turn_cost}")
+            result_diffusion = [pregrasp_pose, regrasp_pose_diffusion, regrasp_traj_diffusion, turn_pose_diffusion, turn_traj_diffusion]
+            results.append(result_diffusion)
+            turn_cost = calculate_turn_cost(regrasp_pose_diffusion.numpy(), turn_pose_diffusion)
+            print('---------------------------------')
+            print(f"Diffusion no contact cost: {turn_cost}")
 
         if calc_novf:
 
@@ -192,23 +171,23 @@ if __name__ == '__main__':
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
             )
        
-            # _, turn_pose_novf, succ_novf, turn_traj_novf, turn_plan = do_turn(
-            #     regrasp_pose_novf, config, env,
-            #     sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
-            #     perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf', use_diffusion = False,
-            # )
+            _, turn_pose_novf, succ_novf, turn_traj_novf, turn_plan = do_turn(
+                regrasp_pose_novf, config, env,
+                sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
+                perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf', use_diffusion = False,
+            )
            
-            # result_novf = [pregrasp_pose, regrasp_pose_novf, regrasp_traj_novf, turn_pose_novf, turn_traj_novf]
-            # checkpoint['results']['no_vf'][combo_tuple] = result_novf
+            result_novf = [pregrasp_pose, regrasp_pose_novf, regrasp_traj_novf, turn_pose_novf, turn_traj_novf]
+            results.append(result_novf)
 
             # turn_cost = calculate_turn_cost(regrasp_pose_novf.numpy(), turn_pose_novf)
             # print('---------------------------------')
             # print(f"No VF cost: {turn_cost}")
-            
+        
         # checkpoint['tested_combinations'].add(combo_tuple)
         # save_checkpoint(checkpoint)
-        # savepath = f'{fpath.resolve()}/test/test_method_{test_name}.pkl'
-        # pkl.dump(checkpoint['results'], open(savepath, 'wb'))
+        savepath = f'{fpath.resolve()}/test/see_constraints_results.pkl'
+        pkl.dump(results, open(savepath, 'wb'))
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)
