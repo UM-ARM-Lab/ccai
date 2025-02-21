@@ -318,6 +318,7 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, dif
             env.reset(dof_pos= default_dof_pos)
 
     last_diffused_q = None
+    initial_samples = None
     # diffusion ############################################################################################################
     
     if use_diffusion:
@@ -507,7 +508,7 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, dif
                     torch.zeros(actual_trajectory.shape[0], 1)
                     ), dim=1).numpy()
    
-    return final_state, full_trajectory, all_regrasp_plans
+    return final_state, full_trajectory, all_regrasp_plans, initial_samples
 
 
 def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use_diffusion = False, diffusion_path=None, perception_noise = 0,
@@ -528,7 +529,7 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
     else:
         env.reset(dof_pos = initial_pose)
 
-
+    initial_samples = None
     # diffusion setup ############################################################################################################
 
     if use_diffusion:
@@ -731,7 +732,7 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
                     torch.zeros(actual_trajectory.shape[0], 1)
                     ), dim=1).numpy()
    
-    return final_distance_to_goal.cpu().detach().item(), final_state, full_trajectory, all_turn_plans
+    return final_distance_to_goal.cpu().detach().item(), final_state, full_trajectory, all_turn_plans, initial_samples
 
 def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, 
             use_diffusion = False, diffusion_path = None,
@@ -755,7 +756,7 @@ def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym,
     object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
     params['object_location'] = object_location
 
-    final_distance_to_goal, final_pose, full_trajectory, turn_plan = solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, image_path = image_path,
+    final_distance_to_goal, final_pose, full_trajectory, turn_plan, initial_samples = solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, image_path = image_path,
                                                                      ros_copy_node=ros_copy_node, perception_noise=perception_noise, iters=iters,
                                                                      use_diffusion=use_diffusion, diffusion_path=diffusion_path,
                                                                      mode=mode, model_name=model_name, initial_yaw = initial_yaw, 
@@ -765,7 +766,7 @@ def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym,
     if final_distance_to_goal < 30 / 180 * np.pi:
         succ = True
 
-    return initial_pose, final_pose, succ, full_trajectory, turn_plan
+    return initial_pose, final_pose, succ, full_trajectory, turn_plan, initial_samples
 
 def get_diffusion(params, path = None):
 

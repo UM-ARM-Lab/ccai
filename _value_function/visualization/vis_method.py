@@ -56,7 +56,7 @@ if __name__ == "__main__":
 
             for repeat_index in range(n_repeat):
 
-                pregrasp_pose, regrasp_pose, regrasp_traj, turn_pose, turn_traj = \
+                pregrasp_pose, regrasp_pose, regrasp_traj, turn_pose, turn_traj, *initial_samples = \
                     results[method_name][(pregrasp_index, repeat_index)]
 
                 cost = calculate_turn_cost(regrasp_pose.numpy(), turn_pose)
