@@ -253,8 +253,8 @@ class ConstrainedSteinTrajOpt:
             # Define file paths for each statistic array
             dir = '/home/newuser/Desktop/Honda/ccai/data/test/print'
             # dir = '/home/abhinav/Desktop/Adam/ccai/data/test/print'
-            cost_file = dir + '/cost_stats_diff.npy'
-            constraint_file = dir + '/constraint_stats_diff.npy'
+            cost_file = dir + '/cost_stats_novf.npy'
+            constraint_file = dir + '/constraint_stats_novf.npy'
             # For the average cost array
             if os.path.exists(cost_file):
                 cost_stats = np.load(cost_file)

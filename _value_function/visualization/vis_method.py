@@ -12,7 +12,16 @@ fpath = pathlib.Path(f'{CCAI_PATH}/data')
 import torch
 
 # make sure tests have the same number of trials and repeats
-experiment_names = ['test_method_test_official_high_iter_all'] #['test_method_test_official_all']#
+experiment_names = ['test_method_test_official_high_iter_all', 
+                    "test_method_test_official_high_iter_singlevf",
+                    "test_method_test_official_high_iter_diffusion10k_with_contact",
+                    "test_method_test_official_high_iter_diffusion10k_no_contact_and_combined",
+                    ] 
+
+
+# experiment_names = ['test_method_test_official_all',
+#                     'test_method_test_official_low_iter_diffusion10k_no_contact',]
+
 results = {}
 
 for name in experiment_names:
@@ -21,11 +30,26 @@ for name in experiment_names:
         single_results = pkl.load(file)
     
     for method, method_results in single_results.items():
-        if method not in results:
-            results[method] = method_results
-        else:
-            print(f"Warning: method {method} already exists in combined_results. Exiting.")
-            exit()
+
+        if method == "no_vf":
+            method = "Vanilla"
+        if method == "vf":
+            method = "VF Ensemble"
+        if method == "diffusion":
+            method = "Diffusion"
+        if method == "diffusion_no_contact_cost":
+            method = "Diffusion"
+        if method == "diffusion_w_contact_cost":
+            method = "Diffusion+"
+        if method == 'singlevf':
+            method = "Single VF"
+        if method == "combined":
+            method = "Diffusion+VF"
+
+        if method in results:
+            print(f"Overriding {method}.")
+        
+        results[method] = method_results
 
 if __name__ == "__main__":
     # config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
@@ -95,11 +119,11 @@ if __name__ == "__main__":
             mean_diff = mean_no_vf - mean_vf
             percent_decrease = (mean_diff / mean_no_vf) * 100
 
-            print(f'Average cost difference (no_vf - vf): {mean_diff}')
+            print(f'Average cost difference (no_vf - vf): {mean_diff:.2f}')
             print(f'Percent decrease in cost: {percent_decrease:.2f}%')
 
     for method in data:
-        print(f'{method} mean cost: {np.mean(data[method]["costs"])}')
+        print(f'{method} mean cost: {np.mean(data[method]["costs"]):.2f} +/- {np.std(data[method]["costs"]):.2f}')
 
     colors = ['blue', 'red', 'green', 'purple', 'orange', 'cyan', 'magenta', 'yellow']
     ts = 16
@@ -117,7 +141,7 @@ if __name__ == "__main__":
                 data[method_name]['costs'], 
                 yerr=data[method_name]['stds'], 
                 fmt='o',  # marker shape
-                label=f'Rollout Cost (method name: {method_name.upper()})', 
+                label=f'Rollout Cost (method name: {method_name})', 
                 linestyle='None', 
                 capsize=3,
                 color=colors[method_i]
@@ -142,7 +166,7 @@ if __name__ == "__main__":
         # Create the boxplot; patch_artist=True allows us to color the boxes.
         bp = plt.boxplot(
             boxplot_data, 
-            labels=[method.upper() for method in method_names], 
+            labels=[method for method in method_names], 
             patch_artist=True, 
             showmeans=False, 
             meanprops=dict(marker='D', markeredgecolor='black', markerfacecolor='black', markersize=8),
@@ -159,7 +183,7 @@ if __name__ == "__main__":
         for i, method in enumerate(method_names):
             median_val = np.median(data[method]['costs'])
             plt.text(
-                i + 1 - 0.15, 
+                i + 1, 
                 median_val - 0.02, 
                 f"{median_val:.2f}", 
                 horizontalalignment='center', 
@@ -185,8 +209,8 @@ if __name__ == "__main__":
 
         for method_name, metrics in data.items():
             tilt_threshold = 10
-            tilt_angles = metrics['tilt_angles']
-            yaw_deltas = metrics['yaw_deltas']
+            tilt_angles = [float(angle) for angle in metrics['tilt_angles']]
+            yaw_deltas = [float(yaw) for yaw in metrics['yaw_deltas']]
             
             total_trials = len(tilt_angles)
             # Count dropped trials
@@ -195,21 +219,24 @@ if __name__ == "__main__":
             
             # Filter yaw_deltas for trials that are not dropped 
             valid_yaw_deltas = [yaw for angle, yaw in zip(tilt_angles, yaw_deltas) if angle <= tilt_threshold]
-            if valid_yaw_deltas:
-                avg_yaw_delta = sum(valid_yaw_deltas) / len(valid_yaw_deltas)
-            else:
-                avg_yaw_delta = None  # or use float('nan') if preferred
+            avg_yaw_delta = sum(valid_yaw_deltas) / len(valid_yaw_deltas)
+
+            import statistics
+            std_tilt = statistics.stdev(tilt_angles)
+            std_yaw = statistics.stdev(valid_yaw_deltas)
             
+            # Print the results
             print(f"Method: {method_name}")
             print(f"  Drop Rate: {drop_rate*100:.2f}%")
-            print(f"  Average Yaw Delta (non-dropped): {avg_yaw_delta:.2f}")
+            print(f"  Average Yaw Delta (non-dropped): {avg_yaw_delta:.2f} +- {std_yaw:.2f}")
+            # print(f"  Std Dev Tilt Angles: {std_tilt:.2f}")
 
             boxplot_data.append(valid_yaw_deltas)
     
         # Create the boxplot; patch_artist=True allows us to color the boxes.
         bp = plt.boxplot(
             boxplot_data, 
-            labels=[method.upper() for method in method_names], 
+            labels=[method for method in method_names], 
             patch_artist=True, 
             showmeans=False, 
             meanprops=dict(marker='D', markeredgecolor='black', markerfacecolor='black', markersize=8),
@@ -221,6 +248,19 @@ if __name__ == "__main__":
         for patch, color in zip(bp['boxes'], colors):
             patch.set_facecolor(color)
             patch.set_alpha(0.5)
+
+        # Annotate each box with its median value
+        for i, method in enumerate(method_names):
+            median_val = np.median(boxplot_data[i])
+            plt.text(
+                i + 1, 
+                median_val - 0.02, 
+                f"{median_val:.2f}", 
+                horizontalalignment='center', 
+                verticalalignment='bottom',
+                fontsize=12,
+                color='black'
+            )
 
         # plt.ylim(0, 5.1)
         plt.xlabel('Method', fontsize=ts)

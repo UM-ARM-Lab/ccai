@@ -92,18 +92,19 @@ def get_initializations(env, config, chain, sim_device, n_samples,
 
 if __name__ == '__main__':
 
-    n_trials = 20
+    n_trials = 5
     n_repeat = 1
     perception_noise = 0.0
 
-    calc_diffusion_no_contact_cost = True
-    calc_novf = False
+    method = "no_vf"
 
     method_names = []
-    if calc_novf:
+    if method == "no_vf":
         method_names.append("no_vf")
-    if calc_diffusion_no_contact_cost:
+    elif method == "diffusion":
         method_names.append("diffusion_no_contact_cost")
+    else:
+        exit("Invalid method name.")
 
     results = []
 
@@ -117,7 +118,7 @@ if __name__ == '__main__':
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True, config_path=config_path)
 
     pregrasp_path = fpath /'test'/'initializations'/'test_method_pregrasps.pkl'
-    diffusion_path = 'data/training/allegro_screwdriver/adam_diffusion/allegro_screwdriver_diffusion_4999.pt'
+    diffusion_path = 'data/training/allegro_screwdriver/adam_diffusion/allegro_screwdriver_diffusion_9999.pt'
 
     if pregrasp_path.exists() == False or len(pkl.load(open(pregrasp_path, 'rb'))) != n_trials:
         print("Generating new pregrasp initializations...")
@@ -137,18 +138,18 @@ if __name__ == '__main__':
 
         pregrasp_pose = pregrasps[pregrasp_index]
 
-        if calc_diffusion_no_contact_cost:
+        if method == "diffusion":
 
             env.reset(dof_pos= pregrasp_pose)
            
-            regrasp_pose_diffusion, regrasp_traj_diffusion, regrasp_plan, initial_samples = regrasp(
+            regrasp_pose_diffusion, regrasp_traj_diffusion, regrasp_plan, rg_initial_samples = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
                 use_diffusion=True, use_contact_cost=False,
                 diffusion_path = diffusion_path,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
             )
        
-            _, turn_pose_diffusion, succ_diffusion, turn_traj_diffusion, turn_plan, initial_samples = do_turn(
+            _, turn_pose_diffusion, succ_diffusion, turn_traj_diffusion, turn_plan, t_initial_samples = do_turn(
                 regrasp_pose_diffusion, config, env,
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                 use_diffusion=True,
@@ -156,13 +157,13 @@ if __name__ == '__main__':
                 perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf',
             )
            
-            result_diffusion = [pregrasp_pose, regrasp_pose_diffusion, regrasp_traj_diffusion, turn_pose_diffusion, turn_traj_diffusion, initial_samples]
+            result_diffusion = [pregrasp_pose, regrasp_pose_diffusion, regrasp_traj_diffusion, turn_pose_diffusion, turn_traj_diffusion, rg_initial_samples, t_initial_samples]
             results.append(result_diffusion)
             turn_cost = calculate_turn_cost(regrasp_pose_diffusion.numpy(), turn_pose_diffusion)
             print('---------------------------------')
             print(f"Diffusion no contact cost: {turn_cost}")
 
-        if calc_novf:
+        if method == "no_vf":
 
             env.reset(dof_pos= pregrasp_pose)
            
@@ -186,7 +187,7 @@ if __name__ == '__main__':
         
         # checkpoint['tested_combinations'].add(combo_tuple)
         # save_checkpoint(checkpoint)
-        savepath = f'{fpath.resolve()}/test/see_constraints_results.pkl'
+        savepath = f'{fpath.resolve()}/test/see_constraints_results_{method}.pkl'
         pkl.dump(results, open(savepath, 'wb'))
 
     gym.destroy_viewer(viewer)
