@@ -17,7 +17,7 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 
 class ObjectPoseReader:
-    def __init__(self, obj='valve', mode='relative', device='cpu') -> None:
+    def __init__(self, obj='blue_screwdriver', mode='relative', device='cpu') -> None:
         # rospy.init_node('object_pose_reader')
         self.mode = mode
         self.obj = obj
@@ -134,7 +134,7 @@ class HardwareEnv:
             ori = self.obj_reader.get_state()
             ori = torch.tensor([ori]).float().to(self.device)
             q.append(ori)
-        elif self.obj == 'screwdriver':
+        elif self.obj == 'screwdriver' or self.obj == 'blue_screwdriver':
             pos, ori = self.obj_reader.get_state()
             pos = torch.tensor(pos).float().to(self.device)
             ori = torch.tensor(ori).float().to(self.device)

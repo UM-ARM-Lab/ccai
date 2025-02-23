@@ -36,6 +36,16 @@ warnings.filterwarnings(
     category=FutureWarning
 )
 
+def swap_index_middle(q):
+    # q = q.reshape(-1, 16)
+    # swap the first four vals with the second four vals
+    temp = q[:, :4].clone()
+    q[:, :4] = q[:, 4:8]
+    q[:, 4:8] = temp
+    # index, ring, middle ,thumb
+    # ring, index, middle, thumb
+    return q
+
 def _full_to_partial(traj, mode):
     if mode == 'index':
         traj = torch.cat((traj[..., :-9], traj[..., -6:]), dim=-1)
@@ -311,7 +321,8 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, dif
     if initialization is not None:
         
         if config['mode'] == 'hardware':
-            env.initial_dof_pos = initialization
+            # env.default_dof_pos = swap_index_middle(initialization)
+            env.default_dof_pos = initialization
             env.reset()
         else:
             default_dof_pos = initialization
@@ -524,7 +535,8 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
     action_list = []
 
     if params['mode'] == 'hardware':
-        env.initial_dof_pos = initial_pose
+        # env.default_dof_pos = swap_index_middle(initial_pose)
+        env.default_dof_pos = initial_pose
         env.reset()
     else:
         env.reset(dof_pos = initial_pose)
@@ -687,8 +699,10 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
 
         ####################################################################################################
         if params['mode'] == 'hardware':
+            # need to swap?
             env.step(action)
         else:
+            # need to swap?
             env.step(action, path_override = image_path)
         action_list.append(action)
         turn_problem._preprocess(best_traj.unsqueeze(0))

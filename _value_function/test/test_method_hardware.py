@@ -10,7 +10,7 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 sys.path.append(str(CCAI_PATH))
 from tqdm import tqdm
 from pathlib import Path
-from _value_function.screwdriver_problem import init_env, do_turn, pregrasp, regrasp, emailer, convert_partial_to_full_config
+from _value_function.screwdriver_problem import init_env, do_turn, pregrasp, regrasp, emailer, convert_partial_to_full_config, swap_index_middle
 from _value_function.data_collect.process_final_poses_regrasp import calculate_turn_cost
 import pytorch_kinematics as pk
 from isaac_victor_envs.utils import get_assets_dir
@@ -27,68 +27,6 @@ if len(sys.argv) == 2:
     config_path = f'allegro_screwdriver_adam{sys.argv[1]}.yaml'
 else:
     config_path = 'allegro_screwdriver_adam0.yaml'
-
-def get_initialization(env, sim_device, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag):
-
-    while True:
-
-        index_noise_mag = torch.tensor([finger_noise_mag]*4)
-        index_noise = index_noise_mag * (2 * torch.rand(4) - 1)
-        middle_thumb_noise_mag = torch.tensor([finger_noise_mag]*4)
-        middle_thumb_noise = middle_thumb_noise_mag * (2 * torch.rand(4) - 1)
-        screwdriver_noise = torch.tensor([
-            np.random.normal(0, screwdriver_noise_mag),  
-            np.random.normal(0, screwdriver_noise_mag),  
-            np.random.uniform(0, 2 * np.pi),
-            0.0  
-        ])
-        #fingers=['index', 'middle', 'ring', 'thumb']
-        initialization = torch.cat((
-            torch.tensor([[0., 0.5, 0.7, 0.7]]).float().to(device=sim_device) + index_noise,
-            torch.tensor([[0., 0.5, 0.7, 0.7]]).float().to(device=sim_device) + middle_thumb_noise,
-            torch.tensor([[0., 0.5, 0.65, 0.65]]).float().to(device=sim_device),
-            torch.tensor([[1.3, 0.3, 0.2, 1.1]]).float().to(device=sim_device) + middle_thumb_noise,
-            torch.tensor([[0.0, 0.0, 0.0, 0.0]]).float().to(device=sim_device) + screwdriver_noise
-        ), dim=1).to(sim_device)
-       
-        env.reset(dof_pos= initialization)
-        for _ in range(64):
-            env._step_sim()
-        solved_initialization = env.get_state()['q'].reshape(1,16)[:,0:-1].to(device=sim_device)
-        solved_initialization = convert_partial_to_full_config(solved_initialization)
-
-        sd = solved_initialization[0, -4:-1]
-
-        if abs(sd[0]) < max_screwdriver_tilt and abs(sd[1]) < max_screwdriver_tilt:
-            return solved_initialization
-def get_initializations(env, config, chain, sim_device, n_samples, 
-                        max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, 
-                        save = False, do_pregrasp=False, name = "unnamed"):
-    
-    savepath = f'{fpath.resolve()}/test/initializations/{name}.pkl'
-   
-    initializations = []
-    for _ in range(n_samples):
-        initialization = get_initialization(env, sim_device, max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag)
-        initializations.append(initialization)
-
-    if do_pregrasp == False:
-        if save == True:
-            pkl.dump(initializations, open(savepath, 'wb'))
-        return initializations
-   
-    else:
-        pregrasps = []
-        for init in initializations:
-            pregrasp_pose, _ = pregrasp(
-                    env, config, chain, deterministic=True, perception_noise=0,
-                    image_path=None, initialization=init, mode='no_vf',
-                    iters=80
-                )
-            pregrasps.append(pregrasp_pose)
-        if save == True:
-            pkl.dump(pregrasps, open(savepath, 'wb'))
-        return pregrasps
 
 if __name__ == '__main__':
 
@@ -108,8 +46,6 @@ if __name__ == '__main__':
     other_weight_t = 1.9
     variance_ratio_t = 1.625
 
-    # config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True, config_path=config_path)
-
     pregrasp_path = fpath /'test'/'official_initializations'/'test_method_pregrasps.pkl'
     diffusion_path = 'data/training/allegro_screwdriver/adam_diffusion/allegro_screwdriver_diffusion_4999.pt'
    
@@ -119,6 +55,13 @@ if __name__ == '__main__':
     print("input trial number:")
     trial_number = int(input())
     # trial_number = 0
+
+    savepath = f'{fpath.resolve()}/test/hardware_results/{method}_trial_{trial_number}.pkl'
+    # if pathlib.Path(savepath).exists():
+    #     print(f"Trial {trial_number} already exists. Overwrite? (y/n)")
+    #     overwrite = input()
+    #     if overwrite != 'y':
+    #         exit()
 
     pregrasps = pkl.load(open(pregrasp_path, 'rb'))
     pregrasp_pose = pregrasps[trial_number]
@@ -130,15 +73,25 @@ if __name__ == '__main__':
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{config_path}').read_text())
 
     from hardware.hardware_env import HardwareEnv
-    default_dof_pos = pregrasp_pose[:,:16]
-    env = HardwareEnv(default_dof_pos[:, :16], 
+    pg = pregrasp_pose.clone()[:,:16]
+    swapped = swap_index_middle(pg)
+
+    # swapped = torch.tensor([[ 
+    #     0.0455,  0.5670,  0.7334,  0.6544, 
+    #     # -0.0369,  0.4414,  0.6583,  0.5270,
+    #     # -0.0369,  0.4414,  0.6583,  0.5270,
+    #     0.0455,  0.5670,  0.7334,  0.6544, 
+    #     0.0000,  0.5000,  0.6500,  0.6500,  
+    #     1.3175,  0.3640,  0.1334,  1.0262]])
+    env = HardwareEnv(swapped, 
                         finger_list=config['fingers'], 
-                        kp=config['kp'], 
-                        obj='screwdriver',
+                        kp=config['kp'],
+                        obj='blue_screwdriver', 
+                        # obj='screwdriver',
                         mode='relative',
                         gradual_control=True,
                         num_repeat=10)
-    env.initial_dof_pos = default_dof_pos
+    env.default_dof_pos = swapped
     env.reset()
 
     env.get_state()
@@ -176,7 +129,7 @@ if __name__ == '__main__':
     
     sim, gym, viewer = sim_env.get_sim()
     assert (np.array(sim_env.robot_p) == robot_p).all()
-    assert (sim_env.initial_dof_pos[:, :16] == default_dof_pos.to(config['sim_device'])).all()
+    # assert (sim_env.initial_dof_pos[:, :16] == default_dof_pos.to(config['sim_device'])).all()
     env.world_trans = sim_env.world_trans
     env.joint_stiffness = sim_env.joint_stiffness
     env.device = sim_env.device
@@ -204,8 +157,8 @@ if __name__ == '__main__':
     print(f"Testing {method} trial {trial_number} ...")
 
     if method == 'vf':
-        env.initial_dof_pos = pregrasp_pose
-        env.reset()
+        # env.default_dof_pos = pregrasp_pose
+        # env.reset()
     
         regrasp_pose_vf, regrasp_traj_vf, regrasp_plan, initial_samples = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
@@ -232,8 +185,8 @@ if __name__ == '__main__':
 
     elif method == 'diffusion_no_contact_cost':
 
-        env.initial_dof_pos = pregrasp_pose
-        env.reset()
+        # env.default_dof_pos = pregrasp_pose
+        # env.reset()
         
         regrasp_pose_diffusion, regrasp_traj_diffusion, regrasp_plan, initial_samples = regrasp(
             env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
@@ -260,8 +213,8 @@ if __name__ == '__main__':
 
     elif method == 'diffusion_w_contact_cost':
 
-        env.initial_dof_pos = pregrasp_pose
-        env.reset()
+        # env.default_dof_pos = pregrasp_pose
+        # env.reset()
         
         regrasp_pose_diffusion_wc, regrasp_traj_diffusion_wc, regrasp_plan, initial_samples = regrasp(
             env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
@@ -288,8 +241,8 @@ if __name__ == '__main__':
 
     elif method == 'combined':
 
-        env.initial_dof_pos = pregrasp_pose
-        env.reset()
+        # env.default_dof_pos = pregrasp_pose
+        # env.reset()
         
         regrasp_pose_combined, regrasp_traj_combined, regrasp_plan, initial_samples = regrasp(
             env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
@@ -315,8 +268,8 @@ if __name__ == '__main__':
         print('---------------------------------')
 
     elif method == 'novf':
-        env.initial_dof_pos = pregrasp_pose
-        env.reset()
+        # env.default_dof_pos = pregrasp_pose
+        # env.reset()
         
         regrasp_pose_novf, regrasp_traj_novf, regrasp_plan, initial_samples = regrasp(
             env, config, chain, state2ee_pos_partial, perception_noise=perception_noise, use_diffusion = False,
@@ -338,7 +291,6 @@ if __name__ == '__main__':
         print(f"No VF cost: {turn_cost}")
         print('---------------------------------')
 
-savepath = f'{fpath.resolve()}/test/hardware_results/{method}_trial_{trial_number}.pkl'
 pkl.dump(result, open(savepath, 'wb'))
 
 gym.destroy_viewer(viewer)
