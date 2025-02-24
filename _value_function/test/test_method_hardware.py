@@ -10,7 +10,8 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[2]
 sys.path.append(str(CCAI_PATH))
 from tqdm import tqdm
 from pathlib import Path
-from _value_function.screwdriver_problem import init_env, do_turn, pregrasp, regrasp, emailer, convert_partial_to_full_config, swap_index_middle
+from _value_function.screwdriver_problem import init_env, do_turn, pregrasp, regrasp, emailer, convert_partial_to_full_config#, swap_index_middle
+from _value_function.test.test_method import get_initialization
 from _value_function.data_collect.process_final_poses_regrasp import calculate_turn_cost
 import pytorch_kinematics as pk
 from isaac_victor_envs.utils import get_assets_dir
@@ -46,7 +47,7 @@ if __name__ == '__main__':
     other_weight_t = 1.9
     variance_ratio_t = 1.625
 
-    pregrasp_path = fpath /'test'/'official_initializations'/'test_method_pregrasps.pkl'
+    pregrasp_path = fpath /'test'/'official_initializations'/'test_method_pregrasps_hardware.pkl'
     diffusion_path = 'data/training/allegro_screwdriver/adam_diffusion/allegro_screwdriver_diffusion_4999.pt'
    
     print("input method:")
@@ -57,11 +58,11 @@ if __name__ == '__main__':
     # trial_number = 0
 
     savepath = f'{fpath.resolve()}/test/hardware_results/{method}_trial_{trial_number}.pkl'
-    # if pathlib.Path(savepath).exists():
-    #     print(f"Trial {trial_number} already exists. Overwrite? (y/n)")
-    #     overwrite = input()
-    #     if overwrite != 'y':
-    #         exit()
+    if pathlib.Path(savepath).exists():
+        print(f"Trial {trial_number} already exists. Overwrite? (y/n)")
+        overwrite = input()
+        if overwrite != 'y':
+            exit()
 
     pregrasps = pkl.load(open(pregrasp_path, 'rb'))
     pregrasp_pose = pregrasps[trial_number]
@@ -74,16 +75,8 @@ if __name__ == '__main__':
 
     from hardware.hardware_env import HardwareEnv
     pg = pregrasp_pose.clone()[:,:16]
-    swapped = swap_index_middle(pg)
 
-    # swapped = torch.tensor([[ 
-    #     0.0455,  0.5670,  0.7334,  0.6544, 
-    #     # -0.0369,  0.4414,  0.6583,  0.5270,
-    #     # -0.0369,  0.4414,  0.6583,  0.5270,
-    #     0.0455,  0.5670,  0.7334,  0.6544, 
-    #     0.0000,  0.5000,  0.6500,  0.6500,  
-    #     1.3175,  0.3640,  0.1334,  1.0262]])
-    env = HardwareEnv(swapped, 
+    env = HardwareEnv(pg, 
                         finger_list=config['fingers'], 
                         kp=config['kp'],
                         obj='blue_screwdriver', 
@@ -91,9 +84,8 @@ if __name__ == '__main__':
                         mode='relative',
                         gradual_control=True,
                         num_repeat=10)
-    env.default_dof_pos = swapped
+    env.default_dof_pos = pg
     env.reset()
-
     env.get_state()
     for _ in range(5):
         root_coor, root_ori = env.obj_reader.get_state_world_frame_pos()
@@ -157,8 +149,8 @@ if __name__ == '__main__':
     print(f"Testing {method} trial {trial_number} ...")
 
     if method == 'vf':
-        # env.default_dof_pos = pregrasp_pose
-        # env.reset()
+        env.default_dof_pos = pregrasp_pose[:, :16]
+        env.reset()
     
         regrasp_pose_vf, regrasp_traj_vf, regrasp_plan, initial_samples = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
@@ -183,10 +175,37 @@ if __name__ == '__main__':
         print(f"VF cost: {turn_cost}")
         print('---------------------------------')
 
+    elif method == 'vf_low':
+        env.default_dof_pos = pregrasp_pose[:, :16]
+        env.reset()
+    
+        regrasp_pose_vf, regrasp_traj_vf, regrasp_plan, initial_samples = regrasp(
+                env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
+                image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=40, model_name = "ensemble_rg",
+                vf_weight=vf_weight_rg, other_weight=other_weight_rg, variance_ratio=variance_ratio_rg,
+                sim_viz_env=sim_env
+        )
+    
+        _, turn_pose_vf, succ_vf, turn_traj_vf, turn_plan, initial_samples = do_turn(
+            regrasp_pose_vf, config, env,
+            sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
+            perception_noise=perception_noise, image_path=img_save_dir, iters=50,mode='vf',
+            model_name="ensemble_t", initial_yaw = regrasp_pose_vf[0, -2],
+            vf_weight=vf_weight_t, other_weight=other_weight_t, variance_ratio=variance_ratio_t,
+            sim_viz_env=sim_env
+        )
+
+        # Store the VF approach result
+        result = [pregrasp_pose, regrasp_pose_vf, regrasp_traj_vf, turn_pose_vf, turn_traj_vf]
+        turn_cost = calculate_turn_cost(regrasp_pose_vf.numpy(), turn_pose_vf)
+        print('---------------------------------')
+        print(f"VF low iter cost: {turn_cost}")
+        print('---------------------------------')
+
     elif method == 'diffusion_no_contact_cost':
 
-        # env.default_dof_pos = pregrasp_pose
-        # env.reset()
+        env.default_dof_pos = pregrasp_pose[:, :16]
+        env.reset()
         
         regrasp_pose_diffusion, regrasp_traj_diffusion, regrasp_plan, initial_samples = regrasp(
             env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
@@ -213,8 +232,8 @@ if __name__ == '__main__':
 
     elif method == 'diffusion_w_contact_cost':
 
-        # env.default_dof_pos = pregrasp_pose
-        # env.reset()
+        env.default_dof_pos = pregrasp_pose[:, :16]
+        env.reset()
         
         regrasp_pose_diffusion_wc, regrasp_traj_diffusion_wc, regrasp_plan, initial_samples = regrasp(
             env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
@@ -241,8 +260,8 @@ if __name__ == '__main__':
 
     elif method == 'combined':
 
-        # env.default_dof_pos = pregrasp_pose
-        # env.reset()
+        env.default_dof_pos = pregrasp_pose[:, :16]
+        env.reset()
         
         regrasp_pose_combined, regrasp_traj_combined, regrasp_plan, initial_samples = regrasp(
             env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
@@ -268,8 +287,8 @@ if __name__ == '__main__':
         print('---------------------------------')
 
     elif method == 'novf':
-        # env.default_dof_pos = pregrasp_pose
-        # env.reset()
+        env.default_dof_pos = pregrasp_pose[:, :16]
+        env.reset()
         
         regrasp_pose_novf, regrasp_traj_novf, regrasp_plan, initial_samples = regrasp(
             env, config, chain, state2ee_pos_partial, perception_noise=perception_noise, use_diffusion = False,

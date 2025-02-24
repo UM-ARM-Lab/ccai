@@ -160,11 +160,11 @@ if __name__ == '__main__':
 
     pregrasp_path = fpath /'test'/'official_initializations'/'test_method_pregrasps.pkl'
 
-    # print("Generating new pregrasp initializations...")
-    # get_official_initializations(env, config, chain, config['sim_device'], n_trials,
-    #                     max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save=True,
-    #                     do_pregrasp=True, name='test_method_pregrasps')
-    # exit()
+    print("Generating new pregrasp initializations...")
+    get_official_initializations(env, config, chain, config['sim_device'], n_trials,
+                        max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save=True,
+                        do_pregrasp=True, name='test_method_pregrasps')
+    exit()
    
     pregrasps = pkl.load(open(pregrasp_path, 'rb'))
    

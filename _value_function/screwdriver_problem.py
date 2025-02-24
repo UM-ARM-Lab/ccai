@@ -36,15 +36,16 @@ warnings.filterwarnings(
     category=FutureWarning
 )
 
-def swap_index_middle(q):
-    # q = q.reshape(-1, 16)
-    # swap the first four vals with the second four vals
-    temp = q[:, :4].clone()
-    q[:, :4] = q[:, 4:8]
-    q[:, 4:8] = temp
-    # index, ring, middle ,thumb
-    # ring, index, middle, thumb
-    return q
+# def swap_index_middle(q):
+#     # q = q.reshape(-1, 16)
+#     # swap the first four vals with the second four vals
+#     qnew = q.clone()
+#     temp = qnew.clone()[:, :4]
+#     qnew[:, :4] = qnew[:, 4:8]
+#     qnew[:, 4:8] = temp
+#     # index, ring, middle ,thumb
+#     # ring, index, middle, thumb
+#     return qnew
 
 def _full_to_partial(traj, mode):
     if mode == 'index':
@@ -321,8 +322,7 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, dif
     if initialization is not None:
         
         if config['mode'] == 'hardware':
-            # env.default_dof_pos = swap_index_middle(initialization)
-            env.default_dof_pos = initialization
+            env.default_dof_pos = initialization[:,:16]
             env.reset()
         else:
             default_dof_pos = initialization
@@ -382,7 +382,19 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, dif
     # print("initial yaw: ", initial_yaw)
     #print("start screwdriver: ", screwdriver)
     # screwdriver = torch.cat((screwdriver, torch.tensor([0]).to(device=device)),dim=0).reshape(1,4)
-
+    if config['mode'] == 'hardware':
+        ddp = env.default_dof_pos[:, :16]
+        min_force_dict = {
+            'thumb': 0.0,
+            'middle': 0.0,
+            'index': 0.0,
+        }
+        # min_force_dict = None
+        
+    else:
+        ddp = env.initial_dof_pos[:, :16]
+        min_force_dict = None
+    
     regrasp_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
             goal=torch.tensor([0., 0., initial_yaw]).to(device=device),
@@ -398,9 +410,9 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, dif
             obj_dof=obj_dof,
             obj_joint_dim=1,
             optimize_force=params['optimize_force'],
-            default_dof_pos=env.initial_dof_pos[:, :16],
+            default_dof_pos= ddp, #env.initial_dof_pos[:, :16],
             obj_gravity=params.get('obj_gravity', False),
-            min_force_dict=None,
+            min_force_dict=min_force_dict,
             model_name=model_name,
             mode = mode,
             vf_weight=vf_weight,
@@ -535,8 +547,7 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
     action_list = []
 
     if params['mode'] == 'hardware':
-        # env.default_dof_pos = swap_index_middle(initial_pose)
-        env.default_dof_pos = initial_pose
+        env.default_dof_pos = initial_pose[:,:16]
         env.reset()
     else:
         env.reset(dof_pos = initial_pose)
@@ -585,7 +596,19 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
     ############################################################################################################
 
     start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
-    min_force_dict = None
+
+    if params['mode'] == 'hardware':
+        ddp = env.default_dof_pos[:, :16]
+        min_force_dict = {
+            'thumb': 0.0,
+            'middle': 0.0,
+            'index': 0.0,
+        }
+        # min_force_dict = None
+    else:
+        ddp = env.initial_dof_pos[:, :16]
+        min_force_dict = None
+
     turn_problem = AllegroScrewdriver(
             start=start[:4 * num_fingers + obj_dof],
             goal=screwdriver_goal.to(device=params['device']),
@@ -601,7 +624,7 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
             obj_dof=obj_dof,
             obj_joint_dim=1,
             optimize_force=params['optimize_force'],
-            default_dof_pos=env.initial_dof_pos[:, :16],
+            default_dof_pos= ddp, #env.initial_dof_pos[:, :16],
             turn=True,
             obj_gravity=params.get('obj_gravity', False),
             min_force_dict=min_force_dict,
@@ -699,10 +722,8 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
 
         ####################################################################################################
         if params['mode'] == 'hardware':
-            # need to swap?
             env.step(action)
         else:
-            # need to swap?
             env.step(action, path_override = image_path)
         action_list.append(action)
         turn_problem._preprocess(best_traj.unsqueeze(0))

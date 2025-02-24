@@ -14,7 +14,7 @@ from _value_function.screwdriver_problem import init_env, do_turn, pregrasp, reg
 from _value_function.data_collect.process_final_poses_regrasp import calculate_turn_cost
 import pytorch_kinematics as pk
 from isaac_victor_envs.utils import get_assets_dir
-
+from _value_function.test.test_method import get_initializations
 from ccai.utils.allegro_utils import state2ee_pos
 from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
 
@@ -30,23 +30,66 @@ else:
 
 if __name__ == '__main__':
 
+    # max_screwdriver_tilt = 0.015
+    # screwdriver_noise_mag = 0.015
+    # finger_noise_mag = 0.0
+    # config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True, config_path=config_path)
+    # pregrasp_pose = get_initializations(env, config, chain, config['sim_device'], 1,
+    #                         max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save=False,
+    #                         do_pregrasp=True, name='x')[0]
+    
+    # gym.destroy_viewer(viewer)
+    # gym.destroy_sim(sim)
+    # del config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial
+
+
     pregrasp_path = fpath /'test'/'official_initializations'/'test_method_pregrasps.pkl'
 
     pregrasps = pkl.load(open(pregrasp_path, 'rb'))
-    pregrasp_pose = pregrasps[0]
+    pregrasp_pose = pregrasps[30]
+
+    # pregrasp_pose = torch.cat((
+    #         torch.tensor([[0., 0.5, 0.7, 0.7]]).float(),
+    #         torch.tensor([[0., 0.5, 0.7, 0.7]]).float(),
+    #         torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
+    #         torch.tensor([[1.3, 0.3, 0.2, 1.1]]).float(),
+    #         torch.tensor([[0.0, 0.0, 0.0, 0.0]]).float()
+    #     ), dim=1)
+    
+
 
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{config_path}').read_text())
 
     from hardware.hardware_env import HardwareEnv
     pg = pregrasp_pose.clone()[:,:16]
-    swapped = swap_index_middle(pg)
+    # swapped = swap_index_middle(pg)
 
-    # swapped = torch.tensor([[ 
-    #     0.0455,  0.5670,  0.7334,  0.6544,  # middle
-    #     -0.0369,  0.4414,  0.6583,  0.5270, # index
-    #     0.0369,  0.4414,  0.6583,  0.5270, # ring  
-    #     1.3175,  0.3640,  0.1334,  1.0262]]) # thumb
-    env = HardwareEnv(swapped, 
+    hardcode = torch.tensor([[ 
+        1.0,  .0,  .0,  .0,  # middle  # index0123
+        .0,  1.0,  .0,  .0, # index  # middle_0123
+        .0,  .0,  .0,  .0,  # ring    #nothing
+        .0,  .0,  .0,  .0,  # thumb # thumb0123
+        ]])
+
+    hardcode = pg
+    
+    # hardcode = torch.tensor([[-0.036893922835588455, 0.4413647949695587, 0.6582543253898621, 
+    #        0.5270181894302368, 0.04545709490776062, 0.567008912563324, 
+    #        0.7333610653877258, 0.6544234752655029, 0.0, 0.5, 
+    #        0.6499999761581421, 0.6499999761581421, 1.3175060749053955, 
+    #        0.36398831009864807, 0.13335226476192474, 1.026167869567871]])
+
+    #home
+    # hardcode = torch.tensor([[0.1000003848222671, 0.6000005636043506, 0.6000005636043506, 0.6000005636043506, -0.1000003848222671, 0.5000001787820835, 0.8999999727418999, 0.8999999727418999, 0.0, 0.5000001787820835, 0.6500007560154842, 0.6500007560154842, 1.1999993818794494, 0.29999940913754936, 0.29999940913754936, 1.1999993818794494]])
+
+    # default
+    # hardcode = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
+    #                             torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float(),
+    #                             torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
+    #                             torch.tensor([[1.2, 0.3, 0.3, 1.2]]).float()),
+    #                             dim=1)
+    
+    env = HardwareEnv(hardcode, 
                         finger_list=config['fingers'], 
                         kp=config['kp'],
                         obj='blue_screwdriver', 
@@ -54,7 +97,7 @@ if __name__ == '__main__':
                         mode='relative',
                         gradual_control=True,
                         num_repeat=10)
-    env.default_dof_pos = swapped
+    env.default_dof_pos = hardcode
     env.reset()
 
     env.get_state()
@@ -80,9 +123,10 @@ if __name__ == '__main__':
                                 gravity=False
                                 )
     
-    sim_env.reset(dof_pos= pregrasp_pose)
-
+    full = torch.cat([hardcode, torch.zeros(1, 4)], dim=1)
+    sim_env.reset(dof_pos= full)
+    
     while True:
-        pass
+        sim_env.reset(dof_pos= full)
     
     

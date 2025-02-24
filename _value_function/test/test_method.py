@@ -48,6 +48,9 @@ def get_initialization(env, sim_device, max_screwdriver_tilt, screwdriver_noise_
             torch.tensor([[1.3, 0.3, 0.2, 1.1]]).float().to(device=sim_device) + middle_thumb_noise,
             torch.tensor([[0.0, 0.0, 0.0, 0.0]]).float().to(device=sim_device) + screwdriver_noise
         ), dim=1).to(sim_device)
+
+
+
        
         env.reset(dof_pos= initialization)
         for _ in range(64):
