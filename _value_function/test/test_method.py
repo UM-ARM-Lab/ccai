@@ -16,6 +16,7 @@ import torch
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 from itertools import product
 import warnings
+import time
 warnings.filterwarnings(
     "ignore",
     message="You are using `torch.load` with `weights_only=False`",
@@ -118,20 +119,24 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'compare_epochs'
+    test_name = 'get_timesLI'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
     n_trials = 20
     n_repeat = 1
     perception_noise = 0.0
+    test_time = True
+    vf_times = []
+    no_vf_times = []
+    diffusion_times = []
 
-    calc_vf = False
-    calc_diffusion_no_contact_cost = True
-    calc_diffusion2 = True
+    calc_vf = True
+    calc_diffusion_no_contact_cost = False
+    calc_diffusion2 = False
     calc_diffusion_w_contact_cost = False
-    calc_novf = False
-    calc_combined = True
+    calc_novf = True
+    calc_combined = False
 
     method_names = []
     if calc_vf:
@@ -165,7 +170,7 @@ if __name__ == '__main__':
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True, config_path=config_path)
 
     pregrasp_path = fpath /'test'/'initializations'/'test_method_pregrasps.pkl'
-    diffusion_path = 'data/training/allegro_screwdriver/adam_diffusion/allegro_screwdriver_diffusion_4999.pt'
+    diffusion_path = 'data/training/allegro_screwdriver/adam_diffusion/allegro_screwdriver_diffusion_9999.pt'
     diffusion_path2 = 'data/training/allegro_screwdriver/adam_diffusion/allegro_screwdriver_diffusion_9999.pt'
 
     if pregrasp_path.exists() == False or len(pkl.load(open(pregrasp_path, 'rb'))) != n_trials:
@@ -198,6 +203,9 @@ if __name__ == '__main__':
         pregrasp_pose = pregrasps[pregrasp_index]
 
         if calc_vf:
+            if test_time:
+                t0 = time.time()
+
             env.reset(dof_pos= pregrasp_pose)
         
             regrasp_pose_vf, regrasp_traj_vf, regrasp_plan, rg_initial_samples = regrasp(
@@ -214,6 +222,11 @@ if __name__ == '__main__':
                 vf_weight=vf_weight_t, other_weight=other_weight_t, variance_ratio=variance_ratio_t
             )
 
+            if test_time:
+                tf = time.time()
+                print(f"VF time: {tf - t0}")
+                vf_times.append(tf - t0)
+
             # Store the VF approach result
             result_vf = [pregrasp_pose, regrasp_pose_vf, regrasp_traj_vf, turn_pose_vf, turn_traj_vf]
             checkpoint['results']['vf'][combo_tuple] = result_vf
@@ -223,6 +236,9 @@ if __name__ == '__main__':
             print(f"VF cost: {turn_cost}")
 
         if calc_diffusion_no_contact_cost:
+
+            if test_time:
+                t0 = time.time()
 
             env.reset(dof_pos= pregrasp_pose)
            
@@ -240,8 +256,13 @@ if __name__ == '__main__':
                 diffusion_path = diffusion_path,
                 perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf',
             )
+
+            if test_time:
+                tf = time.time()
+                print(f"Diffusion no contact cost time: {tf - t0}")
+                diffusion_times.append(tf - t0)
            
-            result_diffusion = [pregrasp_pose, regrasp_pose_diffusion, regrasp_traj_diffusion, turn_pose_diffusion, turn_traj_diffusion, initial_samples]
+            result_diffusion = [pregrasp_pose, regrasp_pose_diffusion, regrasp_traj_diffusion, turn_pose_diffusion, turn_traj_diffusion, rg_initial_samples]
             checkpoint['results']['diffusion_no_contact_cost'][combo_tuple] = result_diffusion
             turn_cost = calculate_turn_cost(regrasp_pose_diffusion.numpy(), turn_pose_diffusion)
             print('---------------------------------')
@@ -266,7 +287,7 @@ if __name__ == '__main__':
                 perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf',
             )
            
-            result_diffusion2 = [pregrasp_pose, regrasp_pose_diffusion2, regrasp_traj_diffusion2, turn_pose_diffusion2, turn_traj_diffusion2, initial_samples]
+            result_diffusion2 = [pregrasp_pose, regrasp_pose_diffusion2, regrasp_traj_diffusion2, turn_pose_diffusion2, turn_traj_diffusion2, rg_initial_samples]
             checkpoint['results']['diffusion2'][combo_tuple] = result_diffusion2
             turn_cost = calculate_turn_cost(regrasp_pose_diffusion2.numpy(), turn_pose_diffusion2)
             print('---------------------------------')
@@ -291,7 +312,7 @@ if __name__ == '__main__':
                 perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf',
             )
            
-            result_diffusion_wc = [pregrasp_pose, regrasp_pose_diffusion_wc, regrasp_traj_diffusion_wc, turn_pose_diffusion_wc, turn_traj_diffusion_wc, initial_samples]
+            result_diffusion_wc = [pregrasp_pose, regrasp_pose_diffusion_wc, regrasp_traj_diffusion_wc, turn_pose_diffusion_wc, turn_traj_diffusion_wc, rg_initial_samples]
             checkpoint['results']['diffusion_w_contact_cost'][combo_tuple] = result_diffusion_wc
             turn_cost = calculate_turn_cost(regrasp_pose_diffusion_wc.numpy(), turn_pose_diffusion_wc)
             print('---------------------------------')
@@ -317,13 +338,16 @@ if __name__ == '__main__':
                 perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='vf',
             )
            
-            result_combined = [pregrasp_pose, regrasp_pose_combined, regrasp_traj_combined, turn_pose_combined, turn_traj_combined, initial_samples]
+            result_combined = [pregrasp_pose, regrasp_pose_combined, regrasp_traj_combined, turn_pose_combined, turn_traj_combined, rg_initial_samples]
             checkpoint['results']['combined'][combo_tuple] = result_combined
             turn_cost = calculate_turn_cost(regrasp_pose_combined.numpy(), turn_pose_combined)
             print('---------------------------------')
             print(f"Combined method cost: {turn_cost}")
 
         if calc_novf:
+            
+            if test_time:
+                t0 = time.time()
 
             env.reset(dof_pos= pregrasp_pose)
            
@@ -337,6 +361,11 @@ if __name__ == '__main__':
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                 perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf', use_diffusion = False,
             )
+
+            if test_time:
+                tf = time.time()
+                print(f"No VF time: {tf - t0}")
+                no_vf_times.append(tf - t0)
            
             result_novf = [pregrasp_pose, regrasp_pose_novf, regrasp_traj_novf, turn_pose_novf, turn_traj_novf]
             checkpoint['results']['no_vf'][combo_tuple] = result_novf
@@ -344,7 +373,11 @@ if __name__ == '__main__':
             turn_cost = calculate_turn_cost(regrasp_pose_novf.numpy(), turn_pose_novf)
             print('---------------------------------')
             print(f"No VF cost: {turn_cost}")
-            
+        
+        if test_time:
+            print(f"Mean VF time: {np.mean(vf_times)}")
+            print(f"Mean No VF time: {np.mean(no_vf_times)}")
+
         checkpoint['tested_combinations'].add(combo_tuple)
         save_checkpoint(checkpoint)
         savepath = f'{fpath.resolve()}/test/test_method_{test_name}.pkl'

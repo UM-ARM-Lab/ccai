@@ -111,7 +111,7 @@ def save_checkpoint(checkpoint):
 if __name__ == '__main__':
 
     # test_name = 'test_official_high_iter_diffusion10k_no_contact_and_combined'
-    test_name = 'test_official_low_iter_diffusion10k_no_contact'
+    test_name = 'test_official_low_iter_novfrepeat'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -119,10 +119,10 @@ if __name__ == '__main__':
     n_repeat = 1
     perception_noise = 0.0
 
-    calc_vf = False
-    calc_diffusion_no_contact_cost = True
+    calc_vf = True
+    calc_diffusion_no_contact_cost = False
     calc_diffusion_w_contact_cost = False
-    calc_novf = False
+    calc_novf = True
     calc_combined = False
     calc_singlevf = False
 
@@ -147,6 +147,7 @@ if __name__ == '__main__':
 
     regrasp_iters = 40
     turn_iters = 50
+    online_iters = 12
 
     vf_weight_rg = 5.0
     other_weight_rg = 1.9
@@ -160,11 +161,11 @@ if __name__ == '__main__':
 
     pregrasp_path = fpath /'test'/'official_initializations'/'test_method_pregrasps.pkl'
 
-    print("Generating new pregrasp initializations...")
-    get_official_initializations(env, config, chain, config['sim_device'], n_trials,
-                        max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save=True,
-                        do_pregrasp=True, name='test_method_pregrasps')
-    exit()
+    # print("Generating new pregrasp initializations...")
+    # get_official_initializations(env, config, chain, config['sim_device'], n_trials,
+    #                     max_screwdriver_tilt, screwdriver_noise_mag, finger_noise_mag, save=True,
+    #                     do_pregrasp=True, name='test_method_pregrasps')
+    # exit()
    
     pregrasps = pkl.load(open(pregrasp_path, 'rb'))
    
@@ -195,6 +196,7 @@ if __name__ == '__main__':
             regrasp_pose_vf, regrasp_traj_vf, regrasp_plan, rg_initial_samples = regrasp(
                     env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
                     image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters, model_name = "ensemble_rg",
+                    online_iters=online_iters,
                     vf_weight=vf_weight_rg, other_weight=other_weight_rg, variance_ratio=variance_ratio_rg
             )
         
@@ -202,6 +204,7 @@ if __name__ == '__main__':
                 regrasp_pose_vf, config, env,
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                 perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='vf',
+                online_iters=online_iters,
                 model_name="ensemble_t", initial_yaw = regrasp_pose_vf[0, -2],
                 vf_weight=vf_weight_t, other_weight=other_weight_t, variance_ratio=variance_ratio_t
             )
@@ -220,12 +223,14 @@ if __name__ == '__main__':
             regrasp_pose_singlevf, regrasp_traj_singlevf, regrasp_plan, rg_initial_samples = regrasp(
                     env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
                     image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters, model_name = "ensemble_rg_single",
+                    online_iters=online_iters,
                     vf_weight=vf_weight_rg, other_weight=other_weight_rg, variance_ratio=variance_ratio_rg
             )
         
             _, turn_pose_singlevf, succ_singlevf, turn_traj_singlevf, turn_plan, t_initial_samples = do_turn(
                 regrasp_pose_singlevf, config, env,
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
+                online_iters=online_iters,
                 perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='vf',
                 model_name="ensemble_t_single", initial_yaw = regrasp_pose_singlevf[0, -2],
                 vf_weight=vf_weight_t, other_weight=other_weight_t, variance_ratio=variance_ratio_t
@@ -247,6 +252,7 @@ if __name__ == '__main__':
                 env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
                 use_diffusion=True, use_contact_cost=False,
                 diffusion_path = diffusion_path,
+                online_iters=online_iters,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
             )
        
@@ -254,6 +260,7 @@ if __name__ == '__main__':
                 regrasp_pose_diffusion, config, env,
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                 use_diffusion=True,
+                online_iters=online_iters,
                 diffusion_path = diffusion_path,
                 perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf',
             )
@@ -296,6 +303,7 @@ if __name__ == '__main__':
             regrasp_pose_combined, regrasp_traj_combined, regrasp_plan, rg_initial_samples = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
                 use_diffusion=True, use_contact_cost=False,
+                online_iters=online_iters,
                 diffusion_path = diffusion_path,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters,
             )
@@ -304,6 +312,7 @@ if __name__ == '__main__':
                 regrasp_pose_combined, config, env,
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                 use_diffusion=True, 
+                online_iters=online_iters,
                 diffusion_path = diffusion_path,
                 initial_yaw = regrasp_pose_combined[0, -2],
                 perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='vf',
@@ -321,12 +330,14 @@ if __name__ == '__main__':
            
             regrasp_pose_novf, regrasp_traj_novf, regrasp_plan, rg_initial_samples = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=perception_noise, use_diffusion = False,
+                online_iters=online_iters,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
             )
        
             _, turn_pose_novf, succ_novf, turn_traj_novf, turn_plan, t_initial_samples = do_turn(
                 regrasp_pose_novf, config, env,
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
+                online_iters=online_iters,
                 perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf', use_diffusion = False,
             )
            

@@ -300,7 +300,9 @@ def pregrasp(env, config, chain, deterministic=True, initialization=None, percep
     return end_state_full.cpu(), action.cpu()
 
 def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, diffusion_path = None, perception_noise = 0, initialization = None,
-             model_name = 'ensemble_rg', mode='no_vf', use_contact_cost = False, vf_weight = 0, other_weight = 10, variance_ratio = 1,
+             model_name = 'ensemble_rg', mode='no_vf', 
+             online_iters = 25,
+             use_contact_cost = False, vf_weight = 0, other_weight = 10, variance_ratio = 1,
             image_path = None, vis_plan = False, iters = 200, sim_viz_env = None):
    
     params = config.copy()
@@ -424,6 +426,7 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, dif
    
     regrasp_planner = PositionControlConstrainedSVGDMPC(regrasp_problem, params)
     regrasp_planner.warmup_iters = iters
+    regrasp_planner.online_iters = online_iters
 
     if params['visualize_plan'] and use_diffusion:
         fname = 'diffusion'
@@ -504,10 +507,14 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, dif
                 print(state[:15][-3:])
 
         ####################################################################################################
+
+        actiont0 = time.time()
         if config['mode'] == 'hardware':
             env.step(action)
         else:
             env.step(action, path_override = image_path)
+        actiont1 = time.time()
+        # print(f"Action time: {actiont1 - actiont0}")
         regrasp_problem._preprocess(best_traj.unsqueeze(0))
 
     state = env.get_state()
@@ -535,7 +542,7 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, dif
 
 
 def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use_diffusion = False, diffusion_path=None, perception_noise = 0,
-               image_path = None, ros_copy_node=None, model_name = "ensemble_t", iters = 200,
+               image_path = None, ros_copy_node=None, model_name = "ensemble_t", iters = 200, online_iters = 25,
                mode='vf', initial_yaw = None, vf_weight = 100.0, other_weight = 0.1, variance_ratio = 5, sim_viz_env=None):
 
     obj_dof = 3
@@ -637,6 +644,7 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
         )
     turn_planner = PositionControlConstrainedSVGDMPC(turn_problem, params)
     turn_planner.warmup_iters = iters
+    turn_planner.online_iters = online_iters
 
     if params['visualize_plan'] and use_diffusion:
         fname = 'diffusion'
@@ -771,7 +779,7 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
 
 def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, 
             use_diffusion = False, diffusion_path = None,
-            image_path = None,
+            image_path = None, online_iters = 25,
             iters = 200, perception_noise = 0, turn_angle = np.pi/2, model_name = "ensemble_t", mode='no_vf', initial_yaw = None,
             vf_weight = 0.0, other_weight = 10.0, variance_ratio = 0.0, sim_viz_env=None):
 
@@ -792,7 +800,7 @@ def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym,
     params['object_location'] = object_location
 
     final_distance_to_goal, final_pose, full_trajectory, turn_plan, initial_samples = solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, image_path = image_path,
-                                                                     ros_copy_node=ros_copy_node, perception_noise=perception_noise, iters=iters,
+                                                                     ros_copy_node=ros_copy_node, perception_noise=perception_noise, iters=iters, online_iters=online_iters,
                                                                      use_diffusion=use_diffusion, diffusion_path=diffusion_path,
                                                                      mode=mode, model_name=model_name, initial_yaw = initial_yaw, 
                                                                      vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio,

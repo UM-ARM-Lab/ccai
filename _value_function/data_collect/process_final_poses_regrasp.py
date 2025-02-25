@@ -24,33 +24,17 @@ def calculate_turn_cost(initial_pose, final_pose):
 
     screwdriver_pose = initial_pose.flatten()[-4:-1]
 
+    # account for weird angle wrapping
     if screwdriver_pose[2] < -np.pi:
         screwdriver_pose[2] += 4 * np.pi
 
     screwdriver_goal = np.array([0, 0, -turn_angle]) + screwdriver_pose
-
-    # screwdriver_goal_mat = R.from_euler('xyz', screwdriver_goal).as_matrix()
-    # screwdriver_state = final_pose.flatten()[-4:-1]
-    # screwdriver_mat = R.from_euler('xyz', screwdriver_state).as_matrix()
-    # # make both matrices 3D (batch_size, 3, 3)
-    # screwdriver_mat = torch.tensor(screwdriver_mat).unsqueeze(0)
-    # screwdriver_goal_mat = torch.tensor(screwdriver_goal_mat).unsqueeze(0).repeat(screwdriver_mat.shape[0], 1, 1)
-    # distance2goal = tf.so3_relative_angle(screwdriver_mat, screwdriver_goal_mat, cos_angle=False).detach().cpu()
-    # final_distance_to_goal = torch.min(distance2goal.abs())
-    # # if final_distance_to_goal < 30 / 180 * np.pi:
-    # if final_distance_to_goal < 45 / 180 * np.pi:
-    #     succ = True
-    # else:
-    #     succ = False
     
     # we're only actually using the screwdriver values
     state = final_pose.flatten()[-4:-1]
 
     if state[2] < -np.pi:
         state[2] += 4 * np.pi
-
-    # upright_cost = 20 * np.sum((state[-3:-1]) ** 2) # the screwdriver should only rotate in z direction
-    # upright_cost = 50 * np.sum((state[-3:-1] - np.array([0, 0])) ** 2) 
 
     ######################### REWARD SHAPING
     # if np.any(state[-3:-1] > 0.3):
@@ -64,9 +48,6 @@ def calculate_turn_cost(initial_pose, final_pose):
 
     goal_cost = ((state[-3:] - screwdriver_goal) ** 2).flatten()
     goal_cost = sum(goal_cost)
-
-    # if np.any(abs(state[-3:-1]) > 0.2):
-    #     goal_cost = 100.0
 
     total_cost = np.minimum(goal_cost, 5.0)
 
