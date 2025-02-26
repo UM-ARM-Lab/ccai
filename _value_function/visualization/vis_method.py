@@ -38,12 +38,12 @@ if __name__ == "__main__":
 
     annotate = True
 
-    experiment_names = ['test_method_test_official_high_iter_all', 
-                        "test_method_test_official_high_iter_singlevf",
-                        "test_method_test_official_high_iter_diffusion10k_with_contact",
-                        "test_method_test_official_high_iter_diffusion10k_no_contact_and_combined",
-                        ] 
-    budget = "High Budget"
+    # experiment_names = ['test_method_test_official_high_iter_all', 
+    #                     "test_method_test_official_high_iter_singlevf",
+    #                     "test_method_test_official_high_iter_diffusion10k_with_contact",
+    #                     "test_method_test_official_high_iter_diffusion10k_no_contact_and_combined",
+    #                     ] 
+    # budget = "High Budget"
 
     # experiment_names = ['test_method_test_official_all',
     #                     'test_method_test_official_low_iter_diffusion10k_no_contact',]
@@ -325,4 +325,5 @@ if __name__ == "__main__":
         plt.xticks(fontsize=ts-2)
         plt.yticks(fontsize=ts-2)
         plt.tight_layout()
+        plt.savefig(save_dir / f"{budget} deg turned sim.png")
         plt.show()
