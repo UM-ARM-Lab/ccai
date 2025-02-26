@@ -309,6 +309,7 @@ if __name__ == "__main__":
 
     regrasp_iters = 40
     turn_iters = 50
+    online_iters = 12
     visualize = False   
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=visualize, config_path=config_path)

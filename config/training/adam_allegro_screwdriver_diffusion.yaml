@@ -10,7 +10,7 @@ train_classifier: False
 eval_classifier: False
 plot: False
 vis_dataset: False
-epochs: 10000
+epochs: 100000
 classifier_epochs: 100
 batch_size: 256
 lr: 1.0e-4

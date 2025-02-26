@@ -282,6 +282,7 @@ if __name__ == "__main__":
 
     regrasp_iters = 40
     turn_iters = 50
+    online_iters = 12
     visualize = False   
 
     vf_weight_t = 3.3
