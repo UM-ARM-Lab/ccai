@@ -478,8 +478,8 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, dif
         with torch.no_grad():
             to = time.time()
             best_traj, _ = regrasp_planner.step(noisy_start[:4 * num_fingers + obj_dof])
-            tf = time.time()
-            td = tf - to
+            tfinal = time.time()
+            td = tfinal - to
             compute_time += td
             best_traj = best_traj.detach()
 
@@ -703,8 +703,8 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
         with torch.no_grad():
             to = time.time()
             best_traj, _ = turn_planner.step(noisy_start[:4 * num_fingers + obj_dof])
-            tf = time.time()
-            td = tf - to
+            tfinal = time.time()
+            td = tfinal - to
             compute_time += td
             best_traj = best_traj.detach()
 

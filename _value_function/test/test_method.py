@@ -119,7 +119,7 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'get_times_fixed_LI'
+    test_name = 'get_times_fixed_HI'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -132,7 +132,7 @@ if __name__ == '__main__':
     diffusion_times = []
 
     calc_vf = True
-    calc_diffusion_no_contact_cost = False
+    calc_diffusion_no_contact_cost = True
     calc_diffusion2 = False
     calc_diffusion_w_contact_cost = False
     calc_novf = True
@@ -156,8 +156,8 @@ if __name__ == '__main__':
     screwdriver_noise_mag = 0.015
     finger_noise_mag = 0.05
 
-    regrasp_iters = 40
-    turn_iters = 50
+    regrasp_iters = 80
+    turn_iters = 100
 
     vf_weight_rg = 5.0
     other_weight_rg = 1.9
