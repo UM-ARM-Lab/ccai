@@ -119,7 +119,7 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'get_timesLI'
+    test_name = 'get_times_fixed_HI'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -156,8 +156,8 @@ if __name__ == '__main__':
     screwdriver_noise_mag = 0.015
     finger_noise_mag = 0.05
 
-    regrasp_iters = 40
-    turn_iters = 50
+    regrasp_iters = 80
+    turn_iters = 100
 
     vf_weight_rg = 5.0
     other_weight_rg = 1.9
@@ -203,18 +203,16 @@ if __name__ == '__main__':
         pregrasp_pose = pregrasps[pregrasp_index]
 
         if calc_vf:
-            if test_time:
-                t0 = time.time()
 
             env.reset(dof_pos= pregrasp_pose)
         
-            regrasp_pose_vf, regrasp_traj_vf, regrasp_plan, rg_initial_samples = regrasp(
+            regrasp_pose_vf, regrasp_traj_vf, regrasp_plan, rg_initial_samples, compute_time_rg = regrasp(
                     env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
                     image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters, model_name = "ensemble_rg",
                     vf_weight=vf_weight_rg, other_weight=other_weight_rg, variance_ratio=variance_ratio_rg
             )
         
-            _, turn_pose_vf, succ_vf, turn_traj_vf, turn_plan, t_initial_samples = do_turn(
+            _, turn_pose_vf, succ_vf, turn_traj_vf, turn_plan, t_initial_samples, compute_time_t = do_turn(
                 regrasp_pose_vf, config, env,
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                 perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='vf',
@@ -223,9 +221,7 @@ if __name__ == '__main__':
             )
 
             if test_time:
-                tf = time.time()
-                print(f"VF time: {tf - t0}")
-                vf_times.append(tf - t0)
+                vf_times.append(compute_time_rg + compute_time_t)
 
             # Store the VF approach result
             result_vf = [pregrasp_pose, regrasp_pose_vf, regrasp_traj_vf, turn_pose_vf, turn_traj_vf]
@@ -237,19 +233,16 @@ if __name__ == '__main__':
 
         if calc_diffusion_no_contact_cost:
 
-            if test_time:
-                t0 = time.time()
-
             env.reset(dof_pos= pregrasp_pose)
            
-            regrasp_pose_diffusion, regrasp_traj_diffusion, regrasp_plan, rg_initial_samples = regrasp(
+            regrasp_pose_diffusion, regrasp_traj_diffusion, regrasp_plan, rg_initial_samples, compute_time_rg = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
                 use_diffusion=True, use_contact_cost=False,
                 diffusion_path = diffusion_path,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
             )
        
-            _, turn_pose_diffusion, succ_diffusion, turn_traj_diffusion, turn_plan, t_initial_samples = do_turn(
+            _, turn_pose_diffusion, succ_diffusion, turn_traj_diffusion, turn_plan, t_initial_samples, compute_time_t = do_turn(
                 regrasp_pose_diffusion, config, env,
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                 use_diffusion=True,
@@ -258,9 +251,7 @@ if __name__ == '__main__':
             )
 
             if test_time:
-                tf = time.time()
-                print(f"Diffusion no contact cost time: {tf - t0}")
-                diffusion_times.append(tf - t0)
+                diffusion_times.append(compute_time_rg + compute_time_t)
            
             result_diffusion = [pregrasp_pose, regrasp_pose_diffusion, regrasp_traj_diffusion, turn_pose_diffusion, turn_traj_diffusion, rg_initial_samples]
             checkpoint['results']['diffusion_no_contact_cost'][combo_tuple] = result_diffusion
@@ -272,14 +263,14 @@ if __name__ == '__main__':
 
             env.reset(dof_pos= pregrasp_pose)
            
-            regrasp_pose_diffusion2, regrasp_traj_diffusion2, regrasp_plan, rg_initial_samples = regrasp(
+            regrasp_pose_diffusion2, regrasp_traj_diffusion2, regrasp_plan, rg_initial_samples, compute_time = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
                 use_diffusion=True, use_contact_cost=False,
                 diffusion_path = diffusion_path2,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
             )
        
-            _, turn_pose_diffusion2, succ_diffusion2, turn_traj_diffusion2, turn_plan, t_initial_samples = do_turn(
+            _, turn_pose_diffusion2, succ_diffusion2, turn_traj_diffusion2, turn_plan, t_initial_samples, compute_time = do_turn(
                 regrasp_pose_diffusion2, config, env,
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                 use_diffusion=True,
@@ -297,14 +288,14 @@ if __name__ == '__main__':
 
             env.reset(dof_pos= pregrasp_pose)
            
-            regrasp_pose_diffusion_wc, regrasp_traj_diffusion_wc, regrasp_plan, rg_initial_samples = regrasp(
+            regrasp_pose_diffusion_wc, regrasp_traj_diffusion_wc, regrasp_plan, rg_initial_samples, compute_time = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
                 use_diffusion=True, use_contact_cost=True,
                 diffusion_path = diffusion_path,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
             )
        
-            _, turn_pose_diffusion_wc, succ_diffusion_wc, turn_traj_diffusion_wc, turn_plan, t_initial_samples = do_turn(
+            _, turn_pose_diffusion_wc, succ_diffusion_wc, turn_traj_diffusion_wc, turn_plan, t_initial_samples, compute_time = do_turn(
                 regrasp_pose_diffusion_wc, config, env,
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                 use_diffusion=True, 
@@ -322,14 +313,14 @@ if __name__ == '__main__':
 
             env.reset(dof_pos= pregrasp_pose)
            
-            regrasp_pose_combined, regrasp_traj_combined, regrasp_plan, rg_initial_samples = regrasp(
+            regrasp_pose_combined, regrasp_traj_combined, regrasp_plan, rg_initial_samples, compute_time = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
                 use_diffusion=True, use_contact_cost=False,
                 diffusion_path = diffusion_path,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters,
             )
        
-            _, turn_pose_combined, succ_combined, turn_traj_combined, turn_plan, t_initial_samples = do_turn(
+            _, turn_pose_combined, succ_combined, turn_traj_combined, turn_plan, t_initial_samples, compute_time = do_turn(
                 regrasp_pose_combined, config, env,
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                 use_diffusion=True, 
@@ -345,27 +336,22 @@ if __name__ == '__main__':
             print(f"Combined method cost: {turn_cost}")
 
         if calc_novf:
-            
-            if test_time:
-                t0 = time.time()
 
             env.reset(dof_pos= pregrasp_pose)
            
-            regrasp_pose_novf, regrasp_traj_novf, regrasp_plan, rg_initial_samples = regrasp(
+            regrasp_pose_novf, regrasp_traj_novf, regrasp_plan, rg_initial_samples, compute_time_rg = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=perception_noise, use_diffusion = False,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
             )
        
-            _, turn_pose_novf, succ_novf, turn_traj_novf, turn_plan, t_initial_samples = do_turn(
+            _, turn_pose_novf, succ_novf, turn_traj_novf, turn_plan, t_initial_samples, compute_time_t = do_turn(
                 regrasp_pose_novf, config, env,
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                 perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf', use_diffusion = False,
             )
 
             if test_time:
-                tf = time.time()
-                print(f"No VF time: {tf - t0}")
-                no_vf_times.append(tf - t0)
+                no_vf_times.append(compute_time_rg + compute_time_t)
            
             result_novf = [pregrasp_pose, regrasp_pose_novf, regrasp_traj_novf, turn_pose_novf, turn_traj_novf]
             checkpoint['results']['no_vf'][combo_tuple] = result_novf

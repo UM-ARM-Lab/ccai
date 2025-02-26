@@ -48,7 +48,7 @@ if __name__ == "__main__":
     # experiment_names = ['test_method_test_official_all',
     #                     'test_method_test_official_low_iter_diffusion10k_no_contact',]
 
-    experiment_names = ['test_method_test_official_low_iter_novfrepeat']
+    experiment_names = ['test_method_test_official_low_iter_superlowiter']
     budget = "Low Budget"
 
     results = {}

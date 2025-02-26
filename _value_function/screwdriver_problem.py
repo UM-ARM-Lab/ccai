@@ -463,6 +463,7 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, dif
 
     all_regrasp_plans = []
 
+    compute_time = 0
     for k in range(params['num_steps']):
         state = env.get_state()
         start = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
@@ -475,7 +476,11 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, dif
         noisy_start[-4:-1] += noise
 
         with torch.no_grad():
+            to = time.time()
             best_traj, _ = regrasp_planner.step(noisy_start[:4 * num_fingers + obj_dof])
+            tf = time.time()
+            td = tf - to
+            compute_time += td
             best_traj = best_traj.detach()
 
         if torch.isnan(best_traj).any().item():
@@ -538,7 +543,7 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, dif
                     torch.zeros(actual_trajectory.shape[0], 1)
                     ), dim=1).numpy()
    
-    return final_state, full_trajectory, all_regrasp_plans, initial_samples
+    return final_state, full_trajectory, all_regrasp_plans, initial_samples, compute_time
 
 
 def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use_diffusion = False, diffusion_path=None, perception_noise = 0,
@@ -680,7 +685,7 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
     num_fingers_to_plan = num_fingers
 
     all_turn_plans = []
-
+    compute_time = 0
     for k in range(params['num_steps']):
         state = env.get_state()
         start = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
@@ -696,7 +701,11 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
         # Key memory-usage fix: no_grad()
         # -------------------------
         with torch.no_grad():
+            to = time.time()
             best_traj, _ = turn_planner.step(noisy_start[:4 * num_fingers + obj_dof])
+            tf = time.time()
+            td = tf - to
+            compute_time += td
             best_traj = best_traj.detach()
 
         if torch.isnan(best_traj).any().item():
@@ -775,7 +784,7 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
                     torch.zeros(actual_trajectory.shape[0], 1)
                     ), dim=1).numpy()
    
-    return final_distance_to_goal.cpu().detach().item(), final_state, full_trajectory, all_turn_plans, initial_samples
+    return final_distance_to_goal.cpu().detach().item(), final_state, full_trajectory, all_turn_plans, initial_samples, compute_time
 
 def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial, 
             use_diffusion = False, diffusion_path = None,
@@ -799,7 +808,7 @@ def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym,
     object_location = torch.tensor(env.table_pose).to(params['device']).float() # TODO: confirm if this is the correct location
     params['object_location'] = object_location
 
-    final_distance_to_goal, final_pose, full_trajectory, turn_plan, initial_samples = solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, image_path = image_path,
+    final_distance_to_goal, final_pose, full_trajectory, turn_plan, initial_samples, compute_time = solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, image_path = image_path,
                                                                      ros_copy_node=ros_copy_node, perception_noise=perception_noise, iters=iters, online_iters=online_iters,
                                                                      use_diffusion=use_diffusion, diffusion_path=diffusion_path,
                                                                      mode=mode, model_name=model_name, initial_yaw = initial_yaw, 
@@ -809,7 +818,7 @@ def do_turn( initial_pose, config, env, sim_env, ros_copy_node, chain, sim, gym,
     if final_distance_to_goal < 30 / 180 * np.pi:
         succ = True
 
-    return initial_pose, final_pose, succ, full_trajectory, turn_plan, initial_samples
+    return initial_pose, final_pose, succ, full_trajectory, turn_plan, initial_samples, compute_time
 
 def get_diffusion(params, path = None):
 
