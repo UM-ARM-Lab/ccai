@@ -13,3 +13,4 @@ data/plots
 examples/config/
 data/test/initializations
 data/diffusion_datasets
+data/diffusion/initial_samples
