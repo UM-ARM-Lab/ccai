@@ -119,7 +119,7 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'get_times_fixed_HI'
+    test_name = 'get_times_fixed_LI'
     checkpoint_path = fpath /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -156,8 +156,9 @@ if __name__ == '__main__':
     screwdriver_noise_mag = 0.015
     finger_noise_mag = 0.05
 
-    regrasp_iters = 80
-    turn_iters = 100
+    regrasp_iters = 40
+    turn_iters = 50
+    online_iters = 10
 
     vf_weight_rg = 5.0
     other_weight_rg = 1.9
@@ -209,6 +210,7 @@ if __name__ == '__main__':
             regrasp_pose_vf, regrasp_traj_vf, regrasp_plan, rg_initial_samples, compute_time_rg = regrasp(
                     env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
                     image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters, model_name = "ensemble_rg",
+                    online_iters=online_iters,
                     vf_weight=vf_weight_rg, other_weight=other_weight_rg, variance_ratio=variance_ratio_rg
             )
         
@@ -216,6 +218,7 @@ if __name__ == '__main__':
                 regrasp_pose_vf, config, env,
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                 perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='vf',
+                online_iters=online_iters,
                 model_name="ensemble_t", initial_yaw = regrasp_pose_vf[0, -2],
                 vf_weight=vf_weight_t, other_weight=other_weight_t, variance_ratio=variance_ratio_t
             )
@@ -240,6 +243,7 @@ if __name__ == '__main__':
                 use_diffusion=True, use_contact_cost=False,
                 diffusion_path = diffusion_path,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
+                online_iters=online_iters,
             )
        
             _, turn_pose_diffusion, succ_diffusion, turn_traj_diffusion, turn_plan, t_initial_samples, compute_time_t = do_turn(
@@ -247,6 +251,7 @@ if __name__ == '__main__':
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                 use_diffusion=True,
                 diffusion_path = diffusion_path,
+                online_iters=online_iters,
                 perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf',
             )
 
@@ -268,6 +273,7 @@ if __name__ == '__main__':
                 use_diffusion=True, use_contact_cost=False,
                 diffusion_path = diffusion_path2,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
+                online_iters=online_iters,
             )
        
             _, turn_pose_diffusion2, succ_diffusion2, turn_traj_diffusion2, turn_plan, t_initial_samples, compute_time = do_turn(
@@ -276,6 +282,7 @@ if __name__ == '__main__':
                 use_diffusion=True,
                 diffusion_path = diffusion_path2,
                 perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf',
+                online_iters=online_iters,
             )
            
             result_diffusion2 = [pregrasp_pose, regrasp_pose_diffusion2, regrasp_traj_diffusion2, turn_pose_diffusion2, turn_traj_diffusion2, rg_initial_samples]
@@ -293,6 +300,7 @@ if __name__ == '__main__':
                 use_diffusion=True, use_contact_cost=True,
                 diffusion_path = diffusion_path,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
+                online_iters=online_iters,
             )
        
             _, turn_pose_diffusion_wc, succ_diffusion_wc, turn_traj_diffusion_wc, turn_plan, t_initial_samples, compute_time = do_turn(
@@ -301,6 +309,7 @@ if __name__ == '__main__':
                 use_diffusion=True, 
                 diffusion_path = diffusion_path,
                 perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf',
+                online_iters=online_iters,
             )
            
             result_diffusion_wc = [pregrasp_pose, regrasp_pose_diffusion_wc, regrasp_traj_diffusion_wc, turn_pose_diffusion_wc, turn_traj_diffusion_wc, rg_initial_samples]
@@ -318,6 +327,7 @@ if __name__ == '__main__':
                 use_diffusion=True, use_contact_cost=False,
                 diffusion_path = diffusion_path,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=regrasp_iters,
+                online_iters=online_iters,
             )
        
             _, turn_pose_combined, succ_combined, turn_traj_combined, turn_plan, t_initial_samples, compute_time = do_turn(
@@ -327,6 +337,7 @@ if __name__ == '__main__':
                 diffusion_path = diffusion_path,
                 initial_yaw = regrasp_pose_combined[0, -2],
                 perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='vf',
+                online_iters=online_iters,
             )
            
             result_combined = [pregrasp_pose, regrasp_pose_combined, regrasp_traj_combined, turn_pose_combined, turn_traj_combined, rg_initial_samples]
@@ -342,12 +353,14 @@ if __name__ == '__main__':
             regrasp_pose_novf, regrasp_traj_novf, regrasp_plan, rg_initial_samples, compute_time_rg = regrasp(
                 env, config, chain, state2ee_pos_partial, perception_noise=perception_noise, use_diffusion = False,
                 image_path=img_save_dir, initialization=pregrasp_pose, mode='no_vf', iters=regrasp_iters,
+                online_iters=online_iters,
             )
        
             _, turn_pose_novf, succ_novf, turn_traj_novf, turn_plan, t_initial_samples, compute_time_t = do_turn(
                 regrasp_pose_novf, config, env,
                 sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
                 perception_noise=perception_noise, image_path=img_save_dir, iters=turn_iters,mode='no_vf', use_diffusion = False,
+                online_iters=online_iters,
             )
 
             if test_time:
