@@ -21,7 +21,7 @@ save_dir = pathlib.Path(f'{CCAI_PATH}/data/figures')
 
 data = {}
 annotate = True
-methods = ['vf', 'novf', 'vf_low']
+methods = ['vf', 'novf', 'low2']  # 'vf_low'
 # params, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
 
 for method_nick in methods:
@@ -30,7 +30,7 @@ for method_nick in methods:
         method = "Vanilla"
     elif method_nick == "vf":
         method = "VF Ensemble"
-    elif method_nick == "vf_low":
+    elif method_nick == "low2":
         method = "VF Low Budget"
     else:
         print(f"{method} is not a valid method")

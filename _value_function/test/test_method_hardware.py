@@ -38,6 +38,7 @@ if __name__ == '__main__':
 
     regrasp_iters = 80
     turn_iters = 100
+    online_iters = 12
 
     vf_weight_rg = 5.0
     other_weight_rg = 1.9
@@ -190,6 +191,36 @@ if __name__ == '__main__':
             regrasp_pose_vf, config, env,
             sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
             perception_noise=perception_noise, image_path=img_save_dir, iters=50,mode='vf',
+            model_name="ensemble_t", initial_yaw = regrasp_pose_vf[0, -2],
+            vf_weight=vf_weight_t, other_weight=other_weight_t, variance_ratio=variance_ratio_t,
+            sim_viz_env=sim_env
+        )
+
+        # Store the VF approach result
+        result = [pregrasp_pose, regrasp_pose_vf, regrasp_traj_vf, turn_pose_vf, turn_traj_vf]
+        turn_cost = calculate_turn_cost(regrasp_pose_vf.numpy(), turn_pose_vf)
+        print('---------------------------------')
+        print(f"VF low iter cost: {turn_cost}")
+        print('---------------------------------')
+
+    elif method == 'low2':
+        env.default_dof_pos = pregrasp_pose[:, :16]
+        env.reset()
+    
+        regrasp_pose_vf, regrasp_traj_vf, regrasp_plan, initial_samples = regrasp(
+                env, config, chain, state2ee_pos_partial, perception_noise=perception_noise,
+                image_path=img_save_dir, initialization=pregrasp_pose, mode='vf', iters=40, 
+                online_iters = online_iters,
+                model_name = "ensemble_rg",
+                vf_weight=vf_weight_rg, other_weight=other_weight_rg, variance_ratio=variance_ratio_rg,
+                sim_viz_env=sim_env
+        )
+    
+        _, turn_pose_vf, succ_vf, turn_traj_vf, turn_plan, initial_samples = do_turn(
+            regrasp_pose_vf, config, env,
+            sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial,
+            perception_noise=perception_noise, image_path=img_save_dir, iters=50,mode='vf',
+            online_iters = online_iters,
             model_name="ensemble_t", initial_yaw = regrasp_pose_vf[0, -2],
             vf_weight=vf_weight_t, other_weight=other_weight_t, variance_ratio=variance_ratio_t,
             sim_viz_env=sim_env
