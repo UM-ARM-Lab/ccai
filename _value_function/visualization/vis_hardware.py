@@ -29,9 +29,9 @@ for method_nick in methods:
     if method_nick == "novf":
         method = "Vanilla"
     elif method_nick == "vf":
-        method = "VF Ensemble"
+        method = "AVO High Budget (ours)"
     elif method_nick == "low2":
-        method = "VF Low Budget"
+        method = "AVO Low Budget (ours)"
     else:
         print(f"{method} is not a valid method")
         exit()
@@ -80,7 +80,7 @@ for method_nick in methods:
     print(f"{method} average yaw delta: {np.mean(data[method]['yaw_deltas'])}")
 
 colors = ['blue', 'red', 'green', 'purple', 'orange', 'cyan', 'magenta', 'yellow']
-ts = 16
+ts = 22
 # ----  Boxplot ----
 # Create a new figure for the boxplot
 plt.figure(figsize=(10, 5))

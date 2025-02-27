@@ -156,9 +156,9 @@ if __name__ == '__main__':
     screwdriver_noise_mag = 0.015
     finger_noise_mag = 0.05
 
-    regrasp_iters = 80
-    turn_iters = 100
-    online_iters = 25
+    regrasp_iters = 40
+    turn_iters = 50
+    online_iters = 12
 
     vf_weight_rg = 5.0
     other_weight_rg = 1.9

@@ -513,12 +513,12 @@ def regrasp(env, config, chain, state2ee_pos_partial, use_diffusion = False, dif
 
         ####################################################################################################
 
-        actiont0 = time.time()
+        # actiont0 = time.time()
         if config['mode'] == 'hardware':
             env.step(action)
         else:
             env.step(action, path_override = image_path)
-        actiont1 = time.time()
+        # actiont1 = time.time()
         # print(f"Action time: {actiont1 - actiont0}")
         regrasp_problem._preprocess(best_traj.unsqueeze(0))
 
@@ -691,7 +691,7 @@ def solve_turn(env, gym, viewer, params, initial_pose, state2ee_pos_partial, use
         start = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
 
         actual_trajectory.append(state['q'][:, :4 * num_fingers + obj_dof].squeeze(0).clone())
-        start_time = time.time()
+        # start_time = time.time()
 
         noise = (torch.rand(3, device=params['device']) - 0.5) * perception_noise * 2
         noisy_start = start.clone()
@@ -846,8 +846,6 @@ def get_diffusion(params, path = None):
     # print('Loaded trajectory sampler')
 
     return trajectory_sampler
-    
-
 
 class emailer():
     def __init__(self):

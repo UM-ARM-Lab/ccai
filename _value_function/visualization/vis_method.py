@@ -38,17 +38,17 @@ if __name__ == "__main__":
 
     annotate = True
 
-    # experiment_names = ['test_method_test_official_high_iter_all', 
-    #                     "test_method_test_official_high_iter_singlevf",
-    #                     "test_method_test_official_high_iter_diffusion10k_with_contact",
-    #                     "test_method_test_official_high_iter_diffusion10k_no_contact_and_combined",
-    #                     ] 
-    # budget = "High Budget"
+    experiment_names = ['test_method_test_official_high_iter_all', 
+                        "test_method_test_official_high_iter_singlevf",
+                        "test_method_test_official_high_iter_diffusion10k_with_contact",
+                        "test_method_test_official_high_iter_diffusion10k_no_contact_and_combined",
+                        ] 
+    budget = "High Budget"
 
     # experiment_names = ['test_method_test_official_all',
-    #                     'test_method_test_official_low_iter_diffusion10k_no_contact',]
+    #                      'test_method_test_official_low_iter_diffusion10k_no_contact',]
 
-    experiment_names = ['test_method_test_official_low_iter_superlowiter']
+    experiment_names = ['test_method_test_official_low_iter_novfrepeat',]
     budget = "Low Budget"
 
     results = {}
@@ -63,7 +63,7 @@ if __name__ == "__main__":
             if method == "no_vf":
                 method = "Vanilla"
             elif method == "vf":
-                method = "VF Ensemble"
+                method = "AVO (ours)"
             elif method == "diffusion":
                 method = "Diffusion"
             elif method == "diffusion_no_contact_cost":
@@ -82,7 +82,7 @@ if __name__ == "__main__":
                 print(f"Overriding {method}.")
                 
             if budget == "Low Budget":
-                if method != "Vanilla" and method != "VF Ensemble":
+                if method != "Vanilla" and method != "AVO (ours)":
                     continue
 
             results[method] = method_results
@@ -162,7 +162,7 @@ if __name__ == "__main__":
         print(f'{method} mean d2g: {np.mean(data[method]["d2gs"]):.2f} +/- {np.std(data[method]["d2gs"]):.2f}')
 
     colors = ['blue', 'red', 'green', 'purple', 'orange', 'cyan', 'magenta', 'yellow']
-    ts = 16
+    ts = 22
     if False:
         plt.figure(figsize=(10, 5))
         method_offset = 0.15  # spacing offset for each method group
@@ -238,7 +238,7 @@ if __name__ == "__main__":
                 median_val = np.median(data[method]['d2gs'])
                 plt.text(
                     i + 1, 
-                    median_val - 0.02, 
+                    median_val, #- 0.02, 
                     f"{median_val:.2f}", 
                     horizontalalignment='center', 
                     verticalalignment='bottom',
@@ -250,6 +250,7 @@ if __name__ == "__main__":
         plt.ylabel('Angle Difference', fontsize=ts)
         plt.title(f'Simulation, {budget}: Angle Differences From Goal', fontsize=ts)
         plt.xticks(fontsize=ts-2)
+        plt.xticks(rotation=20, ha='right')
         plt.yticks(fontsize=ts-2)
         plt.tight_layout()
         plt.savefig(save_dir / f"{budget} sim.png")
