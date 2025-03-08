@@ -24,9 +24,10 @@ sys.path.append('..')
 
 # sys.stdout = open('./logs/live_recovery_shorcut_honda_meeting_full_dof_noise_train_indexing_fix_6500_.08_std_.75_pct_diff_likelihood_no_resample_no_cpc_on_pregrasp.log', 'w', buffering=1)
 # sys.stdout = open('./examples/logs/recovery_as_contact_search.log', 'w', buffering=1)
-# sys.stdout = open('./examples/logs/live_recovery_hardware_orig_ecdf_contact_selection_film.log', 'a', buffering=1)
+# sys.stdout = open('./examples/logs/extreme_projection_recovery.log', 'w', buffering=1)
 # sys.stdout = open('./examples/logs/allegro_screwdriver_recovery_best_traj_only_15000_training_no_downsample_balance_bugfix_diffusion_split_t_x_samples_ecdf.log', 'w', buffering=1)
-sys.stdout = open('./examples/logs/allegro_screwdriver_demo.log', 'w', buffering=1)
+# sys.stdout = open('./examples/logs/allegro_screwdriver_demo.log', 'w', buffering=1)
+sys.stdout = open('./examples/logs/honda_mtg_2-24-faster-poke_pause.log', 'w', buffering=1)
 
 import pytorch_volumetric as pv
 import pytorch_kinematics as pk
@@ -539,12 +540,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         # else:
         min_force_dict = None
-        if params['mode'] == 'hardware':
-            min_force_dict = {
-                'thumb': .5,
-                'middle': .5,
-                'index': .25,
-            }
+        # if params['mode'] == 'hardware':
+        min_force_dict = {
+            'thumb': .75,
+            'middle': .75,
+            'index': .75,
+        }
 
         # min_force_dict = {
         #     'thumb': 0,
@@ -899,7 +900,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # generate initial samples with diffusion model
         sim_rollouts = None
         initial_samples_0 = None
-        new_T = params['T'] if recover else params['T_orig']
+        new_T = params['T'] if (recover or params['compute_recovery_trajectory']) else params['T_orig']
         if trajectory_sampler is not None and params.get('diff_init', True) and initial_samples is None:
 
             sampler = trajectory_sampler if recover else trajectory_sampler_orig
@@ -1016,9 +1017,24 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         plans = None
         resample = params.get('diffusion_resample', False)
         for k in range(planner.problem.T):  # range(params['num_steps']):
+            if params['live_recovery'] and not recover:
+                input('Ready to check_id. Poke now.\n')
             state = env.get_state()
             state = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
             print(state)
+            if params['mode'] == 'hardware':
+                set_state = env.get_state()['q'].to(device=env.device)
+                # print(set_state.shape)
+                sim_viz_env.set_pose(set_state)
+                sim_viz_env.write_image()
+
+                # sim_viz_env.step(action)
+                # for _ in range(3):
+                #     sim_viz_env.step(action)
+                state = sim_viz_env.get_state()['q'].reshape(-1).to(device=params['device'])
+                print(state[:15][-3:])
+            elif params['mode'] == 'hardware_copy':
+                ros_copy_node.apply_action(partial_to_full_state(action[0], params['fingers']))
 
             if params['live_recovery']:
                 id_check = check_id(state) if not recover else True
@@ -1070,7 +1086,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     planner.x = initial_samples[:, k:]
 
             s = time.perf_counter()
-            best_traj, plans = planner.step(state)
+            if recover:
+                skip_optim = k != 0
+            else:
+                skip_optim = False
+            best_traj, plans = planner.step(state, skip_optim=skip_optim)
             print(f'Solve time for step {k+1}', time.perf_counter() - s)
 
             planned_trajectories.append(plans)
@@ -1145,19 +1165,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             else:
                 action = action.to(device=env.device) + state.unsqueeze(0)[:, :4 * num_fingers].to(device=env.device)
             #@adam read dofs from hardware and replicate in sim
-            if params['mode'] == 'hardware':
-                set_state = env.get_state()['q'].to(device=env.device)
-                # print(set_state.shape)
-                sim_viz_env.set_pose(set_state)
-                sim_viz_env.write_image()
-
-                # sim_viz_env.step(action)
-                # for _ in range(3):
-                #     sim_viz_env.step(action)
-                state = sim_viz_env.get_state()['q'].reshape(-1).to(device=params['device'])
-                print(state[:15][-3:])
-            elif params['mode'] == 'hardware_copy':
-                ros_copy_node.apply_action(partial_to_full_state(action[0], params['fingers']))
 
             if params['visualize'] and best_traj.shape[0] > 1 and False:
                 add_trajectories(plans.to(device=env.device), best_traj.to(device=env.device),
@@ -1554,25 +1561,28 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             contact[:, 1] = 1
             contact[:, 2] = 1
 
-        samples, _, _ = trajectory_sampler.sample(N=N_, start=start_for_diff.reshape(1, -1),
+        samples, _, likelihood = trajectory_sampler.sample(N=N_, start=start_for_diff.reshape(1, -1),
                                                             H=trajectory_sampler.T,
                                                             constraints=contact,
-                                                            skip_likelihood=True)
+                                                            skip_likelihood=False)
         samples = convert_sine_cosine_to_yaw(samples)
 
-        problem = mode_problem_dict[mode]
-        problem.start = convert_sine_cosine_to_yaw(start_for_diff)
-        # highest_likelihood_idx = _likelihoods_t_x_c.flatten().argmax(0)
-        initial_samples = _full_to_partial(samples, mode)
-        initial_x = initial_samples[:, 1:, :problem.dx]
-        initial_u = initial_samples[:, :-1, -problem.du:]
-        initial_samples = torch.cat((initial_x, initial_u), dim=-1)
-        initial_z = mode_problem_dict[mode].get_initial_z(initial_samples)
-        augmented_x = torch.cat((initial_samples, initial_z), dim=-1)
+        # problem = mode_problem_dict[mode]
+        # problem.start = convert_sine_cosine_to_yaw(start_for_diff)
+        # # highest_likelihood_idx = _likelihoods_t_x_c.flatten().argmax(0)
+        # initial_samples = _full_to_partial(samples, mode)
+        # initial_x = initial_samples[:, 1:, :problem.dx]
+        # initial_u = initial_samples[:, :-1, -problem.du:]
+        # initial_samples = torch.cat((initial_x, initial_u), dim=-1)
+        # initial_z = mode_problem_dict[mode].get_initial_z(initial_samples)
+        # augmented_x = torch.cat((initial_samples, initial_z), dim=-1)
 
-        constraint_violation, _, _, _ = mode_problem_dict[mode].combined_constraints(augmented_x, compute_grads=False, compute_hess=False)
-        constraint_violation = constraint_violation.abs().sum(-1)
-        highest_likelihood_idx = constraint_violation.argmin(0)
+        # constraint_violation, _, _, _ = mode_problem_dict[mode].combined_constraints(augmented_x, compute_grads=False, compute_hess=False)
+        # constraint_violation = constraint_violation.abs().sum(-1)
+        # highest_likelihood_idx = constraint_violation.argmin(0)
+
+        highest_likelihood_idx = likelihood.argmax(0)
+
 
         if params['visualize_contact_plan']:
             traj_for_viz = samples[highest_likelihood_idx, :, :15]
@@ -1596,10 +1606,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             
         goal_obj_config = samples[highest_likelihood_idx, -1, :4 * num_fingers + obj_dof].squeeze()
 
-        sorted_idx = constraint_violation.argsort(0)
+        sorted_idx = likelihood.argsort(0, descending=True)
         samples = samples[sorted_idx]
 
-        return goal_obj_config, {mode: samples}, {mode: constraint_violation}
+        return goal_obj_config, {mode: samples}, {mode: likelihood}
 
     @torch.no_grad()
     def calc_samples_likeilhoods(mode, start_for_diff, state, mc_samples_normalized, _likelihoods_t_x):
@@ -2189,7 +2199,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # print(f'{params["controller"]}, Average time per step: {duration / (params["num_steps"] - 1)}')
         if add:
             with open(f'{fpath.resolve()}/trajectory.pkl', 'wb') as f:
-                pickle.dump([i.cpu().numpy() for i in actual_trajectory_save], f)
+                dump = []
+                for i in actual_trajectory_save:
+                    if type(i) != list:
+                        dump.append(i.cpu().numpy())
+                    else:
+                        dump.append(i)
+                pickle.dump(dump, f)
         del actual_trajectory_save
 
         if done and params.get('compute_recovery_trajectory', False):
@@ -2208,12 +2224,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 if __name__ == "__main__":
     # get config
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_only.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_orig_likelihood.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_perturbed_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_recovery_as_contact_mode_planning.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_live_recovery_shortcut_0.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_demo.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_live_recovery_shortcut_hardware.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_diff_demo.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_live_recovery_shortcut_hardware.yaml').read_text())
 
     from tqdm import tqdm
 

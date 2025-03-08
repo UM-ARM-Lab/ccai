@@ -162,26 +162,60 @@ class AllegroScrewdriverRLEnv:
             if hasattr(self.env, 'close'):
                 self.env.close()
 
-# Neural network for the actor (policy)
+# Import necessary ODE libraries
+from torchdiffeq import odeint
+
+# Neural network for the actor (policy) using ODE flow
 class ActorNetwork(nn.Module):
     def __init__(self, input_dim, output_dim, hidden_dim=256):
         super(ActorNetwork, self).__init__()
-        self.network = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
+        
+        # Dimensions
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.combined_dim = input_dim + output_dim
+        
+        # MLP for modeling derivatives (vector field)
+        self.vector_field = nn.Sequential(
+            nn.Linear(self.combined_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU()
+            nn.ReLU(),
+            nn.Linear(hidden_dim, self.combined_dim)
         )
         
-        # Mean and log std for Gaussian policy
-        self.mean = nn.Linear(hidden_dim, output_dim)
+        # Parameters for controlling integration
+        self.integration_time = nn.Parameter(torch.tensor([1.0]), requires_grad=False)
         self.log_std = nn.Parameter(torch.zeros(output_dim))
-        
+    
+    def dynamics(self, t, x):
+        """ODE function to integrate"""
+        return self.vector_field(x)
+    
     def forward(self, x):
-        x = self.network(x)
-        mean = self.mean(x)
-        std = torch.exp(self.log_std).expand_as(mean)
-        return mean, std
+        batch_size = x.shape[0]
+        
+        # Generate random normal vectors for action space
+        z = torch.randn(batch_size, self.output_dim, device=x.device)
+        
+        # Concatenate state and random vector
+        x_z = torch.cat([x, z], dim=-1)
+        
+        # Integrate ODE from t=0 to t=1
+        t = torch.tensor([0.0, self.integration_time.item()], device=x.device)
+        trajectory = odeint(self.dynamics, x_z, t, method='dopri5')
+        
+        # Extract the terminal point
+        x_final = trajectory[-1]
+        
+        # Split into state and action parts
+        state_part = x_final[:, :self.input_dim]
+        action_part = x_final[:, self.input_dim:]
+        
+        # Scale the actions using the log_std parameter
+        std = torch.exp(self.log_std).expand_as(action_part)
+        
+        return action_part, std
 
 # Neural network for the critic (value function)
 class CriticNetwork(nn.Module):
@@ -365,6 +399,14 @@ def train_ppo(config, total_timesteps=1000000, save_path=None):
     print(f"Simulation running on: {config['sim_device']}")
     print(f"PPO training running on: {train_device}")
     
+    # Make sure to install torchdiffeq
+    try:
+        import torchdiffeq
+    except ImportError:
+        print("torchdiffeq is not installed. Installing...")
+        import subprocess
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "torchdiffeq"])
+        
     # Initialize PPO agent
     ppo_agent = PPO(
         input_dim=env.obs_dim,

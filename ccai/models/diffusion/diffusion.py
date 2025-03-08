@@ -690,7 +690,7 @@ class GaussianDiffusion(nn.Module):
         all_losses = []
         all_likelihoods = []
         broke = False
-        for proj_t in tqdm(range(15)):
+        for proj_t in tqdm(range(50)):
             optimizer.zero_grad()
             # Sample N trajectories
             samples, likelihoods = self.sample(N, H, condition=condition, context=context, no_grad=False)

@@ -184,7 +184,7 @@ class TrajectoryDiffusionModel(nn.Module):
         condition = self.construct_condition(H, start, goal, past)
 
         if project:
-            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.diffusion_model.project(N=N, H=H, context=context, condition=condition, context_for_likelihood=context_for_likelihood)
+            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.diffusion_model.project(N=N, H=H, context=context, condition=condition)
             return samples, samples_0, (all_losses, all_samples, all_likelihoods)
         else:
             samples = self.diffusion_model.sample(N=N, H=H, context=context, condition=condition, no_grad=no_grad, skip_likelihood=skip_likelihood, context_for_likelihood=context_for_likelihood)  # .reshape(-1, H#,

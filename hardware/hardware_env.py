@@ -52,7 +52,8 @@ class ObjectPoseReader:
         self.arm_base = [i for i in data.tracked_objects if i.name == 'right_arm_base'][0]
         self.mocap_obj = [i for i in data.tracked_objects if i.name == self.obj][0]
         self.obj_euler_, self.obj_trans_ = self.euler_trans_from_segment(self.mocap_obj.segments[0])
-
+        
+        # self.obj_euler_[0] -= .03
 
     def get_state(self):
         return self.obj_trans_, self.obj_euler_

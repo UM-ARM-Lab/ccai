@@ -279,7 +279,7 @@ class ConstrainedSteinTrajOpt:
 
         # weights = weights / torch.sum(weights)
 
-    def solve(self, x0, resample=False):
+    def solve(self, x0, resample=False, skip_optim=False):
         self.normxiJ = None
         self.Bk = None
         # update from problem incase T has changed
@@ -310,6 +310,7 @@ class ConstrainedSteinTrajOpt:
         resample_period = 50
         path = [xuz.data.clone()]
         self.gamma = self.max_gamma
+        T = 0 if skip_optim else T
         for iter in range(T):
             # print(iter)
             # reset slack variables

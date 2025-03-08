@@ -20,7 +20,7 @@ class Constrained_SVGD_MPC:
         self.iter = 0
         self.path = []
 
-    def step(self, state, **kwargs):
+    def step(self, state, skip_optim=False, **kwargs):
         if self.fix_T:
             new_T = None
         else:
@@ -39,7 +39,7 @@ class Constrained_SVGD_MPC:
             self.warmed_up = True
             resample = False
 
-        path = self.solver.solve(self.x, resample)
+        path = self.solver.solve(self.x, resample, skip_optim=skip_optim)
         self.x = path[-1]
         self.path = path
         self.iter += 1

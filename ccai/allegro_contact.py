@@ -690,7 +690,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.contact_points = {}
 
             for finger in self.regrasp_fingers:
-                self.contact_points[finger] = (self.data[finger]['closest_obj_pt_scene_frame'].detach(), .01)
+                self.contact_points[finger] = (self.data[finger]['closest_obj_pt_scene_frame'].detach(), .015)
 
             contact_points_object = torch.stack([self.contact_points[finger][0] for finger in self.regrasp_fingers], dim=1)
 
@@ -828,7 +828,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             self.contact_points = {}
 
             for finger in regrasp_fingers:
-                self.contact_points[finger] = (self.data[finger]['closest_obj_pt_scene_frame'].detach(), .01)
+                self.contact_points[finger] = (self.data[finger]['closest_obj_pt_scene_frame'].detach(), .015)
 
             contact_points_object = torch.stack([self.contact_points[finger][0] for finger in regrasp_fingers], dim=1)
             self._regrasp_dz += self.num_regrasps  # Contact region constraint
@@ -2514,7 +2514,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
             goal_cost = 1 * (x_last - goal).pow(2)
             goal_cost += 1 * (xu[:-1, :self.num_fingers * 4 + self.obj_dof] - goal).pow(2).sum(0)
             goal_cost_weight = torch.ones_like(goal_cost) * .3
-            goal_cost_weight[-self.obj_dof:] = 1
+            goal_cost_weight[-self.obj_dof:] = 2
             goal_cost = goal_cost * goal_cost_weight
             goal_cost = goal_cost.sum()
             goal_cost *= 100
