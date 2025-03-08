@@ -230,7 +230,7 @@ class ActorNetwork(nn.Module):
         
         # Integrate ODE from t=0 to t=1
         integration_times = torch.tensor([0.0, 1.0], device=x.device)
-        trajectory = odeint(self.dynamics, x_z, integration_times, method='dopri5')
+        trajectory = odeint(self.dynamics, x_z, integration_times, method='rk4', options={'step_size': .1})
         
         # Extract the final point of the trajectory
         final_state = trajectory[-1]
@@ -314,7 +314,7 @@ class PPO:
                 action = normal.sample()
                 
         return action
-    
+    # I want to run the same constraint projection done as part of the cnf sampling in allegro_screwdriver_rl.py. I want to use the constraints from a turning problem
     def compute_gae(self, values, rewards, dones, next_value):
         """Compute generalized advantage estimates."""
         advantages = []
@@ -501,7 +501,7 @@ def train_ppo(config, total_timesteps=1000000, save_path=None):
                 states.append(state)
                 actions.append(action_np)
                 rewards.append(reward)
-                dones.append(done)
+                dones.append(float(done))  # Convert boolean to float
                 values.append(value.item())
                 log_probs.append(log_prob.item())
                 
