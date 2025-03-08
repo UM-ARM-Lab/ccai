@@ -87,6 +87,14 @@ class AllegroScrewdriverRLEnv:
             world_trans=self.env.world_trans
         )
         self.chain = chain.to(device=self.device)
+        
+        # Define pregrasp positions for different fingers
+        self.pregrasp_positions = {
+            'index': torch.tensor([0.1, 0.6, 0.6, 0.6]),
+            'middle': torch.tensor([-0.1, 0.5, 0.9, 0.9]),
+            'ring': torch.tensor([0.0, 0.5, 0.65, 0.65]),
+            'thumb': torch.tensor([1.2, 0.3, 0.3, 1.2])
+        }
     
     def _get_obs(self):
         state_dict = self.env.get_state()
@@ -100,19 +108,35 @@ class AllegroScrewdriverRLEnv:
         
         # Combine into observation (without angular velocity)
         obs = torch.cat([joint_pos, orientation], dim=0)
-        return obs.cpu().numpy()
+        return obs
     
     def reset(self):
         self.env.reset()
         self.episode_steps = 0
         print(f"Episode reset - starting new episode")
+        
+        # # Execute pregrasp
+        # print("Executing pregrasp...")
+        
+        # # Construct pregrasp position based on active fingers
+        # pregrasp_action = torch.cat([self.pregrasp_positions[finger] for finger in self.config['fingers']])
+        # pregrasp_action = pregrasp_action.to(device=self.device).reshape(1, -1)
+        
+        # # Execute pregrasp action - move fingers to initial grasp position
+        # for _ in range(5):  # Execute multiple times to ensure stable position
+        #     self.env.step(pregrasp_action)
+            
+        # print("Pregrasp completed")
+
+        self.initial_yaw = self._get_obs()[-1]
+        
         return self._get_obs()
     
     def step(self, action):
         # Convert action to target joint positions
         state_dict = self.env.get_state()
         current_pos = state_dict['q'].reshape(-1)[:self.control_dim]
-        target_pos = current_pos + torch.tensor(action, device=self.device)
+        target_pos = current_pos + action.cpu()
         
         # Step the environment
         self.env.step(target_pos.reshape(1, -1))
@@ -147,10 +171,10 @@ class AllegroScrewdriverRLEnv:
         roll, pitch, yaw = orientation
         
         # Reward turning (yaw change)
-        turn_reward = abs(yaw - self.config.get('initial_yaw', 0.0)) * 5.0
+        turn_reward = -(yaw - self.initial_yaw) * 1.0
         
         # Penalize deviation from upright position
-        upright_penalty = (roll**2 + pitch**2) * 10.0
+        upright_penalty = (roll.abs() + pitch.abs()) * 1.0
         
         # Calculate total reward
         reward = turn_reward - upright_penalty
@@ -162,26 +186,62 @@ class AllegroScrewdriverRLEnv:
             if hasattr(self.env, 'close'):
                 self.env.close()
 
-# Neural network for the actor (policy)
+# Import necessary ODE integration package
+from torchdiffeq import odeint
+
+# Neural network for the actor (policy) using ODE flow
 class ActorNetwork(nn.Module):
     def __init__(self, input_dim, output_dim, hidden_dim=256):
         super(ActorNetwork, self).__init__()
-        self.network = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
+        
+        # Store dimensions
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.combined_dim = input_dim + output_dim
+        
+        # Vector field network that models the dynamics of the state-action system
+        self.vector_field = nn.Sequential(
+            nn.Linear(self.combined_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU()
+            nn.ReLU(),
+            nn.Linear(hidden_dim, self.combined_dim)
         )
         
-        # Mean and log std for Gaussian policy
-        self.mean = nn.Linear(hidden_dim, output_dim)
+        # Log standard deviation parameter
         self.log_std = nn.Parameter(torch.zeros(output_dim))
         
+    def dynamics(self, t, x):
+        """ODE function representing the vector field"""
+        return self.vector_field(x)
+    
     def forward(self, x):
-        x = self.network(x)
-        mean = self.mean(x)
-        std = torch.exp(self.log_std).expand_as(mean)
-        return mean, std
+        
+        if len(x.shape) == 1:
+            x = x.unsqueeze(0)
+        
+        batch_size = x.shape[0]
+        
+        # Generate random normal vectors for action space
+        z = torch.randn(batch_size, self.output_dim, device=x.device)
+        
+        # Concatenate state and random noise vector
+        x_z = torch.cat([x, z], dim=-1)
+        
+        # Integrate ODE from t=0 to t=1
+        integration_times = torch.tensor([0.0, 1.0], device=x.device)
+        trajectory = odeint(self.dynamics, x_z, integration_times, method='dopri5')
+        
+        # Extract the final point of the trajectory
+        final_state = trajectory[-1]
+        
+        # Split into state and action components
+        _, action = final_state[:, :self.input_dim], final_state[:, self.input_dim:]
+        
+        # Compute standard deviation
+        std = torch.exp(self.log_std).expand_as(action)
+        
+        return action, std
 
 # Neural network for the critic (value function)
 class CriticNetwork(nn.Module):
@@ -253,7 +313,7 @@ class PPO:
                 normal = Normal(mean, std)
                 action = normal.sample()
                 
-        return action.cpu().numpy()
+        return action
     
     def compute_gae(self, values, rewards, dones, next_value):
         """Compute generalized advantage estimates."""
@@ -352,6 +412,14 @@ def train_ppo(config, total_timesteps=1000000, save_path=None):
     """
     Train a PPO agent on the AllegroScrewdriver environment
     """
+    # Try to import torchdiffeq, install if not available
+    try:
+        import torchdiffeq
+    except ImportError:
+        print("torchdiffeq not found. Installing...")
+        import subprocess
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "torchdiffeq"])
+        
     # Create environment
     env = make_env(config)
     
@@ -377,13 +445,13 @@ def train_ppo(config, total_timesteps=1000000, save_path=None):
         gamma=0.99,
         gae_lambda=0.95,
         clip_param=0.2,
-        batch_size=64,
+        batch_size=32,
         num_epochs=10
     )
     
     # Training variables
     num_steps_per_episode = config.get('max_episode_steps', 100)
-    update_frequency = config.get('update_frequency', 1024)
+    update_frequency = config.get('update_frequency', 128)
     checkpoint_frequency = config.get('checkpoint_frequency', 2048)
     
     # Initialize tracking variables
@@ -426,7 +494,7 @@ def train_ppo(config, total_timesteps=1000000, save_path=None):
                     value = ppo_agent.critic(state_tensor).squeeze()
                 
                 # Take action in environment
-                action_np = action.cpu().numpy()
+                action_np = action
                 next_state, reward, done = env.step(action_np)
                 
                 # Store data
