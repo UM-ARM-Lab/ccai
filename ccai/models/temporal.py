@@ -546,16 +546,38 @@ class TemporalUnetStateAction(nn.Module):
             if not is_last:
                 horizon = horizon * 2
 
-        self.final_conv = nn.Sequential(
+        self.final_conv_dx = nn.Sequential(
             MLPBlock(dim, dim),
             nn.Linear(dim, transition_dim),
         )
+
+        self.final_conv_ddx = nn.Sequential(
+            MLPBlock(dim, dim),
+            nn.Linear(dim, transition_dim),
+        )
+
+        self.noise_mlp = nn.Sequential(
+            nn.Linear(15, dim),
+            Mish(),
+            nn.Linear(dim, dim),
+            Mish(),
+        )
+        self.noise_mean_pred = nn.Linear(dim, 21)
+        self.noise_logvar_pred = nn.Linear(dim, 21)
 
         # self.context_dropout_p = context_dropout_p
         self.cond_dim = cond_dim
 
         self.problem_dict = problem_dict
         self.transition_dim = transition_dim
+
+        self.reset_z()
+
+    def noise_dist(self, x):
+        noise_mlp_out = self.noise_mlp(x)
+        noise_mean = self.noise_mean_pred(noise_mlp_out)
+        noise_logvar = self.noise_logvar_pred(noise_mlp_out)
+        return noise_mean, noise_logvar
 
     def vmapped_fwd(self, t, x, context=None):
         return self(t.reshape(1), x.unsqueeze(0), context.unsqueeze(0)).squeeze(0)
@@ -571,6 +593,8 @@ class TemporalUnetStateAction(nn.Module):
         t = t.reshape(-1)
         if t.shape[0] == 1:
             t = t.repeat(B)
+
+        # t = torch.zeros_like(t) # Dirty hack to remove time dependence. TODO: Fix this
         t = self.time_embedding(t)
         # x = einops.rearrange(x, 'b h t -> b t h')
         # x = x.permute(0, 2, 1)
@@ -584,13 +608,14 @@ class TemporalUnetStateAction(nn.Module):
             # c = context
             # c = torch.cat((context, ctype_embed), dim=-1)
             # need to do dropout on context embedding to train unconditional model alongside conditional
-            if dropout:
-                mask_dist = Bernoulli(probs=1 - self.context_dropout_p)
-                mask = mask_dist.sample((B,))  # .to(device=context.device)
-                c = mask * c
-                t = torch.cat((t, c), dim=-1)
-            else:
-                t = torch.cat((t, c), dim=-1)
+            # if dropout:
+            #     mask_dist = Bernoulli(probs=1 - self.context_dropout_p)
+            #     mask = mask_dist.sample((B,))  # .to(device=context.device)
+            #     c = mask * c
+            #     t = torch.cat((t, c), dim=-1)
+            # else:
+            #     t = torch.cat((t, c), dim=-1)
+            t = torch.cat((t, c), dim=-1)
         else:
             t = torch.cat((t, torch.zeros(B, 32, device=t.device)), dim=-1)
         t = self.time_mlp(t)
@@ -615,9 +640,10 @@ class TemporalUnetStateAction(nn.Module):
             x = resnet2(x, t)
             # x = attn(x)
             # x = upsample(x)
-        x = self.final_conv(x)
+        dx = self.final_conv_dx(x)
+        ddx = self.final_conv_ddx(x)
 
-        return x_orig, x
+        return x_orig, dx, ddx
         # x = einops.rearrange(x, 'b t h -> b h t')
         # x = x.permute(0, 2, 1)
         # get rid of padding
@@ -627,7 +653,8 @@ class TemporalUnetStateAction(nn.Module):
     def c_state_mask(self, context, x):
         c_state = context
         z_dim = self.problem_dict[c_state].dz
-        mask = torch.ones((self.transition_dim + z_dim), device=x.device).bool()
+        # mask = torch.ones((self.transition_dim + z_dim), device=x.device).bool()
+        mask = torch.ones((self.transition_dim), device=x.device).bool()
         if c_state == (-1, -1, -1):
             mask[27:36] = False
         elif c_state == (-1 , 1, 1):
@@ -635,98 +662,229 @@ class TemporalUnetStateAction(nn.Module):
         elif c_state == (1, -1, -1):
             mask[30:36] = False
         # Concat False to mask to match the size of x
-        mask = torch.cat((mask, torch.zeros(self.transition_dim + z_dim -x.shape[-1], device=x.device).bool()))
+        # mask = torch.cat((mask, torch.zeros(self.transition_dim + z_dim -x.shape[-1], device=x.device).bool()))
+        
         mask_no_z = mask.clone()
-        if z_dim > 0:
-            mask_no_z[-z_dim:] = False
+        mask = torch.cat((mask, mask), dim=-1)
+        # if z_dim > 0:
+        #     mask_no_z[-z_dim:] = False
         return c_state, mask, mask_no_z
 
-    def project(self, x_orig, x, context):
+    def init_z(self, x, problem_idx, mask):
+        x_mask = x[:, :, mask]
+        self.z_dict[problem_idx] = self.problem_dict[problem_idx].get_initial_z(x_mask, projected_diffusion=True)
+
+    def reset_z(self):
+        self.z_dict = {k:None for k in self.problem_dict}
+
+    def project(self, x_orig, x, context, p_matrix=None, xi_C=None):
+        N = x.shape[0]
+        Kh = 3
+        Ktheta = 1
+
+        # Is the below sufficient to go from dtheta/dt to df/dtheta?
+        # x[..., 14] += -33
+        dx = x.clone()
+        dx /= -Ktheta
+        # x = -x
+
         if self.problem_dict is not None:
             for problem_idx in self.problem_dict:
-                problem = self.problem_dict[problem_idx]
+
                 p_idx = sum(problem_idx)
-                c_state, mask, mask_no_z = self.c_state_mask(problem_idx, x)
-                num_dim = mask.long().sum()
 
                 x_this_problem = x_orig[context.sum(-1) == p_idx][:, None] * self.x_std + self.x_mean
-                grad_x_this_problem = x[context.sum(-1) == p_idx][:, None] * self.x_std
-                b = x_this_problem.shape[0]
-
-
-                
                 if x_this_problem.shape[0] == 0:
                     continue
+                grad_x_this_problem = dx[context.sum(-1) == p_idx][:, None]
+                grad_x_this_problem[:,:, :self.x_std.shape[0]] *= self.x_std
+                grad_x_this_problem[:,:, self.x_std.shape[0]:] *= self.x_std
+                b = x_this_problem.shape[0]
 
-                problem._preprocess(x_this_problem[:, :, mask_no_z], projected_diffusion=True)
-                z_dim = problem.dz
-                C, dC, _ = problem.combined_constraints(x_this_problem[:, :, mask], compute_hess=False, projected_diffusion=True)
+                c_state, mask, mask_no_z = self.c_state_mask(problem_idx, dx)
+                problem = self.problem_dict[problem_idx]
+                g_dim = problem.dg
+                h_dim = problem.dh
+                # z_this_problem = torch.zeros((x_this_problem.shape[0], 1, problem.dz), device=x.device, dtype=x.dtype)
 
                 dtype = torch.float64
-                C = C.to(dtype=dtype).squeeze()
-                dC = dC.to(dtype=dtype).squeeze()
-
-                update_this_c = torch.cat((grad_x_this_problem[:, :, mask], torch.zeros((b, 1, z_dim), device=x.device, dtype=dtype)), dim=-1)
-                eye = torch.eye(C.shape[1]).repeat(b, 1, 1).to(device=C.device, dtype=dtype)
+                z_dim = problem.dz
+                # update_this_c = torch.cat((grad_x_this_problem[:, :, mask], torch.zeros((b, 1, z_dim), device=x.device, dtype=dtype)), dim=-1)
+                update_this_c = grad_x_this_problem[:, :, mask]#.to(dtype)
                 
+                # if p_matrix is None:
+
+                problem._preprocess(x_this_problem[:, :, mask_no_z], dxu=update_this_c[:, :, :self.transition_dim][:, :, mask_no_z], projected_diffusion=True)
+                # x_this_problem_for_cnstrt = x_this_problem
+                num_dim = x_this_problem.shape[-1]
+                # num_dim = x_this_problem_for_cnstrt.shape[-1]
+
+                C, dC, _ = problem.combined_constraints(x_this_problem, 
+                                                        compute_hess=False, projected_diffusion=True,
+                                                        include_slack=False,
+                                                        compute_inequality=True,
+                                                        include_deriv_grad=True,)
+                C = C.to(dtype=dtype)
+                dC = dC.to(dtype=dtype)
+
+                dC_mask = ~(dC == 0).all(dim=-1)
+                # dC_mask[:, :3] = False
+                dg_mask = dC_mask[:, :g_dim]
+                g = C[:, :g_dim]
+                dg = dC[:, :g_dim]
+                dh_mask = dC_mask[:, g_dim:]
+                h = C[:, g_dim:]
+                dh = dC[:, g_dim:]
+
+                h_r = torch.relu(h)
+                print(np.round(torch.cat((g, h_r), dim=-1).flatten().cpu().detach().numpy(), 3))
+                g_masked = g[dg_mask].reshape(N, -1)
+                h_masked = h[dh_mask].reshape(N, -1)
+                dg_masked = dg[dg_mask].reshape(N, -1, dC.shape[-1])
+                dh_masked = dh[dh_mask].reshape(N, -1, dC.shape[-1])
+                dC = torch.cat((dg_masked, dh_masked), dim=1).reshape(N, -1, dC.shape[-1])
+                C = torch.cat((g_masked, h_masked), dim=-1).reshape(N, -1)
+
+                #TODO: Is this the correct way to mask the constraints?
+                I_p = h >= 0
+
+                h_I_p = h_masked[I_p].reshape(N, -1)
+                dh_I_p = dh_masked[I_p].reshape(N, -1, dC.shape[-1])
+
+                h_bar = torch.cat((g_masked, h_I_p), dim=1).to(dtype=dx.dtype)
+                dh_bar = torch.cat((dg_masked, dh_I_p), dim=1).to(dtype=dx.dtype)
+
+                # h_bar = g_masked.to(dtype=dx.dtype)
+                # dh_bar = dg_masked.to(dtype=dx.dtype)
+
+                # we try and invert the dC dCT, if it is singular then we use the psuedo-inverse
+                # eye = torch.eye(dC.shape[1]).repeat(N, 1, 1).to(device=C.device, dtype=self.dtype)
+                eye = torch.eye(dh_bar.shape[1]).repeat(N, 1, 1).to(device=C.device, dtype=dx.dtype)
+
+                eye_0 = eye.clone()
+                # eye_0[inactive_constraint_mask_eye] = 0
+                damping_factor = 1e-6
+                eye_0 *= damping_factor
+
+                dCdCT = dh_bar @ dh_bar.permute(0, 2, 1)
+                dCdCT = dCdCT.to(dtype=dx.dtype) * Ktheta
+                A_bmm = lambda x: dCdCT @ x
+                #
+                # damping_factor = 1e-1
                 try:
-                    dCdCT_inv = torch.linalg.solve(dC @ dC.permute(0, 2, 1) +
-                                                1e-6 * eye
-                                                , eye)
+                    dCdCT_inv = torch.linalg.solve(dCdCT + eye_0, eye)
+                    # dCdCT_inv = torch.linalg.solve(dCdCT, eye)
+                    if torch.any(torch.isnan(dCdCT_inv)):
+                        raise ValueError('nan in inverse')
                 except Exception as e:
-                    dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1) * 1e-6 * eye)
-                projection = dC.permute(0, 2, 1) @ dCdCT_inv @ dC
-                eye2 = torch.eye(x_this_problem.shape[-2] * num_dim, device=x.device, dtype=dtype).unsqueeze(0)
-                update_this_c = (eye2 - projection) @ update_this_c.reshape(b, -1, 1)
-                update_this_c = update_this_c.squeeze(-1)
+                    print(e)
+                    # dCdCT_inv = torch.linalg.lstsq(dC @ dC.permute(0, 2, 1), eye).solution
+                    # dCdCT_inv = torch.linalg.pinv(dC @ dC.permute(0, 2, 1))
+                    dCdCT_inv, _ = cg_batch(A_bmm, eye, verbose=False)
+                dCdCT_inv = dCdCT_inv.to(dtype=torch.float32)
+                # get projection operator
 
-                # Update to decrease constraint violation
-                xi_C = dCdCT_inv @ C.unsqueeze(-1)
-                xi_C = (dC.permute(0, 2, 1) @ xi_C).squeeze(-1)
+                # compute gradient for projection
+                # now the second index (1) is the
+                # x with which we are differentiating
 
-                update_this_c -= .1 * xi_C
+                # dCT = dC.permute(0, 2, 1).unsqueeze(1)
+                dC = dC.unsqueeze(1)
+                dh_bar_dJ = torch.bmm(dh_bar, update_this_c.permute(0, 2, 1))
+                second_term =  Ktheta * dh_bar_dJ - Kh * h_bar.unsqueeze(-1)
 
-                if problem.dz > 0:
-                    update_this_c = update_this_c[:, : :-problem.dz]
+                pi = -dCdCT_inv @ second_term
 
-                update_this_c = (update_this_c) / self.x_std[mask]
+                pi[:, g_masked.shape[-1]:] = torch.clamp(pi[:, g_masked.shape[-1]:], min=0)
+                    # p_matrix = p_matrix[:, :-z_dim, :-z_dim]
+                update_this_c = -Ktheta * (update_this_c.squeeze(1) + (dh_bar.permute(0, 2, 1) @ pi).squeeze(-1))
 
-                update_this_c = update_this_c.to(dtype=x.dtype)
+                # if problem.dz > 0:
+                #     update_this_c = update_this_c[:, : :-problem.dz]
 
-                c_ = (context.sum(-1) == p_idx).reshape(-1, 1).repeat(1, x.shape[-1])
-                m = mask.reshape(1, -1).repeat(x.shape[0], 1)
+                update_this_c = (update_this_c) / self.x_std[mask[:self.transition_dim]].repeat(2)
+
+                update_this_c = update_this_c.to(dtype=dx.dtype)
+
+                c_ = (context.sum(-1) == p_idx).reshape(-1, 1).repeat(1, dx.shape[-1])
+                m = mask.reshape(1, -1).repeat(dx.shape[0], 1)
 
                 full_mask = c_ & m
                 full_mask_inv_m = c_ & ~m
-                x[full_mask] = update_this_c.flatten()
-                x[full_mask_inv_m] = 0
+                dx[full_mask] = update_this_c.flatten()
+                dx[full_mask_inv_m] = 0
 
-        return x, x
+        return dx, p_matrix, xi_C
 
-    @torch.compile(mode='max-autotune')
+    # @torch.compile(mode='max-autotune')
     def compiled_conditional_test_fwd(self, t, x, context):
-        x_orig, x = self(t, x, context, dropout=False)
-        return x_orig, x
+        x_orig, dx, ddx = self(t, x, context, dropout=False)
+        return x_orig, dx, ddx
 
-    def compiled_conditional_test(self, t, x, context):
-        x_orig, x = self.compiled_conditional_test_fwd(t, x, context)
-        x, x = self.project(x_orig, x, context)
-        return x, x
+    def compiled_conditional_test(self, t, x, dx, context):
+        x_orig, _, ddx = self.compiled_conditional_test_fwd(t, x, context)
+        p_matrix, xi_C = None, None
+        # dx = torch.zeros_like(x)
+        # dx[:, 12:15] = (self.delta_goal - x[:, 12:15]) / (1-t)
+        # ddx = torch.zeros_like(ddx)
+        # dx[:, -21:] = .1 * x[:, -21:]
+        # Clip norm of dx[:, 12:15] to pi/6
+        # norm_mask = torch.norm(dx[:, 12:15], dim=-1) > 1
+        # dx[norm_mask, 12:15] = dx[norm_mask, 12:15] / torch.norm(dx[norm_mask, 12:15], dim=-1, keepdim=True) * 1
+        # print(dx[:, 12:15])
+        # if torch.isnan(dx).any():
+        #     print('nan in dx', t)
+        #     # Replace nan with 0
+        #     dx[torch.isnan(dx)] = 0
+        # dx *= -1
+        
+        # dx = None
+        ddx *= 1.
+        theta = torch.cat((dx, ddx), dim=-1)
+        
+        
+        # before_x = np.round(((x*self.x_std) + self.x_mean)[0, 14].item(), 3)
+        # before_dx = np.round((dx*self.x_std)[0, 14].item(), 3)
+        # before_ddx = np.round((ddx*self.x_std)[0, 14].item(), 3)
+        proj = True
+        if proj:
+            theta_adj, p_matrix, xi_C = self.project(x, theta, context)
+        else:
+            theta_adj, p_matrix, xi_C = theta, None, None
+        
+        dx = theta_adj[:, :self.transition_dim]
+        ddx = theta_adj[:, self.transition_dim:]
+        
+        # x_norm_mask = torch.norm(x, dim=-1) > 1
+        # x[x_norm_mask] = x[x_norm_mask] / torch.norm(x[x_norm_mask], dim=-1, keepdim=True) * 1
+        # return dx, None, None
+        # after_x = np.round(((x*self.x_std) + self.x_mean)[0, 14].item(), 3)
+        # after_dx = np.round((dx*self.x_std)[0, 14].item(), 3)
+        # after_ddx = np.round((ddx*self.x_std)[0, 14].item(), 3)
+        # print('t:', t.mean().item())
+        # print('Before adj:', (before_x, before_dx, before_ddx))
+        # print('After adj:', (after_x, after_dx, after_ddx))
+        # print('Diff:', (after_x - before_x, after_dx - before_dx, after_ddx - before_ddx))
+        # if (after_dx - before_dx) > 0:
+        #     print('dx increased')
+        # if (after_ddx - before_ddx) > 0:
+        #     print('ddx increased')
+        return dx, ddx, p_matrix, xi_C
 
-    @torch.compile(mode='max-autotune')
+    # @torch.compile(mode='max-autotune')
     def compiled_unconditional_test(self, t, x):
         _, x = self(t, x, context=None, dropout=False)
         return x, x
     
     @torch.compile(mode='max-autotune')
     def compiled_conditional_train_fwd(self, t, x, context):
-        x_orig, x = self(t, x, context, dropout=True)
-        return x_orig, x
+        x_orig, dx, ddx = self(t, x, context, dropout=True)
+        return x_orig, dx, ddx
     
     def compiled_conditional_train(self, t, x, context):
-        x_orig, x = self.compiled_conditional_train_fwd(t, x, context)
-        x, x = self.project(x_orig, x, context)
-        return x, x
+        x_orig, dx, ddx = self.compiled_conditional_train_fwd(t, x, context)
+        # x, p_matrix, xi_C = self.project(x_orig, x, context)
+        return dx, ddx, None, None
 
 class StateActionMLP(nn.Module):
 

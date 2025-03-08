@@ -1,0 +1,62 @@
+Importing module 'gym_38' (/home/abhinav/Downloads/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Downloads/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.1+cu121
+Device count 1
+/home/abhinav/Downloads/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinav/Documents/ccai
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(36, 128), (128, 256), (256, 512), (512, 1024)]
+Loaded trajectory sampler
+Current yaw: tensor([ 1.8865e-05,  1.2382e-02, -5.1842e-02], device='cuda:0')
+Current yaw: tensor([-0.0005,  0.0160, -0.0527], device='cuda:0')
+1 turn
+step 0
+step 1
+step 2
+step 3
+step 4
+step 5
+step 6
+step 7
+step 8
+step 9
+step 10
+step 11
+step 12
+step 13
+step 14
+step 15
+step 16
+step 17
+step 18
+step 19
+step 20
+step 21
+step 22
+step 23
+step 24
+step 25
+step 26
+step 27
+step 28
+step 29
+step 30
+step 31
+step 32
+step 33
+step 34
+step 35
+step 36
+step 37
+step 38
+step 39
+Elapsed time: 3.0552407409995794
+Sampling time 3.0558126600226387

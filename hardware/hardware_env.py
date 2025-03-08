@@ -259,4 +259,3 @@ if __name__ == "__main__":
         cur_pose[-4:-1] = torch.tensor(root_ori, dtype=cur_pose.dtype)
         
         sim_env.set_pose(cur_pose.reshape(1,-1))
-

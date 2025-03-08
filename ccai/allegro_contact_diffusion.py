@@ -120,6 +120,8 @@ class AllegroObjectProblemDiff(ConstrainedSVGDProblem):
         self.all_var_index = self.all_joint_index + self.obj_pos_index + self.control_index
         if kwargs.get('optimize_force', False):
             self.d += 12
+            if kwargs.get('env_force', False):
+                self.d += 3
             # indices for contact forces
             self._contact_force_indices_dict = {
                 'index': [0, 1, 2],
@@ -127,9 +129,16 @@ class AllegroObjectProblemDiff(ConstrainedSVGDProblem):
                 'ring': [6, 7, 8],
                 'thumb': [9, 10, 11]
             }
+            self.contact_force_indices_dict = {
+                'index': [-9, -8, -7],
+                'middle': [-6, -5, -4],
+                'thumb': [-3, -2, -1]
+            }
             self._contact_force_indices = [self._contact_force_indices_dict[finger] for finger in contact_fingers]
             self._contact_force_indices = list(itertools.chain.from_iterable(self._contact_force_indices))
             self.contact_force_indices = [32 + self.obj_dof + idx for idx in self._contact_force_indices]
+            if kwargs.get('env_force', False):
+                self.contact_force_indices += [32 + self.obj_dof + 12, 32 + self.obj_dof + 13, 32 + self.obj_dof + 14]
             self.all_var_index = self.all_var_index + self.contact_force_indices
 
         self.ee_names = {
@@ -149,6 +158,8 @@ class AllegroObjectProblemDiff(ConstrainedSVGDProblem):
             asset_object = get_assets_dir() + '/valve/valve_cylinder.urdf'
         elif object_type == 'screwdriver':
             asset_object = get_assets_dir() + '/screwdriver/screwdriver.urdf'
+        elif object_type == "card":
+            asset_object = get_assets_dir() + '/card/card.urdf'
         self.object_asset_pos = object_asset_pos
         self.moveable_object = moveable_object
         chain_object = pk.build_chain_from_urdf(open(asset_object).read())
@@ -159,6 +170,10 @@ class AllegroObjectProblemDiff(ConstrainedSVGDProblem):
         elif 'screwdriver' in object_type:
             object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver',
                                      use_collision_geometry=False)
+        elif 'card' in object_type:
+            object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/card',
+                                     use_collision_geometry=False)
+        self.object_sdf = object_sdf
         robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models',
                                 use_collision_geometry=False)
 
@@ -166,7 +181,6 @@ class AllegroObjectProblemDiff(ConstrainedSVGDProblem):
             pk.Transform3d(device=device).translate(object_asset_pos[0], object_asset_pos[1], object_asset_pos[2]))
 
         # contact checking
-        self.contact_scenes = {}
         collision_check_links = [self.ee_names[finger] for finger in self.fingers]
         self.contact_scenes = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
                                             collision_check_links=collision_check_links,
@@ -174,6 +188,7 @@ class AllegroObjectProblemDiff(ConstrainedSVGDProblem):
                                             points_per_link=1000,
                                             )
 
+        # self.contact_scenes.visualize_robot(torch.zeros(16).to(self.device), self.start[4*self.num_fingers:].to(self.device))
         ###### Joint limits ########
         # NOTE: DEBUG only, set the joint limit to be very large for now.
         index_x_max = torch.tensor([0.47, 1.6099999999, 1.7089999, 1.61799999]) + 10.05
@@ -207,6 +222,9 @@ class AllegroObjectProblemDiff(ConstrainedSVGDProblem):
             min_f = torch.ones(3 * len(contact_fingers)) * -10
             self.x_max = torch.cat((self.x_max, max_f))
             self.x_min = torch.cat((self.x_min, min_f))
+            if kwargs.get('env_force', False):
+                self.x_max = torch.cat((self.x_max, torch.ones(3) * 10))
+                self.x_min = torch.cat((self.x_min, torch.ones(3) * -10))
 
         #### functorch functions ######
         self.grad_kernel = jacrev(rbf_kernel, argnums=0)
@@ -217,7 +235,7 @@ class AllegroObjectProblemDiff(ConstrainedSVGDProblem):
         self.grad_singularity_constr = vmap(jacrev(self._singularity_constr))
         self.grad_euler_to_angular_velocity = jacrev(euler_to_angular_velocity, argnums=(0, 1))
 
-    def _preprocess(self, xu, projected_diffusion=False):
+    def _preprocess(self, xu, dxu=None, projected_diffusion=False):
         N = xu.shape[0]
         if not projected_diffusion:
             xu = xu.reshape(N, self.T, -1)
@@ -234,6 +252,23 @@ class AllegroObjectProblemDiff(ConstrainedSVGDProblem):
             pass
         else:
             raise NotImplementedError
+        if dxu is not None:
+            delta_q = dxu[:, :, :4 * self.num_fingers]
+            delta_theta = dxu[:, :, 4 * self.num_fingers: 4 * self.num_fingers + self.obj_dof]
+            if self.obj_ori_rep == 'axis_angle':
+                delta_theta = axis_angle_to_euler(delta_theta).float()
+            elif self.obj_ori_rep == 'euler':
+                pass
+            else:
+                raise NotImplementedError
+            delta_theta = delta_theta.float()
+            delta_delta_q = dxu[:, :, 4 * self.num_fingers + self.obj_dof: 4 * self.num_fingers + self.obj_dof + 4 * self.num_fingers]
+            delta_f = dxu[:, :, 4 * self.num_fingers + self.obj_dof + 4 * self.num_fingers:]
+
+            self.data['delta_q'] = delta_q.float()
+            self.data['delta_theta'] = delta_theta.float()
+            self.data['delta_delta_q'] = delta_delta_q.float()
+            self.data['delta_f'] = delta_f.float()
         self._preprocess_fingers(q, theta, self.contact_scenes, projected_diffusion=projected_diffusion)
 
     def _preprocess_fingers(self, q, theta, finger_ee_link, projected_diffusion=False):
@@ -783,12 +818,12 @@ class AllegroContactProblemDiff(AllegroObjectProblemDiff):
         self.contact_control_indices = [16 + self.obj_dof + idx for idx in self.contact_state_indices]
         self.friction_polytope_k = 8
 
-        self._contact_dg_per_t = self.num_contacts * (1) + 3
+        self._contact_dg_per_t = self.num_contacts * (2) + 3
             # self.dg_per_t = self.num_fingers * (1 + 3 + 2) + 3
             # self.dg_per_t = self.num_fingers * (1 + 3 + 2)
         self._contact_dg_constant = 0
         self._contact_dg = self._contact_dg_per_t * T + self._contact_dg_constant  # terminal contact points, terminal sdf=0, and dynamics
-        self._contact_dz = 0  # one friction constraints per finger
+        self._contact_dz = 2 * (self.friction_polytope_k) * self.num_contacts  # one friction constraints per finger
         self._contact_dh = self._contact_dz * T  # inequality
 
     def get_initial_xu(self, N):
@@ -1109,18 +1144,23 @@ class AllegroContactProblemDiff(AllegroObjectProblemDiff):
                            next_theta,
                            contact_jac,
                            contact_loc,
-                           contact_normal):
+                           contact_normal,
+                           dq=None,
+                           obj_omega=None):
         # N, _, _ = current_q.shape
         # T = self.T
         # approximate q dot and theta dot
-        dq = next_q - current_q
-        if self.obj_dof == 3:
-            obj_omega = euler_to_angular_velocity(current_theta, next_theta)
-        elif self.obj_dof == 1:
-            dtheta = next_theta - current_theta
-            obj_omega = torch.concat((torch.zeros_like(dtheta),
-                                      dtheta,
-                                      torch.zeros_like(dtheta)), -1)  # should be N x T-1 x 3
+        if dq is None:
+            dq = next_q - current_q
+
+        if obj_omega is None:
+            if self.obj_dof == 3:
+                obj_omega = euler_to_angular_velocity(current_theta, next_theta)
+            elif self.obj_dof == 1:
+                dtheta = next_theta - current_theta
+                obj_omega = torch.concat((torch.zeros_like(dtheta),
+                                        dtheta,
+                                        torch.zeros_like(dtheta)), -1)  # should be N x T-1 x 3
 
         contact_point_v = (contact_jac @ dq.reshape(4 * self.num_contacts, 1)).squeeze(-1)
 
@@ -1185,7 +1225,8 @@ class AllegroContactProblemDiff(AllegroObjectProblemDiff):
                                    current_theta,
                                    next_theta,
                                    contact_jacobian, contact_loc,
-                                   contact_normal).reshape(N, -1)
+                                   contact_normal, self.data['delta_q'],
+                                   self.data['delta_theta']).reshape(N, -1)
         g_dim = g.reshape(N, T, -1).shape[-1]
 
         if compute_grads:
@@ -1195,7 +1236,8 @@ class AllegroContactProblemDiff(AllegroObjectProblemDiff):
 
             dg_d_current_q, dg_d_next_q, dg_d_current_theta, dg_d_next_theta, dg_d_contact_jac, dg_d_contact_loc, dg_d_normal \
                 = self.grad_kinematics_constr(current_q, next_q, current_theta, next_theta, contact_jacobian,
-                                              contact_loc, contact_normal)
+                                              contact_loc, contact_normal, self.data['delta_q'],
+                                              self.data['delta_theta'])
             with torch.no_grad():
                 dg_d_current_q = dg_d_current_q + dg_d_contact_jac.reshape(N, T, g_dim, -1) @ \
                                  dJ_dq.reshape(N, T, -1, 4 * self.num_contacts)
@@ -1390,10 +1432,17 @@ class AllegroContactProblemDiff(AllegroObjectProblemDiff):
         else:
             contact_v_contact_frame = R.transpose(0, 1) @ self.world_trans.transform_normals(
                 (contact_jacobian @ dq).unsqueeze(0)).squeeze(0)
+            # if min_force is not None:
+            #     min_normal_force_con = min_force - contact_v_contact_frame[2]
+            #     print(min_force, min_normal_force_con)
         # TODO: there are two different ways of doing a friction cone
         # Linearized friction cone - but based on the contact point velocity
         # force is defined as the force of robot pushing the object
-        return B @ contact_v_contact_frame
+        constr = B @ contact_v_contact_frame
+        # if min_force is not None:
+        #     constr = torch.cat((constr, min_normal_force_con.unsqueeze(0)))
+
+        return constr
 
     @contact_finger_constraints
     def _friction_constraint(self, q, delta_q, finger_name, force=None, compute_grads=True, compute_hess=False, projected_diffusion=False):
@@ -1416,23 +1465,26 @@ class AllegroContactProblemDiff(AllegroObjectProblemDiff):
         # u is the delta q commanded
         # retrieved cached values
         contact_jac = self.data[finger_name]['contact_jacobian'].reshape(N, T + T_offset, 3, 16)[
-                      :, :-1, :, self.contact_state_indices]
+                      :, :T, :, self.contact_state_indices]
         contact_normal = self.data[finger_name]['contact_normal'].reshape(N, T + T_offset, 3)[:,
-                         :-1]  # contact normal is pointing out
+                         :T]  # contact normal is pointing out
         dnormal_dq = self.data[finger_name]['dnormal_dq'].reshape(N, T + T_offset, 3, 16)[
-                     :, :-1, :, self.contact_state_indices]
-        dnormal_dtheta = self.data[finger_name]['dnormal_denv_q'].reshape(N, T + T_offset, 3, self.obj_dof)[:, :-1]
+                     :, :T, :, self.contact_state_indices]
+        dnormal_dtheta = self.data[finger_name]['dnormal_denv_q'].reshape(N, T + T_offset, 3, self.obj_dof)[:, :T]
 
+       
         if force is None:
             # compute constraint value
             h = self.friction_constr(u,
                                      contact_normal.reshape(-1, 3),
-                                     contact_jac.reshape(-1, 3, 4 * self.num_contacts)).reshape(N, -1)
+                                     contact_jac.reshape(-1, 3, 4 * self.num_contacts),
+                                     ).reshape(N, -1)
         else:
             # compute constraint value
             h = self.friction_constr_force(u,
                                            contact_normal.reshape(-1, 3),
-                                           contact_jac.reshape(-1, 3, 4 * self.num_contacts)).reshape(N, -1)
+                                           contact_jac.reshape(-1, 3, 4 * self.num_contacts),
+                                           ).reshape(N, -1)
 
         # compute the gradient
         if compute_grads:
@@ -1448,7 +1500,7 @@ class AllegroContactProblemDiff(AllegroObjectProblemDiff):
                                                                                                  4 * self.num_contacts))
 
             djac_dq = self.data[finger_name]['dJ_dq'].reshape(N, T + T_offset, 3, 16, 16)[
-                      :, :-1, :, self.contact_state_indices][:, :, :, :, self.contact_state_indices]
+                      :, :T, :, self.contact_state_indices][:, :, :, :, self.contact_state_indices]
 
             dh = dh_dnormal.shape[1]
             dh_dq = dh_dnormal.reshape(N, T, dh, -1) @ dnormal_dq
@@ -1493,8 +1545,55 @@ class AllegroContactProblemDiff(AllegroObjectProblemDiff):
         return h, grad_h, None
 
     def _con_ineq(self, xu, compute_grads=True, compute_hess=False, verbose=False, projected_diffusion=False):
-        return None, None, None
+        N = xu.shape[0]
+        T = xu.shape[1]
+        q = xu[:, :, :self.num_fingers * 4]
+        delta_q = xu[:, :, self.num_fingers * 4 + self.obj_dof:self.num_fingers * 8 + self.obj_dof]
+        q = partial_to_full_state(q, fingers=self.fingers)
+        delta_q = partial_to_full_state(delta_q, fingers=self.fingers)
+        force = None
+        h, grad_h, hess_h = self._friction_constraint(
+            q=q, delta_q=delta_q, force=None,
+            compute_grads=compute_grads,
+            compute_hess=compute_hess,
+            projected_diffusion=projected_diffusion)
 
+        if self.optimize_force:
+            force = torch.zeros(N, T, 12, device=self.device)
+            force[:, :, self._contact_force_indices] = xu[:, :, -self.num_contacts * 3:]
+            h2, grad_h2, hess_h2 = self._friction_constraint(
+                q=q, delta_q=delta_q, force=None,
+                compute_grads=compute_grads,
+                compute_hess=compute_hess,
+                projected_diffusion=projected_diffusion)
+            h = torch.cat((h, h2), dim=1)
+            if grad_h is not None:
+                grad_h = torch.cat((grad_h, grad_h2), dim=1)
+            # if grad_h is not None:
+            #     grad_h = torch.cat((grad_h, grad_h2, grad_h_min), dim=1)
+            if hess_h is not None:
+                hess_h = torch.cat((hess_h, hess_h2), dim=1)
+        # print("friction", h.max())
+
+        if verbose:
+            print(f"max friction constraint: {torch.max(h)}")
+            # print(f"max step size constraint: {torch.max(h_step_size)}")
+            # print(f"max singularity constraint: {torch.max(h_sin)}")
+            result_dict = {}
+            result_dict['friction'] = torch.max(h).item()
+            # result_dict['singularity'] = torch.max(h_sin).item()
+            return result_dict
+
+        if compute_grads:
+            grad_h = grad_h.reshape(N, -1, (self.T + 1 if projected_diffusion else self.T) * self.d)
+        else:
+            return h, None, None
+        if compute_hess:
+            hess_h = torch.zeros(N, h.shape[1], self.T * (self.dx + self.du), self.T * (self.dx + self.du),
+                                 device=self.device)
+            return h, grad_h, hess_h
+        return h, grad_h, None
+    
     @contact_finger_constraints
     def _running_contact_constraints(self, q, finger_name, compute_grads=True, compute_hess=False,
                                      projected_diffusion=False):

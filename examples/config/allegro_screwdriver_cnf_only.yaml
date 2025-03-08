@@ -1,0 +1,70 @@
+---
+T: 12
+receding_horizon: False
+num_steps: 12
+num_turns: 1
+num_trials: 10
+visualize: True
+# experiment_name: 'allegro_screwdriver_csvto_cnf_ot_sigma_.01_orig_inpaint_dopri5_in_first'
+# experiment_name: 'allegro_screwdriver_cnf_project'
+# experiment_name: 'allegro_screwdriver_cnf_ot_sigma_.1_orig_inpaint_rk4_project_lr_2_m_.99'
+# experiment_name: 'allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_no_project_training_project_inference_alpha_C_1'
+# experiment_name: 'allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_no_project_training_project_inference_alpha_C_.1_all_constraints'
+# experiment_name: 'allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_project_training_C_0_project_inference_alpha_C_10_all_constraints'
+# experiment_name: 'allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_project_inference_alpha_C_10_all_constraints'
+# experiment_name: 'allegro_cnf_state_control_only_turn_only_group_norm_projected'
+# experiment_name: 'allegro_cnf_no_label_norm_cnf_sample_1_action_each_t_rk4_kh_3_ktheta_1_dt_.1_dx_ddx_mult_1._solve_for_u_hat'
+# experiment_name: 'allegro_cnf_no_label_norm_sample_1_action_each_t_rk4_dt_.1'
+# experiment_name: 'allegro_cnf_no_label_norm_cnf_sample_full_traj_rk4_kh_1_ktheta_3_dt_.003'
+experiment_name: 'allegro_cnf_no_label_norm_cnf_sample_full_traj_dopri5_sanity_check_spline'
+# experiment_name: 'allegro_cnf_no_label_norm_cnf_sample_full_project'
+type: 'cnf'
+# experiment_name: 'allegro_screwdriver_new_data_collection_5'
+mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
+# fingers: ['index', 'thumb']
+fingers: ['index', 'middle', 'thumb']
+object_type: 'screwdriver'
+sim_device: 'cpu'
+friction_coefficient: 1.0
+kp: 3.0
+heuristic: 1000
+max_depth: 11
+goal: -1.5
+prior: 1
+multi_particle_search: True
+replan: False
+visualize_plan: True
+optimize_force: True
+exclude_index: False
+projected: False
+use_saved_plans: True
+use_saved_noise: False
+use_guidance: False
+sample_contact: False
+use_partial_constraint: True
+sine_cosine: False
+project_state: False
+state_control_only: True
+cnf_resample: False
+# model_path: 'data/training/allegro_screwdriver/allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_no_project_training_cnf/allegro_screwdriver_cnf.pt'
+# model_path: 'data/training/allegro_screwdriver/allegro_cnf_state_control_only_turn_only_s0_st_sigma_.1_projected_training_projected_target_alpha_C_0_cnf/allegro_screwdriver_cnf.pt'
+# model_path: 'data/training/allegro_screwdriver/allegro_cnf_state_control_only_turn_only_group_norm_cnf/allegro_screwdriver_cnf.pt'
+# model_path: 'data/training/allegro_screwdriver/allegro_cnf_2nd_deriv_kl_.01_sigma_.03_cnf/allegro_screwdriver_cnf.pt'
+model_path: 'data/training/allegro_screwdriver/allegro_cnf_1st_2nd_deriv_kl_.01_sigma_.03_no_label_norm_cnf/allegro_screwdriver_cnf.pt'
+controllers:
+  csvgd:
+    # N: 16
+    N: 1
+    alpha_J: 1.0e-2
+    alpha_C: 1
+    step_size: 0.1
+    momentum: 0.
+    device: 'cuda:0'
+    online_iters: 0
+    warmup_iters: 0
+    resample_steps: 16
+    resample_sigma: 0.01
+    resample_temperature: 0.1
+    penalty: 1000000
+    collision_checking: False
+    joint_friction: 0.0

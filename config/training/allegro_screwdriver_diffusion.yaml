@@ -1,6 +1,6 @@
 ---
-model_name: 'allegro_screwdriver_recovery_best_traj_only_5_10_15_5000_training_per_epoch_downsample_balance'
-T: 9
+model_name: 'allegro_recovery_model_fix_norm_constant_all_data'
+T: 13
 dx: 15
 du: 21
 load_checkpoint: False
@@ -18,7 +18,7 @@ lr: 1.0e-4
 model_type: 'diffusion'
 discriminator_guidance: True
 inverse_dynamics: False
-data_directory: 'allegro_screwdriver_recovery_data_old'
+data_directory: 'allegro_recovery_and_orig'
 device: 'cuda:1'
 test_every: 9999999999
 save_every: 1000
@@ -37,6 +37,8 @@ use_ema: True
 ema_decay: 0.995
 ema_warmup_steps: 1000
 ema_update_every: 10
+skip_pregrasp: True
+
 skip_pregrasp: True
 
 test_directory: 'quadrotor_compose'

@@ -81,19 +81,33 @@ class ConstrainedSVGDProblem(Problem):
     def eval(self, x):
         pass
 
-    def combined_constraints(self, augmented_x, compute_grads=True, compute_hess=True, projected_diffusion=False, include_slack=True):
+    def combined_constraints(self, augmented_x, compute_grads=True, compute_hess=True, projected_diffusion=False, include_slack=True,
+                             compute_inequality=True, include_deriv_grad=False):
+        
+        mult = 2 if include_deriv_grad else 1
         N = augmented_x.shape[0]
-        T_offset = 0 #if projected_diffusion else 1
-        augmented_x = augmented_x.reshape(N, self.T + T_offset, self.dx + self.du + self.dz)
+        T_offset = 0
+        if include_slack:
+            augmented_x = augmented_x.reshape(N, self.T + T_offset, self.dx + self.du + self.dz)
+        else:
+            augmented_x = augmented_x.reshape(N, self.T + T_offset, self.dx + self.du)
         xu = augmented_x[:, :, :(self.dx + self.du)]
         if self.dz > 0:
             z = augmented_x[:, :, -self.dz:]
         else:
             include_slack = False
 
-        g, grad_g, hess_g, t_mask_g = self._con_eq(xu, compute_grads=compute_grads, compute_hess=compute_hess, projected_diffusion=projected_diffusion)
-        h, grad_h, hess_h, t_mask_h = self._con_ineq(xu, compute_grads=compute_grads, compute_hess=compute_hess, projected_diffusion=projected_diffusion)
-
+        g, grad_g, hess_g = self._con_eq(xu, compute_grads=compute_grads, compute_hess=compute_hess, projected_diffusion=projected_diffusion, include_deriv_grad=include_deriv_grad)
+        if compute_inequality:
+            h, grad_h, hess_h = self._con_ineq(xu, compute_grads=compute_grads, compute_hess=compute_hess, projected_diffusion=projected_diffusion, include_deriv_grad=include_deriv_grad)
+            if grad_g is not None and grad_h is not None:
+                max_dim = max(grad_g.shape[-1], grad_h.shape[-1])
+                grad_g = torch.cat((grad_g, torch.zeros(N, self.dg, max_dim - grad_g.shape[-1], device=self.device)), dim=-1)
+                grad_h = torch.cat((grad_h, torch.zeros(N, self.dh, max_dim - grad_h.shape[-1], device=self.device)), dim=-1)
+        else:
+            h = None
+            grad_h = None
+            hess_h = None
         # print(g.max(), g.min(), h.max(), h.min())
 
         if h is None:
@@ -124,9 +138,9 @@ class ConstrainedSVGDProblem(Problem):
             grad_h_aug = torch.cat((
                 grad_h.reshape(N, (self.T + T_offset), self.dz, (self.T + T_offset), -1),
                 z_extended), dim=-1)
-            grad_h_aug = grad_h_aug.reshape(N, self.dh +self.dz * T_offset, (self.T + T_offset) * (self.dx + self.du + self.dz))
+            grad_h_aug = grad_h_aug.reshape(N, self.dh +self.dz * T_offset, mult * (self.T + T_offset) * (self.dx + self.du + self.dz))
         else:
-            grad_h_aug = grad_h.reshape(N, self.dh, (self.T + T_offset) * (self.dx + self.du))
+            grad_h_aug = grad_h.reshape(N, self.dh, mult * (self.T + T_offset) * (self.dx + self.du))
 
         if compute_hess:
             # Hessians - second derivative wrt z should be identity
@@ -157,9 +171,9 @@ class ConstrainedSVGDProblem(Problem):
                 grad_g.reshape(N, self.dg + self.dg_per_t * T_offset, (self.T + T_offset), -1),
                 torch.zeros(N, self.dg + self.dg_per_t * T_offset, (self.T + T_offset), self.dz, device=self.device)),
                 dim=-1
-            ).reshape(N, self.dg + self.dg_per_t * T_offset, (self.T + T_offset) * (self.dx + self.du + self.dz))
+            ).reshape(N, self.dg + self.dg_per_t * T_offset, mult * (self.T + T_offset) * (self.dx + self.du + self.dz))
         else:
-            grad_g_aug = grad_g.reshape(N, self.dg + self.dg_per_t * T_offset, (self.T + T_offset) * (self.dx + self.du))
+            grad_g_aug = grad_g.reshape(N, self.dg + self.dg_per_t * T_offset, mult * (self.T + T_offset) * (self.dx + self.du))
         if compute_hess:
             hess_g_aug = torch.zeros(N, self.dg,
                                      (self.T + T_offset), (self.dx + self.du + self.dz),
@@ -184,8 +198,7 @@ class ConstrainedSVGDProblem(Problem):
         return c, grad_c, hess_c, t_mask
 
     def get_initial_z(self, x, projected_diffusion=False):
-        self._preprocess(x, projected_diffusion)
-        T_offset = 1 if projected_diffusion else 0
+        self._preprocess(x, projected_diffusion=projected_diffusion)
         N = x.shape[0]
         h, _, _, _ = self._con_ineq(x, compute_grads=False, compute_hess=False, projected_diffusion=projected_diffusion)
         if h is not None:
@@ -195,7 +208,7 @@ class ConstrainedSVGDProblem(Problem):
             else:
                 z = torch.where(h < 0, -h / self.slack_weight, 0)
 
-            return z.reshape(-1, self.T + T_offset, self.dz)
+            return z.reshape(-1, self.T, self.dz)
 
 
 class IpoptProblem(Problem):

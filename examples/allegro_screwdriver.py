@@ -376,7 +376,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 optimize_force=params['optimize_force'],
             )
             # finger gate index
-            index_regrasp_problem_diff = AllegroScrewdriverDiff(
+            index_regrasp_problem_diff = AllegroScrewdriver(
                 start=start[:4 * num_fingers + obj_dof],
                 goal=params['valve_goal'],
                 T=1,
@@ -393,7 +393,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 optimize_force=params['optimize_force'],
                 default_dof_pos=env.default_dof_pos[:, :16]
             )
-            thumb_and_middle_regrasp_problem_diff = AllegroScrewdriverDiff(
+            thumb_and_middle_regrasp_problem_diff = AllegroScrewdriver(
                 start=start[:4 * num_fingers + obj_dof],
                 goal=params['valve_goal'],
                 T=1,
@@ -410,7 +410,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 optimize_force=params['optimize_force'],
                 default_dof_pos=env.default_dof_pos[:, :16]
             )
-            turn_problem_diff = AllegroScrewdriverDiff(
+            turn_problem_diff = AllegroScrewdriver(
                 start=start[:4 * num_fingers + obj_dof],
                 goal=params['valve_goal'],
                 T=1,
@@ -965,7 +965,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                         traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
                         # traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof] = axis_angle_to_euler(traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof])
 
-                        viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/{name}/{k}")
+                        viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/{name}/init/{k}")
                         img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
                         gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
                         pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
@@ -986,7 +986,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
             initial_samples = _full_to_partial(initial_samples, mode)
             initial_x = initial_samples[:, 1:, :planner.problem.dx]
-            initial_u = initial_samples[:, :-1, -planner.problem.du:]
+            if params['type'] == 'cnf':
+                initial_u = initial_samples[:, 1:, -planner.problem.du:]
+            else:
+                initial_u = initial_samples[:, :-1, -planner.problem.du:]
             initial_samples = torch.cat((initial_x, initial_u), dim=-1)
 
 
@@ -1015,7 +1018,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         }
         plans = None
         resample = params.get('diffusion_resample', False)
-        for k in range(planner.problem.T):  # range(params['num_steps']):
+        resample_cnf = params.get('cnf_resample', False)
+        for k in range(params['T']):  # range(params['num_steps']):
             state = env.get_state()
             state = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
             print(state)
@@ -1061,7 +1065,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                             timestep=50)
                     initial_samples = _full_to_partial(initial_samples, mode)
                     initial_x = initial_samples[:, 1:, :planner.problem.dx]
-                    initial_u = initial_samples[:, :-1, -planner.problem.du:]
+                    if params['type'] == 'cnf':
+                        initial_u = initial_samples[:, 1:, -planner.problem.du:]
+                    else:
+                        initial_u = initial_samples[:, :-1, -planner.problem.du:]
                     initial_samples = torch.cat((initial_x, initial_u), dim=-1)
 
                     # if state[-1] < -1.0:
@@ -1110,7 +1117,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 index_force = torch.norm(best_traj[..., 27:30], dim=-1)
                 print('Index force:', index_force)
             if params['controller'] != 'diffusion_policy':
-                action = best_traj[0, planner.problem.dx:planner.problem.dx + planner.problem.du]
                 x = best_traj[0, :planner.problem.dx + planner.problem.du]
                 x = x.reshape(1, planner.problem.dx + planner.problem.du)
                 action = x[:, planner.problem.dx:planner.problem.dx + planner.problem.du].to(device=env.device)
@@ -1965,7 +1971,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 env.set_external_wrench_perturb(False)
             contact = 'pregrasp'
             start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
+            a = time.perf_counter()
             best_traj, _ = pregrasp_planner.step(start[:pregrasp_planner.problem.dx])
+            print(f'Solve time for pregrasp', time.perf_counter() - a)
             for x in best_traj[:, :4 * num_fingers]:
                 action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
                 env.step(action)
@@ -1976,7 +1984,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     # for i in range(3):
                     #     sim_viz_env.step(action)
                     state = sim_viz_env.get_state()['q'].reshape(-1).to(device=params['device'])
-                    print(state[:15][-3:])
             if params['mode'] == 'hardware':
                 input("Pregrasp complete. Ready to execute. Press <ENTER> to continue.")
             stage += 1

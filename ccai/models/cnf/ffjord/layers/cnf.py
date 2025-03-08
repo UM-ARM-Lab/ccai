@@ -47,14 +47,15 @@ class CNF(nn.Module):
             self.odefunc,
             state,
             integration_times.to(z),
+            options=self.solver_options,
             atol=self.test_atol,
             rtol=self.test_rtol,
             method=self.test_solver,
         )
 
         #TODO: Fix for other integration time settings
-        if len(integration_times) == 2:
-            state_t = tuple(s[1] for s in state_t)
+        # if len(integration_times) == 2:
+        #     state_t = tuple(s[1] for s in state_t)
 
         z_t, dlogpx_t = state_t[:2]
 

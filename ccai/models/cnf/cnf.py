@@ -3,14 +3,17 @@
 import torch
 torch.set_float32_matmul_precision('high')
 import torch.nn as nn
-from torch.nn.functional import mse_loss
+from torch.nn.functional import mse_loss, huber_loss
 from torch.func import jacrev, vmap
+# from torchcubicspline import(natural_cubic_spline_coeffs, 
+#                              NaturalCubicSpline)
 
 from ccai.models.temporal import TemporalUnet, TemporalUnetDynamics, TemporalUnetStateAction, StateActionMLP
 
 from ccai.models.cnf.ffjord.layers import CNF, ODEfunc
 # from torchcfm.conditional_flow_matching import SchrodingerBridgeConditionalFlowMatcher, ExactOptimalTransportConditionalFlowMatcher
 from ccai.models.helpers import SinusoidalPosEmb
+from torch_cg import cg_batch
 # import ot
 import numpy as np
 from tqdm import tqdm
@@ -82,10 +85,12 @@ def set_cnf_options(solver, model):
             module.atol = 1e-5
             module.rtol = 1e-5
 
+            # module.solver_options['first_step'] = 0.2
             # If using fixed-grid adams, restrict order to not be too high.
             if solver in ['fixed_adams', 'explicit_adams']:
                 module.solver_options['max_order'] = 4
-            module.solver_options['first_step'] = 0.2
+            if solver == 'rk4':
+                module.solver_options['step_size'] = .003
 
             # Set the test settings
             module.test_solver = solver
@@ -109,7 +114,7 @@ class TrajectoryCNF(nn.Module):
             hidden_dim=32,
             inflation_noise=0.0,
             state_only=False,
-            state_control_only=False
+            state_control_only=False,
     ):
         super().__init__()
 
@@ -138,7 +143,7 @@ class TrajectoryCNF(nn.Module):
             #                         cond_dim=context_dim,
             #                         dim=hidden_dim, dim_mults=(1, 2, 4, 8),
             #                         attention=False)
-            self.FM = ExactOptimalTransportConditionalFlowMatcher(sigma=.01)
+            self.FM = ExactOptimalTransportConditionalFlowMatcher(sigma=.1)
         else:
             self.loss_type = 'conditional_ot_sb'
             # sigma = .025 ** .5
@@ -152,6 +157,8 @@ class TrajectoryCNF(nn.Module):
         # self.model = MLP(horizon * xu_dim, context_dim, 256, num_layers=4)
         # self.model = TrajectoryConvNet(xu_dim, context_dim)
 
+        self.label_norm_v = nn.BatchNorm1d(self.xu_dim, affine=False)
+        self.label_norm_a = nn.BatchNorm1d(self.xu_dim, affine=False)
         self.register_buffer('prior_mu', torch.zeros(horizon, self.xu_dim))
         self.register_buffer('prior_sigma', torch.ones(horizon, self.xu_dim))
         self.register_buffer('x_mean', torch.zeros(self.xu_dim))
@@ -162,13 +169,14 @@ class TrajectoryCNF(nn.Module):
         noise_dist = torch.distributions.Normal(self.prior_mu, self.prior_sigma)
 
         odefunc = ODEfunc(
-            diffeq=self.masked_grad if self.loss_type == 'conditional_ot_sb' else self.state_control_only_forward,
+            diffeq=self.masked_grad,# if self.loss_type == 'conditional_ot_sb' else self.state_control_only_forward,
             divergence_fn='approximate',
             residual=False,
             rademacher=False,
         )
 
-        solver = 'dopri5'
+        # solver = 'dopri5'
+        solver = 'rk4'
         self.flow = CNF(odefunc=odefunc,
                         T=1.0,
                         train_T=False,
@@ -190,27 +198,48 @@ class TrajectoryCNF(nn.Module):
 
         self.interp = vmap(self._interp, randomness='same')
         self.dinterp_dt = vmap(jacrev(self._interp, argnums=2), randomness='same')
-        # self.jac = jacrev(self.interp, argnums=)
 
     def state_control_only_forward(self, t, x, context=None):
         dx, _ = self.model(t, x, context)
         return dx * (self.horizon-1)
 
-    def masked_grad(self, t, x, context=None):
-        dx, _ = self.model(t, x, context)
+    def masked_grad(self, t, xdx, context=None):
+        # print(f'step {self.step_id}')
+        if t == 1:
+            return torch.zeros_like(xdx)
+        self.step_id += 1
+        # print(t)
+        x_arange = torch.linspace(0, 1, self.traj.shape[1], device=self.traj.device).expand(self.traj.shape[0], -1)
+        # t_mask = x_arange > t
+        # x_arange[:, 0] = t
+        # x_arange = x_arange[t_mask]
+        # Concat t to x_arange front
+        # x_arange = torch.cat((t.reshape(1), x_arange)).unsqueeze(0)
+        # self.traj[:, 0] = xdx[:, :self.xu_dim]
+        # traj = torch.cat((xdx.unsqueeze(1), self.traj[t_mask].unsqueeze(0)), dim=1)
 
-        if len(self._grad_mask.shape) == 4:
-            num_samples, num_sub_trajs = self._grad_mask.shape[:2]
+        traj = self.traj
+        _, dx, ddx = self.interp(x_arange, traj, t.reshape(-1, 1))
+        ds_ret = torch.zeros_like(xdx)
+        # ds_ret[..., :self.xu_dim] = dx*12
+        ds_ret[..., :self.xu_dim] = xdx[..., self.xu_dim:]
+        ds_ret[..., self.xu_dim:] = ddx# * 12#*12
 
-            dx = dx.reshape(-1, num_sub_trajs, self.horizon, self.xu_dim)
-            for i in range(num_sub_trajs - 1):
-                tmp = dx[:, i, -1, :self.dx].clone()
-                dx[:, i, -1, :self.dx] = (tmp + dx[:, i + 1, 0, :self.dx]) / 2
-                dx[:, i + 1, 0, :self.dx] = dx[:, i, -1, :self.dx]
+        # x = xdx[..., :self.xu_dim]
+        # dx = xdx[..., self.xu_dim:]
+        # dx, ddx, _, _ = self.model.compiled_conditional_test(t, x, dx, context)
 
-            dx = dx.reshape(-1, self.horizon, self.xu_dim)
+        # # if hasattr(self, 'label_norm_a'):
+        # #     ddx = self.label_norm_a.running_mean + ddx * self.label_norm_a.running_var.sqrt()
 
-        return dx# * self._grad_mask.reshape(-1, self.horizon, self.xu_dim)
+        # ds_ret = torch.zeros_like(xdx)
+        # if dx is None:
+        #     ds_ret[..., :self.xu_dim] = xdx[..., self.xu_dim:]
+        # else:
+        #     ds_ret[..., :self.xu_dim] = dx
+        # ds_ret[..., self.xu_dim:] = ddx
+        
+        return ds_ret
 
     def flow_matching_loss(self, xu, context, mask=None):
         if self.loss_type == 'diffusion':
@@ -266,42 +295,116 @@ class TrajectoryCNF(nn.Module):
             'flow_loss': flow_loss,
             'action_loss': action_loss
         }
-    
+
     def h_poly(self, t):
-        tt = t[None, :]**torch.arange(4, device=t.device)[:, None]
+        tt = t[None, :]**torch.arange(8, device=t.device)[:, None]
         A = torch.tensor([
-            [1, 0, -3, 2],
-            [0, 1, -2, 1],
-            [0, 0, 3, -2],
-            [0, 0, -1, 1]
+        #[0, 1,  2,   3,    4,   5,    6,   7],
+            [1, 0,  0,   0,  -35,  84,  -70,  20], #p0
+            [0, 1,  0,   0,  -20,  45,  -36,  10], #v0
+            [0, 0, .5,   0,   -5,  10, -7.5,   2], #a0
+            [0, 0,  0, 1/6, -2/3,   1, -2/3, 1/6], #j0
+            [0, 0,  0,   0,   35, -84,   70, -20], #p1
+            [0, 0,  0,   0,  -15,  39,  -34,  10], #v1
+            [0, 0,  0,   0,  5/2,  -7, 13/2,  -2], #a1
+            [0, 0,  0,   0, -1/6, 1/2, -1/2, 1/6], #j1
         ], dtype=t.dtype, device=t.device)
+        return A @ tt
+
+    def dh_poly(self, t):
+        tt = t[None, :]**torch.arange(8, device=t.device)[:, None]
+        A = torch.tensor([[   0.0000,    0.0000,    0.0000, -140.0000,  420.0000, -420.0000,
+            140.0000,    0.0000],
+            [   1.0000,    0.0000,    0.0000,  -80.0000,  225.0000, -216.0000,
+            70.0000,    0.0000],
+            [   0.0000,    1.0000,    0.0000,  -20.0000,   50.0000,  -45.0000,
+            14.0000,    0.0000],
+            [   0.0000,    0.0000,    0.5000,   -2.6667,    5.0000,   -4.0000,
+                1.1667,    0.0000],
+            [   0.0000,    0.0000,    0.0000,  140.0000, -420.0000,  420.0000,
+            -140.0000,    0.0000],
+            [   0.0000,    0.0000,    0.0000,  -60.0000,  195.0000, -204.0000,
+            70.0000,    0.0000],
+            [   0.0000,    0.0000,    0.0000,   10.0000,  -35.0000,   39.0000,
+            -14.0000,    0.0000],
+            [   0.0000,    0.0000,    0.0000,   -0.6667,    2.5000,   -3.0000,
+                1.1667,    0.0000]], dtype=t.dtype, device=t.device)
+        
+        return A @ tt
+
+    def d2h_poly(self, t):
+        tt = t[None, :]**torch.arange(8, device=t.device)[:, None]
+        A = torch.tensor([[ 0.0000e+00,  0.0000e+00, -4.2000e+02,  1.6800e+03, -2.1000e+03,
+            8.4000e+02,  0.0000e+00,  0.0000e+00],
+            [ 0.0000e+00,  0.0000e+00, -2.4000e+02,  9.0000e+02, -1.0800e+03,
+            4.2000e+02,  0.0000e+00,  0.0000e+00],
+            [ 1.0000e+00,  0.0000e+00, -6.0000e+01,  2.0000e+02, -2.2500e+02,
+            8.4000e+01,  0.0000e+00,  0.0000e+00],
+            [ 0.0000e+00,  1.0000e+00, -8.0000e+00,  2.0000e+01, -2.0000e+01,
+            7.0000e+00,  0.0000e+00,  0.0000e+00],
+            [ 0.0000e+00,  0.0000e+00,  4.2000e+02, -1.6800e+03,  2.1000e+03,
+            -8.4000e+02,  0.0000e+00,  0.0000e+00],
+            [ 0.0000e+00,  0.0000e+00, -1.8000e+02,  7.8000e+02, -1.0200e+03,
+            4.2000e+02,  0.0000e+00,  0.0000e+00],
+            [ 0.0000e+00,  0.0000e+00,  3.0000e+01, -1.4000e+02,  1.9500e+02,
+            -8.4000e+01,  0.0000e+00,  0.0000e+00],
+            [ 0.0000e+00,  0.0000e+00, -2.0000e+00,  1.0000e+01, -1.5000e+01,
+            7.0000e+00,  0.0000e+00,  0.0000e+00]], dtype=t.dtype, device=t.device)
         return A @ tt
 
     def _interp(self,x, y, xs):
         x_ = x.reshape(-1, 1)
         m = (y[1:] - y[:-1]) / (x_[1:] - x_[:-1])
         m = torch.cat([m[[0]], (m[1:] + m[:-1]) / 2, m[[-1]]])
+        m_prime = (m[1:] - m[:-1]) / (x_[1:] - x_[:-1])
+        m_prime = torch.cat([m_prime[[0]], (m_prime[1:] + m_prime[:-1]) / 2, m_prime[[-1]]])
 
+        m_prime_prime = (m_prime[1:] - m_prime[:-1]) / (x_[1:] - x_[:-1])
+        m_prime_prime = torch.cat([m_prime_prime[[0]], (m_prime_prime[1:] + m_prime_prime[:-1]) / 2, m_prime_prime[[-1]]])
+        
         idxs = torch.searchsorted(x[1:], xs)
         dx = (x[idxs + 1] - x[idxs])
-        hh = self.h_poly((xs - x[idxs]) / dx).unsqueeze(-1)#.unsqueeze(-1)
-        # ret = hh[0] * torch.gather(y, 1, idxs.reshape(-1, 1, 1).expand(-1, -1, y.shape[-1]))
-        ret = hh[0] * y[idxs]
+        hh = self.h_poly((xs - x[idxs]) / dx).unsqueeze(-1)
+        hh_deriv = self.dh_poly((xs - x[idxs]) / dx).unsqueeze(-1)#.unsqueeze(-1)        # ret = hh[0] * torch.gather(y, 1, idxs.reshape(-1, 1, 1).expand(-1, -1, y.shape[-1]))
+        hh_deriv2 = self.d2h_poly((xs - x[idxs]) / dx).unsqueeze(-1)#.unsqueeze(-1)
         dx = dx.unsqueeze(-1)#.unsqueeze(-1)
-
         # ret += hh[1] * torch.gather(m, 1, idxs.reshape(-1, 1, 1).expand(-1, -1, y.shape[-1])) * dx
         # ret += hh[2] * torch.gather(y, 1, 1+idxs.reshape(-1, 1, 1).expand(-1, -1, y.shape[-1]))
         # ret += hh[3] * torch.gather(m, 1, 1+idxs.reshape(-1, 1, 1).expand(-1, -1, y.shape[-1])) * dx
         
+        ret = hh[0] * y[idxs]
         ret += hh[1] * m[idxs] * dx
-        ret += hh[2] * y[idxs+1]
-        ret += hh[3] * m[idxs+1] * dx
+        ret += hh[2] * m_prime[idxs] * dx * dx * .5
+        ret += hh[3] * m_prime_prime[idxs] * dx * dx * dx * (1/6)
 
-        return ret.squeeze()
+        ret += hh[4] * y[idxs+1]
+        ret += hh[5] * m[idxs+1] * dx
+        ret += hh[6] * m_prime[idxs+1] * dx * dx * .5
+        ret += hh[7] * m_prime_prime[idxs+1] * dx * dx * dx * (1/6)
 
-    # xs = torch.tensor([0.1, 0.5, 1.5, 2.5, 2.75], requires_grad=True)
+        ret_dh = hh_deriv[0] * y[idxs]
+        ret_dh += hh_deriv[1] * m[idxs] * dx
+        ret_dh += hh_deriv[2] * m_prime[idxs] * dx * dx * .5
+        ret_dh += hh_deriv[3] * m_prime_prime[idxs] * dx * dx * dx * (1/6)
 
-    # interpolated = interp(torch.tensor([0, 1, 2., 3]), torch.tensor([1., 2.25, 3., 4.]), xs)
+        ret_dh += hh_deriv[4] * y[idxs+1]
+        ret_dh += hh_deriv[5] * m[idxs+1] * dx
+        ret_dh += hh_deriv[6] * m_prime[idxs+1] * dx * dx * .5
+        ret_dh += hh_deriv[7] * m_prime_prime[idxs+1] * dx * dx * dx * (1/6)
+
+        ret_d2h = hh_deriv2[0] * y[idxs]
+        ret_d2h += hh_deriv2[1] * m[idxs] * dx
+        ret_d2h += hh_deriv2[2] * m_prime[idxs] * dx * dx * .5
+        ret_d2h += hh_deriv2[3] * m_prime_prime[idxs] * dx * dx * dx * (1/6)
+
+        ret_d2h += hh_deriv2[4] * y[idxs+1]
+        ret_d2h += hh_deriv2[5] * m[idxs+1] * dx
+        ret_d2h += hh_deriv2[6] * m_prime[idxs+1] * dx * dx * .5
+        ret_d2h += hh_deriv2[7] * m_prime_prime[idxs+1] * dx * dx * dx * (1/6)
+        return ret.squeeze(), ret_dh.squeeze(), ret_d2h.squeeze()
+    
+    def standard_normal_kl_div(self, mu, logvar):
+        return -0.5 * (1 + logvar - mu.pow(2) - logvar.exp()).mean()
 
     def flow_matching_loss_state_control_only(self, xu, context, mask=None):
 
@@ -316,100 +419,155 @@ class TrajectoryCNF(nn.Module):
         t0_ind = (t0 * (self.horizon-1)).long() # Get local time index for vector field prediction
         t_ind.clamp_(0, self.horizon-2)
         t0_ind.clamp_(0, self.horizon-2)
-        t_ind_for_gather = t_ind.reshape(xu.shape[0], 1, 1).repeat(1, 1, self.xu_dim)
-        t_ind_for_gather_1 = t_ind_for_gather + 1
-        # t_ind_for_gather_1 = t_ind_for_gather + self.horizon - 1
+        t0_ind_for_gather = t0_ind.reshape(xu.shape[0], 1, 1).repeat(1, 1, self.xu_dim)
 
-        if t_ind_for_gather_1.max() >= self.horizon:
-            print('t_ind_for_gather_1', t_ind_for_gather_1.max())
-        x0 = torch.gather(xu, 1, t_ind_for_gather).squeeze()
-        x1 = torch.gather(xu, 1, t_ind_for_gather_1).squeeze()
+        x_init = torch.gather(xu, 1, t0_ind_for_gather).squeeze()
 
-        truevt = (x1 - x0) #* (self.horizon - 1)
-        # xut = x0 + (t * self.horizon - t_ind.float()) * truevt/(self.horizon-1)
-        # xut = x1 * (t*(self.horizon-1) - t_ind) + x0 * (t_ind + 1 - t*(self.horizon-1))
-        
         x_arange = torch.linspace(0, 1, xu.shape[1], device=xu.device).expand(xu.shape[0], -1)
 
-        
-        # xt = x1 * (t + t0) + x0 * (1 - (t + t0))
+        rand_for_u0 = torch.randn_like(xu[:, 0,  self.dx:])
 
+        noise_mean, noise_logvar = self.model.noise_dist(x_init[..., :self.dx])
 
-        u0 = x0[..., self.dx:]
-        # u0[((t_ind - t0_ind) == 0).flatten()] = torch.randn_like(u0[((t_ind - t0_ind) == 0).flatten()])
-        rand_for_u0 = torch.randn_like(u0)
-        goal_u0 = x1[:, self.dx:]
-        arange0 = torch.arange(rand_for_u0.shape[0], device=xu.device)
-        arange1 = torch.arange(goal_u0.shape[0], device=xu.device)
-        # a = time.perf_counter()
-        rand_for_u0, goal_u0, arange0, arange1 = self.FM.ot_sampler.sample_plan_with_labels(rand_for_u0, goal_u0, y0=arange0, y1=arange1)#, replace=False)
-        # _, ut, _, arange0, arange1 = self.FM.guided_sample_location_and_conditional_flow(rand_for_u0, goal_u0, y0=arange0, y1=arange1, t=t)#, replace=False)
-        # Rearrange ut, true_uv using arange
-        rand_for_u0 = rand_for_u0[arange1]
-        xu[:, 0, self.dx:] = rand_for_u0
+        pred_noise_u0 = noise_mean + rand_for_u0 * torch.exp(.5 * noise_logvar)
 
-        xt = self.interp(x_arange, xu, t)
-        truevt = self.dinterp_dt(x_arange, xu, t).squeeze()
+        # goal_u0 = x1[:, self.dx:]
 
-        xt += torch.randn_like(xt) * .1
+        # arange0 = torch.arange(rand_for_u0.shape[0], device=xu.device)
+        # arange1 = torch.arange(goal_u0.shape[0], device=xu.device)
 
-        # u1 = x0[..., self.dx:]
-        # true_u = u1 - u0
-        # ut = u1 * (t + t0) + u0 * (1 - (t + t0))
-        # xut = torch.cat((xt[..., :self.dx], ut), dim=-1)
-        # truevt[..., self.dx:] = true_uv
-        # xut = torch.cat((xut, r), dim=-1)
-        # a = time.perf_counter()
-        vt, _ = self.model.compiled_conditional_train(t.reshape(-1), xt, context)
-        flow_loss = mse_loss(vt, truevt)
+        # rand_for_u0, goal_u0, arange0, arange1 = self.FM.ot_sampler.sample_plan_with_labels(rand_for_u0, goal_u0, y0=arange0, y1=arange1, replace=False)
+        # # Rearrange ut, true_uv using arange
+        # inds = torch.sort(arange1).indices
+        # rand_for_u0 = rand_for_u0[inds]#.contiguous()
 
-        # for key in self.problem_dict:
+        xu[:, 0, self.dx:] = pred_noise_u0
+        # xu[:, 0, self.dx:] = rand_for_u0
 
+        xt, truevt, trueat = self.interp(x_arange, xu, t)
+        # truevt = self.dinterp_dt(x_arange, xu, t).squeeze()
+        if False:
+            truevt_norm = self.label_norm_v(truevt)
+            trueat_norm = self.label_norm_a(trueat)
+        else:
+            truevt_norm = truevt
+            trueat_norm = trueat
+        # xt += torch.randn_like(xt) * .1
+        xt += torch.randn_like(xt) * .03
 
+        vt, at, p_matrix, xi_C = self.model.compiled_conditional_train(t.reshape(-1), xt, context)
+        flow_loss_v = mse_loss(vt, truevt_norm)
+        flow_loss_a = mse_loss(at, trueat_norm)
+        flow_loss = .5 * flow_loss_v + .5 * flow_loss_a
+        state_loss = mse_loss(vt[:, :self.dx], truevt_norm[:, :self.dx])
+        action_loss = mse_loss(vt[:, self.dx:], truevt_norm[:, self.dx:])
+        kl_loss = self.standard_normal_kl_div(noise_mean, noise_logvar)
         return {
-            'loss': flow_loss,
+            'loss': flow_loss + .01 * kl_loss,
             'flow_loss': flow_loss,
-            'action_loss': torch.tensor(0.0)
+            'flow_loss_v': flow_loss_v,
+            'flow_loss_a': flow_loss_a,
+            'kl_loss': kl_loss,
+            'state_loss': state_loss,
+            'action_loss': action_loss
         }
 
-    def _sample(self, context=None, condition=None, mask=None, H=None, noise=None):
+    @torch.no_grad()
+    def _sample(self, context=None, condition=None, mask=None, H=None, noise=None, start_time=0, end_time=1):
         N = context.shape[0]
         if H is None:
             H = self.horizon
 
-        num_sub_trajectories = H // self.horizon
+        sigma_save = self.FM.sigma
+        self.FM.sigma = 0
+        num_sub_trajectories = max(H // self.horizon, 1)
         sample_shape = torch.Size([N, num_sub_trajectories])
         assert context.shape[1] == num_sub_trajectories
 
-        if noise is None:
-            prior = torch.distributions.Normal(self.prior_mu, self.prior_sigma)
-            noise = prior.sample(sample_shape=sample_shape).to(dtype=context, device=context.device)
+        # if noise is None:
+        #     prior = torch.distributions.Normal(self.prior_mu, self.prior_sigma)
+        #     noise = prior.sample(sample_shape=sample_shape).to(dtype=context.dtype, device=context.device)
 
-        # if longer horizon, set noise of starts / ends to be same value
-        for i in range(num_sub_trajectories - 1):
-            noise[:, i, -1] = noise[:, i + 1, 0]
+        # # if longer horizon, set noise of starts / ends to be same value
+        # for i in range(num_sub_trajectories - 1):
+        #     noise[:, i, -1] = noise[:, i + 1, 0]
 
+        self.noise = condition[0][1].clone()
+        self.noise = self.noise.reshape(1, -1).repeat(N, 1)
+
+
+        #TODO: Is this defined properly?
+        self.model.delta_goal = torch.zeros((N, 3), dtype=self.noise.dtype, device=self.noise.device)
+        self.model.delta_goal[:, -1] = -torch.pi/2
+        self.model.delta_goal -= self.x_mean[12:15]
+        self.model.delta_goal /= self.x_std[12:15]
+
+        if start_time == 0:
+            with torch.no_grad():
+                noise_mean, noise_logvar = self.model.noise_dist(self.noise)
+            # torch.manual_seed(234)
+            pred_noise_u0 = noise_mean + torch.randn_like(noise_mean) * torch.exp(.5 * noise_logvar)
+            # pred_noise_u0 = torch.randn_like(noise_mean)
+            self.noise = torch.cat((self.noise, pred_noise_u0), dim=-1)
+
+        # Add derivative to state
+
+        # Predict first derivative
+        t_0 = torch.zeros(N, 1, device=self.noise.device) + start_time
+        # _, vt, _ = self.model.compiled_conditional_test_fwd(t_0, self.noise, context)
+        x_arange = torch.linspace(0, 1, self.traj.shape[1], device=self.traj.device).expand(self.traj.shape[0], -1)
+        self.traj[:, 0] = self.noise
+        _, vt, _ = self.interp(x_arange, self.traj, t_0)
+        # vt *= 1.
+        # if hasattr(self, 'label_norm_v'):
+        #     vt = self.label_norm_v.running_mean + vt * self.label_norm_v.running_var.sqrt()
+        # self.noise = torch.cat((self.noise, torch.zeros_like(self.noise)), dim=-1)
+        
+        self.noise = torch.cat((self.noise, vt*12), dim=-1)
         # manually set the conditions
         if condition is not None:
-            noise[:, 0] = self._apply_conditioning(noise[:, 0], condition)
-            self._grad_mask = mask
-            if num_sub_trajectories > 1:
-                self._grad_mask = torch.cat((self._grad_mask[:, None],
-                                             torch.ones(N, num_sub_trajectories - 1,
-                                                        self.horizon, self.xu_dim, device=mask.device)), dim=1)
+            self.condition = condition
+            # noise[:, 0] = self._apply_conditioning(noise[:, 0], condition)
+            # self._grad_mask = mask
+            # if num_sub_trajectories > 1:
+                # self._grad_mask = torch.cat((self._grad_mask[:, None],
+                #                              torch.ones(N, num_sub_trajectories - 1,
+                #                                         self.horizon, self.xu_dim, device=mask.device)), dim=1)
         else:
-            self._grad_mask = torch.ones_like(noise)
-        self._grad_mask = self._grad_mask.to(device=noise.device)
-        log_prob = torch.zeros(N * num_sub_trajectories, device=noise.device)
-        out = self.flow(noise.reshape(-1, self.horizon, self.xu_dim),
-                        logpx=log_prob,
-                        context=context.reshape(-1, context.shape[-1]),
-                        reverse=False,
-                        integration_times=torch.linspace(0, 1, self.horizon, device=noise.device) if self.loss_type=='state_control_only' else None)
+            self.condition = None
+            # self._grad_mask = torch.ones_like(noise)
+        # self._grad_mask = self._grad_mask.to(device=self.noise.device)
+        # self.noise = self._apply_conditioning(self.noise, None, condition=condition)
+        log_prob = torch.zeros(N * num_sub_trajectories, device=self.noise.device)
+
+        self.step_id = 0
+        with torch.no_grad():
+            a = time.perf_counter()
+            self.model.reset_z()
+            out = self.flow(self.noise,
+                            logpx=log_prob,
+                            context=context.reshape(-1, context.shape[-1]),
+                            reverse=False,
+                            integration_times=torch.linspace(start_time, end_time, H, device=self.noise.device))
+            print(f'Elapsed time: {time.perf_counter() - a}')
 
         trajectories, log_prob = out[:2]
+        trajectories = trajectories.permute(1, 0, 2)
+        # Remove the derivative from state
+        trajectories = trajectories[..., :self.xu_dim].reshape(N, -1, self.xu_dim)
+        self.FM.sigma = sigma_save
 
-        return trajectories.reshape(N, -1, self.xu_dim), log_prob.reshape(N, -1).sum(dim=1)
+        # turn_problem = self.problem_dict[(1, 1, 1)]
+        # turn_problem.start = trajectories[0, 0, :15]
+
+        # turn_problem._preprocess(trajectories[:, 1:2])
+
+        # u_hat = turn_problem.solve_for_u_hat(trajectories[:, 1:2])
+
+        # trajectories[:, 1, 15:27] = u_hat
+        # trajectories, _, _ = self.interp(x_arange, self.traj, x_arange)
+
+        return trajectories, log_prob.reshape(N, -1).sum(dim=1)
 
     def project(self, H=None, condition=None, context=None):
         N = context.shape[0]

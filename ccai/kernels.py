@@ -13,6 +13,8 @@ def median(tensor):
     else:
         n = tensor.shape[0]
         tensor = tensor.unsqueeze(0)
+    if n == 1:
+        return tensor
     m = tensor.shape[0]
     idx = torch.triu_indices(n, n, 1)
     tensor = tensor[:, idx[0], idx[1]]

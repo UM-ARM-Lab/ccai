@@ -18,7 +18,7 @@ model_type: 'cnf'
 discriminator_guidance: True
 inverse_dynamics: False
 data_directory: 'allegro_high_force_high_eps_pi_6'
-device: 'cuda:0'
+device: 'cuda:1'
 test_every: 10001
 save_every: 10
 normalize_data: True
@@ -26,7 +26,7 @@ constraint_embedding_dim: 64
 constrained: False
 guided: False
 timesteps: 256
-hidden_dim: 128
+hidden_dim: 256
 unconditional: True
 sine_cosine: False
 use_class: True
