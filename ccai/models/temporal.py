@@ -677,11 +677,11 @@ class TemporalUnetStateAction(nn.Module):
 
     def project(self, x_orig, x, context, p_matrix=None, xi_C=None):
         N = x.shape[0]
-        Kh = 3
+        Kh = 1
         Ktheta = 1
 
         # Is the below sufficient to go from dtheta/dt to df/dtheta?
-        # x[..., 14] += -33
+        # x[..., 14] += -10
         dx = x.clone()
         dx /= -Ktheta
         # x = -x
@@ -735,7 +735,7 @@ class TemporalUnetStateAction(nn.Module):
                 dh = dC[:, g_dim:]
 
                 h_r = torch.relu(h)
-                print(np.round(torch.cat((g, h_r), dim=-1).flatten().cpu().detach().numpy(), 3))
+                # print(np.round(torch.cat((g, h_r), dim=-1).flatten().cpu().detach().numpy(), 3))
                 g_masked = g[dg_mask].reshape(N, -1)
                 h_masked = h[dh_mask].reshape(N, -1)
                 dg_masked = dg[dg_mask].reshape(N, -1, dC.shape[-1])
@@ -817,6 +817,8 @@ class TemporalUnetStateAction(nn.Module):
     # @torch.compile(mode='max-autotune')
     def compiled_conditional_test_fwd(self, t, x, context):
         x_orig, dx, ddx = self(t, x, context, dropout=False)
+        dx *= 12
+        ddx *= 144
         return x_orig, dx, ddx
 
     def compiled_conditional_test(self, t, x, dx, context):
@@ -835,24 +837,23 @@ class TemporalUnetStateAction(nn.Module):
         #     # Replace nan with 0
         #     dx[torch.isnan(dx)] = 0
         # dx *= -1
-        
+
         # dx = None
-        ddx *= 1.
+        # ddx[..., 14] *= 1.0
         theta = torch.cat((dx, ddx), dim=-1)
-        
-        
+
         # before_x = np.round(((x*self.x_std) + self.x_mean)[0, 14].item(), 3)
         # before_dx = np.round((dx*self.x_std)[0, 14].item(), 3)
         # before_ddx = np.round((ddx*self.x_std)[0, 14].item(), 3)
-        proj = True
+        proj = False
         if proj:
             theta_adj, p_matrix, xi_C = self.project(x, theta, context)
         else:
             theta_adj, p_matrix, xi_C = theta, None, None
-        
+
         dx = theta_adj[:, :self.transition_dim]
         ddx = theta_adj[:, self.transition_dim:]
-        
+
         # x_norm_mask = torch.norm(x, dim=-1) > 1
         # x[x_norm_mask] = x[x_norm_mask] / torch.norm(x[x_norm_mask], dim=-1, keepdim=True) * 1
         # return dx, None, None
@@ -873,12 +874,12 @@ class TemporalUnetStateAction(nn.Module):
     def compiled_unconditional_test(self, t, x):
         _, x = self(t, x, context=None, dropout=False)
         return x, x
-    
+
     @torch.compile(mode='max-autotune')
     def compiled_conditional_train_fwd(self, t, x, context):
         x_orig, dx, ddx = self(t, x, context, dropout=True)
         return x_orig, dx, ddx
-    
+
     def compiled_conditional_train(self, t, x, context):
         x_orig, dx, ddx = self.compiled_conditional_train_fwd(t, x, context)
         # x, p_matrix, xi_C = self.project(x_orig, x, context)

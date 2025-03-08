@@ -1,0 +1,669 @@
+Importing module 'gym_38' (/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.0+cu121
+Device count 2
+/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinav/Documents/ccai
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(36, 256), (256, 512), (512, 1024), (1024, 2048)]
+Loaded trajectory sampler
+Current yaw: tensor([-9.8306e-05,  1.2234e-02, -5.3800e-02], device='cuda:0')
+Solve time for pregrasp 10.01291565700376
+pregrasp complete: tensor([-9.8306e-05,  1.2234e-02, -5.3800e-02], device='cuda:0')
+Current yaw: tensor([ 0.0003,  0.0150, -0.0518], device='cuda:0')
+1 turn
+Elapsed time: 15.22038621500542
+Sampling time 15.300913390005007
+Solve time for step 1 0.07161498069763184
+Current ori: tensor([ 0.0003,  0.0150, -0.0518], device='cuda:0')
+Middle force: tensor([0.6795], device='cuda:0')
+Thumb force: tensor([0.4942], device='cuda:0')
+Index force: tensor([0.9961], device='cuda:0')
+Elapsed time: 15.046588522993261
+Solve time for step 2 0.0742502212524414
+Current ori: tensor([ 0.0021,  0.0179, -0.0774], device='cuda:0')
+Middle force: tensor([1.7497], device='cuda:0')
+Thumb force: tensor([1.1360], device='cuda:0')
+Index force: tensor([0.4133], device='cuda:0')
+Elapsed time: 15.621120346011594
+Solve time for step 3 0.07266354560852051
+Current ori: tensor([ 0.0027,  0.0195, -0.1045], device='cuda:0')
+Middle force: tensor([0.9776], device='cuda:0')
+Thumb force: tensor([1.0530], device='cuda:0')
+Index force: tensor([0.9289], device='cuda:0')
+Elapsed time: 15.805893135999213
+Solve time for step 4 0.0763857364654541
+Current ori: tensor([ 0.0030,  0.0198, -0.1334], device='cuda:0')
+Middle force: tensor([1.7155], device='cuda:0')
+Thumb force: tensor([2.6237], device='cuda:0')
+Index force: tensor([0.7820], device='cuda:0')
+Elapsed time: 12.965348160010763
+Solve time for step 5 0.0727076530456543
+Current ori: tensor([ 0.0037,  0.0228, -0.1539], device='cuda:0')
+Middle force: tensor([2.5787], device='cuda:0')
+Thumb force: tensor([1.0805], device='cuda:0')
+Index force: tensor([1.0263], device='cuda:0')
+Elapsed time: 13.92453411599854
+Solve time for step 6 0.07143712043762207
+Current ori: tensor([ 0.0037,  0.0194, -0.1930], device='cuda:0')
+Middle force: tensor([1.3370], device='cuda:0')
+Thumb force: tensor([0.5092], device='cuda:0')
+Index force: tensor([0.7509], device='cuda:0')
+Elapsed time: 15.639646377007011
+Solve time for step 7 0.07277131080627441
+Current ori: tensor([ 0.0045,  0.0197, -0.2073], device='cuda:0')
+Middle force: tensor([1.6990], device='cuda:0')
+Thumb force: tensor([1.8349], device='cuda:0')
+Index force: tensor([0.7139], device='cuda:0')
+Elapsed time: 14.068296056997497
+Solve time for step 8 0.07306027412414551
+Current ori: tensor([-0.0011,  0.0055, -0.2657], device='cuda:0')
+Middle force: tensor([0.0150], device='cuda:0')
+Thumb force: tensor([0.1672], device='cuda:0')
+Index force: tensor([0.5783], device='cuda:0')
+Elapsed time: 15.578955217002658
+Solve time for step 9 0.07051730155944824
+Current ori: tensor([-0.0010,  0.0055, -0.2928], device='cuda:0')
+Middle force: tensor([1.8933], device='cuda:0')
+Thumb force: tensor([0.8985], device='cuda:0')
+Index force: tensor([1.7459], device='cuda:0')
+Elapsed time: 15.065229992003879
+Solve time for step 10 0.07104372978210449
+Current ori: tensor([-0.0098,  0.0011, -0.3143], device='cuda:0')
+Middle force: tensor([0.9047], device='cuda:0')
+Thumb force: tensor([0.6771], device='cuda:0')
+Index force: tensor([0.6135], device='cuda:0')
+Elapsed time: 16.199802754999837
+Solve time for step 11 0.07257366180419922
+Current ori: tensor([-0.0113, -0.0146, -0.3192], device='cuda:0')
+Middle force: tensor([0.8738], device='cuda:0')
+Thumb force: tensor([0.9744], device='cuda:0')
+Index force: tensor([1.1915], device='cuda:0')
+Elapsed time: 15.099719178004307
+Solve time for step 12 0.07127809524536133
+Current ori: tensor([-0.0164, -0.0396, -0.3169], device='cuda:0')
+Middle force: tensor([0.9705], device='cuda:0')
+Thumb force: tensor([0.0659], device='cuda:0')
+Index force: tensor([0.7127], device='cuda:0')
+{}
+[ models/temporal ] Channel dimensions: [(36, 256), (256, 512), (512, 1024), (1024, 2048)]
+Loaded trajectory sampler
+[Open3D INFO] Memory Statistics: (Device) (#Malloc) (#Free)
+[Open3D INFO] ---------------------------------------------
+[1;33m[Open3D WARNING] CPU:0: 10752 10185 --> 567 with 49114512 total bytes[0;m
+[1;33m[Open3D WARNING]     0x67fce110 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x6c5e5980 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x8d9273e0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x75035510 @ 102120 bytes[0;m
+[1;33m[Open3D WARNING]     0x67f09d20 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x7397cf30 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x6911d160 @ 10728 bytes[0;m
+[1;33m[Open3D WARNING]     0x5ff7d690 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x739c1f10 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x93ebcae0 @ 47136 bytes[0;m
+[1;33m[Open3D WARNING]     0x6c311040 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x6c88ef80 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x93a6b500 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x99575d30 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x67551e60 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x671ee610 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x6774bef0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x70f150d0 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x6c964cc0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x930c7da0 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x930b9190 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x7339bb40 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x68c26c30 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x672e2f10 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x677f10f0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x90bf71f0 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x91478d00 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x677dbd70 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x73fd7160 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x71f05f90 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x756d3570 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x756c4960 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x69730990 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x99508f20 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x663cc580 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x6569fb10 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x91252e80 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x757199b0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x6f23eb10 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x72e9e5e0 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x75739f00 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x739cd300 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x8e680350 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x8e671740 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x6f32f480 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x90da46d0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x94523050 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x6f2240f0 @ 54528 bytes[0;m
+[1;33m[Open3D WARNING]     0x8ceca500 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x6efd7900 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x8d69f990 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x65c63c50 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x68385050 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x69561450 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x6156b640 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x69645120 @ 102120 bytes[0;m
+[1;33m[Open3D WARNING]     0x960e2640 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x612c6250 @ 118824 bytes[0;m
+[1;33m[Open3D WARNING]     0x60d457e0 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x9174e250 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x99603900 @ 10728 bytes[0;m
+[1;33m[Open3D WARNING]     0x8d70c290 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x8d0c83e0 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x74f7d720 @ 47136 bytes[0;m
+[1;33m[Open3D WARNING]     0x6a54e6c0 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x9012e9d0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x65e65c40 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x951b5200 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x969152d0 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x8e0e6ad0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x8ddc9c50 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x66fd2280 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x742572c0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x7225a2c0 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x8d72b920 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x604ca590 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x6fa3c9e0 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x60a9cea0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x6480b8d0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x90616b50 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x6f93a480 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x6e78f160 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x74574e30 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x73d7e9d0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x71c39cc0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x7353cc40 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x99067730 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x60ae9fa0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x67d860d0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x6d225cc0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x616ff180 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x689f9700 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x9712d300 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x69623440 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x97117f80 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x6774ff70 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x6b0d8440 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x74f95350 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x69a535e0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x8d1b9970 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x68efe7b0 @ 54528 bytes[0;m
+[1;33m[Open3D WARNING]     0x91462c40 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x969b5d00 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x6e2023c0 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x908fd4b0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x93d53700 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x66005440 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x6bae10e0 @ 102120 bytes[0;m
+[1;33m[Open3D WARNING]     0x67a7a230 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x613e0520 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x60a777c0 @ 118824 bytes[0;m
+[1;33m[Open3D WARNING]     0x99b1e8f0 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x91782f50 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x613aa8b0 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x653cbaf0 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x97090280 @ 47136 bytes[0;m
+[1;33m[Open3D WARNING]     0x64df5210 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x8e3573e0 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x674e1880 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x6ab913a0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x96f48970 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x99e84b50 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x8ce2e840 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x69d0bd00 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x9368b290 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x9307be70 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x697f40e0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x726d58e0 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9113c580 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x6725b9c0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x6ad178e0 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x64ecc9e0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x6542b720 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x8e4f9c70 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x6fd007d0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x8e119a00 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x8e164200 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x9963ba00 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x8d8c4fc0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x6cc4b320 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x65aa3d80 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x94118e40 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x728400e0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x69444430 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x6d0d6a30 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x94758620 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x8deb83d0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x96cedb80 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x9485e7a0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x752981d0 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x8e37ee40 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x8e9231d0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x8e4514c0 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x72fedf70 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x8e2a9450 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x60b4ecc0 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x66df1870 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x8e2c6150 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x607f7540 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x671699e0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x8d164560 @ 54528 bytes[0;m
+[1;33m[Open3D WARNING]     0x8e1f32a0 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x8fda0c10 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x9c6f88b0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x9c71b470 @ 102120 bytes[0;m
+[1;33m[Open3D WARNING]     0x9cd91550 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x9c6c6140 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x9c7b65a0 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x9c6aff40 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x9cce00a0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x9c4d6210 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x9cc67b40 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x9cc496c0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9cbe6e80 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9d4aede0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x9d30e540 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x8d0a0640 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9d2bf410 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x9d4bf280 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x9c449070 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x9c26eaa0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x9d25a580 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x9cf52950 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9bef5ea0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x9bed2680 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x9c2f6e10 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x9c1af250 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x9af60270 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x9beb1b50 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x9bea5b10 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x6e259b40 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9bfa3dd0 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x8dc10e50 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x9c0cd9d0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b50e8f0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x9c158c10 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x9bf86990 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b13a490 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b1a3cc0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b51be00 @ 54528 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b5057d0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b4ed750 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x9ae0ef70 @ 102120 bytes[0;m
+[1;33m[Open3D WARNING]     0x9af15610 @ 118824 bytes[0;m
+[1;33m[Open3D WARNING]     0x990aedb0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b6e0b90 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b03f980 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b728060 @ 10728 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b6680d0 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x9ab17050 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x9aeaa120 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b8f3480 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b65acc0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b59ab00 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x6165b7d0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b6af610 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b66eb60 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x9bd94f00 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b431400 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b8e4870 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x9ad2c2d0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x656c10a0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x9bc2bd00 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x9bd23460 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b9297e0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x9bcdba20 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b8a2180 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9abda340 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x9ac9d010 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x9a727350 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x9a535310 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x99a70590 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x9a76f6b0 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x9ac74b20 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b69d070 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x9a741a00 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9a1c38f0 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x9a6e82a0 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9a6353c0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x9a4c38f0 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x9a552550 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x99a605c0 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b5119b0 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x9801e600 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x98429400 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x98729c80 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x9c1f2640 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x982cad80 @ 102120 bytes[0;m
+[1;33m[Open3D WARNING]     0x983145b0 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x982ff9c0 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x9814a9c0 @ 118824 bytes[0;m
+[1;33m[Open3D WARNING]     0x9803cce0 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x97f5b310 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x676fe240 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x9853b120 @ 47136 bytes[0;m
+[1;33m[Open3D WARNING]     0x9865ada0 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x98749610 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x9806a060 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x984e7ee0 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b53e250 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x98deedc0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x98829810 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x9bb42750 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x987dd9c0 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x98d5c320 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x98e857f0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x98e42400 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x6833c1d0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x98c54700 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x98e30a40 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x98ee6250 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x989d2e90 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x8fe8e9c0 @ 118824 bytes[0;m
+[1;33m[Open3D WARNING]     0x9aa39c60 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x9a930bc0 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x9c5efc60 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x947ceb70 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x961536b0 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x8f056300 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b9fba00 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x965e99d0 @ 10728 bytes[0;m
+[1;33m[Open3D WARNING]     0x94848c60 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x8d19b720 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x9cb06350 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x8ff35f60 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x9ae98760 @ 47136 bytes[0;m
+[1;33m[Open3D WARNING]     0x8fe01f00 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x92db7680 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x96d1ea50 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x945c2140 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b804160 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x8d9d30c0 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x9d274180 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x9cb4c760 @ 118824 bytes[0;m
+[1;33m[Open3D WARNING]     0x8ea1a570 @ 54528 bytes[0;m
+[1;33m[Open3D WARNING]     0x9a55c9a0 @ 54528 bytes[0;m
+[1;33m[Open3D WARNING]     0x8f94b240 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x8ed85060 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x9bc6f0f0 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x9abe8f50 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x9af3bf50 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x92c24540 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x9bda83d0 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x9c53ce10 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x98e3ca80 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x979328b0 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9d3ec730 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x9a8cb250 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x94827e50 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x9aa03490 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x964a29b0 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x94a07a40 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x9d3c66b0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x967fe590 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b4f9790 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x91f2d760 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x9ccbd4e0 @ 47136 bytes[0;m
+[1;33m[Open3D WARNING]     0x981d2740 @ 10728 bytes[0;m
+[1;33m[Open3D WARNING]     0x9207b3e0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x92adb2c0 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x8f85cbe0 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x9cfbe940 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x8ea5ac00 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x9016d3c0 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x8ee8d100 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x94bec690 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x96a0b6d0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x98c32bc0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x99a3c4f0 @ 118824 bytes[0;m
+[1;33m[Open3D WARNING]     0x98926f80 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x9c143890 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9bf48e60 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x8fce05d0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x8ec9c580 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x95ea37c0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x97e36c20 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x965dd990 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x92560550 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x92172ee0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x92b1c850 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x97d038d0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x61213430 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x963f69e0 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x9c919db0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x9209e940 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x987973c0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x9c503e60 @ 10728 bytes[0;m
+[1;33m[Open3D WARNING]     0x91b94390 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x98d47060 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b90fbe0 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x92cdc4e0 @ 10728 bytes[0;m
+[1;33m[Open3D WARNING]     0x9adfa380 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x94c29980 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x9c706880 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x8eca5700 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x9253bc00 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x6bea7910 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x68f77f10 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x95f85ea0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x9a50ee70 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x9230ba00 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x8f4eb890 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x9c501e90 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x8ee3a890 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x944e8080 @ 54528 bytes[0;m
+[1;33m[Open3D WARNING]     0x8f50d590 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9cd2e600 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x8ecfc0c0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x91bb4410 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x92c19fe0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x8e9de130 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x9aa05020 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x8fef1b50 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x8fae5e60 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x69d12b00 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x978ac1e0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x92cb0fc0 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x92dec2c0 @ 118824 bytes[0;m
+[1;33m[Open3D WARNING]     0x8f8aac10 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x98b429d0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x91655830 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x9a347950 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x9a5f1fd0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x94c92840 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x95ecf800 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x9cdfe270 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x987cc000 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x92fe7880 @ 102120 bytes[0;m
+[1;33m[Open3D WARNING]     0x94a95390 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x94cf1c00 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b3aaa50 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b1fa650 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x95c9f7b0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x651a9c50 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x94963190 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x963c1da0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x98899800 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9bf57a70 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x961a0ed0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x928cfa00 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x8d95f540 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x8ffdb3d0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x95005900 @ 47136 bytes[0;m
+[1;33m[Open3D WARNING]     0x9ce00f00 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x9233c2f0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x981d5f80 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x9cfe52c0 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x95dbee80 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x8ef1c090 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x92092900 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x6f3af770 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x95a09f90 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x96075cd0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x950dd800 @ 102120 bytes[0;m
+[1;33m[Open3D WARNING]     0x8f262a10 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x9d28f1c0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x92415f80 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x9199fb30 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x8f4843c0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x97a5a450 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x8edbc280 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x8f0216a0 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x8ef06d10 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x92425100 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x8edfd820 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x8d340a90 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x8fe7d000 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x8edfb4f0 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x8f1e9440 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x8f1d6660 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x8f0996f0 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x6f25aed0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x8f1c6e90 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x8f911bf0 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9272bb80 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x8f4662f0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x8f43de00 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x8fa2af90 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x8fa6e380 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x8fbf7e90 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x9abeaba0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x91ab9f10 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x8ff92a20 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x652db650 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x94f01300 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x8fd49560 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9d5080b0 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x8f684240 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9ce9a590 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x8fc19980 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x8fb52810 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x8fcc5720 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x92514580 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x8ff3fb70 @ 47136 bytes[0;m
+[1;33m[Open3D WARNING]     0x928e4d80 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x97079560 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x8fd47a60 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x8f449e40 @ 10728 bytes[0;m
+[1;33m[Open3D WARNING]     0x8ffb8400 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x8ff03b90 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x90181fb0 @ 102120 bytes[0;m
+[1;33m[Open3D WARNING]     0x902aee70 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x979e23c0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x8faeb150 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x920b0310 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x917ce0e0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x963a1390 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x94fce980 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x9503a540 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x8f935ec0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x92ec5910 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x916913c0 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x9a27ed50 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x917d0850 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x9882b510 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9195c740 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x988790c0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9179d620 @ 54528 bytes[0;m
+[1;33m[Open3D WARNING]     0x91be5050 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x930dc680 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x91bf3c60 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x920393d0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x91e63420 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x91dd7f90 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x91c91600 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x91cd49f0 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x920c4030 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x928b5380 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9208e260 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x92910cc0 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x922b2700 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b5e5c10 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x92270ed0 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x92187250 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x8fbaf0c0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x925ba110 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x9273bfe0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x92dc1290 @ 47136 bytes[0;m
+[1;33m[Open3D WARNING]     0x8e511150 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x92cda510 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x8f924230 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x9260fb80 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x92ef2a80 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x93000770 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x964e1f10 @ 98520 bytes[0;m
+[1;33m[Open3D WARNING]     0x91c22b80 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x8ded9ce0 @ 10728 bytes[0;m
+[1;33m[Open3D WARNING]     0x9625feb0 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x95f59bd0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x98d93880 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x97810f00 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x94308200 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x92386c40 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9218c750 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x944ddc30 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x94e83050 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x94371d30 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x943b5120 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x94a5e3a0 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x94bd7310 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b72dbc0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x94404d20 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x94a15f50 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x94f51bc0 @ 275424 bytes[0;m
+[1;33m[Open3D WARNING]     0x95d75fc0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x959db070 @ 65904 bytes[0;m
+[1;33m[Open3D WARNING]     0x95a37620 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x97863650 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x95a4c9a0 @ 105456 bytes[0;m
+[1;33m[Open3D WARNING]     0x94d1fea0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x94926cd0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x96027c10 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x960177f0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x95c5ab10 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x95d6f8a0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x965ae2c0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x95b33b90 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x96494e00 @ 39936 bytes[0;m
+[1;33m[Open3D WARNING]     0x90e9c660 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x96373c90 @ 8136 bytes[0;m
+[1;33m[Open3D WARNING]     0x968aa0d0 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x96533280 @ 118824 bytes[0;m
+[1;33m[Open3D WARNING]     0x68d359f0 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x950c8c10 @ 84960 bytes[0;m
+[1;33m[Open3D WARNING]     0x961ee670 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x8d34e200 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x961fa6b0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x94ff75e0 @ 35472 bytes[0;m
+[1;33m[Open3D WARNING]     0x925758d0 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x9cc15da0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x9b40b240 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x995609b0 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x525e4370 @ 6480 bytes[0;m
+[1;33m[Open3D WARNING]     0x8ec3bf00 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x985596e0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x98b668d0 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x96cb8f40 @ 42048 bytes[0;m
+[1;33m[Open3D WARNING]     0x96cc3390 @ 54528 bytes[0;m
+[1;33m[Open3D WARNING]     0x96841980 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x97923ca0 @ 60420 bytes[0;m
+[1;33m[Open3D WARNING]     0x9781fb10 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x97834e90 @ 86904 bytes[0;m
+[1;33m[Open3D WARNING]     0x96b8c990 @ 8640 bytes[0;m
+[1;33m[Open3D WARNING]     0x9784a210 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x73fec4e0 @ 49200 bytes[0;m
+[1;33m[Open3D WARNING]     0x97d46cc0 @ 308592 bytes[0;m
+[1;33m[Open3D WARNING]     0x98906f00 @ 86904 bytes[0;m
+[Open3D INFO] ---------------------------------------------

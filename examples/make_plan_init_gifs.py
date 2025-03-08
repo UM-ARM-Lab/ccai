@@ -10,6 +10,8 @@ import PIL
 
 from PIL import Image, ImageDraw, ImageFont
 
+from copy import deepcopy
+
 import imageio
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
@@ -27,7 +29,7 @@ def add_text_to_imgs(imgs, labels):
         imgs_with_txt.append(np.asarray(img))
     return imgs_with_txt
 
-for trial_num in range(0, config['num_trials']):
+for trial_num in range(0, 3):
 # for trial_num in [4, 9]:
     fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}./csvgd/trial_{trial_num + 1}')
 
@@ -40,13 +42,23 @@ for trial_num in range(0, config['num_trials']):
     width = 300
     # Add a progress bar to the gif by editing each image. Overwrite the original images
     imgs_with_progress_bar = []
-    for i in range(len(isaac_imgs)):
-        img = isaac_imgs[i]
+    start_end_buffer = 15
+    new_isaac_imgs = []
+
+    for j in range(len(isaac_imgs)):
+        img = isaac_imgs[j]
+        num_adds = start_end_buffer if (j == 0 or j == len(isaac_imgs) - 1) else 1
+        for _ in range(num_adds):
+            new_isaac_imgs.append((j, img))
+
+    for i in range(len(new_isaac_imgs)):
+        idx, img = new_isaac_imgs[i]
         # Add progress bar to image. Should be green rectangle that grows depending on i
         img = Image.fromarray(img)
         draw = ImageDraw.Draw(img)
-        draw.rectangle([x0, y0, x0 + width * i / len(isaac_imgs), y0 + 20], fill='green')
-        img = np.asarray(img)
+        draw.rectangle([x0, y0, x0 + width * idx /(len(isaac_imgs)), y0 + 20], fill='green')
+        img = np.asarray(img).copy()
+        img[0, 0] = np.random.randint(0, 255, 4)
         imgs_with_progress_bar.append(img)
     if len(imgs_with_progress_bar) > 0:
         imageio.mimsave(f'{fpath}/isaac.gif', imgs_with_progress_bar, loop=0)

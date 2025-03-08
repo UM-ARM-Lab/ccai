@@ -90,7 +90,7 @@ def set_cnf_options(solver, model):
             if solver in ['fixed_adams', 'explicit_adams']:
                 module.solver_options['max_order'] = 4
             if solver == 'rk4':
-                module.solver_options['step_size'] = .003
+                module.solver_options['step_size'] = .03
 
             # Set the test settings
             module.test_solver = solver
@@ -209,7 +209,7 @@ class TrajectoryCNF(nn.Module):
             return torch.zeros_like(xdx)
         self.step_id += 1
         # print(t)
-        x_arange = torch.linspace(0, 1, self.traj.shape[1], device=self.traj.device).expand(self.traj.shape[0], -1)
+        # x_arange = torch.linspace(0, 1, self.traj.shape[1], device=self.traj.device).expand(self.traj.shape[0], -1)
         # t_mask = x_arange > t
         # x_arange[:, 0] = t
         # x_arange = x_arange[t_mask]
@@ -218,26 +218,25 @@ class TrajectoryCNF(nn.Module):
         # self.traj[:, 0] = xdx[:, :self.xu_dim]
         # traj = torch.cat((xdx.unsqueeze(1), self.traj[t_mask].unsqueeze(0)), dim=1)
 
-        traj = self.traj
-        _, dx, ddx = self.interp(x_arange, traj, t.reshape(-1, 1))
-        ds_ret = torch.zeros_like(xdx)
+        # traj = self.traj
+        # _, dx, ddx = self.interp(x_arange, traj, t.reshape(-1, 1))
+        # ds_ret = torch.zeros_like(xdx)
         # ds_ret[..., :self.xu_dim] = dx*12
-        ds_ret[..., :self.xu_dim] = xdx[..., self.xu_dim:]
-        ds_ret[..., self.xu_dim:] = ddx# * 12#*12
+        # ds_ret[..., :self.xu_dim] = xdx[..., self.xu_dim:]
+        # ds_ret[..., self.xu_dim:] = ddx * 144
 
-        # x = xdx[..., :self.xu_dim]
-        # dx = xdx[..., self.xu_dim:]
-        # dx, ddx, _, _ = self.model.compiled_conditional_test(t, x, dx, context)
-
+        x = xdx[..., :self.xu_dim]
+        dx = xdx[..., self.xu_dim:]
+        dx, ddx, _, _ = self.model.compiled_conditional_test(t, x, dx, context)
         # # if hasattr(self, 'label_norm_a'):
         # #     ddx = self.label_norm_a.running_mean + ddx * self.label_norm_a.running_var.sqrt()
 
-        # ds_ret = torch.zeros_like(xdx)
-        # if dx is None:
-        #     ds_ret[..., :self.xu_dim] = xdx[..., self.xu_dim:]
-        # else:
-        #     ds_ret[..., :self.xu_dim] = dx
-        # ds_ret[..., self.xu_dim:] = ddx
+        ds_ret = torch.zeros_like(xdx)
+        if dx is None:
+            ds_ret[..., :self.xu_dim] = xdx[..., self.xu_dim:]
+        else:
+            ds_ret[..., :self.xu_dim] = dx
+        ds_ret[..., self.xu_dim:] = ddx
         
         return ds_ret
 
@@ -514,16 +513,17 @@ class TrajectoryCNF(nn.Module):
 
         # Predict first derivative
         t_0 = torch.zeros(N, 1, device=self.noise.device) + start_time
-        # _, vt, _ = self.model.compiled_conditional_test_fwd(t_0, self.noise, context)
-        x_arange = torch.linspace(0, 1, self.traj.shape[1], device=self.traj.device).expand(self.traj.shape[0], -1)
-        self.traj[:, 0] = self.noise
-        _, vt, _ = self.interp(x_arange, self.traj, t_0)
+        _, vt, _ = self.model.compiled_conditional_test_fwd(t_0, self.noise, context)
+        # x_arange = torch.linspace(0, 1, self.traj.shape[1], device=self.traj.device).expand(self.traj.shape[0], -1)
+        # self.traj[:, 0] = self.noise
+        # _, vt, _ = self.interp(x_arange, self.traj, t_0)
+
         # vt *= 1.
         # if hasattr(self, 'label_norm_v'):
         #     vt = self.label_norm_v.running_mean + vt * self.label_norm_v.running_var.sqrt()
         # self.noise = torch.cat((self.noise, torch.zeros_like(self.noise)), dim=-1)
         
-        self.noise = torch.cat((self.noise, vt*12), dim=-1)
+        self.noise = torch.cat((self.noise, vt), dim=-1)
         # manually set the conditions
         if condition is not None:
             self.condition = condition
@@ -557,15 +557,14 @@ class TrajectoryCNF(nn.Module):
         trajectories = trajectories[..., :self.xu_dim].reshape(N, -1, self.xu_dim)
         self.FM.sigma = sigma_save
 
-        # turn_problem = self.problem_dict[(1, 1, 1)]
-        # turn_problem.start = trajectories[0, 0, :15]
+        turn_problem = self.problem_dict[(1, 1, 1)]
+        turn_problem.start = trajectories[0, 0, :15]
 
-        # turn_problem._preprocess(trajectories[:, 1:2])
+        turn_problem._preprocess(trajectories[:, 1:2])
 
-        # u_hat = turn_problem.solve_for_u_hat(trajectories[:, 1:2])
+        u_hat = turn_problem.solve_for_u_hat(trajectories[:, 1:2])
 
-        # trajectories[:, 1, 15:27] = u_hat
-        # trajectories, _, _ = self.interp(x_arange, self.traj, x_arange)
+        trajectories[:, 1, 15:27] = u_hat
 
         return trajectories, log_prob.reshape(N, -1).sum(dim=1)
 

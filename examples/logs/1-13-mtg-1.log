@@ -1,0 +1,46 @@
+Importing module 'gym_38' (/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.0+cu121
+Device count 2
+/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinav/Documents/ccai
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(36, 256), (256, 512), (512, 1024), (1024, 2048)]
+Loaded trajectory sampler
+Final ori: tensor([-9.8306e-05,  1.2234e-02, -5.3800e-02], device='cuda:1')
+Solve time for pregrasp 32.359941104019526
+pregrasp complete: tensor([-9.8306e-05,  1.2234e-02, -5.3800e-02], device='cuda:1')
+1 turn
+Elapsed time: 4.237699168996187
+Sampling time 4.508804651995888
+Solve time for step 1 0.20766162872314453
+Current ori: tensor([ 0.0002,  0.0143, -0.0686], device='cuda:1')
+Middle force: tensor([41.1861], device='cuda:1')
+Thumb force: tensor([21.8349], device='cuda:1')
+Index force: tensor([54.8495], device='cuda:1')
+Elapsed time: 4.282646365987603
+Solve time for step 2 0.23386001586914062
+Current ori: tensor([-1.8967e-05, -3.8256e-02, -1.1177e-01], device='cuda:1')
+Middle force: tensor([20118.5020], device='cuda:1')
+Thumb force: tensor([3051.7422], device='cuda:1')
+Index force: tensor([157429.2188], device='cuda:1')
+Elapsed time: 4.101389627001481
+Solve time for step 3 0.2855088710784912
+Current ori: tensor([0.0687, 0.2112, 0.3558], device='cuda:1')
+Middle force: tensor([18717.4570], device='cuda:1')
+Thumb force: tensor([4421.6958], device='cuda:1')
+Index force: tensor([151557.7031], device='cuda:1')
+Elapsed time: 4.437408385012532
+Solve time for step 4 0.21497273445129395
+Current ori: tensor([-0.6779,  0.2326,  0.1172], device='cuda:1')
+Middle force: tensor([16730.3730], device='cuda:1')
+Thumb force: tensor([5737.1460], device='cuda:1')
+Index force: tensor([146429.9219], device='cuda:1')
