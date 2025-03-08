@@ -9,7 +9,7 @@ max_recovery_stages: 4
 num_trials: 10
 visualize: True
 # experiment_name: 'allegro_screwdriver_csvto_live_OOD_recovery_best_traj_data_shortcut_lower_threshold'
-experiment_name: 'allegro_screwdriver_recovery_best_traj_only_15000_training_no_downsample_balance_bugfix_diffusion_split_t_x_samples_ecdf'
+experiment_name: 'allegro_screwdriver_recovery_IGNORE'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -23,6 +23,7 @@ goal: -1.5
 prior: 1
 # likelihood_threshold: -22.618363952636717
 likelihood_threshold: -25
+project_threshold: -16
 # likelihood_threshold: -35
 drop_threshold: -50
 multi_particle_search: True

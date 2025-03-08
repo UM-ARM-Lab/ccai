@@ -37,7 +37,7 @@ randomize_obj_start: True
 perturb_action: False
 live_recovery: False
 obj_gravity: False
-start_ind: 0
+start_ind: 90
 # model_path: 'data/training/allegro_screwdriver/allegro_better_model/allegro_screwdriver_diffusion_w_classifier.pt'
 # model_path: 'data/training/allegro_screwdriver/allegro_test_new_data_augment_angle_diffusion/allegro_screwdriver_diffusion.pt'
 controllers:
@@ -48,7 +48,7 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:0'
+    device: 'cuda:1'
     online_iters: 35
     warmup_iters: 150
     resample_steps: 16

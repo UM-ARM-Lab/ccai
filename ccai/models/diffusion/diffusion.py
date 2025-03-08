@@ -123,17 +123,18 @@ class GaussianDiffusion(nn.Module):
             raise ValueError('Invalid model type')
 
         # model provides score fcn for both trajectory and context
-        if model_type == 'conv_unet':
-            self.model = TemporalUnet(horizon, dx + du, context_dim, dim=hidden_dim)
-        else:
-            self.model = TransformerForDiffusion(dx + du, dx + du, horizon, 1, cond_dim=context_dim, n_emb=hidden_dim)
+        # if model_type == 'conv_unet':
+        #     self.model = TemporalUnet(horizon, dx + du, context_dim, dim=hidden_dim)
+        # else:
+        #     self.model = TransformerForDiffusion(dx + du, dx + du, horizon, 1, cond_dim=context_dim, n_emb=hidden_dim)
 
         self.horizon = horizon
         self.xu_dim = dx + du
         self.dx = dx
         self.du = du
         self.hidden_dim = hidden_dim
-        self.model = TemporalUnet(self.horizon, self.xu_dim, cond_dim=context_dim, dim=hidden_dim)
+        self.model = TemporalUnet(self.horizon, self.xu_dim, cond_dim=context_dim, dim=hidden_dim,
+                                  context_dropout_p=.25)
 
         self.classifier = None
         # if discriminator_guidance:
@@ -209,10 +210,9 @@ class GaussianDiffusion(nn.Module):
 
         self.classifier_guidance = torch.vmap(torch.func.jacrev(self._classifier_guidance, argnums=1))
 
-    def add_classifier(self, dim_mults=(1,2)):
+    def add_classifier(self):
         #self.classifier = BinaryClassifier()
-        self.classifier = UnetClassifier(self.horizon, self.xu_dim, cond_dim=self.context_dim, dim=self.hidden_dim,
-                                         dim_mults=dim_mults)
+        self.classifier = UnetClassifier(self.horizon, self.xu_dim, cond_dim=self.context_dim, dim=self.hidden_dim)
 
     def predict_start_from_noise(self, x_t, t, noise):
         return (
@@ -253,10 +253,11 @@ class GaussianDiffusion(nn.Module):
             context = context.reshape(context.shape[0], -1, context.shape[-1])
             B, N, _ = context.shape
         guidance_weights = torch.tensor([0.5, 0.5], device=x.device)
-        w_total = 1.2
-        # w_total = 10
+
         unconditional, _ = self.model.compiled_unconditional_test(t, x)
         if not (context is None or self.unconditional):
+            w_total = 1.2 if context.mean().item() == 1 else 1.2
+            # w_total = 30
             num_constraints = context.shape[1]
 
             conditional, _ = self.model.compiled_conditional_test(t.unsqueeze(1).expand(-1, N).reshape(-1),
@@ -643,8 +644,8 @@ class GaussianDiffusion(nn.Module):
         t = torch.arange(1, self.num_timesteps, device=device).long()
         # t = torch.arange(1, self.num_timesteps, 8, device=device).long()
         # t = torch.arange(5, 30, 2, device=device).long()
-        if self.subsampled_t:
-            t = torch.tensor([5, 10, 15], device=device).long()
+        # if self.subsampled_t:
+        # t = torch.tensor([5, 10, 15], device=device).long()
 
         N = t.shape[0]
         t = t[None, :].repeat(B, 1).reshape(B * N)

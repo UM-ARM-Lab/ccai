@@ -16,7 +16,7 @@ class SymbolicKinematics:
     """Symbolic kinematics for multi-finger robots with drop-in replacement for pytorch_kinematics."""
     
     def __init__(self, urdf_path: str, fingers: List[Dict[str, str]], 
-                 cache_dir: str = "./pytorch_kinematics", use_cache: bool = True,
+                 cache_dir: str = "./kinematics", use_cache: bool = True,
                  joint_counts: Optional[Dict[str, int]] = None) -> None:
         """
         Initialize kinematics for multiple fingers with optional caching.
@@ -1108,8 +1108,7 @@ class SymbolicKinematics:
 def main() -> None:
     """
     Main function to test symbolic kinematics with caching and compare to PyTorch Kinematics.
-    Identifies finger joints using naming patterns rather than serial chains, and 
-    ensures joint angles are sampled within limits.
+    Also compares with the optimized HandKinematicsModel using JIT compilation.
     
     Returns:
         None
@@ -1120,6 +1119,9 @@ def main() -> None:
     from pathlib import Path
     import torch
     from typing import Dict, List, Optional, Tuple, Any
+    
+    # Import the optimized HandKinematicsModel
+    from kinematics.optimized_model import HandKinematicsModel
     
     # URDF path verification
     urdf_path = '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/allegro_hand_right.urdf'
@@ -1271,7 +1273,7 @@ def main() -> None:
         pk_comparison = False
     
     # Set up cache directory for symbolic kinematics
-    cache_dir = "./pytorch_kinematics"
+    cache_dir = "./kinematics"
     
     # Initialize symbolic kinematics with correct joint counts
     print("Initializing symbolic kinematics...")
@@ -1282,6 +1284,12 @@ def main() -> None:
         use_cache=True,
         joint_counts=joint_counts
     )
+    
+    # Initialize optimized HandKinematicsModel with and without JIT
+    print("Initializing optimized HandKinematicsModel...")
+    hand_model_jit = HandKinematicsModel(use_jit=True)
+    hand_model_no_jit = HandKinematicsModel(use_jit=False)
+    print("HandKinematicsModel initialization complete")
     
     # Create batch of joint angles within limits
     batch_size = 5
@@ -1301,7 +1309,7 @@ def main() -> None:
         num_joints = len(lower)
         
         # Sample uniformly between lower and upper limits
-        finger_joints = torch.zeros(batch_size, num_joints, dtype=torch.float32, device=all_joints.device)
+        finger_joints = torch.zeros(batch_size, num_joints, dtype=torch.float32, device='cuda:0' if torch.cuda.is_available() else 'cpu')
         for j in range(num_joints):
             finger_joints[:, j] = torch.rand(batch_size) * (upper[j] - lower[j]) + lower[j]
         
@@ -1343,6 +1351,31 @@ def main() -> None:
     sym_fk_time2 = time.perf_counter() - start
     print(f"FK time: {sym_fk_time2 * 1000:.2f} ms")
     
+    # ===== Method 5: HandKinematicsModel with JIT compilation =====
+    print("\n--- Method 5: HandKinematicsModel with JIT ---")
+    start = time.perf_counter()
+    jit_fk_results = {}
+    for name, q in joint_angles.items():
+        jit_fk_results[name] = hand_model_jit.forward_kinematics(name, q)
+    jit_fk_time = time.perf_counter() - start
+    print(f"FK time: {jit_fk_time * 1000:.2f} ms")
+    
+    # ===== Method 6: HandKinematicsModel without JIT compilation =====
+    print("\n--- Method 6: HandKinematicsModel without JIT ---")
+    start = time.perf_counter()
+    no_jit_fk_results = {}
+    for name, q in joint_angles.items():
+        no_jit_fk_results[name] = hand_model_no_jit.forward_kinematics(name, q)
+    no_jit_fk_time = time.perf_counter() - start
+    print(f"FK time: {no_jit_fk_time * 1000:.2f} ms")
+    
+    # ===== Method 7: HandKinematicsModel forward pass =====
+    print("\n--- Method 7: HandKinematicsModel forward() Method ---")
+    start = time.perf_counter()
+    model_forward_results = hand_model_jit.forward(joint_angles, compute_jacobian=False)
+    model_forward_time = time.perf_counter() - start
+    print(f"FK time (using forward() method): {model_forward_time * 1000:.2f} ms")
+    
     # Only run PyTorch Kinematics comparison if initialization succeeded
     if pk_comparison:
         # ===== Method 3: PyTorch Kinematics with complete chain from URDF =====
@@ -1354,6 +1387,7 @@ def main() -> None:
         
         # Compute FK with the full chain
         all_poses = full_chain.forward_kinematics(all_joints)
+        pk_fk_time = time.perf_counter() - start
         
         # Extract end effector poses for each finger
         for finger in fingers:
@@ -1361,7 +1395,6 @@ def main() -> None:
             end = finger["end"]
             pk_fk_results[name] = all_poses[end]
             
-        pk_fk_time = time.perf_counter() - start
         print(f"FK time: {pk_fk_time * 1000:.2f} ms")
         
         # ===== Method 4: PyTorch Kinematics with Serial Chains (per finger) =====
@@ -1397,6 +1430,37 @@ def main() -> None:
     sym_jac_time2 = time.perf_counter() - start
     print(f"Jacobian time: {sym_jac_time2 * 1000:.2f} ms")
     
+    # ===== Method 5: HandKinematicsModel with JIT compilation =====
+    print("\n--- Method 5: HandKinematicsModel with JIT ---")
+    start = time.perf_counter()
+    jit_jac_results = {}
+    for name, q in joint_angles.items():
+        jit_jac_results[name] = {
+            finger["end"]: hand_model_jit.jacobian(name, q)
+            for finger in fingers if finger["name"] == name
+        }
+    jit_jac_time = time.perf_counter() - start
+    print(f"Jacobian time: {jit_jac_time * 1000:.2f} ms")
+    
+    # ===== Method 6: HandKinematicsModel without JIT compilation =====
+    print("\n--- Method 6: HandKinematicsModel without JIT ---")
+    start = time.perf_counter()
+    no_jit_jac_results = {}
+    for name, q in joint_angles.items():
+        no_jit_jac_results[name] = {
+            finger["end"]: hand_model_no_jit.jacobian(name, q)
+            for finger in fingers if finger["name"] == name
+        }
+    no_jit_jac_time = time.perf_counter() - start
+    print(f"Jacobian time: {no_jit_jac_time * 1000:.2f} ms")
+    
+    # ===== Method 7: HandKinematicsModel forward pass with Jacobian =====
+    print("\n--- Method 7: HandKinematicsModel forward() Method with Jacobian ---")
+    start = time.perf_counter()
+    model_forward_jac_results = hand_model_jit.forward(joint_angles, compute_jacobian=True)
+    model_forward_jac_time = time.perf_counter() - start
+    print(f"Jacobian time (using forward() method): {model_forward_jac_time * 1000:.2f} ms")
+    
     # Only run PyTorch Kinematics comparison if initialization succeeded
     if pk_comparison:
         # ===== Method 3: PyTorch Kinematics Jacobian with Serial Chains =====
@@ -1425,151 +1489,48 @@ def main() -> None:
 
         pk_jac_time = time.perf_counter() - start
         print(f"Jacobian time: {pk_jac_time * 1000:.2f} ms")
-        
-        # ===== VALIDATION: Compare symbolic vs PyTorch kinematics outputs =====
-        print("\n========== VALIDATION: COMPARING SYMBOLIC VS PYTORCH KINEMATICS ==========")
-        
-        # Helper function to convert Transform3d to tensor if needed
-        def ensure_tensor(obj: Any) -> torch.Tensor:
-            """
-            Convert PyTorch Kinematics Transform3d objects to tensors for comparison.
-            
-            Args:
-                obj: Object to convert, can be Transform3d, dict, list, or tensor
-                
-            Returns:
-                torch.Tensor: Tensor representation of the object
-            """
-            import pytorch_kinematics.transforms as tf
-            
-            if isinstance(obj, tf.Transform3d):
-                return obj.get_matrix()  # Extract the transformation matrix
-            elif isinstance(obj, dict):
-                return {k: ensure_tensor(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [ensure_tensor(item) for item in obj]
-            return obj
-
-        # Helper function to compute error metrics between tensors
-        def compute_error_metrics(symbolic_tensor: torch.Tensor, 
-                                 pytorch_tensor: torch.Tensor) -> Dict[str, float]:
-            """
-            Compute error metrics between symbolic and PyTorch tensors.
-            
-            Args:
-                symbolic_tensor: Output from symbolic kinematics
-                pytorch_tensor: Output from PyTorch kinematics
-                
-            Returns:
-                Dictionary with error metrics including max, mean, and relative errors
-            """
-            # Ensure both are tensors with compatible shapes
-            if not isinstance(symbolic_tensor, torch.Tensor):
-                raise TypeError(f"Expected symbolic_tensor to be a torch.Tensor, got {type(symbolic_tensor)}")
-            
-            # Convert pytorch_tensor to tensor if it's a Transform3d object
-            pytorch_tensor = ensure_tensor(pytorch_tensor)
-            
-            # Ensure tensors are on the same device
-            if symbolic_tensor.device != pytorch_tensor.device:
-                pytorch_tensor = pytorch_tensor.to(symbolic_tensor.device)
-                
-            # Compute absolute difference
-            abs_diff = torch.abs(symbolic_tensor - pytorch_tensor)
-            
-            # Compute metrics
-            max_error = torch.max(abs_diff).item()
-            mean_error = torch.mean(abs_diff).item()
-            relative_error = torch.mean(abs_diff / (torch.abs(pytorch_tensor) + 1e-6)).item()
-            
-            return {
-                "max_error": max_error,
-                "mean_error": mean_error,
-                "relative_error": relative_error * 100  # as percentage
-            }
-
-        # Compare Forward Kinematics results
-        print("\n--- Forward Kinematics Validation ---")
-        fk_valid = True
-        for name in joint_angles.keys():
-            if name in sym_fk_results2 and name in pk_fk_results:
-                sym_fk = sym_fk_results2[name]
-                pk_fk = ensure_tensor(pk_fk_results[name])  # Convert Transform3d to tensor
-                
-                # Check shapes first
-                if sym_fk.shape != pk_fk.shape:
-                    print(f"  {name}: Shape mismatch! Symbolic: {sym_fk.shape}, PyTorch: {pk_fk.shape}")
-                    fk_valid = False
-                    continue
-                
-                # Compute error metrics
-                error_metrics = compute_error_metrics(sym_fk, pk_fk)
-                
-                # Report metrics
-                print(f"  {name}: Max Error: {error_metrics['max_error']:.6f}, "
-                      f"Mean Error: {error_metrics['mean_error']:.6f}, "
-                      f"Relative Error: {error_metrics['relative_error']:.2f}%")
-                
-                # Check if errors are within acceptable range
-                if error_metrics['max_error'] > 0.01:  # Threshold of 0.01 (adjust as needed)
-                    print(f"    WARNING: Large error detected in {name} FK!")
-                    fk_valid = False
-                    # Print sample for debugging
-                    print(f"    Sample comparison (first batch item):")
-                    print(f"    Symbolic:\n{sym_fk[0]}")
-                    print(f"    PyTorch:\n{pk_fk[0]}")
-
-        # Compare Jacobian results
-        print("\n--- Jacobian Validation ---")
-        jac_valid = True
-        for name in joint_angles.keys():
-            if name in sym_jac_results2 and name in pk_jac_results:
-                # Get end-effector link name
-                ee_link = next(f["end"] for f in fingers if f["name"] == name)
-                
-                # Extract the Jacobian for the end-effector
-                if ee_link in sym_jac_results2[name]:
-                    sym_jac = sym_jac_results2[name][ee_link]
-                    pk_jac = ensure_tensor(pk_jac_results[name])  # Convert if needed
-                    
-                    # Check shapes first
-                    if sym_jac.shape != pk_jac.shape:
-                        print(f"  {name}: Shape mismatch! Symbolic: {sym_jac.shape}, PyTorch: {pk_jac.shape}")
-                        jac_valid = False
-                        continue
-                    
-                    # Compute error metrics
-                    error_metrics = compute_error_metrics(sym_jac, pk_jac)
-                    
-                    # Report metrics
-                    print(f"  {name}: Max Error: {error_metrics['max_error']:.6f}, "
-                          f"Mean Error: {error_metrics['mean_error']:.6f}, "
-                          f"Relative Error: {error_metrics['relative_error']:.2f}%")
-                    
-                    # Check if errors are within acceptable range
-                    if error_metrics['max_error'] > 0.01:  # Threshold of 0.01
-                        print(f"    WARNING: Large error detected in {name} Jacobian!")
-                        jac_valid = False
-                        # Print sample for debugging
-                        print(f"    Sample comparison (first batch item, first 3 rows):")
-                        print(f"    Symbolic:\n{sym_jac[0, :3, :]}")
-                        print(f"    PyTorch:\n{pk_jac[0, :3, :]}")
-        
-        # Overall validation summary
-        print("\n--- Validation Summary ---")
-        print(f"Forward Kinematics: {'PASS' if fk_valid else 'FAIL'}")
-        print(f"Jacobian: {'PASS' if jac_valid else 'FAIL'}")
-        
-        # Performance comparison summary
-        print("\n========== PERFORMANCE COMPARISON ==========")
-        print(f"Forward Kinematics:")
-        print(f"  Symbolic (Joint Indices) vs PyTorch Kinematics: {pk_fk_time / sym_fk_time1:.2f}x speedup")
-        print(f"  Symbolic (Per-finger) vs PyTorch Kinematics: {pk_fk_time / sym_fk_time2:.2f}x speedup")
-        print(f"  Serial Chain vs Full Chain: {pk_fk_time / serial_fk_time:.2f}x speedup")
-        
-        print(f"Jacobian:")
-        print(f"  Symbolic (Joint Indices) vs PyTorch Kinematics: {pk_jac_time / sym_jac_time1:.2f}x speedup")
-        print(f"  Symbolic (Per-finger) vs PyTorch Kinematics: {pk_jac_time / sym_jac_time2:.2f}x speedup")
+    
+    # Performance comparison summary
+    print("\n========== PERFORMANCE COMPARISON ==========")
+    print(f"Forward Kinematics:")
+    print(f"  Symbolic (Joint Indices): {sym_fk_time1 * 1000:.2f} ms")
+    print(f"  Symbolic (Per-finger): {sym_fk_time2 * 1000:.2f} ms")
+    print(f"  HandKinematicsModel with JIT: {jit_fk_time * 1000:.2f} ms")
+    print(f"  HandKinematicsModel without JIT: {no_jit_fk_time * 1000:.2f} ms")
+    print(f"  HandKinematicsModel forward(): {model_forward_time * 1000:.2f} ms")
+    
+    if pk_comparison:
+        print(f"  PyTorch Kinematics (Full Chain): {pk_fk_time * 1000:.2f} ms")
+        print(f"  PyTorch Kinematics (Serial Chains): {serial_fk_time * 1000:.2f} ms")
+    
+    # Calculate speedups relative to PyTorch Kinematics if available
+    if pk_comparison:
+        print("\nSpeedups (relative to PyTorch Kinematics Full Chain):")
+        print(f"  Symbolic (Joint Indices): {pk_fk_time / sym_fk_time1:.2f}x")
+        print(f"  Symbolic (Per-finger): {pk_fk_time / sym_fk_time2:.2f}x")
+        print(f"  HandKinematicsModel with JIT: {pk_fk_time / jit_fk_time:.2f}x")
+        print(f"  HandKinematicsModel without JIT: {pk_fk_time / no_jit_fk_time:.2f}x")
+        print(f"  HandKinematicsModel forward(): {pk_fk_time / model_forward_time:.2f}x")
+        print(f"  PyTorch Kinematics (Serial Chains): {pk_fk_time / serial_fk_time:.2f}x")
+    
+    print(f"\nJacobian:")
+    print(f"  Symbolic (Joint Indices): {sym_jac_time1 * 1000:.2f} ms")
+    print(f"  Symbolic (Per-finger): {sym_jac_time2 * 1000:.2f} ms")
+    print(f"  HandKinematicsModel with JIT: {jit_jac_time * 1000:.2f} ms")
+    print(f"  HandKinematicsModel without JIT: {no_jit_jac_time * 1000:.2f} ms")
+    print(f"  HandKinematicsModel forward() with Jacobian: {model_forward_jac_time * 1000:.2f} ms")
+    
+    if pk_comparison:
+        print(f"  PyTorch Kinematics: {pk_jac_time * 1000:.2f} ms")
+    
+    # Calculate speedups for Jacobian
+    if pk_comparison:
+        print("\nSpeedups (relative to PyTorch Kinematics):")
+        print(f"  Symbolic (Joint Indices): {pk_jac_time / sym_jac_time1:.2f}x")
+        print(f"  Symbolic (Per-finger): {pk_jac_time / sym_jac_time2:.2f}x")
+        print(f"  HandKinematicsModel with JIT: {pk_jac_time / jit_jac_time:.2f}x")
+        print(f"  HandKinematicsModel without JIT: {pk_jac_time / no_jit_jac_time:.2f}x")
+        print(f"  HandKinematicsModel forward() with Jacobian: {pk_jac_time / model_forward_jac_time:.2f}x")
 
 
 if __name__ == "__main__":

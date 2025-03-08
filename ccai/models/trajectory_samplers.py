@@ -1,5 +1,9 @@
+from typing import Dict
 import torch
 from torch import nn
+import torch.nn.functional as F
+from torch.distributions import Normal
+from torch.optim import Adam
 
 # Normalizing flow stuff
 # from nflows.flows.base import Flow
@@ -15,7 +19,7 @@ from ccai.models.diffusion.diffusion import GaussianDiffusion, ConstrainedDiffus
 from ccai.models.cnf.cnf import TrajectoryCNF
 
 from ccai.models.helpers import MLP
-
+from ccai.models.likelihood_residual_gp import LikelihoodResidualGP
 
 class TrajectoryFlowModel(nn.Module):
 
@@ -184,7 +188,7 @@ class TrajectoryDiffusionModel(nn.Module):
         condition = self.construct_condition(H, start, goal, past)
 
         if project:
-            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.diffusion_model.project(N=N, H=H, context=context, condition=condition, context_for_likelihood=context_for_likelihood)
+            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.diffusion_model.project(N=N, H=H, context=context, condition=condition)
             return samples, samples_0, (all_losses, all_samples, all_likelihoods)
         else:
             samples = self.diffusion_model.sample(N=N, H=H, context=context, condition=condition, no_grad=no_grad, skip_likelihood=skip_likelihood, context_for_likelihood=context_for_likelihood)  # .reshape(-1, H#,
@@ -303,7 +307,8 @@ class TrajectorySampler(nn.Module):
     def __init__(self, T, dx, du, context_dim, type='nf', dynamics=None, problem=None, timesteps=50, hidden_dim=64,
                  constrain=False, unconditional=False, generate_context=False, score_model='conv_unet',
                  latent_diffusion=False, vae=None, inits_noise=None, noise_noise=None, guided=False, discriminator_guidance=False,
-                 learn_inverse_dynamics=False, state_only=False, state_control_only=False):
+                 learn_inverse_dynamics=False, state_only=False, state_control_only=False,
+                 rl_adjustment=False, initial_threshold=-15):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -330,12 +335,78 @@ class TrajectorySampler(nn.Module):
         self.register_buffer('x_std', torch.ones(dx + du))
         self.send_norm_constants_to_submodels()
 
+        self.rl_ajdustment = rl_adjustment
+        if self.rl_ajdustment:
+            self.id_threshold = torch.nn.Parameter(torch.tensor([initial_threshold]))
+
+            self.gp = LikelihoodResidualGP(dx, num_inducing=32)
+            
+            # Add value function for PPO
+            self.value_function = MLP(dx + 1, 1, hidden_size=64)  # +1 for sine/cosine representation of yaw
+            self.ppo_optimizer = Adam([
+                {'params': self.gp.gp_model.parameters()},
+                {'params': self.gp.likelihood.parameters()},
+                {'params': [self.id_threshold], 'lr': 1e-2},
+                {'params': self.value_function.parameters(), 'lr': 3e-4}
+            ])
+            
+            # PPO hyperparameters
+            self.clip_param = 0.2
+            self.value_loss_coef = 0.5
+            self.entropy_coef = 0.01
+            self.max_grad_norm = 0.5
+            self.ppo_epochs = 10
+            self.batch_size = 64
+            self.gamma = 0.99
+            self.gae_lambda = 0.95
+            
+            # PPO memory
+            self.ppo_states = []
+            self.ppo_actions = []
+            self.ppo_log_probs = []
+            self.ppo_rewards = []
+            self.ppo_values = []
+            self.ppo_dones = []
+            self.ppo_returns = []
+            self.ppo_advantages = []
+
     def set_norm_constants(self, x_mean, x_std):
         self.x_mean.data = x_mean.to(device=self.x_mean.device, dtype=self.x_mean.dtype)
         self.x_std.data = x_std.to(device=self.x_std.device, dtype=self.x_std.dtype)
 
     def send_norm_constants_to_submodels(self):
         self.model.set_norm_constants(self.x_mean, self.x_std)
+
+    def convert_yaw_to_sine_cosine(self, xu):
+        """
+        xu is shape (N, T, 36)
+        Replace the yaw in xu with sine and cosine and return the new xu
+        """
+        yaw = xu[14]
+        sine = torch.sin(yaw)
+        cosine = torch.cos(yaw)
+        xu_new = torch.cat([xu[:14], cosine.unsqueeze(-1), sine.unsqueeze(-1), xu[15:]], dim=-1)
+        return xu_new
+
+    def check_id(self, state, N, threshold=None):
+
+        start = state[:4 * 3 + 3]
+        start_sine_cosine = self.convert_yaw_to_sine_cosine(start)
+        samples, _, likelihood = self.sample(N=N, H=self.T, start=start_sine_cosine.reshape(1, -1),
+                constraints=torch.ones(N, 3).to(device=self.model.device))
+        likelihood = likelihood.reshape(N).mean().item()
+        # samples = samples.cpu().numpy()
+        if self.rl_ajdustment:
+            likelihood_residual_mean, likelihood_residual_variance = self.gp.predict(start_sine_cosine)
+            likelihood += likelihood_residual_mean
+            print('Likelihood residual:', likelihood_residual_mean)
+        print('Likelihood:', likelihood)
+        if threshold is None:
+            threshold = self.id_threshold
+        if likelihood < threshold:
+            print('State is out of distribution')
+            return False, likelihood
+        return True, likelihood
 
     def sample(self, N, H=10, start=None, goal=None, constraints=None, past=None, project=False, no_grad=True, skip_likelihood=False, context_for_likelihood=True):
         norm_start = None
@@ -409,3 +480,485 @@ class TrajectorySampler(nn.Module):
 
     def classifier_loss(self, trajectories, mask=None, context=None, label=None):
         return self.model.classifier_loss(trajectories, context=context, mask=mask, label=label)
+
+    def evaluate_actions(self, states, actions):
+        """
+        Evaluate the log probability and value function for given states and actions,
+        ensuring proper gradient flow for PPO updates.
+        
+        Args:
+            states: Batch of states [batch_size, state_dim]
+            actions: Batch of actions [batch_size, 1] (binary decisions: 0=OOD, 1=ID)
+            
+        Returns:
+            action_log_probs: Log probabilities of actions
+            state_values: Value function estimates
+            dist_entropy: Entropy of the policy distribution
+        """
+        # Convert states for consistency
+        state_batch = torch.stack([self.convert_yaw_to_sine_cosine(state) for state in states])
+        
+        # Sample trajectories to get base likelihoods
+        # We need to do this part without gradients because it's expensive and not directly differentiable
+        with torch.no_grad():
+            batch_likelihoods = []
+            for state in state_batch:
+                _, _, likelihood = self.sample(
+                    N=5,  # Small number for efficiency
+                    H=self.T,
+                    start=state.reshape(1, -1),
+                    constraints=torch.ones(5, 3).to(device=state.device)
+                )
+                batch_likelihoods.append(likelihood.mean().item())
+            
+            # Convert to tensor on the right device
+            base_likelihoods = torch.tensor(batch_likelihoods, device=state_batch.device)
+        
+        # Create a new tensor that requires gradients - this is a trick to incorporate 
+        # the base likelihoods into our computational graph
+        base_likelihoods = base_likelihoods.detach().requires_grad_(False)
+        
+        # Get GP predictions WITH gradients using the new method
+        likelihood_residuals = self.gp.forward_for_policy(state_batch)
+        
+        # Combine base likelihoods with residuals
+        adjusted_likelihoods = base_likelihoods + likelihood_residuals.squeeze()
+        
+        # Calculate policy distribution
+        probs = torch.sigmoid(adjusted_likelihoods - self.id_threshold)
+        dist = torch.distributions.Bernoulli(probs)
+        
+        # Get log probabilities and entropy
+        action_log_probs = dist.log_prob(actions.float())
+        dist_entropy = dist.entropy().mean()
+        
+        # Get value function predictions
+        state_values = self.value_function(state_batch)
+        
+        return action_log_probs, state_values, dist_entropy
+
+    def ppo_update(self, states: torch.Tensor, actions: torch.Tensor, 
+                  old_log_probs: torch.Tensor, returns: torch.Tensor, 
+                  advantages: torch.Tensor) -> Dict[str, float]:
+        """
+        Update the policy parameters (GP and threshold) and value function using PPO.
+        
+        Args:
+            states: Batch of states [batch_size, state_dim]
+            actions: Batch of actions [batch_size, 1] (binary decisions: 0=OOD, 1=ID)
+            old_log_probs: Log probabilities of actions under old policy [batch_size]
+            returns: Discounted returns [batch_size]
+            advantages: Advantages (returns - values) [batch_size]
+            
+        Returns:
+            Dictionary with loss information
+        """
+        # Ensure inputs are tensors and on the correct device
+        device = self.id_threshold.device
+        states = torch.as_tensor(states, device=device)
+        actions = torch.as_tensor(actions, device=device)
+        old_log_probs = torch.as_tensor(old_log_probs, device=device)
+        returns = torch.as_tensor(returns, device=device)
+        advantages = torch.as_tensor(advantages, device=device)
+        
+        # Normalize advantages for more stable training
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+        
+        # Metrics to track during training
+        total_policy_loss = 0
+        total_value_loss = 0
+        total_entropy = 0
+        total_clip_fraction = 0
+        num_updates = 0
+        
+        # Multiple epochs of PPO update
+        for _ in range(self.ppo_epochs):
+            # Create data loader for mini-batches
+            batch_indices = torch.randperm(len(states))
+            
+            # Process mini-batches
+            for start_idx in range(0, len(states), self.batch_size):
+                num_updates += 1
+                end_idx = min(start_idx + self.batch_size, len(states))
+                batch_idx = batch_indices[start_idx:end_idx]
+                
+                # Get batch data
+                batch_states = states[batch_idx]
+                batch_actions = actions[batch_idx]
+                batch_old_log_probs = old_log_probs[batch_idx]
+                batch_returns = returns[batch_idx]
+                batch_advantages = advantages[batch_idx]
+                
+                # Evaluate current policy on batch
+                log_probs, values, entropy = self.evaluate_actions(batch_states, batch_actions)
+                
+                # PPO policy loss calculation
+                ratio = torch.exp(log_probs - batch_old_log_probs)
+                surr1 = ratio * batch_advantages
+                surr2 = torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * batch_advantages
+                
+                # Calculate policy loss (negative because we're minimizing)
+                policy_loss = -torch.min(surr1, surr2).mean()
+                
+                # Calculate value function loss
+                value_loss = F.mse_loss(values.squeeze(), batch_returns)
+                
+                # Calculate combined loss
+                loss = policy_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy
+                
+                # Perform gradient step
+                self.ppo_optimizer.zero_grad()
+                loss.backward()
+                
+                # Optional: gradient clipping for stability
+                if self.max_grad_norm > 0:
+                    torch.nn.utils.clip_grad_norm_(
+                        list(self.gp.gp_model.parameters()) + 
+                        list(self.gp.likelihood.parameters()) +
+                        [self.id_threshold] +
+                        list(self.value_function.parameters()),
+                        self.max_grad_norm
+                    )
+                
+                # Update parameters
+                self.ppo_optimizer.step()
+                
+                # Track metrics
+                total_policy_loss += policy_loss.item()
+                total_value_loss += value_loss.item()
+                total_entropy += entropy.item()
+                
+                # Calculate clipping fraction for monitoring
+                clip_fraction = ((ratio - 1.0).abs() > self.clip_param).float().mean().item()
+                total_clip_fraction += clip_fraction
+        
+        # Return average metrics
+        return {
+            'policy_loss': total_policy_loss / num_updates,
+            'value_loss': total_value_loss / num_updates,
+            'entropy': total_entropy / num_updates,
+            'clip_fraction': total_clip_fraction / num_updates,
+            'threshold': self.id_threshold.item()
+        }
+    
+    def collect_rollout_data(self, env, num_steps: int, gamma: float = 0.99, 
+                            gae_lambda: float = 0.95) -> Dict[str, torch.Tensor]:
+        """
+        Collect rollout data from environment interactions for PPO training.
+        
+        Args:
+            env: Environment that provides states and rewards
+            num_steps: Number of environment steps to collect
+            gamma: Discount factor
+            gae_lambda: GAE lambda parameter for advantage estimation
+            
+        Returns:
+            Dictionary containing collected rollout data for PPO
+        """
+        # Storage for collected data
+        states = []
+        actions = []
+        rewards = []
+        values = []
+        log_probs = []
+        dones = []
+        
+        # Get initial state
+        state = env.reset()
+        done = False
+        
+        for _ in range(num_steps):
+            # Process state and evaluate policy
+            state_tensor = torch.tensor(self.convert_yaw_to_sine_cosine(state), 
+                                        dtype=torch.float32, device=self.id_threshold.device).unsqueeze(0)
+            
+            # Get value estimate
+            with torch.no_grad():
+                value = self.value_function(state_tensor).squeeze().item()
+            
+            # Get action from policy
+            decision, prob = self.compute_policy_decision(state, return_prob=True)
+            action = 1 if decision else 0  # Convert boolean to int (1=in-distribution, 0=out-of-distribution)
+            
+            # Calculate log probability of the action
+            log_prob = torch.log(prob + 1e-8) if action == 1 else torch.log(1 - prob + 1e-8)
+            log_prob = log_prob.item()  # Convert to scalar
+            
+            # Step environment with chosen action
+            next_state, reward, done, info = env.step(action)
+            
+            # Store transition
+            states.append(state)
+            actions.append(action)
+            rewards.append(reward)
+            values.append(value)
+            log_probs.append(log_prob)
+            dones.append(done)
+            
+            # Move to next state
+            state = next_state
+            
+            # Reset if environment is done
+            if done:
+                state = env.reset()
+                done = False
+        
+        # Calculate advantages using Generalized Advantage Estimation (GAE)
+        returns = []
+        advantages = []
+        
+        # Get final value for bootstrapping
+        final_state = torch.tensor(self.convert_yaw_to_sine_cosine(state), 
+                                  dtype=torch.float32, device=self.id_threshold.device).unsqueeze(0)
+        with torch.no_grad():
+            last_value = 0.0 if done else self.value_function(final_state).squeeze().item()
+        
+        # Initialize with last value
+        next_return = last_value
+        next_advantage = 0
+        
+        # Process transitions in reverse for easier bootstrapping
+        for step in reversed(range(len(rewards))):
+            # Calculate returns and advantages
+            if dones[step]:
+                # If terminal state, no bootstrapping
+                next_return = 0.0
+                next_advantage = 0.0
+            
+            # Calculate return with bootstrapping
+            current_return = rewards[step] + gamma * next_return * (1.0 - dones[step])
+            returns.insert(0, current_return)
+            
+            # TD error
+            delta = rewards[step] + gamma * next_value * (1.0 - dones[step]) - values[step]
+            
+            # GAE calculation
+            current_advantage = delta + gamma * gae_lambda * next_advantage * (1.0 - dones[step])
+            advantages.insert(0, current_advantage)
+            
+            # Update for next iteration
+            next_return = current_return
+            next_advantage = current_advantage
+            next_value = values[step]
+        
+        # Convert lists to tensors
+        states = torch.tensor(states, dtype=torch.float32, device=self.id_threshold.device)
+        actions = torch.tensor(actions, dtype=torch.long, device=self.id_threshold.device).unsqueeze(-1)
+        returns = torch.tensor(returns, dtype=torch.float32, device=self.id_threshold.device)
+        advantages = torch.tensor(advantages, dtype=torch.float32, device=self.id_threshold.device)
+        log_probs = torch.tensor(log_probs, dtype=torch.float32, device=self.id_threshold.device)
+        
+        return {
+            'states': states,
+            'actions': actions,
+            'log_probs': log_probs,
+            'returns': returns,
+            'advantages': advantages,
+            'values': torch.tensor(values, device=self.id_threshold.device)
+        }
+
+    def store_transition(self, state, action: int, next_state, reward: float, done: bool = False) -> None:
+        """
+        Store a transition in the PPO memory.
+        
+        Args:
+            state: Current state
+            action: Action taken (0 or 1)
+            next_state: Resulting next state
+            reward: Reward received
+            done: Whether the episode is done
+        """
+        if not self.rl_ajdustment:
+            return
+            
+        # Process state and evaluate policy
+        state_tensor = torch.tensor(self.convert_yaw_to_sine_cosine(state), 
+                                    dtype=torch.float32, device=self.id_threshold.device).unsqueeze(0)
+        
+        # Get value estimate
+        with torch.no_grad():
+            value = self.value_function(state_tensor).squeeze().item()
+        
+        # Get action probability
+        decision, prob = self.compute_policy_decision(state, return_prob=True)
+        # Calculate log probability of the action
+        action_tensor = torch.tensor(action, dtype=torch.float, device=self.id_threshold.device)
+        log_prob = torch.log(prob + 1e-8) if action == 1 else torch.log(1 - prob + 1e-8)
+        log_prob = log_prob.item()  # Convert to scalar
+        
+        # Store in memory
+        self.ppo_states.append(state)
+        self.ppo_actions.append(action)
+        self.ppo_log_probs.append(log_prob)
+        self.ppo_rewards.append(reward)
+        self.ppo_values.append(value)
+        self.ppo_dones.append(done)
+    
+    def compute_returns_and_advantages(self) -> None:
+        """
+        Compute returns and advantages from stored transitions using GAE.
+        This should be called before ppo_update when enough data has been collected.
+        """
+        if not self.ppo_states:
+            return  # No data to process
+        
+        device = self.id_threshold.device
+        
+        # Get final value for bootstrapping
+        if self.ppo_dones[-1]:
+            last_value = 0.0
+        else:
+            # Use the last state's value as bootstrap
+            final_state = torch.tensor(
+                self.convert_yaw_to_sine_cosine(self.ppo_states[-1]),
+                dtype=torch.float32, 
+                device=device
+            ).unsqueeze(0)
+            
+            with torch.no_grad():
+                last_value = self.value_function(final_state).squeeze().item()
+        
+        # Calculate returns and advantages using GAE
+        self.ppo_returns = []
+        self.ppo_advantages = []
+        
+        next_return = last_value
+        next_advantage = 0
+        
+        # Process transitions in reverse for easier bootstrapping
+        for step in reversed(range(len(self.ppo_rewards))):
+            # Calculate returns and advantages
+            if self.ppo_dones[step]:
+                # If terminal state, no bootstrapping
+                next_return = 0.0
+                next_advantage = 0.0
+            
+            # GAE calculations
+            delta = self.ppo_rewards[step] + self.gamma * next_return * (1.0 - self.ppo_dones[step]) - self.ppo_values[step]
+            current_advantage = delta + self.gamma * self.gae_lambda * next_advantage * (1.0 - self.ppo_dones[step])
+            
+            # Store results
+            self.ppo_returns.insert(0, delta + self.ppo_values[step])
+            self.ppo_advantages.insert(0, current_advantage)
+            
+            # Update for next iteration
+            next_return = self.ppo_returns[0]  
+            next_advantage = current_advantage
+    
+    def clear_memory(self) -> None:
+        """Clear all stored PPO data."""
+        self.ppo_states = []
+        self.ppo_actions = []
+        self.ppo_log_probs = []
+        self.ppo_rewards = []
+        self.ppo_values = []
+        self.ppo_dones = []
+        self.ppo_returns = []
+        self.ppo_advantages = []
+    
+    def get_memory_size(self) -> int:
+        """Return the current size of stored transitions."""
+        return len(self.ppo_states)
+        
+    def ppo_update(self) -> Dict[str, float]:
+        """
+        Update the policy parameters (GP and threshold) and value function using PPO.
+        Uses data stored in the PPO memory.
+        
+        Returns:
+            Dictionary with loss information
+        """
+        if not self.ppo_returns or len(self.ppo_states) == 0:
+            return {'error': 'No data available for update'}
+            
+        device = self.id_threshold.device
+        
+        # Convert memory to tensors on the correct device
+        states = torch.tensor(self.ppo_states, dtype=torch.float32, device=device)
+        actions = torch.tensor(self.ppo_actions, dtype=torch.long, device=device).unsqueeze(-1)
+        old_log_probs = torch.tensor(self.ppo_log_probs, dtype=torch.float32, device=device)
+        returns = torch.tensor(self.ppo_returns, dtype=torch.float32, device=device)
+        advantages = torch.tensor(self.ppo_advantages, dtype=torch.float32, device=device)
+        
+        # Normalize advantages for more stable training
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+        
+        # Metrics to track during training
+        total_policy_loss = 0
+        total_value_loss = 0
+        total_entropy = 0
+        total_clip_fraction = 0
+        num_updates = 0
+        
+        # Multiple epochs of PPO update
+        for _ in range(self.ppo_epochs):
+            # Create data loader for mini-batches
+            batch_indices = torch.randperm(len(states))
+            
+            # Process mini-batches
+            for start_idx in range(0, len(states), self.batch_size):
+                num_updates += 1
+                end_idx = min(start_idx + self.batch_size, len(states))
+                batch_idx = batch_indices[start_idx:end_idx]
+                
+                # Get batch data
+                batch_states = states[batch_idx]
+                batch_actions = actions[batch_idx]
+                batch_old_log_probs = old_log_probs[batch_idx]
+                batch_returns = returns[batch_idx]
+                batch_advantages = advantages[batch_idx]
+                
+                # Evaluate current policy on batch
+                log_probs, values, entropy = self.evaluate_actions(batch_states, batch_actions)
+                
+                # PPO policy loss calculation
+                ratio = torch.exp(log_probs - batch_old_log_probs)
+                surr1 = ratio * batch_advantages
+                surr2 = torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * batch_advantages
+                
+                # Calculate policy loss (negative because we're minimizing)
+                policy_loss = -torch.min(surr1, surr2).mean()
+                
+                # Calculate value function loss
+                value_loss = F.mse_loss(values.squeeze(), batch_returns)
+                
+                # Calculate combined loss
+                loss = policy_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy
+                
+                # Perform gradient step
+                self.ppo_optimizer.zero_grad()
+                loss.backward()
+                
+                # Optional: gradient clipping for stability
+                if self.max_grad_norm > 0:
+                    torch.nn.utils.clip_grad_norm_(
+                        list(self.gp.gp_model.parameters()) + 
+                        list(self.gp.likelihood.parameters()) +
+                        [self.id_threshold] +
+                        list(self.value_function.parameters()),
+                        self.max_grad_norm
+                    )
+                
+                # Update parameters
+                self.ppo_optimizer.step()
+                
+                # Track metrics
+                total_policy_loss += policy_loss.item()
+                total_value_loss += value_loss.item()
+                total_entropy += entropy.item()
+                
+                # Calculate clipping fraction for monitoring
+                clip_fraction = ((ratio - 1.0).abs() > self.clip_param).float().mean().item()
+                total_clip_fraction += clip_fraction
+        
+        # Clear memory after update
+        self.clear_memory()
+        
+        # Return average metrics
+        return {
+            'policy_loss': total_policy_loss / num_updates,
+            'value_loss': total_value_loss / num_updates,
+            'entropy': total_entropy / num_updates,
+            'clip_fraction': total_clip_fraction / num_updates,
+            'threshold': self.id_threshold.item()
+        }

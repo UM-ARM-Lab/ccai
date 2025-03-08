@@ -264,10 +264,10 @@ class AllegroScrewDriverDataset(Dataset):
                                 end_states.append(np.concatenate((traj_data[i], zero_pad)))
                         # print(traj.shape)
                         if not exec_only or (exec_only and t == min_t):
-                            classes.append(data[t]['contact_state'][:, None, :])#.repeat(traj.shape[1], axis=1)
+                            classes.append(data[t]['contact_state'][:, None, :].repeat(traj.shape[1], axis=1))
                             # combine traj and starts
                             if use_actual_traj:
-                                traj = np.concatenate(actual_traj + [traj], axis=2)[..., :1 , :,:]
+                                traj = np.concatenate(actual_traj + [traj], axis=2)#[..., :1 , :,:]
                                 masks.append(np.ones((traj.shape[0], traj.shape[1], traj.shape[2])))
                             else:
                                 zeros = [np.zeros_like(actual_traj[0])] * (len(actual_traj) - 1)

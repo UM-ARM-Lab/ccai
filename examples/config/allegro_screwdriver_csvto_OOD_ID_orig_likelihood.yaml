@@ -7,7 +7,7 @@ num_turns: 1
 max_recovery_stages: 4
 num_trials: 10
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_data_turn_only_likelihood_no_turn_orig_likelihood'
+experiment_name: 'allegro_screwdriver_recovery_data_turn_only_likelihood_no_turn_orig_likelihood_gravity_min_force_multi_link_contact'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -21,9 +21,9 @@ goal: -1.5
 prior: 1
 multi_particle_search: True
 replan: False
-visualize_plan: False
-visualize_recovery_plan: False
-visualize_contact_plan: False
+visualize_plan: True
+visualize_recovery_plan: True
+visualize_contact_plan: True
 optimize_force: True
 exclude_index: False
 projected: False
@@ -56,7 +56,7 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:0'
+    device: 'cuda:1'
     online_iters: 35
     warmup_iters: 50
     resample_steps: 16
