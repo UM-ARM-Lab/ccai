@@ -26,7 +26,7 @@ sys.path.append('..')
 # sys.stdout = open('./examples/logs/recovery_as_contact_search.log', 'w', buffering=1)
 # sys.stdout = open('./examples/logs/live_recovery_hardware_orig_ecdf_contact_selection_film.log', 'a', buffering=1)
 # sys.stdout = open('./examples/logs/allegro_screwdriver_recovery_best_traj_only_15000_training_no_downsample_balance_bugfix_diffusion_split_t_x_samples_ecdf.log', 'w', buffering=1)
-sys.stdout = open('./examples/logs/alelgro_screwdriver_data_genpi_2.log', 'w', buffering=1)
+# sys.stdout = open('./examples/logs/alelgro_screwdriver_data_genpi_2.log', 'w', buffering=1)
 
 import pytorch_volumetric as pv
 import pytorch_kinematics as pk
@@ -1751,10 +1751,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 contact_sequence.append(gen.choice(contact_options, 1)[0])
                 if contact_sequence[-1] == 'turn':
                     break
-    elif not sample_contact:
-        # contact_sequence = ['turn', 'turn', 'thumb_middle', 'turn']
-        contact_sequence = ['turn', 'thumb_middle', 'turn', 'thumb_middle', 'turn']
-        num_stages = len(contact_sequence)
+    # elif not sample_contact:
+    #     # contact_sequence = ['turn', 'turn', 'thumb_middle', 'turn']
+    #     contact_sequence = ['turn', 'thumb_middle', 'turn', 'thumb_middle', 'turn']
+    #     num_stages = len(contact_sequence)
     elif not sample_contact:
         contact_sequence = ['turn']
         for k in range(params['num_turns'] - 1):
@@ -2133,8 +2133,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_only.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_only.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_perturbed_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_orig_likelihood.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_live_recovery_shortcut_0.yaml').read_text())
