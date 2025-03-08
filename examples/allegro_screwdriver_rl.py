@@ -314,7 +314,6 @@ class PPO:
                 action = normal.sample()
                 
         return action
-    # I want to run the same constraint projection done as part of the cnf sampling in allegro_screwdriver_rl.py. I want to use the constraints from a turning problem
     def compute_gae(self, values, rewards, dones, next_value):
         """Compute generalized advantage estimates."""
         advantages = []
@@ -333,10 +332,21 @@ class PPO:
     
     def update(self, states, actions, old_log_probs, returns, advantages):
         """Update policy and value networks."""
-        # Convert to tensors
-        states = torch.tensor(states, dtype=torch.float32).to(self.device)
-        actions = torch.tensor(actions, dtype=torch.float32).to(self.device)
-        old_log_probs = torch.tensor(old_log_probs, dtype=torch.float32).to(self.device)
+        # Convert to tensors - check if inputs are already tensors and stack them
+        if isinstance(states[0], torch.Tensor):
+            states = torch.stack(states).to(self.device)
+        else:
+            states = torch.tensor(states, dtype=torch.float32).to(self.device)
+            
+        if isinstance(actions[0], torch.Tensor):
+            actions = torch.stack(actions).to(self.device)
+        else:
+            actions = torch.tensor(actions, dtype=torch.float32).to(self.device)
+            
+        if isinstance(old_log_probs[0], torch.Tensor):
+            old_log_probs = torch.tensor(old_log_probs, dtype=torch.float32).to(self.device)
+        else:
+            old_log_probs = torch.tensor(old_log_probs, dtype=torch.float32).to(self.device)
         
         # Normalize advantages
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
@@ -451,7 +461,7 @@ def train_ppo(config, total_timesteps=1000000, save_path=None):
     
     # Training variables
     num_steps_per_episode = config.get('max_episode_steps', 100)
-    update_frequency = config.get('update_frequency', 128)
+    update_frequency = config.get('update_frequency', 1024)
     checkpoint_frequency = config.get('checkpoint_frequency', 2048)
     
     # Initialize tracking variables
