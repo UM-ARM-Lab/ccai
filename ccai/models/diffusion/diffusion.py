@@ -678,9 +678,9 @@ class GaussianDiffusion(nn.Module):
         overall_kl = kl_x.reshape(B, N).mean(dim=1).to(x.device)
         return -overall_kl
  
-    def project(self, N, H=None, condition=None, context=None):
+    def project(self, N, threshold, H=None, condition=None, context=None):
 
-        min_likelihood = self.cutoff
+        min_likelihood = threshold
 
         x = condition[0][1]
         B = x.shape[0]

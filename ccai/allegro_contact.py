@@ -231,42 +231,42 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             'thumb': 'allegro_hand_oya_finger_3_aftc_base_link',
         }
 
-        self.collision_link_names = {
-            'index':
-            ['allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
-             'allegro_hand_hitosashi_finger_finger_link_3',
-             'allegro_hand_hitosashi_finger_finger_link_2',
-             'allegro_hand_hitosashi_finger_finger_link_1',
-             'allegro_hand_hitosashi_finger_finger_link_0'],
-             'middle':
-            ['allegro_hand_naka_finger_finger_1_aftc_base_link',
-             'allegro_hand_naka_finger_finger_link_7',
-             'allegro_hand_naka_finger_finger_link_6',
-             'allegro_hand_naka_finger_finger_link_5',
-             'allegro_hand_naka_finger_finger_link_4'],
-                'ring':
-            ['allegro_hand_kusuri_finger_finger_2_aftc_base_link',
-                'allegro_hand_kusuri_finger_finger_link_11',
-                'allegro_hand_kusuri_finger_finger_link_10',
-                'allegro_hand_kusuri_finger_finger_link_9',
-                'allegro_hand_kusuri_finger_finger_link_8'],
-                'thumb':
-            ['allegro_hand_oya_finger_3_aftc_base_link',
-            'allegro_hand_oya_finger_link_15',
-            'allegro_hand_oya_finger_link_14',
-            'allegro_hand_oya_finger_link_13',
-            'allegro_hand_oya_finger_link_12'],
-        }
         # self.collision_link_names = {
         #     'index':
-        #     ['allegro_hand_hitosashi_finger_finger_0_aftc_base_link'],
+        #     ['allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
+        #      'allegro_hand_hitosashi_finger_finger_link_3',
+        #      'allegro_hand_hitosashi_finger_finger_link_2',
+        #      'allegro_hand_hitosashi_finger_finger_link_1',
+        #      'allegro_hand_hitosashi_finger_finger_link_0'],
         #      'middle':
-        #     ['allegro_hand_naka_finger_finger_1_aftc_base_link'],
+        #     ['allegro_hand_naka_finger_finger_1_aftc_base_link',
+        #      'allegro_hand_naka_finger_finger_link_7',
+        #      'allegro_hand_naka_finger_finger_link_6',
+        #      'allegro_hand_naka_finger_finger_link_5',
+        #      'allegro_hand_naka_finger_finger_link_4'],
         #         'ring':
-        #     ['allegro_hand_kusuri_finger_finger_2_aftc_base_link'],
+        #     ['allegro_hand_kusuri_finger_finger_2_aftc_base_link',
+        #         'allegro_hand_kusuri_finger_finger_link_11',
+        #         'allegro_hand_kusuri_finger_finger_link_10',
+        #         'allegro_hand_kusuri_finger_finger_link_9',
+        #         'allegro_hand_kusuri_finger_finger_link_8'],
         #         'thumb':
-        #     ['allegro_hand_oya_finger_3_aftc_base_link'],
+        #     ['allegro_hand_oya_finger_3_aftc_base_link',
+        #     'allegro_hand_oya_finger_link_15',
+        #     'allegro_hand_oya_finger_link_14',
+        #     'allegro_hand_oya_finger_link_13',
+        #     'allegro_hand_oya_finger_link_12'],
         # }
+        self.collision_link_names = {
+            'index':
+            ['allegro_hand_hitosashi_finger_finger_0_aftc_base_link'],
+             'middle':
+            ['allegro_hand_naka_finger_finger_1_aftc_base_link'],
+                'ring':
+            ['allegro_hand_kusuri_finger_finger_2_aftc_base_link'],
+                'thumb':
+            ['allegro_hand_oya_finger_3_aftc_base_link'],
+        }
         self.ee_link_idx = {finger: chain.frame_to_idx[ee_name] for finger, ee_name in self.ee_names.items()}
         self.frame_indices = torch.tensor([self.ee_link_idx[finger] for finger in self.fingers])
 

@@ -72,6 +72,42 @@ class TrajectoryFlowModel(nn.Module):
         transforms = CompositeTransform(transforms)
         self.flow = Flow(transforms, base_dist)
 
+    def to(self, device: torch.device) -> 'TrajectorySampler':
+        """
+        Move the model to the specified device, including the GP model.
+        
+        Args:
+            device: Device to move the model to
+            
+        Returns:
+            Self for method chaining
+        """
+        # Move the main model
+        self.model = self.model.to(device)
+        
+        # Move normalization constants
+        self.x_mean = self.x_mean.to(device)
+        self.x_std = self.x_std.to(device)
+        
+        # Move GP model and associated components if present
+        if hasattr(self, 'rl_adjustment') and self.rl_adjustment:
+            self.id_threshold = self.id_threshold.to(device)
+            self.gp = self.gp.to(device)
+            self.value_function = self.value_function.to(device)
+            
+            # Update optimizer with new parameter references
+            self.ppo_optimizer = torch.optim.Adam([
+                {'params': self.gp.gp_model.parameters()},
+                {'params': self.gp.likelihood.parameters()},
+                {'params': [self.id_threshold], 'lr': 1e-2},
+                {'params': self.value_function.parameters(), 'lr': 3e-4}
+            ])
+        
+        # Update submodels with new device
+        self.send_norm_constants_to_submodels()
+        
+        return self
+
     def sample(self, N, H=None, start=None, goal=None, constraints=None, T=1):
         B = 1
         if start is not None:
@@ -181,14 +217,14 @@ class TrajectoryDiffusionModel(nn.Module):
             condition = None
         return condition
     
-    def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None, project=False, no_grad=True, skip_likelihood=False, context_for_likelihood=True):
+    def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None, project=False, no_grad=True, skip_likelihood=False, context_for_likelihood=True, threshold=None):
         # B, N, _ = constraints.shape
         context = self.construct_context(constraints)
 
         condition = self.construct_condition(H, start, goal, past)
 
         if project:
-            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.diffusion_model.project(N=N, H=H, context=context, condition=condition)
+            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.diffusion_model.project(N=N, threshold=threshold, H=H, context=context, condition=condition)
             return samples, samples_0, (all_losses, all_samples, all_likelihoods)
         else:
             samples = self.diffusion_model.sample(N=N, H=H, context=context, condition=condition, no_grad=no_grad, skip_likelihood=skip_likelihood, context_for_likelihood=context_for_likelihood)  # .reshape(-1, H#,
@@ -333,16 +369,16 @@ class TrajectorySampler(nn.Module):
 
         self.register_buffer('x_mean', torch.zeros(dx + du))
         self.register_buffer('x_std', torch.ones(dx + du))
-        self.send_norm_constants_to_submodels()
 
-        self.rl_ajdustment = rl_adjustment
-        if self.rl_ajdustment:
+        self.rl_adjustment = rl_adjustment
+        if self.rl_adjustment:
             self.id_threshold = torch.nn.Parameter(torch.tensor([initial_threshold]))
 
             self.gp = LikelihoodResidualGP(dx, num_inducing=32)
+
             
             # Add value function for PPO
-            self.value_function = MLP(dx + 1, 1, hidden_size=64)  # +1 for sine/cosine representation of yaw
+            self.value_function = MLP(dx, 1, hidden_size=64)  # +1 for sine/cosine representation of yaw
             self.ppo_optimizer = Adam([
                 {'params': self.gp.gp_model.parameters()},
                 {'params': self.gp.likelihood.parameters()},
@@ -370,12 +406,52 @@ class TrajectorySampler(nn.Module):
             self.ppo_returns = []
             self.ppo_advantages = []
 
+        self.send_norm_constants_to_submodels()
+
+    def to(self, device: torch.device) -> 'TrajectorySampler':
+        """
+        Move the model to the specified device, including the GP model.
+        
+        Args:
+            device: Device to move the model to
+            
+        Returns:
+            Self for method chaining
+        """
+        # Move the main model
+        self.model = self.model.to(device)
+        
+        # Move normalization constants
+        self.x_mean = self.x_mean.to(device)
+        self.x_std = self.x_std.to(device)
+        
+        # Move GP model and associated components if present
+        if self.rl_adjustment:
+            self.id_threshold.data = self.id_threshold.to(device)
+            self.gp = self.gp.to(device)
+            self.value_function = self.value_function.to(device)
+            
+            # Update optimizer with new parameter references
+            self.ppo_optimizer = torch.optim.Adam([
+                {'params': self.gp.gp_model.parameters()},
+                {'params': self.gp.likelihood.parameters()},
+                {'params': [self.id_threshold], 'lr': 1e-2},
+                {'params': self.value_function.parameters(), 'lr': 3e-4}
+            ])
+        
+        # Update submodels with new device
+        self.send_norm_constants_to_submodels()
+        
+        return self
+
+
     def set_norm_constants(self, x_mean, x_std):
         self.x_mean.data = x_mean.to(device=self.x_mean.device, dtype=self.x_mean.dtype)
         self.x_std.data = x_std.to(device=self.x_std.device, dtype=self.x_std.dtype)
 
     def send_norm_constants_to_submodels(self):
         self.model.set_norm_constants(self.x_mean, self.x_std)
+        self.gp.set_norm_constants(self.x_mean, self.x_std)
 
     def convert_yaw_to_sine_cosine(self, xu):
         """
@@ -393,10 +469,10 @@ class TrajectorySampler(nn.Module):
         start = state[:4 * 3 + 3]
         start_sine_cosine = self.convert_yaw_to_sine_cosine(start)
         samples, _, likelihood = self.sample(N=N, H=self.T, start=start_sine_cosine.reshape(1, -1),
-                constraints=torch.ones(N, 3).to(device=self.model.device))
+                constraints=torch.ones(N, 3).to(device=state.device))
         likelihood = likelihood.reshape(N).mean().item()
         # samples = samples.cpu().numpy()
-        if self.rl_ajdustment:
+        if self.rl_adjustment:
             likelihood_residual_mean, likelihood_residual_variance = self.gp.predict(start_sine_cosine)
             likelihood += likelihood_residual_mean
             print('Likelihood residual:', likelihood_residual_mean)
@@ -420,7 +496,7 @@ class TrajectorySampler(nn.Module):
         else:
             norm_past = past
         if project:
-            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project, context_for_likelihood=context_for_likelihood)
+            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project, context_for_likelihood=context_for_likelihood, threshold=self.id_threshold)
         else:
             samples = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project, no_grad=no_grad, skip_likelihood=skip_likelihood, context_for_likelihood=context_for_likelihood)
         # if len(samples) == N:
@@ -757,7 +833,7 @@ class TrajectorySampler(nn.Module):
             'values': torch.tensor(values, device=self.id_threshold.device)
         }
 
-    def store_transition(self, state, action: int, next_state, reward: float, done: bool = False) -> None:
+    def store_transition(self, state, action: int, likelihood: torch.Tensor, next_state, reward: float, done: bool = False) -> None:
         """
         Store a transition in the PPO memory.
         
@@ -768,7 +844,7 @@ class TrajectorySampler(nn.Module):
             reward: Reward received
             done: Whether the episode is done
         """
-        if not self.rl_ajdustment:
+        if not self.rl_adjustment:
             return
             
         # Process state and evaluate policy
@@ -779,11 +855,11 @@ class TrajectorySampler(nn.Module):
         with torch.no_grad():
             value = self.value_function(state_tensor).squeeze().item()
         
-        # Get action probability
-        decision, prob = self.compute_policy_decision(state, return_prob=True)
+        # Get action probability using sigmoid and the threshold
+        prob = torch.sigmoid(likelihood - self.id_threshold)
         # Calculate log probability of the action
         action_tensor = torch.tensor(action, dtype=torch.float, device=self.id_threshold.device)
-        log_prob = torch.log(prob + 1e-8) if action == 1 else torch.log(1 - prob + 1e-8)
+        log_prob = torch.log(prob + 1e-8)
         log_prob = log_prob.item()  # Convert to scalar
         
         # Store in memory

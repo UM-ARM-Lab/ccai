@@ -6,7 +6,7 @@ num_steps: 12
 num_turns: 2
 num_trials: 90
 visualize: True
-experiment_name: 'allegro_screwdriver_data_gen_pi_2_gravity_full_finger'
+experiment_name: 'allegro_screwdriver_data_gen_pi_2'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
@@ -21,7 +21,7 @@ goal: -1.5
 prior: 1
 multi_particle_search: True
 replan: False
-visualize_plan: True
+visualize_plan: False
 visualize_recovery_plan: False
 optimize_force: True
 exclude_index: False

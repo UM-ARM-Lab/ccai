@@ -27,8 +27,8 @@ class VariationalGP(ApproximateGP):
         state_dim: int,
         num_inducing: int = 128,
         inducing_points: Optional[torch.Tensor] = None,
-        mean_type: str = "constant",
-        kernel_type: str = "rbf",
+        mean_type: str = "zero",
+        kernel_type: str = "matern32",
         learn_inducing_locations: bool = True,
         use_ard: bool = True,
         lengthscale_prior: Optional[gpytorch.priors.Prior] = None,
@@ -105,6 +105,11 @@ class VariationalGP(ApproximateGP):
         Returns:
             MultivariateNormal distribution representing GP predictions
         """
+
+
+        # Normalize
+        x = (x - self.x_mean[:x.shape[-1]]) / self.x_std[:x.shape[-1]]
+
         # Apply mean and covariance functions
         mean_x = self.mean_module(x)
         covar_x = self.covar_module(x)
@@ -223,6 +228,32 @@ class LikelihoodResidualGP:
         else:
             self.likelihood = likelihood
     
+    def to(self, device: torch.device) -> 'LikelihoodResidualGP':
+        """
+        Move the GP model and likelihood to the specified device.
+        
+        Args:
+            device: Device to move the model to
+            
+        Returns:
+            Self for chaining
+        """
+        self.gp_model = self.gp_model.to(device)
+        self.likelihood = self.likelihood.to(device)
+
+        return self
+
+    def set_norm_constants(self, mean: torch.Tensor, std: torch.Tensor) -> None:
+        """
+        Set normalization constants for the target values.
+        
+        Args:
+            mean: Mean of the target values
+            std: Standard deviation of the target values
+        """
+        self.gp_model.x_mean = mean
+        self.gp_model.x_std = std
+
     def train_model(
         self,
         train_x: torch.Tensor,
@@ -330,6 +361,8 @@ class LikelihoodResidualGP:
         self.gp_model.eval()
         self.likelihood.eval()
         
+        if len(x.shape) == 1:
+            x = x.unsqueeze(0)
         # Get GP output distribution
         output = self.gp_model(x)
         
