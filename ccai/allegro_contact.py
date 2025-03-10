@@ -371,8 +371,6 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         obj_dof = theta.shape[-1]
 
         T = self.T
-        if compute_closest_obj_point:
-            T = 0
 
         # reshape to batch across time
         q_b = q.reshape(-1, 4 * self.num_fingers)
@@ -386,7 +384,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         ret_scene = self.contact_scenes.scene_collision_check(full_q, theta_b,
                                                               compute_gradient=True,
                                                               compute_hessian=False,
-                                                              compute_closest_obj_point=compute_closest_obj_point)
+                                                              )
         for i, finger in enumerate(self.fingers):
             self.data[finger] = {}
             self.data[finger]['sdf'] = ret_scene['sdf'][:, i].reshape(N, self.T + T_offset)
@@ -423,8 +421,6 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.data[finger]['grad_env_sdf'] = ret_scene['grad_env_sdf'][:, i, :obj_dof]
             dJ_dq = contact_hessian
             self.data[finger]['dJ_dq'] = dJ_dq  # Jacobian of the contact point
-            if compute_closest_obj_point:
-                self.data[finger]['closest_obj_pt_scene_frame'] = ret_scene['closest_obj_pt_scene_frame'][:, i]
             
             self.data[finger]['closest_rob_pt_scene_frame'] = ret_scene['closest_rob_pt_scene_frame'][:, i]
             
@@ -702,7 +698,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
             self.goal_theta = self.goal[self.num_fingers * 4:]
 
-            self._preprocess_fingers(self.goal[: self.num_fingers * 4][None, None], self.goal_theta[None, None], compute_closest_obj_point=True)
+            self._preprocess_fingers(self.goal[: self.num_fingers * 4][None, None], self.goal_theta[None, None])
 
             self.contact_points = {}
 
@@ -844,7 +840,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
 
             self.goal_theta = self.goal[self.num_fingers * 4:]
 
-            self._preprocess_fingers(self.goal[: self.num_fingers * 4][None, None], self.goal_theta[None, None], compute_closest_obj_point=True)
+            self._preprocess_fingers(self.goal[: self.num_fingers * 4][None, None], self.goal_theta[None, None])
 
             self.contact_points = {}
 

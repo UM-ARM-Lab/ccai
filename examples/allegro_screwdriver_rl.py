@@ -86,7 +86,7 @@ class AllegroScrewdriverRLEnv:
             frame_indices=frame_indices,
             world_trans=self.env.world_trans
         )
-        self.chain = chain.to(device=self.device)
+        self.chain = chain.to(device='cuda:0')
         
         # Define pregrasp positions for different fingers
         self.pregrasp_positions = {
@@ -191,7 +191,7 @@ from torchdiffeq import odeint
 
 # Neural network for the actor (policy) using ODE flow
 class ActorNetwork(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_dim=256):
+    def __init__(self, input_dim, output_dim, hidden_dim=256, constraint_problem=None):
         super(ActorNetwork, self).__init__()
         
         # Store dimensions
@@ -211,9 +211,98 @@ class ActorNetwork(nn.Module):
         # Log standard deviation parameter
         self.log_std = nn.Parameter(torch.zeros(output_dim))
         
+        # Store constraint problem for projection
+        self.constraint_problem = constraint_problem
+        
     def dynamics(self, t, x):
         """ODE function representing the vector field"""
-        return self.vector_field(x)
+        # Apply vector field
+        dx = self.vector_field(x)
+        
+        # Apply constraint projection if constraint_problem is available
+        if self.constraint_problem is not None:
+            dx = self.project_vector_field(x, dx)
+            
+        return dx
+    
+    def project_vector_field(self, x, dx):
+        """Project vector field to satisfy constraints"""
+        batch_size = x.shape[0]
+        
+        # Parameters for projection
+        Kh = 3
+        Ktheta = 1
+        
+        # Apply projection
+        self.constraint_problem._preprocess(x, dxu=update_this_c[:, :, :self.transition_dim][:, :, mask_no_z], projected_diffusion=True)
+        
+        # Get constraints and their derivatives
+        C, dC, _ = self.constraint_problem.combined_constraints(
+            x,
+            compute_hess=False,
+            projected_diffusion=True,
+            include_slack=False,
+            compute_inequality=True,
+            include_deriv_grad=True
+        )
+        
+        # Create masks for active constraints
+        dC_mask = ~(dC == 0).all(dim=-1)
+        g_dim = self.constraint_problem.dg
+        dg_mask = dC_mask[:, :g_dim]
+        g = C[:, :g_dim]
+        dg = dC[:, :g_dim]
+        dh_mask = dC_mask[:, g_dim:]
+        h = C[:, g_dim:]
+        dh = dC[:, g_dim:]
+        
+        # Check which inequality constraints are active
+        I_p = h >= 0
+        
+        # Extract active constraints
+        dg_masked = dg[dg_mask].reshape(batch_size, -1, dC.shape[-1])
+        h_masked = h[dh_mask].reshape(batch_size, -1)
+        dh_masked = dh[dh_mask].reshape(batch_size, -1, dC.shape[-1])
+        
+        h_I_p = h_masked[I_p].reshape(batch_size, -1)
+        dh_I_p = dh_masked[I_p].reshape(batch_size, -1, dC.shape[-1])
+        
+        g_masked = g[dg_mask].reshape(batch_size, -1)
+        
+        # Combine active constraints
+        h_bar = torch.cat((g_masked, h_I_p), dim=1)
+        dh_bar = torch.cat((dg_masked, dh_I_p), dim=1)
+        
+        # Add small damping factor for numerical stability
+        eye = torch.eye(dh_bar.shape[1]).repeat(batch_size, 1, 1).to(device=C.device)
+        eye_0 = eye.clone() * 1e-6
+        
+        # Compute projection matrix
+        dCdCT = dh_bar @ dh_bar.permute(0, 2, 1)
+        dCdCT = dCdCT * Ktheta
+        
+        # Solve the system
+        try:
+            dCdCT_inv = torch.linalg.solve(dCdCT + eye_0, eye)
+            if torch.any(torch.isnan(dCdCT_inv)):
+                raise ValueError('nan in inverse')
+        except Exception as e:
+            print(f"Using CG due to error: {e}")
+            A_bmm = lambda x: dCdCT @ x
+            dCdCT_inv, _ = cg_batch(A_bmm, eye, verbose=False)
+        
+        # Project the vector field
+        dh_bar_dJ = torch.bmm(dh_bar, dx.unsqueeze(-1))
+        second_term = Ktheta * dh_bar_dJ - Kh * h_bar.unsqueeze(-1)
+        pi = -dCdCT_inv @ second_term
+        
+        # Ensure inequality constraints are properly handled
+        pi[:, g_masked.shape[-1]:] = torch.clamp(pi[:, g_masked.shape[-1]:], min=0)
+        
+        # Apply projection
+        projected_dx = dx + (dh_bar.permute(0, 2, 1) @ pi).squeeze(-1)
+        
+        return projected_dx
     
     def forward(self, x):
         
@@ -258,6 +347,12 @@ class CriticNetwork(nn.Module):
     def forward(self, x):
         return self.network(x)
 
+# Import necessary modules for constraint projection
+from allegro_screwdriver import AllegroScrewdriver
+import copy
+import torch.nn.functional as F
+from torch_cg import cg_batch
+
 class PPO:
     def __init__(
         self,
@@ -275,7 +370,9 @@ class PPO:
         entropy_coef=0.01,
         max_grad_norm=0.5,
         batch_size=64,
-        num_epochs=10
+        num_epochs=10,
+        use_constraints=False,
+        env=None
     ):
         self.device = device
         self.gamma = gamma
@@ -298,11 +395,52 @@ class PPO:
         # Optimizers
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr_actor)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=lr_critic)
+        
+        self.use_constraints = use_constraints
+        
+        # Create constraint problem if constraints are enabled
+        constraint_problem = None
+        if use_constraints and env is not None:
+            constraint_problem = AllegroScrewdriver(
+                start=torch.zeros(input_dim).to('cuda:0'),
+                goal=torch.zeros(3).to('cuda:0'),  # Goal will be set dynamically
+                T=1,
+                chain=env.chain,
+                device=torch.device('cuda:0'),
+                object_asset_pos=env.env.table_pose,
+                object_location='screwdriver',
+                object_type='screwdriver',
+                world_trans=env.env.world_trans,
+                contact_fingers=['index', 'middle', 'thumb'],
+                obj_dof=3,
+                obj_joint_dim=1,
+                optimize_force=False,
+                turn=True
+            )
+            self.constraint_problem = constraint_problem
+        
+        # Policy and value networks
+        self.actor = ActorNetwork(input_dim, output_dim, 
+                                 constraint_problem=constraint_problem).to(device)
+        self.critic = CriticNetwork(input_dim).to(device)
+        
+        # Optimizers
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr_actor)
+        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=lr_critic)
+        
+        # Add timing statistics for action prediction
+        self.prediction_times = []
+    
+    # No need for project_action method anymore since projection happens during integration
     
     def select_action(self, state, evaluate=False):
         """Select an action from the policy given the state."""
         with torch.no_grad():
             state = torch.FloatTensor(state).to(self.device)
+            
+            # Start timing action prediction
+            start_time = time.time()
+            
             mean, std = self.actor(state)
             
             if evaluate:
@@ -312,8 +450,13 @@ class PPO:
                 # During training, sample from the distribution
                 normal = Normal(mean, std)
                 action = normal.sample()
+            
+            # End timing and record
+            end_time = time.time()
+            self.prediction_times.append(end_time - start_time)
                 
         return action
+
     def compute_gae(self, values, rewards, dones, next_value):
         """Compute generalized advantage estimates."""
         advantages = []
@@ -443,7 +586,7 @@ def train_ppo(config, total_timesteps=1000000, save_path=None):
     print(f"Simulation running on: {config['sim_device']}")
     print(f"PPO training running on: {train_device}")
     
-    # Initialize PPO agent
+    # Initialize PPO agent with constraint projection
     ppo_agent = PPO(
         input_dim=env.obs_dim,
         output_dim=env.control_dim,
@@ -456,7 +599,9 @@ def train_ppo(config, total_timesteps=1000000, save_path=None):
         gae_lambda=0.95,
         clip_param=0.2,
         batch_size=32,
-        num_epochs=10
+        num_epochs=10,
+        use_constraints=config.get('use_constraints', False),
+        env=env if config.get('use_constraints', False) else None
     )
     
     # Training variables
@@ -555,8 +700,16 @@ def train_ppo(config, total_timesteps=1000000, save_path=None):
         )
         update_duration = time.time() - update_start_time
         
+        # Calculate and print average action prediction time
+        avg_prediction_time = np.mean(ppo_agent.prediction_times) * 1000 if ppo_agent.prediction_times else 0
+        max_prediction_time = np.max(ppo_agent.prediction_times) * 1000 if ppo_agent.prediction_times else 0
+        
         print(f"Network update - time: {update_duration:.2f}s, collected steps: {steps_this_update}")
         print(f"  Policy loss: {policy_loss:.4f}, Value loss: {value_loss:.4f}, Entropy: {entropy:.4f}")
+        print(f"  Action prediction - avg: {avg_prediction_time:.2f}ms, max: {max_prediction_time:.2f}ms")
+        
+        # Reset prediction times for next update
+        ppo_agent.prediction_times = []
         
         # Log progress
         if len(episode_rewards) % log_interval == 0:
