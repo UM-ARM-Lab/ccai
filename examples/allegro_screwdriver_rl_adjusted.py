@@ -58,7 +58,7 @@ print("CCAI_PATH", CCAI_PATH)
 obj_dof = 3
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
-sys.stdout = open('./examples/logs/allegro_screwdriver_rl_tuning.log', 'w', buffering=1)
+sys.stdout = open('./examples/logs/allegro_screwdriver_rl_tuning_bernoulli_likelihood.log', 'w', buffering=1)
 
 
 def vector_cos(a, b):
@@ -191,7 +191,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
 def collect_rl_data_during_execution(
     state: torch.Tensor, 
     action_is_recover: int, 
-    likelihood: torch.Tensor,
+    likelihood: float,
     next_state: torch.Tensor, 
     reward: float, 
     done: bool, 
@@ -203,19 +203,26 @@ def collect_rl_data_during_execution(
     Args:
         state: Current state before action (full robot+object state)
         action_is_recover: Whether the action was to recover (1) or not (0)
+        likelihood: Base likelihood value from trajectory sampler
         next_state: State after action/recovery
         reward: Reward value (distance improvement to goal)
         done: Whether episode is done
         trajectory_steps: Length of trajectory (used to scale reward for recovery)
     """
     if not params.get('rl_adjustment', False) or trajectory_sampler_orig is None:
+        print("Skipping RL data collection: rl_adjustment disabled or trajectory_sampler_orig is None")
         return
         
     # Scale reward by trajectory length if recovering
+    original_reward = reward
     if action_is_recover:
         reward = reward / max(1, trajectory_steps)
         
     # Store transition in PPO memory
+    print(f"Storing {'RECOVERY' if action_is_recover else 'NORMAL'} transition: " 
+          f"reward={original_reward:.4f} (scaled={reward:.4f}), "
+          f"steps={trajectory_steps}")
+    
     trajectory_sampler_orig.store_transition(
         state=state,
         action=int(action_is_recover),
@@ -408,8 +415,15 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             contact_distance: Contact distances
             recover: Whether recovery is needed
             executed_steps: Number of steps executed before OOD detection
+            pre_recovery_state: State before recovery
+            pre_recovery_likelihood: Likelihood before recovery
         """
         nonlocal episode_num_steps
+        
+        # Initialize variables that might be referenced before assignment
+        pre_recovery_state = None
+        pre_recovery_likelihood = None
+        
         # reset planner
         state = env.get_state()
         state = state['q'].reshape(-1)[:15].to(device=params['device'])
@@ -641,40 +655,20 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             state = state['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
             print(state)
 
-            if params['live_recovery']:
-                id_check, final_likelihood = trajectory_sampler_orig.check_id(state, params['N']) if not recover else (True, None)
-                if final_likelihood is not None:
-                    data['final_likelihoods'].append(final_likelihood)
-
-            elif params.get('compute_recovery_trajectory', False) or params.get('test_recovery_trajectory', False):
-                id_check, final_likelihood = trajectory_sampler_orig.check_id(state, params['N'], threshold=params.get('drop_threshold', -300))
+            # Use stochastic policy during normal execution, deterministic for recovery
+            deterministic = recover  # Deterministic when recovering, stochastic otherwise
+            if recover:
+                id_check, final_likelihood = True, None
+            else:
+                id_check, final_likelihood = trajectory_sampler_orig.check_id(state, params['N'], deterministic=deterministic)
+            if final_likelihood is not None:
                 data['final_likelihoods'].append(final_likelihood)
 
-            else:
-                id_check = True
-
             if not id_check:
-                # State is OOD. Collect data for RL
-                current_state = state[:4 * num_fingers + obj_dof].clone()
-                
-                # Store transition data for RL - we'll update the reward later after recovery
-                if params.get('rl_adjustment', False) and trajectory_sampler_orig is not None:
-                    # The action is to recover (1)
-                    # We'll store with a temporary reward that will be updated after recovery
-                    collect_rl_data_during_execution(
-                        state=current_state,
-                        action_is_recover=1,
-                        likelihood=final_likelihood,
-                        next_state=current_state,  # Will be updated after recovery
-                        reward=0.0,  # Temporary value, will be updated after recovery
-                        done=False,
-                        trajectory_steps=1  # Will be updated after recovery
-                    )
-                    # Store index of this transition so we can update it later
-                    if not hasattr(trajectory_sampler_orig, 'last_recovery_index'):
-                        trajectory_sampler_orig.last_recovery_index = len(trajectory_sampler_orig.ppo_rewards) - 1
-                    else:
-                        trajectory_sampler_orig.last_recovery_index = len(trajectory_sampler_orig.ppo_rewards) - 1
+                # State is OOD. Save state and likelihood but DON'T collect data for RL yet.
+                # We will collect it only AFTER recovery completes
+                pre_recovery_state = state[:4 * num_fingers + obj_dof].clone()
+                pre_recovery_likelihood = final_likelihood
                 
                 # State is OOD. Return and move to recovery pipeline
                 planner.problem.data = {}
@@ -682,7 +676,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     actual_trajectory = torch.stack(actual_trajectory, dim=0).to(device=params['device'])
                 # Return how many steps we've executed for resuming later
                 executed_steps = k
-                return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, True, executed_steps
+                return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, True, executed_steps, pre_recovery_state, pre_recovery_likelihood
             
             # We're in distribution, collect data for staying (action=0)
             current_state = state[:4 * num_fingers + obj_dof].clone()
@@ -863,7 +857,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # for memory reasons we clear the data
         if params['controller'] != 'diffusion_policy':
             planner.problem.data = {}
-        return actual_trajectory, planned_trajectories, initial_samples, sim_rollouts, optimizer_paths, contact_points, contact_distance, recover, executed_steps
+        return actual_trajectory, planned_trajectories, initial_samples, sim_rollouts, optimizer_paths, contact_points, contact_distance, recover, executed_steps, pre_recovery_state, pre_recovery_likelihood
 
     data = {}
     t_range = params['T']
@@ -1008,7 +1002,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
             start = x[-1]
             start_sine_cosine = convert_yaw_to_sine_cosine(start)
-            _, likelihood, samples = trajectory_sampler_orig.check_id(start_sine_cosine, params['N'])
+            likelihood, samples = trajectory_sampler_orig.check_id(start_sine_cosine, params['N'], likelihood_only=True, return_samples=True)
             distances.append(-likelihood)
             viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fpath}/recovery_stage_{all_stage}/{mode}")
             pathlib.Path.mkdir(viz_fpath, parents=True, exist_ok=True)
@@ -1070,9 +1064,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     all_stage = 0
     done = False
     recovery_state = {
-        'index': {'goal': None, 'remaining_steps': None, 'pre_recovery_state': None},
-        'thumb_middle': {'goal': None, 'remaining_steps': None, 'pre_recovery_state': None},
-        'turn': {'goal': None, 'remaining_steps': None, 'pre_recovery_state': None}
+        'index': {'goal': None, 'remaining_steps': None, 'pre_recovery_state': None, 'pre_recovery_likelihood': None},
+        'thumb_middle': {'goal': None, 'remaining_steps': None, 'pre_recovery_state': None, 'pre_recovery_likelihood': None},
+        'turn': {'goal': None, 'remaining_steps': None, 'pre_recovery_state': None, 'pre_recovery_likelihood': None}
     }
     
     # for stage in range(num_stages):
@@ -1160,48 +1154,54 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 index_regrasp_planner, mode='index', goal=_goal, 
                 fname=f'index_regrasp_{all_stage}', initial_samples=initial_samples, 
                 recover=recover, start_timestep=start_timestep, max_timesteps=max_timesteps)
-                
-            if len(result) == 9:  # New return format with executed_steps
-                traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover, executed_steps = result
-                
-                # If OOD detected during this execution, save goal and remaining steps
-                if recover and not pre_recover:
-                    recovery_state['index']['goal'] = _goal
-                    recovery_state['index']['remaining_steps'] = params['T'] - executed_steps
-                    recovery_state['index']['pre_recovery_state'] = state[:4 * num_fingers + obj_dof].clone()
+            state = env.get_state()
+            state = state['q'].reshape(-1)[:15].to(device=params['device'])
+
+            if len(result) == 11:  # New return format with executed_steps and pre-recovery info
+                traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover, executed_steps, pre_recovery_state, pre_recovery_likelihood = result
                     
-                # If we just finished recovery, update the reward for the recovery transition
-                if pre_recover and not recover and params.get('rl_adjustment', False) and trajectory_sampler_orig is not None:
-                    # Get current state and goal
+                # If we COMPLETED recovery, NOW collect the data for RL
+                if pre_recover and params.get('rl_adjustment', False) and trajectory_sampler_orig is not None:
+                    # Now that recovery is complete, we can calculate the actual reward
                     current_state = state[:4 * num_fingers + obj_dof]
-                    recovery_goal = recovery_state['index']['goal']
-                    pre_recovery_state = recovery_state['index']['pre_recovery_state']
+                    recovery_goal = recovery_state['turn']['goal']
+                    pre_recovery_state = recovery_state['turn'].get('pre_recovery_state')
+                    pre_recovery_likelihood = recovery_state['turn'].get('pre_recovery_likelihood')
                     
-                    if pre_recovery_state is not None and recovery_goal is not None:
+                    if pre_recovery_state is not None and recovery_goal is not None and pre_recovery_likelihood is not None:
                         # Calculate improvement in distance to goal
                         pre_distance = torch.norm(pre_recovery_state[-obj_dof:] - recovery_goal[-obj_dof:])
                         post_distance = torch.norm(current_state[-obj_dof:] - recovery_goal[-obj_dof:])
                         reward = pre_distance - post_distance
                         
                         # Calculate trajectory steps for scaling
-                        traj_steps = params['T'] - recovery_state['index']['remaining_steps']
+                        traj_steps = params['T'] - recovery_state['turn']['remaining_steps']
                         
-                        # Update the reward in the stored transition
-                        if hasattr(trajectory_sampler_orig, 'last_recovery_index'):
-                            idx = trajectory_sampler_orig.last_recovery_index
-                            if idx < len(trajectory_sampler_orig.ppo_rewards):
-                                trajectory_sampler_orig.ppo_rewards[idx] = reward.item() / max(1, traj_steps)
-                                
-                                # Also update the next_state
-                                trajectory_sampler_orig.ppo_states[idx+1] = current_state.cpu().numpy() if idx+1 < len(trajectory_sampler_orig.ppo_states) else current_state.cpu().numpy()
+                        # NOW store the transition with the correct reward
+                        collect_rl_data_during_execution(
+                            state=pre_recovery_state,
+                            action_is_recover=1,  # This was a recovery action
+                            likelihood=pre_recovery_likelihood,
+                            next_state=current_state,
+                            reward=reward,
+                            done=False,
+                            trajectory_steps=traj_steps
+                        )
+                    
+                # If we're now in-distribution, reset recovery state
+                if not recover:
+                    recovery_state['turn']['goal'] = None
+                    recovery_state['turn']['remaining_steps'] = None
+                    recovery_state['turn']['pre_recovery_state'] = None
+                    recovery_state['turn']['pre_recovery_likelihood'] = None
             else:
                 # Backward compatibility with old return format
                 traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
 
             if not recover:
                 # Reset recovery state since we completed successfully
-                recovery_state['index']['goal'] = None
-                recovery_state['index']['remaining_steps'] = None
+                recovery_state['turn']['goal'] = None
+                recovery_state['turn']['remaining_steps'] = None
                 plans = [torch.cat((plan[..., :-6],
                                     torch.zeros(*plan.shape[:-1], 3).to(device=params['device']),
                                     plan[..., -6:]),
@@ -1228,41 +1228,61 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 thumb_and_middle_regrasp_planner, mode='thumb_middle',
                 goal=_goal, fname=f'thumb_middle_regrasp_{all_stage}', initial_samples=initial_samples, 
                 recover=recover, start_timestep=start_timestep, max_timesteps=max_timesteps)
-                
-            if len(result) == 9:  # New return format with executed_steps
-                traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover, executed_steps = result
+            state = env.get_state()
+            state = state['q'].reshape(-1)[:15].to(device=params['device'])
+
+            if len(result) == 11:  # New return format with executed_steps and pre-recovery info
+                traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover, executed_steps, pre_recovery_state, pre_recovery_likelihood = result
                 
                 # If OOD detected during this execution, save goal and remaining steps
                 if recover and not pre_recover:
-                    recovery_state['thumb_middle']['goal'] = _goal
-                    recovery_state['thumb_middle']['remaining_steps'] = params['T'] - executed_steps
-                    recovery_state['thumb_middle']['pre_recovery_state'] = state[:4 * num_fingers + obj_dof].clone()
+                    recovery_state['turn']['goal'] = _goal
+                    recovery_state['turn']['remaining_steps'] = params['T'] - executed_steps
+                    recovery_state['turn']['pre_recovery_state'] = pre_recovery_state
+                    recovery_state['turn']['pre_recovery_likelihood'] = pre_recovery_likelihood
                     
-                # If we just finished recovery, update the reward for the recovery transition
-                if pre_recover and not recover and params.get('rl_adjustment', False) and trajectory_sampler_orig is not None:
-                    # Similar reward update logic as for index
+                # If we COMPLETED recovery, NOW collect the data for RL
+                if pre_recover and params.get('rl_adjustment', False) and trajectory_sampler_orig is not None:
+                    # Now that recovery is complete, we can calculate the actual reward
                     current_state = state[:4 * num_fingers + obj_dof]
-                    recovery_goal = recovery_state['thumb_middle']['goal']
-                    pre_recovery_state = recovery_state['thumb_middle']['pre_recovery_state']
+                    recovery_goal = recovery_state['turn']['goal']
+                    pre_recovery_state = recovery_state['turn'].get('pre_recovery_state')
+                    pre_recovery_likelihood = recovery_state['turn'].get('pre_recovery_likelihood')
                     
-                    if pre_recovery_state is not None and recovery_goal is not None:
+                    if pre_recovery_state is not None and recovery_goal is not None and pre_recovery_likelihood is not None:
+                        # Calculate improvement in distance to goal
                         pre_distance = torch.norm(pre_recovery_state[-obj_dof:] - recovery_goal[-obj_dof:])
                         post_distance = torch.norm(current_state[-obj_dof:] - recovery_goal[-obj_dof:])
                         reward = pre_distance - post_distance
-                        traj_steps = params['T'] - recovery_state['thumb_middle']['remaining_steps']
                         
-                        if hasattr(trajectory_sampler_orig, 'last_recovery_index'):
-                            idx = trajectory_sampler_orig.last_recovery_index
-                            if idx < len(trajectory_sampler_orig.ppo_rewards):
-                                trajectory_sampler_orig.ppo_rewards[idx] = reward.item() / max(1, traj_steps)
-                                trajectory_sampler_orig.ppo_states[idx+1] = current_state.cpu().numpy() if idx+1 < len(trajectory_sampler_orig.ppo_states) else current_state.cpu().numpy()
+                        # Calculate trajectory steps for scaling
+                        traj_steps = params['T'] - recovery_state['turn']['remaining_steps']
+                        
+                        # NOW store the transition with the correct reward
+                        collect_rl_data_during_execution(
+                            state=pre_recovery_state,
+                            action_is_recover=1,  # This was a recovery action
+                            likelihood=pre_recovery_likelihood,
+                            next_state=current_state,
+                            reward=reward,
+                            done=False,
+                            trajectory_steps=traj_steps
+                        )
+                        
+                # If we're now in-distribution, reset recovery state
+                if not recover:
+                    recovery_state['turn']['goal'] = None
+                    recovery_state['turn']['remaining_steps'] = None
+                    recovery_state['turn']['pre_recovery_state'] = None
+                    recovery_state['turn']['pre_recovery_likelihood'] = None
             else:
+                # Backward compatibility with old return format
                 traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
                 
             if not recover:
                 # Reset recovery state since we completed successfully
-                recovery_state['thumb_middle']['goal'] = None
-                recovery_state['thumb_middle']['remaining_steps'] = None
+                recovery_state['turn']['goal'] = None
+                recovery_state['turn']['remaining_steps'] = None
                 plans = [torch.cat((plan,
                                     torch.zeros(*plan.shape[:-1], 6).to(device=params['device'])),
                                 dim=-1) for plan in plans]
@@ -1283,34 +1303,55 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 None, mode='turn', goal=_goal, fname=f'turn_{all_stage}', initial_samples=initial_samples, 
                 recover=recover, start_timestep=start_timestep, max_timesteps=max_timesteps)
                 
-            if len(result) == 9:  # New return format with executed_steps
-                traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover, executed_steps = result
+            state = env.get_state()
+            state = state['q'].reshape(-1)[:15].to(device=params['device'])
+
+            if len(result) == 11:  # New return format with executed_steps and pre-recovery info
+                traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover, executed_steps, pre_recovery_state, pre_recovery_likelihood = result
                 
                 # If OOD detected during this execution, save goal and remaining steps
                 if recover and not pre_recover:
                     recovery_state['turn']['goal'] = _goal
                     recovery_state['turn']['remaining_steps'] = params['T'] - executed_steps
-                    recovery_state['turn']['pre_recovery_state'] = state[:4 * num_fingers + obj_dof].clone()
+                    recovery_state['turn']['pre_recovery_state'] = pre_recovery_state
+                    recovery_state['turn']['pre_recovery_likelihood'] = pre_recovery_likelihood
                     
-                # If we just finished recovery, update the reward for the recovery transition
-                if pre_recover and not recover and params.get('rl_adjustment', False) and trajectory_sampler_orig is not None:
-                    # Similar reward update logic
+                # If we COMPLETED recovery, NOW collect the data for RL
+                if pre_recover and params.get('rl_adjustment', False) and trajectory_sampler_orig is not None:
+                    # Now that recovery is complete, we can calculate the actual reward
                     current_state = state[:4 * num_fingers + obj_dof]
                     recovery_goal = recovery_state['turn']['goal']
-                    pre_recovery_state = recovery_state['turn']['pre_recovery_state']
+                    pre_recovery_state = recovery_state['turn'].get('pre_recovery_state')
+                    pre_recovery_likelihood = recovery_state['turn'].get('pre_recovery_likelihood')
                     
-                    if pre_recovery_state is not None and recovery_goal is not None:
+                    if pre_recovery_state is not None and recovery_goal is not None and pre_recovery_likelihood is not None:
+                        # Calculate improvement in distance to goal
                         pre_distance = torch.norm(pre_recovery_state[-obj_dof:] - recovery_goal[-obj_dof:])
                         post_distance = torch.norm(current_state[-obj_dof:] - recovery_goal[-obj_dof:])
                         reward = pre_distance - post_distance
+                        
+                        # Calculate trajectory steps for scaling
                         traj_steps = params['T'] - recovery_state['turn']['remaining_steps']
                         
-                        if hasattr(trajectory_sampler_orig, 'last_recovery_index'):
-                            idx = trajectory_sampler_orig.last_recovery_index
-                            if idx < len(trajectory_sampler_orig.ppo_rewards):
-                                trajectory_sampler_orig.ppo_rewards[idx] = reward.item() / max(1, traj_steps)
-                                trajectory_sampler_orig.ppo_states[idx+1] = current_state.cpu().numpy() if idx+1 < len(trajectory_sampler_orig.ppo_states) else current_state.cpu().numpy()
+                        # NOW store the transition with the correct reward
+                        collect_rl_data_during_execution(
+                            state=pre_recovery_state,
+                            action_is_recover=1,  # This was a recovery action
+                            likelihood=pre_recovery_likelihood,
+                            next_state=current_state,
+                            reward=reward,
+                            done=False,
+                            trajectory_steps=traj_steps
+                        )
+                        
+                # If we're now in-distribution, reset recovery state
+                if not recover:
+                    recovery_state['turn']['goal'] = None
+                    recovery_state['turn']['remaining_steps'] = None
+                    recovery_state['turn']['pre_recovery_state'] = None
+                    recovery_state['turn']['pre_recovery_likelihood'] = None
             else:
+                # Backward compatibility with old return format
                 traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
                 
             if not recover:
@@ -1323,7 +1364,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # done = False
         add = not recover or params['live_recovery']
 
-        if not pre_recover:
+        if (not pre_recover and recover):
             likelihood = data['final_likelihoods'][-1]
         else:
             state = env.get_state()
@@ -1331,31 +1372,47 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             
             start = state[:4 * num_fingers + obj_dof]
             start_sine_cosine = convert_yaw_to_sine_cosine(start)
-            _, _, likelihood = trajectory_sampler_orig.sample(N=params['N'], H=trajectory_sampler_orig.T, start=start_sine_cosine.reshape(1, -1),
-                    constraints=torch.ones(params['N'], 3).to(device=params['device']))
-            likelihood = likelihood.reshape(params['N']).mean().item()
-            print('Likelihood:', likelihood)
-        if likelihood > trajectory_sampler_orig.id_threshold.item():
-            recover = False
-        elif likelihood < params.get('drop_threshold', -300):
+            id, likelihood = trajectory_sampler_orig.check_id(start_sine_cosine, params['N'])
+            recover = not id
+            
+        if likelihood < params.get('drop_threshold', -300):
             print('Probably dropped the object')
             done = True
             add = False
+            
         if recover and not done:
-            print('State is out of distribution')
             state = env.get_state()
             state = state['q'].reshape(-1)[:15].to(device=params['device'])
             
             start = state[:4 * num_fingers + obj_dof]
             start_sine_cosine = convert_yaw_to_sine_cosine(start)
+            
             # Project the state back into distribution if we are computing recovery trajectories
-            projected_samples, _, _, _, (all_losses, all_samples, all_likelihoods) = trajectory_sampler_orig.sample(16, H=trajectory_sampler_orig.T, start=start_sine_cosine.reshape(1, -1), project=True,
-                    constraints=torch.ones(16, 3).to(device=params['device']))
+            projected_samples, _, _, _, (all_losses, all_samples, all_likelihoods) = trajectory_sampler_orig.sample(
+                16, H=trajectory_sampler_orig.T, start=start_sine_cosine.reshape(1, -1), project=True,
+                constraints=torch.ones(16, 3).to(device=params['device'])
+            )
             print('Final likelihood:', all_likelihoods[-1])
-            if all_likelihoods[-1].mean().item() < trajectory_sampler_orig.id_threshold.item():
-                print('1 mode projection failed, trying anyway')
+            
+            # Use custom likelihood bias for checking if projection succeeded
+            if trajectory_sampler_orig.rl_adjustment:
+                bias = trajectory_sampler_orig.gp.likelihood.bias.item()
+                final_likelihood = all_likelihoods[-1].mean()
+                adj = final_likelihood + bias
+                projection_success = adj >= 0.
+                print(f"Final projection likelihood: {final_likelihood:.4f}")
+                if not projection_success:
+                    print('1 mode projection failed, trying anyway')
+                else:
+                    print('1 mode projection succeeded')
             else:
-                print('1 mode projection succeeded')
+                # Fallback to threshold approach
+                threshold = params.get('likelihood_threshold', -15)
+                if all_likelihoods[-1].mean().item() < threshold:
+                    print('1 mode projection failed, trying anyway')
+                else:
+                    print('1 mode projection succeeded')
+                
             goal = convert_sine_cosine_to_yaw(projected_samples[-1][0])[:15]
             if index_regrasp_planner is None:
                 index_regrasp_problem = AllegroScrewdriver(
@@ -1455,6 +1512,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         del actual_trajectory_save
 
         if done:
+            trajectory_sampler_orig.ppo_dones[-1] = True
             break
 
     # np.savez(f'{fpath.resolve()}/trajectory.npz', x=[i.cpu().numpy() for i in actual_trajectory],)
@@ -1462,6 +1520,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             #  d2goal=final_distance_to_goal.cpu().numpy())
     if params['mode'] == 'hardware':
         input("Ready to regrasp. Press <ENTER> to continue.")
+    trajectory_sampler_orig.ppo_dones[-1] = True
 
     env.reset()
     return -1#torch.min(final_distance_to_goal).cpu().numpy()
@@ -1696,3 +1755,4 @@ if __name__ == "__main__":
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)
+

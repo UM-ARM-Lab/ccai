@@ -1,7 +1,7 @@
 import torch
 import gpytorch
 from gpytorch.models import ApproximateGP
-from gpytorch.variational import CholeskyVariationalDistribution
+from gpytorch.variational import NaturalVariationalDistribution
 from gpytorch.variational import VariationalStrategy
 from typing import Optional, Tuple, Union, Dict, List, Callable
 from gpytorch.optim import NGD
@@ -10,7 +10,7 @@ class VariationalGP(ApproximateGP):
     """
     Variational Gaussian Process model that predicts a scalar value from a state vector.
     
-    This implementation uses a CholeskyVariationalDistribution with VariationalStrategy for
+    This implementation uses a NaturalVariationalDistribution with VariationalStrategy for
     efficient sparse approximation. It's designed to work with high-dimensional inputs
     by providing flexible kernel choices and inducing point selection.
     
@@ -106,10 +106,6 @@ class VariationalGP(ApproximateGP):
             MultivariateNormal distribution representing GP predictions
         """
 
-
-        # Normalize
-        x = (x - self.x_mean[:x.shape[-1]]) / self.x_std[:x.shape[-1]]
-
         # Apply mean and covariance functions
         mean_x = self.mean_module(x)
         covar_x = self.covar_module(x)
@@ -128,6 +124,22 @@ class VariationalGP(ApproximateGP):
         Returns:
             Tuple of (mean, variance) tensors
         """
+        x = (x - self.x_mean[:x.shape[-1]]) / self.x_std[:x.shape[-1]]
+        self.eval()
+        output = self(x)
+        return output.mean, output.variance
+    
+    def predict_with_grad(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Make predictions with the GP model, preserving gradients.
+        
+        Args:
+            x: Input tensor of shape [batch_size, state_dim]
+
+        Returns:
+            Tuple of (mean, variance) tensors
+        """
+        x = (x - self.x_mean[:x.shape[-1]]) / self.x_std[:x.shape[-1]]
         self.eval()
         output = self(x)
         return output.mean, output.variance
@@ -145,6 +157,7 @@ class VariationalGP(ApproximateGP):
         Returns:
             Tuple of (mean, variance, samples) tensors
         """
+        x = (x - self.x_mean[:x.shape[-1]]) / self.x_std[:x.shape[-1]]
         self.eval()
         with torch.no_grad():
             output = self(x)
@@ -358,6 +371,7 @@ class LikelihoodResidualGP:
         Returns:
             Tuple of (mean, variance) tensors
         """
+        x = (x - self.gp_model.x_mean[:x.shape[-1]]) / self.gp_model.x_std[:x.shape[-1]]
         self.gp_model.eval()
         self.likelihood.eval()
         
@@ -381,6 +395,7 @@ class LikelihoodResidualGP:
         Returns:
             Tuple of (mean, variance) tensors
         """
+        x = (x - self.gp_model.x_mean[:x.shape[-1]]) / self.gp_model.x_std[:x.shape[-1]]
         self.gp_model.eval()
         self.likelihood.eval()
         

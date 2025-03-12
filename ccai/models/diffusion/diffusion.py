@@ -678,7 +678,7 @@ class GaussianDiffusion(nn.Module):
         overall_kl = kl_x.reshape(B, N).mean(dim=1).to(x.device)
         return -overall_kl
  
-    def project(self, N, threshold, H=None, condition=None, context=None, residual_gp=None):
+    def project(self, N, H=None, condition=None, context=None, residual_gp=None):
 
         # min_likelihood = threshold
         min_likelihood = self.cutoff
@@ -701,22 +701,24 @@ class GaussianDiffusion(nn.Module):
             likelihood_reshape = likelihoods.reshape(B, -1).mean(1)
 
             if residual_gp is not None:
-                likelihood_reshape += residual_gp.predict_with_grad(x)[0]
+                likelihood_reshape += residual_gp.gp_model.predict_with_grad(x)[0]
             grad_mask[likelihood_reshape >= min_likelihood] = 0.0
 
             if proj_t == 0:
                 samples_0 = samples.clone().detach()
             if grad_mask.sum() == 0:
-                likelihoods_loss = -likelihoods.mean()
+                likelihoods_loss = -likelihood_reshape.mean()
                 likelihoods_loss.backward()
                 broke = True
                 break
-            likelihoods_loss = -likelihoods.mean()
+            likelihoods_loss = -likelihood_reshape.mean()
             all_losses.append(likelihoods_loss.item())
-            print(f'Projection step: {proj_t}, Loss: {-likelihoods.mean(0)}')
+            print(f'Projection step: {proj_t}, Loss: {likelihoods_loss.item()}')
             likelihoods_loss.backward()
-            x.grad = samples.grad.reshape(B, 16, self.horizon, -1)[:, :, 0, :self.dx].mean(1) * grad_mask
-            print(x.grad)
+            if residual_gp is not None:
+                x.grad += samples.grad.reshape(B, 16, self.horizon, -1)[:, :, 0, :self.dx].mean(1) * grad_mask
+            else:
+                x_grad = samples.grad.reshape(B, 16, self.horizon, -1)[:, :, 0, :self.dx].mean(1) * grad_mask
             # x.grad[:, -2:] = 0.0
 
             optimizer.step()
@@ -726,11 +728,15 @@ class GaussianDiffusion(nn.Module):
             samples, likelihoods = self.sample(N, H, condition=condition, context=context, no_grad=False)
             all_samples.append(samples.clone().detach().cpu())
             all_likelihoods.append(likelihoods.clone().detach().cpu())
-            likelihoods_loss = -likelihoods.mean(0)
+            likelihood_reshape = likelihoods.reshape(B, -1).mean(1)
+
+            if residual_gp is not None:
+                likelihood_reshape += residual_gp.gp_model.predict_with_grad(x)[0]
+            likelihoods_loss = -likelihood_reshape.mean()
             all_losses.append(likelihoods_loss.item())
             likelihoods_loss.backward()
 
-        print(f'Projection step: {proj_t+1}, Loss: {-likelihoods.mean(0)}')
+        print(f'Projection step: {proj_t+1}, Loss: {likelihoods_loss.item()}')
         best_sample = all_samples[-1].to(x.device)
         best_likelihood = all_likelihoods[-1].to(x.device)
         return (best_sample, best_likelihood), samples_0, (all_losses, all_samples, all_likelihoods)

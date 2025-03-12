@@ -7,6 +7,9 @@ from torch.distributions import Normal
 from torch.optim import Adam
 
 from tqdm import tqdm
+from ccai.models.custom_likelihoods import SigmoidBernoulliLikelihood
+from ccai.models.helpers import MLP
+from ccai.models.likelihood_residual_gp import LikelihoodResidualGP
 
 # Normalizing flow stuff
 # from nflows.flows.base import Flow
@@ -23,6 +26,9 @@ from ccai.models.cnf.cnf import TrajectoryCNF
 
 from ccai.models.helpers import MLP
 from ccai.models.likelihood_residual_gp import LikelihoodResidualGP
+
+import time
+import collections
 
 class TrajectoryFlowModel(nn.Module):
 
@@ -75,41 +81,6 @@ class TrajectoryFlowModel(nn.Module):
         transforms = CompositeTransform(transforms)
         self.flow = Flow(transforms, base_dist)
 
-    def to(self, device: torch.device) -> 'TrajectorySampler':
-        """
-        Move the model to the specified device, including the GP model.
-        
-        Args:
-            device: Device to move the model to
-            
-        Returns:
-            Self for method chaining
-        """
-        # Move the main model
-        self.model = self.model.to(device)
-        
-        # Move normalization constants
-        self.x_mean = self.x_mean.to(device)
-        self.x_std = self.x_std.to(device)
-        
-        # Move GP model and associated components if present
-        if hasattr(self, 'rl_adjustment') and self.rl_adjustment:
-            self.id_threshold = self.id_threshold.to(device)
-            self.gp = self.gp.to(device)
-            self.value_function = self.value_function.to(device)
-            
-            # Update optimizer with new parameter references
-            self.ppo_optimizer = torch.optim.Adam([
-                {'params': self.gp.gp_model.parameters()},
-                {'params': self.gp.likelihood.parameters()},
-                {'params': [self.id_threshold], 'lr': .1},
-                {'params': self.value_function.parameters(), 'lr': 3e-4}
-            ])
-        
-        # Update submodels with new device
-        self.send_norm_constants_to_submodels()
-        
-        return self
 
     def sample(self, N, H=None, start=None, goal=None, constraints=None, T=1):
         B = 1
@@ -220,14 +191,14 @@ class TrajectoryDiffusionModel(nn.Module):
             condition = None
         return condition
     
-    def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None, project=False, no_grad=True, skip_likelihood=False, context_for_likelihood=True):
+    def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None, project=False, no_grad=True, skip_likelihood=False, context_for_likelihood=True, residual_gp=None):
         # B, N, _ = constraints.shape
         context = self.construct_context(constraints)
 
         condition = self.construct_condition(H, start, goal, past)
 
         if project:
-            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.diffusion_model.project(N=N, H=H, context=context, condition=condition)
+            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.diffusion_model.project(N=N, H=H, context=context, condition=condition, residual_gp=residual_gp)
             return samples, samples_0, (all_losses, all_samples, all_likelihoods)
         else:
             samples = self.diffusion_model.sample(N=N, H=H, context=context, condition=condition, no_grad=no_grad, skip_likelihood=skip_likelihood, context_for_likelihood=context_for_likelihood)  # .reshape(-1, H#,
@@ -375,23 +346,35 @@ class TrajectorySampler(nn.Module):
 
         self.rl_adjustment = rl_adjustment
         if self.rl_adjustment:
-            self.id_threshold = torch.nn.Parameter(torch.tensor([initial_threshold]))
-
-            self.gp = LikelihoodResidualGP(dx, num_inducing=32)
-
+            # We no longer need the threshold as a separate parameter
+            # Instead, we'll use the bias parameter in our custom likelihood
             
-            # Replace MLP value function with a GP
-            self.value_function = LikelihoodResidualGP(dx, num_inducing=32, 
-                                                      kernel_type="matern32",
-                                                      use_ard=True)
+            # Create the actor GP with our custom likelihood
+            actor_likelihood = SigmoidBernoulliLikelihood(
+                initial_bias=-initial_threshold,
+                initial_temp=.1,
+                num_samples=15
+            )
+            self.gp = LikelihoodResidualGP(
+                dx, 
+                num_inducing=32,
+                likelihood=actor_likelihood
+            )
             
-            # Update PPO optimizer to include the new value function GP parameters
+            # Value function GP still uses Gaussian likelihood
+            self.value_function = LikelihoodResidualGP(
+                dx, 
+                num_inducing=32, 
+                kernel_type="matern32",
+                use_ard=True
+            )
+            
+            # Update optimizer to include all parameters
             self.ppo_optimizer = Adam([
-                {'params': self.gp.gp_model.parameters(), 'lr': 1e-2},
-                {'params': self.gp.likelihood.parameters(), 'lr': 1e-2},
-                {'params': [self.id_threshold], 'lr': 1e-2},
-                {'params': self.value_function.gp_model.parameters(), 'lr': 1e-3},
-                {'params': self.value_function.likelihood.parameters(), 'lr': 1e-3}
+                {'params': self.gp.gp_model.parameters(), 'lr': 1e-1},
+                {'params': self.gp.likelihood.parameters(), 'lr': 1e-1},
+                {'params': self.value_function.gp_model.parameters(), 'lr': 1e-1},
+                {'params': self.value_function.likelihood.parameters(), 'lr': 1e-1}
             ])
             
             # PPO hyperparameters
@@ -399,7 +382,7 @@ class TrajectorySampler(nn.Module):
             self.value_loss_coef = 0.5
             self.entropy_coef = 0.01
             self.max_grad_norm = 0.5
-            self.ppo_epochs = 10
+            self.ppo_epochs = 32
             self.batch_size = 32
             self.gamma = 0.99
             self.gae_lambda = 0.95
@@ -426,6 +409,8 @@ class TrajectorySampler(nn.Module):
         Returns:
             Self for method chaining
         """
+
+        self.device = device
         # Move the main model
         self.model = self.model.to(device)
         
@@ -435,7 +420,6 @@ class TrajectorySampler(nn.Module):
         
         # Move GP model and associated components if present
         if self.rl_adjustment:
-            self.id_threshold.data = self.id_threshold.to(device)
             self.gp = self.gp.to(device)
             self.value_function = self.value_function.to(device)
             
@@ -443,7 +427,6 @@ class TrajectorySampler(nn.Module):
             self.ppo_optimizer = torch.optim.Adam([
                 {'params': self.gp.gp_model.parameters()},
                 {'params': self.gp.likelihood.parameters()},
-                {'params': [self.id_threshold], 'lr': 1e-2},
                 {'params': self.value_function.gp_model.parameters(), 'lr': 1e-3},
                 {'params': self.value_function.likelihood.parameters(), 'lr': 1e-3}
             ])
@@ -474,31 +457,87 @@ class TrajectorySampler(nn.Module):
         xu_new = torch.cat([xu[:14], cosine.unsqueeze(-1), sine.unsqueeze(-1), xu[15:]], dim=-1)
         return xu_new
 
-    def check_id(self, state, N, threshold=None, return_samples=False):
-
+    def check_id(self, state, N, threshold=None, likelihood_only=False, return_samples=False, deterministic=False):
+        """
+        Check if the state is in-distribution using the learned model.
+        
+        Args:
+            state: Current state to check
+            N: Number of samples for likelihood estimation
+            threshold: Fallback threshold if not using GP (legacy)
+            return_samples: Whether to return samples
+            deterministic: Whether to use deterministic decision (True) or 
+                          sample from Bernoulli (False)
+            
+        Returns:
+            Tuple of (is_in_distribution, likelihood, [samples if return_samples])
+        """
         start = state[:4 * 3 + 3]
         start_sine_cosine = self.convert_yaw_to_sine_cosine(start)
         samples, _, likelihood = self.sample(N=N, H=self.T, start=start_sine_cosine.reshape(1, -1),
                 constraints=torch.ones(N, 3).to(device=state.device))
         likelihood = likelihood.reshape(N).mean().item()
-        # samples = samples.cpu().numpy()
+        
         if self.rl_adjustment:
-            likelihood_residual_mean, likelihood_residual_variance = self.gp.predict(start_sine_cosine)
-            likelihood += likelihood_residual_mean
-            print('Likelihood residual:', likelihood_residual_mean)
-        print('Likelihood:', likelihood)
-        if threshold is None:
-            threshold = self.id_threshold
-        if likelihood < threshold:
-            print('State is out of distribution')
-            if return_samples:
-                return False, likelihood, samples
-            else:
-                return False, likelihood
-        if return_samples:
-            return True, likelihood, samples
+            # Use the GP likelihood to get prediction
+            with torch.no_grad():
+                # Get residual mean
+                output = self.gp.gp_model.predict(start_sine_cosine.unsqueeze(0))
+                residual = output[0]  # mean of prediction
+                print('Likelihood residual:', residual.item())
+                
+                # Combine base likelihood with residual
+                print('Original likelihood:', likelihood)
+                adjusted_likelihood = likelihood + residual.item()
+                print('Adjusted likelihood:', adjusted_likelihood)
+
+                if likelihood_only:
+                    if return_samples:
+                        return adjusted_likelihood, samples
+                    else:
+                        return adjusted_likelihood
+                
+                # Use sigmoid with bias and temperature to get ID probability
+                bias = self.gp.likelihood.bias.item()
+                temperature = self.gp.likelihood.temperature.item()
+                id_probability = torch.sigmoid(temperature * (torch.tensor(adjusted_likelihood) + bias)).item()
+                print(f'ID probability: {id_probability:.4f}')
+                
+                # Either use deterministic policy or sample from Bernoulli
+                if deterministic:
+                    # Deterministic mode (for evaluation or testing)
+                    is_id = id_probability >= 0.5
+                    print(f"Deterministic decision: {'ID' if is_id else 'OOD'}")
+                else:
+                    # Stochastic mode (for training and exploration)
+                    is_id = torch.bernoulli(torch.tensor(id_probability)).bool().item()
+                    print(f"Stochastic decision: {'ID' if is_id else 'OOD'} (sampled from p={id_probability:.4f})")
+                
+                if not is_id:
+                    print('State is out of distribution')
+                    if return_samples:
+                        return False, adjusted_likelihood, samples
+                    else:
+                        return False, adjusted_likelihood
+                if return_samples:
+                    return True, adjusted_likelihood, samples
+                else:
+                    return True, adjusted_likelihood
         else:
-            return True, likelihood
+            # Fall back to threshold based approach if rl_adjustment is False
+            if threshold is None:
+                threshold = -15  # Default threshold
+            
+            if likelihood < threshold:
+                print('State is out of distribution')
+                if return_samples:
+                    return False, likelihood, samples
+                else:
+                    return False, likelihood
+            if return_samples:
+                return True, likelihood, samples
+            else:
+                return True, likelihood
 
     def sample(self, N, H=10, start=None, goal=None, constraints=None, past=None, project=False, no_grad=True, skip_likelihood=False, context_for_likelihood=True):
         norm_start = None
@@ -512,8 +551,9 @@ class TrajectorySampler(nn.Module):
         else:
             norm_past = past
         if project:
-            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project, context_for_likelihood=context_for_likelihood)
-        else:odel.sample(N, H, norm_start, goal, constraints, norm_past, project, no_grad=no_grad, skip_likelihood=skip_likelihood, context_for_likelihood=context_for_likelihood)
+            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project, context_for_likelihood=context_for_likelihood, residual_gp=self.gp)
+        else:
+            samples = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project, no_grad=no_grad, skip_likelihood=skip_likelihood, context_for_likelihood=context_for_likelihood)
         # if len(samples) == N:
         #     x = samples
         #     c = None
@@ -590,7 +630,6 @@ class TrajectorySampler(nn.Module):
         state_batch = torch.stack([self.convert_yaw_to_sine_cosine(state) for state in states])
         
         # Sample trajectories to get base likelihoods
-        # We need to do this part without gradients because it's expensive and not directly differentiable
         with torch.no_grad():
             batch_likelihoods = []
             _, _, likelihood = self.sample(
@@ -605,54 +644,46 @@ class TrajectorySampler(nn.Module):
         # the base likelihoods into our computational graph
         base_likelihoods = base_likelihoods.detach().requires_grad_(False)
         
-        # Get GP predictions WITH gradients using the new method
-        likelihood_residuals = self.gp.predict_with_grad(state_batch)[0]
+        # Get GP predictions WITH gradients
+        output_mean, _ = self.gp.gp_model.predict_with_grad(state_batch)
         
-        # Combine base likelihoods with residuals
-        adjusted_likelihoods = base_likelihoods + likelihood_residuals.squeeze()
-        
-        # Calculate policy distribution
-        probs = torch.sigmoid(adjusted_likelihoods - self.id_threshold)
-        dist = torch.distributions.Bernoulli(probs)
+        # Combine base likelihoods with GP output
+        combined_features = base_likelihoods + output_mean
+        combined_features = combined_features.unsqueeze(-1)
+        # Get Bernoulli distribution from the likelihood
+        dist = self.gp.likelihood(combined_features)
         
         # Get log probabilities and entropy
         action_log_probs = dist.log_prob(actions.float())
-        dist_entropy = dist.entropy().mean()
+        dist_entropy = -action_log_probs.mean()  # Approximate entropy
         
         # Get value predictions using GP
-        state_values = self.value_function.gp_model(state_batch)[0]
+        value_output = self.value_function.gp_model(state_batch)
         
-        return action_log_probs, state_values, dist_entropy
+        return action_log_probs, value_output, dist_entropy
 
-    def store_transition(self, state, action: int, likelihood: torch.Tensor, next_state, reward: float, done: bool = False) -> None:
+    def store_transition(self, state, action: int, likelihood: float, next_state, reward: float, done: bool = False) -> None:
         """
         Store a transition in the PPO memory.
-        
-        Args:
-            state: Current state
-            action: Action taken (0 or 1)
-            next_state: Resulting next state
-            reward: Reward received
-            done: Whether the episode is done
         """
         if not self.rl_adjustment:
             return
             
         # Process state and evaluate policy
         state_tensor = torch.tensor(self.convert_yaw_to_sine_cosine(state), 
-                                    dtype=torch.float32, device=self.id_threshold.device).unsqueeze(0)
+                                    dtype=torch.float32, device=next(self.parameters()).device).unsqueeze(0)
         
-        # Get value estimate using GP
+        # Get value estimate using GP. Use predict
+        value_output_mean, _ = self.value_function.predict(state_tensor)
+        value = value_output_mean.squeeze().item()
+        
+        # Get action probability using the GP and likelihood
         with torch.no_grad():
-            value, _ = self.value_function.predict(state_tensor)
-            value = value.squeeze().item()
-        
-        # Get action probability using sigmoid and the threshold
-        prob = torch.sigmoid(likelihood - self.id_threshold)
-        # Calculate log probability of the action
-        action_tensor = torch.tensor(action, dtype=torch.float, device=self.id_threshold.device)
-        log_prob = torch.log(prob + 1e-8)
-        log_prob = log_prob.item()  # Convert to scalar
+            output_mean, _ = self.gp.predict(state_tensor)
+            combined_feature = likelihood + output_mean
+            bernoulli_dist = self.gp.likelihood(combined_feature)
+            log_prob = bernoulli_dist.log_prob(torch.tensor([action], dtype=torch.float, 
+                                                            device=next(self.parameters()).device)).item()
         
         # Store in memory
         self.ppo_states.append(state)
@@ -670,7 +701,7 @@ class TrajectorySampler(nn.Module):
         if not self.ppo_states:
             return  # No data to process
         
-        device = self.id_threshold.device
+        device = self.device
         
         # Get final value for bootstrapping
         if self.ppo_dones[-1]:
@@ -683,8 +714,8 @@ class TrajectorySampler(nn.Module):
                 device=device
             ).unsqueeze(0)
             
-            with torch.no_grad():
-                last_value = self.value_function(final_state).squeeze().item()
+            # Use predict to get value
+            last_value = self.value_function.predict(final_state)[0].squeeze().item()
         
         # Calculate returns and advantages using GAE
         self.ppo_returns = []
@@ -734,14 +765,38 @@ class TrajectorySampler(nn.Module):
         Uses data stored in the PPO memory.
         
         Returns:
-            Dictionary with loss information
+            Dictionary with loss information and timing statistics
         """
+        update_start_time = time.time()
+        timing_stats = collections.defaultdict(float)
 
-        self.value_function.train()
+        # Store initial inducing points for tracking changes
+        with torch.no_grad():
+            initial_actor_inducing_points = self.gp.gp_model.variational_strategy.inducing_points.clone()
+            initial_value_inducing_points = self.value_function.gp_model.variational_strategy.inducing_points.clone()
+            
+            # Also track the likelihood parameters
+            initial_bias = self.gp.likelihood.bias.clone()
+            initial_temp = self.gp.likelihood.temperature.clone()
+            
+            print("\n===== INITIAL GP PARAMETERS =====")
+            print(f"Actor GP inducing points: shape={initial_actor_inducing_points.shape}")
+            print(f"Value GP inducing points: shape={initial_value_inducing_points.shape}")
+            print(f"Actor bias: {initial_bias.item():.5f}")
+            print(f"Actor temperature: {initial_temp.item():.5f}")
+            print("==================================\n")
+
+        self.value_function.gp_model.train()
+        self.value_function.likelihood.train()
+        self.gp.gp_model.train()
+        self.gp.likelihood.train()
+        
         if not self.ppo_returns or len(self.ppo_states) == 0:
             return {'error': 'No data available for update'}
             
-        device = self.id_threshold.device
+        # Data preparation timing
+        data_prep_start = time.time()
+        device = self.device
         
         # Convert memory to tensors on the correct device
         states = torch.stack(self.ppo_states).to(dtype=torch.float32, device=device)
@@ -752,6 +807,7 @@ class TrajectorySampler(nn.Module):
         
         # Normalize advantages for more stable training
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+        timing_stats['data_preparation'] = time.time() - data_prep_start
         
         # Metrics to track during training
         total_policy_loss = 0
@@ -759,30 +815,50 @@ class TrajectorySampler(nn.Module):
         total_entropy = 0
         total_clip_fraction = 0
         num_updates = 0
-        objective_function = gpytorch.mlls.PredictiveLogLikelihood(self.value_function.likelihood, self.value_function.gp_model, num_data=batch_states.shape[0])
+        objective_function = gpytorch.mlls.PredictiveLogLikelihood(
+            self.value_function.likelihood, 
+            self.value_function.gp_model, 
+            num_data=self.batch_size
+        )
 
         # Multiple epochs of PPO update
-        for _ in tqdm(range(self.ppo_epochs)):
+        for epoch in range(self.ppo_epochs):
+            epoch_start = time.time()
+            
+            # Track losses for this epoch
+            epoch_policy_loss = 0
+            epoch_value_loss = 0
+            epoch_entropy = 0
+            epoch_clip_fraction = 0
+            epoch_updates = 0
+            
             # Create data loader for mini-batches
             batch_indices = torch.randperm(len(states))
             
             # Process mini-batches
-            for start_idx in tqdm(range(0, len(states), self.batch_size)):
+            for start_idx in range(0, len(states), self.batch_size):
+                batch_start = time.time()
                 num_updates += 1
+                epoch_updates += 1
                 end_idx = min(start_idx + self.batch_size, len(states))
                 batch_idx = batch_indices[start_idx:end_idx]
                 
                 # Get batch data
+                batch_data_start = time.time()
                 batch_states = states[batch_idx]
                 batch_actions = actions[batch_idx]
                 batch_old_log_probs = old_log_probs[batch_idx]
                 batch_returns = returns[batch_idx]
                 batch_advantages = advantages[batch_idx]
+                timing_stats['batch_data_prep'] += time.time() - batch_data_start
                 
                 # Evaluate current policy on batch
+                policy_eval_start = time.time()
                 log_probs, values, entropy = self.evaluate_actions(batch_states, batch_actions)
+                timing_stats['policy_evaluation'] += time.time() - policy_eval_start
                 
                 # PPO policy loss calculation
+                loss_calc_start = time.time()
                 ratio = torch.exp(log_probs - batch_old_log_probs)
                 surr1 = ratio * batch_advantages
                 surr2 = torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * batch_advantages
@@ -791,27 +867,42 @@ class TrajectorySampler(nn.Module):
                 policy_loss = -torch.min(surr1, surr2).mean()
                 
                 # Calculate value function loss
-                value_loss = F.mse_loss(values.squeeze(), batch_returns)
+                value_loss = -objective_function(values, batch_returns)
                 
                 # Calculate combined loss
                 loss = policy_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy
+                timing_stats['loss_calculation'] += time.time() - loss_calc_start
                 
                 # Perform gradient step
+                backprop_start = time.time()
                 self.ppo_optimizer.zero_grad()
                 loss.backward()
                 
-                # Optional: gradient clipping for stability
-                if self.max_grad_norm > 0:
-                    torch.nn.utils.clip_grad_norm_(
-                        list(self.gp.gp_model.parameters()) + 
-                        list(self.gp.likelihood.parameters()) +
-                        [self.id_threshold] +
-                        list(self.value_function.parameters()),
-                        self.max_grad_norm
-                    )
+                # Report gradients for inducing points
+                if num_updates == 1:  # Only print once per update
+                    with torch.no_grad():
+                        has_actor_grad = self.gp.gp_model.variational_strategy.inducing_points.grad is not None
+                        has_value_grad = self.value_function.gp_model.variational_strategy.inducing_points.grad is not None
+                        print(f"Actor inducing points have gradients: {has_actor_grad}")
+                        if has_actor_grad:
+                            grad_norm = torch.norm(self.gp.gp_model.variational_strategy.inducing_points.grad)
+                            print(f"Actor inducing points gradient norm: {grad_norm.item():.5f}")
+                        print(f"Value inducing points have gradients: {has_value_grad}")
+                        if has_value_grad:
+                            grad_norm = torch.norm(self.value_function.gp_model.variational_strategy.inducing_points.grad)
+                            print(f"Value inducing points gradient norm: {grad_norm.item():.5f}")
+                        
+                        if self.gp.likelihood.bias.grad is not None:
+                            print(f"Bias gradient: {self.gp.likelihood.bias.grad.item():.5f}")
+                        if self.gp.likelihood.temperature.grad is not None:
+                            print(f"Temperature gradient: {self.gp.likelihood.temperature.grad.item():.5f}")
+                
+                timing_stats['backpropagation'] += time.time() - backprop_start
                 
                 # Update parameters
+                optimizer_step_start = time.time()
                 self.ppo_optimizer.step()
+                timing_stats['optimizer_step'] += time.time() - optimizer_step_start
                 
                 # Track metrics
                 total_policy_loss += policy_loss.item()
@@ -821,16 +912,153 @@ class TrajectorySampler(nn.Module):
                 # Calculate clipping fraction for monitoring
                 clip_fraction = ((ratio - 1.0).abs() > self.clip_param).float().mean().item()
                 total_clip_fraction += clip_fraction
+                
+                # Also track for this epoch
+                epoch_policy_loss += policy_loss.item()
+                epoch_value_loss += value_loss.item()
+                epoch_entropy += entropy.item()
+                epoch_clip_fraction += clip_fraction
+                
+                timing_stats['batch_total'] += time.time() - batch_start
+            
+            # Calculate epoch averages
+            if epoch_updates > 0:
+                epoch_avg_policy_loss = epoch_policy_loss / epoch_updates
+                epoch_avg_value_loss = epoch_value_loss / epoch_updates
+                epoch_avg_entropy = epoch_entropy / epoch_updates
+                epoch_avg_clip = epoch_clip_fraction / epoch_updates
+            else:
+                epoch_avg_policy_loss = epoch_avg_value_loss = epoch_avg_entropy = epoch_avg_clip = 0
+                
+            # Calculate the actual threshold value from bias for easier interpretation
+            current_threshold = -self.gp.likelihood.bias.item()
+            
+            timing_stats['epoch_time'] += time.time() - epoch_start
+            epoch_time = time.time() - epoch_start
+            
+            # Print summary for this epoch
+            print(f"\n==== Epoch {epoch+1}/{self.ppo_epochs} Summary ====")
+            print(f"Time: {epoch_time:.4f}s")
+            print(f"Policy Loss: {epoch_avg_policy_loss:.6f}")
+            print(f"Value Loss: {epoch_avg_value_loss:.6f}")
+            print(f"Entropy: {epoch_avg_entropy:.6f}")
+            print(f"Clip Fraction: {epoch_avg_clip:.4f}")
+            print(f"Current Threshold: {current_threshold:.4f}")
+            print("=======================================")
+            
+            # Periodically report inducing point changes during training
+            if (epoch + 1) % 5 == 0 or epoch == 0 or epoch == self.ppo_epochs - 1:
+                with torch.no_grad():
+                    current_actor_inducing = self.gp.gp_model.variational_strategy.inducing_points
+                    current_value_inducing = self.value_function.gp_model.variational_strategy.inducing_points
+                    
+                    actor_change = torch.norm(current_actor_inducing - initial_actor_inducing_points)
+                    value_change = torch.norm(current_value_inducing - initial_value_inducing_points)
+                    
+                    current_bias = self.gp.likelihood.bias
+                    current_temp = self.gp.likelihood.temperature
+                    bias_change = torch.abs(current_bias - initial_bias)
+                    temp_change = torch.abs(current_temp - initial_temp)
+                    
+                    print(f"\nEpoch {epoch+1} parameter changes:")
+                    print(f"Actor inducing points L2 change: {actor_change.item():.5f}")
+                    print(f"Value inducing points L2 change: {value_change.item():.5f}")
+                    print(f"Bias change: {bias_change.item():.5f} (now: {current_bias.item():.5f})")
+                    print(f"Temperature change: {temp_change.item():.5f} (now: {current_temp.item():.5f})\n")
+        
+        # Final parameter change reporting
+        with torch.no_grad():
+            final_actor_inducing = self.gp.gp_model.variational_strategy.inducing_points
+            final_value_inducing = self.value_function.gp_model.variational_strategy.inducing_points
+            
+            actor_change = torch.norm(final_actor_inducing - initial_actor_inducing_points)
+            value_change = torch.norm(final_value_inducing - initial_value_inducing_points)
+            
+            # Calculate per-dimension stats
+            actor_dim_changes = torch.mean(torch.abs(final_actor_inducing - initial_actor_inducing_points), dim=0)
+            value_dim_changes = torch.mean(torch.abs(final_value_inducing - initial_value_inducing_points), dim=0)
+            
+            # Check if any inducing points moved significantly
+            actor_max_change = torch.max(torch.abs(final_actor_inducing - initial_actor_inducing_points))
+            value_max_change = torch.max(torch.abs(final_value_inducing - initial_value_inducing_points))
+            
+            # Check if inducing points are diverse or collapsed
+            actor_inducing_std = torch.std(final_actor_inducing, dim=0).mean()
+            value_inducing_std = torch.std(final_value_inducing, dim=0).mean()
+            
+            final_bias = self.gp.likelihood.bias
+            final_temp = self.gp.likelihood.temperature
+            bias_change = torch.abs(final_bias - initial_bias)
+            temp_change = torch.abs(final_temp - initial_temp)
+            
+            print("\n===== GP PARAMETER CHANGES AFTER UPDATE =====")
+            print(f"Actor inducing points total L2 change: {actor_change.item():.5f}")
+            print(f"Value inducing points total L2 change: {value_change.item():.5f}")
+            print(f"Actor max point change: {actor_max_change.item():.5f}")
+            print(f"Value max point change: {value_max_change.item():.5f}")
+            print(f"Actor inducing points diversity (std): {actor_inducing_std.item():.5f}")
+            print(f"Value inducing points diversity (std): {value_inducing_std.item():.5f}")
+            print(f"Bias change: {bias_change.item():.5f} (now: {final_bias.item():.5f})")
+            print(f"Temperature change: {temp_change.item():.5f} (now: {final_temp.item():.5f})")
+            
+            # Report dimension-wise changes
+            print("\nAverage change per dimension (actor):")
+            for i, change in enumerate(actor_dim_changes):
+                print(f"  Dim {i}: {change.item():.5f}", end=" | ")
+                if (i+1) % 5 == 0:
+                    print()  # Newline every 5 dimensions
+            if len(actor_dim_changes) % 5 != 0:
+                print()
+                
+            print("\n=========================================\n")
+            
+            # Store timing statistics for inducing points
+            timing_stats['inducing_point_changes'] = {
+                'actor_change': actor_change.item(),
+                'value_change': value_change.item(),
+                'actor_max_change': actor_max_change.item(),
+                'value_max_change': value_max_change.item(),
+                'actor_diversity': actor_inducing_std.item(),
+                'value_diversity': value_inducing_std.item(),
+            }
         
         # Clear memory after update
+        memory_clear_start = time.time()
         self.clear_memory()
-        self.value_function.eval()
+        timing_stats['memory_clear'] = time.time() - memory_clear_start
         
-        # Return average metrics
+        self.value_function.gp_model.eval()
+        self.value_function.likelihood.eval()
+        self.gp.gp_model.eval()
+        self.gp.likelihood.eval()
+        
+        # Calculate average times
+        timing_stats['avg_batch_time'] = timing_stats['batch_total'] / max(1, num_updates)
+        timing_stats['avg_policy_eval'] = timing_stats['policy_evaluation'] / max(1, num_updates)
+        timing_stats['avg_loss_calc'] = timing_stats['loss_calculation'] / max(1, num_updates)
+        timing_stats['avg_backprop'] = timing_stats['backpropagation'] / max(1, num_updates)
+        timing_stats['avg_optim_step'] = timing_stats['optimizer_step'] / max(1, num_updates)
+        timing_stats['total_update_time'] = time.time() - update_start_time
+        
+        # Log timing statistics
+        print("\n===== PPO UPDATE TIMING STATISTICS =====")
+        print(f"Total update time: {timing_stats['total_update_time']:.4f}s")
+        print(f"Data preparation: {timing_stats['data_preparation']:.4f}s")
+        print(f"Average epoch time: {timing_stats['epoch_time']/max(1, self.ppo_epochs):.4f}s")
+        print(f"Average batch time: {timing_stats['avg_batch_time']:.4f}s")
+        print(f"Average policy evaluation: {timing_stats['avg_policy_eval']:.4f}s")
+        print(f"Average loss calculation: {timing_stats['avg_loss_calc']:.4f}s")
+        print(f"Average backpropagation: {timing_stats['avg_backprop']:.4f}s")
+        print(f"Average optimizer step: {timing_stats['avg_optim_step']:.4f}s")
+        print("=======================================\n")
+        
+        # Return average metrics and timing info
         return {
             'policy_loss': total_policy_loss / num_updates,
             'value_loss': total_value_loss / num_updates,
             'entropy': total_entropy / num_updates,
             'clip_fraction': total_clip_fraction / num_updates,
-            'threshold': self.id_threshold.item()
+            'threshold': -self.gp.likelihood.bias.squeeze().item(),
+            'inducing_points': timing_stats['inducing_point_changes'],
+            'timing': dict(timing_stats)  # Convert defaultdict to regular dict for return
         }
