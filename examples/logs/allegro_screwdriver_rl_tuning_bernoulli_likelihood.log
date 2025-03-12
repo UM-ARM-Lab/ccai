@@ -7,17 +7,17 @@ Loaded trajectory sampler
 Current yaw: tensor([ 5.5207e-05,  1.3631e-02, -4.8130e-02], device='cuda:1')
 Current yaw: tensor([ 5.5207e-05,  1.3631e-02, -4.8130e-02], device='cuda:1')
 1 turn
-Sampling time 5.446379043161869
+Sampling time 5.335711448919028
 tensor([ 1.5497e-01,  6.1007e-01,  5.7076e-01,  6.1106e-01, -1.1513e-01,
          5.4013e-01,  8.8512e-01,  9.3454e-01,  1.2569e+00,  2.2909e-01,
          2.3290e-01,  1.2085e+00,  5.5207e-05,  1.3631e-02, -4.8130e-02,
          4.4650e-01], device='cuda:1')
-Likelihood residual: -4.4678492372440815e-07
+Likelihood residual: 1.0
 Original likelihood: -107.05027770996094
-Adjusted likelihood: -107.05027815674586
-ID probability: 0.9509
-Stochastic decision: ID (sampled from p=0.9509)
-Solve time for step 1 15.359647891949862
+Adjusted likelihood: -106.05027770996094
+ID probability: 0.9995
+Stochastic decision: ID (sampled from p=0.9995)
+Solve time for step 1 14.263024798827246
 Current ori: tensor([ 5.5207e-05,  1.3631e-02, -4.8130e-02], device='cuda:1')
 Middle force: tensor([0.5787, 0.5693, 1.1468, 0.5579, 1.1098, 0.6485, 0.5337, 0.5207, 0.5460,
         0.5341, 0.5538, 0.5290], device='cuda:1')
@@ -30,91 +30,969 @@ Collected 1 transitions for RL
 tensor([ 0.1563,  0.6327,  0.5465,  0.6003, -0.1233,  0.5596,  0.8484,  0.9802,
          1.2576,  0.2567,  0.2527,  1.1338, -0.0073,  0.0069, -0.1142,  0.6397],
        device='cuda:1')
-Likelihood residual: -4.0478141727362527e-07
-Original likelihood: -125.11587524414062
-Adjusted likelihood: -125.11587564892204
-ID probability: 0.7606
-Stochastic decision: OOD (sampled from p=0.7606)
-State is out of distribution
-Projection step: 0, Loss: 131.59307861328125
-Projection step: 1, Loss: 90.23050689697266
-Projection step: 2, Loss: 99.74583435058594
-Projection step: 3, Loss: 91.54792785644531
-Projection step: 4, Loss: 94.62107849121094
-Projection step: 5, Loss: 92.40453338623047
-Projection step: 7, Loss: 86.25827026367188
-Final likelihood: tensor([-101.1052,  -83.0950,  -83.5170,  -81.3770,  -83.3364,  -91.0216,
-         -82.8010,  -84.6488,  -83.4247,  -78.1445,  -84.9371,  -82.9507,
-        -102.7856,  -83.4765,  -83.8551,  -89.6561])
-Final projection likelihood: -86.2583
-1 mode projection succeeded
-New goal: tensor([ 0.0367,  0.5175,  0.4917,  0.6247, -0.0192,  0.5809,  0.9034,  0.8782,
-         1.2554,  0.3752,  0.2220,  1.3287,  0.0028,  0.0112, -0.8356],
-       device='cuda:1')
-tensor([[0.0024]], device='cuda:1') tensor([[0.0025]], device='cuda:1') tensor([[0.0029]], device='cuda:1')
-Likelihood residual: -4.7024762750425e-08
-Original likelihood: -144.46217346191406
-Adjusted likelihood: -144.46217350893883
-Likelihood residual: 4.025769229087928e-08
-Original likelihood: -131.59976196289062
-Adjusted likelihood: -131.59976192263292
-{'index': 131.59976192263292, 'thumb_middle': 144.46217350893883}
-Current yaw: tensor([-0.0073,  0.0069, -0.1142], device='cuda:1')
-2 index
-tensor([ 0.1563,  0.6327,  0.5465,  0.6003, -0.1233,  0.5596,  0.8484,  0.9802,
-         1.2576,  0.2567,  0.2527,  1.1338, -0.0073,  0.0069, -0.1142,  0.6397],
-       device='cuda:1')
-Solve time for step 1 10.394310691161081
+Likelihood residual: 1.0
+Original likelihood: -124.97850799560547
+Adjusted likelihood: -123.97850799560547
+ID probability: 0.9599
+Stochastic decision: ID (sampled from p=0.9599)
+Solve time for step 2 4.460100650088862
 Current ori: tensor([-0.0073,  0.0069, -0.1142], device='cuda:1')
-Middle force: tensor([0.5815, 0.5210, 0.5828, 0.5920], device='cuda:1')
-Thumb force: tensor([0.6117, 0.5943, 0.5503, 0.5062], device='cuda:1')
-tensor([ 0.0964,  0.5093,  0.4698,  0.6001, -0.1025,  0.5457,  0.9068,  0.9337,
-         1.2272,  0.2889,  0.2413,  1.1444, -0.0084, -0.0079, -0.1393, -0.7919],
-       device='cuda:1')
-Solve time for step 2 3.173452964052558
-Current ori: tensor([-0.0084, -0.0079, -0.1393], device='cuda:1')
-Middle force: tensor([0.5202, 0.5818, 0.5896], device='cuda:1')
-Thumb force: tensor([0.5881, 0.5479, 0.5057], device='cuda:1')
-tensor([ 0.0759,  0.5002,  0.4652,  0.6060, -0.0857,  0.5532,  0.9190,  0.9153,
-         1.2357,  0.2697,  0.2070,  1.1651, -0.0115, -0.0198, -0.1483, -1.7356],
-       device='cuda:1')
-Solve time for step 3 3.2519726809114218
-Current ori: tensor([-0.0115, -0.0198, -0.1483], device='cuda:1')
-Middle force: tensor([0.5796, 0.5864], device='cuda:1')
-Thumb force: tensor([0.5436, 0.5051], device='cuda:1')
-tensor([ 0.0685,  0.4964,  0.4635,  0.6074, -0.0807,  0.5581,  0.9195,  0.9076,
-         1.2163,  0.2932,  0.2114,  1.1697, -0.0120, -0.0233, -0.1389, -2.4341],
-       device='cuda:1')
-Solve time for step 4 3.1503108551260084
-Current ori: tensor([-0.0120, -0.0233, -0.1389], device='cuda:1')
-Middle force: tensor([0.5567], device='cuda:1')
-Thumb force: tensor([0.5335], device='cuda:1')
-Storing RECOVERY transition: reward=0.0219 (scaled=0.0219), steps=1
+Middle force: tensor([0.5651, 1.1183, 0.5534, 1.0880, 0.6417, 0.5308, 0.5183, 0.5436, 0.5300,
+        0.5492, 0.5265], device='cuda:1')
+Thumb force: tensor([0.8040, 0.7325, 0.9777, 0.9352, 0.6467, 0.5212, 0.8668, 0.5764, 0.5843,
+        0.5689, 0.5633], device='cuda:1')
+Index force: tensor([0.5908, 0.5528, 0.5645, 0.7874, 0.5215, 0.9726, 0.8984, 0.5648, 0.5601,
+        0.5280, 0.5650], device='cuda:1')
+Storing NORMAL transition: reward=0.0625 (scaled=0.0625), steps=1
 Collected 2 transitions for RL
-
-===== INITIAL GP PARAMETERS =====
-Actor GP inducing points: shape=torch.Size([32, 16])
-Value GP inducing points: shape=torch.Size([32, 16])
-Actor bias: 136.67581
-Actor temperature: 0.10000
-==================================
-
+tensor([ 0.1556,  0.6414,  0.5362,  0.5961, -0.1207,  0.5537,  0.8449,  1.0152,
+         1.2680,  0.2650,  0.2540,  1.0864, -0.0087,  0.0054, -0.1767,  0.6999],
+       device='cuda:1')
+Likelihood residual: 1.0
+Original likelihood: -130.64703369140625
+Adjusted likelihood: -129.64703369140625
+ID probability: 0.8529
+Stochastic decision: ID (sampled from p=0.8529)
+Solve time for step 3 4.052142361877486
+Current ori: tensor([-0.0087,  0.0054, -0.1767], device='cuda:1')
+Middle force: tensor([0.5151, 1.5514, 0.7068, 1.3536, 0.5038, 0.4999, 0.5512, 0.5087, 0.6627,
+        0.5116], device='cuda:1')
+Thumb force: tensor([0.5047, 1.9080, 1.1842, 0.5446, 1.1283, 0.5024, 0.6127, 0.6730, 0.5593,
+        0.8745], device='cuda:1')
+Index force: tensor([0.6418, 0.5669, 0.5468, 0.6211, 0.5025, 0.6239, 0.5353, 0.6497, 0.5603,
+        0.5759], device='cuda:1')
+Storing NORMAL transition: reward=-0.0140 (scaled=-0.0140), steps=1
+Collected 3 transitions for RL
+tensor([ 0.1426,  0.6034,  0.5642,  0.6170, -0.1315,  0.5533,  0.8508,  0.9862,
+         1.2800,  0.2722,  0.2455,  1.0943, -0.0058,  0.0124, -0.1628,  0.7649],
+       device='cuda:1')
+Likelihood residual: 1.0
+Original likelihood: -101.71141052246094
+Adjusted likelihood: -100.71141052246094
+ID probability: 0.9999
+Stochastic decision: ID (sampled from p=0.9999)
+Solve time for step 4 3.9183133041951805
+Current ori: tensor([-0.0058,  0.0124, -0.1628], device='cuda:1')
+Middle force: tensor([1.5243, 0.7014, 1.3368, 0.5041, 0.5004, 0.5501, 0.5085, 0.6592, 0.5111],
+       device='cuda:1')
+Thumb force: tensor([1.8771, 1.1702, 0.5416, 1.1100, 0.5017, 0.6097, 0.6660, 0.5573, 0.8669],
+       device='cuda:1')
+Index force: tensor([0.5633, 0.5444, 0.6186, 0.5023, 0.6746, 0.5337, 0.6460, 0.5582, 0.5733],
+       device='cuda:1')
+Storing NORMAL transition: reward=0.0447 (scaled=0.0447), steps=1
+Collected 4 transitions for RL
+tensor([ 0.1341,  0.5952,  0.5689,  0.6125, -0.1379,  0.5348,  0.8660,  1.0002,
+         1.3395,  0.1913,  0.2316,  1.0671, -0.0041,  0.0172, -0.2077,  0.8113],
+       device='cuda:1')
+Likelihood residual: 1.0
+Original likelihood: -120.89637756347656
+Adjusted likelihood: -119.89637756347656
+ID probability: 0.9852
+Stochastic decision: ID (sampled from p=0.9852)
+Solve time for step 5 3.578735515009612
+Current ori: tensor([-0.0041,  0.0172, -0.2077], device='cuda:1')
+Middle force: tensor([0.6941, 1.3214, 0.5039, 0.5003, 0.5489, 0.5079, 0.6556, 0.5105],
+       device='cuda:1')
+Thumb force: tensor([1.1538, 0.5393, 1.0973, 0.5011, 0.6059, 0.6624, 0.5550, 0.8593],
+       device='cuda:1')
+Index force: tensor([0.5409, 0.6168, 0.5019, 0.7402, 0.5323, 0.6413, 0.5561, 0.5705],
+       device='cuda:1')
+Storing NORMAL transition: reward=0.0543 (scaled=0.0543), steps=1
+Collected 5 transitions for RL
+tensor([ 1.3686e-01,  5.7860e-01,  5.8506e-01,  6.3049e-01, -1.4125e-01,
+         5.1253e-01,  8.8551e-01,  1.0308e+00,  1.3454e+00,  2.0389e-01,
+         2.2318e-01,  1.0541e+00,  6.7384e-04,  1.6885e-02, -2.6202e-01,
+         8.7365e-01], device='cuda:1')
+Likelihood residual: 1.0
+Original likelihood: -111.03687286376953
+Adjusted likelihood: -110.03687286376953
+ID probability: 0.9987
+Stochastic decision: ID (sampled from p=0.9987)
+Solve time for step 6 3.649743755115196
+Current ori: tensor([ 0.0007,  0.0169, -0.2620], device='cuda:1')
+Middle force: tensor([1.3027, 0.5037, 0.5003, 0.5472, 0.5074, 0.6518, 0.5100],
+       device='cuda:1')
+Thumb force: tensor([0.5360, 1.0849, 0.5008, 0.6043, 0.6589, 0.5530, 0.8522],
+       device='cuda:1')
+Index force: tensor([0.6142, 0.5016, 0.7991, 0.5305, 0.6369, 0.5543, 0.5679],
+       device='cuda:1')
+Storing NORMAL transition: reward=0.1130 (scaled=0.1130), steps=1
+Collected 6 transitions for RL
+tensor([ 1.5462e-01,  5.8041e-01,  5.9785e-01,  6.3895e-01, -1.1187e-01,
+         4.9832e-01,  9.1122e-01,  1.0745e+00,  1.3318e+00,  2.2091e-01,
+         2.1418e-01,  1.0192e+00, -4.6370e-04, -2.4348e-03, -3.7462e-01,
+         1.1023e+00], device='cuda:1')
+Likelihood residual: 1.0
+Original likelihood: -117.03956604003906
+Adjusted likelihood: -116.03956604003906
+ID probability: 0.9943
+Stochastic decision: ID (sampled from p=0.9943)
+Solve time for step 7 3.3976646431256086
+Current ori: tensor([-0.0005, -0.0024, -0.3746], device='cuda:1')
+Middle force: tensor([0.5170, 0.5106, 0.5070, 0.7801, 0.5190, 0.5694], device='cuda:1')
+Thumb force: tensor([0.5118, 0.8016, 0.5210, 0.5229, 0.5890, 0.5817], device='cuda:1')
+Index force: tensor([0.8971, 0.8254, 0.5442, 0.5672, 0.5326, 0.5488], device='cuda:1')
+Storing NORMAL transition: reward=0.0204 (scaled=0.0204), steps=1
+Collected 7 transitions for RL
+tensor([ 0.1285,  0.5591,  0.5875,  0.6637, -0.1338,  0.4929,  0.8960,  1.0785,
+         1.3261,  0.2591,  0.2465,  0.9837,  0.0026,  0.0122, -0.3955,  1.0785],
+       device='cuda:1')
+Likelihood residual: 1.0
+Original likelihood: -91.03567504882812
+Adjusted likelihood: -90.03567504882812
+ID probability: 1.0000
+Stochastic decision: ID (sampled from p=1.0000)
+Solve time for step 8 3.245123220840469
+Current ori: tensor([ 0.0026,  0.0122, -0.3955], device='cuda:1')
+Middle force: tensor([0.5097, 0.5063, 0.7724, 0.5171, 0.5663], device='cuda:1')
+Thumb force: tensor([0.7833, 0.5184, 0.5202, 0.5827, 0.5769], device='cuda:1')
+Index force: tensor([0.8080, 0.5411, 0.5629, 0.5294, 0.5450], device='cuda:1')
+Storing NORMAL transition: reward=-0.0100 (scaled=-0.0100), steps=1
+Collected 8 transitions for RL
+tensor([ 0.1332,  0.5654,  0.5818,  0.6673, -0.1306,  0.5014,  0.8875,  1.0782,
+         1.3129,  0.2762,  0.2500,  0.9879,  0.0021,  0.0097, -0.3852,  1.0522],
+       device='cuda:1')
+Likelihood residual: 1.0
+Original likelihood: -102.13290405273438
+Adjusted likelihood: -101.13290405273438
+ID probability: 0.9999
+Stochastic decision: ID (sampled from p=0.9999)
+Solve time for step 9 3.146205496042967
+Current ori: tensor([ 0.0021,  0.0097, -0.3852], device='cuda:1')
+Middle force: tensor([0.5282, 0.5138, 0.5305, 0.5153], device='cuda:1')
+Thumb force: tensor([0.5425, 0.5553, 0.5466, 0.5398], device='cuda:1')
+Index force: tensor([0.5373, 0.5376, 0.5122, 0.5400], device='cuda:1')
+Storing NORMAL transition: reward=0.0157 (scaled=0.0157), steps=1
+Collected 9 transitions for RL
+tensor([ 1.3936e-01,  5.7178e-01,  5.8350e-01,  6.5946e-01, -1.2427e-01,
+         5.0487e-01,  8.8740e-01,  1.0797e+00,  1.3156e+00,  2.7107e-01,
+         2.4272e-01,  9.8370e-01, -4.5846e-05,  5.7167e-03, -4.0082e-01,
+         1.0795e+00], device='cuda:1')
+Likelihood residual: 1.0
+Original likelihood: -102.56346893310547
+Adjusted likelihood: -101.56346893310547
+ID probability: 0.9998
+Stochastic decision: ID (sampled from p=0.9998)
+Solve time for step 10 2.9727973348926753
+Current ori: tensor([-4.5846e-05,  5.7167e-03, -4.0082e-01], device='cuda:1')
+Middle force: tensor([0.5130, 0.5291, 0.5145], device='cuda:1')
+Thumb force: tensor([0.5518, 0.5439, 0.5377], device='cuda:1')
+Index force: tensor([0.5338, 0.5111, 0.5373], device='cuda:1')
+Storing NORMAL transition: reward=0.0208 (scaled=0.0208), steps=1
+Collected 10 transitions for RL
+tensor([ 1.3028e-01,  5.6508e-01,  5.8254e-01,  6.6092e-01, -1.3206e-01,
+         4.9552e-01,  8.9032e-01,  1.0892e+00,  1.3341e+00,  2.5105e-01,
+         2.4645e-01,  9.6835e-01,  1.0695e-03,  1.1103e-02, -4.2189e-01,
+         1.1059e+00], device='cuda:1')
+Likelihood residual: 1.0
+Original likelihood: -101.10724639892578
+Adjusted likelihood: -100.10724639892578
+ID probability: 0.9999
+Stochastic decision: ID (sampled from p=0.9999)
+Solve time for step 11 2.9272952619940042
+Current ori: tensor([ 0.0011,  0.0111, -0.4219], device='cuda:1')
+Middle force: tensor([0.5277, 0.5133], device='cuda:1')
+Thumb force: tensor([0.5400, 0.5352], device='cuda:1')
+Index force: tensor([0.5092, 0.5341], device='cuda:1')
+Storing NORMAL transition: reward=0.0161 (scaled=0.0161), steps=1
+Collected 11 transitions for RL
+tensor([ 0.1349,  0.5658,  0.5847,  0.6639, -0.1290,  0.4943,  0.8930,  1.0977,
+         1.3266,  0.2622,  0.2503,  0.9624,  0.0014,  0.0088, -0.4379,  1.1170],
+       device='cuda:1')
+Likelihood residual: 1.0
+Original likelihood: -102.11320495605469
+Adjusted likelihood: -101.11320495605469
+ID probability: 0.9999
+Stochastic decision: ID (sampled from p=0.9999)
+Solve time for step 12 2.9898796330671757
+Current ori: tensor([ 0.0014,  0.0088, -0.4379], device='cuda:1')
+Middle force: tensor([0.5121], device='cuda:1')
+Thumb force: tensor([0.5315], device='cuda:1')
+Index force: tensor([0.5295], device='cuda:1')
+Storing NORMAL transition: reward=0.0437 (scaled=0.0437), steps=1
+Collected 12 transitions for RL
+Likelihood residual: 1.0
+Original likelihood: -124.16644287109375
+Adjusted likelihood: -123.16644287109375
+ID probability: 0.9670
+Stochastic decision: ID (sampled from p=0.9670)
+Current yaw: tensor([-0.0011,  0.0049, -0.4814], device='cuda:1')
+2 turn
+Sampling time 5.016088146949187
+tensor([ 1.4038e-01,  5.7666e-01,  5.7801e-01,  6.5922e-01, -1.2254e-01,
+         4.9280e-01,  8.9897e-01,  1.1076e+00,  1.3339e+00,  2.5453e-01,
+         2.4779e-01,  9.4185e-01, -1.0610e-03,  4.9045e-03, -4.8137e-01,
+         1.1553e+00], device='cuda:1')
+Likelihood residual: 1.0
+Original likelihood: -109.24076843261719
+Adjusted likelihood: -108.24076843261719
+ID probability: 0.9992
+Stochastic decision: ID (sampled from p=0.9992)
+Solve time for step 1 14.89013400906697
+Current ori: tensor([-0.0011,  0.0049, -0.4814], device='cuda:1')
+Middle force: tensor([1.6592, 0.5020, 0.5005, 0.5403, 0.5507, 0.5072, 1.1390, 0.5935, 0.5901,
+        0.6058, 0.5358, 0.5288], device='cuda:1')
+Thumb force: tensor([1.7034, 0.5515, 0.7631, 1.1953, 0.9836, 0.5930, 1.3340, 0.5775, 0.8657,
+        0.5858, 0.6241, 0.6486], device='cuda:1')
+Index force: tensor([0.5595, 0.7864, 0.6459, 0.7220, 0.5402, 0.6215, 0.5452, 0.6026, 0.8423,
+        0.6038, 0.5841, 0.6590], device='cuda:1')
+Storing NORMAL transition: reward=0.1301 (scaled=0.1301), steps=1
+Collected 13 transitions for RL
+tensor([ 1.4524e-01,  5.6934e-01,  5.9806e-01,  6.4977e-01, -1.1082e-01,
+         4.7381e-01,  9.0646e-01,  1.1755e+00,  1.3083e+00,  3.0861e-01,
+         3.1425e-01,  8.2811e-01, -7.4187e-06,  1.8987e-03, -6.1144e-01,
+         1.2843e+00], device='cuda:1')
+Likelihood residual: 1.0
+Original likelihood: -118.0299072265625
+Adjusted likelihood: -117.0299072265625
+ID probability: 0.9927
+Stochastic decision: ID (sampled from p=0.9927)
+Solve time for step 2 4.236336310161278
+Current ori: tensor([-7.4187e-06,  1.8987e-03, -6.1144e-01], device='cuda:1')
+Middle force: tensor([0.5017, 0.5007, 0.5366, 0.5474, 0.5063, 1.1104, 0.5876, 0.5864, 0.6014,
+        0.5334, 0.5275], device='cuda:1')
+Thumb force: tensor([0.5466, 0.7532, 1.1789, 0.9668, 0.5870, 1.3095, 0.5743, 0.8470, 0.5798,
+        0.6195, 0.6426], device='cuda:1')
+Index force: tensor([0.7738, 0.6512, 0.7117, 0.5375, 0.6183, 0.5429, 0.5981, 0.8307, 0.5993,
+        0.5809, 0.6527], device='cuda:1')
+Storing NORMAL transition: reward=0.0428 (scaled=0.0428), steps=1
+Collected 14 transitions for RL
+tensor([ 1.5398e-01,  5.7122e-01,  6.0161e-01,  6.5537e-01, -1.0882e-01,
+         4.8221e-01,  9.0409e-01,  1.1880e+00,  1.3311e+00,  2.9291e-01,
+         3.0682e-01,  7.9771e-01,  9.9498e-05, -2.5895e-03, -6.5420e-01,
+         1.3348e+00], device='cuda:1')
+Likelihood residual: 1.0
+Original likelihood: -130.63421630859375
+Adjusted likelihood: -129.63421630859375
+ID probability: 0.8533
+Stochastic decision: ID (sampled from p=0.8533)
+Solve time for step 3 4.005560553167015
+Current ori: tensor([ 9.9498e-05, -2.5895e-03, -6.5420e-01], device='cuda:1')
+Middle force: tensor([0.5004, 0.5353, 0.5455, 0.5037, 1.0911, 0.5828, 0.5811, 0.5979, 0.5311,
+        0.5257], device='cuda:1')
+Thumb force: tensor([0.7398, 1.1550, 0.9512, 0.5828, 1.2797, 0.5715, 0.8352, 0.5738, 0.6154,
+        0.6364], device='cuda:1')
+Index force: tensor([0.6410, 0.7012, 0.5339, 0.6360, 0.5403, 0.5921, 0.8168, 0.5941, 0.5778,
+        0.6469], device='cuda:1')
+Storing NORMAL transition: reward=0.0366 (scaled=0.0366), steps=1
+Collected 15 transitions for RL
+tensor([ 1.6107e-01,  5.7859e-01,  6.0002e-01,  6.5383e-01, -1.0003e-01,
+         4.8523e-01,  9.0308e-01,  1.2013e+00,  1.3894e+00,  1.9683e-01,
+         2.6853e-01,  8.0066e-01, -1.3512e-03, -7.1049e-03, -6.9088e-01,
+         1.3849e+00], device='cuda:1')
+Likelihood residual: 1.0
+Original likelihood: -149.10719299316406
+Adjusted likelihood: -148.10719299316406
+ID probability: 0.0543
+Stochastic decision: OOD (sampled from p=0.0543)
+State is out of distribution
+Projection step: 0, Loss: 142.9668426513672
+Projection step: 1, Loss: 118.4345703125
+Projection step: 2, Loss: 93.50852966308594
+Projection step: 4, Loss: 75.67216491699219
+Final likelihood: tensor([ -74.9603,  -91.1978,  -68.3868,  -80.1335,  -68.4203,  -58.2432,
+        -105.9589,  -76.5638,  -76.7891,  -75.3372,  -72.7821,  -70.8751,
+         -73.4770,  -73.9789,  -72.5275,  -71.1234])
+Final projection likelihood: -75.6722
+1 mode projection succeeded
+New goal: tensor([ 0.0402,  0.5722,  0.4669,  0.5560, -0.0789,  0.5162,  0.7707,  0.8323,
+         1.3285,  0.4618,  0.1671,  1.2122,  0.0048,  0.0155, -1.8785],
+       device='cuda:1')
+tensor([[0.0023]], device='cuda:1') tensor([[0.0022]], device='cuda:1') tensor([[0.0030]], device='cuda:1')
+Likelihood residual: 1.0
+Original likelihood: -108.06864929199219
+Adjusted likelihood: -107.06864929199219
+Likelihood residual: 1.0
+Original likelihood: -181.9578399658203
+Adjusted likelihood: -180.9578399658203
+{'index': 180.9578399658203, 'thumb_middle': 107.06864929199219}
+Current yaw: tensor([-0.0014, -0.0071, -0.6909], device='cuda:1')
+3 thumb_middle
+tensor([ 1.6107e-01,  5.7859e-01,  6.0002e-01,  6.5383e-01, -1.0003e-01,
+         4.8523e-01,  9.0308e-01,  1.2013e+00,  1.3894e+00,  1.9683e-01,
+         2.6853e-01,  8.0066e-01, -1.3512e-03, -7.1049e-03, -6.9088e-01,
+         1.3849e+00], device='cuda:1')
+Solve time for step 1 9.56375894206576
+Current ori: tensor([-0.0014, -0.0071, -0.6909], device='cuda:1')
+Index force: tensor([0.5277, 0.5855, 0.5727, 0.5729], device='cuda:1')
+tensor([ 0.1532,  0.5888,  0.5800,  0.6486, -0.1518,  0.5450,  0.7674,  0.8905,
+         1.2548,  0.3882,  0.0854,  1.0745, -0.0042, -0.0029, -0.6877,  1.3699],
+       device='cuda:1')
+Solve time for step 2 2.9778549568727612
+Current ori: tensor([-0.0042, -0.0029, -0.6877], device='cuda:1')
+Index force: tensor([0.5772, 0.5675, 0.5683], device='cuda:1')
+tensor([ 0.1060,  0.6016,  0.5308,  0.6155, -0.1777,  0.5455,  0.7446,  0.8509,
+         1.2590,  0.4156,  0.0660,  1.1437, -0.0101,  0.0233, -0.6877,  1.2919],
+       device='cuda:1')
+Solve time for step 3 3.008407189976424
+Current ori: tensor([-0.0101,  0.0233, -0.6877], device='cuda:1')
+Index force: tensor([0.5586, 0.5619], device='cuda:1')
+tensor([ 0.0579,  0.5926,  0.5191,  0.5708, -0.2038,  0.5423,  0.7401,  0.8168,
+         1.2682,  0.4462,  0.0724,  1.1695, -0.0103,  0.0506, -0.6877,  1.2094],
+       device='cuda:1')
+Solve time for step 4 2.8858692571520805
+Current ori: tensor([-0.0103,  0.0506, -0.6877], device='cuda:1')
+Index force: tensor([0.5493], device='cuda:1')
+Storing RECOVERY transition: reward=-0.0302 (scaled=-0.0101), steps=3
+Collected 16 transitions for RL
 
 ==== Epoch 1/32 Summary ====
-Time: 5.3151s (NGD: 0.0005s, Adam: 0.0155s)
-Policy Loss: -0.194810
-Value Loss: 1.083814
-Entropy: 1.086643
-Clip Fraction: 0.7500
-Current Threshold: -136.6748
+Time: 5.3376s (NGD: 0.0004s, Adam: 0.0137s)
+Data preparation: 0.0005s (0.0%)
+Batch preparation: 0.0001s (0.0%)
+Objective creation: 0.0002s (0.0%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: 0.0003s (0.0%)
+Optimizer steps: 0.0141s (0.3%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.3370s/batch
+Policy Loss: 109.649742
+Value Loss: 1.125947
+Entropy: 0.110059
+Clip Fraction: 0.9727
+Current Threshold: -136.6858
 =======================================
 
-Epoch 1 parameter changes:
-Actor inducing points L2 change: 0.00039
-Value inducing points L2 change: 0.00596
-Actor bias: 136.67480
-Actor temperature: 0.09900
-Bias change: 0.00101
-Temperature change: 0.00100
+==== Epoch 2/32 Summary ====
+Time: 5.2558s (NGD: 0.0005s, Adam: 0.0012s)
+Data preparation: 0.0006s (0.0%)
+Batch preparation: 0.0003s (0.0%)
+Objective creation: 0.0003s (0.0%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.0123s (-0.2%)
+Optimizer steps: 0.0017s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.2551s/batch
+Policy Loss: 138.886368
+Value Loss: 1.122653
+Entropy: 0.105427
+Clip Fraction: 0.9570
+Current Threshold: -136.6949
+=======================================
 
+==== Epoch 3/32 Summary ====
+Time: 5.4218s (NGD: 0.0005s, Adam: 0.0013s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0004s (0.0%)
+Objective creation: 0.0004s (0.0%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.0232s (-0.4%)
+Optimizer steps: 0.0019s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.4210s/batch
+Policy Loss: 220.198547
+Value Loss: 1.119354
+Entropy: 0.179589
+Clip Fraction: 0.9609
+Current Threshold: -136.7039
+=======================================
+
+==== Epoch 4/32 Summary ====
+Time: 5.3866s (NGD: 0.0005s, Adam: 0.0012s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0006s (0.0%)
+Objective creation: 0.0005s (0.0%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.0309s (-0.6%)
+Optimizer steps: 0.0017s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.3859s/batch
+Policy Loss: 143.290939
+Value Loss: 1.116049
+Entropy: 0.110101
+Clip Fraction: 0.9844
+Current Threshold: -136.7124
+=======================================
+
+==== Epoch 5/32 Summary ====
+Time: 5.0798s (NGD: 0.0004s, Adam: 0.0010s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0007s (0.0%)
+Objective creation: 0.0007s (0.0%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.0392s (-0.8%)
+Optimizer steps: 0.0013s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.0790s/batch
+Policy Loss: 218.815475
+Value Loss: 1.112740
+Entropy: 0.114359
+Clip Fraction: 0.9570
+Current Threshold: -136.7201
+=======================================
+
+==== Epoch 6/32 Summary ====
+Time: 5.0346s (NGD: 0.0005s, Adam: 0.0013s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0009s (0.0%)
+Objective creation: 0.0008s (0.0%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.0467s (-0.9%)
+Optimizer steps: 0.0018s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.0339s/batch
+Policy Loss: 272.327728
+Value Loss: 1.109425
+Entropy: 0.155442
+Clip Fraction: 0.9727
+Current Threshold: -136.7286
+=======================================
+
+==== Epoch 7/32 Summary ====
+Time: 5.2641s (NGD: 0.0006s, Adam: 0.0011s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0011s (0.0%)
+Objective creation: 0.0009s (0.0%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.0556s (-1.1%)
+Optimizer steps: 0.0016s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.2633s/batch
+Policy Loss: 195.712097
+Value Loss: 1.106105
+Entropy: 0.134683
+Clip Fraction: 0.9648
+Current Threshold: -136.7373
+=======================================
+
+==== Epoch 8/32 Summary ====
+Time: 5.0123s (NGD: 0.0005s, Adam: 0.0013s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0012s (0.0%)
+Objective creation: 0.0010s (0.0%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.0642s (-1.3%)
+Optimizer steps: 0.0018s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.0115s/batch
+Policy Loss: 77.299332
+Value Loss: 1.102780
+Entropy: 0.078617
+Clip Fraction: 0.9727
+Current Threshold: -136.7463
+=======================================
+
+==== Epoch 9/32 Summary ====
+Time: 5.2829s (NGD: 0.0005s, Adam: 0.0011s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0014s (0.0%)
+Objective creation: 0.0011s (0.0%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.0721s (-1.4%)
+Optimizer steps: 0.0016s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.2822s/batch
+Policy Loss: 46.755680
+Value Loss: 1.099449
+Entropy: 0.072246
+Clip Fraction: 0.9688
+Current Threshold: -136.7554
+=======================================
+
+==== Epoch 10/32 Summary ====
+Time: 5.0260s (NGD: 0.0005s, Adam: 0.0009s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0015s (0.0%)
+Objective creation: 0.0013s (0.0%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.0791s (-1.6%)
+Optimizer steps: 0.0013s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.0253s/batch
+Policy Loss: 95.094391
+Value Loss: 1.096113
+Entropy: 0.104904
+Clip Fraction: 0.9766
+Current Threshold: -136.7643
+=======================================
+
+==== Epoch 11/32 Summary ====
+Time: 5.5142s (NGD: 0.0004s, Adam: 0.0009s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0017s (0.0%)
+Objective creation: 0.0014s (0.0%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.0857s (-1.6%)
+Optimizer steps: 0.0013s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.5134s/batch
+Policy Loss: 65.260338
+Value Loss: 1.092772
+Entropy: 0.091159
+Clip Fraction: 0.9688
+Current Threshold: -136.7735
+=======================================
+
+==== Epoch 12/32 Summary ====
+Time: 5.3434s (NGD: 0.0004s, Adam: 0.0009s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0018s (0.0%)
+Objective creation: 0.0015s (0.0%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.0927s (-1.7%)
+Optimizer steps: 0.0013s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.3427s/batch
+Policy Loss: 33.924599
+Value Loss: 1.089425
+Entropy: 0.055203
+Clip Fraction: 0.9844
+Current Threshold: -136.7824
+=======================================
+
+==== Epoch 13/32 Summary ====
+Time: 5.0277s (NGD: 0.0003s, Adam: 0.0009s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0020s (0.0%)
+Objective creation: 0.0016s (0.0%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.1007s (-2.0%)
+Optimizer steps: 0.0012s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.0269s/batch
+Policy Loss: 111.848335
+Value Loss: 1.086073
+Entropy: 0.114438
+Clip Fraction: 0.9805
+Current Threshold: -136.7918
+=======================================
+
+==== Epoch 14/32 Summary ====
+Time: 5.3091s (NGD: 0.0004s, Adam: 0.0010s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0021s (0.0%)
+Objective creation: 0.0017s (0.0%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.1051s (-2.0%)
+Optimizer steps: 0.0014s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.3083s/batch
+Policy Loss: 114.964714
+Value Loss: 1.082716
+Entropy: 0.135643
+Clip Fraction: 0.9805
+Current Threshold: -136.8013
+=======================================
+
+==== Epoch 15/32 Summary ====
+Time: 5.3372s (NGD: 0.0004s, Adam: 0.0010s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0023s (0.0%)
+Objective creation: 0.0018s (0.0%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.1125s (-2.1%)
+Optimizer steps: 0.0014s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.3364s/batch
+Policy Loss: 36.269798
+Value Loss: 1.079353
+Entropy: 0.050899
+Clip Fraction: 0.9688
+Current Threshold: -136.8105
+=======================================
+
+==== Epoch 16/32 Summary ====
+Time: 5.3512s (NGD: 0.0005s, Adam: 0.0011s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0025s (0.0%)
+Objective creation: 0.0020s (0.0%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.1230s (-2.3%)
+Optimizer steps: 0.0016s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.3504s/batch
+Policy Loss: 208.659149
+Value Loss: 1.075984
+Entropy: 0.101646
+Clip Fraction: 0.9805
+Current Threshold: -136.8189
+=======================================
+
+==== Epoch 17/32 Summary ====
+Time: 5.4301s (NGD: 0.0005s, Adam: 0.0012s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0026s (0.0%)
+Objective creation: 0.0021s (0.0%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.1338s (-2.5%)
+Optimizer steps: 0.0016s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.4293s/batch
+Policy Loss: 29.812162
+Value Loss: 1.072611
+Entropy: 0.042691
+Clip Fraction: 0.9688
+Current Threshold: -136.8258
+=======================================
+
+==== Epoch 18/32 Summary ====
+Time: 5.2972s (NGD: 0.0005s, Adam: 0.0012s)
+Data preparation: 0.0008s (0.0%)
+Batch preparation: 0.0028s (0.1%)
+Objective creation: 0.0022s (0.0%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.1444s (-2.7%)
+Optimizer steps: 0.0017s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.2964s/batch
+Policy Loss: 96.986832
+Value Loss: 1.069232
+Entropy: 0.067740
+Clip Fraction: 0.9727
+Current Threshold: -136.8315
+=======================================
+
+==== Epoch 19/32 Summary ====
+Time: 5.5072s (NGD: 0.0004s, Adam: 0.0011s)
+Data preparation: 0.0008s (0.0%)
+Batch preparation: 0.0029s (0.1%)
+Objective creation: 0.0023s (0.0%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.1503s (-2.7%)
+Optimizer steps: 0.0015s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.5063s/batch
+Policy Loss: 120.453957
+Value Loss: 1.065848
+Entropy: 0.100719
+Clip Fraction: 0.9688
+Current Threshold: -136.8369
+=======================================
+
+==== Epoch 20/32 Summary ====
+Time: 5.1186s (NGD: 0.0004s, Adam: 0.0011s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0031s (0.1%)
+Objective creation: 0.0024s (0.0%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.1579s (-3.1%)
+Optimizer steps: 0.0015s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.1178s/batch
+Policy Loss: 127.102982
+Value Loss: 1.062458
+Entropy: 0.066258
+Clip Fraction: 0.9805
+Current Threshold: -136.8419
+=======================================
+
+==== Epoch 21/32 Summary ====
+Time: 5.0545s (NGD: 0.0004s, Adam: 0.0012s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0033s (0.1%)
+Objective creation: 0.0026s (0.1%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.1655s (-3.3%)
+Optimizer steps: 0.0017s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.0537s/batch
+Policy Loss: 66.551796
+Value Loss: 1.059063
+Entropy: 0.081271
+Clip Fraction: 0.9609
+Current Threshold: -136.8480
+=======================================
+
+==== Epoch 22/32 Summary ====
+Time: 5.2537s (NGD: 0.0004s, Adam: 0.0009s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0034s (0.1%)
+Objective creation: 0.0027s (0.1%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.1731s (-3.3%)
+Optimizer steps: 0.0014s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.2530s/batch
+Policy Loss: 7.904500
+Value Loss: 1.055662
+Entropy: 0.019749
+Clip Fraction: 0.9805
+Current Threshold: -136.8537
+=======================================
+
+==== Epoch 23/32 Summary ====
+Time: 5.1372s (NGD: 0.0004s, Adam: 0.0009s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0036s (0.1%)
+Objective creation: 0.0028s (0.1%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.1805s (-3.5%)
+Optimizer steps: 0.0014s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.1364s/batch
+Policy Loss: 49.944691
+Value Loss: 1.052256
+Entropy: 0.068793
+Clip Fraction: 0.9688
+Current Threshold: -136.8602
+=======================================
+
+==== Epoch 24/32 Summary ====
+Time: 5.1138s (NGD: 0.0004s, Adam: 0.0012s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0037s (0.1%)
+Objective creation: 0.0029s (0.1%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.1880s (-3.7%)
+Optimizer steps: 0.0016s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.1130s/batch
+Policy Loss: 70.679115
+Value Loss: 1.048845
+Entropy: 0.083707
+Clip Fraction: 0.9688
+Current Threshold: -136.8676
+=======================================
+
+==== Epoch 25/32 Summary ====
+Time: 5.0878s (NGD: 0.0003s, Adam: 0.0009s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0039s (0.1%)
+Objective creation: 0.0030s (0.1%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.1956s (-3.8%)
+Optimizer steps: 0.0012s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.0870s/batch
+Policy Loss: 3.339391
+Value Loss: 1.045429
+Entropy: 0.008995
+Clip Fraction: 0.9844
+Current Threshold: -136.8745
+=======================================
+
+==== Epoch 26/32 Summary ====
+Time: 5.1975s (NGD: 0.0003s, Adam: 0.0009s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0041s (0.1%)
+Objective creation: 0.0031s (0.1%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.1999s (-3.8%)
+Optimizer steps: 0.0012s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.1968s/batch
+Policy Loss: 105.581070
+Value Loss: 1.042007
+Entropy: 0.073844
+Clip Fraction: 0.9844
+Current Threshold: -136.8804
+=======================================
+
+==== Epoch 27/32 Summary ====
+Time: 5.0534s (NGD: 0.0004s, Adam: 0.0009s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0042s (0.1%)
+Objective creation: 0.0033s (0.1%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.2042s (-4.0%)
+Optimizer steps: 0.0014s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.0526s/batch
+Policy Loss: 56.388847
+Value Loss: 1.038580
+Entropy: 0.076806
+Clip Fraction: 0.9688
+Current Threshold: -136.8860
+=======================================
+
+==== Epoch 28/32 Summary ====
+Time: 5.2621s (NGD: 0.0004s, Adam: 0.0010s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0044s (0.1%)
+Objective creation: 0.0034s (0.1%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.2116s (-4.0%)
+Optimizer steps: 0.0014s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.2613s/batch
+Policy Loss: 26.080055
+Value Loss: 1.035149
+Entropy: 0.043781
+Clip Fraction: 0.9688
+Current Threshold: -136.8909
+=======================================
+
+==== Epoch 29/32 Summary ====
+Time: 5.0275s (NGD: 0.0004s, Adam: 0.0009s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0045s (0.1%)
+Objective creation: 0.0035s (0.1%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.2189s (-4.4%)
+Optimizer steps: 0.0013s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.0268s/batch
+Policy Loss: 48.790783
+Value Loss: 1.031711
+Entropy: 0.064047
+Clip Fraction: 0.9922
+Current Threshold: -136.8947
+=======================================
+
+==== Epoch 30/32 Summary ====
+Time: 5.2149s (NGD: 0.0004s, Adam: 0.0013s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0047s (0.1%)
+Objective creation: 0.0036s (0.1%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.2255s (-4.3%)
+Optimizer steps: 0.0017s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.2141s/batch
+Policy Loss: 137.589874
+Value Loss: 1.028269
+Entropy: 0.036686
+Clip Fraction: 0.9766
+Current Threshold: -136.8988
+=======================================
+
+==== Epoch 31/32 Summary ====
+Time: 5.1309s (NGD: 0.0003s, Adam: 0.0010s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0049s (0.1%)
+Objective creation: 0.0037s (0.1%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.2326s (-4.5%)
+Optimizer steps: 0.0013s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.1301s/batch
+Policy Loss: 13.611275
+Value Loss: 1.024822
+Entropy: 0.030367
+Clip Fraction: 0.9805
+Current Threshold: -136.9028
+=======================================
+
+==== Epoch 32/32 Summary ====
+Time: 5.2197s (NGD: 0.0004s, Adam: 0.0013s)
+Data preparation: 0.0007s (0.0%)
+Batch preparation: 0.0050s (0.1%)
+Objective creation: 0.0039s (0.1%)
+Policy evaluation: 0.0000s (0.0%)
+Forward pass: 0.0000s (0.0%)
+Loss computation: 0.0000s (0.0%)
+Backward pass: 0.0000s (0.0%)
+GPU sync: -0.2398s (-4.6%)
+Optimizer steps: 0.0017s (0.0%)
+Memory operations: 0.0000s (0.0%)
+Avg batch time: 5.2189s/batch
+Policy Loss: 73.093781
+Value Loss: 1.021370
+Entropy: 0.073337
+Clip Fraction: 0.9609
+Current Threshold: -136.9059
+=======================================
+
+============== PPO UPDATE COMPREHENSIVE TIMING SUMMARY ==============
+Total update time: 172.7162s for 32 epochs (32 updates)
+Data preparation: 0.0007s (0.0%)
+Average epoch time: 5.2216s
+Average batch time: 5.2208s
+
+Computation breakdown (total time / percentage):
+  Forward pass:      0.0000s (0.0%)
+  Loss computation:  0.0643s (0.0%)
+  Backward pass:     0.2512s (0.1%)
+  GPU sync:          -4.0643s (-2.4%)
+  NGD optimization:  0.0138s (0.0%)
+  Adam optimization: 0.0470s (0.0%)
+  Optimizer overhead:0.0055s (0.0%)
+  Memory operations: 0.0000s (0.0%)
+  Memory cleanup:    0.0002s (0.0%)
+
+Epoch-by-epoch timing (seconds):
+Epoch Total Forward Loss Backward NGD Adam Mem-Ops Batch Avg
 Backend TkAgg is interactive backend. Turning interactive mode on.

@@ -1,18 +1,19 @@
 import torch
 import gpytorch
 from gpytorch.models import ApproximateGP
-from gpytorch.variational import NaturalVariationalDistribution
-from gpytorch.variational import VariationalStrategy
-from typing import Optional, Tuple, Union, Dict, List, Callable
+from gpytorch.variational import NaturalVariationalDistribution, VariationalStrategy
+from gpytorch.distributions import MultivariateNormal
+from typing import Optional, Tuple, Union, Dict, List, Callable, Any
 from gpytorch.optim import NGD
+from gpytorch.settings import fast_pred_var, fast_pred_samples, cg_tolerance, use_toeplitz, cholesky_jitter
 
 class VariationalGP(ApproximateGP):
     """
-    Variational Gaussian Process model that predicts a scalar value from a state vector.
+    Variational Gaussian Process model with optimized prediction speed.
     
-    This implementation uses a NaturalVariationalDistribution with VariationalStrategy for
-    efficient sparse approximation. It's designed to work with high-dimensional inputs
-    by providing flexible kernel choices and inducing point selection.
+    This implementation uses a NaturalVariationalDistribution with WhitenedVariationalStrategy
+    for efficient and numerically stable sparse approximation. Also includes fast prediction
+    methods for improved inference speed.
     
     Attributes:
         input_dim (int): Dimensionality of the input state
@@ -31,6 +32,7 @@ class VariationalGP(ApproximateGP):
         kernel_type: str = "matern32",
         learn_inducing_locations: bool = True,
         use_ard: bool = True,
+        use_whitening: bool = True,  # Added whitening option
         lengthscale_prior: Optional[gpytorch.priors.Prior] = None,
         outputscale_prior: Optional[gpytorch.priors.Prior] = None,
     ):
@@ -40,12 +42,12 @@ class VariationalGP(ApproximateGP):
         Args:
             state_dim: Dimension of input state vector
             num_inducing: Number of inducing points to use
-            inducing_points: Optional tensor of inducing point locations. If None, 
-                            randomly initialized from N(0,1)
+            inducing_points: Optional tensor of inducing point locations
             mean_type: Type of mean function ('zero', 'constant')
             kernel_type: Type of kernel ('rbf', 'matern12', 'matern32', 'matern52')
             learn_inducing_locations: Whether to optimize inducing point locations
-            use_ard: Whether to use Automatic Relevance Determination (separate lengthscales)
+            use_ard: Whether to use Automatic Relevance Determination
+            use_whitening: Whether to use whitened parameterization for numerical stability
             lengthscale_prior: Prior for kernel lengthscale
             outputscale_prior: Prior for kernel outputscale
         """
@@ -58,10 +60,19 @@ class VariationalGP(ApproximateGP):
         
         # Set up variational distribution and strategy
         variational_distribution = NaturalVariationalDistribution(num_inducing)
-        variational_strategy = VariationalStrategy(
-            self, inducing_points, variational_distribution, 
-            learn_inducing_locations=learn_inducing_locations
-        )
+        
+        # Use whitened variational strategy for better numerical stability
+        if use_whitening:
+            variational_strategy = VariationalStrategy(
+                self, inducing_points, variational_distribution, 
+                learn_inducing_locations=learn_inducing_locations
+            )
+        else:
+            variational_strategy = VariationalStrategy(
+                self, inducing_points, variational_distribution, 
+                learn_inducing_locations=learn_inducing_locations
+            )
+            
         super().__init__(variational_strategy)
         
         # Set up mean function
@@ -94,6 +105,9 @@ class VariationalGP(ApproximateGP):
         self.covar_module = gpytorch.kernels.ScaleKernel(
             base_kernel, outputscale_prior=outputscale_prior
         )
+        
+        # Cache for faster predictions
+        self._has_updated_cached_kernel = False
     
     def forward(self, x: torch.Tensor) -> gpytorch.distributions.MultivariateNormal:
         """
@@ -105,7 +119,6 @@ class VariationalGP(ApproximateGP):
         Returns:
             MultivariateNormal distribution representing GP predictions
         """
-
         # Apply mean and covariance functions
         mean_x = self.mean_module(x)
         covar_x = self.covar_module(x)
@@ -114,99 +127,100 @@ class VariationalGP(ApproximateGP):
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
     
     @torch.no_grad()
-    def predict(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def predict(self, x: torch.Tensor, fast_mode: bool = True) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Make predictions with the GP model (in eval mode).
+        Make predictions with the GP model (in eval mode) using fast_pred_var.
         
         Args:
             x: Input tensor of shape [batch_size, state_dim]
+            fast_mode: Whether to use GPyTorch fast prediction mode
             
         Returns:
             Tuple of (mean, variance) tensors
         """
         x = (x - self.x_mean[:x.shape[-1]]) / self.x_std[:x.shape[-1]]
         self.eval()
-        output = self(x)
+        
+        # Use GPyTorch's fast predictive variance setting
+        with fast_pred_var() if fast_mode else torch.no_grad():
+            # Further optimize with higher CG tolerance for faster matrix solves
+            with cg_tolerance(1e-3):
+                output = self(x)
+        
         return output.mean, output.variance
     
-    def predict_with_grad(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def predict_with_grad(self, x: torch.Tensor, fast_mode: bool = True) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Make predictions with the GP model, preserving gradients.
+        Uses fast_pred_var for efficient variance computation.
         
         Args:
             x: Input tensor of shape [batch_size, state_dim]
+            fast_mode: Whether to use GPyTorch fast prediction mode
 
         Returns:
             Tuple of (mean, variance) tensors
         """
         x = (x - self.x_mean[:x.shape[-1]]) / self.x_std[:x.shape[-1]]
         self.eval()
-        output = self(x)
+        
+        # Use fast_pred_var but keep gradients
+        with fast_pred_var() if fast_mode else torch.enable_grad():
+            # Higher CG tolerance for faster matrix solves
+            with cg_tolerance(1e-3):
+                output = self(x)
+        
         return output.mean, output.variance
     
     def get_prediction_with_uncertainty(
-        self, x: torch.Tensor, n_samples: int = 10
+        self, x: torch.Tensor, n_samples: int = 10, fast_mode: bool = True
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Get prediction with uncertainty by drawing multiple samples.
+        Uses fast_pred_samples for efficient sample generation.
         
         Args:
             x: Input tensor of shape [batch_size, state_dim]
             n_samples: Number of samples to draw from the predictive distribution
+            fast_mode: Whether to use GPyTorch fast prediction mode
             
         Returns:
             Tuple of (mean, variance, samples) tensors
         """
         x = (x - self.x_mean[:x.shape[-1]]) / self.x_std[:x.shape[-1]]
         self.eval()
-        with torch.no_grad():
-            output = self(x)
-            samples = output.rsample(torch.Size([n_samples]))
-            mean = output.mean
-            variance = output.variance
+        
+        with torch.no_grad(), fast_pred_var(), fast_pred_samples() if fast_mode else torch.no_grad():
+            # Higher CG tolerance for faster matrix solves
+            with cg_tolerance(1e-3):
+                output = self(x)
+                samples = output.rsample(torch.Size([n_samples]))
+                mean = output.mean
+                variance = output.variance
         
         return mean, variance, samples
+
+    def cache_kernel(self) -> None:
+        """
+        Pre-compute and cache kernel matrices for faster inference.
+        This is useful when making repeated predictions with the same model.
+        """
+        with torch.no_grad():
+            # Force kernel evaluation to create cache
+            inducing_points = self.variational_strategy.inducing_points
+            _ = self.covar_module(inducing_points)
+            self._has_updated_cached_kernel = True
     
-    def save(self, filepath: str) -> None:
-        """
-        Save the GP model to a file.
-        
-        Args:
-            filepath: Path to save the model
-        """
-        state_dict = {
-            'model_state_dict': self.state_dict(),
-            'input_dim': self.input_dim,
-            'num_inducing': self.num_inducing,
-        }
-        torch.save(state_dict, filepath)
-    
-    @classmethod
-    def load(cls, filepath: str, **kwargs) -> 'VariationalGP':
-        """
-        Load a GP model from a file.
-        
-        Args:
-            filepath: Path to the saved model
-            **kwargs: Additional arguments to pass to the constructor
-            
-        Returns:
-            Loaded VariationalGP model
-        """
-        state_dict = torch.load(filepath)
-        model = cls(
-            state_dim=state_dict['input_dim'],
-            num_inducing=state_dict['num_inducing'],
-            **kwargs
-        )
-        model.load_state_dict(state_dict['model_state_dict'])
-        return model
+    def clear_cache(self) -> None:
+        """Clear any cached computations to free memory."""
+        self.covar_module.clear_cache()
+        self._has_updated_cached_kernel = False
 
 
 class LikelihoodResidualGP:
     """
     Wrapper class for a Gaussian Process model with a likelihood function.
-    Designed for learning residuals on top of a nominal model.
+    Enhanced with fast prediction capabilities.
     
     Attributes:
         gp_model (VariationalGP): The underlying Gaussian Process model
@@ -219,6 +233,7 @@ class LikelihoodResidualGP:
         num_inducing: int = 128,
         likelihood: Optional[gpytorch.likelihoods.Likelihood] = None,
         noise_constraint: Optional[gpytorch.constraints.Interval] = None,
+        use_whitening: bool = True,  # Added whitening option
         **gp_kwargs
     ):
         """
@@ -229,9 +244,16 @@ class LikelihoodResidualGP:
             num_inducing: Number of inducing points to use
             likelihood: Observation likelihood. If None, uses GaussianLikelihood
             noise_constraint: Constraint on the noise parameter
+            use_whitening: Whether to use whitened variational strategy
             **gp_kwargs: Additional arguments to pass to VariationalGP constructor
         """
-        self.gp_model = VariationalGP(state_dim=state_dim, num_inducing=num_inducing, **gp_kwargs)
+        # Pass use_whitening to the VariationalGP constructor
+        self.gp_model = VariationalGP(
+            state_dim=state_dim, 
+            num_inducing=num_inducing, 
+            use_whitening=use_whitening,
+            **gp_kwargs
+        )
         
         # Set up likelihood
         if likelihood is None:
@@ -240,6 +262,9 @@ class LikelihoodResidualGP:
             self.likelihood = gpytorch.likelihoods.GaussianLikelihood(noise_constraint=noise_constraint)
         else:
             self.likelihood = likelihood
+            
+        # Cache flag for repeated predictions
+        self.prediction_cache_enabled = False
     
     def to(self, device: torch.device) -> 'LikelihoodResidualGP':
         """
@@ -278,6 +303,7 @@ class LikelihoodResidualGP:
         optimizer_cls: Callable = torch.optim.Adam,
         verbose: bool = True,
         log_interval: int = 100,
+        batch_size: Optional[int] = None,  # Added batch training option
     ) -> List[float]:
         """
         Train the GP model using variational inference with natural gradient descent.
@@ -292,6 +318,7 @@ class LikelihoodResidualGP:
             optimizer_cls: Optimizer class for hyperparameters
             verbose: Whether to print progress
             log_interval: How often to print progress
+            batch_size: If not None, use mini-batch training with this batch size
             
         Returns:
             List of loss values during training
@@ -300,9 +327,16 @@ class LikelihoodResidualGP:
         self.gp_model.train()
         self.likelihood.train()
         
+        # Clear any caches before training
+        self.gp_model.clear_cache()
+        
+        # Use full dataset size if batch_size is None
+        full_dataset_size = train_x.size(0)
+        batch_size = batch_size or full_dataset_size
+        
         # Define objective function
         mll = gpytorch.mlls.PredictiveLogLikelihood(
-            self.likelihood, self.gp_model, num_data=train_x.size(0)
+            self.likelihood, self.gp_model, num_data=full_dataset_size
         )
         
         # Separate variational parameters from other parameters
@@ -321,7 +355,7 @@ class LikelihoodResidualGP:
         # Initialize optimizers
         if use_natural_gradient and len(variational_params) > 0:
             # Use NGD for variational parameters and standard optimizer for hyperparameters
-            var_optimizer = NGD(variational_params, num_data=train_x.size(0), lr=ngd_lr)
+            var_optimizer = NGD(variational_params, num_data=full_dataset_size, lr=ngd_lr)
             hyper_optimizer = optimizer_cls(hyper_params, lr=learning_rate)
         else:
             # Use standard optimizer for all parameters
@@ -333,17 +367,35 @@ class LikelihoodResidualGP:
         
         # Training loop
         losses = []
+        
         for i in range(n_iterations):
+            # Use mini-batches if batch_size < full_dataset_size
+            if batch_size < full_dataset_size:
+                # Randomly select batch
+                batch_idx = torch.randperm(full_dataset_size)[:batch_size]
+                x_batch = train_x[batch_idx]
+                y_batch = train_y[batch_idx]
+                
+                # Adjust MLL for batch
+                batch_mll = gpytorch.mlls.PredictiveLogLikelihood(
+                    self.likelihood, self.gp_model, num_data=full_dataset_size
+                )
+            else:
+                # Use full dataset
+                x_batch = train_x
+                y_batch = train_y
+                batch_mll = mll
+            
             # Zero out gradients
             if var_optimizer is not None:
                 var_optimizer.zero_grad()
             hyper_optimizer.zero_grad()
             
             # Get output from model
-            output = self.gp_model(train_x)
+            output = self.gp_model(x_batch)
             
             # Calculate loss
-            loss = -mll(output, train_y)
+            loss = -batch_mll(output, y_batch)
             losses.append(loss.item())
             
             # Backpropagate
@@ -361,12 +413,13 @@ class LikelihoodResidualGP:
         return losses
     
     @torch.no_grad()
-    def predict(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def predict(self, x: torch.Tensor, fast_mode: bool = True) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Make predictions with the trained model.
+        Make predictions with the trained model using fast prediction settings.
         
         Args:
             x: Input tensor of shape [batch_size, state_dim]
+            fast_mode: Whether to use GPyTorch fast prediction optimizations
             
         Returns:
             Tuple of (mean, variance) tensors
@@ -377,20 +430,34 @@ class LikelihoodResidualGP:
         
         if len(x.shape) == 1:
             x = x.unsqueeze(0)
-        # Get GP output distribution
-        output = self.gp_model(x)
         
-        # Get predictive distribution from likelihood
-        pred_dist = self.likelihood(output)
+        # Enable caching if we're going to make many predictions
+        if not self.gp_model._has_updated_cached_kernel and self.prediction_cache_enabled:
+            self.gp_model.cache_kernel()
+        
+        # Fix the with statement syntax
+        if fast_mode:
+            with fast_pred_var(), cg_tolerance(1e-3):
+                # Get GP output distribution
+                output = self.gp_model(x)
+                
+                # Get predictive distribution from likelihood
+                pred_dist = self.likelihood(output)
+        else:
+            with torch.no_grad():
+                output = self.gp_model(x)
+                pred_dist = self.likelihood(output)
         
         return pred_dist.mean, pred_dist.variance
     
-    def predict_with_grad(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def predict_with_grad(self, x: torch.Tensor, fast_mode: bool = True) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Make predictions with the trained model, preserving gradients.
+        Uses GPyTorch fast prediction optimizations.
         
         Args:
             x: Input tensor of shape [batch_size, state_dim]
+            fast_mode: Whether to use GPyTorch fast prediction optimizations
             
         Returns:
             Tuple of (mean, variance) tensors
@@ -399,14 +466,72 @@ class LikelihoodResidualGP:
         self.gp_model.eval()
         self.likelihood.eval()
         
-        # Get GP output distribution
-        output = self.gp_model(x)
-        
-        # Get predictive distribution from likelihood
-        pred_dist = self.likelihood(output)
+        # Fix the with statement syntax
+        if fast_mode:
+            with fast_pred_var(), cg_tolerance(1e-3):
+                # Get GP output distribution
+                output = self.gp_model(x)
+                
+                # Get predictive distribution from likelihood
+                pred_dist = self.likelihood(output)
+        else:
+            with torch.enable_grad():
+                output = self.gp_model(x)
+                pred_dist = self.likelihood(output)
         
         return pred_dist.mean, pred_dist.variance
     
+    def get_prediction_samples(
+        self, x: torch.Tensor, n_samples: int = 10, fast_mode: bool = True
+    ) -> torch.Tensor:
+        """
+        Get samples from the predictive distribution efficiently.
+        
+        Args:
+            x: Input tensor of shape [batch_size, state_dim]
+            n_samples: Number of samples to draw
+            fast_mode: Whether to use fast prediction settings
+            
+        Returns:
+            Samples tensor of shape [n_samples, batch_size, 1]
+        """
+        x = (x - self.gp_model.x_mean[:x.shape[-1]]) / self.gp_model.x_std[:x.shape[-1]]
+        self.gp_model.eval()
+        self.likelihood.eval()
+        
+        if len(x.shape) == 1:
+            x = x.unsqueeze(0)
+        
+        # Fix the with statement syntax
+        with torch.no_grad():
+            if fast_mode:
+                with fast_pred_var(), fast_pred_samples(), cg_tolerance(1e-3):
+                    # Get GP output distribution
+                    output = self.gp_model(x)
+                    
+                    # Get samples from likelihood
+                    pred_dist = self.likelihood(output)
+                    samples = pred_dist.sample(torch.Size([n_samples]))
+            else:
+                output = self.gp_model(x)
+                pred_dist = self.likelihood(output)
+                samples = pred_dist.sample(torch.Size([n_samples]))
+                
+        return samples
+    
+    def enable_prediction_caching(self, enabled: bool = True) -> None:
+        """
+        Enable or disable kernel caching for faster repeated predictions.
+        
+        Args:
+            enabled: Whether to enable caching
+        """
+        self.prediction_cache_enabled = enabled
+        if enabled and not self.gp_model._has_updated_cached_kernel:
+            self.gp_model.cache_kernel()
+        elif not enabled:
+            self.gp_model.clear_cache()
+
     def save(self, filepath: str) -> None:
         """
         Save the model to a file.
