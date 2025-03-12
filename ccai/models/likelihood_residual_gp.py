@@ -371,29 +371,26 @@ class LikelihoodResidualGP:
         
         return pred_dist.mean, pred_dist.variance
     
-    def forward_for_policy(self, x: torch.Tensor) -> torch.Tensor:
+    def predict_with_grad(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Forward pass through the GP for policy evaluation, ensuring gradient flow.
-        Unlike predict(), this doesn't use @torch.no_grad() so it can be used in PPO.
+        Make predictions with the trained model, preserving gradients.
         
         Args:
             x: Input tensor of shape [batch_size, state_dim]
             
         Returns:
-            Mean predictions with gradient information preserved
+            Tuple of (mean, variance) tensors
         """
-        # Run the model in train mode to preserve gradients
-        self.gp_model.train()
-        self.likelihood.train()
+        self.gp_model.eval()
+        self.likelihood.eval()
         
-        # Get GP distribution
+        # Get GP output distribution
         output = self.gp_model(x)
         
-        # Get predictive distribution
+        # Get predictive distribution from likelihood
         pred_dist = self.likelihood(output)
         
-        # Return mean predictions (with gradients)
-        return pred_dist.mean
+        return pred_dist.mean, pred_dist.variance
     
     def save(self, filepath: str) -> None:
         """

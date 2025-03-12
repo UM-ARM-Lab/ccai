@@ -1,9 +1,12 @@
 from typing import Dict
+import gpytorch
 import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.distributions import Normal
 from torch.optim import Adam
+
+from tqdm import tqdm
 
 # Normalizing flow stuff
 # from nflows.flows.base import Flow
@@ -99,7 +102,7 @@ class TrajectoryFlowModel(nn.Module):
             self.ppo_optimizer = torch.optim.Adam([
                 {'params': self.gp.gp_model.parameters()},
                 {'params': self.gp.likelihood.parameters()},
-                {'params': [self.id_threshold], 'lr': 1e-2},
+                {'params': [self.id_threshold], 'lr': .1},
                 {'params': self.value_function.parameters(), 'lr': 3e-4}
             ])
         
@@ -217,14 +220,14 @@ class TrajectoryDiffusionModel(nn.Module):
             condition = None
         return condition
     
-    def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None, project=False, no_grad=True, skip_likelihood=False, context_for_likelihood=True, threshold=None):
+    def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None, project=False, no_grad=True, skip_likelihood=False, context_for_likelihood=True):
         # B, N, _ = constraints.shape
         context = self.construct_context(constraints)
 
         condition = self.construct_condition(H, start, goal, past)
 
         if project:
-            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.diffusion_model.project(N=N, threshold=threshold, H=H, context=context, condition=condition)
+            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.diffusion_model.project(N=N, H=H, context=context, condition=condition)
             return samples, samples_0, (all_losses, all_samples, all_likelihoods)
         else:
             samples = self.diffusion_model.sample(N=N, H=H, context=context, condition=condition, no_grad=no_grad, skip_likelihood=skip_likelihood, context_for_likelihood=context_for_likelihood)  # .reshape(-1, H#,
@@ -377,13 +380,18 @@ class TrajectorySampler(nn.Module):
             self.gp = LikelihoodResidualGP(dx, num_inducing=32)
 
             
-            # Add value function for PPO
-            self.value_function = MLP(dx, 1, hidden_size=64)  # +1 for sine/cosine representation of yaw
+            # Replace MLP value function with a GP
+            self.value_function = LikelihoodResidualGP(dx, num_inducing=32, 
+                                                      kernel_type="matern32",
+                                                      use_ard=True)
+            
+            # Update PPO optimizer to include the new value function GP parameters
             self.ppo_optimizer = Adam([
-                {'params': self.gp.gp_model.parameters()},
-                {'params': self.gp.likelihood.parameters()},
+                {'params': self.gp.gp_model.parameters(), 'lr': 1e-2},
+                {'params': self.gp.likelihood.parameters(), 'lr': 1e-2},
                 {'params': [self.id_threshold], 'lr': 1e-2},
-                {'params': self.value_function.parameters(), 'lr': 3e-4}
+                {'params': self.value_function.gp_model.parameters(), 'lr': 1e-3},
+                {'params': self.value_function.likelihood.parameters(), 'lr': 1e-3}
             ])
             
             # PPO hyperparameters
@@ -392,7 +400,7 @@ class TrajectorySampler(nn.Module):
             self.entropy_coef = 0.01
             self.max_grad_norm = 0.5
             self.ppo_epochs = 10
-            self.batch_size = 64
+            self.batch_size = 32
             self.gamma = 0.99
             self.gae_lambda = 0.95
             
@@ -436,7 +444,8 @@ class TrajectorySampler(nn.Module):
                 {'params': self.gp.gp_model.parameters()},
                 {'params': self.gp.likelihood.parameters()},
                 {'params': [self.id_threshold], 'lr': 1e-2},
-                {'params': self.value_function.parameters(), 'lr': 3e-4}
+                {'params': self.value_function.gp_model.parameters(), 'lr': 1e-3},
+                {'params': self.value_function.likelihood.parameters(), 'lr': 1e-3}
             ])
         
         # Update submodels with new device
@@ -452,6 +461,7 @@ class TrajectorySampler(nn.Module):
     def send_norm_constants_to_submodels(self):
         self.model.set_norm_constants(self.x_mean, self.x_std)
         self.gp.set_norm_constants(self.x_mean, self.x_std)
+        self.value_function.set_norm_constants(self.x_mean, self.x_std)
 
     def convert_yaw_to_sine_cosine(self, xu):
         """
@@ -464,7 +474,7 @@ class TrajectorySampler(nn.Module):
         xu_new = torch.cat([xu[:14], cosine.unsqueeze(-1), sine.unsqueeze(-1), xu[15:]], dim=-1)
         return xu_new
 
-    def check_id(self, state, N, threshold=None):
+    def check_id(self, state, N, threshold=None, return_samples=False):
 
         start = state[:4 * 3 + 3]
         start_sine_cosine = self.convert_yaw_to_sine_cosine(start)
@@ -481,8 +491,14 @@ class TrajectorySampler(nn.Module):
             threshold = self.id_threshold
         if likelihood < threshold:
             print('State is out of distribution')
-            return False, likelihood
-        return True, likelihood
+            if return_samples:
+                return False, likelihood, samples
+            else:
+                return False, likelihood
+        if return_samples:
+            return True, likelihood, samples
+        else:
+            return True, likelihood
 
     def sample(self, N, H=10, start=None, goal=None, constraints=None, past=None, project=False, no_grad=True, skip_likelihood=False, context_for_likelihood=True):
         norm_start = None
@@ -496,9 +512,8 @@ class TrajectorySampler(nn.Module):
         else:
             norm_past = past
         if project:
-            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project, context_for_likelihood=context_for_likelihood, threshold=self.id_threshold)
-        else:
-            samples = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project, no_grad=no_grad, skip_likelihood=skip_likelihood, context_for_likelihood=context_for_likelihood)
+            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project, context_for_likelihood=context_for_likelihood)
+        else:odel.sample(N, H, norm_start, goal, constraints, norm_past, project, no_grad=no_grad, skip_likelihood=skip_likelihood, context_for_likelihood=context_for_likelihood)
         # if len(samples) == N:
         #     x = samples
         #     c = None
@@ -578,24 +593,20 @@ class TrajectorySampler(nn.Module):
         # We need to do this part without gradients because it's expensive and not directly differentiable
         with torch.no_grad():
             batch_likelihoods = []
-            for state in state_batch:
-                _, _, likelihood = self.sample(
-                    N=5,  # Small number for efficiency
-                    H=self.T,
-                    start=state.reshape(1, -1),
-                    constraints=torch.ones(5, 3).to(device=state.device)
-                )
-                batch_likelihoods.append(likelihood.mean().item())
-            
-            # Convert to tensor on the right device
-            base_likelihoods = torch.tensor(batch_likelihoods, device=state_batch.device)
+            _, _, likelihood = self.sample(
+                N=5*state_batch.shape[0],  # Small number for efficiency
+                H=self.T,
+                start=state_batch.repeat_interleave(5, 0),
+                constraints=torch.ones(5*state_batch.shape[0], 3).to(device=state_batch.device)
+            )
+            base_likelihoods = likelihood.reshape(-1, 5).mean(dim=1)
         
         # Create a new tensor that requires gradients - this is a trick to incorporate 
         # the base likelihoods into our computational graph
         base_likelihoods = base_likelihoods.detach().requires_grad_(False)
         
         # Get GP predictions WITH gradients using the new method
-        likelihood_residuals = self.gp.forward_for_policy(state_batch)
+        likelihood_residuals = self.gp.predict_with_grad(state_batch)[0]
         
         # Combine base likelihoods with residuals
         adjusted_likelihoods = base_likelihoods + likelihood_residuals.squeeze()
@@ -608,230 +619,10 @@ class TrajectorySampler(nn.Module):
         action_log_probs = dist.log_prob(actions.float())
         dist_entropy = dist.entropy().mean()
         
-        # Get value function predictions
-        state_values = self.value_function(state_batch)
+        # Get value predictions using GP
+        state_values = self.value_function.gp_model(state_batch)[0]
         
         return action_log_probs, state_values, dist_entropy
-
-    def ppo_update(self, states: torch.Tensor, actions: torch.Tensor, 
-                  old_log_probs: torch.Tensor, returns: torch.Tensor, 
-                  advantages: torch.Tensor) -> Dict[str, float]:
-        """
-        Update the policy parameters (GP and threshold) and value function using PPO.
-        
-        Args:
-            states: Batch of states [batch_size, state_dim]
-            actions: Batch of actions [batch_size, 1] (binary decisions: 0=OOD, 1=ID)
-            old_log_probs: Log probabilities of actions under old policy [batch_size]
-            returns: Discounted returns [batch_size]
-            advantages: Advantages (returns - values) [batch_size]
-            
-        Returns:
-            Dictionary with loss information
-        """
-        # Ensure inputs are tensors and on the correct device
-        device = self.id_threshold.device
-        states = torch.as_tensor(states, device=device)
-        actions = torch.as_tensor(actions, device=device)
-        old_log_probs = torch.as_tensor(old_log_probs, device=device)
-        returns = torch.as_tensor(returns, device=device)
-        advantages = torch.as_tensor(advantages, device=device)
-        
-        # Normalize advantages for more stable training
-        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
-        
-        # Metrics to track during training
-        total_policy_loss = 0
-        total_value_loss = 0
-        total_entropy = 0
-        total_clip_fraction = 0
-        num_updates = 0
-        
-        # Multiple epochs of PPO update
-        for _ in range(self.ppo_epochs):
-            # Create data loader for mini-batches
-            batch_indices = torch.randperm(len(states))
-            
-            # Process mini-batches
-            for start_idx in range(0, len(states), self.batch_size):
-                num_updates += 1
-                end_idx = min(start_idx + self.batch_size, len(states))
-                batch_idx = batch_indices[start_idx:end_idx]
-                
-                # Get batch data
-                batch_states = states[batch_idx]
-                batch_actions = actions[batch_idx]
-                batch_old_log_probs = old_log_probs[batch_idx]
-                batch_returns = returns[batch_idx]
-                batch_advantages = advantages[batch_idx]
-                
-                # Evaluate current policy on batch
-                log_probs, values, entropy = self.evaluate_actions(batch_states, batch_actions)
-                
-                # PPO policy loss calculation
-                ratio = torch.exp(log_probs - batch_old_log_probs)
-                surr1 = ratio * batch_advantages
-                surr2 = torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * batch_advantages
-                
-                # Calculate policy loss (negative because we're minimizing)
-                policy_loss = -torch.min(surr1, surr2).mean()
-                
-                # Calculate value function loss
-                value_loss = F.mse_loss(values.squeeze(), batch_returns)
-                
-                # Calculate combined loss
-                loss = policy_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy
-                
-                # Perform gradient step
-                self.ppo_optimizer.zero_grad()
-                loss.backward()
-                
-                # Optional: gradient clipping for stability
-                if self.max_grad_norm > 0:
-                    torch.nn.utils.clip_grad_norm_(
-                        list(self.gp.gp_model.parameters()) + 
-                        list(self.gp.likelihood.parameters()) +
-                        [self.id_threshold] +
-                        list(self.value_function.parameters()),
-                        self.max_grad_norm
-                    )
-                
-                # Update parameters
-                self.ppo_optimizer.step()
-                
-                # Track metrics
-                total_policy_loss += policy_loss.item()
-                total_value_loss += value_loss.item()
-                total_entropy += entropy.item()
-                
-                # Calculate clipping fraction for monitoring
-                clip_fraction = ((ratio - 1.0).abs() > self.clip_param).float().mean().item()
-                total_clip_fraction += clip_fraction
-        
-        # Return average metrics
-        return {
-            'policy_loss': total_policy_loss / num_updates,
-            'value_loss': total_value_loss / num_updates,
-            'entropy': total_entropy / num_updates,
-            'clip_fraction': total_clip_fraction / num_updates,
-            'threshold': self.id_threshold.item()
-        }
-    
-    def collect_rollout_data(self, env, num_steps: int, gamma: float = 0.99, 
-                            gae_lambda: float = 0.95) -> Dict[str, torch.Tensor]:
-        """
-        Collect rollout data from environment interactions for PPO training.
-        
-        Args:
-            env: Environment that provides states and rewards
-            num_steps: Number of environment steps to collect
-            gamma: Discount factor
-            gae_lambda: GAE lambda parameter for advantage estimation
-            
-        Returns:
-            Dictionary containing collected rollout data for PPO
-        """
-        # Storage for collected data
-        states = []
-        actions = []
-        rewards = []
-        values = []
-        log_probs = []
-        dones = []
-        
-        # Get initial state
-        state = env.reset()
-        done = False
-        
-        for _ in range(num_steps):
-            # Process state and evaluate policy
-            state_tensor = torch.tensor(self.convert_yaw_to_sine_cosine(state), 
-                                        dtype=torch.float32, device=self.id_threshold.device).unsqueeze(0)
-            
-            # Get value estimate
-            with torch.no_grad():
-                value = self.value_function(state_tensor).squeeze().item()
-            
-            # Get action from policy
-            decision, prob = self.compute_policy_decision(state, return_prob=True)
-            action = 1 if decision else 0  # Convert boolean to int (1=in-distribution, 0=out-of-distribution)
-            
-            # Calculate log probability of the action
-            log_prob = torch.log(prob + 1e-8) if action == 1 else torch.log(1 - prob + 1e-8)
-            log_prob = log_prob.item()  # Convert to scalar
-            
-            # Step environment with chosen action
-            next_state, reward, done, info = env.step(action)
-            
-            # Store transition
-            states.append(state)
-            actions.append(action)
-            rewards.append(reward)
-            values.append(value)
-            log_probs.append(log_prob)
-            dones.append(done)
-            
-            # Move to next state
-            state = next_state
-            
-            # Reset if environment is done
-            if done:
-                state = env.reset()
-                done = False
-        
-        # Calculate advantages using Generalized Advantage Estimation (GAE)
-        returns = []
-        advantages = []
-        
-        # Get final value for bootstrapping
-        final_state = torch.tensor(self.convert_yaw_to_sine_cosine(state), 
-                                  dtype=torch.float32, device=self.id_threshold.device).unsqueeze(0)
-        with torch.no_grad():
-            last_value = 0.0 if done else self.value_function(final_state).squeeze().item()
-        
-        # Initialize with last value
-        next_return = last_value
-        next_advantage = 0
-        
-        # Process transitions in reverse for easier bootstrapping
-        for step in reversed(range(len(rewards))):
-            # Calculate returns and advantages
-            if dones[step]:
-                # If terminal state, no bootstrapping
-                next_return = 0.0
-                next_advantage = 0.0
-            
-            # Calculate return with bootstrapping
-            current_return = rewards[step] + gamma * next_return * (1.0 - dones[step])
-            returns.insert(0, current_return)
-            
-            # TD error
-            delta = rewards[step] + gamma * next_value * (1.0 - dones[step]) - values[step]
-            
-            # GAE calculation
-            current_advantage = delta + gamma * gae_lambda * next_advantage * (1.0 - dones[step])
-            advantages.insert(0, current_advantage)
-            
-            # Update for next iteration
-            next_return = current_return
-            next_advantage = current_advantage
-            next_value = values[step]
-        
-        # Convert lists to tensors
-        states = torch.tensor(states, dtype=torch.float32, device=self.id_threshold.device)
-        actions = torch.tensor(actions, dtype=torch.long, device=self.id_threshold.device).unsqueeze(-1)
-        returns = torch.tensor(returns, dtype=torch.float32, device=self.id_threshold.device)
-        advantages = torch.tensor(advantages, dtype=torch.float32, device=self.id_threshold.device)
-        log_probs = torch.tensor(log_probs, dtype=torch.float32, device=self.id_threshold.device)
-        
-        return {
-            'states': states,
-            'actions': actions,
-            'log_probs': log_probs,
-            'returns': returns,
-            'advantages': advantages,
-            'values': torch.tensor(values, device=self.id_threshold.device)
-        }
 
     def store_transition(self, state, action: int, likelihood: torch.Tensor, next_state, reward: float, done: bool = False) -> None:
         """
@@ -851,9 +642,10 @@ class TrajectorySampler(nn.Module):
         state_tensor = torch.tensor(self.convert_yaw_to_sine_cosine(state), 
                                     dtype=torch.float32, device=self.id_threshold.device).unsqueeze(0)
         
-        # Get value estimate
+        # Get value estimate using GP
         with torch.no_grad():
-            value = self.value_function(state_tensor).squeeze().item()
+            value, _ = self.value_function.predict(state_tensor)
+            value = value.squeeze().item()
         
         # Get action probability using sigmoid and the threshold
         prob = torch.sigmoid(likelihood - self.id_threshold)
@@ -944,13 +736,15 @@ class TrajectorySampler(nn.Module):
         Returns:
             Dictionary with loss information
         """
+
+        self.value_function.train()
         if not self.ppo_returns or len(self.ppo_states) == 0:
             return {'error': 'No data available for update'}
             
         device = self.id_threshold.device
         
         # Convert memory to tensors on the correct device
-        states = torch.tensor(self.ppo_states, dtype=torch.float32, device=device)
+        states = torch.stack(self.ppo_states).to(dtype=torch.float32, device=device)
         actions = torch.tensor(self.ppo_actions, dtype=torch.long, device=device).unsqueeze(-1)
         old_log_probs = torch.tensor(self.ppo_log_probs, dtype=torch.float32, device=device)
         returns = torch.tensor(self.ppo_returns, dtype=torch.float32, device=device)
@@ -965,14 +759,15 @@ class TrajectorySampler(nn.Module):
         total_entropy = 0
         total_clip_fraction = 0
         num_updates = 0
-        
+        objective_function = gpytorch.mlls.PredictiveLogLikelihood(self.value_function.likelihood, self.value_function.gp_model, num_data=batch_states.shape[0])
+
         # Multiple epochs of PPO update
-        for _ in range(self.ppo_epochs):
+        for _ in tqdm(range(self.ppo_epochs)):
             # Create data loader for mini-batches
             batch_indices = torch.randperm(len(states))
             
             # Process mini-batches
-            for start_idx in range(0, len(states), self.batch_size):
+            for start_idx in tqdm(range(0, len(states), self.batch_size)):
                 num_updates += 1
                 end_idx = min(start_idx + self.batch_size, len(states))
                 batch_idx = batch_indices[start_idx:end_idx]
@@ -1029,6 +824,7 @@ class TrajectorySampler(nn.Module):
         
         # Clear memory after update
         self.clear_memory()
+        self.value_function.eval()
         
         # Return average metrics
         return {

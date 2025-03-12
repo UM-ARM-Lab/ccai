@@ -641,11 +641,11 @@ class GaussianDiffusion(nn.Module):
         # N = 100
         # we could randomly choose timesteps, or do all of them. For now let's randomly generatre
         # t = torch.randint(1, self.num_timesteps, (N,), device=device).long()
-        t = torch.arange(1, self.num_timesteps, device=device).long()
+        # t = torch.arange(1, self.num_timesteps, device=device).long()
         # t = torch.arange(1, self.num_timesteps, 8, device=device).long()
         # t = torch.arange(5, 30, 2, device=device).long()
         # if self.subsampled_t:
-        # t = torch.tensor([5, 10, 15], device=device).long()
+        t = torch.tensor([5, 10, 15], device=device).long()
 
         N = t.shape[0]
         t = t[None, :].repeat(B, 1).reshape(B * N)
@@ -678,15 +678,16 @@ class GaussianDiffusion(nn.Module):
         overall_kl = kl_x.reshape(B, N).mean(dim=1).to(x.device)
         return -overall_kl
  
-    def project(self, N, threshold, H=None, condition=None, context=None):
+    def project(self, N, threshold, H=None, condition=None, context=None, residual_gp=None):
 
-        min_likelihood = threshold
+        # min_likelihood = threshold
+        min_likelihood = self.cutoff
 
         x = condition[0][1]
         B = x.shape[0]
         x.requires_grad = True
         grad_mask = torch.ones_like(x)
-        optimizer = torch.optim.SGD([x], lr=1, momentum=0.5)
+        optimizer = torch.optim.SGD([x], lr=1.5, momentum=0.5)
         all_samples = []
         all_losses = []
         all_likelihoods = []
@@ -698,6 +699,9 @@ class GaussianDiffusion(nn.Module):
             all_samples.append(samples.clone().detach().cpu())
             all_likelihoods.append(likelihoods.clone().detach().cpu())
             likelihood_reshape = likelihoods.reshape(B, -1).mean(1)
+
+            if residual_gp is not None:
+                likelihood_reshape += residual_gp.predict_with_grad(x)[0]
             grad_mask[likelihood_reshape >= min_likelihood] = 0.0
 
             if proj_t == 0:

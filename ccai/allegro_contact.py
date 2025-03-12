@@ -231,42 +231,42 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             'thumb': 'allegro_hand_oya_finger_3_aftc_base_link',
         }
 
-        # self.collision_link_names = {
-        #     'index':
-        #     ['allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
-        #      'allegro_hand_hitosashi_finger_finger_link_3',
-        #      'allegro_hand_hitosashi_finger_finger_link_2',
-        #      'allegro_hand_hitosashi_finger_finger_link_1',
-        #      'allegro_hand_hitosashi_finger_finger_link_0'],
-        #      'middle':
-        #     ['allegro_hand_naka_finger_finger_1_aftc_base_link',
-        #      'allegro_hand_naka_finger_finger_link_7',
-        #      'allegro_hand_naka_finger_finger_link_6',
-        #      'allegro_hand_naka_finger_finger_link_5',
-        #      'allegro_hand_naka_finger_finger_link_4'],
-        #         'ring':
-        #     ['allegro_hand_kusuri_finger_finger_2_aftc_base_link',
-        #         'allegro_hand_kusuri_finger_finger_link_11',
-        #         'allegro_hand_kusuri_finger_finger_link_10',
-        #         'allegro_hand_kusuri_finger_finger_link_9',
-        #         'allegro_hand_kusuri_finger_finger_link_8'],
-        #         'thumb':
-        #     ['allegro_hand_oya_finger_3_aftc_base_link',
-        #     'allegro_hand_oya_finger_link_15',
-        #     'allegro_hand_oya_finger_link_14',
-        #     'allegro_hand_oya_finger_link_13',
-        #     'allegro_hand_oya_finger_link_12'],
-        # }
         self.collision_link_names = {
             'index':
-            ['allegro_hand_hitosashi_finger_finger_0_aftc_base_link'],
+            ['allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
+             'allegro_hand_hitosashi_finger_finger_link_3',
+             'allegro_hand_hitosashi_finger_finger_link_2',
+             'allegro_hand_hitosashi_finger_finger_link_1',
+             'allegro_hand_hitosashi_finger_finger_link_0'],
              'middle':
-            ['allegro_hand_naka_finger_finger_1_aftc_base_link'],
+            ['allegro_hand_naka_finger_finger_1_aftc_base_link',
+             'allegro_hand_naka_finger_finger_link_7',
+             'allegro_hand_naka_finger_finger_link_6',
+             'allegro_hand_naka_finger_finger_link_5',
+             'allegro_hand_naka_finger_finger_link_4'],
                 'ring':
-            ['allegro_hand_kusuri_finger_finger_2_aftc_base_link'],
+            ['allegro_hand_kusuri_finger_finger_2_aftc_base_link',
+                'allegro_hand_kusuri_finger_finger_link_11',
+                'allegro_hand_kusuri_finger_finger_link_10',
+                'allegro_hand_kusuri_finger_finger_link_9',
+                'allegro_hand_kusuri_finger_finger_link_8'],
                 'thumb':
-            ['allegro_hand_oya_finger_3_aftc_base_link'],
+            ['allegro_hand_oya_finger_3_aftc_base_link',
+            'allegro_hand_oya_finger_link_15',
+            'allegro_hand_oya_finger_link_14',
+            'allegro_hand_oya_finger_link_13',
+            'allegro_hand_oya_finger_link_12'],
         }
+        # self.collision_link_names = {
+        #     'index':
+        #     ['allegro_hand_hitosashi_finger_finger_0_aftc_base_link'],
+        #      'middle':
+        #     ['allegro_hand_naka_finger_finger_1_aftc_base_link'],
+        #         'ring':
+        #     ['allegro_hand_kusuri_finger_finger_2_aftc_base_link'],
+        #         'thumb':
+        #     ['allegro_hand_oya_finger_3_aftc_base_link'],
+        # }
         self.ee_link_idx = {finger: chain.frame_to_idx[ee_name] for finger, ee_name in self.ee_names.items()}
         self.frame_indices = torch.tensor([self.ee_link_idx[finger] for finger in self.fingers])
 
@@ -313,13 +313,13 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         self.contact_scenes = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
                                             collision_check_links=collision_check_links,
                                             softmin_temp=1.0e3,
-                                            points_per_link=1000,
+                                            points_per_link=750,
                                             links_per_finger=len(self.collision_link_names['index'])
                                             )
         self.contact_scenes_for_viz = pv.RobotScene(robot_sdf, object_sdf_for_viz, scene_trans,
                                             collision_check_links=collision_check_links,
                                             softmin_temp=1.0e3,
-                                            points_per_link=1000,
+                                            points_per_link=750,
                                             links_per_finger=len(self.collision_link_names['index'])
                                             )
 
@@ -675,6 +675,14 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         x_axis = x_axis / torch.norm(x_axis, dim=1, keepdim=True)
         R = torch.stack((x_axis, y_axis, z_axis), dim=2)
         return R
+    
+    def preprocess_from_aug(self, augmented_trajectory):
+        N = augmented_trajectory.shape[0]
+        augmented_trajectory = augmented_trajectory.clone().reshape(N, self.T, -1)
+        x = augmented_trajectory[:, :, :self.dx + self.du]
+
+        # preprocess fingers
+        self._preprocess(x)
 
     def eval(self, augmented_trajectory):
         N = augmented_trajectory.shape[0]

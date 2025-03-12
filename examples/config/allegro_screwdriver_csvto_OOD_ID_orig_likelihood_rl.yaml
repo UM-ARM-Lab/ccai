@@ -5,9 +5,9 @@ receding_horizon: False
 num_steps: 8
 num_turns: 1
 max_recovery_stages: 4
-num_trials: 10
+num_trials: 1000
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_data_turn_only_likelihood_no_turn_orig_likelihood_gravity_min_force_multi_link_contact'
+experiment_name: 'allegro_screwdriver_recovery_data_rl'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -21,8 +21,8 @@ goal: -1.5
 prior: 1
 multi_particle_search: True
 replan: False
-visualize_plan: True
-visualize_recovery_plan: True
+visualize_plan: False
+visualize_recovery_plan: False
 visualize_contact_plan: True
 optimize_force: True
 exclude_index: False
@@ -39,17 +39,18 @@ rl_adjustment: True
 test_recovery_trajectory: False
 perturb_action: False
 viz_states: False
-diff_init: False
+diff_init: True
 live_recovery: True
 type: 'diffusion'
 model_dir: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion'
 model_path: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
-likelihood_threshold: -22.618363952636717
-project_threshold: -16
-ppo_batch_size: 128
+# likelihood_threshold: -25.0
+# project_threshold: -15
+ppo_batch_size: 64
 num_episodes: 1000
 # likelihood_threshold: -16
-# likelihood_threshold: -136.6758056640625
+likelihood_threshold: -136.6758056640625
+project_threshold: -75
 # parity: 654
 controllers:
   csvgd:
@@ -60,7 +61,7 @@ controllers:
     step_size: 0.1
     momentum: 0.
     device: 'cuda:1'
-    online_iters: 25
+    online_iters: 15
     warmup_iters: 50
     resample_steps: 16
     resample_sigma: 0.01
