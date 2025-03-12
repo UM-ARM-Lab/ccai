@@ -7,9 +7,114 @@ Loaded trajectory sampler
 Current yaw: tensor([ 5.5207e-05,  1.3631e-02, -4.8130e-02], device='cuda:1')
 Current yaw: tensor([ 5.5207e-05,  1.3631e-02, -4.8130e-02], device='cuda:1')
 1 turn
-Sampling time 5.366111072944477
+Sampling time 5.446379043161869
 tensor([ 1.5497e-01,  6.1007e-01,  5.7076e-01,  6.1106e-01, -1.1513e-01,
          5.4013e-01,  8.8512e-01,  9.3454e-01,  1.2569e+00,  2.2909e-01,
          2.3290e-01,  1.2085e+00,  5.5207e-05,  1.3631e-02, -4.8130e-02,
          4.4650e-01], device='cuda:1')
+Likelihood residual: -4.4678492372440815e-07
+Original likelihood: -107.05027770996094
+Adjusted likelihood: -107.05027815674586
+ID probability: 0.9509
+Stochastic decision: ID (sampled from p=0.9509)
+Solve time for step 1 15.359647891949862
+Current ori: tensor([ 5.5207e-05,  1.3631e-02, -4.8130e-02], device='cuda:1')
+Middle force: tensor([0.5787, 0.5693, 1.1468, 0.5579, 1.1098, 0.6485, 0.5337, 0.5207, 0.5460,
+        0.5341, 0.5538, 0.5290], device='cuda:1')
+Thumb force: tensor([0.8617, 0.8266, 0.7522, 1.0034, 0.9702, 0.6565, 0.5239, 0.8831, 0.5828,
+        0.5901, 0.5732, 0.5677], device='cuda:1')
+Index force: tensor([0.5962, 0.6005, 0.5573, 0.5693, 0.7994, 0.5242, 0.9919, 0.9173, 0.5698,
+        0.5646, 0.5311, 0.5697], device='cuda:1')
+Storing NORMAL transition: reward=0.0661 (scaled=0.0661), steps=1
+Collected 1 transitions for RL
+tensor([ 0.1563,  0.6327,  0.5465,  0.6003, -0.1233,  0.5596,  0.8484,  0.9802,
+         1.2576,  0.2567,  0.2527,  1.1338, -0.0073,  0.0069, -0.1142,  0.6397],
+       device='cuda:1')
+Likelihood residual: -4.0478141727362527e-07
+Original likelihood: -125.11587524414062
+Adjusted likelihood: -125.11587564892204
+ID probability: 0.7606
+Stochastic decision: OOD (sampled from p=0.7606)
+State is out of distribution
+Projection step: 0, Loss: 131.59307861328125
+Projection step: 1, Loss: 90.23050689697266
+Projection step: 2, Loss: 99.74583435058594
+Projection step: 3, Loss: 91.54792785644531
+Projection step: 4, Loss: 94.62107849121094
+Projection step: 5, Loss: 92.40453338623047
+Projection step: 7, Loss: 86.25827026367188
+Final likelihood: tensor([-101.1052,  -83.0950,  -83.5170,  -81.3770,  -83.3364,  -91.0216,
+         -82.8010,  -84.6488,  -83.4247,  -78.1445,  -84.9371,  -82.9507,
+        -102.7856,  -83.4765,  -83.8551,  -89.6561])
+Final projection likelihood: -86.2583
+1 mode projection succeeded
+New goal: tensor([ 0.0367,  0.5175,  0.4917,  0.6247, -0.0192,  0.5809,  0.9034,  0.8782,
+         1.2554,  0.3752,  0.2220,  1.3287,  0.0028,  0.0112, -0.8356],
+       device='cuda:1')
+tensor([[0.0024]], device='cuda:1') tensor([[0.0025]], device='cuda:1') tensor([[0.0029]], device='cuda:1')
+Likelihood residual: -4.7024762750425e-08
+Original likelihood: -144.46217346191406
+Adjusted likelihood: -144.46217350893883
+Likelihood residual: 4.025769229087928e-08
+Original likelihood: -131.59976196289062
+Adjusted likelihood: -131.59976192263292
+{'index': 131.59976192263292, 'thumb_middle': 144.46217350893883}
+Current yaw: tensor([-0.0073,  0.0069, -0.1142], device='cuda:1')
+2 index
+tensor([ 0.1563,  0.6327,  0.5465,  0.6003, -0.1233,  0.5596,  0.8484,  0.9802,
+         1.2576,  0.2567,  0.2527,  1.1338, -0.0073,  0.0069, -0.1142,  0.6397],
+       device='cuda:1')
+Solve time for step 1 10.394310691161081
+Current ori: tensor([-0.0073,  0.0069, -0.1142], device='cuda:1')
+Middle force: tensor([0.5815, 0.5210, 0.5828, 0.5920], device='cuda:1')
+Thumb force: tensor([0.6117, 0.5943, 0.5503, 0.5062], device='cuda:1')
+tensor([ 0.0964,  0.5093,  0.4698,  0.6001, -0.1025,  0.5457,  0.9068,  0.9337,
+         1.2272,  0.2889,  0.2413,  1.1444, -0.0084, -0.0079, -0.1393, -0.7919],
+       device='cuda:1')
+Solve time for step 2 3.173452964052558
+Current ori: tensor([-0.0084, -0.0079, -0.1393], device='cuda:1')
+Middle force: tensor([0.5202, 0.5818, 0.5896], device='cuda:1')
+Thumb force: tensor([0.5881, 0.5479, 0.5057], device='cuda:1')
+tensor([ 0.0759,  0.5002,  0.4652,  0.6060, -0.0857,  0.5532,  0.9190,  0.9153,
+         1.2357,  0.2697,  0.2070,  1.1651, -0.0115, -0.0198, -0.1483, -1.7356],
+       device='cuda:1')
+Solve time for step 3 3.2519726809114218
+Current ori: tensor([-0.0115, -0.0198, -0.1483], device='cuda:1')
+Middle force: tensor([0.5796, 0.5864], device='cuda:1')
+Thumb force: tensor([0.5436, 0.5051], device='cuda:1')
+tensor([ 0.0685,  0.4964,  0.4635,  0.6074, -0.0807,  0.5581,  0.9195,  0.9076,
+         1.2163,  0.2932,  0.2114,  1.1697, -0.0120, -0.0233, -0.1389, -2.4341],
+       device='cuda:1')
+Solve time for step 4 3.1503108551260084
+Current ori: tensor([-0.0120, -0.0233, -0.1389], device='cuda:1')
+Middle force: tensor([0.5567], device='cuda:1')
+Thumb force: tensor([0.5335], device='cuda:1')
+Storing RECOVERY transition: reward=0.0219 (scaled=0.0219), steps=1
+Collected 2 transitions for RL
+
+===== INITIAL GP PARAMETERS =====
+Actor GP inducing points: shape=torch.Size([32, 16])
+Value GP inducing points: shape=torch.Size([32, 16])
+Actor bias: 136.67581
+Actor temperature: 0.10000
+==================================
+
+
+==== Epoch 1/32 Summary ====
+Time: 5.3151s (NGD: 0.0005s, Adam: 0.0155s)
+Policy Loss: -0.194810
+Value Loss: 1.083814
+Entropy: 1.086643
+Clip Fraction: 0.7500
+Current Threshold: -136.6748
+=======================================
+
+Epoch 1 parameter changes:
+Actor inducing points L2 change: 0.00039
+Value inducing points L2 change: 0.00596
+Actor bias: 136.67480
+Actor temperature: 0.09900
+Bias change: 0.00101
+Temperature change: 0.00100
+
 Backend TkAgg is interactive backend. Turning interactive mode on.

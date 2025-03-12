@@ -660,7 +660,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             if recover:
                 id_check, final_likelihood = True, None
             else:
-                id_check, final_likelihood = trajectory_sampler_orig.check_id(state, params['N'], deterministic=deterministic)
+                id_check, final_likelihood = trajectory_sampler_orig.check_id(state, 8, deterministic=deterministic)
             if final_likelihood is not None:
                 data['final_likelihoods'].append(final_likelihood)
 
@@ -1002,7 +1002,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
             start = x[-1]
             start_sine_cosine = convert_yaw_to_sine_cosine(start)
-            likelihood, samples = trajectory_sampler_orig.check_id(start_sine_cosine, params['N'], likelihood_only=True, return_samples=True)
+            likelihood, samples = trajectory_sampler_orig.check_id(start_sine_cosine, 8, likelihood_only=True, return_samples=True)
             distances.append(-likelihood)
             viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fpath}/recovery_stage_{all_stage}/{mode}")
             pathlib.Path.mkdir(viz_fpath, parents=True, exist_ok=True)
@@ -1372,7 +1372,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             
             start = state[:4 * num_fingers + obj_dof]
             start_sine_cosine = convert_yaw_to_sine_cosine(start)
-            id, likelihood = trajectory_sampler_orig.check_id(start_sine_cosine, params['N'])
+            id, likelihood = trajectory_sampler_orig.check_id(start_sine_cosine, 8)
             recover = not id
             
         if likelihood < params.get('drop_threshold', -300):

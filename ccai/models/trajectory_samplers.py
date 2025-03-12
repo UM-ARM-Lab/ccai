@@ -1,10 +1,12 @@
 from typing import Dict
+import numpy as np
 import gpytorch
 import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.distributions import Normal
 from torch.optim import Adam
+from gpytorch.optim import NGD
 
 from tqdm import tqdm
 from ccai.models.custom_likelihoods import SigmoidBernoulliLikelihood
@@ -369,13 +371,22 @@ class TrajectorySampler(nn.Module):
                 use_ard=True
             )
             
-            # Update optimizer to include all parameters
-            self.ppo_optimizer = Adam([
-                {'params': self.gp.gp_model.parameters(), 'lr': 1e-1},
-                {'params': self.gp.likelihood.parameters(), 'lr': 1e-1},
-                {'params': self.value_function.gp_model.parameters(), 'lr': 1e-1},
-                {'params': self.value_function.likelihood.parameters(), 'lr': 1e-1}
-            ])
+            # Separate variational parameters from hyperparameters for NGD
+            actor_variational_params = []
+            actor_hyper_params = []
+            for name, param in self.gp.gp_model.named_parameters():
+                if 'variational' in name:
+                    actor_variational_params.append(param)
+                else:
+                    actor_hyper_params.append(param)
+            
+            value_variational_params = []
+            value_hyper_params = []
+            for name, param in self.value_function.gp_model.named_parameters():
+                if 'variational' in name:
+                    value_variational_params.append(param)
+                else:
+                    value_hyper_params.append(param)
             
             # PPO hyperparameters
             self.clip_param = 0.2
@@ -383,7 +394,7 @@ class TrajectorySampler(nn.Module):
             self.entropy_coef = 0.01
             self.max_grad_norm = 0.5
             self.ppo_epochs = 32
-            self.batch_size = 32
+            self.batch_size = 2
             self.gamma = 0.99
             self.gae_lambda = 0.95
             
@@ -396,6 +407,18 @@ class TrajectorySampler(nn.Module):
             self.ppo_dones = []
             self.ppo_returns = []
             self.ppo_advantages = []
+
+            # Use NGD for variational parameters (typically needs higher learning rate)
+            self.actor_ngd_optimizer = NGD(actor_variational_params, num_data=self.batch_size, lr=0.1)
+            self.value_ngd_optimizer = NGD(value_variational_params, num_data=self.batch_size, lr=0.1)
+            
+            # Use Adam for hyperparameters and likelihood parameters
+            self.ppo_optimizer = Adam([
+                {'params': actor_hyper_params, 'lr': 1e-1},
+                {'params': self.gp.likelihood.parameters(), 'lr': 1e-1},
+                {'params': value_hyper_params, 'lr': 1e-1},
+                {'params': self.value_function.likelihood.parameters(), 'lr': 1e-1}
+            ])
 
         self.send_norm_constants_to_submodels()
 
@@ -627,18 +650,18 @@ class TrajectorySampler(nn.Module):
             dist_entropy: Entropy of the policy distribution
         """
         # Convert states for consistency
-        state_batch = torch.stack([self.convert_yaw_to_sine_cosine(state) for state in states])
+        state_batch = torch.stack(states)
         
         # Sample trajectories to get base likelihoods
         with torch.no_grad():
             batch_likelihoods = []
             _, _, likelihood = self.sample(
-                N=5*state_batch.shape[0],  # Small number for efficiency
+                N=8*state_batch.shape[0],  # Small number for efficiency
                 H=self.T,
-                start=state_batch.repeat_interleave(5, 0),
-                constraints=torch.ones(5*state_batch.shape[0], 3).to(device=state_batch.device)
+                start=state_batch.repeat_interleave(8, 0),
+                constraints=torch.ones(8*state_batch.shape[0], 3).to(device=state_batch.device)
             )
-            base_likelihoods = likelihood.reshape(-1, 5).mean(dim=1)
+            base_likelihoods = likelihood.reshape(-1, 8).mean(dim=1)
         
         # Create a new tensor that requires gradients - this is a trick to incorporate 
         # the base likelihoods into our computational graph
@@ -686,7 +709,7 @@ class TrajectorySampler(nn.Module):
                                                             device=next(self.parameters()).device)).item()
         
         # Store in memory
-        self.ppo_states.append(state)
+        self.ppo_states.append(state_tensor)
         self.ppo_actions.append(action)
         self.ppo_log_probs.append(log_prob)
         self.ppo_rewards.append(reward)
@@ -709,7 +732,7 @@ class TrajectorySampler(nn.Module):
         else:
             # Use the last state's value as bootstrap
             final_state = torch.tensor(
-                self.convert_yaw_to_sine_cosine(self.ppo_states[-1]),
+                self.ppo_states[-1],
                 dtype=torch.float32, 
                 device=device
             ).unsqueeze(0)
@@ -737,8 +760,8 @@ class TrajectorySampler(nn.Module):
             current_advantage = delta + self.gamma * self.gae_lambda * next_advantage * (1.0 - self.ppo_dones[step])
             
             # Store results
-            self.ppo_returns.insert(0, delta + self.ppo_values[step])
-            self.ppo_advantages.insert(0, current_advantage)
+            self.ppo_returns.insert(0, (delta + self.ppo_values[step]).item())
+            self.ppo_advantages.insert(0, current_advantage.item())
             
             # Update for next iteration
             next_return = self.ppo_returns[0]  
@@ -762,13 +785,17 @@ class TrajectorySampler(nn.Module):
     def ppo_update(self) -> Dict[str, float]:
         """
         Update the policy parameters (GP and threshold) and value function using PPO.
-        Uses data stored in the PPO memory.
+        Fixed to ensure proper handling of computation graphs between epochs.
         
         Returns:
             Dictionary with loss information and timing statistics
         """
         update_start_time = time.time()
         timing_stats = collections.defaultdict(float)
+
+        # Track NGD-specific timing
+        timing_stats['ngd_time'] = 0.0
+        timing_stats['adam_time'] = 0.0
 
         # Store initial inducing points for tracking changes
         with torch.no_grad():
@@ -798,15 +825,15 @@ class TrajectorySampler(nn.Module):
         data_prep_start = time.time()
         device = self.device
         
-        # Convert memory to tensors on the correct device
-        states = torch.stack(self.ppo_states).to(dtype=torch.float32, device=device)
-        actions = torch.tensor(self.ppo_actions, dtype=torch.long, device=device).unsqueeze(-1)
-        old_log_probs = torch.tensor(self.ppo_log_probs, dtype=torch.float32, device=device)
-        returns = torch.tensor(self.ppo_returns, dtype=torch.float32, device=device)
-        advantages = torch.tensor(self.ppo_advantages, dtype=torch.float32, device=device)
+        # Convert memory to tensors on the correct device - but don't attach them to computation graph yet
+        states_np = torch.stack(self.ppo_states).cpu().numpy()
+        actions_np = np.array(self.ppo_actions).reshape(-1, 1)
+        old_log_probs_np = np.array(self.ppo_log_probs)
+        returns_np = np.array(self.ppo_returns)
+        advantages_np = np.array(self.ppo_advantages)
         
-        # Normalize advantages for more stable training
-        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+        # Normalize advantages in numpy to avoid graph issues
+        advantages_np = (advantages_np - advantages_np.mean()) / (advantages_np.std() + 1e-8)
         timing_stats['data_preparation'] = time.time() - data_prep_start
         
         # Metrics to track during training
@@ -818,7 +845,7 @@ class TrajectorySampler(nn.Module):
         objective_function = gpytorch.mlls.PredictiveLogLikelihood(
             self.value_function.likelihood, 
             self.value_function.gp_model, 
-            num_data=self.batch_size
+            num_data=min(self.batch_size, states_np.shape[0])
         )
 
         # Multiple epochs of PPO update
@@ -831,6 +858,14 @@ class TrajectorySampler(nn.Module):
             epoch_entropy = 0
             epoch_clip_fraction = 0
             epoch_updates = 0
+            
+            # Create fresh tensors for this epoch to ensure clean computation graph
+            device = self.device
+            states = torch.tensor(states_np, dtype=torch.float32, device=device)
+            actions = torch.tensor(actions_np, dtype=torch.long, device=device)
+            old_log_probs = torch.tensor(old_log_probs_np, dtype=torch.float32, device=device)
+            returns = torch.tensor(returns_np, dtype=torch.float32, device=device)
+            advantages = torch.tensor(advantages_np, dtype=torch.float32, device=device)
             
             # Create data loader for mini-batches
             batch_indices = torch.randperm(len(states))
@@ -873,36 +908,31 @@ class TrajectorySampler(nn.Module):
                 loss = policy_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy
                 timing_stats['loss_calculation'] += time.time() - loss_calc_start
                 
-                # Perform gradient step
+                # Perform gradient step using separate optimizers
                 backprop_start = time.time()
+                
+                # Zero all gradients
+                self.actor_ngd_optimizer.zero_grad()
+                self.value_ngd_optimizer.zero_grad()
                 self.ppo_optimizer.zero_grad()
+                
+                # Backpropagate
                 loss.backward()
-                
-                # Report gradients for inducing points
-                if num_updates == 1:  # Only print once per update
-                    with torch.no_grad():
-                        has_actor_grad = self.gp.gp_model.variational_strategy.inducing_points.grad is not None
-                        has_value_grad = self.value_function.gp_model.variational_strategy.inducing_points.grad is not None
-                        print(f"Actor inducing points have gradients: {has_actor_grad}")
-                        if has_actor_grad:
-                            grad_norm = torch.norm(self.gp.gp_model.variational_strategy.inducing_points.grad)
-                            print(f"Actor inducing points gradient norm: {grad_norm.item():.5f}")
-                        print(f"Value inducing points have gradients: {has_value_grad}")
-                        if has_value_grad:
-                            grad_norm = torch.norm(self.value_function.gp_model.variational_strategy.inducing_points.grad)
-                            print(f"Value inducing points gradient norm: {grad_norm.item():.5f}")
-                        
-                        if self.gp.likelihood.bias.grad is not None:
-                            print(f"Bias gradient: {self.gp.likelihood.bias.grad.item():.5f}")
-                        if self.gp.likelihood.temperature.grad is not None:
-                            print(f"Temperature gradient: {self.gp.likelihood.temperature.grad.item():.5f}")
-                
                 timing_stats['backpropagation'] += time.time() - backprop_start
                 
-                # Update parameters
-                optimizer_step_start = time.time()
+                # Apply NGD step for variational parameters
+                ngd_start = time.time()
+                self.actor_ngd_optimizer.step()
+                self.value_ngd_optimizer.step()
+                ngd_time = time.time() - ngd_start
+                timing_stats['ngd_time'] += ngd_time
+                
+                # Apply Adam step for hyperparameters
+                adam_start = time.time()
                 self.ppo_optimizer.step()
-                timing_stats['optimizer_step'] += time.time() - optimizer_step_start
+                adam_time = time.time() - adam_start
+                timing_stats['adam_time'] += adam_time
+                
                 
                 # Track metrics
                 total_policy_loss += policy_loss.item()
@@ -938,7 +968,7 @@ class TrajectorySampler(nn.Module):
             
             # Print summary for this epoch
             print(f"\n==== Epoch {epoch+1}/{self.ppo_epochs} Summary ====")
-            print(f"Time: {epoch_time:.4f}s")
+            print(f"Time: {epoch_time:.4f}s (NGD: {timing_stats['ngd_time']/(epoch+1):.4f}s, Adam: {timing_stats['adam_time']/(epoch+1):.4f}s)")
             print(f"Policy Loss: {epoch_avg_policy_loss:.6f}")
             print(f"Value Loss: {epoch_avg_value_loss:.6f}")
             print(f"Entropy: {epoch_avg_entropy:.6f}")
@@ -963,8 +993,10 @@ class TrajectorySampler(nn.Module):
                     print(f"\nEpoch {epoch+1} parameter changes:")
                     print(f"Actor inducing points L2 change: {actor_change.item():.5f}")
                     print(f"Value inducing points L2 change: {value_change.item():.5f}")
-                    print(f"Bias change: {bias_change.item():.5f} (now: {current_bias.item():.5f})")
-                    print(f"Temperature change: {temp_change.item():.5f} (now: {current_temp.item():.5f})\n")
+                    print(f"Actor bias: {current_bias.item():.5f}")
+                    print(f"Actor temperature: {current_temp.item():.5f}")
+                    print(f"Bias change: {bias_change.item():.5f}")
+                    print(f"Temperature change: {temp_change.item():.5f}\n")
         
         # Final parameter change reporting
         with torch.no_grad():
@@ -1052,6 +1084,14 @@ class TrajectorySampler(nn.Module):
         print(f"Average optimizer step: {timing_stats['avg_optim_step']:.4f}s")
         print("=======================================\n")
         
+        # Include NGD stats in output metrics
+        timing_stats['optimization'] = {
+            'ngd_total_time': timing_stats['ngd_time'],
+            'adam_total_time': timing_stats['adam_time'],
+            'ngd_avg_time': timing_stats['ngd_time'] / max(1, num_updates),
+            'adam_avg_time': timing_stats['adam_time'] / max(1, num_updates),
+        }
+
         # Return average metrics and timing info
         return {
             'policy_loss': total_policy_loss / num_updates,
@@ -1060,5 +1100,22 @@ class TrajectorySampler(nn.Module):
             'clip_fraction': total_clip_fraction / num_updates,
             'threshold': -self.gp.likelihood.bias.squeeze().item(),
             'inducing_points': timing_stats['inducing_point_changes'],
-            'timing': dict(timing_stats)  # Convert defaultdict to regular dict for return
+            'timing': dict(timing_stats),
+            'ngd_stats': timing_stats['optimization']
         }
+
+    def adjust_ngd_learning_rate(self, actor_lr: float = 0.1, value_lr: float = 0.1) -> None:
+        """
+        Adjust the learning rates for Natural Gradient Descent optimizers.
+        
+        Args:
+            actor_lr: Learning rate for actor GP optimizer
+            value_lr: Learning rate for value function GP optimizer
+        """
+        for param_group in self.actor_ngd_optimizer.param_groups:
+            param_group['lr'] = actor_lr
+            
+        for param_group in self.value_ngd_optimizer.param_groups:
+            param_group['lr'] = value_lr
+            
+        print(f"NGD learning rates adjusted: Actor={actor_lr}, Value={value_lr}") 

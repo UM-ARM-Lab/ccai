@@ -57,7 +57,7 @@ class VariationalGP(ApproximateGP):
             inducing_points = torch.randn(num_inducing, state_dim)
         
         # Set up variational distribution and strategy
-        variational_distribution = CholeskyVariationalDistribution(num_inducing)
+        variational_distribution = NaturalVariationalDistribution(num_inducing)
         variational_strategy = VariationalStrategy(
             self, inducing_points, variational_distribution, 
             learn_inducing_locations=learn_inducing_locations
