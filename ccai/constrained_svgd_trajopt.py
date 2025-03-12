@@ -36,7 +36,6 @@ class ConstrainedSteinTrajOpt:
         self.dtype = torch.float64
         self.delta_x = None
         self.Bk = None
-        self.t_mask = None
         self.reset()
 
     def reset(self):
@@ -108,7 +107,6 @@ class ConstrainedSteinTrajOpt:
         eye = torch.eye(dh_bar.shape[1]).repeat(N, 1, 1).to(device=C.device, dtype=grad_J.dtype)
 
         eye_0 = eye.clone()
-        # eye_0[inactive_constraint_mask_eye] = 0
         damping_factor = 1e-6
         eye_0 *= damping_factor
 
@@ -158,19 +156,9 @@ class ConstrainedSteinTrajOpt:
         xuz.requires_grad = True
 
         xuz = xuz.to(dtype=torch.float32)
-        # grad_J, hess_J, K, grad_K, C, dC, hess_C, t_mask = self.problem.eval(xuz.to(dtype=torch.float32))
-        # self.t_mask = t_mask
 
-        # active_constraint_mask = torch.logical_or((C > 0).unsqueeze(-1), self.dual > 0)
-        # active_constraint_mask[:, :self.dg] = True
 
-        # inactive_constraint_mask = ~active_constraint_mask
-        # inactive_constraint_mask_eye = torch.logical_and(inactive_constraint_mask, inactive_constraint_mask.transpose(1, 2))
-        
-        # C[inactive_constraint_mask[:, :, 0]] = 0
-        # dC[inactive_constraint_mask.expand(-1, -1, dC.shape[-1])] = 0
-
-        grad_J, hess_J, K, grad_K, C, dC, hess_C, t_mask = self.problem.eval(xuz.to(dtype=torch.float32))
+        grad_J, hess_J, K, grad_K, C, dC, hess_C = self.problem.eval(xuz.to(dtype=torch.float32))
         dC_mask = ~(dC == 0).all(dim=-1)
         dC = dC[dC_mask].reshape(N, -1, dC.shape[-1])
         C = C[dC_mask].reshape(N, -1)
@@ -181,7 +169,6 @@ class ConstrainedSteinTrajOpt:
             # we try and invert the dC dCT, if it is singular then we use the psuedo-inverse
             eye = torch.eye(dC.shape[1]).repeat(N, 1, 1).to(device=C.device, dtype=self.dtype)
             eye_0 = eye.clone()
-            # eye_0[inactive_constraint_mask_eye] = 0
             damping_factor = 1e-6
             eye_0 *= damping_factor
             dCdCT = dC @ dC.permute(0, 2, 1)
@@ -315,8 +302,6 @@ class ConstrainedSteinTrajOpt:
         # a = np.stack(self.dual_history, 0).squeeze()
         # a = a[:, 0]
         # xs = np.arange(a.shape[0])
-        # self.dual = self.dual[:, self.t_mask[0]]
-        # self.dual_history = [self.dual.cpu().detach().numpy()]
         pass
 
     def _clamp_in_bounds(self, xuz):

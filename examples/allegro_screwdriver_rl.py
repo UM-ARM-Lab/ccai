@@ -14,6 +14,7 @@ from functools import partial
 import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import Normal
+torch.autograd.set_detect_anomaly(True)
 
 sys.path.append('..')
 
@@ -146,7 +147,7 @@ class AllegroScrewdriverRLEnv:
         obs = self._get_obs()
         
         # Calculate reward
-        reward = self._compute_reward(obs)
+        reward = self._compute_reward(obs, action)
         
         # Extract orientation
         orientation = obs[self.control_dim:self.control_dim + self.obj_dof]
@@ -165,7 +166,7 @@ class AllegroScrewdriverRLEnv:
         
         return obs, reward, done
 
-    def _compute_reward(self, obs):
+    def _compute_reward(self, obs, action):
         # Extract orientation
         orientation = obs[self.control_dim:self.control_dim + self.obj_dof]
         roll, pitch, yaw = orientation
@@ -174,10 +175,13 @@ class AllegroScrewdriverRLEnv:
         turn_reward = -(yaw - self.initial_yaw) * 1.0
         
         # Penalize deviation from upright position
-        upright_penalty = (roll.abs() + pitch.abs()) * 1.0
+        # upright_penalty = (roll.abs() + pitch.abs()) * 1.0
         
         # Calculate total reward
-        reward = turn_reward - upright_penalty
+        reward = turn_reward #- upright_penalty
+
+        # Compute constraint violation penalty
+
         
         return reward
 
@@ -191,28 +195,59 @@ from torchdiffeq import odeint
 
 # Neural network for the actor (policy) using ODE flow
 class ActorNetwork(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_dim=256, constraint_problem=None):
+    def __init__(self, input_dim, output_dim, force_dim, action_low, action_high, hidden_dim=256, constraint_problem=None):
         super(ActorNetwork, self).__init__()
         
         # Store dimensions
         self.input_dim = input_dim
         self.output_dim = output_dim
-        self.combined_dim = input_dim + output_dim
+        self.force_dim = force_dim
+        self.combined_dim_no_force = input_dim + output_dim
+        self.combined_dim = input_dim + output_dim + force_dim
+
+        self.action_low = action_low
+        self.action_high = action_high
         
         # Vector field network that models the dynamics of the state-action system
         self.vector_field = nn.Sequential(
+            nn.Linear(self.combined_dim*2, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, self.combined_dim*2)
+        )
+
+        # Predicts initial x dot for ODE integration
+        self.xdot0 = nn.Sequential(
             nn.Linear(self.combined_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, self.combined_dim)
         )
+
+        # Initialize both networks with small weights
         
         # Log standard deviation parameter
         self.log_std = nn.Parameter(torch.zeros(output_dim))
         
         # Store constraint problem for projection
         self.constraint_problem = constraint_problem
+
+        self.fingers = ['index', 'middle', 'thumb']
+        index_x_max = torch.tensor([0.47, 1.6099999999, 1.7089999, 1.61799999])
+        index_x_min = torch.tensor([-0.47, -0.195999999999, -0.174000000, -0.227])
+        thumb_x_max = torch.tensor([1.396, 1.1629999999999, 1.644, 1.71899999])
+        thumb_x_min = torch.tensor([0.26, -0.1049999999, -0.1889999999, -0.162])
+        joint_min = {'index': index_x_min, 'middle': index_x_min, 'ring': index_x_min, 'thumb': thumb_x_min}
+        joint_max = {'index': index_x_max, 'middle': index_x_max, 'ring': index_x_max, 'thumb': thumb_x_max}
+        self.x_max = torch.cat([joint_max[finger] for finger in self.fingers])
+        self.x_min = torch.cat([joint_min[finger] for finger in self.fingers])
+        self.robot_joint_x_max = torch.cat([joint_max[finger] for finger in self.fingers]).to('cuda:0')
+        self.robot_joint_x_min = torch.cat([joint_min[finger] for finger in self.fingers]).to('cuda:0')
+
+        self.robot_joint_x_min = torch.cat([self.robot_joint_x_min, torch.tensor([-torch.pi, -torch.pi, -torch.pi]).to('cuda:0')])
+        self.robot_joint_x_max = torch.cat([self.robot_joint_x_max, torch.tensor([torch.pi, torch.pi, torch.pi]).to('cuda:0')])
         
     def dynamics(self, t, x):
         """ODE function representing the vector field"""
@@ -225,27 +260,53 @@ class ActorNetwork(nn.Module):
             
         return dx
     
+    def compute_constraint_violation(self, obs, action, force):
+        
+        obs = obs.reshape(1, 1, -1)
+        action = action.reshape(1, 1, -1)
+        force = force.reshape(1, 1, -1)
+        decision_variable = torch.cat([obs, action,force], dim=-1)
+        self.constraint_problem._preprocess(decision_variable, projected_diffusion=True)
+        C, _, _ = self.constraint_problem.combined_constraints(
+            decision_variable,
+            compute_hess=False,
+            compute_grads=False,
+            projected_diffusion=True,
+            include_slack=False,
+            compute_inequality=True,
+            include_deriv_grad=False
+        )
+        return C.sum()   
+
     def project_vector_field(self, x, dx):
         """Project vector field to satisfy constraints"""
         batch_size = x.shape[0]
-        
+        x_ = x.clone()
+        x_[:, :, :self.input_dim] = torch.clamp(x[:, :, :self.input_dim], self.robot_joint_x_min.to('cuda:0'), self.robot_joint_x_max.to('cuda:0'))
+        x_[:, :, self.input_dim:self.combined_dim_no_force] = torch.clamp(x[:, :, self.input_dim:self.combined_dim_no_force], self.action_low, self.action_high)
+        x_[:, :, self.combined_dim_no_force:] = torch.clamp(x[:, :, self.combined_dim_no_force:], -2, 2)
+        x = x_
+        # print(x)
+        # print(dx)
         # Parameters for projection
-        Kh = 3
+        Kh = 1
         Ktheta = 1
-        
+
+        decision_variable = x[:, :, :self.combined_dim]
         # Apply projection
-        self.constraint_problem._preprocess(x, dxu=update_this_c[:, :, :self.transition_dim][:, :, mask_no_z], projected_diffusion=True)
+        self.constraint_problem._preprocess(decision_variable, dxu=x[:, :, self.combined_dim:], projected_diffusion=True)
         
         # Get constraints and their derivatives
         C, dC, _ = self.constraint_problem.combined_constraints(
-            x,
+            decision_variable,
             compute_hess=False,
             projected_diffusion=True,
             include_slack=False,
             compute_inequality=True,
             include_deriv_grad=True
         )
-        
+        # print(C)
+        # print()
         # Create masks for active constraints
         dC_mask = ~(dC == 0).all(dim=-1)
         g_dim = self.constraint_problem.dg
@@ -292,7 +353,7 @@ class ActorNetwork(nn.Module):
             dCdCT_inv, _ = cg_batch(A_bmm, eye, verbose=False)
         
         # Project the vector field
-        dh_bar_dJ = torch.bmm(dh_bar, dx.unsqueeze(-1))
+        dh_bar_dJ = torch.bmm(dh_bar, dx.permute(0, 2, 1))
         second_term = Ktheta * dh_bar_dJ - Kh * h_bar.unsqueeze(-1)
         pi = -dCdCT_inv @ second_term
         
@@ -301,6 +362,13 @@ class ActorNetwork(nn.Module):
         
         # Apply projection
         projected_dx = dx + (dh_bar.permute(0, 2, 1) @ pi).squeeze(-1)
+
+        x_ = x.clone()
+        x_[:, :, :self.input_dim] = torch.clamp(x[:, :, :self.input_dim], self.robot_joint_x_min.to('cuda:0'), self.robot_joint_x_max.to('cuda:0'))
+        x_[:, :, self.input_dim:self.combined_dim_no_force] = torch.clamp(x[:, :, self.input_dim:self.combined_dim_no_force], self.action_low, self.action_high)
+        x_[:, :, self.combined_dim_no_force:] = torch.clamp(x[:, :, self.combined_dim_no_force:], -2, 2)
+
+        x = x_
         
         return projected_dx
     
@@ -312,25 +380,45 @@ class ActorNetwork(nn.Module):
         batch_size = x.shape[0]
         
         # Generate random normal vectors for action space
-        z = torch.randn(batch_size, self.output_dim, device=x.device)
+        z = torch.randn(batch_size, self.output_dim+self.force_dim, device=x.device)
         
         # Concatenate state and random noise vector
         x_z = torch.cat([x, z], dim=-1)
+
+        # x_z_dot0 = self.xdot0(x_z)
+        x_z_dot0 = torch.zeros_like(x_z)
+
+        integration_input = torch.cat([x_z, x_z_dot0], dim=-1)
         
         # Integrate ODE from t=0 to t=1
         integration_times = torch.tensor([0.0, 1.0], device=x.device)
-        trajectory = odeint(self.dynamics, x_z, integration_times, method='rk4', options={'step_size': .1})
+
+        # Unsqueeze for CSVTO
+        integration_input = integration_input.unsqueeze(1)
+        trajectory = odeint(self.dynamics, integration_input, integration_times, method='rk4', options={'step_size': .3})
+
+        trajectory[..., self.combined_dim_no_force:self.combined_dim] = torch.clamp(trajectory[..., self.combined_dim_no_force:self.combined_dim], -2, 2)
+
+        self.constraint_problem.start = trajectory[0, 0, :15]
+        self.constraint_problem._preprocess(trajectory[:, 1:2])
+
+        u_hat = self.constraint_problem.solve_for_u_hat(trajectory[:, 1:2])
         
         # Extract the final point of the trajectory
         final_state = trajectory[-1]
+
+        final_state[:, self.input_dim:self.combined_dim_no_force] = u_hat.squeeze(1)
         
         # Split into state and action components
-        _, action = final_state[:, :self.input_dim], final_state[:, self.input_dim:]
-        
+        action = final_state[:, 0, self.input_dim:self.combined_dim_no_force]
+        action = torch.clamp(action, self.action_low, self.action_high)
+
+        force = final_state[:, 0, self.combined_dim_no_force:self.combined_dim]
+
         # Compute standard deviation
         std = torch.exp(self.log_std).expand_as(action)
         
-        return action, std
+        return action, std, force
 
 # Neural network for the critic (value function)
 class CriticNetwork(nn.Module):
@@ -358,6 +446,7 @@ class PPO:
         self,
         input_dim,
         output_dim,
+        force_dim,
         action_low,
         action_high,
         device,
@@ -384,18 +473,7 @@ class PPO:
         self.batch_size = batch_size
         self.num_epochs = num_epochs
         
-        # Scale actions from [-1, 1] to [low, high]
-        self.action_scale = (action_high - action_low) / 2.0
-        self.action_bias = (action_high + action_low) / 2.0
-        
-        # Policy and value networks
-        self.actor = ActorNetwork(input_dim, output_dim).to(device)
-        self.critic = CriticNetwork(input_dim).to(device)
-        
-        # Optimizers
-        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr_actor)
-        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=lr_critic)
-        
+               
         self.use_constraints = use_constraints
         
         # Create constraint problem if constraints are enabled
@@ -408,19 +486,20 @@ class PPO:
                 chain=env.chain,
                 device=torch.device('cuda:0'),
                 object_asset_pos=env.env.table_pose,
-                object_location='screwdriver',
+                object_location=torch.tensor([0, 0, 1.205]).to('cuda:0'),
                 object_type='screwdriver',
                 world_trans=env.env.world_trans,
                 contact_fingers=['index', 'middle', 'thumb'],
                 obj_dof=3,
                 obj_joint_dim=1,
-                optimize_force=False,
+                optimize_force=True,
                 turn=True
             )
             self.constraint_problem = constraint_problem
         
         # Policy and value networks
-        self.actor = ActorNetwork(input_dim, output_dim, 
+        self.actor = ActorNetwork(input_dim, output_dim, force_dim,
+                                  action_low, action_high,
                                  constraint_problem=constraint_problem).to(device)
         self.critic = CriticNetwork(input_dim).to(device)
         
@@ -441,7 +520,7 @@ class PPO:
             # Start timing action prediction
             start_time = time.time()
             
-            mean, std = self.actor(state)
+            mean, std, _ = self.actor(state)
             
             if evaluate:
                 # During evaluation, just use the mean
@@ -508,8 +587,16 @@ class PPO:
                 minibatch_returns = returns[minibatch_indices]
                 minibatch_advantages = advantages[minibatch_indices]
                 
-                # Evaluate actions
-                means, stds = self.actor(minibatch_states)
+                # Evaluate actions, 1 at a time
+                means = []
+                stds = []
+                for state in minibatch_states:
+                    mean, std, _ = self.actor(state)
+                    means.append(mean)
+                    stds.append(std)
+                means = torch.stack(means)
+                stds = torch.stack(stds)
+
                 dist = Normal(means, stds)
                 current_log_probs = dist.log_prob(minibatch_actions).sum(dim=-1)
                 entropy = dist.entropy().mean()
@@ -590,6 +677,7 @@ def train_ppo(config, total_timesteps=1000000, save_path=None):
     ppo_agent = PPO(
         input_dim=env.obs_dim,
         output_dim=env.control_dim,
+        force_dim=9,
         action_low=env.action_low,
         action_high=env.action_high,
         device=train_device,
@@ -598,7 +686,7 @@ def train_ppo(config, total_timesteps=1000000, save_path=None):
         gamma=0.99,
         gae_lambda=0.95,
         clip_param=0.2,
-        batch_size=32,
+        batch_size=config.get('batch_size', 64),
         num_epochs=10,
         use_constraints=config.get('use_constraints', False),
         env=env if config.get('use_constraints', False) else None
@@ -642,15 +730,18 @@ def train_ppo(config, total_timesteps=1000000, save_path=None):
                 with torch.no_grad():
                     # Move state to the training device (GPU)
                     state_tensor = torch.FloatTensor(state).to(train_device)
-                    mean, std = ppo_agent.actor(state_tensor)
+                    mean, std, force = ppo_agent.actor(state_tensor)
                     dist = Normal(mean, std)
-                    action = dist.sample()
+                    # action = dist.sample()
+                    action = mean
                     log_prob = dist.log_prob(action).sum(dim=-1)
                     value = ppo_agent.critic(state_tensor).squeeze()
                 
                 # Take action in environment
                 action_np = action
                 next_state, reward, done = env.step(action_np)
+
+                reward += -.1 * ppo_agent.actor.compute_constraint_violation(state_tensor, action, force).item()
                 
                 # Store data
                 states.append(state)

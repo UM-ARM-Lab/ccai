@@ -111,7 +111,7 @@ class ConstrainedSVGDProblem(Problem):
         # print(g.max(), g.min(), h.max(), h.min())
 
         if h is None:
-            return g, grad_g, hess_g, t_mask_g
+            return g, grad_g, hess_g
 
         if include_slack:
             if self.squared_slack:
@@ -123,8 +123,8 @@ class ConstrainedSVGDProblem(Problem):
 
         if not compute_grads:
             if g is None:
-                return h_aug, None, None, t_mask_h
-            return torch.cat((g, h_aug), dim=1), None, None, torch.cat((t_mask_g, t_mask_h), dim=1)
+                return h_aug, None, None
+            return torch.cat((g, h_aug), dim=1), None, None
 
             # Gradients - gradient wrt z should be z
         if include_slack:
@@ -165,7 +165,7 @@ class ConstrainedSVGDProblem(Problem):
             hess_h_aug = None
 
         if g is None:
-            return h_aug, grad_h_aug, hess_h_aug, t_mask_h
+            return h_aug, grad_h_aug, hess_h_aug
         if include_slack:
             grad_g_aug = torch.cat((
                 grad_g.reshape(N, self.dg + self.dg_per_t * T_offset, (self.T + T_offset), -1),
@@ -192,10 +192,9 @@ class ConstrainedSVGDProblem(Problem):
             hess_c = None
 
         c = torch.cat((g, h_aug), dim=1)  # (N, dg + dh)
-        t_mask = torch.cat((t_mask_g, t_mask_h), dim=1)
         grad_c = torch.cat((grad_g_aug, grad_h_aug), dim=1)
 
-        return c, grad_c, hess_c, t_mask
+        return c, grad_c, hess_c
 
     def get_initial_z(self, x, projected_diffusion=False):
         self._preprocess(x, projected_diffusion=projected_diffusion)

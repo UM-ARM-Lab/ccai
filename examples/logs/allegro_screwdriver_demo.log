@@ -1,4 +1,4 @@
-CCAI_PATH /home/abhinav/Documents/ccai
+CCAI_PATH /home/abhinav/Documents/constrained_rl
 Simulation running on: cpu
 PPO training running on: cuda:0
 object to robot tensor([[[-7.6604e-01,  4.1318e-01,  4.9240e-01,  9.2768e-01],
@@ -10,6 +10,6 @@ object to robot tensor([[[-7.6604e-01,  4.1318e-01,  4.9240e-01,  9.2768e-01],
          [ 6.4279e-01,  4.9240e-01,  5.8682e-01,  1.0828e+00],
          [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  1.0000e+00]]])
 
-Collecting 1024 steps of experience...
+Collecting 2 steps of experience...
 Episode reset - starting new episode
 Backend TkAgg is interactive backend. Turning interactive mode on.
