@@ -242,11 +242,11 @@ def collect_rl_data_during_execution(
     
     # Check if we have enough data to update the policy
     if trajectory_sampler_orig.get_memory_size() >= params.get('sac_batch_size', 512):
-        # Update policy using sac - returns comprehensive metrics
+        # Update policy using SAC - returns comprehensive metrics
         metrics = trajectory_sampler_orig.sac_update()
         
         # Log detailed metrics to console
-        print(f"sac Update - Actor Loss: {metrics.get('actor_loss', 0):.4f}, "
+        print(f"SAC Update - Actor Loss: {metrics.get('actor_loss', 0):.4f}, "
               f"Q1 Loss: {metrics.get('critic_loss_1', 0):.4f}, "
               f"Q2 Loss: {metrics.get('critic_loss_2', 0):.4f}, "
               f"Entropy: {metrics.get('entropy', 0):.4f}, "
