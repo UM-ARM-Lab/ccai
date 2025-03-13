@@ -357,7 +357,7 @@ class TrajectorySampler(nn.Module):
             # Create the actor GP with our custom likelihood
             actor_likelihood = SigmoidBernoulliLikelihood(
                 initial_bias=-initial_threshold,
-                initial_temp=.25,
+                initial_temp=.1,
                 num_samples=15
             )
             self.gp = LikelihoodResidualGP(
@@ -397,10 +397,10 @@ class TrajectorySampler(nn.Module):
             # PPO hyperparameters
             self.clip_param = 0.2
             self.value_loss_coef = 0.5
-            self.entropy_coef = 0.01
+            self.entropy_coef = 0.1
             self.max_grad_norm = 0.5
-            self.ppo_epochs = 32
-            self.batch_size = 32
+            self.ppo_epochs = 10
+            self.batch_size = 64
             self.gamma = 0.99
             self.gae_lambda = 0.95
             
@@ -507,7 +507,7 @@ class TrajectorySampler(nn.Module):
             # Use the optimized GP prediction
             with torch.no_grad():
                 # Get residual mean with fast prediction
-                residual, _ = self.gp.predict(start_sine_cosine.unsqueeze(0), fast_mode=True)
+                residual, _ = self.gp.gp_model.predict(start_sine_cosine.unsqueeze(0), fast_mode=True)
                 residual = residual.item()
                 print('Likelihood residual:', residual)
                 
@@ -895,7 +895,7 @@ class TrajectorySampler(nn.Module):
                 
                 # PPO policy loss calculation
                 loss_calc_start = time.time()
-                ratio = torch.exp(log_probs - batch_old_log_probs)
+                ratio = torch.exp(log_probs.flatten() - batch_old_log_probs)
                 surr1 = ratio * batch_advantages
                 surr2 = torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * batch_advantages
                 
@@ -924,6 +924,9 @@ class TrajectorySampler(nn.Module):
                 
                 # Measure NGD optimizer step time
                 ngd_start = time.time()
+                with torch.no_grad():
+                    actor_ip_before = self.gp.gp_model.variational_strategy.inducing_points.clone()
+                    value_ip_before = self.value_function.gp_model.variational_strategy.inducing_points.clone()
                 self.actor_ngd_optimizer.step()
                 self.value_ngd_optimizer.step()
                 ngd_time = time.time() - ngd_start
@@ -968,6 +971,13 @@ class TrajectorySampler(nn.Module):
                 
                 timing_stats['batch_total'] += time.time() - batch_start
                 epoch_timings['batch_total'] += time.time() - batch_start
+
+                with torch.no_grad():
+                    actor_ip_after = self.gp.gp_model.variational_strategy.inducing_points
+                    value_ip_after = self.value_function.gp_model.variational_strategy.inducing_points
+                    actor_ip_change = torch.norm(actor_ip_after - actor_ip_before).item()
+                    value_ip_change = torch.norm(value_ip_after - value_ip_before).item()
+                    print(f"Actor IP change: {actor_ip_change:.6f} | Value IP change: {value_ip_change:.6f}")
             
             # Calculate epoch averages
             if epoch_updates > 0:

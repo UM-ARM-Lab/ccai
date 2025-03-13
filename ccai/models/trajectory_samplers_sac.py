@@ -1,12 +1,17 @@
-from typing import Dict
+from typing import Dict, Tuple, List, Optional, Union
 import numpy as np
 import gpytorch
 import torch
 from torch import nn
 import torch.nn.functional as F
-from torch.distributions import Normal
+from torch.distributions import Normal, Categorical
 from torch.optim import Adam
 from gpytorch.optim import NGD
+
+import random
+import time
+import collections
+from collections import deque
 
 from tqdm import tqdm
 from ccai.models.custom_likelihoods import SigmoidBernoulliLikelihood
@@ -34,6 +39,9 @@ import collections
 
 # Import fast prediction settings
 from gpytorch.settings import fast_pred_var, fast_pred_samples, cg_tolerance
+
+# Import the new PrioritizedReplayBuffer
+from ccai.models.replay_buffer import PrioritizedReplayBuffer
 
 class TrajectoryFlowModel(nn.Module):
 
@@ -351,30 +359,39 @@ class TrajectorySampler(nn.Module):
 
         self.rl_adjustment = rl_adjustment
         if self.rl_adjustment:
-            # We no longer need the threshold as a separate parameter
-            # Instead, we'll use the bias parameter in our custom likelihood
-            
-            # Create the actor GP with our custom likelihood
+            # Create the actor GP (policy network)
             actor_likelihood = SigmoidBernoulliLikelihood(
                 initial_bias=-initial_threshold,
-                initial_temp=.25,
+                initial_temp=0.1,
                 num_samples=15
             )
             self.gp = LikelihoodResidualGP(
                 dx, 
                 num_inducing=32,
+                kernel_type="matern32",
                 likelihood=actor_likelihood,
-                use_whitening=True  # Use whitening for better numerical stability
+                use_whitening=True
             )
             
-            # Value function GP still uses Gaussian likelihood
+            # Create the critic GP (Q-function)
             self.value_function = LikelihoodResidualGP(
                 dx, 
                 num_inducing=32, 
                 kernel_type="matern32",
                 use_ard=True,
-                use_whitening=True  # Use whitening for better numerical stability
+                use_whitening=True
             )
+            
+            # Create target critic for stability
+            self.value_function_target = LikelihoodResidualGP(
+                dx, 
+                num_inducing=32, 
+                kernel_type="matern32",
+                use_ard=True,
+                use_whitening=True
+            )
+            # Copy weights
+            self.value_function_target.load_state_dict(self.value_function.state_dict())
             
             # Separate variational parameters from hyperparameters for NGD
             actor_variational_params = []
@@ -393,60 +410,41 @@ class TrajectorySampler(nn.Module):
                 else:
                     value_hyper_params.append(param)
             
-            # PPO hyperparameters
-            self.clip_param = 0.2
-            self.value_loss_coef = 0.5
-            self.entropy_coef = 0.01
-            self.max_grad_norm = 0.5
-            self.ppo_epochs = 32
-            self.batch_size = 32
-            self.gamma = 0.99
-            self.gae_lambda = 0.95
+            # SAC hyperparameters
+            self.gamma = 0.99  # Discount factor
+            self.tau = 0.005   # Soft target update parameter
+            self.batch_size = 64
+            self.alpha = 0.2   # Temperature parameter for entropy
+            self.buffer_size = 10000  # Replay buffer size
             
-            # PPO memory
-            self.ppo_states = []
-            self.ppo_actions = []
-            self.ppo_log_probs = []
-            self.ppo_rewards = []
-            self.ppo_values = []
-            self.ppo_dones = []
-            self.ppo_returns = []
-            self.ppo_advantages = []
-
-            # Use NGD for variational parameters (typically needs higher learning rate)
+            # Prioritized experience replay parameters
+            self.per_alpha = 0.75  # How much prioritization to use (0 = none, 1 = full)
+            self.per_beta = 0.4   # Importance sampling correction (0 = none, 1 = full)
+            self.per_beta_increment = 0.001  # Increment per update
+            self.per_epsilon = 0.01  # Small constant to ensure non-zero priority
+            
+            # Using NGD for variational parameters
             self.actor_ngd_optimizer = NGD(actor_variational_params, num_data=self.batch_size, lr=0.1)
             self.value_ngd_optimizer = NGD(value_variational_params, num_data=self.batch_size, lr=0.1)
             
-            # Use Adam for hyperparameters and likelihood parameters
+            # Using Adam for hyperparameters
             self.sac_optimizer = Adam([
                 {'params': actor_hyper_params, 'lr': 1e-2},
                 {'params': self.gp.likelihood.parameters(), 'lr': 1e-2},
                 {'params': value_hyper_params, 'lr': 1e-2},
                 {'params': self.value_function.likelihood.parameters(), 'lr': 1e-2}
             ])
+            
+            # Replace regular replay buffer with prioritized version
+            self.replay_buffer = PrioritizedReplayBuffer(
+                capacity=self.buffer_size,
+                alpha=self.per_alpha,
+                beta=self.per_beta,
+                beta_increment=self.per_beta_increment,
+                epsilon=self.per_epsilon
+            )
 
         self.send_norm_constants_to_submodels()
-
-        # Remove PPO-specific references:
-        # ...existing code...
-
-        # Introduce SAC-specific components:
-        self.sac_alpha = 0.2
-        self.sac_gamma = 0.99
-        self.sac_tau = 0.005  # For soft target updates
-        self.sac_actor_lr = 1e-3
-        self.sac_critic_lr = 1e-3
-        self.replay_buffer = []  # Minimal placeholder for replay buffer
-
-        # Example networks (replace or reuse):
-        self.value_function_target = LikelihoodResidualGP(
-            dx,
-            num_inducing=32,
-            kernel_type="matern32",
-            use_ard=True,
-            use_whitening=True
-        )
-        self.value_function_target.load_state_dict(self.value_function.state_dict())
 
     def to(self, device: torch.device) -> 'TrajectorySampler':
         """
@@ -527,7 +525,7 @@ class TrajectorySampler(nn.Module):
             # Use the optimized GP prediction
             with torch.no_grad():
                 # Get residual mean with fast prediction
-                residual, _ = self.gp.predict(start_sine_cosine.unsqueeze(0), fast_mode=True)
+                residual, _ = self.gp.gp_model.predict(start_sine_cosine.unsqueeze(0), fast_mode=True)
                 residual = residual.item()
                 print('Likelihood residual:', residual)
                 
@@ -712,101 +710,293 @@ class TrajectorySampler(nn.Module):
 
     def store_transition(self, state, action: int, likelihood: float, next_state, reward: float, done: bool = False) -> None:
         """
-        Store a transition in the SAC replay buffer.
+        Store a transition in the SAC prioritized replay buffer.
+        
+        Args:
+            state: Current state
+            action: Action taken (0=OOD, 1=ID)
+            likelihood: Base likelihood estimate
+            next_state: Next state
+            reward: Reward received
+            done: Whether the episode is done
         """
-        self.replay_buffer.append((state, action, reward, next_state, done))
-
-    def sample_replay_buffer(self, batch_size: int = 64):
-        """
-        Sample a random minibatch from the replay buffer.
-        """
-        indices = np.random.randint(0, len(self.replay_buffer), batch_size)
-        states, actions, rewards, next_states, dones = [], [], [], [], []
-        for idx in indices:
-            s, a, r, ns, d = self.replay_buffer[idx]
-            states.append(s)
-            actions.append(a)
-            rewards.append(r)
-            next_states.append(ns)
-            dones.append(d)
-        return (
-            torch.stack(states, dim=0),
-            torch.stack(actions, dim=0),
-            torch.tensor(rewards, dtype=torch.float32, device=states[0].device),
-            torch.stack(next_states, dim=0),
-            torch.tensor(dones, dtype=torch.float32, device=states[0].device)
+        if not self.rl_adjustment:
+            return
+            
+        # Process state with sine/cosine conversion
+        state_tensor = torch.tensor(
+            self.convert_yaw_to_sine_cosine(state), 
+            dtype=torch.float32, 
+            device=next(self.parameters()).device
+        ).unsqueeze(0)
+        
+        next_state_tensor = torch.tensor(
+            self.convert_yaw_to_sine_cosine(next_state), 
+            dtype=torch.float32, 
+            device=next(self.parameters()).device
+        ).unsqueeze(0) if next_state is not None else None
+        
+        # Store likelihood for context
+        likelihood_tensor = torch.tensor([likelihood], 
+                                          dtype=torch.float32, 
+                                          device=next(self.parameters()).device)
+        
+        # Create experience tuple
+        experience = (
+            state_tensor, 
+            action, 
+            likelihood_tensor,
+            reward, 
+            next_state_tensor, 
+            done
         )
-
-    def get_action(self, states: torch.Tensor) -> torch.Tensor:
+        
+        # Store transition with maximum priority for new experiences
+        self.replay_buffer.add(experience)
+    
+    def sample_replay_buffer(self, batch_size: int = None) -> Tuple:
         """
-        Sample actions from self.gp (acting as policy).
-        For simplicity, we interpret the Bernoulli outcome as an action in {0, 1}.
+        Sample a batch from the prioritized replay buffer.
+        
+        Args:
+            batch_size: Number of transitions to sample (defaults to self.batch_size)
+            
+        Returns:
+            Tuple of (states, actions, likelihoods, rewards, next_states, dones, indices, is_weights)
         """
-        # Example approach: for each state, compute Bernoulli prob, sample action
+        if batch_size is None:
+            batch_size = self.batch_size
+            
+        batch_size = min(batch_size, len(self.replay_buffer))
+        
+        # Sample from prioritized replay buffer
+        experiences, indices, is_weights = self.replay_buffer.sample(batch_size)
+        
+        # Convert is_weights to tensor
+        is_weights = torch.tensor(is_weights, dtype=torch.float32, device=self.device)
+        
+        # Unpack the experiences
+        states, actions, likelihoods, rewards, next_states, dones = zip(*experiences)
+        
+        # Convert to tensors and stack
+        states = torch.cat(states)
+        actions = torch.tensor(actions, dtype=torch.long, device=states.device).unsqueeze(1)
+        likelihoods = torch.cat(likelihoods)
+        rewards = torch.tensor(rewards, dtype=torch.float32, device=states.device)
+        
+        # Handle None values in next_states for terminal states
+        valid_next_states = [s for s in next_states if s is not None]
+        if valid_next_states:
+            next_states_tensor = torch.cat(valid_next_states)
+            # For None values, use zeros or the last state
+            missing_shape = list(next_states_tensor.shape[1:])
+            for i, ns in enumerate(next_states):
+                if ns is None:
+                    next_states[i] = torch.zeros([1] + missing_shape, device=states.device)
+            next_states = torch.cat(next_states)
+        else:
+            # If all next_states are None, create zeros
+            next_states = torch.zeros_like(states)
+            
+        dones = torch.tensor(dones, dtype=torch.float32, device=states.device)
+        
+        return states, actions, likelihoods, rewards, next_states, dones, indices, is_weights
+    
+    def get_action(self, state: torch.Tensor, likelihood: float, deterministic: bool = False) -> Tuple[int, float]:
+        """
+        Sample an action from the policy, adding the likelihood as context.
+        
+        Args:
+            state: Current state tensor
+            likelihood: Base likelihood from trajectory sampling
+            deterministic: If True, choose most likely action
+            
+        Returns:
+            Tuple of (action, log_prob)
+        """
         with torch.no_grad(), fast_pred_var():
-            out_mean, _ = self.gp.predict(states, fast_mode=True)
-        action_probs = torch.sigmoid(out_mean)  # shape [batch_size, 1]
-        return torch.bernoulli(action_probs).float()
+            # Get GP prediction
+            output_mean, _ = self.gp.predict(state, fast_mode=True)
+            
+            # Add base likelihood for context
+            combined_feature = likelihood + output_mean
+            combined_feature = combined_feature.unsqueeze(-1)
+            
+            # Convert to Bernoulli distribution via the likelihood
+            dist = self.gp.likelihood(combined_feature)
+            
+            # Generate probabilities for action 1 (ID)
+            prob_id = dist.mean  # Probability of being in-distribution
+            
+            # Create a proper categorical distribution
+            probs = torch.cat([1-prob_id, prob_id], dim=-1)
+            
+            # Sample from distribution or take most likely
+            if deterministic:
+                action = torch.argmax(probs).item()
+            else:
+                action = torch.distributions.Categorical(probs).sample().item()
+            
+            # Calculate log prob for the action
+            log_prob = torch.log(probs.squeeze()[action] + 1e-10)
+            
+        return action, log_prob.item()
 
-    def sac_update(self, batch_size: int = 64) -> Dict[str, float]:
+    def sac_update(self) -> Dict[str, float]:
         """
-        Perform one SAC update step using self.gp as the actor and
-        self.value_function / self.value_function_target as the critic networks.
+        Update the actor (GP) and critic (value_function) using SAC with prioritized experience replay.
+        
+        Returns:
+            Dictionary with loss information
         """
-        if len(self.replay_buffer) < batch_size:
-            return {"critic_loss": 0.0, "actor_loss": 0.0}
-
-        states, actions, rewards, next_states, dones = self.sample_replay_buffer(batch_size)
-
-        # Critic update
+        if len(self.replay_buffer) < self.batch_size:
+            return {
+                "actor_loss": 0.0,
+                "critic_loss": 0.0,
+                "alpha_loss": 0.0,
+                "mean_reward": 0.0
+            }
+        
+        # Sample from replay buffer with importance sampling weights
+        states, actions, likelihoods, rewards, next_states, dones, indices, is_weights = self.sample_replay_buffer()
+        
+        # Normalize states
+        state_norm = (states - self.x_mean[:self.dx]) / self.x_std[:self.dx]
+        next_state_norm = (next_states - self.x_mean[:self.dx]) / self.x_std[:self.dx]
+        
+        # Track inducing point changes
         with torch.no_grad():
-            next_actions = self.get_action(next_states)
-            # Evaluate target Q
-            target_q_out = self.value_function_target.gp_model(torch.cat([next_states, next_actions], dim=1))
-            y = rewards + self.sac_gamma * (1.0 - dones) * target_q_out.mean.squeeze(-1)
-
-        q_pred = self.value_function.gp_model(torch.cat([states, actions], dim=1)).mean.squeeze(-1)
-        critic_loss = nn.MSELoss()(q_pred, y)
-
+            actor_ip_before = self.gp.gp_model.variational_strategy.inducing_points.clone()
+            critic_ip_before = self.value_function.gp_model.variational_strategy.inducing_points.clone()
+        
+        # Critic update (minimize Q-value loss)
+        with torch.no_grad():
+            # Get next state GP output for target critic
+            next_output_mean = self.gp.gp_model(next_state_norm).mean
+            
+            # Combine with likelihoods (assuming they're preserved across transitions)
+            next_combined = next_output_mean + likelihoods
+            next_combined = next_combined.unsqueeze(-1)
+            
+            # Get action probabilities using the target network
+            next_probs = self.gp.likelihood(next_combined).mean
+            next_probs = torch.cat([1-next_probs, next_probs], dim=-1)
+            next_dist = Categorical(next_probs)
+            
+            # Calculate entropy term
+            next_entropy = next_dist.entropy()
+            
+            # Calculate expected next Q-value with entropy regularization
+            next_q_values = self.value_function_target.gp_model(next_state_norm).mean
+            
+            # Target Q = r + γ(Q(s',a') + α*H(π(·|s')))
+            target_q = rewards + (1 - dones) * self.gamma * (next_q_values.squeeze() + self.alpha * next_entropy)
+        
+        # Zero gradients
         self.value_ngd_optimizer.zero_grad()
         self.sac_optimizer.zero_grad()
+        
+        # Current Q-value prediction
+        current_q_values = self.value_function.gp_model(state_norm).mean
+        
+        # Compute TD errors for priority updates
+        td_errors = target_q - current_q_values.squeeze()
+        
+        # Compute critic loss with importance sampling weights
+        critic_loss = (is_weights * F.mse_loss(current_q_values.squeeze(), target_q, reduction='none')).mean()
+        
+        # Backpropagate critic loss
         critic_loss.backward()
+        
+        # Step optimizers for critic
         self.value_ngd_optimizer.step()
         self.sac_optimizer.step()
-
-        # Actor update
-        new_actions = self.get_action(states)
-        q_for_actor = self.value_function.gp_model(torch.cat([states, new_actions], dim=1)).mean
-        actor_loss = -q_for_actor.mean()
-
+        
+        # Actor update (maximize policy objective)
+        # Zero gradients
         self.actor_ngd_optimizer.zero_grad()
         self.sac_optimizer.zero_grad()
+        
+        # Get output from GP
+        output_mean = self.gp.gp_model(state_norm).mean
+        
+        # Combine with likelihoods
+        combined_features = output_mean + likelihoods
+        combined_features = combined_features.unsqueeze(-1)
+        
+        # Get action probabilities
+        probs = self.gp.likelihood(combined_features).mean
+        probs = torch.cat([1-probs, probs], dim=-1)
+        dist = Categorical(probs)
+        
+        # Get entropy
+        entropy = dist.entropy().mean()
+        
+        # Get log probs for each action in the batch
+        log_probs = torch.log(torch.gather(probs, 1, actions) + 1e-10)
+        
+        # Estimate Q-value for current policy
+        q_values = self.value_function.gp_model(state_norm).mean
+        
+        # Actor loss: E[α*log(π(a|s)) - Q(s,a)] with importance sampling
+        actor_loss = (is_weights * (self.alpha * log_probs - q_values)).mean()
+        
+        # Backpropagate actor loss
         actor_loss.backward()
+        
+        # Step optimizers for actor
         self.actor_ngd_optimizer.step()
         self.sac_optimizer.step()
-
-        # Soft update target critic
+        
+        # Soft update target networks
         with torch.no_grad():
             for param, target_param in zip(
-                self.value_function.gp_model.parameters(),
-                self.value_function_target.gp_model.parameters()
+                self.value_function.parameters(),
+                self.value_function_target.parameters()
             ):
                 target_param.data.copy_(
-                    self.sac_tau * param.data + (1.0 - self.sac_tau) * target_param.data
+                    self.tau * param.data + (1 - self.tau) * target_param.data
                 )
-
+                
+            # Calculate inducing point changes
+            actor_ip_after = self.gp.gp_model.variational_strategy.inducing_points
+            critic_ip_after = self.value_function.gp_model.variational_strategy.inducing_points
+            actor_ip_change = torch.norm(actor_ip_after - actor_ip_before).item()
+            critic_ip_change = torch.norm(critic_ip_after - critic_ip_before).item()
+            print(f"Actor IP change: {actor_ip_change:.6f} | Critic IP change: {critic_ip_change:.6f}")
+        
+        # Update priorities in the replay buffer
+        td_errors_np = td_errors.abs().detach().cpu().numpy()
+        self.replay_buffer.update_priorities(indices, td_errors_np)
+        
+        # Return metrics
         return {
+            "actor_loss": actor_loss.item(),
             "critic_loss": critic_loss.item(),
-            "actor_loss": actor_loss.item()
+            "entropy": entropy.item(),
+            "mean_reward": rewards.mean().item(),
+            "actor_ip_change": actor_ip_change,
+            "critic_ip_change": critic_ip_change,
+            "mean_td_error": td_errors.abs().mean().item()
         }
-
+        
+    def adjust_temperature(self, alpha: float) -> None:
+        """
+        Adjust the temperature parameter alpha.
+        
+        Args:
+            alpha: New temperature value
+        """
+        self.alpha = alpha
+        print(f"SAC temperature adjusted: α={alpha}")
+        
     def adjust_ngd_learning_rate(self, actor_lr: float = 0.1, value_lr: float = 0.1) -> None:
         """
         Adjust the learning rates for Natural Gradient Descent optimizers.
         
         Args:
             actor_lr: Learning rate for actor GP optimizer
-            value_lr: Learning rate for value function GP optimizer
+            value_lr: Learning rate for critic GP optimizer
         """
         for param_group in self.actor_ngd_optimizer.param_groups:
             param_group['lr'] = actor_lr

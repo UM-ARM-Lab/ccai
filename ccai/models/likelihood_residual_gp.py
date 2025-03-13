@@ -149,7 +149,7 @@ class VariationalGP(ApproximateGP):
         
         return output.mean, output.variance
     
-    def predict_with_grad(self, x: torch.Tensor, fast_mode: bool = True) -> Tuple[torch.Tensor, torch.Tensor]:
+    def predict_with_grad(self, x: torch.Tensor, fast_mode: bool = True, normalize=True) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Make predictions with the GP model, preserving gradients.
         Uses fast_pred_var for efficient variance computation.
@@ -161,7 +161,8 @@ class VariationalGP(ApproximateGP):
         Returns:
             Tuple of (mean, variance) tensors
         """
-        x = (x - self.x_mean[:x.shape[-1]]) / self.x_std[:x.shape[-1]]
+        if normalize:
+            x = (x - self.x_mean[:x.shape[-1]]) / self.x_std[:x.shape[-1]]
         self.eval()
         
         # Use fast_pred_var but keep gradients

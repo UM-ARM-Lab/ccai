@@ -58,7 +58,7 @@ print("CCAI_PATH", CCAI_PATH)
 obj_dof = 3
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
-sys.stdout = open('./examples/logs/allegro_screwdriver_rl_tuning_bernoulli_likelihood.log', 'w', buffering=1)
+sys.stdout = open('./examples/logs/allegro_screwdriver_rl_tuning_bernoulli_likelihood_64.log', 'w', buffering=1)
 
 
 def vector_cos(a, b):
@@ -195,7 +195,8 @@ def collect_rl_data_during_execution(
     next_state: torch.Tensor, 
     reward: float, 
     done: bool, 
-    trajectory_steps: int = 1
+    model_path_rl_adjusted: str,
+    trajectory_steps: int = 1,
 ) -> None:
     """
     Store transition data for RL training.
@@ -244,6 +245,9 @@ def collect_rl_data_during_execution(
         print(f"PPO Update - Policy Loss: {metrics.get('policy_loss', 0):.4f}, "
               f"Value Loss: {metrics.get('value_loss', 0):.4f}, "
               f"New Threshold: {metrics.get('threshold', 0):.4f}")
+        
+        # Save model
+        torch.save(trajectory_sampler_orig.model.state_dict(), f'{CCAI_PATH}/{model_path_rl_adjusted}')
 
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noise=None, noise_noise=None, sim=None, seed=None,
              proj_path=None, perturb_this_trial=False):
@@ -847,6 +851,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     next_state=next_state,
                     reward=reward,
                     done=False,
+                    model_path_rl_adjusted=model_path_rl_adjusted,
                     trajectory_steps=1
                 )
             executed_steps = k + 1
@@ -1185,6 +1190,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                             next_state=current_state,
                             reward=reward,
                             done=False,
+                            model_path_rl_adjusted=model_path_rl_adjusted,
                             trajectory_steps=traj_steps
                         )
                     
@@ -1266,6 +1272,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                             next_state=current_state,
                             reward=reward,
                             done=False,
+                            model_path_rl_adjusted=model_path_rl_adjusted,
                             trajectory_steps=traj_steps
                         )
                         
@@ -1341,6 +1348,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                             next_state=current_state,
                             reward=reward,
                             done=False,
+                            model_path_rl_adjusted=model_path_rl_adjusted,
                             trajectory_steps=traj_steps
                         )
                         
@@ -1656,6 +1664,7 @@ if __name__ == "__main__":
     trajectory_sampler = None
     model_path = config.get('model_path', None)
     model_path_orig = config.get('model_path_orig', None)
+    model_path_rl_adjusted = config.get('model_path_rl_adjusted', None)
 
     params = config.copy()
     params.pop('controllers')
