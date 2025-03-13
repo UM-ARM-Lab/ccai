@@ -116,7 +116,7 @@ class CDFBernoulliLikelihood(Likelihood):
 
         # Extract single variate normal from multivariatenormal using mean, variance
         loc = function_dist.mean
-        scale = function_dist.variance.sqrt() + torch.exp(self.global_scale_increase)
+        scale = function_dist.variance.sqrt() + torch.exp(self.log_global_scale_increase)
         output_probs = torch.distributions.Normal(loc, scale).cdf(self.threshold)
 
         
