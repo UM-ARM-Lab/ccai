@@ -14,7 +14,7 @@ import collections
 from collections import deque
 
 from tqdm import tqdm
-from ccai.models.custom_likelihoods import SigmoidBernoulliLikelihood
+from ccai.models.custom_likelihoods import CDFBernoulliLikelihood
 from ccai.models.helpers import MLP
 from ccai.models.likelihood_residual_gp import LikelihoodResidualGP
 
@@ -360,38 +360,55 @@ class TrajectorySampler(nn.Module):
         self.rl_adjustment = rl_adjustment
         if self.rl_adjustment:
             # Create the actor GP (policy network)
-            actor_likelihood = SigmoidBernoulliLikelihood(
-                initial_bias=-initial_threshold,
-                initial_temp=0.1,
+            num_inducing = 32
+            actor_likelihood = CDFBernoulliLikelihood(
+                initial_threshold=initial_threshold,
                 num_samples=15
             )
             self.gp = LikelihoodResidualGP(
                 dx, 
-                num_inducing=32,
-                kernel_type="matern32",
+                num_inducing=num_inducing,
+                kernel_type="rbf",
                 likelihood=actor_likelihood,
                 use_whitening=True
             )
-            
+            value_function_inducing_points = torch.randn(num_inducing, dx+1)
             # Create the critic GP (Q-function)
             self.value_function = LikelihoodResidualGP(
-                dx, 
-                num_inducing=32, 
-                kernel_type="matern32",
+                dx+1, 
+                inducing_points=value_function_inducing_points, 
+                kernel_type="rbf",
                 use_ard=True,
                 use_whitening=True
             )
             
             # Create target critic for stability
             self.value_function_target = LikelihoodResidualGP(
-                dx, 
-                num_inducing=32, 
-                kernel_type="matern32",
+                dx+1, 
+                inducing_points=value_function_inducing_points, 
+                kernel_type="rbf",
                 use_ard=True,
                 use_whitening=True
             )
-            # Copy weights
-            self.value_function_target.load_state_dict(self.value_function.state_dict())
+            
+            # Create Q-function 2 for clipped double-Q trick
+            value_function_inducing_points_2 = torch.randn(num_inducing, dx)
+            self.value_function_2 = LikelihoodResidualGP(
+                dx, 
+                inducing_points=value_function_inducing_points_2, 
+                kernel_type="rbf",
+                use_ard=True,
+                use_whitening=True
+            )
+            
+            # Create target for Q-function 2
+            self.value_function_target_2 = LikelihoodResidualGP(
+                dx, 
+                inducing_points=value_function_inducing_points_2, 
+                kernel_type="rbf",
+                use_ard=True,
+                use_whitening=True
+            )
             
             # Separate variational parameters from hyperparameters for NGD
             actor_variational_params = []
@@ -410,10 +427,19 @@ class TrajectorySampler(nn.Module):
                 else:
                     value_hyper_params.append(param)
             
+            # Value function 2 parameters
+            value_variational_params_2 = []
+            value_hyper_params_2 = []
+            for name, param in self.value_function_2.gp_model.named_parameters():
+                if 'variational' in name:
+                    value_variational_params_2.append(param)
+                else:
+                    value_hyper_params_2.append(param)
+            
             # SAC hyperparameters
             self.gamma = 0.99  # Discount factor
             self.tau = 0.005   # Soft target update parameter
-            self.batch_size = 64
+            self.batch_size = 2
             self.alpha = 0.2   # Temperature parameter for entropy
             self.buffer_size = 10000  # Replay buffer size
             
@@ -426,13 +452,16 @@ class TrajectorySampler(nn.Module):
             # Using NGD for variational parameters
             self.actor_ngd_optimizer = NGD(actor_variational_params, num_data=self.batch_size, lr=0.1)
             self.value_ngd_optimizer = NGD(value_variational_params, num_data=self.batch_size, lr=0.1)
+            self.value_ngd_optimizer_2 = NGD(value_variational_params_2, num_data=self.batch_size, lr=0.1)
             
             # Using Adam for hyperparameters
             self.sac_optimizer = Adam([
                 {'params': actor_hyper_params, 'lr': 1e-2},
                 {'params': self.gp.likelihood.parameters(), 'lr': 1e-2},
                 {'params': value_hyper_params, 'lr': 1e-2},
-                {'params': self.value_function.likelihood.parameters(), 'lr': 1e-2}
+                {'params': value_hyper_params_2, 'lr': 1e-2},
+                {'params': self.value_function.likelihood.parameters(), 'lr': 1e-2},
+                {'params': self.value_function_2.likelihood.parameters(), 'lr': 1e-2}
             ])
             
             # Replace regular replay buffer with prioritized version
@@ -444,6 +473,7 @@ class TrajectorySampler(nn.Module):
                 epsilon=self.per_epsilon
             )
 
+        self.num_update = 5  # Multiple updates per call
         self.send_norm_constants_to_submodels()
 
     def to(self, device: torch.device) -> 'TrajectorySampler':
@@ -469,6 +499,10 @@ class TrajectorySampler(nn.Module):
         if self.rl_adjustment:
             self.gp = self.gp.to(device)
             self.value_function = self.value_function.to(device)
+            self.value_function_target = self.value_function_target.to(device)
+            # Add second Q-function and target
+            self.value_function_2 = self.value_function_2.to(device)
+            self.value_function_target_2 = self.value_function_target_2.to(device)
         
         # Update submodels with new device
         self.send_norm_constants_to_submodels()
@@ -482,8 +516,14 @@ class TrajectorySampler(nn.Module):
 
     def send_norm_constants_to_submodels(self):
         self.model.set_norm_constants(self.x_mean, self.x_std)
-        self.gp.set_norm_constants(self.x_mean, self.x_std)
-        self.value_function.set_norm_constants(self.x_mean, self.x_std)
+        if hasattr(self, 'gp'):
+            self.gp.set_norm_constants(self.x_mean, self.x_std)
+        if hasattr(self, 'value_function'):
+            self.value_function.set_norm_constants(self.x_mean, self.x_std)
+            self.value_function_target.set_norm_constants(self.x_mean, self.x_std)
+        if hasattr(self, 'value_function_2'):
+            self.value_function_2.set_norm_constants(self.x_mean, self.x_std)
+            self.value_function_target_2.set_norm_constants(self.x_mean, self.x_std)
 
     def convert_yaw_to_sine_cosine(self, xu):
         """
@@ -519,41 +559,39 @@ class TrajectorySampler(nn.Module):
             samples, _, likelihood = self.sample(N=N, H=self.T, start=start_sine_cosine.reshape(1, -1),
                     constraints=torch.ones(N, 3).to(device=state.device))
         
-        likelihood = likelihood.reshape(N).mean().item()
+        likelihood = likelihood.reshape(N).mean()
         
         if self.rl_adjustment:
             # Use the optimized GP prediction
             with torch.no_grad():
                 # Get residual mean with fast prediction
-                residual, _ = self.gp.gp_model.predict(start_sine_cosine.unsqueeze(0), fast_mode=True)
-                residual = residual.item()
-                print('Likelihood residual:', residual)
-                
+
+                bernoulli_dist, adjusted_likelihood, _ = self.gp.predict(start_sine_cosine.unsqueeze(0), likelihood, fast_mode=True)
+                adjusted_likelihood = adjusted_likelihood.item()
+                likelihood = likelihood.item()
                 # Combine base likelihood with residual
                 print('Original likelihood:', likelihood)
-                adjusted_likelihood = likelihood + residual
                 print('Adjusted likelihood:', adjusted_likelihood)
+
+                residual = adjusted_likelihood - likelihood
+                print('Likelihood residual:', residual)
 
                 if likelihood_only:
                     if return_samples:
                         return adjusted_likelihood, samples
                     else:
                         return adjusted_likelihood
-                
-                # Use sigmoid with bias and temperature to get ID probability
-                bias = self.gp.likelihood.bias.item()
-                temperature = self.gp.likelihood.temperature.item()
-                id_probability = torch.sigmoid(temperature * (torch.tensor(adjusted_likelihood) + bias)).item()
-                print(f'ID probability: {id_probability:.4f}')
+    
                 
                 # Either use deterministic policy or sample from Bernoulli
                 if deterministic:
                     # Deterministic mode (for evaluation or testing)
-                    is_id = id_probability >= 0.5
+                    is_id = bernoulli_dist.probs.item() >= 0.5
                     print(f"Deterministic decision: {'ID' if is_id else 'OOD'}")
                 else:
                     # Stochastic mode (for training and exploration)
-                    is_id = torch.bernoulli(torch.tensor(id_probability)).bool().item()
+                    is_id = (1-bernoulli_dist.sample((1,))).bool().item()
+                    id_probability = 1-bernoulli_dist.probs.item()
                     print(f"Stochastic decision: {'ID' if is_id else 'OOD'} (sampled from p={id_probability:.4f})")
                 
                 if not is_id:
@@ -655,59 +693,6 @@ class TrajectorySampler(nn.Module):
     def classifier_loss(self, trajectories, mask=None, context=None, label=None):
         return self.model.classifier_loss(trajectories, context=context, mask=mask, label=label)
 
-    def evaluate_actions(self, states, actions):
-        """
-        Evaluate the log probability and value function for given states and actions,
-        ensuring proper gradient flow for PPO updates.
-        
-        Args:
-            states: Batch of states [batch_size, state_dim]
-            actions: Batch of actions [batch_size, 1] (binary decisions: 0=OOD, 1=ID)
-            
-        Returns:
-            action_log_probs: Log probabilities of actions
-            state_values: Value function estimates
-            dist_entropy: Entropy of the policy distribution
-        """
-        # Convert states for consistency
-        state_batch = states
-        
-        # Sample trajectories to get base likelihoods
-        with torch.no_grad(), fast_pred_var(), fast_pred_samples():
-            sb_for_lb = state_batch.detach()
-            batch_likelihoods = []
-            _, _, likelihood = self.sample(
-                N=8*sb_for_lb.shape[0],  # Small number for efficiency
-                H=self.T,
-                start=sb_for_lb.repeat_interleave(8, 0),
-                constraints=torch.ones(8*sb_for_lb.shape[0], 3).to(device=sb_for_lb.device)
-            )
-            base_likelihoods = likelihood.reshape(-1, 8).mean(dim=1)
-        state_batch_normalized = (state_batch - self.x_mean[:self.dx]) / self.x_std[:self.dx]
-        
-        # Create a new tensor that requires gradients - this is a trick to incorporate 
-        # the base likelihoods into our computational graph
-        base_likelihoods = base_likelihoods.clone().detach().requires_grad_(False)
-        
-        # Use fast_pred_var for GP predictions with gradients
-        with fast_pred_var():
-            output_mean = self.gp.gp_model(state_batch_normalized).mean
-        
-        # Combine base likelihoods with GP output
-        combined_features = base_likelihoods + output_mean
-        combined_features = combined_features.unsqueeze(-1)
-        # Get Bernoulli distribution from the likelihood
-        dist = self.gp.likelihood(combined_features)
-        
-        # Get log probabilities and entropy
-        action_log_probs = dist.log_prob(actions.float())
-        dist_entropy = dist.entropy().mean()  # Approximate entropy
-        
-        # Get value predictions using GP
-        value_output = self.value_function.gp_model(state_batch_normalized)
-
-        return action_log_probs, value_output, dist_entropy
-
     def store_transition(self, state, action: int, likelihood: float, next_state, reward: float, done: bool = False) -> None:
         """
         Store a transition in the SAC prioritized replay buffer.
@@ -753,6 +738,15 @@ class TrajectorySampler(nn.Module):
         
         # Store transition with maximum priority for new experiences
         self.replay_buffer.add(experience)
+    
+    def get_memory_size(self):
+        """
+        Get the current size of the replay buffer.
+        
+        Returns:
+            Size of the replay buffer
+        """
+        return len(self.replay_buffer)
     
     def sample_replay_buffer(self, batch_size: int = None) -> Tuple:
         """
@@ -802,7 +796,7 @@ class TrajectorySampler(nn.Module):
         
         return states, actions, likelihoods, rewards, next_states, dones, indices, is_weights
     
-    def get_action(self, state: torch.Tensor, likelihood: float, deterministic: bool = False) -> Tuple[int, float]:
+    def get_action(self, state: torch.Tensor, likelihood: float, deterministic: bool = False, return_entropy=False) -> Tuple[int, float]:
         """
         Sample an action from the policy, adding the likelihood as context.
         
@@ -812,173 +806,341 @@ class TrajectorySampler(nn.Module):
             deterministic: If True, choose most likely action
             
         Returns:
-            Tuple of (action, log_prob)
+            Tuple of (action, log_prob, entropy [if return_entropy])
         """
         with torch.no_grad(), fast_pred_var():
             # Get GP prediction
-            output_mean, _ = self.gp.predict(state, fast_mode=True)
+            dist = self.gp.predict(state, torch.tensor(likelihood).to(device=state.device, dtype=state.dtype), fast_mode=True)
             
-            # Add base likelihood for context
-            combined_feature = likelihood + output_mean
-            combined_feature = combined_feature.unsqueeze(-1)
+            action = torch.round(dist.probs).item() if deterministic else dist.sample().item()
+            log_prob = dist.log_prob(torch.tensor(action).to(device=state.device, dtype=state.dtype))
             
-            # Convert to Bernoulli distribution via the likelihood
-            dist = self.gp.likelihood(combined_feature)
-            
-            # Generate probabilities for action 1 (ID)
-            prob_id = dist.mean  # Probability of being in-distribution
-            
-            # Create a proper categorical distribution
-            probs = torch.cat([1-prob_id, prob_id], dim=-1)
-            
-            # Sample from distribution or take most likely
-            if deterministic:
-                action = torch.argmax(probs).item()
-            else:
-                action = torch.distributions.Categorical(probs).sample().item()
-            
-            # Calculate log prob for the action
-            log_prob = torch.log(probs.squeeze()[action] + 1e-10)
-            
+        if return_entropy:
+            return action, log_prob.item(), dist.entropy().item()
         return action, log_prob.item()
+    
+    def get_action_batch(self, state: torch.Tensor, likelihood: torch.Tensor, deterministic: bool = False, return_entropy=False) -> Tuple[int, float]:
+        """
+        Sample an action from the policy, adding the likelihood as context.
+        
+        Args:
+            state: Current state tensor
+            likelihood: Base likelihood from trajectory sampling
+            deterministic: If True, choose most likely action
+            
+        Returns:
+            Tuple of (action, log_prob, entropy [if return_entropy])
+        """
+        with torch.no_grad(), fast_pred_var():
+            # Get GP prediction
+            dist = self.gp.predict(state, likelihood, fast_mode=True)
+            
+            action = torch.round(dist.probs) if deterministic else dist.sample()
+            log_prob = dist.log_prob(action)
+            
+        if return_entropy:
+            return action, log_prob, dist.entropy()
+        return action, log_prob
 
     def sac_update(self) -> Dict[str, float]:
         """
-        Update the actor (GP) and critic (value_function) using SAC with prioritized experience replay.
+        Update the actor (GP) and critic (value_function) using SAC with prioritized experience replay
+        and clipped double-Q trick.
         
         Returns:
-            Dictionary with loss information
+            Dictionary with loss information and timing statistics
         """
-        if len(self.replay_buffer) < self.batch_size:
-            return {
-                "actor_loss": 0.0,
-                "critic_loss": 0.0,
-                "alpha_loss": 0.0,
-                "mean_reward": 0.0
-            }
+        update_start_time = time.time()
+        timing_stats = collections.defaultdict(float)
         
-        # Sample from replay buffer with importance sampling weights
-        states, actions, likelihoods, rewards, next_states, dones, indices, is_weights = self.sample_replay_buffer()
-        
-        # Normalize states
-        state_norm = (states - self.x_mean[:self.dx]) / self.x_std[:self.dx]
-        next_state_norm = (next_states - self.x_mean[:self.dx]) / self.x_std[:self.dx]
-        
-        # Track inducing point changes
-        with torch.no_grad():
-            actor_ip_before = self.gp.gp_model.variational_strategy.inducing_points.clone()
-            critic_ip_before = self.value_function.gp_model.variational_strategy.inducing_points.clone()
-        
-        # Critic update (minimize Q-value loss)
-        with torch.no_grad():
-            # Get next state GP output for target critic
-            next_output_mean = self.gp.gp_model(next_state_norm).mean
-            
-            # Combine with likelihoods (assuming they're preserved across transitions)
-            next_combined = next_output_mean + likelihoods
-            next_combined = next_combined.unsqueeze(-1)
-            
-            # Get action probabilities using the target network
-            next_probs = self.gp.likelihood(next_combined).mean
-            next_probs = torch.cat([1-next_probs, next_probs], dim=-1)
-            next_dist = Categorical(next_probs)
-            
-            # Calculate entropy term
-            next_entropy = next_dist.entropy()
-            
-            # Calculate expected next Q-value with entropy regularization
-            next_q_values = self.value_function_target.gp_model(next_state_norm).mean
-            
-            # Target Q = r + γ(Q(s',a') + α*H(π(·|s')))
-            target_q = rewards + (1 - dones) * self.gamma * (next_q_values.squeeze() + self.alpha * next_entropy)
-        
-        # Zero gradients
-        self.value_ngd_optimizer.zero_grad()
-        self.sac_optimizer.zero_grad()
-        
-        # Current Q-value prediction
-        current_q_values = self.value_function.gp_model(state_norm).mean
-        
-        # Compute TD errors for priority updates
-        td_errors = target_q - current_q_values.squeeze()
-        
-        # Compute critic loss with importance sampling weights
-        critic_loss = (is_weights * F.mse_loss(current_q_values.squeeze(), target_q, reduction='none')).mean()
-        
-        # Backpropagate critic loss
-        critic_loss.backward()
-        
-        # Step optimizers for critic
-        self.value_ngd_optimizer.step()
-        self.sac_optimizer.step()
-        
-        # Actor update (maximize policy objective)
-        # Zero gradients
-        self.actor_ngd_optimizer.zero_grad()
-        self.sac_optimizer.zero_grad()
-        
-        # Get output from GP
-        output_mean = self.gp.gp_model(state_norm).mean
-        
-        # Combine with likelihoods
-        combined_features = output_mean + likelihoods
-        combined_features = combined_features.unsqueeze(-1)
-        
-        # Get action probabilities
-        probs = self.gp.likelihood(combined_features).mean
-        probs = torch.cat([1-probs, probs], dim=-1)
-        dist = Categorical(probs)
-        
-        # Get entropy
-        entropy = dist.entropy().mean()
-        
-        # Get log probs for each action in the batch
-        log_probs = torch.log(torch.gather(probs, 1, actions) + 1e-10)
-        
-        # Estimate Q-value for current policy
-        q_values = self.value_function.gp_model(state_norm).mean
-        
-        # Actor loss: E[α*log(π(a|s)) - Q(s,a)] with importance sampling
-        actor_loss = (is_weights * (self.alpha * log_probs - q_values)).mean()
-        
-        # Backpropagate actor loss
-        actor_loss.backward()
-        
-        # Step optimizers for actor
-        self.actor_ngd_optimizer.step()
-        self.sac_optimizer.step()
-        
-        # Soft update target networks
-        with torch.no_grad():
-            for param, target_param in zip(
-                self.value_function.parameters(),
-                self.value_function_target.parameters()
-            ):
-                target_param.data.copy_(
-                    self.tau * param.data + (1 - self.tau) * target_param.data
-                )
-                
-            # Calculate inducing point changes
-            actor_ip_after = self.gp.gp_model.variational_strategy.inducing_points
-            critic_ip_after = self.value_function.gp_model.variational_strategy.inducing_points
-            actor_ip_change = torch.norm(actor_ip_after - actor_ip_before).item()
-            critic_ip_change = torch.norm(critic_ip_after - critic_ip_before).item()
-            print(f"Actor IP change: {actor_ip_change:.6f} | Critic IP change: {critic_ip_change:.6f}")
-        
-        # Update priorities in the replay buffer
-        td_errors_np = td_errors.abs().detach().cpu().numpy()
-        self.replay_buffer.update_priorities(indices, td_errors_np)
-        
-        # Return metrics
-        return {
-            "actor_loss": actor_loss.item(),
-            "critic_loss": critic_loss.item(),
-            "entropy": entropy.item(),
-            "mean_reward": rewards.mean().item(),
-            "actor_ip_change": actor_ip_change,
-            "critic_ip_change": critic_ip_change,
-            "mean_td_error": td_errors.abs().mean().item()
+        # Initialize track metrics
+        aggregated_metrics = {
+            "actor_loss": 0.0,
+            "critic_loss_1": 0.0,
+            "critic_loss_2": 0.0,
+            "entropy": 0.0,
+            "mean_reward": 0.0,
+            "actor_ip_change": 0.0,
+            "critic_ip_change_1": 0.0,
+            "critic_ip_change_2": 0.0,
+            "mean_td_error": 0.0
         }
+        
+        if len(self.replay_buffer) < self.batch_size:
+            return aggregated_metrics
+        
+        # Set models to evaluation mode for inference
+        self.gp.gp_model.eval()
+        self.gp.likelihood.eval()
+        self.value_function.gp_model.eval()
+        self.value_function.likelihood.eval()
+        self.value_function_2.gp_model.eval() 
+        self.value_function_2.likelihood.eval()
+        self.value_function_target.gp_model.eval()
+        self.value_function_target.likelihood.eval()
+        self.value_function_target_2.gp_model.eval()
+        self.value_function_target_2.likelihood.eval()
+        
+        for update_iter in range(self.num_update):
+            iter_start_time = time.time()
+            
+            # Sample from replay buffer with importance sampling weights
+            sampling_start = time.time()
+            states, actions, likelihoods, rewards, next_states, dones, indices, is_weights = self.sample_replay_buffer()
+            timing_stats['sampling_time'] += time.time() - sampling_start
+            
+            # Normalize states
+            norm_start = time.time()
+            state_norm = (states - self.x_mean[:self.dx]) / self.x_std[:self.dx]
+            next_state_norm = (next_states - self.x_mean[:self.dx]) / self.x_std[:self.dx]
+
+            # Concatenate the actions to the states for Q functions
+            state_action_norm = torch.cat([state_norm, actions.float()], dim=-1)
+            timing_stats['norm_time'] += time.time() - norm_start
+            
+            # Track inducing point changes
+            ip_start = time.time()
+            with torch.no_grad():
+                actor_ip_before = self.gp.gp_model.variational_strategy.inducing_points.clone()
+                critic_ip_before_1 = self.value_function.gp_model.variational_strategy.inducing_points.clone()
+                critic_ip_before_2 = self.value_function_2.gp_model.variational_strategy.inducing_points.clone()
+            timing_stats['ip_tracking'] += time.time() - ip_start
+            
+            # ------------------------ Update Critic (Q-functions) ------------------------
+            target_q_start = time.time()
+            with torch.no_grad():
+                # Get next state GP output and action probabilities
+                action, _, next_entropy = self.get_action_batch(next_state_norm, likelihoods, deterministic=False, return_entropy=True)
+
+                next_state_action_norm = torch.cat([next_state_norm, action], dim=-1)
+
+                # Get both Q-values and take the minimum for the target (clipped double-Q trick)
+                _, next_q_values_1, _ = self.value_function_target.predict(next_state_action_norm, fast_mode=True)
+                _, next_q_values_2, _ = self.value_function_target_2.predict(next_state_action_norm, fast_mode=True)
+                
+                # Take minimum of the two Q-values for the target calculation
+                next_q_values_min = torch.min(next_q_values_1, next_q_values_2)
+                
+                # Target Q = r + γ(min(Q1, Q2) + α*H(π(·|s')))
+                target_q = rewards + (1 - dones) * self.gamma * (next_q_values_min + self.alpha * next_entropy)
+            timing_stats['target_q_time'] += time.time() - target_q_start
+            
+            # Update first Q-function
+            q1_update_start = time.time()
+            # Set models to training mode for SGD
+            self.value_function.gp_model.train()
+            self.value_function.likelihood.train()
+            
+            # Zero gradients for first critic update
+            self.value_ngd_optimizer.zero_grad()
+            self.sac_optimizer.zero_grad()
+            
+            # Create predictive log likelihood objective for Q1
+            batch_objective_1 = gpytorch.mlls.PredictiveLogLikelihood(
+                self.value_function.likelihood,
+                self.value_function.gp_model,
+                num_data=states.shape[0]
+            )
+            
+            # Current Q1 prediction
+            current_q_values_1 = self.value_function.gp_model(state_action_norm)
+                        
+            # Compute Q1 loss using PredictiveLogLikelihood
+            critic_loss_1 = -batch_objective_1(current_q_values_1, target_q.unsqueeze(-1))
+            
+            # Weight the loss with importance sampling weights
+            critic_loss_1 = (is_weights * critic_loss_1).mean()
+            
+            # Backpropagate first critic loss
+            critic_loss_1.backward()
+            
+            # Step optimizers for first critic
+            self.value_ngd_optimizer.step()
+            self.sac_optimizer.step()
+            timing_stats['q1_update_time'] += time.time() - q1_update_start
+            
+            # Update second Q-function 
+            q2_update_start = time.time()
+            # Set models to training mode
+            self.value_function_2.gp_model.train()
+            self.value_function_2.likelihood.train()
+            
+            # Zero gradients for second critic update
+            self.value_ngd_optimizer_2.zero_grad()
+            self.sac_optimizer.zero_grad()
+            
+            # Create predictive log likelihood objective for Q2
+            batch_objective_2 = gpytorch.mlls.PredictiveLogLikelihood(
+                self.value_function_2.likelihood,
+                self.value_function_2.gp_model,
+                num_data=states.shape[0]
+            )
+            
+            # Current Q2 prediction
+            current_q_values_2 = self.value_function_2.gp_model(state_action_norm)
+            
+            min_q_for_td_error = torch.min(current_q_values_1.mean.detach().squeeze(), current_q_values_2.mean.detach().squeeze())
+            td_errors = (target_q - min_q_for_td_error).detach()
+
+            # Compute Q2 loss using PredictiveLogLikelihood
+            critic_loss_2 = -batch_objective_2(current_q_values_2, target_q.unsqueeze(-1))
+            
+            # Weight the loss with importance sampling weights
+            critic_loss_2 = (is_weights * critic_loss_2).mean()
+            
+            # Backpropagate second critic loss
+            critic_loss_2.backward()
+            
+            # Step optimizers for second critic
+            self.value_ngd_optimizer_2.step()
+            self.sac_optimizer.step()
+            timing_stats['q2_update_time'] += time.time() - q2_update_start
+            
+            # ------------------------ Update Actor (Policy) ------------------------
+            actor_update_start = time.time()
+            # Set actor to training mode
+            self.gp.gp_model.train()
+            self.gp.likelihood.train()
+            
+            # Set critics to evaluation mode for policy update
+            self.value_function.gp_model.eval()
+            self.value_function.likelihood.eval()
+            self.value_function_2.gp_model.eval()
+            self.value_function_2.likelihood.eval()
+            
+            # Zero gradients for actor update
+            self.actor_ngd_optimizer.zero_grad()
+            self.sac_optimizer.zero_grad()
+            boolean_dist, _, _ = self.gp.predict_with_grad(state_norm, torch.tensor(likelihoods).to(device=state_norm.device, dtype=state_norm.dtype), fast_mode=True)
+            
+            # Get action probabilities
+            probs = boolean_dist.probs
+            probs = torch.cat([1-probs, probs], dim=-1)
+            dist = Categorical(probs)
+            
+            # Get entropy
+            entropy = dist.entropy().mean()
+            
+            # Get log probs for each action in the batch
+            log_probs = torch.log(torch.gather(probs, 1, actions) + 1e-10)
+
+            state_pred_prob_norm = torch.cat([state_norm, probs], dim=-1)
+            
+            # Estimate Q-value using the first critic for policy optimization
+            q_values_1 = self.value_function.gp_model(state_pred_prob_norm).mean
+            q_values_2 = self.value_function_2.gp_model(state_pred_prob_norm).mean
+            q_values = torch.min(q_values_1, q_values_2)
+            
+            # Actor loss: E[α*log(π(a|s)) - Q(s,a)] with importance sampling weights
+            actor_loss = (is_weights * (self.alpha * log_probs - q_values)).mean()
+            
+            # Backpropagate actor loss
+            actor_loss.backward()
+            
+            # Step optimizers for actor
+            self.actor_ngd_optimizer.step()
+            self.sac_optimizer.step()
+            timing_stats['actor_update_time'] += time.time() - actor_update_start
+            
+            # ------------------------ Soft Update Target Networks ------------------------
+            target_update_start = time.time()
+            with torch.no_grad():
+                # Soft update first Q-network target
+                for param, target_param in zip(
+                    self.value_function.parameters(),
+                    self.value_function_target.parameters()
+                ):
+                    target_param.data.copy_(
+                        self.tau * param.data + (1 - self.tau) * target_param.data
+                    )
+                
+                # Soft update second Q-network target
+                for param, target_param in zip(
+                    self.value_function_2.parameters(),
+                    self.value_function_target_2.parameters()
+                ):
+                    target_param.data.copy_(
+                        self.tau * param.data + (1 - self.tau) * target_param.data
+                    )
+                    
+                # Calculate inducing point changes
+                actor_ip_after = self.gp.gp_model.variational_strategy.inducing_points
+                critic_ip_after_1 = self.value_function.gp_model.variational_strategy.inducing_points
+                critic_ip_after_2 = self.value_function_2.gp_model.variational_strategy.inducing_points
+                actor_ip_change = torch.norm(actor_ip_after - actor_ip_before).item()
+                critic_ip_change_1 = torch.norm(critic_ip_after_1 - critic_ip_before_1).item()
+                critic_ip_change_2 = torch.norm(critic_ip_after_2 - critic_ip_before_2).item()
+
+            # Set models back to evaluation mode
+            self.gp.gp_model.eval()
+            self.gp.likelihood.eval()
+            timing_stats['target_update_time'] += time.time() - target_update_start
+            
+            # ------------------------ Update Replay Buffer Priorities ------------------------
+            priority_update_start = time.time()
+            # Update priorities in the replay buffer using TD errors
+            td_errors_np = td_errors.abs().detach().cpu().numpy()
+            self.replay_buffer.update_priorities(indices, td_errors_np)
+            timing_stats['priority_update_time'] += time.time() - priority_update_start
+            
+            # ------------------------ Collect metrics for this iteration ------------------------
+            # Aggregate metrics for each iteration
+            aggregated_metrics["actor_loss"] += actor_loss.item()
+            aggregated_metrics["critic_loss_1"] += critic_loss_1.item()
+            aggregated_metrics["critic_loss_2"] += critic_loss_2.item()
+            aggregated_metrics["entropy"] += entropy.item()
+            aggregated_metrics["mean_reward"] += rewards.mean().item()
+            aggregated_metrics["actor_ip_change"] += actor_ip_change
+            aggregated_metrics["critic_ip_change_1"] += critic_ip_change_1
+            aggregated_metrics["critic_ip_change_2"] += critic_ip_change_2
+            aggregated_metrics["mean_td_error"] += td_errors.abs().mean().item()
+            
+            # Calculate iteration time
+            iter_time = time.time() - iter_start_time
+            timing_stats['total_iter_time'] += iter_time
+            
+            # Print progress for this iteration
+            if update_iter % max(1, self.num_update // 5) == 0:
+                print(f"SAC Update {update_iter+1}/{self.num_update}: "
+                      f"Actor Loss={actor_loss.item():.4f}, "
+                      f"Q1 Loss={critic_loss_1.item():.4f}, "
+                      f"Q2 Loss={critic_loss_2.item():.4f}, "
+                      f"Entropy={entropy.item():.4f}, "
+                      f"Time={iter_time:.2f}s")
+        
+        # ------------------------ Final processing ------------------------
+        # Average metrics over the number of updates
+        for key in aggregated_metrics:
+            aggregated_metrics[key] /= self.num_update
+        
+        # Add hyperparameter values to metrics
+        aggregated_metrics['threshold'] = self.gp.likelihood.threshold.item()
+        aggregated_metrics['alpha'] = self.alpha
+        
+        # Calculate and add timing statistics
+        total_time = time.time() - update_start_time
+        timing_stats['total_time'] = total_time
+        aggregated_metrics['timing'] = dict(timing_stats)
+        
+        # Print comprehensive timing summary
+        print(f"\n------ SAC Update Summary ({self.num_update} iterations) ------")
+        print(f"Total time: {total_time:.2f}s, Avg iteration: {total_time/self.num_update:.2f}s")
+        print(f"Sampling: {timing_stats['sampling_time']:.2f}s ({100*timing_stats['sampling_time']/total_time:.1f}%)")
+        print(f"Target Q: {timing_stats['target_q_time']:.2f}s ({100*timing_stats['target_q_time']/total_time:.1f}%)")
+        print(f"Q1 update: {timing_stats['q1_update_time']:.2f}s ({100*timing_stats['q1_update_time']/total_time:.1f}%)")
+        print(f"Q2 update: {timing_stats['q2_update_time']:.2f}s ({100*timing_stats['q2_update_time']/total_time:.1f}%)")
+        print(f"Actor update: {timing_stats['actor_update_time']:.2f}s ({100*timing_stats['actor_update_time']/total_time:.1f}%)")
+        print(f"Target update: {timing_stats['target_update_time']:.2f}s ({100*timing_stats['target_update_time']/total_time:.1f}%)")
+        print(f"Priority update: {timing_stats['priority_update_time']:.2f}s ({100*timing_stats['priority_update_time']/total_time:.1f}%)")
+        print(f"Actor loss: {aggregated_metrics['actor_loss']:.6f}")
+        print(f"Q1 loss: {aggregated_metrics['critic_loss_1']:.6f}")
+        print(f"Q2 loss: {aggregated_metrics['critic_loss_2']:.6f}")
+        print(f"Current threshold: {aggregated_metrics['threshold']:.4f}")
+        print(f"Temperature: {aggregated_metrics['temperature']:.4f}")
+        print("----------------------------------------------")
+        
+        # Return the aggregated metrics
+        return aggregated_metrics
         
     def adjust_temperature(self, alpha: float) -> None:
         """

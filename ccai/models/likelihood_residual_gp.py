@@ -109,7 +109,7 @@ class VariationalGP(ApproximateGP):
         # Cache for faster predictions
         self._has_updated_cached_kernel = False
     
-    def forward(self, x: torch.Tensor) -> gpytorch.distributions.MultivariateNormal:
+    def forward(self, x: torch.Tensor, base_likelihood: torch.Tensor = 0) -> gpytorch.distributions.MultivariateNormal:
         """
         Forward pass through the Gaussian Process.
         
@@ -120,14 +120,14 @@ class VariationalGP(ApproximateGP):
             MultivariateNormal distribution representing GP predictions
         """
         # Apply mean and covariance functions
-        mean_x = self.mean_module(x)
+        mean_x = self.mean_module(x) + base_likelihood
         covar_x = self.covar_module(x)
         
         # Return distribution
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
     
     @torch.no_grad()
-    def predict(self, x: torch.Tensor, fast_mode: bool = True) -> Tuple[torch.Tensor, torch.Tensor]:
+    def predict(self, x: torch.Tensor, base_likelihood: torch.Tensor = 0, fast_mode: bool = True) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Make predictions with the GP model (in eval mode) using fast_pred_var.
         
@@ -145,11 +145,11 @@ class VariationalGP(ApproximateGP):
         with fast_pred_var() if fast_mode else torch.no_grad():
             # Further optimize with higher CG tolerance for faster matrix solves
             with cg_tolerance(1e-3):
-                output = self(x)
+                output = self(x, base_likelihood=base_likelihood)
         
         return output.mean, output.variance
     
-    def predict_with_grad(self, x: torch.Tensor, fast_mode: bool = True, normalize=True) -> Tuple[torch.Tensor, torch.Tensor]:
+    def predict_with_grad(self, x: torch.Tensor, base_likelihood: torch.Tensor = 0, fast_mode: bool = True, normalize=True) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Make predictions with the GP model, preserving gradients.
         Uses fast_pred_var for efficient variance computation.
@@ -169,7 +169,7 @@ class VariationalGP(ApproximateGP):
         with fast_pred_var() if fast_mode else torch.enable_grad():
             # Higher CG tolerance for faster matrix solves
             with cg_tolerance(1e-3):
-                output = self(x)
+                output = self(x, base_likelihood=base_likelihood)
         
         return output.mean, output.variance
     
@@ -414,7 +414,7 @@ class LikelihoodResidualGP:
         return losses
     
     @torch.no_grad()
-    def predict(self, x: torch.Tensor, fast_mode: bool = True) -> Tuple[torch.Tensor, torch.Tensor]:
+    def predict(self, x: torch.Tensor, base_likelihood = 0, fast_mode: bool = True) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Make predictions with the trained model using fast prediction settings.
         
@@ -440,18 +440,17 @@ class LikelihoodResidualGP:
         if fast_mode:
             with fast_pred_var(), cg_tolerance(1e-3):
                 # Get GP output distribution
-                output = self.gp_model(x)
-                
+                output = self.gp_model(x, base_likelihood=base_likelihood)
                 # Get predictive distribution from likelihood
                 pred_dist = self.likelihood(output)
         else:
             with torch.no_grad():
-                output = self.gp_model(x)
+                output = self.gp_model(x, base_likelihood=base_likelihood)
                 pred_dist = self.likelihood(output)
         
-        return pred_dist.mean, pred_dist.variance
+        return pred_dist, output.mean, output.variance
     
-    def predict_with_grad(self, x: torch.Tensor, fast_mode: bool = True) -> Tuple[torch.Tensor, torch.Tensor]:
+    def predict_with_grad(self, x: torch.Tensor, base_likelihood: torch.Tensor = 0, fast_mode: bool = True) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Make predictions with the trained model, preserving gradients.
         Uses GPyTorch fast prediction optimizations.
@@ -471,16 +470,16 @@ class LikelihoodResidualGP:
         if fast_mode:
             with fast_pred_var(), cg_tolerance(1e-3):
                 # Get GP output distribution
-                output = self.gp_model(x)
+                output = self.gp_model(x, base_likelihood=base_likelihood)
                 
                 # Get predictive distribution from likelihood
                 pred_dist = self.likelihood(output)
         else:
             with torch.enable_grad():
-                output = self.gp_model(x)
+                output = self.gp_model(x, base_likelihood=base_likelihood)
                 pred_dist = self.likelihood(output)
         
-        return pred_dist.mean, pred_dist.variance
+        return pred_dist, output.mean, output.variance
     
     def get_prediction_samples(
         self, x: torch.Tensor, n_samples: int = 10, fast_mode: bool = True

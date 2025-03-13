@@ -698,10 +698,10 @@ class GaussianDiffusion(nn.Module):
             samples, likelihoods = self.sample(N, H, condition=condition, context=context, no_grad=False)
             all_samples.append(samples.clone().detach().cpu())
             all_likelihoods.append(likelihoods.clone().detach().cpu())
-            likelihood_reshape = likelihoods.reshape(B, -1).mean(1)
+            likelihood_reshape = likelihoods.reshape(B, -1).mean(1, keepdim=True)
 
             if residual_gp is not None:
-                likelihood_reshape += residual_gp.gp_model.predict_with_grad(x, normalize=False)[0]
+                likelihood_reshape = residual_gp.gp_model.predict_with_grad(x, base_likelihood=likelihood_reshape, fast_mode=True, normalize=False)[0].flatten()
             grad_mask[likelihood_reshape >= min_likelihood] = 0.0
 
             if proj_t == 0:
@@ -731,7 +731,7 @@ class GaussianDiffusion(nn.Module):
             likelihood_reshape = likelihoods.reshape(B, -1).mean(1)
 
             if residual_gp is not None:
-                likelihood_reshape += residual_gp.gp_model.predict_with_grad(x, normalize=False)[0]
+                likelihood_reshape = residual_gp.gp_model.predict_with_grad(x, base_likelihood=likelihood_reshape, fast_mode=True, normalize=False)[0]
             likelihoods_loss = -likelihood_reshape.mean()
             all_losses.append(likelihoods_loss.item())
             likelihoods_loss.backward()

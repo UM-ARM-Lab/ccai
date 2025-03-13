@@ -1,3 +1,4 @@
+import wandb
 from isaac_victor_envs.utils import get_assets_dir
 from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
 try:
@@ -13,6 +14,7 @@ from copy import deepcopy
 
 import torch
 import time
+import datetime
 import copy
 import yaml
 import pathlib
@@ -42,7 +44,7 @@ from scipy.spatial.transform import Rotation as R
 
 # from ccai.mpc.ipopt import IpoptMPC
 # from ccai.problem import IpoptProblem
-from ccai.models.trajectory_samplers import TrajectorySampler
+from ccai.models.trajectory_samplers_sac import TrajectorySampler
 from ccai.models.contact_samplers import GraphSearch, Node
 
 from model import LatentDiffusionModel
@@ -51,6 +53,9 @@ from diffusion_mcts import DiffusionMCTS
 
 from ccai.trajectory_shortcut import shortcut_trajectory
 
+
+
+
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
 print("CCAI_PATH", CCAI_PATH)
@@ -58,7 +63,7 @@ print("CCAI_PATH", CCAI_PATH)
 obj_dof = 3
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
-sys.stdout = open('./examples/logs/allegro_screwdriver_rl_tuning_bernoulli_likelihood_64.log', 'w', buffering=1)
+sys.stdout = open('./examples/logs/allegro_screwdriver_sac_tuning_bernoulli_likelihood_64.log', 'w', buffering=1)
 
 
 def vector_cos(a, b):
@@ -199,7 +204,7 @@ def collect_rl_data_during_execution(
     trajectory_steps: int = 1,
 ) -> None:
     """
-    Store transition data for RL training.
+    Store transition data for sac training.
     
     Args:
         state: Current state before action (full robot+object state)
@@ -219,7 +224,7 @@ def collect_rl_data_during_execution(
     if action_is_recover:
         reward = reward / max(1, trajectory_steps)
         
-    # Store transition in PPO memory
+    # Store transition in sac memory
     print(f"Storing {'RECOVERY' if action_is_recover else 'NORMAL'} transition: " 
           f"reward={original_reward:.4f} (scaled={reward:.4f}), "
           f"steps={trajectory_steps}")
@@ -236,15 +241,20 @@ def collect_rl_data_during_execution(
     print(f'Collected {trajectory_sampler_orig.get_memory_size()} transitions for RL')
     
     # Check if we have enough data to update the policy
-    if trajectory_sampler_orig.get_memory_size() >= params.get('ppo_batch_size', 512):
-        # Compute returns and advantages
-        trajectory_sampler_orig.compute_returns_and_advantages()
+    if trajectory_sampler_orig.get_memory_size() >= params.get('sac_batch_size', 512):
+        # Update policy using sac - returns comprehensive metrics
+        metrics = trajectory_sampler_orig.sac_update()
         
-        # Update policy using PPO
-        metrics = trajectory_sampler_orig.ppo_update()
-        print(f"PPO Update - Policy Loss: {metrics.get('policy_loss', 0):.4f}, "
-              f"Value Loss: {metrics.get('value_loss', 0):.4f}, "
-              f"New Threshold: {metrics.get('threshold', 0):.4f}")
+        # Log detailed metrics to console
+        print(f"sac Update - Actor Loss: {metrics.get('actor_loss', 0):.4f}, "
+              f"Q1 Loss: {metrics.get('critic_loss_1', 0):.4f}, "
+              f"Q2 Loss: {metrics.get('critic_loss_2', 0):.4f}, "
+              f"Entropy: {metrics.get('entropy', 0):.4f}, "
+              f"Mean TD Error: {metrics.get('mean_td_error', 0):.4f}, "
+              f"Threshold: {metrics.get('threshold', 0):.4f}")
+        
+        # Log metrics to wandb for visualization
+        wandb.log(metrics)
         
         # Save model
         torch.save(trajectory_sampler_orig.model.state_dict(), f'{CCAI_PATH}/{model_path_rl_adjusted}')
@@ -1404,10 +1414,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             
             # Use custom likelihood bias for checking if projection succeeded
             if trajectory_sampler_orig.rl_adjustment:
-                bias = trajectory_sampler_orig.gp.likelihood.bias.item()
-                final_likelihood = all_likelihoods[-1].mean()
-                adj = final_likelihood + bias
-                projection_success = adj >= 0.
+                final_likelihood = all_likelihoods[-1].mean().item()
+                projection_success = final_likelihood >= trajectory_sampler_orig.gp.likelihood.threshold.item()
                 print(f"Final projection likelihood: {final_likelihood:.4f}")
                 if not projection_success:
                     print('1 mode projection failed, trying anyway')
@@ -1520,7 +1528,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         del actual_trajectory_save
 
         if done:
-            trajectory_sampler_orig.ppo_dones[-1] = True
+            trajectory_sampler_orig.sac_dones[-1] = True
             break
 
     # np.savez(f'{fpath.resolve()}/trajectory.npz', x=[i.cpu().numpy() for i in actual_trajectory],)
@@ -1528,7 +1536,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             #  d2goal=final_distance_to_goal.cpu().numpy())
     if params['mode'] == 'hardware':
         input("Ready to regrasp. Press <ENTER> to continue.")
-    trajectory_sampler_orig.ppo_dones[-1] = True
+    trajectory_sampler_orig.sac_dones[-1] = True
 
     env.reset()
     return -1#torch.min(final_distance_to_goal).cpu().numpy()
@@ -1717,6 +1725,9 @@ if __name__ == "__main__":
         else:
             trajectory_sampler_orig = trajectory_sampler
 
+    dt = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    run = wandb.init(project='ccai-screwdriver', entity='abhinavk99', config=config,
+                    name=f'screwdriver_sac_adj_{dt}')
     start_ind = 0
     step_size = 1
     num_episodes = config['num_episodes']+start_ind

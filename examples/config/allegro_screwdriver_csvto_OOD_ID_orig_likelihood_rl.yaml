@@ -7,7 +7,7 @@ num_turns: 1
 max_recovery_stages: 4
 num_trials: 1000
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_data_rl_bernoulli_likelihood_64'
+experiment_name: 'allegro_screwdriver_recovery_data_sac_bernoulli_likelihood_64'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -47,7 +47,7 @@ model_path: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_
 model_path_rl_adjusted: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier_rl_adj.pt'
 # likelihood_threshold: -25.0
 # project_threshold: -15
-ppo_batch_size: 64
+sac_batch_size: 2
 num_episodes: 1000
 # likelihood_threshold: -16
 likelihood_threshold: -136.6758056640625
@@ -62,7 +62,7 @@ controllers:
     step_size: 0.1
     momentum: 0.
     device: 'cuda:1'
-    online_iters: 15
+    online_iters: 10
     warmup_iters: 50
     resample_steps: 16
     resample_sigma: 0.01

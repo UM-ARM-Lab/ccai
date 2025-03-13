@@ -3,7 +3,7 @@ import gpytorch
 from gpytorch.likelihoods import Likelihood
 from typing import Any, Optional, Tuple
 
-class SigmoidBernoulliLikelihood(Likelihood):
+class CDFBernoulliLikelihood(Likelihood):
     """
     Custom Bernoulli likelihood that uses a sigmoid activation with learnable
     bias and temperature parameters.
@@ -13,27 +13,26 @@ class SigmoidBernoulliLikelihood(Likelihood):
     the diffusion model likelihood distribution.
     
     Attributes:
-        bias: Learnable bias parameter (initialized with negative threshold)
-        temperature: Learnable temperature parameter for sigmoid scaling
+        bias: Learnable bias parameter (initialized with threshold)
     """
     
     def __init__(
         self, 
-        initial_bias: float = -15.0, 
-        initial_temp: float = .1, 
+        initial_threshold: float = -15.0, 
+        # initial_temp: float = .1, 
         num_samples: int = 15
     ):
         """
         Initialize custom Bernoulli likelihood.
         
         Args:
-            initial_bias: Initial value for the bias parameter
+            initial_threshold: Initial value for the bias parameter
             initial_temp: Initial value for the temperature parameter
             num_samples: Number of MC samples for expected log prob calculations
         """
         super().__init__()
-        self.bias = torch.nn.Parameter(torch.tensor([initial_bias]))
-        self.temperature = torch.nn.Parameter(torch.tensor([initial_temp]))
+        self.threshold = torch.nn.Parameter(torch.tensor([initial_threshold]))
+        # self.temperature = torch.nn.Parameter(torch.tensor([initial_temp]))
         self.num_samples = num_samples
         
     def forward(self, function_samples: torch.Tensor) -> torch.distributions.Bernoulli:
@@ -47,10 +46,10 @@ class SigmoidBernoulliLikelihood(Likelihood):
             A Bernoulli distribution with probabilities determined by sigmoid(temperature * (input + bias))
         """
         # Apply temperature and bias, then sigmoid
-        probs = torch.sigmoid(self.temperature * (function_samples + self.bias))
+        output_probs = function_samples.cdf(self.threshold)
         
         # Return Bernoulli distribution
-        return torch.distributions.Bernoulli(probs=probs)
+        return torch.distributions.Bernoulli(probs=output_probs)
     
     def expected_log_prob(self, target: torch.Tensor, function_dist: gpytorch.distributions.MultivariateNormal) -> torch.Tensor:
         """
@@ -67,7 +66,8 @@ class SigmoidBernoulliLikelihood(Likelihood):
         function_samples = function_dist.rsample(torch.Size([self.num_samples]))
         
         # Get probabilities for each sample
-        probs = torch.sigmoid(self.temperature * (function_samples + self.bias))
+        probs = function_dist.cdf(target)
+        
         
         # Calculate log probabilities for the binary observations
         log_probs = torch.zeros_like(probs)
@@ -89,7 +89,8 @@ class SigmoidBernoulliLikelihood(Likelihood):
         """
         # Use Monte Carlo integration to approximate the integral
         function_samples = function_dist.rsample(torch.Size([self.num_samples]))
-        probs = torch.sigmoid(self.temperature * (function_samples + self.bias))
+        probs = function_dist.cdf(observations)
+
         
         # Calculate log probabilities
         obs = observations.unsqueeze(0).expand(self.num_samples, *observations.shape)
@@ -109,11 +110,16 @@ class SigmoidBernoulliLikelihood(Likelihood):
             Bernoulli distribution representing the marginal
         """
         # Use Monte Carlo integration to compute the marginal probabilities
-        function_samples = function_dist.rsample(torch.Size([self.num_samples]))
-        probs = torch.sigmoid(self.temperature * (function_samples + self.bias))
+        # function_samples = function_dist.rsample(torch.Size([self.num_samples]))
+
+        # Extract single variate normal from multivariatenormal using mean, variance
+        loc = function_dist.mean
+        scale = function_dist.variance.sqrt()
+        output_probs = torch.distributions.Normal(loc, scale).cdf(self.threshold)
+
         
         # Average probabilities over samples
-        marginal_probs = probs.mean(0)
+        marginal_probs = output_probs.mean(0)
         
         # Return Bernoulli with these average probabilities
         return torch.distributions.Bernoulli(probs=marginal_probs)

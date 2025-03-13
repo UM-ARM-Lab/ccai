@@ -9,7 +9,7 @@ from torch.optim import Adam
 from gpytorch.optim import NGD
 
 from tqdm import tqdm
-from ccai.models.custom_likelihoods import SigmoidBernoulliLikelihood
+from ccai.models.custom_likelihoods import CDFBernoulliLikelihood
 from ccai.models.helpers import MLP
 from ccai.models.likelihood_residual_gp import LikelihoodResidualGP
 
@@ -355,9 +355,8 @@ class TrajectorySampler(nn.Module):
             # Instead, we'll use the bias parameter in our custom likelihood
             
             # Create the actor GP with our custom likelihood
-            actor_likelihood = SigmoidBernoulliLikelihood(
-                initial_bias=-initial_threshold,
-                initial_temp=.1,
+            actor_likelihood = CDFBernoulliLikelihood(
+                initial_threshold=initial_threshold,
                 num_samples=15
             )
             self.gp = LikelihoodResidualGP(

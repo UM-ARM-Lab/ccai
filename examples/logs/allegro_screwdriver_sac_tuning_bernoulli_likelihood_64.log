@@ -1,0 +1,32 @@
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+
+Trial 1
+No action perturbation this trial
+Loaded trajectory sampler
+Current yaw: tensor([ 5.5207e-05,  1.3631e-02, -4.8130e-02], device='cuda:1')
+Current yaw: tensor([ 5.5207e-05,  1.3631e-02, -4.8130e-02], device='cuda:1')
+1 turn
+Sampling time 5.194028057157993
+tensor([ 1.5497e-01,  6.1007e-01,  5.7076e-01,  6.1106e-01, -1.1513e-01,
+         5.4013e-01,  8.8512e-01,  9.3454e-01,  1.2569e+00,  2.2909e-01,
+         2.3290e-01,  1.2085e+00,  5.5207e-05,  1.3631e-02, -4.8130e-02,
+         4.4650e-01], device='cuda:1')
+Original likelihood: -107.05027770996094
+Adjusted likelihood: -107.05027770996094
+Likelihood residual: 0.0
+Stochastic decision: ID (sampled from p=1.0000)
+Solve time for step 1 15.034565965877846
+Current ori: tensor([ 5.5207e-05,  1.3631e-02, -4.8130e-02], device='cuda:1')
+Middle force: tensor([0.5787, 0.5693, 1.1468, 0.5579, 1.1098, 0.6485, 0.5337, 0.5207, 0.5460,
+        0.5341, 0.5538, 0.5290], device='cuda:1')
+Thumb force: tensor([0.8617, 0.8266, 0.7522, 1.0034, 0.9702, 0.6565, 0.5239, 0.8831, 0.5828,
+        0.5901, 0.5732, 0.5677], device='cuda:1')
+Index force: tensor([0.5962, 0.6005, 0.5573, 0.5693, 0.7994, 0.5242, 0.9919, 0.9173, 0.5698,
+        0.5646, 0.5311, 0.5697], device='cuda:1')
+Storing NORMAL transition: reward=0.0661 (scaled=0.0661), steps=1
+Collected 1 transitions for RL
+tensor([ 0.1563,  0.6327,  0.5465,  0.6003, -0.1233,  0.5596,  0.8484,  0.9802,
+         1.2576,  0.2567,  0.2527,  1.1338, -0.0073,  0.0069, -0.1142,  0.6397],
+       device='cuda:1')
+Backend TkAgg is interactive backend. Turning interactive mode on.
