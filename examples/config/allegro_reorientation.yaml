@@ -2,15 +2,15 @@
 T: 8
 receding_horizon: False
 num_steps: 8
-num_trials: 20
+num_trials: 30
 visualize: True
-experiment_name: 'allegro_reorientation'
+experiment_name: 'allegro_reorientation_again'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 simulator: "isaac_gym" # choose from 'isaac_sim', 'isaac_gym'
 fingers: ['index', 'middle', 'thumb']
 object_type: 'batarang'
 sim_device: 'cpu'
-device: 'cuda:1'
+device: 'cuda:0'
 friction_coefficient: 0.95
 kp: 3.0
 visualize_plan: False
@@ -35,6 +35,7 @@ controllers:
     resample_temperature: 0.1
     penalty: 1000000
     random_init_every_iter: False
+    geometry_grad: True
     obj_gravity: True # whether to conside the object gravity in our optimization
   ablation:
     N: 16

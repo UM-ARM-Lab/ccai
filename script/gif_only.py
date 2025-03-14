@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import torch
 
 # directory = '/home/fanyang/github/ccai/data/experiments/allegro_peg_insertion_env_force_3/csvgd/trial_2'
-directory = '/home/fanyang/github/ccai/baselines/data/experiments/allegro_reorientation_horizon_500_samples/mppi/trial_3'
+directory = '/home/fanyang/github/DynamicCatching/data/experiments/allegro_screwdriver/trial_1'
 
 if __name__ == '__main__':
 

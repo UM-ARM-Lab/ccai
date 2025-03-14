@@ -2,18 +2,18 @@
 T: 10
 receding_horizon: False
 num_steps: 10
-num_trials: 20
+num_trials: 30
 visualize: True
-experiment_name: 'allegro_peg_turning'
+experiment_name: 'allegro_peg_turning_no_geometry_grad'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 simulator: "isaac_gym" # choose from 'isaac_sim', 'isaac_gym'
 fingers: ['index', 'middle', 'thumb']
 object_type: 'short_peg'
 sim_device: 'cpu'
-device: 'cuda:1'
+device: 'cuda:0'
 friction_coefficient: 0.95
 kp: 6.0 # kp is increased to compenstate for gravity
-visualize_plan: False
+visualize_plan: True
 optimize_force: True
 force_balance: False  # in addition to the torque balance, do we also need force balance, just for the screwdriver turning experiment w\o slot. 
 gradual_control: True
@@ -38,6 +38,7 @@ controllers:
     random_init_every_iter: False
     obj_gravity: True # whether to conside the object gravity in our optimization
     contact_region: False # whether to consider the contact region of the index finegr in our optimization
+    geometry_grad: True
     static_init: False # whether to use the static initialization for the optimization
   ablation:
     N: 16

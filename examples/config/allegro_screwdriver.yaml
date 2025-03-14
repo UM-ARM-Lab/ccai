@@ -2,18 +2,19 @@
 T: 12
 receding_horizon: False
 num_steps: 12
-num_trials: 20
+num_trials: 30
 visualize: True
-experiment_name: 'allegro_screwdriver_damped_0.1'
+# experiment_name: 'allegro_screwdriver'
+experiment_name: 'allegro_screwdriver_no_geometry_grad'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 simulator: "isaac_gym" # choose from 'isaac_sim', 'isaac_gym'
 fingers: ['index', 'middle', 'thumb']
 object_type: 'screwdriver'
 sim_device: 'cpu'
-device: 'cuda:1'
+device: 'cuda:0'
 friction_coefficient: 0.95
 kp: 3.0
-visualize_plan: False
+visualize_plan: True
 optimize_force: True
 force_balance: False  # in addition to the torque balance, do we also need force balance, just for the screwdriver turning experiment w\o slot. 
 gradual_control: True
@@ -31,6 +32,7 @@ controllers:
     momentum: 0.
     use_momentum: False
     online_iters: 50
+    # online_iters: 5
     warmup_iters: 300
     resample_steps: 1
     resample_sigma: 0.01
@@ -41,6 +43,7 @@ controllers:
     obj_gravity: True # whether to conside the object gravity in our optimization
     contact_region: True # whether to consider the contact region of the index finegr in our optimization
     static_init: False # whether to use the static initialization for the optimization
+    geometry_grad: True
   ablation:
     N: 16
     alpha_J: 5.0e-3
