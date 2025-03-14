@@ -1,0 +1,2286 @@
+Simulation running on: cpu
+TD3 training running on: cuda:0
+object to robot tensor([[[-7.6604e-01,  4.1318e-01,  4.9240e-01,  9.2768e-01],
+         [ 1.1921e-07, -7.6604e-01,  6.4279e-01, -9.5000e-02],
+         [ 6.4279e-01,  4.9240e-01,  5.8682e-01,  1.0828e+00],
+         [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  1.0000e+00]]])
+object to robot tensor([[[-7.6604e-01,  4.1318e-01,  4.9240e-01,  9.2768e-01],
+         [ 1.1921e-07, -7.6604e-01,  6.4279e-01, -9.5000e-02],
+         [ 6.4279e-01,  4.9240e-01,  5.8682e-01,  1.0828e+00],
+         [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  1.0000e+00]]])
+Episode reset - starting new episode
+Starting training for 1000000 timesteps
+
+===== project_vector_field Timing Analysis (call 1) =====
+Total time:            857.68 ms (100%)
+1. Initial setup:      0.18 ms (0.0%)
+2. Preprocessing:      107.33 ms (12.5%)
+3. Constraint comp:    731.20 ms (85.3%)
+4. Masks creation:     0.46 ms (0.1%)
+5. Matrix operations:  15.88 ms (1.9%)
+6. Final projection:   2.61 ms (0.3%)
+
+===== project_vector_field Timing Analysis (call 2) =====
+Total time:            706.22 ms (100%)
+1. Initial setup:      0.14 ms (0.0%)
+2. Preprocessing:      76.33 ms (10.8%)
+3. Constraint comp:    619.80 ms (87.8%)
+4. Masks creation:     0.43 ms (0.1%)
+5. Matrix operations:  8.07 ms (1.1%)
+6. Final projection:   1.43 ms (0.2%)
+
+===== project_vector_field Timing Analysis (call 3) =====
+Total time:            658.93 ms (100%)
+1. Initial setup:      0.13 ms (0.0%)
+2. Preprocessing:      65.54 ms (9.9%)
+3. Constraint comp:    586.28 ms (89.0%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  5.50 ms (0.8%)
+6. Final projection:   1.05 ms (0.2%)
+
+===== project_vector_field Timing Analysis (call 4) =====
+Total time:            635.05 ms (100%)
+1. Initial setup:      0.13 ms (0.0%)
+2. Preprocessing:      60.67 ms (9.6%)
+3. Constraint comp:    568.79 ms (89.6%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  4.19 ms (0.7%)
+6. Final projection:   0.85 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 5) =====
+Total time:            620.97 ms (100%)
+1. Initial setup:      0.12 ms (0.0%)
+2. Preprocessing:      59.65 ms (9.6%)
+3. Constraint comp:    556.63 ms (89.6%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  3.41 ms (0.5%)
+6. Final projection:   0.73 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 6) =====
+Total time:            612.27 ms (100%)
+1. Initial setup:      0.12 ms (0.0%)
+2. Preprocessing:      57.00 ms (9.3%)
+3. Constraint comp:    551.20 ms (90.0%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  2.89 ms (0.5%)
+6. Final projection:   0.65 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 7) =====
+Total time:            605.83 ms (100%)
+1. Initial setup:      0.11 ms (0.0%)
+2. Preprocessing:      55.22 ms (9.1%)
+3. Constraint comp:    546.97 ms (90.3%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  2.51 ms (0.4%)
+6. Final projection:   0.60 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 8) =====
+Total time:            601.38 ms (100%)
+1. Initial setup:      0.11 ms (0.0%)
+2. Preprocessing:      53.77 ms (8.9%)
+3. Constraint comp:    544.30 ms (90.5%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  2.23 ms (0.4%)
+6. Final projection:   0.55 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 9) =====
+Total time:            595.94 ms (100%)
+1. Initial setup:      0.11 ms (0.0%)
+2. Preprocessing:      52.70 ms (8.8%)
+3. Constraint comp:    540.18 ms (90.6%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  2.01 ms (0.3%)
+6. Final projection:   0.52 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 10) =====
+Total time:            594.86 ms (100%)
+1. Initial setup:      0.11 ms (0.0%)
+2. Preprocessing:      51.84 ms (8.7%)
+3. Constraint comp:    540.17 ms (90.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  1.84 ms (0.3%)
+6. Final projection:   0.49 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 11) =====
+Total time:            591.34 ms (100%)
+1. Initial setup:      0.11 ms (0.0%)
+2. Preprocessing:      51.36 ms (8.7%)
+3. Constraint comp:    537.29 ms (90.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  1.70 ms (0.3%)
+6. Final projection:   0.47 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 12) =====
+Total time:            589.79 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      50.85 ms (8.6%)
+3. Constraint comp:    536.39 ms (90.9%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  1.58 ms (0.3%)
+6. Final projection:   0.45 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 13) =====
+Total time:            586.27 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      50.30 ms (8.6%)
+3. Constraint comp:    533.54 ms (91.0%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  1.48 ms (0.3%)
+6. Final projection:   0.44 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 14) =====
+Total time:            584.62 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      49.84 ms (8.5%)
+3. Constraint comp:    532.45 ms (91.1%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  1.39 ms (0.2%)
+6. Final projection:   0.42 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 15) =====
+Total time:            582.99 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      49.54 ms (8.5%)
+3. Constraint comp:    531.20 ms (91.1%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  1.32 ms (0.2%)
+6. Final projection:   0.41 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 16) =====
+Total time:            582.40 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      49.21 ms (8.4%)
+3. Constraint comp:    531.03 ms (91.2%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  1.25 ms (0.2%)
+6. Final projection:   0.40 ms (0.1%)
+[9.379406929016113]
+
+===== project_vector_field Timing Analysis (call 17) =====
+Total time:            580.81 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      48.86 ms (8.4%)
+3. Constraint comp:    529.86 ms (91.2%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  1.19 ms (0.2%)
+6. Final projection:   0.39 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 18) =====
+Total time:            579.89 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      48.57 ms (8.4%)
+3. Constraint comp:    529.30 ms (91.3%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  1.14 ms (0.2%)
+6. Final projection:   0.38 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 19) =====
+Total time:            579.30 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      48.28 ms (8.3%)
+3. Constraint comp:    529.04 ms (91.3%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  1.09 ms (0.2%)
+6. Final projection:   0.38 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 20) =====
+Total time:            579.24 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      48.05 ms (8.3%)
+3. Constraint comp:    529.26 ms (91.4%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  1.05 ms (0.2%)
+6. Final projection:   0.37 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 21) =====
+Total time:            578.70 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      47.85 ms (8.3%)
+3. Constraint comp:    528.96 ms (91.4%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  1.02 ms (0.2%)
+6. Final projection:   0.36 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 22) =====
+Total time:            578.56 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      47.70 ms (8.2%)
+3. Constraint comp:    529.01 ms (91.4%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  0.98 ms (0.2%)
+6. Final projection:   0.36 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 23) =====
+Total time:            577.82 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      47.51 ms (8.2%)
+3. Constraint comp:    528.50 ms (91.5%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  0.95 ms (0.2%)
+6. Final projection:   0.35 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 24) =====
+Total time:            577.48 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      47.41 ms (8.2%)
+3. Constraint comp:    528.30 ms (91.5%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  0.92 ms (0.2%)
+6. Final projection:   0.35 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 25) =====
+Total time:            577.17 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      47.28 ms (8.2%)
+3. Constraint comp:    528.14 ms (91.5%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  0.89 ms (0.2%)
+6. Final projection:   0.35 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 26) =====
+Total time:            576.63 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      47.13 ms (8.2%)
+3. Constraint comp:    527.77 ms (91.5%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  0.87 ms (0.2%)
+6. Final projection:   0.34 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 27) =====
+Total time:            576.66 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      47.07 ms (8.2%)
+3. Constraint comp:    527.90 ms (91.5%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  0.85 ms (0.1%)
+6. Final projection:   0.34 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 28) =====
+Total time:            576.75 ms (100%)
+1. Initial setup:      0.11 ms (0.0%)
+2. Preprocessing:      46.97 ms (8.1%)
+3. Constraint comp:    528.10 ms (91.6%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  0.83 ms (0.1%)
+6. Final projection:   0.33 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 29) =====
+Total time:            576.61 ms (100%)
+1. Initial setup:      0.11 ms (0.0%)
+2. Preprocessing:      46.85 ms (8.1%)
+3. Constraint comp:    528.10 ms (91.6%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  0.81 ms (0.1%)
+6. Final projection:   0.33 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 30) =====
+Total time:            576.95 ms (100%)
+1. Initial setup:      0.11 ms (0.0%)
+2. Preprocessing:      46.81 ms (8.1%)
+3. Constraint comp:    528.50 ms (91.6%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  0.79 ms (0.1%)
+6. Final projection:   0.33 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 31) =====
+Total time:            577.54 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.74 ms (8.1%)
+3. Constraint comp:    529.17 ms (91.6%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  0.78 ms (0.1%)
+6. Final projection:   0.33 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 32) =====
+Total time:            577.70 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.72 ms (8.1%)
+3. Constraint comp:    529.37 ms (91.6%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  0.76 ms (0.1%)
+6. Final projection:   0.33 ms (0.1%)
+[9.379406929016113, 9.223959922790527]
+
+===== project_vector_field Timing Analysis (call 33) =====
+Total time:            577.18 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.65 ms (8.1%)
+3. Constraint comp:    528.93 ms (91.6%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  0.75 ms (0.1%)
+6. Final projection:   0.32 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 34) =====
+Total time:            577.28 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.56 ms (8.1%)
+3. Constraint comp:    529.15 ms (91.7%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  0.74 ms (0.1%)
+6. Final projection:   0.32 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 35) =====
+Total time:            577.12 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.54 ms (8.1%)
+3. Constraint comp:    529.03 ms (91.7%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  0.72 ms (0.1%)
+6. Final projection:   0.32 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 36) =====
+Total time:            577.29 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.51 ms (8.1%)
+3. Constraint comp:    529.24 ms (91.7%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  0.71 ms (0.1%)
+6. Final projection:   0.32 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 37) =====
+Total time:            576.96 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.51 ms (8.1%)
+3. Constraint comp:    528.92 ms (91.7%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  0.70 ms (0.1%)
+6. Final projection:   0.32 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 38) =====
+Total time:            577.23 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.48 ms (8.1%)
+3. Constraint comp:    529.24 ms (91.7%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  0.69 ms (0.1%)
+6. Final projection:   0.31 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 39) =====
+Total time:            577.49 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.43 ms (8.0%)
+3. Constraint comp:    529.56 ms (91.7%)
+4. Masks creation:     0.40 ms (0.1%)
+5. Matrix operations:  0.68 ms (0.1%)
+6. Final projection:   0.31 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 40) =====
+Total time:            577.62 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.42 ms (8.0%)
+3. Constraint comp:    529.70 ms (91.7%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.67 ms (0.1%)
+6. Final projection:   0.31 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 41) =====
+Total time:            577.48 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.41 ms (8.0%)
+3. Constraint comp:    529.58 ms (91.7%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.66 ms (0.1%)
+6. Final projection:   0.31 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 42) =====
+Total time:            577.39 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.40 ms (8.0%)
+3. Constraint comp:    529.51 ms (91.7%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.65 ms (0.1%)
+6. Final projection:   0.31 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 43) =====
+Total time:            577.39 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.40 ms (8.0%)
+3. Constraint comp:    529.52 ms (91.7%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.64 ms (0.1%)
+6. Final projection:   0.31 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 44) =====
+Total time:            577.46 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.36 ms (8.0%)
+3. Constraint comp:    529.64 ms (91.7%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.63 ms (0.1%)
+6. Final projection:   0.31 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 45) =====
+Total time:            577.37 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.31 ms (8.0%)
+3. Constraint comp:    529.61 ms (91.7%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.63 ms (0.1%)
+6. Final projection:   0.30 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 46) =====
+Total time:            577.43 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.30 ms (8.0%)
+3. Constraint comp:    529.69 ms (91.7%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.62 ms (0.1%)
+6. Final projection:   0.30 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 47) =====
+Total time:            577.22 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.29 ms (8.0%)
+3. Constraint comp:    529.50 ms (91.7%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.61 ms (0.1%)
+6. Final projection:   0.30 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 48) =====
+Total time:            577.21 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.28 ms (8.0%)
+3. Constraint comp:    529.51 ms (91.7%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.60 ms (0.1%)
+6. Final projection:   0.30 ms (0.1%)
+[9.379406929016113, 9.223959922790527, 9.276867628097534]
+
+===== project_vector_field Timing Analysis (call 49) =====
+Total time:            576.96 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.37 ms (8.0%)
+3. Constraint comp:    529.17 ms (91.7%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.60 ms (0.1%)
+6. Final projection:   0.30 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 50) =====
+Total time:            576.57 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.36 ms (8.0%)
+3. Constraint comp:    528.80 ms (91.7%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.59 ms (0.1%)
+6. Final projection:   0.30 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 51) =====
+Total time:            576.60 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.38 ms (8.0%)
+3. Constraint comp:    528.79 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.59 ms (0.1%)
+6. Final projection:   0.30 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 52) =====
+Total time:            576.21 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.44 ms (8.1%)
+3. Constraint comp:    528.36 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.58 ms (0.1%)
+6. Final projection:   0.30 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 53) =====
+Total time:            575.93 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.38 ms (8.1%)
+3. Constraint comp:    528.15 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.57 ms (0.1%)
+6. Final projection:   0.30 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 54) =====
+Total time:            575.90 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.32 ms (8.0%)
+3. Constraint comp:    528.18 ms (91.7%)
+4. Masks creation:     0.43 ms (0.1%)
+5. Matrix operations:  0.57 ms (0.1%)
+6. Final projection:   0.30 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 55) =====
+Total time:            575.77 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.29 ms (8.0%)
+3. Constraint comp:    528.08 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.56 ms (0.1%)
+6. Final projection:   0.30 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 56) =====
+Total time:            575.49 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.26 ms (8.0%)
+3. Constraint comp:    527.85 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.56 ms (0.1%)
+6. Final projection:   0.30 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 57) =====
+Total time:            575.04 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.21 ms (8.0%)
+3. Constraint comp:    527.45 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.55 ms (0.1%)
+6. Final projection:   0.30 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 58) =====
+Total time:            575.14 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.15 ms (8.0%)
+3. Constraint comp:    527.61 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.55 ms (0.1%)
+6. Final projection:   0.29 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 59) =====
+Total time:            575.09 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.13 ms (8.0%)
+3. Constraint comp:    527.60 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.54 ms (0.1%)
+6. Final projection:   0.29 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 60) =====
+Total time:            574.99 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.09 ms (8.0%)
+3. Constraint comp:    527.54 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.54 ms (0.1%)
+6. Final projection:   0.29 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 61) =====
+Total time:            574.75 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.05 ms (8.0%)
+3. Constraint comp:    527.35 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.53 ms (0.1%)
+6. Final projection:   0.29 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 62) =====
+Total time:            574.75 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.00 ms (8.0%)
+3. Constraint comp:    527.40 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.53 ms (0.1%)
+6. Final projection:   0.29 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 63) =====
+Total time:            574.71 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.96 ms (8.0%)
+3. Constraint comp:    527.41 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.52 ms (0.1%)
+6. Final projection:   0.29 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 64) =====
+Total time:            574.66 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.92 ms (8.0%)
+3. Constraint comp:    527.40 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.52 ms (0.1%)
+6. Final projection:   0.29 ms (0.1%)
+[9.379406929016113, 9.223959922790527, 9.276867628097534, 9.125778198242188]
+Episode terminated: dropped screwdriver (roll=0.282, pitch=-0.045), final reward: 0.000, step: 4
+Episode 0: 4 steps, reward=0.06
+Episode reset - starting new episode
+
+===== project_vector_field Timing Analysis (call 65) =====
+Total time:            574.49 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.07 ms (8.0%)
+3. Constraint comp:    527.09 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.51 ms (0.1%)
+6. Final projection:   0.29 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 66) =====
+Total time:            574.36 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      46.04 ms (8.0%)
+3. Constraint comp:    526.98 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.51 ms (0.1%)
+6. Final projection:   0.29 ms (0.1%)
+
+===== project_vector_field Timing Analysis (call 67) =====
+Total time:            574.24 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.99 ms (8.0%)
+3. Constraint comp:    526.93 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.51 ms (0.1%)
+6. Final projection:   0.29 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 68) =====
+Total time:            574.32 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.96 ms (8.0%)
+3. Constraint comp:    527.04 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.50 ms (0.1%)
+6. Final projection:   0.29 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 69) =====
+Total time:            574.28 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.94 ms (8.0%)
+3. Constraint comp:    527.03 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.50 ms (0.1%)
+6. Final projection:   0.29 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 70) =====
+Total time:            574.36 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.91 ms (8.0%)
+3. Constraint comp:    527.13 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.50 ms (0.1%)
+6. Final projection:   0.29 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 71) =====
+Total time:            574.15 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.89 ms (8.0%)
+3. Constraint comp:    526.95 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.49 ms (0.1%)
+6. Final projection:   0.28 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 72) =====
+Total time:            574.10 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.99 ms (8.0%)
+3. Constraint comp:    526.81 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.49 ms (0.1%)
+6. Final projection:   0.28 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 73) =====
+Total time:            573.76 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.96 ms (8.0%)
+3. Constraint comp:    526.50 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.49 ms (0.1%)
+6. Final projection:   0.28 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 74) =====
+Total time:            573.52 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.92 ms (8.0%)
+3. Constraint comp:    526.31 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.48 ms (0.1%)
+6. Final projection:   0.28 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 75) =====
+Total time:            573.49 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.88 ms (8.0%)
+3. Constraint comp:    526.31 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.48 ms (0.1%)
+6. Final projection:   0.28 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 76) =====
+Total time:            573.29 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.84 ms (8.0%)
+3. Constraint comp:    526.17 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.48 ms (0.1%)
+6. Final projection:   0.28 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 77) =====
+Total time:            572.98 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.81 ms (8.0%)
+3. Constraint comp:    525.90 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.48 ms (0.1%)
+6. Final projection:   0.28 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 78) =====
+Total time:            572.84 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.79 ms (8.0%)
+3. Constraint comp:    525.77 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.47 ms (0.1%)
+6. Final projection:   0.28 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 79) =====
+Total time:            572.82 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.76 ms (8.0%)
+3. Constraint comp:    525.79 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.47 ms (0.1%)
+6. Final projection:   0.28 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 80) =====
+Total time:            572.68 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.74 ms (8.0%)
+3. Constraint comp:    525.67 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.47 ms (0.1%)
+6. Final projection:   0.28 ms (0.0%)
+[9.379406929016113, 9.223959922790527, 9.276867628097534, 9.125778198242188, 9.090621948242188]
+
+===== project_vector_field Timing Analysis (call 81) =====
+Total time:            572.05 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.79 ms (8.0%)
+3. Constraint comp:    525.00 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.46 ms (0.1%)
+6. Final projection:   0.28 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 82) =====
+Total time:            571.48 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.75 ms (8.0%)
+3. Constraint comp:    524.47 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.46 ms (0.1%)
+6. Final projection:   0.28 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 83) =====
+Total time:            570.91 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.72 ms (8.0%)
+3. Constraint comp:    523.93 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.46 ms (0.1%)
+6. Final projection:   0.28 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 84) =====
+Total time:            570.38 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.70 ms (8.0%)
+3. Constraint comp:    523.43 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.46 ms (0.1%)
+6. Final projection:   0.28 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 85) =====
+Total time:            569.73 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.67 ms (8.0%)
+3. Constraint comp:    522.81 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.45 ms (0.1%)
+6. Final projection:   0.28 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 86) =====
+Total time:            569.22 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.64 ms (8.0%)
+3. Constraint comp:    522.33 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.45 ms (0.1%)
+6. Final projection:   0.28 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 87) =====
+Total time:            568.93 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.61 ms (8.0%)
+3. Constraint comp:    522.08 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.45 ms (0.1%)
+6. Final projection:   0.28 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 88) =====
+Total time:            568.94 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.58 ms (8.0%)
+3. Constraint comp:    522.12 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.45 ms (0.1%)
+6. Final projection:   0.28 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 89) =====
+Total time:            568.74 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.55 ms (8.0%)
+3. Constraint comp:    521.95 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.45 ms (0.1%)
+6. Final projection:   0.28 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 90) =====
+Total time:            568.75 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.52 ms (8.0%)
+3. Constraint comp:    521.99 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.44 ms (0.1%)
+6. Final projection:   0.28 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 91) =====
+Total time:            568.81 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.50 ms (8.0%)
+3. Constraint comp:    522.08 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.44 ms (0.1%)
+6. Final projection:   0.28 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 92) =====
+Total time:            568.96 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.47 ms (8.0%)
+3. Constraint comp:    522.25 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.44 ms (0.1%)
+6. Final projection:   0.27 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 93) =====
+Total time:            569.07 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.45 ms (8.0%)
+3. Constraint comp:    522.38 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.44 ms (0.1%)
+6. Final projection:   0.27 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 94) =====
+Total time:            569.17 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.43 ms (8.0%)
+3. Constraint comp:    522.50 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.44 ms (0.1%)
+6. Final projection:   0.27 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 95) =====
+Total time:            569.25 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.41 ms (8.0%)
+3. Constraint comp:    522.61 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.44 ms (0.1%)
+6. Final projection:   0.27 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 96) =====
+Total time:            569.50 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.39 ms (8.0%)
+3. Constraint comp:    522.88 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.43 ms (0.1%)
+6. Final projection:   0.27 ms (0.0%)
+[9.379406929016113, 9.223959922790527, 9.276867628097534, 9.125778198242188, 9.090621948242188, 8.915270805358887]
+
+===== project_vector_field Timing Analysis (call 97) =====
+Total time:            569.43 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.38 ms (8.0%)
+3. Constraint comp:    522.83 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.43 ms (0.1%)
+6. Final projection:   0.27 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 98) =====
+Total time:            569.54 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.40 ms (8.0%)
+3. Constraint comp:    522.91 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.43 ms (0.1%)
+6. Final projection:   0.27 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 99) =====
+Total time:            569.65 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.42 ms (8.0%)
+3. Constraint comp:    523.00 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.43 ms (0.1%)
+6. Final projection:   0.27 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 100) =====
+Total time:            569.70 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.42 ms (8.0%)
+3. Constraint comp:    523.06 ms (91.8%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.43 ms (0.1%)
+6. Final projection:   0.27 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 101) =====
+Total time:            566.77 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.79 ms (7.9%)
+3. Constraint comp:    520.94 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 102) =====
+Total time:            567.01 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.77 ms (7.9%)
+3. Constraint comp:    521.21 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 103) =====
+Total time:            566.99 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.78 ms (7.9%)
+3. Constraint comp:    521.17 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 104) =====
+Total time:            567.02 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.75 ms (7.9%)
+3. Constraint comp:    521.24 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 105) =====
+Total time:            566.84 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.62 ms (7.9%)
+3. Constraint comp:    521.18 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 106) =====
+Total time:            566.77 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.62 ms (7.9%)
+3. Constraint comp:    521.11 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 107) =====
+Total time:            566.72 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.61 ms (7.9%)
+3. Constraint comp:    521.07 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 108) =====
+Total time:            566.67 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.60 ms (7.9%)
+3. Constraint comp:    521.03 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 109) =====
+Total time:            566.66 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.60 ms (7.9%)
+3. Constraint comp:    521.03 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 110) =====
+Total time:            566.51 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.61 ms (7.9%)
+3. Constraint comp:    520.87 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 111) =====
+Total time:            566.73 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.57 ms (7.9%)
+3. Constraint comp:    521.12 ms (92.0%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 112) =====
+Total time:            566.78 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.55 ms (7.9%)
+3. Constraint comp:    521.19 ms (92.0%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+[9.379406929016113, 9.223959922790527, 9.276867628097534, 9.125778198242188, 9.090621948242188, 8.915270805358887, 9.137993812561035]
+
+===== project_vector_field Timing Analysis (call 113) =====
+Total time:            566.60 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.61 ms (7.9%)
+3. Constraint comp:    520.96 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 114) =====
+Total time:            566.42 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.60 ms (7.9%)
+3. Constraint comp:    520.78 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 115) =====
+Total time:            566.54 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.58 ms (7.9%)
+3. Constraint comp:    520.92 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 116) =====
+Total time:            566.42 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.57 ms (7.9%)
+3. Constraint comp:    520.81 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 117) =====
+Total time:            566.52 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.57 ms (7.9%)
+3. Constraint comp:    520.91 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 118) =====
+Total time:            566.76 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.58 ms (7.9%)
+3. Constraint comp:    521.15 ms (92.0%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 119) =====
+Total time:            566.92 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.59 ms (7.9%)
+3. Constraint comp:    521.30 ms (92.0%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 120) =====
+Total time:            567.02 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.59 ms (7.9%)
+3. Constraint comp:    521.40 ms (92.0%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 121) =====
+Total time:            567.13 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.60 ms (7.9%)
+3. Constraint comp:    521.49 ms (92.0%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 122) =====
+Total time:            567.41 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.66 ms (7.9%)
+3. Constraint comp:    521.71 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 123) =====
+Total time:            567.61 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.70 ms (7.9%)
+3. Constraint comp:    521.88 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 124) =====
+Total time:            567.91 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.70 ms (7.9%)
+3. Constraint comp:    522.17 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 125) =====
+Total time:            567.91 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.70 ms (7.9%)
+3. Constraint comp:    522.18 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 126) =====
+Total time:            568.22 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.71 ms (7.9%)
+3. Constraint comp:    522.46 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 127) =====
+Total time:            568.19 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.71 ms (7.9%)
+3. Constraint comp:    522.44 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 128) =====
+Total time:            568.23 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.71 ms (7.9%)
+3. Constraint comp:    522.48 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+[9.379406929016113, 9.223959922790527, 9.276867628097534, 9.125778198242188, 9.090621948242188, 8.915270805358887, 9.137993812561035, 9.273018598556519]
+
+===== project_vector_field Timing Analysis (call 129) =====
+Total time:            568.31 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.74 ms (7.9%)
+3. Constraint comp:    522.53 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 130) =====
+Total time:            568.27 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.76 ms (7.9%)
+3. Constraint comp:    522.47 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 131) =====
+Total time:            568.25 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.78 ms (7.9%)
+3. Constraint comp:    522.43 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 132) =====
+Total time:            568.45 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.78 ms (7.9%)
+3. Constraint comp:    522.63 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 133) =====
+Total time:            568.75 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.80 ms (7.9%)
+3. Constraint comp:    522.91 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 134) =====
+Total time:            568.89 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.83 ms (7.9%)
+3. Constraint comp:    523.02 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 135) =====
+Total time:            569.13 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.84 ms (7.9%)
+3. Constraint comp:    523.25 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 136) =====
+Total time:            569.12 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.83 ms (7.9%)
+3. Constraint comp:    523.24 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 137) =====
+Total time:            569.28 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.81 ms (7.9%)
+3. Constraint comp:    523.42 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 138) =====
+Total time:            569.14 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.82 ms (7.9%)
+3. Constraint comp:    523.26 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 139) =====
+Total time:            569.05 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.83 ms (7.9%)
+3. Constraint comp:    523.17 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 140) =====
+Total time:            569.00 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.81 ms (7.9%)
+3. Constraint comp:    523.14 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 141) =====
+Total time:            569.09 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.82 ms (7.9%)
+3. Constraint comp:    523.22 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 142) =====
+Total time:            569.16 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.83 ms (7.9%)
+3. Constraint comp:    523.28 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 143) =====
+Total time:            569.14 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.83 ms (7.9%)
+3. Constraint comp:    523.27 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 144) =====
+Total time:            569.01 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.84 ms (7.9%)
+3. Constraint comp:    523.12 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+[9.379406929016113, 9.223959922790527, 9.276867628097534, 9.125778198242188, 9.090621948242188, 8.915270805358887, 9.137993812561035, 9.273018598556519, 9.393027067184448]
+Episode terminated: dropped screwdriver (roll=-0.430, pitch=-0.041), final reward: -0.042, step: 5
+Episode 1: 5 steps, reward=-0.11
+Episode reset - starting new episode
+
+===== project_vector_field Timing Analysis (call 145) =====
+Total time:            569.11 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.95 ms (7.9%)
+3. Constraint comp:    523.12 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 146) =====
+Total time:            569.26 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.96 ms (7.9%)
+3. Constraint comp:    523.25 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 147) =====
+Total time:            569.42 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.96 ms (7.9%)
+3. Constraint comp:    523.41 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 148) =====
+Total time:            569.12 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.96 ms (7.9%)
+3. Constraint comp:    523.11 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 149) =====
+Total time:            568.82 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.91 ms (7.9%)
+3. Constraint comp:    522.86 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 150) =====
+Total time:            568.69 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.90 ms (7.9%)
+3. Constraint comp:    522.74 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 151) =====
+Total time:            568.33 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.86 ms (7.9%)
+3. Constraint comp:    522.42 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 152) =====
+Total time:            568.21 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.81 ms (7.9%)
+3. Constraint comp:    522.36 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 153) =====
+Total time:            567.93 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.82 ms (7.9%)
+3. Constraint comp:    522.07 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 154) =====
+Total time:            567.58 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.83 ms (7.9%)
+3. Constraint comp:    521.71 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 155) =====
+Total time:            567.34 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.81 ms (7.9%)
+3. Constraint comp:    521.49 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 156) =====
+Total time:            567.15 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.83 ms (7.9%)
+3. Constraint comp:    521.28 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 157) =====
+Total time:            566.97 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.83 ms (7.9%)
+3. Constraint comp:    521.10 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 158) =====
+Total time:            566.72 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.88 ms (7.9%)
+3. Constraint comp:    520.79 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 159) =====
+Total time:            566.39 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.89 ms (7.9%)
+3. Constraint comp:    520.45 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 160) =====
+Total time:            566.11 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.91 ms (7.9%)
+3. Constraint comp:    520.16 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+[9.379406929016113, 9.223959922790527, 9.276867628097534, 9.125778198242188, 9.090621948242188, 8.915270805358887, 9.137993812561035, 9.273018598556519, 9.393027067184448, 8.856853723526001]
+
+===== project_vector_field Timing Analysis (call 161) =====
+Total time:            565.77 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.93 ms (7.9%)
+3. Constraint comp:    519.80 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 162) =====
+Total time:            565.32 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.93 ms (7.9%)
+3. Constraint comp:    519.35 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 163) =====
+Total time:            564.90 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.93 ms (8.0%)
+3. Constraint comp:    518.93 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 164) =====
+Total time:            564.49 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.93 ms (8.0%)
+3. Constraint comp:    518.52 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 165) =====
+Total time:            564.14 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.80 ms (7.9%)
+3. Constraint comp:    518.29 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 166) =====
+Total time:            563.82 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.81 ms (7.9%)
+3. Constraint comp:    517.97 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 167) =====
+Total time:            563.77 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.81 ms (7.9%)
+3. Constraint comp:    517.91 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 168) =====
+Total time:            563.45 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.81 ms (8.0%)
+3. Constraint comp:    517.59 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 169) =====
+Total time:            562.92 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.79 ms (8.0%)
+3. Constraint comp:    517.09 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 170) =====
+Total time:            562.53 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.79 ms (8.0%)
+3. Constraint comp:    516.70 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 171) =====
+Total time:            562.47 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.80 ms (8.0%)
+3. Constraint comp:    516.63 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 172) =====
+Total time:            562.52 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.71 ms (7.9%)
+3. Constraint comp:    516.77 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 173) =====
+Total time:            562.71 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.76 ms (8.0%)
+3. Constraint comp:    516.91 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 174) =====
+Total time:            562.96 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.79 ms (8.0%)
+3. Constraint comp:    517.12 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 175) =====
+Total time:            563.01 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.83 ms (8.0%)
+3. Constraint comp:    517.14 ms (91.9%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 176) =====
+Total time:            563.22 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.86 ms (8.0%)
+3. Constraint comp:    517.30 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+[9.379406929016113, 9.223959922790527, 9.276867628097534, 9.125778198242188, 9.090621948242188, 8.915270805358887, 9.137993812561035, 9.273018598556519, 9.393027067184448, 8.856853723526001, 8.837821245193481]
+
+===== project_vector_field Timing Analysis (call 177) =====
+Total time:            563.35 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.89 ms (8.0%)
+3. Constraint comp:    517.41 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 178) =====
+Total time:            563.52 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.89 ms (8.0%)
+3. Constraint comp:    517.58 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.28 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 179) =====
+Total time:            563.55 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.92 ms (8.0%)
+3. Constraint comp:    517.58 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 180) =====
+Total time:            563.70 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.92 ms (8.0%)
+3. Constraint comp:    517.74 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 181) =====
+Total time:            564.11 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.87 ms (8.0%)
+3. Constraint comp:    518.19 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 182) =====
+Total time:            564.59 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.87 ms (7.9%)
+3. Constraint comp:    518.67 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 183) =====
+Total time:            565.19 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.93 ms (7.9%)
+3. Constraint comp:    519.21 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 184) =====
+Total time:            565.72 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      44.96 ms (7.9%)
+3. Constraint comp:    519.71 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.28 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 185) =====
+Total time:            566.28 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.00 ms (7.9%)
+3. Constraint comp:    520.23 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.28 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 186) =====
+Total time:            566.82 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.04 ms (7.9%)
+3. Constraint comp:    520.72 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.28 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 187) =====
+Total time:            567.15 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.07 ms (7.9%)
+3. Constraint comp:    521.03 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.28 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 188) =====
+Total time:            567.31 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.10 ms (7.9%)
+3. Constraint comp:    521.16 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 189) =====
+Total time:            567.54 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.11 ms (7.9%)
+3. Constraint comp:    521.38 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 190) =====
+Total time:            567.68 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.15 ms (8.0%)
+3. Constraint comp:    521.47 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.28 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 191) =====
+Total time:            567.74 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.19 ms (8.0%)
+3. Constraint comp:    521.49 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 192) =====
+Total time:            567.74 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.21 ms (8.0%)
+3. Constraint comp:    521.48 ms (91.9%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.28 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+[9.379406929016113, 9.223959922790527, 9.276867628097534, 9.125778198242188, 9.090621948242188, 8.915270805358887, 9.137993812561035, 9.273018598556519, 9.393027067184448, 8.856853723526001, 8.837821245193481, 9.283442497253418]
+
+===== project_vector_field Timing Analysis (call 193) =====
+Total time:            567.66 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.23 ms (8.0%)
+3. Constraint comp:    521.37 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 194) =====
+Total time:            567.49 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.22 ms (8.0%)
+3. Constraint comp:    521.21 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 195) =====
+Total time:            567.52 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.24 ms (8.0%)
+3. Constraint comp:    521.23 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 196) =====
+Total time:            567.39 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.27 ms (8.0%)
+3. Constraint comp:    521.07 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 197) =====
+Total time:            567.39 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.27 ms (8.0%)
+3. Constraint comp:    521.06 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 198) =====
+Total time:            567.36 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.24 ms (8.0%)
+3. Constraint comp:    521.07 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 199) =====
+Total time:            567.34 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.21 ms (8.0%)
+3. Constraint comp:    521.07 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 200) =====
+Total time:            567.29 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.20 ms (8.0%)
+3. Constraint comp:    521.03 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 201) =====
+Total time:            566.88 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.20 ms (8.0%)
+3. Constraint comp:    520.63 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 202) =====
+Total time:            566.46 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.20 ms (8.0%)
+3. Constraint comp:    520.20 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 203) =====
+Total time:            566.24 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.18 ms (8.0%)
+3. Constraint comp:    520.00 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 204) =====
+Total time:            566.08 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.19 ms (8.0%)
+3. Constraint comp:    519.83 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 205) =====
+Total time:            566.11 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.22 ms (8.0%)
+3. Constraint comp:    519.83 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 206) =====
+Total time:            566.06 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.24 ms (8.0%)
+3. Constraint comp:    519.77 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 207) =====
+Total time:            565.87 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.24 ms (8.0%)
+3. Constraint comp:    519.57 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 208) =====
+Total time:            565.48 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.24 ms (8.0%)
+3. Constraint comp:    519.18 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+[9.379406929016113, 9.223959922790527, 9.276867628097534, 9.125778198242188, 9.090621948242188, 8.915270805358887, 9.137993812561035, 9.273018598556519, 9.393027067184448, 8.856853723526001, 8.837821245193481, 9.283442497253418, 8.96257209777832]
+
+===== project_vector_field Timing Analysis (call 209) =====
+Total time:            565.42 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.31 ms (8.0%)
+3. Constraint comp:    519.05 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 210) =====
+Total time:            565.16 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.32 ms (8.0%)
+3. Constraint comp:    518.79 ms (91.8%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 211) =====
+Total time:            564.93 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.35 ms (8.0%)
+3. Constraint comp:    518.52 ms (91.8%)
+4. Masks creation:     0.43 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 212) =====
+Total time:            564.67 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.37 ms (8.0%)
+3. Constraint comp:    518.25 ms (91.8%)
+4. Masks creation:     0.43 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 213) =====
+Total time:            565.16 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.35 ms (8.0%)
+3. Constraint comp:    518.75 ms (91.8%)
+4. Masks creation:     0.43 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 214) =====
+Total time:            565.28 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.37 ms (8.0%)
+3. Constraint comp:    518.84 ms (91.8%)
+4. Masks creation:     0.43 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 215) =====
+Total time:            565.08 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.38 ms (8.0%)
+3. Constraint comp:    518.64 ms (91.8%)
+4. Masks creation:     0.43 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 216) =====
+Total time:            565.26 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.42 ms (8.0%)
+3. Constraint comp:    518.78 ms (91.8%)
+4. Masks creation:     0.43 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 217) =====
+Total time:            565.28 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.59 ms (8.1%)
+3. Constraint comp:    518.62 ms (91.7%)
+4. Masks creation:     0.43 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 218) =====
+Total time:            564.91 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.60 ms (8.1%)
+3. Constraint comp:    518.25 ms (91.7%)
+4. Masks creation:     0.43 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 219) =====
+Total time:            564.54 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.61 ms (8.1%)
+3. Constraint comp:    517.88 ms (91.7%)
+4. Masks creation:     0.43 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 220) =====
+Total time:            564.16 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.62 ms (8.1%)
+3. Constraint comp:    517.48 ms (91.7%)
+4. Masks creation:     0.43 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 221) =====
+Total time:            563.76 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.61 ms (8.1%)
+3. Constraint comp:    517.09 ms (91.7%)
+4. Masks creation:     0.43 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 222) =====
+Total time:            563.43 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.58 ms (8.1%)
+3. Constraint comp:    516.78 ms (91.7%)
+4. Masks creation:     0.43 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 223) =====
+Total time:            563.39 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.57 ms (8.1%)
+3. Constraint comp:    516.76 ms (91.7%)
+4. Masks creation:     0.43 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 224) =====
+Total time:            562.93 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.57 ms (8.1%)
+3. Constraint comp:    516.30 ms (91.7%)
+4. Masks creation:     0.43 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+[9.379406929016113, 9.223959922790527, 9.276867628097534, 9.125778198242188, 9.090621948242188, 8.915270805358887, 9.137993812561035, 9.273018598556519, 9.393027067184448, 8.856853723526001, 8.837821245193481, 9.283442497253418, 8.96257209777832, 8.9743013381958]
+
+===== project_vector_field Timing Analysis (call 225) =====
+Total time:            562.95 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.57 ms (8.1%)
+3. Constraint comp:    516.32 ms (91.7%)
+4. Masks creation:     0.43 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 226) =====
+Total time:            562.66 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.57 ms (8.1%)
+3. Constraint comp:    516.02 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 227) =====
+Total time:            562.69 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.59 ms (8.1%)
+3. Constraint comp:    516.05 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 228) =====
+Total time:            562.68 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.59 ms (8.1%)
+3. Constraint comp:    516.02 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 229) =====
+Total time:            562.58 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.57 ms (8.1%)
+3. Constraint comp:    515.95 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 230) =====
+Total time:            562.33 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.54 ms (8.1%)
+3. Constraint comp:    515.73 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 231) =====
+Total time:            562.00 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.52 ms (8.1%)
+3. Constraint comp:    515.43 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 232) =====
+Total time:            561.82 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.50 ms (8.1%)
+3. Constraint comp:    515.27 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 233) =====
+Total time:            561.66 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.49 ms (8.1%)
+3. Constraint comp:    515.12 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 234) =====
+Total time:            561.46 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.47 ms (8.1%)
+3. Constraint comp:    514.94 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 235) =====
+Total time:            561.35 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.47 ms (8.1%)
+3. Constraint comp:    514.83 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 236) =====
+Total time:            561.59 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.47 ms (8.1%)
+3. Constraint comp:    515.07 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 237) =====
+Total time:            561.74 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.52 ms (8.1%)
+3. Constraint comp:    515.17 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 238) =====
+Total time:            561.81 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.52 ms (8.1%)
+3. Constraint comp:    515.24 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 239) =====
+Total time:            561.89 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.54 ms (8.1%)
+3. Constraint comp:    515.30 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 240) =====
+Total time:            562.16 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.58 ms (8.1%)
+3. Constraint comp:    515.54 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+[9.379406929016113, 9.223959922790527, 9.276867628097534, 9.125778198242188, 9.090621948242188, 8.915270805358887, 9.137993812561035, 9.273018598556519, 9.393027067184448, 8.856853723526001, 8.837821245193481, 9.283442497253418, 8.96257209777832, 8.9743013381958, 9.33089542388916]
+Episode terminated: dropped screwdriver (roll=-0.453, pitch=0.447), final reward: -0.000, step: 6
+Episode 2: 6 steps, reward=0.02
+Episode reset - starting new episode
+
+===== project_vector_field Timing Analysis (call 241) =====
+Total time:            562.21 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.66 ms (8.1%)
+3. Constraint comp:    515.50 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 242) =====
+Total time:            562.25 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.63 ms (8.1%)
+3. Constraint comp:    515.57 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 243) =====
+Total time:            562.37 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.63 ms (8.1%)
+3. Constraint comp:    515.69 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 244) =====
+Total time:            562.56 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.63 ms (8.1%)
+3. Constraint comp:    515.88 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.28 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 245) =====
+Total time:            562.46 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.52 ms (8.1%)
+3. Constraint comp:    515.88 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.28 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 246) =====
+Total time:            562.48 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.51 ms (8.1%)
+3. Constraint comp:    515.92 ms (91.7%)
+4. Masks creation:     0.42 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 247) =====
+Total time:            562.52 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.50 ms (8.1%)
+3. Constraint comp:    515.96 ms (91.7%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 248) =====
+Total time:            562.98 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.48 ms (8.1%)
+3. Constraint comp:    516.46 ms (91.7%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 249) =====
+Total time:            563.36 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.48 ms (8.1%)
+3. Constraint comp:    516.84 ms (91.7%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)
+
+===== project_vector_field Timing Analysis (call 250) =====
+Total time:            563.74 ms (100%)
+1. Initial setup:      0.10 ms (0.0%)
+2. Preprocessing:      45.49 ms (8.1%)
+3. Constraint comp:    517.20 ms (91.7%)
+4. Masks creation:     0.41 ms (0.1%)
+5. Matrix operations:  0.27 ms (0.0%)
+6. Final projection:   0.25 ms (0.0%)

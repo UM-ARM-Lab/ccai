@@ -1673,6 +1673,24 @@ class AllegroContactProblem(AllegroObjectProblem):
             torque_list.append(torque)
             # Force is in the robot frame instead of the world frame.
             # It does not matter for comuputing the force equilibrium constraint
+
+        # if self.obj_gravity:
+        #     if self.obj_translational_dim > 0:
+        #         g = self.obj_mass * torch.tensor([0, 0, -9.8], device=self.device, dtype=torch.float32)
+        #         force_list = torch.cat((force_list, g.unsqueeze(0)))
+        #         # force_list.append(g)
+        #     if self.obj_rotational_dim > 0:
+        #         if self.object_type == 'screwdriver':
+        #             # NOTE: only works for the screwdriver now
+        #             g = self.obj_mass * torch.tensor([0, 0, -9.8], device=self.device, dtype=torch.float32)
+        #             # add the additional dimension for the screwdriver cap
+        #             tmp = torch.zeros_like(next_env_q)
+        #             next_env_q = torch.cat((next_env_q, tmp[:1]), dim=-1)
+
+        #             body_tf = self.contact_scenes.scene_sdf.chain.forward_kinematics(next_env_q)['screwdriver_body']
+        #             body_com_pos = body_tf.get_matrix()[:, :3, -1]
+        #             torque = torch.linalg.cross(body_com_pos[0], g)
+        #             torque_list.append(torque)
         # force_world_frame = self.world_trans.transform_normals(force.unsqueeze(0)).squeeze(0)
         torque_list = torch.stack(torque_list, dim=0)
         torque_list = torch.sum(torque_list, dim=0)
