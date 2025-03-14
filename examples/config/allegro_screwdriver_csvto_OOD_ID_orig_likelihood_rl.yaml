@@ -47,9 +47,9 @@ model_path: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_
 model_path_rl_adjusted: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier_rl_adj.pt'
 # likelihood_threshold: -25.0
 # project_threshold: -15
-sac_batch_size: 2
+sac_batch_size: 64
 num_episodes: 1000
-# likelihood_threshold: -16
+# likelihood_threshold: -16.0
 likelihood_threshold: -136.6758056640625
 project_threshold: -90
 # parity: 654

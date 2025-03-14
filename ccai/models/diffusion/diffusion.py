@@ -1,3 +1,4 @@
+from typing import Any, Dict, Optional, Tuple
 import torch
 from torch import nn
 import numpy as np
@@ -678,69 +679,147 @@ class GaussianDiffusion(nn.Module):
         overall_kl = kl_x.reshape(B, N).mean(dim=1).to(x.device)
         return -overall_kl
  
-    def project(self, N, H=None, condition=None, context=None, residual_gp=None):
-
-        # min_likelihood = threshold
+    def project(self, N: int, H: Optional[int] = None, condition: Optional[Dict] = None, 
+            context: Optional[torch.Tensor] = None, residual_gp: Optional[Any] = None) -> Tuple:
+        """
+        Project initial state to a high-likelihood region using gradient ascent with SGD and momentum.
+        
+        Args:
+            N: Number of trajectories to sample per gradient step
+            H: Horizon length (defaults to self.horizon if None)
+            condition: Trajectory conditioning information
+            context: Context tensor for conditional generation
+            residual_gp: Optional GP model for likelihood adjustment
+            
+        Returns:
+            Tuple containing:
+                - (best_sample, best_likelihood): The best sample and its likelihood
+                - samples_0: Initial samples before projection
+                - (all_losses, all_samples, all_likelihoods): History of optimization
+        """
+        # Set GP to training mode if provided
+        if residual_gp is not None:
+            residual_gp.gp_model.train()
+            residual_gp.likelihood.train()
+        
+        # Define minimum acceptable likelihood
         min_likelihood = self.cutoff
 
-        x = condition[0][1]
+        # Extract the initial state to optimize
+        x = condition[0][1].clone()
         B = x.shape[0]
-        x.requires_grad = True
+        
+        # Create gradient mask to track which states need optimization
         grad_mask = torch.ones_like(x)
-        optimizer = torch.optim.SGD([x], lr=1.5, momentum=0.5)
+        
+        # Setup optimizer with momentum
+        optimizer = torch.optim.SGD([torch.nn.Parameter(x)], lr=1.5, momentum=0.5)
+        
+        # Storage for tracking optimization progress
         all_samples = []
         all_losses = []
         all_likelihoods = []
         broke = False
+
+        # Main projection loop
         for proj_t in tqdm(range(15)):
+            # Zero gradients from previous iteration
             optimizer.zero_grad()
-            # Sample N trajectories
-            samples, likelihoods = self.sample(N, H, condition=condition, context=context, no_grad=False)
-            all_samples.append(samples.clone().detach().cpu())
-            all_likelihoods.append(likelihoods.clone().detach().cpu())
-            likelihood_reshape = likelihoods.reshape(B, -1).mean(1, keepdim=True)
+            
+            # Clone and detach x to create a fresh computational graph for this iteration
+            x = optimizer.param_groups[0]['params'][0].detach().clone()
+            optimizer.param_groups[0]['params'][0] = torch.nn.Parameter(x)
+            
+            # Update the condition with the new x
+            condition[0] = (condition[0][0], x)
+            
+            # Sample N trajectories with the current x
+            with torch.set_grad_enabled(True):
+                samples, likelihoods = self.sample(N, H, condition=condition, context=context, no_grad=False)
+                
+                # Store samples and likelihoods for tracking
+                all_samples.append(samples.clone().detach().cpu())
+                all_likelihoods.append(likelihoods.clone().detach().cpu())
+                
+                # Reshape likelihoods for easier processing
+                likelihood_reshape = likelihoods.reshape(B, -1).mean(1)
 
-            if residual_gp is not None:
-                likelihood_reshape = residual_gp.gp_model.predict_with_grad(x, base_likelihood=likelihood_reshape, fast_mode=True, normalize=False)[0].flatten()
-            grad_mask[likelihood_reshape >= min_likelihood] = 0.0
+                # Apply GP adjustment if provided
+                if residual_gp is not None:
+                    likelihood_reshape = residual_gp.gp_model.predict_with_grad(
+                        optimizer.param_groups[0]['params'][0], base_likelihood=likelihood_reshape, fast_mode=False, normalize=False
+                    )[0].flatten()
+                
+                # Update gradient mask - don't optimize states that already meet the threshold
+                grad_mask[likelihood_reshape >= min_likelihood] = 0.0
 
-            if proj_t == 0:
-                samples_0 = samples.clone().detach()
-            if grad_mask.sum() == 0:
+                # Store initial samples
+                if proj_t == 0:
+                    samples_0 = samples.clone().detach()
+                
+                # If all states meet threshold, we can stop early
+                if grad_mask.sum() == 0:
+                    likelihoods_loss = -likelihood_reshape.mean()
+                    likelihoods_loss.backward()
+                    all_losses.append(likelihoods_loss.item())
+                    broke = True
+                    break
+                
+                # Calculate loss and record
                 likelihoods_loss = -likelihood_reshape.mean()
+                all_losses.append(likelihoods_loss.item())
+                print(f'Projection step: {proj_t}, Loss: {likelihoods_loss.item()}')
+                
+                # Compute gradients
                 likelihoods_loss.backward()
-                broke = True
-                break
-            likelihoods_loss = -likelihood_reshape.mean()
-            all_losses.append(likelihoods_loss.item())
-            print(f'Projection step: {proj_t}, Loss: {likelihoods_loss.item()}')
-            likelihoods_loss.backward()
-            if residual_gp is not None:
-                x.grad += samples.grad.reshape(B, 16, self.horizon, -1)[:, :, 0, :self.dx].mean(1) * grad_mask
-            else:
-                x_grad = samples.grad.reshape(B, 16, self.horizon, -1)[:, :, 0, :self.dx].mean(1) * grad_mask
-            # x.grad[:, -2:] = 0.0
-
+                
+                # Apply gradient mask and combine with gradients from samples if using GP
+                if residual_gp is not None:
+                    samples_grad = samples.grad.reshape(B, 16, self.horizon, -1)[:, :, 0, :self.dx].mean(1)
+                    optimizer.param_groups[0]['params'][0].grad += samples_grad * grad_mask
+                else:
+                    samples_grad = samples.grad.reshape(B, 16, self.horizon, -1)[:, :, 0, :self.dx].mean(1)
+                    optimizer.param_groups[0]['params'][0].grad = samples_grad * grad_mask
+            
+            # Take optimization step
             optimizer.step()
-            condition[0][1] = x.detach()
+            
+            # Update condition with the optimized x
+            x = optimizer.param_groups[0]['params'][0].data
+            condition[0] = (condition[0][0], x)
 
+        # Final evaluation if not broken early
         if not broke:
-            samples, likelihoods = self.sample(N, H, condition=condition, context=context, no_grad=False)
-            all_samples.append(samples.clone().detach().cpu())
-            all_likelihoods.append(likelihoods.clone().detach().cpu())
-            likelihood_reshape = likelihoods.reshape(B, -1).mean(1)
+            with torch.no_grad():
+                samples, likelihoods = self.sample(N, H, condition=condition, context=context, no_grad=True)
+                all_samples.append(samples.clone().detach().cpu())
+                all_likelihoods.append(likelihoods.clone().detach().cpu())
+                likelihood_reshape = likelihoods.reshape(B, -1).mean(1)
 
-            if residual_gp is not None:
-                likelihood_reshape = residual_gp.gp_model.predict_with_grad(x, base_likelihood=likelihood_reshape, fast_mode=True, normalize=False)[0]
-            likelihoods_loss = -likelihood_reshape.mean()
-            all_losses.append(likelihoods_loss.item())
-            likelihoods_loss.backward()
-
-        print(f'Projection step: {proj_t+1}, Loss: {likelihoods_loss.item()}')
+                if residual_gp is not None:
+                    likelihood_reshape = residual_gp.gp_model.predict(
+                        x, base_likelihood=likelihood_reshape, normalize=False
+                    )[0]
+                
+                likelihoods_loss = -likelihood_reshape.mean().item()
+                all_losses.append(likelihoods_loss)
+        else:
+            print_ind = proj_t
+            if not broke:
+                print_ind += 1
+            print(f'Projection step: {print_ind}, Loss: {all_losses[-1]}')
+        
+        # Return the best sample, initial sample, and optimization history
         best_sample = all_samples[-1].to(x.device)
         best_likelihood = all_likelihoods[-1].to(x.device)
-        return (best_sample, best_likelihood), samples_0, (all_losses, all_samples, all_likelihoods)
 
+        # Set GP back to eval mode
+        if residual_gp is not None:
+            residual_gp.gp_model.eval()
+            residual_gp.likelihood.eval()
+            
+        return (best_sample, best_likelihood), samples_0, (all_losses, all_samples, all_likelihoods)
+    
     @staticmethod
     def _gaussian_kl(mu_1, var_1, mu_2, var_2):
         """ computes kl divergence KL(p_1 | p_2) """

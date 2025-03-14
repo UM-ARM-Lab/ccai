@@ -33,6 +33,7 @@ from ccai.models.cnf.cnf import TrajectoryCNF
 
 from ccai.models.helpers import MLP
 from ccai.models.likelihood_residual_gp import LikelihoodResidualGP
+from ccai.models.custom_predictive_log_likelihood import CustomPredictiveLogLikelihood
 
 import time
 import collections
@@ -367,6 +368,7 @@ class TrajectorySampler(nn.Module):
             )
             self.gp = LikelihoodResidualGP(
                 dx, 
+                0,
                 num_inducing=num_inducing,
                 kernel_type="rbf",
                 likelihood=actor_likelihood,
@@ -375,7 +377,8 @@ class TrajectorySampler(nn.Module):
             value_function_inducing_points = torch.randn(num_inducing, dx+1)
             # Create the critic GP (Q-function)
             self.value_function = LikelihoodResidualGP(
-                dx+1, 
+                dx,
+                1, 
                 inducing_points=value_function_inducing_points, 
                 kernel_type="rbf",
                 use_ard=True,
@@ -384,7 +387,8 @@ class TrajectorySampler(nn.Module):
             
             # Create target critic for stability
             self.value_function_target = LikelihoodResidualGP(
-                dx+1, 
+                dx,
+                1, 
                 inducing_points=value_function_inducing_points, 
                 kernel_type="rbf",
                 use_ard=True,
@@ -392,9 +396,10 @@ class TrajectorySampler(nn.Module):
             )
             
             # Create Q-function 2 for clipped double-Q trick
-            value_function_inducing_points_2 = torch.randn(num_inducing, dx)
+            value_function_inducing_points_2 = torch.randn(num_inducing, dx+1)
             self.value_function_2 = LikelihoodResidualGP(
-                dx, 
+                dx,
+                1, 
                 inducing_points=value_function_inducing_points_2, 
                 kernel_type="rbf",
                 use_ard=True,
@@ -404,6 +409,7 @@ class TrajectorySampler(nn.Module):
             # Create target for Q-function 2
             self.value_function_target_2 = LikelihoodResidualGP(
                 dx, 
+                1,
                 inducing_points=value_function_inducing_points_2, 
                 kernel_type="rbf",
                 use_ard=True,
@@ -439,7 +445,7 @@ class TrajectorySampler(nn.Module):
             # SAC hyperparameters
             self.gamma = 0.99  # Discount factor
             self.tau = 0.005   # Soft target update parameter
-            self.batch_size = 2
+            self.batch_size = 32
             self.alpha = 0.2   # Temperature parameter for entropy
             self.buffer_size = 10000  # Replay buffer size
             
@@ -472,8 +478,11 @@ class TrajectorySampler(nn.Module):
                 beta_increment=self.per_beta_increment,
                 epsilon=self.per_epsilon
             )
+            
+            # For tracking the last transition
+            self._last_transition_idx = None
 
-        self.num_update = 5  # Multiple updates per call
+        self.num_update = 1  # Multiple updates per call
         self.send_norm_constants_to_submodels()
 
     def to(self, device: torch.device) -> 'TrajectorySampler':
@@ -737,8 +746,46 @@ class TrajectorySampler(nn.Module):
         )
         
         # Store transition with maximum priority for new experiences
-        self.replay_buffer.add(experience)
-    
+        self._last_transition_idx = self.replay_buffer.add(experience)
+        
+    def mark_last_transition_done(self) -> bool:
+        """
+        Mark the last added transition as done (terminal state).
+        
+        Returns:
+            bool: True if successfully marked, False if no last transition exists
+        """
+        if not self.rl_adjustment or self._last_transition_idx is None:
+            return False
+            
+        # Check if the index is valid in the buffer
+        if self._last_transition_idx >= len(self.replay_buffer):
+            print("Warning: Last transition index is out of bounds")
+            return False
+            
+        try:
+            # Get the transition
+            transition = self.replay_buffer._storage[self._last_transition_idx]
+            if transition is None:
+                print("Warning: No transition found at last index")
+                return False
+                
+            # Unpack transition components
+            state, action, likelihood, reward, next_state, _ = transition
+            
+            # Create updated transition with done=True
+            updated_transition = (state, action, likelihood, reward, next_state, True)
+            
+            # Update the storage
+            self.replay_buffer._storage[self._last_transition_idx] = updated_transition
+            
+            print(f"Successfully marked transition {self._last_transition_idx} as done")
+            return True
+            
+        except Exception as e:
+            print(f"Failed to mark last transition as done: {e}")
+            return False
+
     def get_memory_size(self):
         """
         Get the current size of the replay buffer.
@@ -833,7 +880,7 @@ class TrajectorySampler(nn.Module):
         """
         with torch.no_grad(), fast_pred_var():
             # Get GP prediction
-            dist = self.gp.predict(state, likelihood, fast_mode=True)
+            dist, _, _ = self.gp.predict(state, likelihood, fast_mode=True)
             
             action = torch.round(dist.probs) if deterministic else dist.sample()
             log_prob = dist.log_prob(action)
@@ -912,7 +959,7 @@ class TrajectorySampler(nn.Module):
                 # Get next state GP output and action probabilities
                 action, _, next_entropy = self.get_action_batch(next_state_norm, likelihoods, deterministic=False, return_entropy=True)
 
-                next_state_action_norm = torch.cat([next_state_norm, action], dim=-1)
+                next_state_action_norm = torch.cat([next_state_norm, action.reshape(-1, 1)], dim=-1).to(dtype=next_state_norm.dtype)
 
                 # Get both Q-values and take the minimum for the target (clipped double-Q trick)
                 _, next_q_values_1, _ = self.value_function_target.predict(next_state_action_norm, fast_mode=True)
@@ -936,7 +983,7 @@ class TrajectorySampler(nn.Module):
             self.sac_optimizer.zero_grad()
             
             # Create predictive log likelihood objective for Q1
-            batch_objective_1 = gpytorch.mlls.PredictiveLogLikelihood(
+            batch_objective_1 = CustomPredictiveLogLikelihood(
                 self.value_function.likelihood,
                 self.value_function.gp_model,
                 num_data=states.shape[0]
@@ -945,11 +992,11 @@ class TrajectorySampler(nn.Module):
             # Current Q1 prediction
             current_q_values_1 = self.value_function.gp_model(state_action_norm)
                         
-            # Compute Q1 loss using PredictiveLogLikelihood
-            critic_loss_1 = -batch_objective_1(current_q_values_1, target_q.unsqueeze(-1))
+            # Compute Q1 loss using CustomPredictiveLogLikelihood
+            critic_loss_1 = -batch_objective_1(current_q_values_1, target_q)
             
             # Weight the loss with importance sampling weights
-            critic_loss_1 = (is_weights * critic_loss_1).mean()
+            critic_loss_1 = (is_weights * critic_loss_1).sum()
             
             # Backpropagate first critic loss
             critic_loss_1.backward()
@@ -970,7 +1017,7 @@ class TrajectorySampler(nn.Module):
             self.sac_optimizer.zero_grad()
             
             # Create predictive log likelihood objective for Q2
-            batch_objective_2 = gpytorch.mlls.PredictiveLogLikelihood(
+            batch_objective_2 = CustomPredictiveLogLikelihood(
                 self.value_function_2.likelihood,
                 self.value_function_2.gp_model,
                 num_data=states.shape[0]
@@ -982,11 +1029,11 @@ class TrajectorySampler(nn.Module):
             min_q_for_td_error = torch.min(current_q_values_1.mean.detach().squeeze(), current_q_values_2.mean.detach().squeeze())
             td_errors = (target_q - min_q_for_td_error).detach()
 
-            # Compute Q2 loss using PredictiveLogLikelihood
-            critic_loss_2 = -batch_objective_2(current_q_values_2, target_q.unsqueeze(-1))
+            # Compute Q2 loss using CustomPredictiveLogLikelihood
+            critic_loss_2 = -batch_objective_2(current_q_values_2, target_q)
             
             # Weight the loss with importance sampling weights
-            critic_loss_2 = (is_weights * critic_loss_2).mean()
+            critic_loss_2 = (is_weights * critic_loss_2).sum()
             
             # Backpropagate second critic loss
             critic_loss_2.backward()
@@ -1011,10 +1058,10 @@ class TrajectorySampler(nn.Module):
             # Zero gradients for actor update
             self.actor_ngd_optimizer.zero_grad()
             self.sac_optimizer.zero_grad()
-            boolean_dist, _, _ = self.gp.predict_with_grad(state_norm, torch.tensor(likelihoods).to(device=state_norm.device, dtype=state_norm.dtype), fast_mode=True)
+            boolean_dist, _, _ = self.gp.predict_with_grad(state_norm, torch.tensor(likelihoods).to(device=state_norm.device, dtype=state_norm.dtype), fast_mode=False)
             
             # Get action probabilities
-            probs = boolean_dist.probs
+            probs = boolean_dist.probs.reshape(-1, 1)
             probs = torch.cat([1-probs, probs], dim=-1)
             dist = Categorical(probs)
             
@@ -1024,7 +1071,7 @@ class TrajectorySampler(nn.Module):
             # Get log probs for each action in the batch
             log_probs = torch.log(torch.gather(probs, 1, actions) + 1e-10)
 
-            state_pred_prob_norm = torch.cat([state_norm, probs], dim=-1)
+            state_pred_prob_norm = torch.cat([state_norm, probs[:, 1:2]], dim=-1).to(dtype=state_norm.dtype)
             
             # Estimate Q-value using the first critic for policy optimization
             q_values_1 = self.value_function.gp_model(state_pred_prob_norm).mean
@@ -1032,7 +1079,7 @@ class TrajectorySampler(nn.Module):
             q_values = torch.min(q_values_1, q_values_2)
             
             # Actor loss: E[α*log(π(a|s)) - Q(s,a)] with importance sampling weights
-            actor_loss = (is_weights * (self.alpha * log_probs - q_values)).mean()
+            actor_loss = (is_weights * (self.alpha * log_probs.flatten() - q_values)).mean()
             
             # Backpropagate actor loss
             actor_loss.backward()
@@ -1047,17 +1094,35 @@ class TrajectorySampler(nn.Module):
             with torch.no_grad():
                 # Soft update first Q-network target
                 for param, target_param in zip(
-                    self.value_function.parameters(),
-                    self.value_function_target.parameters()
+                    self.value_function.gp_model.parameters(),
+                    self.value_function_target.gp_model.parameters()
                 ):
                     target_param.data.copy_(
                         self.tau * param.data + (1 - self.tau) * target_param.data
                     )
                 
+                # Soft update first Q-network likelihood
+                for param, target_param in zip(
+                    self.value_function.likelihood.parameters(),
+                    self.value_function_target.likelihood.parameters()
+                ):
+                    target_param.data.copy_(
+                        self.tau * param.data + (1 - self.tau) * target_param.data
+                    )
+
                 # Soft update second Q-network target
                 for param, target_param in zip(
-                    self.value_function_2.parameters(),
-                    self.value_function_target_2.parameters()
+                    self.value_function_2.gp_model.parameters(),
+                    self.value_function_target_2.gp_model.parameters()
+                ):
+                    target_param.data.copy_(
+                        self.tau * param.data + (1 - self.tau) * target_param.data
+                    )
+
+                # Soft update second Q-network likelihood
+                for param, target_param in zip(
+                    self.value_function_2.likelihood.parameters(),
+                    self.value_function_target_2.likelihood.parameters()
                 ):
                     target_param.data.copy_(
                         self.tau * param.data + (1 - self.tau) * target_param.data
@@ -1115,7 +1180,7 @@ class TrajectorySampler(nn.Module):
         
         # Add hyperparameter values to metrics
         aggregated_metrics['threshold'] = self.gp.likelihood.threshold.item()
-        aggregated_metrics['alpha'] = self.alpha
+        aggregated_metrics['global_scale_offset'] = torch.exp(self.gp.likelihood.log_global_scale_increase).item()
         
         # Calculate and add timing statistics
         total_time = time.time() - update_start_time
@@ -1136,9 +1201,19 @@ class TrajectorySampler(nn.Module):
         print(f"Q1 loss: {aggregated_metrics['critic_loss_1']:.6f}")
         print(f"Q2 loss: {aggregated_metrics['critic_loss_2']:.6f}")
         print(f"Current threshold: {aggregated_metrics['threshold']:.4f}")
-        print(f"Temperature: {aggregated_metrics['temperature']:.4f}")
+        print(f"Global Scale Offset: {aggregated_metrics['global_scale_offset']:.4f}")
         print("----------------------------------------------")
         
+        self.gp.gp_model.eval()
+        self.gp.likelihood.eval()
+        self.value_function.gp_model.eval()
+        self.value_function.likelihood.eval()
+        self.value_function_2.gp_model.eval() 
+        self.value_function_2.likelihood.eval()
+        self.value_function_target.gp_model.eval()
+        self.value_function_target.likelihood.eval()
+        self.value_function_target_2.gp_model.eval()
+        self.value_function_target_2.likelihood.eval()
         # Return the aggregated metrics
         return aggregated_metrics
         

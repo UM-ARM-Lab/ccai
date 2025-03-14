@@ -57,6 +57,9 @@ class VariationalGP(ApproximateGP):
         # Initialize inducing points if not provided
         if inducing_points is None:
             inducing_points = torch.randn(num_inducing, state_dim)
+        else:
+            num_inducing = inducing_points.size(0)
+            assert inducing_points.size(1) == state_dim, "Inducing points dimension must match input dimension"
         
         # Set up variational distribution and strategy
         variational_distribution = NaturalVariationalDistribution(num_inducing)
@@ -109,7 +112,7 @@ class VariationalGP(ApproximateGP):
         # Cache for faster predictions
         self._has_updated_cached_kernel = False
     
-    def forward(self, x: torch.Tensor, base_likelihood: torch.Tensor = 0) -> gpytorch.distributions.MultivariateNormal:
+    def forward(self, x: torch.Tensor) -> gpytorch.distributions.MultivariateNormal:
         """
         Forward pass through the Gaussian Process.
         
@@ -120,7 +123,7 @@ class VariationalGP(ApproximateGP):
             MultivariateNormal distribution representing GP predictions
         """
         # Apply mean and covariance functions
-        mean_x = self.mean_module(x) + base_likelihood
+        mean_x = self.mean_module(x)
         covar_x = self.covar_module(x)
         
         # Return distribution
@@ -138,41 +141,80 @@ class VariationalGP(ApproximateGP):
         Returns:
             Tuple of (mean, variance) tensors
         """
-        x = (x - self.x_mean[:x.shape[-1]]) / self.x_std[:x.shape[-1]]
+        x[:, :self.state_dim] = (x[:, :self.state_dim] - self.x_mean[:self.state_dim]) / self.x_std[:self.state_dim]
         self.eval()
         
         # Use GPyTorch's fast predictive variance setting
         with fast_pred_var() if fast_mode else torch.no_grad():
             # Further optimize with higher CG tolerance for faster matrix solves
             with cg_tolerance(1e-3):
-                output = self(x, base_likelihood=base_likelihood)
+                output = self(x)
+                output.loc += base_likelihood
         
         return output.mean, output.variance
     
-    def predict_with_grad(self, x: torch.Tensor, base_likelihood: torch.Tensor = 0, fast_mode: bool = True, normalize=True) -> Tuple[torch.Tensor, torch.Tensor]:
+    def predict_with_grad(
+        self, 
+        x: torch.Tensor, 
+        base_likelihood: torch.Tensor = 0, 
+        fast_mode: bool = True, 
+        normalize: bool = True
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Make predictions with the GP model, preserving gradients.
-        Uses fast_pred_var for efficient variance computation.
+        Make predictions with the GP model, preserving gradients for backpropagation.
+        Uses fast_pred_var for efficient variance computation when enabled.
         
         Args:
             x: Input tensor of shape [batch_size, state_dim]
+            base_likelihood: Base likelihood value to add to the predicted mean
             fast_mode: Whether to use GPyTorch fast prediction mode
-
+            normalize: Whether to normalize inputs using stored normalization constants
+            
         Returns:
-            Tuple of (mean, variance) tensors
+            Tuple of (mean, variance) tensors with gradients preserved
         """
+        # Create a clone to avoid in-place operations that break gradient flow
         if normalize:
-            x = (x - self.x_mean[:x.shape[-1]]) / self.x_std[:x.shape[-1]]
-        self.eval()
+            x_norm = x.clone()
+            # Only normalize the state dimensions with proper indexing
+            if hasattr(self, 'state_dim'):
+                state_indices = slice(0, self.state_dim)
+                x_norm[:, state_indices] = (
+                    (x_norm[:, state_indices] - self.x_mean[state_indices]) / 
+                    self.x_std[state_indices]
+                )
+            else:
+                # If state_dim not set, normalize all dimensions
+                x_norm = (x_norm - self.x_mean) / self.x_std
+        else:
+            x_norm = x
         
-        # Use fast_pred_var but keep gradients
-        with fast_pred_var() if fast_mode else torch.enable_grad():
-            # Higher CG tolerance for faster matrix solves
-            with cg_tolerance(1e-3):
-                output = self(x, base_likelihood=base_likelihood)
         
-        return output.mean, output.variance
-    
+        # Use appropriate context managers based on fast_mode setting
+        if fast_mode:
+            # Fast predictions but preserve gradients
+            with fast_pred_var(), cg_tolerance(1e-3):
+                output = self(x_norm)
+                
+                # Add base likelihood to mean while maintaining gradient flow
+                if base_likelihood is not None and torch.is_tensor(base_likelihood):
+                    output = MultivariateNormal(
+                        output.mean + base_likelihood,
+                        output.lazy_covariance_matrix
+                    )
+        else:
+            # Full computation with explicit gradient tracking
+            with torch.enable_grad():
+                output = self(x_norm)
+                
+                # Add base likelihood to mean while maintaining gradient flow
+                if base_likelihood is not None and torch.is_tensor(base_likelihood):
+                    output = MultivariateNormal(
+                        output.mean + base_likelihood,
+                        output.lazy_covariance_matrix
+                    )
+        
+        return output.mean, output.variance    
     def get_prediction_with_uncertainty(
         self, x: torch.Tensor, n_samples: int = 10, fast_mode: bool = True
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -188,7 +230,7 @@ class VariationalGP(ApproximateGP):
         Returns:
             Tuple of (mean, variance, samples) tensors
         """
-        x = (x - self.x_mean[:x.shape[-1]]) / self.x_std[:x.shape[-1]]
+        x[:, :self.state_dim] = (x[:, :self.state_dim] - self.x_mean[:self.state_dim]) / self.x_std[:self.state_dim]
         self.eval()
         
         with torch.no_grad(), fast_pred_var(), fast_pred_samples() if fast_mode else torch.no_grad():
@@ -231,6 +273,7 @@ class LikelihoodResidualGP:
     def __init__(
         self,
         state_dim: int,
+        action_dim: int,
         num_inducing: int = 128,
         likelihood: Optional[gpytorch.likelihoods.Likelihood] = None,
         noise_constraint: Optional[gpytorch.constraints.Interval] = None,
@@ -250,12 +293,15 @@ class LikelihoodResidualGP:
         """
         # Pass use_whitening to the VariationalGP constructor
         self.gp_model = VariationalGP(
-            state_dim=state_dim, 
+            state_dim=state_dim+action_dim, 
             num_inducing=num_inducing, 
             use_whitening=use_whitening,
             **gp_kwargs
         )
-        
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+        self.gp_model.state_dim = state_dim
+        self.gp_model.action_dim = action_dim
         # Set up likelihood
         if likelihood is None:
             if noise_constraint is None:
@@ -425,7 +471,7 @@ class LikelihoodResidualGP:
         Returns:
             Tuple of (mean, variance) tensors
         """
-        x = (x - self.gp_model.x_mean[:x.shape[-1]]) / self.gp_model.x_std[:x.shape[-1]]
+        x[:, :self.state_dim] = (x[:, :self.state_dim] - self.gp_model.x_mean[:self.state_dim]) / self.gp_model.x_std[:self.state_dim]
         self.gp_model.eval()
         self.likelihood.eval()
         
@@ -440,44 +486,76 @@ class LikelihoodResidualGP:
         if fast_mode:
             with fast_pred_var(), cg_tolerance(1e-3):
                 # Get GP output distribution
-                output = self.gp_model(x, base_likelihood=base_likelihood)
+                output = self.gp_model(x)
+                output.loc += base_likelihood
                 # Get predictive distribution from likelihood
                 pred_dist = self.likelihood(output)
         else:
             with torch.no_grad():
-                output = self.gp_model(x, base_likelihood=base_likelihood)
+                output = self.gp_model(x)
+                output.loc += base_likelihood
                 pred_dist = self.likelihood(output)
         
         return pred_dist, output.mean, output.variance
     
-    def predict_with_grad(self, x: torch.Tensor, base_likelihood: torch.Tensor = 0, fast_mode: bool = True) -> Tuple[torch.Tensor, torch.Tensor]:
+    def predict_with_grad(
+        self, 
+        x: torch.Tensor, 
+        base_likelihood: torch.Tensor = 0, 
+        fast_mode: bool = True,
+        normalize: bool = True
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Make predictions with the trained model, preserving gradients.
         Uses GPyTorch fast prediction optimizations.
         
         Args:
-            x: Input tensor of shape [batch_size, state_dim]
+            x: Input tensor of shape [batch_size, input_dim]
+            base_likelihood: Base likelihood value to add to the predicted mean
             fast_mode: Whether to use GPyTorch fast prediction optimizations
+            normalize: Whether to normalize inputs using stored norm constants
             
         Returns:
-            Tuple of (mean, variance) tensors
+            Tuple of (pred_dist, mean, variance) with gradients preserved
         """
-        x = (x - self.gp_model.x_mean[:x.shape[-1]]) / self.gp_model.x_std[:x.shape[-1]]
-        self.gp_model.eval()
-        self.likelihood.eval()
+        # Create a clone to avoid in-place operations that break gradients
+        if normalize:
+            x_norm = x.clone()
+            # Only normalize the state dimensions, keeping the exact indexing
+            state_indices = slice(0, self.state_dim)
+            x_norm[:, state_indices] = (
+                (x_norm[:, state_indices] - self.gp_model.x_mean[state_indices]) / 
+                self.gp_model.x_std[state_indices]
+            )
+        else:
+            x_norm = x
         
-        # Fix the with statement syntax
+        # Use context managers for faster prediction while preserving gradients
         if fast_mode:
             with fast_pred_var(), cg_tolerance(1e-3):
                 # Get GP output distribution
-                output = self.gp_model(x, base_likelihood=base_likelihood)
+                output = self.gp_model(x_norm)
                 
+                # Add base likelihood to mean in a way that preserves gradients
+                if base_likelihood is not None:
+                    output = MultivariateNormal(
+                        output.loc + base_likelihood,
+                        output.lazy_covariance_matrix
+                    )
+                    
                 # Get predictive distribution from likelihood
                 pred_dist = self.likelihood(output)
         else:
-            with torch.enable_grad():
-                output = self.gp_model(x, base_likelihood=base_likelihood)
-                pred_dist = self.likelihood(output)
+            # Full computation without optimizations
+            output = self.gp_model(x_norm)
+            
+            if base_likelihood is not None:
+                output = MultivariateNormal(
+                    output.loc + base_likelihood,
+                    output.lazy_covariance_matrix
+                )
+                
+            pred_dist = self.likelihood(output)
         
         return pred_dist, output.mean, output.variance
     
@@ -495,7 +573,7 @@ class LikelihoodResidualGP:
         Returns:
             Samples tensor of shape [n_samples, batch_size, 1]
         """
-        x = (x - self.gp_model.x_mean[:x.shape[-1]]) / self.gp_model.x_std[:x.shape[-1]]
+        x[:, :self.state_dim] = (x[:, :self.state_dim] - self.gp_model.x_mean[:self.state_dim]) / self.gp_model.x_std[:self.state_dim]
         self.gp_model.eval()
         self.likelihood.eval()
         

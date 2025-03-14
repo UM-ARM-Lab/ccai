@@ -118,10 +118,6 @@ class CDFBernoulliLikelihood(Likelihood):
         loc = function_dist.mean
         scale = function_dist.variance.sqrt() + torch.exp(self.log_global_scale_increase)
         output_probs = torch.distributions.Normal(loc, scale).cdf(self.threshold)
-
-        
-        # Average probabilities over samples
-        marginal_probs = output_probs.mean(0)
         
         # Return Bernoulli with these average probabilities
-        return torch.distributions.Bernoulli(probs=marginal_probs)
+        return torch.distributions.Bernoulli(probs=output_probs)

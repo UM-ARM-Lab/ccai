@@ -1528,15 +1528,14 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         del actual_trajectory_save
 
         if done:
-            trajectory_sampler_orig.sac_dones[-1] = True
+            if params.get('rl_adjustment', False) and trajectory_sampler_orig is not None:
+                trajectory_sampler_orig.mark_last_transition_done()
+                print("Marked last transition as done (episode completed)")
             break
 
-    # np.savez(f'{fpath.resolve()}/trajectory.npz', x=[i.cpu().numpy() for i in actual_trajectory],)
-             #  constr=constraint_val.cpu().numpy(),
-            #  d2goal=final_distance_to_goal.cpu().numpy())
-    if params['mode'] == 'hardware':
-        input("Ready to regrasp. Press <ENTER> to continue.")
-    trajectory_sampler_orig.sac_dones[-1] = True
+    if params.get('rl_adjustment', False) and trajectory_sampler_orig is not None:
+        trajectory_sampler_orig.mark_last_transition_done()
+        print("Marked last transition as done (final step)")
 
     env.reset()
     return -1#torch.min(final_distance_to_goal).cpu().numpy()
