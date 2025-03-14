@@ -530,6 +530,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                  obj_joint_dim=0,
                  fixed_obj=False,
                  collision_checking=False,
+                 geometry_grad=True,
                  arm_type='None',
                  device='cuda:0'):
         # object_location is different from object_asset_pos. object_asset_pos is 
@@ -540,6 +541,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                          obj_joint_dim=obj_joint_dim, fixed_obj=fixed_obj, 
                          arm_type=arm_type, device=device)
         self.collision_checking = collision_checking
+        self.geometry_grad = geometry_grad
         self.get_constraint_dim(T)
 
         # update x_max with valve angle
@@ -597,6 +599,10 @@ class AllegroContactProblem(AllegroObjectProblem):
         #                                            softmin_temp=100.0)
         # contact checking
         collision_check_links = [self.collision_checking_ee_names[finger] for finger in self.fingers]
+        if self.geometry_grad:
+            grad_smooth_points = 50
+        else:
+            grad_smooth_points = 1
         if collision_checking:
             collision_check_links.append('allegro_hand_hitosashi_finger_finger_link_2')
             collision_check_links.append('allegro_hand_hitosashi_finger_finger_link_3')
@@ -605,6 +611,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                                             softmin_temp=1.0e3,
                                             points_per_link=1000,
                                             partial_patch=False,
+                                            grad_smooth_points=grad_smooth_points,
                                             )
         object_sdf = pv.RobotSDF(self.object_chain, path_prefix=None, use_collision_geometry=False) # since we are using primitive shapes for the object, there's no need to define path for stl
         robot_sdf = pv.RobotSDF(self.chain, path_prefix=get_assets_dir() + '/xela_models', use_collision_geometry=False)
@@ -613,6 +620,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                                             softmin_temp=1.0e3,
                                             points_per_link=1000,
                                             partial_patch=False,
+                                            grad_smooth_points=grad_smooth_points,
                                             )
         # self.viz_contact_scenes.visualize_robot(partial_to_full_state(self.start[:self.robot_dof], fingers=self.fingers, arm_dof=self.arm_dof), None)
 
@@ -805,6 +813,7 @@ class AllegroValveTurning(AllegroContactProblem):
                  du=None,
                  contact_region=False,
                  arm_type='None',
+                 geometry_grad=True,
                  device='cuda:0', **kwargs):
         self.screwdriver_force_balance = screwdriver_force_balance
         self.optimize_force = optimize_force
@@ -840,7 +849,7 @@ class AllegroValveTurning(AllegroContactProblem):
                          fingers=fingers, obj_dof_code=obj_dof_code, 
                          obj_joint_dim=obj_joint_dim, fixed_obj=False, 
                          collision_checking=collision_checking, 
-                         arm_type=arm_type, device=device)
+                         arm_type=arm_type, geometry_grad=geometry_grad, device=device)
         self.friction_coefficient = friction_coefficient
         self.dynamics_constr = vmap(self._dynamics_constr)
         self.grad_dynamics_constr = vmap(jacrev(self._dynamics_constr, argnums=(0, 1, 2, 3, 4)))
@@ -1100,6 +1109,7 @@ class AllegroValveTurning(AllegroContactProblem):
         
 
     def _force_equlibrium_constr_w_force(self, q, u, next_q, force_list, contact_jac_list, contact_point_list, next_env_q):
+        # TODO: the gradient computation is missing some gradients w,r,t, the environment q
         # NOTE: the constriant is defined in the robot frame
         # NOTE: this only holds for quasi static system, as the reference point for the torque is essentially arbitrary
         # in a more general case, it has to be the CoM

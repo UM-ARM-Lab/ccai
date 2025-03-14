@@ -292,8 +292,8 @@ def do_trial(env, params, fpath, sim_viz_env=None):
 if __name__ == "__main__":
     # get config
     from tqdm import tqdm
-    task = 'screwdriver_turning'
-    # task = 'valve_turning'
+    # task = 'screwdriver_turning'
+    task = 'valve_turning'
     # task = 'peg_alignment'
     # task = 'peg_turning'
     # task =  'reorientation'

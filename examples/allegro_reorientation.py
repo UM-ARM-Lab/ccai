@@ -64,6 +64,7 @@ class AllegroReorientation(AllegroValveTurning):
                  friction_coefficient=0.95,
                  optimize_force=False,
                  obj_dof_code=[1, 1, 1, 1, 1, 1],
+                 geometry_grad=True,
                  obj_gravity=False,
                  device='cuda:0', **kwargs):
         self.num_fingers = len(fingers)
@@ -74,7 +75,8 @@ class AllegroReorientation(AllegroValveTurning):
         super(AllegroReorientation, self).__init__(start=start, goal=goal, T=T, chain=chain, object_location=object_location,
                                                  object_type=object_type, world_trans=world_trans, object_asset_pos=object_asset_pos,
                                                  fingers=fingers, friction_coefficient=friction_coefficient, obj_dof_code=obj_dof_code, 
-                                                 obj_joint_dim=0, optimize_force=optimize_force, obj_gravity=obj_gravity, device=device)
+                                                 obj_joint_dim=0, optimize_force=optimize_force, obj_gravity=obj_gravity, 
+                                                 geometry_grad=geometry_grad, device=device)
         self.friction_coefficient = friction_coefficient
         # self.min_force_dict = {'index': 0.2, 'middle': 0.2, 'ring': 0.2, 'thumb': 0.2}
     

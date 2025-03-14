@@ -98,6 +98,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                 obj_dof_code=params['obj_dof_code'],
                 obj_joint_dim=obj_joint_dim,
                 fixed_obj=True,
+                geometry_grad=params['geometry_grad'],
                 arm_type=params['arm_type'],
             )
 
@@ -166,6 +167,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                 collision_checking=params['collision_checking'],
                 obj_gravity=params['obj_gravity'],
                 contact_region=params['contact_region'],
+                geometry_grad=params['geometry_grad'],
                 arm_type=params['arm_type'],
             )
         elif config['task'] == 'valve_turning':
@@ -183,6 +185,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                 fingers=params['fingers'],
                 arm_type=params['arm_type'],
                 optimize_force=params['optimize_force'],
+                geometry_grad=params['geometry_grad'],
                 obj_dof_code=params['obj_dof_code'],
             )
         elif config['task'] == 'peg_turning':
@@ -200,6 +203,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                 device=params['device'],
                 fingers=params['fingers'],
                 obj_dof_code=params['obj_dof_code'],
+                geometry_grad=params['geometry_grad'],
                 obj_gravity=params['obj_gravity'],
             )
         elif config['task'] == 'peg_alignment':
@@ -237,6 +241,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
                 device=params['device'],
                 fingers=params['fingers'],
                 obj_dof_code=params['obj_dof_code'],
+                geometry_grad=params['geometry_grad'],
                 obj_gravity=params['obj_gravity'],
             )
 
@@ -514,9 +519,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
 
 if __name__ == "__main__":
     # get config
-    task = 'screwdriver_turning'
+    # task = 'screwdriver_turning'
     # task = 'valve_turning'
-    # task = 'reorientation'
+    task = 'reorientation'
     # task = 'peg_alignment'
     # task = 'peg_turning'
 

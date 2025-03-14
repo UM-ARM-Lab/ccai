@@ -74,6 +74,7 @@ class AllegroScrewdriver(AllegroValveTurning):
                  device='cuda:0', 
                  obj_gravity=False,
                  contact_region=False,
+                 geometry_grad=True,
                  arm_type='None',
                  **kwargs):
         self.num_fingers = len(fingers)
@@ -81,6 +82,7 @@ class AllegroScrewdriver(AllegroValveTurning):
         self.optimize_force = optimize_force
         self.obj_mass = 0.05
         self.contact_region = contact_region
+        self.geometry_grad = geometry_grad
         self.arm_type = arm_type
         if self.arm_type == 'None':
             self.arm_dof = 0
@@ -101,7 +103,8 @@ class AllegroScrewdriver(AllegroValveTurning):
                                                  obj_joint_dim=1, optimize_force=optimize_force, 
                                                  screwdriver_force_balance=force_balance,
                                                  collision_checking=collision_checking, obj_gravity=obj_gravity,
-                                                 contact_region=contact_region, du=du, arm_type=arm_type, device=device)
+                                                 contact_region=contact_region, du=du, geometry_grad=geometry_grad, 
+                                                 arm_type=arm_type, device=device)
         self.min_force_dict = {'index': 0.0001, 'middle': 0.1, 'ring': 0.1, 'thumb': 0.1}
         # self.min_force_dict = {'index': 0.0001, 'middle': 1.0, 'ring': 1.0, 'thumb': 1.0}
         self.friction_coefficient = friction_coefficient

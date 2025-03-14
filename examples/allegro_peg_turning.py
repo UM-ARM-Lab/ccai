@@ -65,6 +65,7 @@ class AllegroPegTurning(AllegroValveTurning):
                  optimize_force=False,
                  obj_dof_code=[1, 1, 1, 1, 1, 1],
                  obj_gravity=False,
+                 geometry_grad=True,
                  device='cuda:0', **kwargs):
         self.num_fingers = len(fingers)
         self.optimize_force = optimize_force
@@ -74,7 +75,8 @@ class AllegroPegTurning(AllegroValveTurning):
         super(AllegroPegTurning, self).__init__(start=start, goal=goal, T=T, chain=chain, object_location=object_location,
                                                  object_type=object_type, world_trans=world_trans, object_asset_pos=object_asset_pos,
                                                  fingers=fingers, friction_coefficient=friction_coefficient, obj_dof_code=obj_dof_code, 
-                                                 obj_joint_dim=0, optimize_force=optimize_force, obj_gravity=obj_gravity, device=device)
+                                                 obj_joint_dim=0, optimize_force=optimize_force, obj_gravity=obj_gravity, 
+                                                 geometry_grad=geometry_grad, device=device)
         self.friction_coefficient = friction_coefficient
     
     def _cost(self, xu, start, goal):
