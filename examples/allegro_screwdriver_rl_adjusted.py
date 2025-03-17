@@ -63,7 +63,7 @@ print("CCAI_PATH", CCAI_PATH)
 obj_dof = 3
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
-sys.stdout = open('./examples/logs/allegro_screwdriver_sac_tuning_bernoulli_likelihood_64.log', 'w', buffering=1)
+# sys.stdout = open('./examples/logs/allegro_screwdriver_sac_tuning_bernoulli_likelihood_64.log', 'w', buffering=1)
 
 
 def vector_cos(a, b):

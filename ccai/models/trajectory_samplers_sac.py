@@ -445,7 +445,7 @@ class TrajectorySampler(nn.Module):
             # SAC hyperparameters
             self.gamma = 0.99  # Discount factor
             self.tau = 0.005   # Soft target update parameter
-            self.batch_size = 32
+            self.batch_size = 2
             self.alpha = 0.2   # Temperature parameter for entropy
             self.buffer_size = 10000  # Replay buffer size
             
@@ -481,8 +481,19 @@ class TrajectorySampler(nn.Module):
             
             # For tracking the last transition
             self._last_transition_idx = None
+            
+            # Reward normalization parameters
+            self.normalize_rewards = True
+            self.reward_stats = {
+                'mean': 0.0,
+                'var': 1.0,
+                'count': 0,
+                'running_mean': 0.0,
+                'running_var': 0.0
+            }
+            self.reward_norm_eps = 1e-6  # Small constant for numerical stability
 
-        self.num_update = 1  # Multiple updates per call
+        self.num_update = 5  # Multiple updates per call
         self.send_norm_constants_to_submodels()
 
     def to(self, device: torch.device) -> 'TrajectorySampler':
@@ -735,6 +746,10 @@ class TrajectorySampler(nn.Module):
                                           dtype=torch.float32, 
                                           device=next(self.parameters()).device)
         
+        # Update reward statistics with the new reward
+        reward_tensor = torch.tensor([reward], device=next(self.parameters()).device)
+        self._update_reward_stats(reward_tensor)
+        
         # Create experience tuple
         experience = (
             state_tensor, 
@@ -936,6 +951,10 @@ class TrajectorySampler(nn.Module):
             states, actions, likelihoods, rewards, next_states, dones, indices, is_weights = self.sample_replay_buffer()
             timing_stats['sampling_time'] += time.time() - sampling_start
             
+            # Normalize rewards if enabled
+            raw_rewards = rewards.clone()
+            normalized_rewards = self._normalize_rewards(rewards)
+            
             # Normalize states
             norm_start = time.time()
             state_norm = (states - self.x_mean[:self.dx]) / self.x_std[:self.dx]
@@ -969,7 +988,8 @@ class TrajectorySampler(nn.Module):
                 next_q_values_min = torch.min(next_q_values_1, next_q_values_2)
                 
                 # Target Q = r + γ(min(Q1, Q2) + α*H(π(·|s')))
-                target_q = rewards + (1 - dones) * self.gamma * (next_q_values_min + self.alpha * next_entropy)
+                # Use normalized rewards here
+                target_q = normalized_rewards + (1 - dones) * self.gamma * (next_q_values_min + self.alpha * next_entropy)
             timing_stats['target_q_time'] += time.time() - target_q_start
             
             # Update first Q-function
@@ -1058,7 +1078,7 @@ class TrajectorySampler(nn.Module):
             # Zero gradients for actor update
             self.actor_ngd_optimizer.zero_grad()
             self.sac_optimizer.zero_grad()
-            boolean_dist, _, _ = self.gp.predict_with_grad(state_norm, torch.tensor(likelihoods).to(device=state_norm.device, dtype=state_norm.dtype), fast_mode=False)
+            boolean_dist, _, _ = self.gp.predict_with_grad(state_norm, torch.tensor(likelihoods).to(device=state_norm.device, dtype=state_norm.dtype), fast_mode=True)
             
             # Get action probabilities
             probs = boolean_dist.probs.reshape(-1, 1)
@@ -1171,12 +1191,24 @@ class TrajectorySampler(nn.Module):
                       f"Q1 Loss={critic_loss_1.item():.4f}, "
                       f"Q2 Loss={critic_loss_2.item():.4f}, "
                       f"Entropy={entropy.item():.4f}, "
-                      f"Time={iter_time:.2f}s")
+                      f"Time={iter_time:.2f}s"
+                      f"Actor IP Change={actor_ip_change:.4f}, "
+                      f"Critic IP Change 1={critic_ip_change_1:.4f}, "
+                      f"Critic IP Change 2={critic_ip_change_2:.4f}, "
+                      f"Mean TD Error={td_errors.abs().mean().item():.4f}")
+        
+
         
         # ------------------------ Final processing ------------------------
         # Average metrics over the number of updates
         for key in aggregated_metrics:
             aggregated_metrics[key] /= self.num_update
+        
+        # Add reward normalization stats to metrics
+        aggregated_metrics["reward_mean"] = self.reward_stats['mean']
+        aggregated_metrics["reward_std"] = np.sqrt(self.reward_stats['var'])
+        aggregated_metrics["normalized_reward_mean"] = normalized_rewards.mean().item()
+        aggregated_metrics["normalized_reward_std"] = normalized_rewards.std().item() if len(normalized_rewards) > 1 else 0
         
         # Add hyperparameter values to metrics
         aggregated_metrics['threshold'] = self.gp.likelihood.threshold.item()
@@ -1202,6 +1234,8 @@ class TrajectorySampler(nn.Module):
         print(f"Q2 loss: {aggregated_metrics['critic_loss_2']:.6f}")
         print(f"Current threshold: {aggregated_metrics['threshold']:.4f}")
         print(f"Global Scale Offset: {aggregated_metrics['global_scale_offset']:.4f}")
+        print(f"Reward stats: mean={self.reward_stats['mean']:.4f}, "
+              f"std={np.sqrt(self.reward_stats['var']):.4f}, count={self.reward_stats['count']}")
         print("----------------------------------------------")
         
         self.gp.gp_model.eval()
@@ -1242,3 +1276,93 @@ class TrajectorySampler(nn.Module):
             param_group['lr'] = value_lr
             
         print(f"NGD learning rates adjusted: Actor={actor_lr}, Value={value_lr}")
+        
+    def _update_reward_stats(self, rewards: torch.Tensor) -> None:
+        """
+        Update running statistics for reward normalization using Welford's algorithm.
+        
+        Args:
+            rewards: Batch of rewards to update statistics with
+        """
+        if not self.normalize_rewards:
+            return
+            
+        batch_size = rewards.shape[0]
+        
+        if batch_size == 0:
+            return
+            
+        # Get statistics before update for logging
+        old_mean = self.reward_stats['mean']
+        
+        # Update count
+        new_count = self.reward_stats['count'] + batch_size
+        
+        # Update mean
+        batch_mean = rewards.mean().item()
+        delta = batch_mean - self.reward_stats['mean']
+        new_mean = self.reward_stats['mean'] + delta * batch_size / new_count
+        
+        # Update variance using Welford's online algorithm
+        batch_var = rewards.var(unbiased=False).item() if batch_size > 1 else 0.0
+        m_a = self.reward_stats['var'] * self.reward_stats['count']
+        m_b = batch_var * batch_size
+        M2 = m_a + m_b + delta**2 * self.reward_stats['count'] * batch_size / new_count
+        new_var = M2 / new_count
+        
+        # Store updated statistics
+        self.reward_stats['count'] = new_count
+        self.reward_stats['mean'] = new_mean
+        self.reward_stats['var'] = new_var
+        
+        # Also track exponentially weighted statistics for smoother updates
+        if self.reward_stats['count'] <= 1:
+            self.reward_stats['running_mean'] = batch_mean
+            self.reward_stats['running_var'] = batch_var if batch_var > 0 else 1.0
+        else:
+            momentum = 0.99 if self.reward_stats['count'] > 1000 else 0.9
+            self.reward_stats['running_mean'] = momentum * self.reward_stats['running_mean'] + (1 - momentum) * batch_mean
+            self.reward_stats['running_var'] = momentum * self.reward_stats['running_var'] + (1 - momentum) * batch_var
+            
+        print(f"Reward stats updated: mean {old_mean:.4f} -> {new_mean:.4f}, "
+              f"std: {np.sqrt(self.reward_stats['var']):.4f}")
+    
+    def _normalize_rewards(self, rewards: torch.Tensor) -> torch.Tensor:
+        """
+        Normalize rewards using tracked statistics.
+        
+        Args:
+            rewards: Rewards to normalize
+        
+        Returns:
+            Normalized rewards
+        """
+        if not self.normalize_rewards or self.reward_stats['count'] < 100:  
+            # Don't normalize until we have enough samples
+            return rewards
+            
+        std = torch.sqrt(torch.tensor(self.reward_stats['var'] + self.reward_norm_eps, device=rewards.device))
+        mean = torch.tensor(self.reward_stats['mean'], device=rewards.device)
+        
+        return (rewards - mean) / std
+        
+    def set_reward_normalization(self, enabled: bool = True) -> None:
+        """
+        Enable or disable reward normalization.
+        
+        Args:
+            enabled: Whether to normalize rewards
+        """
+        self.normalize_rewards = enabled
+        print(f"Reward normalization {'enabled' if enabled else 'disabled'}")
+        
+    def reset_reward_stats(self) -> None:
+        """Reset the reward normalization statistics."""
+        self.reward_stats = {
+            'mean': 0.0,
+            'var': 1.0,
+            'count': 0,
+            'running_mean': 0.0,
+            'running_var': 0.0
+        }
+        print("Reward statistics have been reset")

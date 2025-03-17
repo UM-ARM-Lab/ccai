@@ -33,7 +33,7 @@ class CDFBernoulliLikelihood(Likelihood):
         """
         super().__init__()
         self.threshold = torch.nn.Parameter(torch.tensor([initial_threshold]))
-        self.log_global_scale_increase = torch.nn.Parameter(torch.tensor([np.log(10.0)]))
+        self.log_global_scale_increase = torch.nn.Parameter(torch.tensor([np.log(1.0)]))
         # self.temperature = torch.nn.Parameter(torch.tensor([initial_temp]))
         self.num_samples = num_samples
         

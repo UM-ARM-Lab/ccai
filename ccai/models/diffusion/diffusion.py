@@ -642,11 +642,11 @@ class GaussianDiffusion(nn.Module):
         # N = 100
         # we could randomly choose timesteps, or do all of them. For now let's randomly generatre
         # t = torch.randint(1, self.num_timesteps, (N,), device=device).long()
-        # t = torch.arange(1, self.num_timesteps, device=device).long()
+        t = torch.arange(1, self.num_timesteps, device=device).long()
         # t = torch.arange(1, self.num_timesteps, 8, device=device).long()
         # t = torch.arange(5, 30, 2, device=device).long()
         # if self.subsampled_t:
-        t = torch.tensor([5, 10, 15], device=device).long()
+        # t = torch.tensor([5, 10, 15], device=device).long()
 
         N = t.shape[0]
         t = t[None, :].repeat(B, 1).reshape(B * N)

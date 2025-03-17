@@ -130,7 +130,7 @@ class VariationalGP(ApproximateGP):
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
     
     @torch.no_grad()
-    def predict(self, x: torch.Tensor, base_likelihood: torch.Tensor = 0, fast_mode: bool = True) -> Tuple[torch.Tensor, torch.Tensor]:
+    def predict(self, x: torch.Tensor, base_likelihood: torch.Tensor = 0, fast_mode: bool = True, normalize=True) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Make predictions with the GP model (in eval mode) using fast_pred_var.
         
@@ -141,7 +141,8 @@ class VariationalGP(ApproximateGP):
         Returns:
             Tuple of (mean, variance) tensors
         """
-        x[:, :self.state_dim] = (x[:, :self.state_dim] - self.x_mean[:self.state_dim]) / self.x_std[:self.state_dim]
+        if normalize:
+            x[:, :self.state_dim] = (x[:, :self.state_dim] - self.x_mean[:self.state_dim]) / self.x_std[:self.state_dim]
         self.eval()
         
         # Use GPyTorch's fast predictive variance setting
@@ -460,7 +461,7 @@ class LikelihoodResidualGP:
         return losses
     
     @torch.no_grad()
-    def predict(self, x: torch.Tensor, base_likelihood = 0, fast_mode: bool = True) -> Tuple[torch.Tensor, torch.Tensor]:
+    def predict(self, x: torch.Tensor, base_likelihood = 0, fast_mode: bool = True, normalize=True) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Make predictions with the trained model using fast prediction settings.
         
@@ -471,7 +472,8 @@ class LikelihoodResidualGP:
         Returns:
             Tuple of (mean, variance) tensors
         """
-        x[:, :self.state_dim] = (x[:, :self.state_dim] - self.gp_model.x_mean[:self.state_dim]) / self.gp_model.x_std[:self.state_dim]
+        if normalize:
+            x[:, :self.state_dim] = (x[:, :self.state_dim] - self.gp_model.x_mean[:self.state_dim]) / self.gp_model.x_std[:self.state_dim]
         self.gp_model.eval()
         self.likelihood.eval()
         
