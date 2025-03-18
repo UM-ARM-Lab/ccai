@@ -63,7 +63,7 @@ print("CCAI_PATH", CCAI_PATH)
 obj_dof = 3
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
-sys.stdout = open('./examples/logs/allegro_screwdriver_recovery_data_5_10_15_denoise_proj.log', 'w', buffering=1)
+sys.stdout = open('./examples/logs/allegro_screwdriver_recovery_data_5_10_15_action_perturb.log', 'w', buffering=1)
 
 
 def vector_cos(a, b):
@@ -433,6 +433,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             pre_recovery_likelihood: Likelihood before recovery
         """
         nonlocal episode_num_steps
+        data['final_likelihoods'].append([])
         
         # Initialize variables that might be referenced before assignment
         pre_recovery_state = None
@@ -674,9 +675,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             if recover:
                 id_check, final_likelihood = True, None
             else:
-                id_check, final_likelihood = trajectory_sampler_orig.check_id(state, 8, deterministic=deterministic)
+                id_check, final_likelihood = trajectory_sampler_orig.check_id(state, 8, deterministic=deterministic, threshold=params.get('likelihood_threshold', -15))
             if final_likelihood is not None:
-                data['final_likelihoods'].append(final_likelihood)
+                data['final_likelihoods'][-1].append(final_likelihood)
 
             if not id_check:
                 # State is OOD. Save state and likelihood but DON'T collect data for RL yet.
@@ -977,7 +978,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             , turn_problem.contact_scenes_for_viz, viz_fpath,
                                 turn_problem.fingers, turn_problem.obj_dof + 1)
         
-        dist_min = 5e-3
+        dist_min = 7e-3
         mode_skip = []
         planner = mode_planner_dict['index']
         cur_q = state[:4 * num_fingers]
@@ -1017,7 +1018,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
             start = x[-1]
             start_sine_cosine = convert_yaw_to_sine_cosine(start)
-            likelihood, samples = trajectory_sampler_orig.check_id(start_sine_cosine, 8, likelihood_only=True, return_samples=True)
+            likelihood, samples = trajectory_sampler_orig.check_id(start_sine_cosine, 8, likelihood_only=True, return_samples=True, threshold=params.get('likelihood_threshold', -15))
             distances.append(-likelihood)
             viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fpath}/recovery_stage_{all_stage}/{mode}")
             pathlib.Path.mkdir(viz_fpath, parents=True, exist_ok=True)
@@ -1383,14 +1384,14 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         add = not recover or params['live_recovery']
 
         if (not pre_recover and recover):
-            likelihood = data['final_likelihoods'][-1]
+            likelihood = data['final_likelihoods'][-1][-1]
         else:
             state = env.get_state()
             state = state['q'].reshape(-1)[:15].to(device=params['device'])
             
             start = state[:4 * num_fingers + obj_dof]
             start_sine_cosine = convert_yaw_to_sine_cosine(start)
-            id, likelihood = trajectory_sampler_orig.check_id(start_sine_cosine, 8)
+            id, likelihood = trajectory_sampler_orig.check_id(start_sine_cosine, 8, threshold=params.get('likelihood_threshold', -15))
             recover = not id
             
         if likelihood < params.get('drop_threshold', -300):
