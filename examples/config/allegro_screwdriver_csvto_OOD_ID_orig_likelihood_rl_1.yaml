@@ -7,7 +7,7 @@ num_turns: 1
 max_recovery_stages: 4
 num_trials: 1000
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_data_sac_bernoulli_likelihood_64_orig_lower_critic_lr_lower_lower_alpha_more_inducing_pts_reward_norm'
+experiment_name: 'allegro_screwdriver_recovery_data_5_10_15_denoise_proj'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -45,14 +45,17 @@ type: 'diffusion'
 model_dir: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion'
 model_path: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
 model_path_rl_adjusted: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier_rl_adj.pt'
-likelihood_threshold: -30.0
-project_threshold: -15
+# likelihood_threshold: -350.0
+# project_threshold: -200
+drop_threshold: -500
 sac_batch_size: 64
 num_episodes: 1000
 # likelihood_threshold: -16.0
-# likelihood_threshold: -136.6758056640625
-# project_threshold: -90
-# parity: 654
+likelihood_threshold: -150.
+project_threshold: -105.
+# likelihood_threshold: -275.
+# project_threshold: -235.
+parity: 654
 controllers:
   csvgd:
     # N: 16
@@ -61,8 +64,8 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:0'
-    online_iters: 10
+    device: 'cuda:1'
+    online_iters: 20
     warmup_iters: 50
     resample_steps: 16
     resample_sigma: 0.01

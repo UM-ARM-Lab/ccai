@@ -446,7 +446,7 @@ class TrajectorySampler(nn.Module):
             self.gamma = 0.99  # Discount factor
             self.tau = 0.005   # Soft target update parameter
             self.batch_size = 2
-            self.alpha = 0.2   # Temperature parameter for entropy
+            self.alpha = 0.02   # Temperature parameter for entropy
             self.buffer_size = 10000  # Replay buffer size
             
             # Prioritized experience replay parameters
@@ -1192,9 +1192,9 @@ class TrajectorySampler(nn.Module):
                       f"Q2 Loss={critic_loss_2.item():.4f}, "
                       f"Entropy={entropy.item():.4f}, "
                       f"Time={iter_time:.2f}s"
-                      f"Actor IP Change={actor_ip_change:.4f}, "
-                      f"Critic IP Change 1={critic_ip_change_1:.4f}, "
-                      f"Critic IP Change 2={critic_ip_change_2:.4f}, "
+                      f"Actor IP Change={actor_ip_change:.8f}, "
+                      f"Critic IP Change 1={critic_ip_change_1:.8f}, "
+                      f"Critic IP Change 2={critic_ip_change_2:.8f}, "
                       f"Mean TD Error={td_errors.abs().mean().item():.4f}")
         
 

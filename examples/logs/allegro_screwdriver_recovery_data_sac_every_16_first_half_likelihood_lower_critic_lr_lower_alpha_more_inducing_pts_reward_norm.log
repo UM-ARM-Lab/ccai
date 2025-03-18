@@ -1,0 +1,3 @@
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+Backend TkAgg is interactive backend. Turning interactive mode on.

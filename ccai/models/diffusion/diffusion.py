@@ -257,7 +257,7 @@ class GaussianDiffusion(nn.Module):
 
         unconditional, _ = self.model.compiled_unconditional_test(t, x)
         if not (context is None or self.unconditional):
-            w_total = 1.2 if context.mean().item() == 1 else 1.2
+            w_total = 1.2# if context.mean().item() == 1 else 1.2
             # w_total = 30
             num_constraints = context.shape[1]
 
@@ -614,8 +614,13 @@ class GaussianDiffusion(nn.Module):
         self.mu = mu
         self.std = std
 
-    def resample(self, x, condition, context, timestep):
-        B = x.shape[0]
+    def project(self, N: int, H: Optional[int] = None, condition: Optional[Dict] = None, 
+            context: Optional[torch.Tensor] = None, residual_gp: Optional[Any] = None) -> Tuple:
+        
+        x0 = condition[0][1].clone()
+        samples, likelihoods = self.sample(N, H, condition=condition, context=context, no_grad=True)
+        
+        B = samples.shape[0]
         if context is not None:
             B, num_constraints, dc = context.shape
             context = context.reshape(B, 1, num_constraints, dc)
@@ -626,15 +631,24 @@ class GaussianDiffusion(nn.Module):
         # takes a current data estimate x_0, samples from forward diffusion to noise to x_timestep < T
         # then runs reverse diffusion to get a new updated sample
         # what if we noise it a little less than we were supposed to
-        batched_times = torch.full((B,), timestep, device=x.device, dtype=torch.long)
+        batched_times = torch.full((B,), 50, device=samples.device, dtype=torch.long)
 
-        x_noised = self.q_sample(x, batched_times - 1)
+        x_noised = self.q_sample(samples, batched_times - 1)
         # x_noised = x
         # return resampled
-        return self.p_sample_loop(x.shape, condition=condition, context=context,
+        x_denoised = self.p_sample_loop(samples.shape, condition=None, context=context,
                                   return_all_timesteps=False,
-                                  start_timestep=timestep,
+                                  start_timestep=50,
                                   trajectory=x_noised)
+        
+        likelihood = self.approximate_likelihood(x_denoised.reshape(-1, self.horizon, self.xu_dim), context=context.reshape(-1, self.context_dim))
+
+        likelihood_argsort = torch.argsort(likelihood, dim=0, descending=True)
+
+        highest_likelihood_x0 = x_denoised.reshape(-1, self.horizon, self.xu_dim)[likelihood_argsort]
+        likelihood_sort = likelihood[likelihood_argsort]
+
+        return (highest_likelihood_x0, likelihood_sort), samples, (None, [samples, highest_likelihood_x0], [likelihoods, likelihood_sort])
 
     def approximate_likelihood(self, x, context=None, forward_kl=False):
         B, H, d = x.shape
@@ -642,11 +656,11 @@ class GaussianDiffusion(nn.Module):
         # N = 100
         # we could randomly choose timesteps, or do all of them. For now let's randomly generatre
         # t = torch.randint(1, self.num_timesteps, (N,), device=device).long()
-        t = torch.arange(1, self.num_timesteps, device=device).long()
-        # t = torch.arange(1, self.num_timesteps, 8, device=device).long()
+        # t = torch.arange(1, self.num_timesteps, device=device).long()
+        # t = torch.arange(1, self.num_timesteps//2, 16, device=device).long()
         # t = torch.arange(5, 30, 2, device=device).long()
         # if self.subsampled_t:
-        # t = torch.tensor([5, 10, 15], device=device).long()
+        t = torch.tensor([5, 10, 15], device=device).long()
 
         N = t.shape[0]
         t = t[None, :].repeat(B, 1).reshape(B * N)
@@ -679,7 +693,7 @@ class GaussianDiffusion(nn.Module):
         overall_kl = kl_x.reshape(B, N).mean(dim=1).to(x.device)
         return -overall_kl
  
-    def project(self, N: int, H: Optional[int] = None, condition: Optional[Dict] = None, 
+    def project_old(self, N: int, H: Optional[int] = None, condition: Optional[Dict] = None, 
             context: Optional[torch.Tensor] = None, residual_gp: Optional[Any] = None) -> Tuple:
         """
         Project initial state to a high-likelihood region using gradient ascent with SGD and momentum.
@@ -697,6 +711,7 @@ class GaussianDiffusion(nn.Module):
                 - samples_0: Initial samples before projection
                 - (all_losses, all_samples, all_likelihoods): History of optimization
         """
+        residual_gp = None
         # Set GP to training mode if provided
         if residual_gp is not None:
             residual_gp.gp_model.train()
@@ -713,7 +728,7 @@ class GaussianDiffusion(nn.Module):
         grad_mask = torch.ones_like(x)
         
         # Setup optimizer with momentum
-        optimizer = torch.optim.SGD([torch.nn.Parameter(x)], lr=1.5, momentum=0.5)
+        optimizer = torch.optim.SGD([torch.nn.Parameter(x)], lr=.3, momentum=0.9)
         
         # Storage for tracking optimization progress
         all_samples = []
@@ -722,7 +737,7 @@ class GaussianDiffusion(nn.Module):
         broke = False
 
         # Main projection loop
-        for proj_t in tqdm(range(15)):
+        for proj_t in tqdm(range(25)):
             # Zero gradients from previous iteration
             optimizer.zero_grad()
             
@@ -780,7 +795,7 @@ class GaussianDiffusion(nn.Module):
                 else:
                     samples_grad = samples.grad.reshape(B, 16, self.horizon, -1)[:, :, 0, :self.dx].mean(1)
                     optimizer.param_groups[0]['params'][0].grad = samples_grad * grad_mask
-            
+                
             # Take optimization step
             optimizer.step()
             

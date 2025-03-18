@@ -63,7 +63,7 @@ print("CCAI_PATH", CCAI_PATH)
 obj_dof = 3
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
-# sys.stdout = open('./examples/logs/allegro_screwdriver_sac_tuning_bernoulli_likelihood_64.log', 'w', buffering=1)
+sys.stdout = open('./examples/logs/allegro_screwdriver_recovery_data_5_10_15_denoise_proj.log', 'w', buffering=1)
 
 
 def vector_cos(a, b):
@@ -977,7 +977,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             , turn_problem.contact_scenes_for_viz, viz_fpath,
                                 turn_problem.fingers, turn_problem.obj_dof + 1)
         
-        dist_min = 3e-3
+        dist_min = 5e-3
         mode_skip = []
         planner = mode_planner_dict['index']
         cur_q = state[:4 * num_fingers]
@@ -1429,7 +1429,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 else:
                     print('1 mode projection succeeded')
                 
-            goal = convert_sine_cosine_to_yaw(projected_samples[-1][0])[:15]
+            goal = convert_sine_cosine_to_yaw(projected_samples[0][0])[:15]
             if index_regrasp_planner is None:
                 index_regrasp_problem = AllegroScrewdriver(
                     start=start[:4 * num_fingers + obj_dof],
@@ -1544,7 +1544,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 if __name__ == "__main__":
     # get config
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl_1.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_perturbed_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_orig_likelihood.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_live_recovery_shortcut_0.yaml').read_text())
@@ -1726,7 +1726,7 @@ if __name__ == "__main__":
 
     dt = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     run = wandb.init(project='ccai-screwdriver', entity='abhinavk99', config=config,
-                    name=f'screwdriver_sac_adj_{dt}')
+                    name=f'{config["experiment_name"]}_{dt}')
     start_ind = 0
     step_size = 1
     num_episodes = config['num_episodes']+start_ind
