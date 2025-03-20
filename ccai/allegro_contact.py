@@ -372,7 +372,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.data['delta_theta'] = delta_theta.float()
             self.data['delta_delta_q'] = delta_delta_q.float()
             self.data['delta_f'] = delta_f.float()
-        self._preprocess_fingers(q, theta, projected_diffusion=projected_diffusion)
+        self._preprocess_fingers(q, theta)#, projected_diffusion=projected_diffusion)
 
     def _preprocess_fingers(self, q, theta, projected_diffusion=False):
         N, _, _ = q.shape
@@ -733,6 +733,8 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                  last_diffused_q = None,
                  *args, **kwargs):
 
+        if not hasattr(self, 'use_diffusion'):
+            self.use_diffusion = False
         # object_location is different from object_asset_pos. object_asset_pos is 
         # used for pytorch volumetric. The asset of valve might contain something else such as a wall, a table
         # object_location is the location of the object joint, which is what we care for motion planning

@@ -39,11 +39,13 @@ regrasp_poses = regrasp_stacked[:,-1,:]
 regrasp_poses = regrasp_poses.reshape(-1, 20)[0:10,:]
 regrasp_poses = convert_full_to_partial_config(regrasp_poses)
 
-regrasp_traj = regrasp_stacked[0,:,:].reshape(13,20)
-
+regrasp_traj = regrasp_stacked[5,:,:].reshape(13,20)
+which_ones = [12]
+regrasp_poses = regrasp_traj[which_ones,:]
+regrasp_poses = convert_full_to_partial_config(regrasp_poses)
 
 def grad_descent(lr = 0.3, iters = 1000):
-    models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble(model_name="ensemble_rg_wide")
+    models, poses_mean, poses_std, cost_mean, cost_std = load_ensemble(model_name="ensemble_rg")
     
     poses = torch.from_numpy(regrasp_poses)
 
@@ -51,6 +53,7 @@ def grad_descent(lr = 0.3, iters = 1000):
     poses_norm = poses_norm.float()
 
     column_to_add = torch.full((poses_norm.size(0), 1), 12)
+    column_to_add = torch.tensor(which_ones, dtype=torch.float32).reshape(len(which_ones),1)
     poses_norm = torch.cat((poses_norm, column_to_add), dim=1)
 
     original_costs_norm = torch.mean(query_ensemble(poses_norm, models), dim=0).detach().cpu().numpy()
@@ -119,6 +122,18 @@ if __name__ == "__main__":
     
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=True)
+
+    while True:
+        print("before")
+        for i in range(full_optimized_poses.shape[0]):
+            env.reset(torch.from_numpy(full_poses[i]).reshape(1,20).float())
+            time.sleep(0.5)
+        print("after")
+        for i in range(full_optimized_poses.shape[0]):
+            env.reset(torch.from_numpy(full_optimized_poses[i]).reshape(1,20).float())
+            time.sleep(0.5)
+
+
     for j in range(full_semi_optimized_poses.shape[1]):
         for i in range(full_semi_optimized_poses.shape[0]):
             env.reset(torch.from_numpy(full_semi_optimized_poses[i,j,:]).reshape(1,20).float())

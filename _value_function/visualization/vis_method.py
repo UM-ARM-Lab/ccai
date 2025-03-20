@@ -48,8 +48,8 @@ if __name__ == "__main__":
     # experiment_names = ['test_method_test_official_all',
     #                      'test_method_test_official_low_iter_diffusion10k_no_contact',]
 
-    experiment_names = ['test_method_test_official_low_iter_novfrepeat',]
-    budget = "Low Budget"
+    # experiment_names = ['test_method_test_official_low_iter_novfrepeat',]
+    # budget = "Low Budget"
 
     results = {}
 
@@ -61,19 +61,19 @@ if __name__ == "__main__":
         for method, method_results in single_results.items():
 
             if method == "no_vf":
-                method = "Vanilla"
+                method = "T.O."
             elif method == "vf":
                 method = "AVO (ours)"
-            elif method == "diffusion":
-                method = "Diffusion"
+            # elif method == "diffusion":
+            #     method = "Diffusion + T.O."
             elif method == "diffusion_no_contact_cost":
-                method = "Diffusion"
+                method = "Diffusion + T.O."
             elif method == "diffusion_w_contact_cost":
-                method = "Diffusion+"
+                method = "Diffusion + T.O. + Contact Cost"
             elif method == 'singlevf':
                 method = "Single VF"
             elif method == "combined":
-                method = "Diffusion+VF"
+                method = "Hybrid"
             else:
                 print("Invalid method")
                 exit()
@@ -82,7 +82,7 @@ if __name__ == "__main__":
                 print(f"Overriding {method}.")
                 
             if budget == "Low Budget":
-                if method != "Vanilla" and method != "AVO (ours)":
+                if method != "T.O." and method != "AVO (ours)":
                     continue
 
             results[method] = method_results

@@ -22,14 +22,14 @@ from torch.func import vmap, jacrev, hessian, jacfwd
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 from ccai.utils.allegro_utils import *
 from ccai.allegro_contact import AllegroManipulationExternalContactProblem, PositionControlConstrainedSVGDMPC
-from ccai.allegro_screwdriver_problem_diffusion import AllegroScrewdriverDiff
-from ccai.mpc.diffusion_policy import Diffusion_Policy, DummyProblem
+# from ccai.allegro_screwdriver_problem_diffusion import AllegroScrewdriverDiff
+# from ccai.mpc.diffusion_policy import Diffusion_Policy, DummyProblem
 from ccai.models.trajectory_samplers import TrajectorySampler
 from ccai.models.contact_samplers import GraphSearchCard, Node
 
-from model import LatentDiffusionModel
+# from model import LatentDiffusionModel
 
-from diffusion_mcts import DiffusionMCTS
+# from diffusion_mcts import DiffusionMCTS
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
@@ -190,6 +190,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None, s
     # start = torch.cat((state['q'].reshape(10), torch.zeros(1).to(state['q'].device))).to(device=params['device'])
     if 'csvgd' in params['controller']:
         # use index finger to slide the card
+
         index_problem = AllegroCard(
             start=start[:4 * num_fingers + obj_dof],
             goal=params['valve_goal'],
@@ -206,7 +207,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None, s
             obj_dof=obj_dof,
             obj_joint_dim=1,
             optimize_force=params['optimize_force'],
-            default_dof_pos=env.default_dof_pos[:, :16],
+            default_dof_pos=env.initial_dof_pos[:, :16],
             obj_gravity=params.get('obj_gravity', False),
         )
         # use middle finger to slide the card
@@ -226,7 +227,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None, s
             obj_dof=obj_dof,
             obj_joint_dim=1,
             optimize_force=params['optimize_force'],
-            default_dof_pos=env.default_dof_pos[:, :16],
+            default_dof_pos=env.initial_dof_pos[:, :16],
             obj_gravity=params.get('obj_gravity', False),
         )
         # use index and middle finger to slide the card
@@ -246,7 +247,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None, s
             obj_dof=obj_dof,
             obj_joint_dim=1,
             optimize_force=params['optimize_force'],
-            default_dof_pos=env.default_dof_pos[:, :16],
+            default_dof_pos=env.initial_dof_pos[:, :16],
             turn=True,
             obj_gravity=params.get('obj_gravity', False),
         )
@@ -267,7 +268,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None, s
             obj_dof=obj_dof,
             obj_joint_dim=1,
             optimize_force=params['optimize_force'],
-            default_dof_pos=env.default_dof_pos[:, :16],
+            default_dof_pos=env.initial_dof_pos[:, :16],
             turn=True,
             obj_gravity=params.get('obj_gravity', False),
         )
@@ -322,7 +323,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None, s
             #     obj_dof=obj_dof,
             #     obj_joint_dim=1,
             #     optimize_force=params['optimize_force'],
-            #     default_dof_pos=env.default_dof_pos[:, :16]
+            #     initial_dof_pos=env.initial_dof_pos[:, :16]
             # )
             # thumb_and_middle_regrasp_problem_diff = AllegroScrewdriverDiff(
             #     start=start[:4 * num_fingers + obj_dof],
@@ -339,7 +340,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None, s
             #     obj_dof=obj_dof,
             #     obj_joint_dim=1,
             #     optimize_force=params['optimize_force'],
-            #     default_dof_pos=env.default_dof_pos[:, :16]
+            #     initial_dof_pos=env.initial_dof_pos[:, :16]
             # )
             # turn_problem_diff = AllegroScrewdriverDiff(
             #     start=start[:4 * num_fingers + obj_dof],
@@ -355,7 +356,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None, s
             #     obj_dof=obj_dof,
             #     obj_joint_dim=1,
             #     optimize_force=params['optimize_force'],
-            #     default_dof_pos=env.default_dof_pos[:, :16]
+            #     initial_dof_pos=env.initial_dof_pos[:, :16]
             # )
 
             if params['use_partial_constraint']:
@@ -395,6 +396,8 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None, s
         trajectory_sampler.to(device=params['device'])
         trajectory_sampler.send_norm_constants_to_submodels()
         print('Loaded trajectory sampler')
+
+    
 
     # start = env.get_state()['q'].reshape(4 * num_fingers + 4).to(device=params['device'])
     # best_traj, _ = pregrasp_planner.step(start[:4 * num_fingers + obj_dof])
@@ -804,6 +807,9 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None, s
             contact_sequence.append(np.random.choice(contact_options))
     else:
         contact_sequence = None
+    
+    contact_sequence = ['index', 'middle', 'index']
+
     num_stages = params['num_turns']
     # state = state['q'].reshape(-1)[:11].to(device=params['device'])
     # initial_samples = gen_initial_samples_multi_mode(contact_sequence)
@@ -949,6 +955,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None, s
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance = execute_traj(
                 index_planner, mode='index', goal=_goal, fname=f'index_{stage}', initial_samples=initial_samples)
             print('traj pre index', traj.shape)
+            traj = traj.to(device=params['device'])
             plans = [_partial_to_full(plan, 'index') for plan in plans]
             traj = torch.cat((traj[..., :-3], torch.zeros(*traj.shape[:-1], 3).to(device=params['device']), traj[..., -3:]), dim=-1)
             print('traj post index', traj.shape)
@@ -967,6 +974,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None, s
             
             print('traj pre middle', traj.shape)
             plans = [_partial_to_full(plan, 'middle') for plan in plans]
+            traj = traj.to(device=params['device'])
             traj = torch.cat((traj[..., :-6], torch.zeros(*traj.shape[:-1], 3).to(device=params['device']), traj[..., -6:]), dim=-1)
             print('traj post middle', traj.shape)
 
@@ -1027,7 +1035,7 @@ def do_trial(env, params, fpath, inits_noise=None, noise_noise=None, sim=None, s
 
 if __name__ == "__main__":
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/card.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_card_csvto_diff_plan.yaml').read_text())
     from tqdm import tqdm
 
