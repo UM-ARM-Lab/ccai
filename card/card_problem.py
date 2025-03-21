@@ -322,7 +322,7 @@ def pull_middle(env, config, chain, image_path=None, warmup_iters=35, online_ite
 
 
 def delete_imgs():
-    img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/imgs')
+    img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/card/imgs')
     # Check if the directory exists
     if img_save_dir.exists() and img_save_dir.is_dir():
         # Iterate through each item in the directory and delete
@@ -343,11 +343,16 @@ if __name__ == "__main__":
     warmup_iters = 35
     online_iters = 150
 
-    img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/card/imgs')
-    pathlib.Path.mkdir(img_save_dir, parents=True, exist_ok=True)  
+    
 
     full_trajs = []
-    for i in range(1):
+    for i in range(5):
+        img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/card/imgs/test/trial_{i}')
+        pathlib.Path.mkdir(img_save_dir, parents=True, exist_ok=True)  
+        env.frame_fpath = img_save_dir
+        env.frame_id = 0
+
+        env.reset()
         final_state, full_traj0 = pull_index(env, config, chain, img_save_dir, warmup_iters, online_iters)
         final_state, full_traj1 = pull_middle(env, config, chain, img_save_dir, warmup_iters, online_iters)
         final_state, full_traj2 = pull_index(env, config, chain, img_save_dir, warmup_iters, online_iters)

@@ -52,7 +52,7 @@ if len(sys.argv) == 2:
 else:
     config_path = 'card0.yaml'
 
-visualize = True
+visualize = False
 config, env, sim_env, ros_copy_node, chain, sim, gym, viewer = init_env(visualize=visualize, config_path=config_path)
 sim_device = config['sim_device']
 computer_id = config['data_collection_id']
