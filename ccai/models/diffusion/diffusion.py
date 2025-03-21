@@ -116,7 +116,8 @@ class GaussianDiffusion(nn.Module):
             hidden_dim=32,
             unconditional=True,
             model_type='conv_unet',
-            discriminator_guidance=False
+            discriminator_guidance=False,
+            new_projection=False
     ):
         super().__init__()
 
@@ -128,7 +129,7 @@ class GaussianDiffusion(nn.Module):
         #     self.model = TemporalUnet(horizon, dx + du, context_dim, dim=hidden_dim)
         # else:
         #     self.model = TransformerForDiffusion(dx + du, dx + du, horizon, 1, cond_dim=context_dim, n_emb=hidden_dim)
-
+        self.new_projection = new_projection
         self.horizon = horizon
         self.xu_dim = dx + du
         self.dx = dx
@@ -620,6 +621,13 @@ class GaussianDiffusion(nn.Module):
 
     def project(self, N: int, H: Optional[int] = None, condition: Optional[Dict] = None, 
             context: Optional[torch.Tensor] = None, residual_gp: Optional[Any] = None) -> Tuple:
+        if self.new_projection:
+            return self.project_new(N, H, condition, context, residual_gp)
+        else:
+            return self.project_old(N, H, condition, context, residual_gp)
+
+    def project_new(self, N: int, H: Optional[int] = None, condition: Optional[Dict] = None, 
+            context: Optional[torch.Tensor] = None, residual_gp: Optional[Any] = None) -> Tuple:
         """
         Project to a high-likelihood region by sampling with conditioning followed by unconditioned denoising.
         
@@ -654,8 +662,8 @@ class GaussianDiffusion(nn.Module):
         # 1. Start with random noise (more efficient than sampling then renoising)
         noise = torch.randn((B, H, self.xu_dim), device=device)
         
-        # Projection cutoff timestep (where we switch from conditioned to unconditioned)
-        cutoff_timestep = 75
+        # Projection cutoff timestep (when we switch from conditioned to unconditioned)
+        cutoff_timestep = 128
         
         # 2. First denoising pass: T → 50 WITH conditioning
         # Apply the conditioning here to initialize the process properly
@@ -707,6 +715,147 @@ class GaussianDiffusion(nn.Module):
         
         # Return in the same format as the original implementation for compatibility
         return (highest_likelihood_samples, likelihood_sort), None, (None, [samples_0, highest_likelihood_samples], [None, likelihood_sort])
+
+    def project_old(self, N: int, H: Optional[int] = None, condition: Optional[Dict] = None, 
+            context: Optional[torch.Tensor] = None, residual_gp: Optional[Any] = None) -> Tuple:
+        """
+        Project initial state to a high-likelihood region using gradient ascent with SGD and momentum.
+        
+        Args:
+            N: Number of trajectories to sample per gradient step
+            H: Horizon length (defaults to self.horizon if None)
+            condition: Trajectory conditioning information
+            context: Context tensor for conditional generation
+            residual_gp: Optional GP model for likelihood adjustment
+            
+        Returns:
+            Tuple containing:
+                - (best_sample, best_likelihood): The best sample and its likelihood
+                - samples_0: Initial samples before projection
+                - (all_losses, all_samples, all_likelihoods): History of optimization
+        """
+        # Set GP to training mode if provided
+        if residual_gp is not None:
+            residual_gp.gp_model.train()
+            residual_gp.likelihood.train()
+        
+        # Define minimum acceptable likelihood
+        min_likelihood = self.cutoff
+
+        # Extract the initial state to optimize
+        x = condition[0][1].clone()
+        B = x.shape[0]
+        
+        # Create gradient mask to track which states need optimization
+        grad_mask = torch.ones_like(x)
+        
+        # Setup optimizer with momentum
+        optimizer = torch.optim.SGD([torch.nn.Parameter(x)], lr=.3, momentum=0.9)
+        
+        # Storage for tracking optimization progress
+        all_samples = []
+        all_losses = []
+        all_likelihoods = []
+        broke = False
+
+        # Main projection loop
+        for proj_t in tqdm(range(25)):
+            # Zero gradients from previous iteration
+            optimizer.zero_grad()
+            
+            # Clone and detach x to create a fresh computational graph for this iteration
+            x = optimizer.param_groups[0]['params'][0].detach().clone()
+            optimizer.param_groups[0]['params'][0] = torch.nn.Parameter(x)
+            
+            # Update the condition with the new x
+            condition[0] = (condition[0][0], x)
+            
+            # Sample N trajectories with the current x
+            with torch.set_grad_enabled(True):
+                samples, likelihoods = self.sample(N, H, condition=condition, context=context, no_grad=False)
+                
+                # Store samples and likelihoods for tracking
+                all_samples.append(samples.clone().detach().cpu())
+                all_likelihoods.append(likelihoods.clone().detach().cpu())
+                
+                # Reshape likelihoods for easier processing
+                likelihood_reshape = likelihoods.reshape(B, -1).mean(1)
+
+                # Apply GP adjustment if provided
+                if residual_gp is not None:
+                    likelihood_reshape = residual_gp.gp_model.predict_with_grad(
+                        optimizer.param_groups[0]['params'][0], base_likelihood=likelihood_reshape, fast_mode=False, normalize=False
+                    )[0].flatten()
+                
+                # Update gradient mask - don't optimize states that already meet the threshold
+                grad_mask[likelihood_reshape >= min_likelihood] = 0.0
+
+                # Store initial samples
+                if proj_t == 0:
+                    samples_0 = samples.clone().detach()
+                
+                # If all states meet threshold, we can stop early
+                if grad_mask.sum() == 0:
+                    likelihoods_loss = -likelihood_reshape.mean()
+                    likelihoods_loss.backward()
+                    all_losses.append(likelihoods_loss.item())
+                    broke = True
+                    break
+                
+                # Calculate loss and record
+                likelihoods_loss = -likelihood_reshape.mean()
+                all_losses.append(likelihoods_loss.item())
+                print(f'Projection step: {proj_t}, Loss: {likelihoods_loss.item()}')
+                
+                # Compute gradients
+                likelihoods_loss.backward()
+                
+                # Apply gradient mask and combine with gradients from samples if using GP
+                if residual_gp is not None:
+                    samples_grad = samples.grad.reshape(B, 16, self.horizon, -1)[:, :, 0, :self.dx].mean(1)
+                    optimizer.param_groups[0]['params'][0].grad += samples_grad * grad_mask
+                else:
+                    samples_grad = samples.grad.reshape(B, 16, self.horizon, -1)[:, :, 0, :self.dx].mean(1)
+                    optimizer.param_groups[0]['params'][0].grad = samples_grad * grad_mask
+            
+            # Take optimization step
+            optimizer.step()
+            
+            # Update condition with the optimized x
+            x = optimizer.param_groups[0]['params'][0].data
+            condition[0] = (condition[0][0], x)
+
+        # Final evaluation if not broken early
+        if not broke:
+            with torch.no_grad():
+                samples, likelihoods = self.sample(N, H, condition=condition, context=context, no_grad=True)
+                all_samples.append(samples.clone().detach().cpu())
+                all_likelihoods.append(likelihoods.clone().detach().cpu())
+                likelihood_reshape = likelihoods.reshape(B, -1).mean(1)
+
+                if residual_gp is not None:
+                    likelihood_reshape = residual_gp.gp_model.predict(
+                        x, base_likelihood=likelihood_reshape, normalize=False
+                    )[0]
+                
+                likelihoods_loss = -likelihood_reshape.mean().item()
+                all_losses.append(likelihoods_loss)
+        else:
+            print_ind = proj_t
+            if not broke:
+                print_ind += 1
+            print(f'Projection step: {print_ind}, Loss: {all_losses[-1]}')
+        
+        # Return the best sample, initial sample, and optimization history
+        best_sample = all_samples[-1].to(x.device)
+        best_likelihood = all_likelihoods[-1].to(x.device)
+
+        # Set GP back to eval mode
+        if residual_gp is not None:
+            residual_gp.gp_model.eval()
+            residual_gp.likelihood.eval()
+            
+        return (best_sample, best_likelihood), samples_0, (all_losses, all_samples, all_likelihoods)
 
     def approximate_likelihood(self, x, context=None, forward_kl=False):
         B, H, d = x.shape
