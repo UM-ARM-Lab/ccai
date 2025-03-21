@@ -87,6 +87,6 @@ while True:
 
     while Path(savepath).exists():
         prog_id += 1
-        savepath = f'{fpath.resolve()}/card_dataset_{computer_id}_{prog_id}.pkl'
+        savepath = f'{fpath.resolve()}/card_datasets/card_dataset_{computer_id}_{prog_id}.pkl'
 
     pkl.dump(pose_tuples, open(savepath, 'wb'))
