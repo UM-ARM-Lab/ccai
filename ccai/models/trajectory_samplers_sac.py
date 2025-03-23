@@ -143,7 +143,7 @@ class TrajectoryDiffusionModel(nn.Module):
 
     def __init__(self, T, dx, du, context_dim, problem=None, timesteps=20, hidden_dim=64, constrained=False,
                  unconditional=False, generate_context=False, score_model='conv_unet', latent_diffusion=False,
-                 vae=None, inits_noise=None, noise_noise=None, guided=False):
+                 vae=None, inits_noise=None, noise_noise=None, guided=False, new_projection=False):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -176,7 +176,7 @@ class TrajectoryDiffusionModel(nn.Module):
                     self.diffusion_model = GaussianDiffusion(T, dx, du, context_dim, timesteps=timesteps,
                                                             sampling_timesteps=timesteps, hidden_dim=hidden_dim,
                                                             unconditional=unconditional,
-                                                            model_type=score_model)
+                                                            model_type=score_model, new_projection=new_projection)
 
     def construct_context(self, constraints=None):
         if constraints is not None:
@@ -332,7 +332,7 @@ class TrajectorySampler(nn.Module):
                  constrain=False, unconditional=False, generate_context=False, score_model='conv_unet',
                  latent_diffusion=False, vae=None, inits_noise=None, noise_noise=None, guided=False, discriminator_guidance=False,
                  learn_inverse_dynamics=False, state_only=False, state_control_only=False,
-                 rl_adjustment=False, initial_threshold=-15):
+                 rl_adjustment=False, initial_threshold=-15, new_projection=False):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -353,11 +353,12 @@ class TrajectorySampler(nn.Module):
         else:
             self.model = TrajectoryDiffusionModel(T, dx, du, context_dim, problem, timesteps, hidden_dim, constrain,
                                                   unconditional, generate_context=generate_context, score_model=score_model,
-                                                  inits_noise=inits_noise, noise_noise=noise_noise, guided=guided)
+                                                  inits_noise=inits_noise, noise_noise=noise_noise, guided=guided, new_projection=new_projection)
 
         self.register_buffer('x_mean', torch.zeros(dx + du))
         self.register_buffer('x_std', torch.ones(dx + du))
 
+        self.gp = None
         self.rl_adjustment = rl_adjustment
         if self.rl_adjustment:
             # Create the actor GP (policy network)
@@ -536,7 +537,7 @@ class TrajectorySampler(nn.Module):
 
     def send_norm_constants_to_submodels(self):
         self.model.set_norm_constants(self.x_mean, self.x_std)
-        if hasattr(self, 'gp'):
+        if self.gp is not None:
             self.gp.set_norm_constants(self.x_mean, self.x_std)
         if hasattr(self, 'value_function'):
             self.value_function.set_norm_constants(self.x_mean, self.x_std)
@@ -575,7 +576,7 @@ class TrajectorySampler(nn.Module):
         start_sine_cosine = self.convert_yaw_to_sine_cosine(start)
         
         # Use GPyTorch's fast prediction settings to speed up sampling
-        with fast_pred_var(), fast_pred_samples(), cg_tolerance(1e-3):
+        with torch.no_grad(), fast_pred_var(), fast_pred_samples(), cg_tolerance(1e-3):
             samples, _, likelihood = self.sample(N=N, H=self.T, start=start_sine_cosine.reshape(1, -1),
                     constraints=torch.ones(N, 3).to(device=state.device))
         
@@ -625,10 +626,17 @@ class TrajectorySampler(nn.Module):
                 else:
                     return True, adjusted_likelihood
         else:
+            likelihood = likelihood.item()
+            print('Likelihood:', likelihood)
             # Fall back to threshold based approach if rl_adjustment is False
             if threshold is None:
                 threshold = -15  # Default threshold
             
+            if likelihood_only:
+                if return_samples:
+                    return likelihood, samples
+                else:
+                    return likelihood
             if likelihood < threshold:
                 print('State is out of distribution')
                 if return_samples:
@@ -668,7 +676,7 @@ class TrajectorySampler(nn.Module):
             
         if self.type != 'latent_diffusion':
             if project:
-                return x * self.x_std + self.x_mean, c, likelihood, samples_0 * self.x_std + self.x_mean, (all_losses, all_samples, all_likelihoods)
+                return x * self.x_std + self.x_mean, c, likelihood, None, (all_losses, all_samples, all_likelihoods)
             elif not no_grad:
                 return x, c, likelihood
             else:

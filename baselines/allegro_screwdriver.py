@@ -75,7 +75,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                                                  turn=turn, obj_gravity=obj_gravity)
         self.friction_coefficient = friction_coefficient
 
-    def _cost(self, xu, start, goal):
+    def _cost(self, xu, start, goal, projected_diffusion=False):
         # TODO: check if the addtional term of the smoothness cost and running goal cost is necessary
         state = xu[:, :self.dx]  # state dim = 9
         state = torch.cat((start.reshape(1, self.dx), state), dim=0)  # combine the first time step into it
@@ -83,7 +83,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
         smoothness_cost = torch.sum((state[1:, -self.obj_dof:] - state[:-1, -self.obj_dof:]) ** 2)
         upright_cost = 500 * torch.sum(
             (state[:, -self.obj_dof:-1]) ** 2)  # the screwdriver should only rotate in z direction
-        return smoothness_cost + upright_cost + super()._cost(xu, start, goal)
+        return smoothness_cost + upright_cost + super()._cost(xu, start, goal, projected_diffusion=projected_diffusion)
     
 
 class DynamicsModel:
