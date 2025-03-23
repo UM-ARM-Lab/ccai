@@ -45,7 +45,7 @@ def get_args():
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_project_ood_states.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_id_ood_states.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion.yaml')
-    parser.add_argument('--config', type=str, default='allegro_screwdriver_classifier.yaml')
+    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_5_10_15_7000_training_no_downsample_best_traj_only.yaml')
     return parser.parse_args()
 
 
@@ -1090,7 +1090,8 @@ if __name__ == "__main__":
                               discriminator_guidance=config['discriminator_guidance'],
                               learn_inverse_dynamics=config['inverse_dynamics'],
                               state_only=config['state_only'], state_control_only=config['state_control_only'],
-                              problem=problem_for_sampler if config['state_control_only'] else None,)
+                              problem=problem_for_sampler if config['state_control_only'] else None,
+                              context_dropout_p=config['context_dropout_p'],)
 
     data_path = pathlib.Path(f'{CCAI_PATH}/data/training_data/{config["data_directory"]}')
     if config.get('eval_train_likelihood', False) or config.get('id_ood_states', False):
@@ -1107,7 +1108,9 @@ if __name__ == "__main__":
                                                 states_only=config['du'] == 0,
                                                 skip_pregrasp=config['skip_pregrasp'],
                                                 type=config['model_type'],
-                                                exec_only=config.get('train_classifier', False),)
+                                                exec_only=config.get('train_classifier', False),
+                                                best_traj_only=config['best_traj_only'])
+                                                
     if not config.get('project_ood_states', False):
         if config['normalize_data']:
             # normalize data

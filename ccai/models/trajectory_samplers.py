@@ -134,7 +134,7 @@ class TrajectoryDiffusionModel(nn.Module):
 
     def __init__(self, T, dx, du, context_dim, problem=None, timesteps=20, hidden_dim=64, constrained=False,
                  unconditional=False, generate_context=False, score_model='conv_unet', latent_diffusion=False,
-                 vae=None, inits_noise=None, noise_noise=None, guided=False):
+                 vae=None, inits_noise=None, noise_noise=None, guided=False, context_dropout_p=.25):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -167,7 +167,8 @@ class TrajectoryDiffusionModel(nn.Module):
                     self.diffusion_model = GaussianDiffusion(T, dx, du, context_dim, timesteps=timesteps,
                                                             sampling_timesteps=timesteps, hidden_dim=hidden_dim,
                                                             unconditional=unconditional,
-                                                            model_type=score_model)
+                                                            model_type=score_model,
+                                                            context_dropout_p=context_dropout_p)
 
     def construct_context(self, constraints=None):
         if constraints is not None:
@@ -323,7 +324,7 @@ class TrajectorySampler(nn.Module):
                  constrain=False, unconditional=False, generate_context=False, score_model='conv_unet',
                  latent_diffusion=False, vae=None, inits_noise=None, noise_noise=None, guided=False, discriminator_guidance=False,
                  learn_inverse_dynamics=False, state_only=False, state_control_only=False,
-                 rl_adjustment=False, initial_threshold=-15):
+                 rl_adjustment=False, initial_threshold=-15, context_dropout_p=.25):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -344,7 +345,7 @@ class TrajectorySampler(nn.Module):
         else:
             self.model = TrajectoryDiffusionModel(T, dx, du, context_dim, problem, timesteps, hidden_dim, constrain,
                                                   unconditional, generate_context=generate_context, score_model=score_model,
-                                                  inits_noise=inits_noise, noise_noise=noise_noise, guided=guided)
+                                                  inits_noise=inits_noise, noise_noise=noise_noise, guided=guided, context_dropout_p=context_dropout_p)
 
         self.register_buffer('x_mean', torch.zeros(dx + du))
         self.register_buffer('x_std', torch.ones(dx + du))
@@ -463,8 +464,9 @@ class TrajectorySampler(nn.Module):
 
     def send_norm_constants_to_submodels(self):
         self.model.set_norm_constants(self.x_mean, self.x_std)
-        self.gp.set_norm_constants(self.x_mean, self.x_std)
-        self.value_function.set_norm_constants(self.x_mean, self.x_std)
+        if hasattr(self, 'gp'):
+            self.gp.set_norm_constants(self.x_mean, self.x_std)
+            self.value_function.set_norm_constants(self.x_mean, self.x_std)
 
     def convert_yaw_to_sine_cosine(self, xu):
         """

@@ -116,6 +116,7 @@ class GaussianDiffusion(nn.Module):
             hidden_dim=32,
             unconditional=True,
             model_type='conv_unet',
+            context_dropout_p=.25,
             discriminator_guidance=False
     ):
         super().__init__()
@@ -135,7 +136,7 @@ class GaussianDiffusion(nn.Module):
         self.du = du
         self.hidden_dim = hidden_dim
         self.model = TemporalUnet(self.horizon, self.xu_dim, cond_dim=context_dim, dim=hidden_dim,
-                                  context_dropout_p=.25)
+                                  context_dropout_p=context_dropout_p)
 
         self.classifier = None
         # if discriminator_guidance:

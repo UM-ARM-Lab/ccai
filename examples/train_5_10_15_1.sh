@@ -1,0 +1,1 @@
+python train_allegro_screwdriver.py --config allegro_screwdriver_diffusion_5_10_15_7000_training_no_downsample_all_particles.yaml

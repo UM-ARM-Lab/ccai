@@ -212,7 +212,8 @@ class AllegroValveDataset(Dataset):
 class AllegroScrewDriverDataset(Dataset):
 
     def __init__(self, folders, max_T, cosine_sine=False, states_only=False, 
-                 skip_pregrasp=False, type='diffusion', exec_only=False):
+                 skip_pregrasp=False, type='diffusion', exec_only=False,
+                 best_traj_only=False):
         super().__init__()
         self.cosine_sine = cosine_sine
         self.skip_pregrasp = skip_pregrasp
@@ -241,11 +242,58 @@ class AllegroScrewDriverDataset(Dataset):
                     actual_traj = []
 
                     need_to_continue = False
+                    
                     for t in range(max_T, min_t - 1, -1):
+                        # Filter out any trajectories with contact_state [1, 1, 1]
+                        # new_starts = []
+                        # for s in data[t]['starts']:
+                        #     if s.shape[-1] != 36:
+                        #         new_starts.append(s)
+                        # new_plans = []
+                        # for p in data[t]['plans']:
+                        #     if p.shape[-1] != 36:
+                        #         new_plans.append(p)
+                        new_cs = []
+                        for c in data[t]['contact_state']:
+                            new_cs.append(c.sum())
+                            if c.sum() != 3:
+                                if isinstance(c, np.ndarray):
+                                    c = torch.from_numpy(c).float()
+                                new_cs.append(c)
+                        data[t]['starts'] = new_starts
+                        data[t]['plans'] = new_plans
+                        data[t]['contact_state'] = new_cs
                         if len(data[t]['starts']) == 0:
                             print('No starts')
                             need_to_continue = True
                             break
+                        # for key in ['starts', 'plans']:
+                        #     new_data = []
+                        #     new_cs = []
+                        #     for d, c in zip(data[t][key], data[t]['contact_state']):
+
+                        #         # If d is np array, convert to tensor
+                        #         if isinstance(d, np.ndarray):
+                        #             d = torch.from_numpy(d).float()
+                        #         if c.sum() == 1:
+                        #             new_data.append(
+                        #                 torch.cat((d, torch.torch.zeros(*d.shape[:-1], 6).to(device=d.device)), dim=-1).cpu()
+                        #             )
+                        #         elif c.sum() == 2:
+                        #             new_data.append(
+                        #                 torch.cat(
+                        #                     (d[..., :-6],
+                        #             torch.zeros(*d.shape[:-1], 3).to(device=d.device),
+                        #             d[..., -6:]), dim=-1
+                        #                 ).cpu()
+                        #             )
+                        #     data[t][key] = torch.stack(new_data, dim=0)
+                            
+                        # data[t]['contact_state'] = torch.stack(data[t]['contact_state'], dim=0)                   
+                        
+                        # for key in ['starts', 'plans', 'contact_state']:
+                        #     data[t][key] = data[t][key].cpu().numpy()
+
                         # if len(data['final_likelihoods']) == 1 and data['final_likelihoods'][0] < -45:
                         #     print('No Data')
                         #     need_to_continue = True
@@ -264,10 +312,15 @@ class AllegroScrewDriverDataset(Dataset):
                                 end_states.append(np.concatenate((traj_data[i], zero_pad)))
                         # print(traj.shape)
                         if not exec_only or (exec_only and t == min_t):
-                            classes.append(data[t]['contact_state'][:, None, :].repeat(traj.shape[1], axis=1))
+                            to_append = data[t]['contact_state'][:, None, :]
+                            if not best_traj_only:
+                                to_append = to_append.repeat(traj.shape[1], axis=1)
+                            classes.append(to_append)
                             # combine traj and starts
                             if use_actual_traj:
-                                traj = np.concatenate(actual_traj + [traj], axis=2)#[..., :1 , :,:]
+                                traj = np.concatenate(actual_traj + [traj], axis=2)
+                                if best_traj_only:
+                                    traj = traj[..., :1 , :,:]
                                 masks.append(np.ones((traj.shape[0], traj.shape[1], traj.shape[2])))
                             else:
                                 zeros = [np.zeros_like(actual_traj[0])] * (len(actual_traj) - 1)

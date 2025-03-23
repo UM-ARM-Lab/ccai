@@ -37,7 +37,7 @@ randomize_obj_start: True
 perturb_action: False
 live_recovery: False
 obj_gravity: False
-start_ind: 90
+start_ind: 270
 # model_path: 'data/training/allegro_screwdriver/allegro_better_model/allegro_screwdriver_diffusion_w_classifier.pt'
 # model_path: 'data/training/allegro_screwdriver/allegro_test_new_data_augment_angle_diffusion/allegro_screwdriver_diffusion.pt'
 controllers:
