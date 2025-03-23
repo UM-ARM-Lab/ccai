@@ -778,7 +778,8 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.contact_points_rob_link = []
 
             for finger in self.regrasp_fingers:
-                self.contact_points[finger] = (self.data[finger]['closest_obj_pt_scene_frame'].clone().detach(), .01)
+                rad = .01 if finger != 'index' else .005
+                self.contact_points[finger] = (self.data[finger]['closest_obj_pt_scene_frame'].clone().detach(), rad)
                 self.contact_points_rob_link.append(self.data[finger]['closest_rob_pt_link_frame'].clone().detach())
             self.contact_points_rob_link = torch.cat(self.contact_points_rob_link, dim=0)
 
@@ -920,7 +921,8 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             self.contact_points_rob_link = []
 
             for finger in self.regrasp_fingers:
-                self.contact_points[finger] = (self.data[finger]['closest_obj_pt_scene_frame'].clone().detach(), .01)
+                rad = .01 if finger != 'index' else .005
+                self.contact_points[finger] = (self.data[finger]['closest_obj_pt_scene_frame'].clone().detach(), rad)
                 self.contact_points_rob_link.append(self.data[finger]['closest_rob_pt_link_frame'].clone().detach())
             self.contact_points_rob_link = torch.cat(self.contact_points_rob_link, dim=0)
 
@@ -973,8 +975,8 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             return 0.0
         if self.full_dof_goal:
             T_offset = 0 if projected_diffusion else 1
-            rob_link_cost = torch.sum((rob_link_pts[:, T_offset:] - self.contact_points_rob_link) ** 2)* 300
-            closest_obj_pt_to_finger_cost = torch.sum((nearest_robot_pts[:, T_offset:] - self.contact_points_object) ** 2) * 750
+            rob_link_cost = 0#torch.sum((rob_link_pts[:, T_offset:] - self.contact_points_rob_link) ** 2)* 1000
+            closest_obj_pt_to_finger_cost = 0#torch.sum((nearest_robot_pts[:, T_offset:] - self.contact_points_object) ** 2) * 1000
             return rob_link_cost + closest_obj_pt_to_finger_cost
         
         # if self.full_dof_goal:
@@ -1054,8 +1056,16 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         # this_finger_contact_point_robot = self.world_trans.inverse().transform_points(this_finger_contact_point_world)
 
         # this_finger_contact_point_world = self.contact_scenes.scene_transform.transform_points(this_finger_contact_point.unsqueeze(0))[0]
+
         norm = torch.norm(closest_obj_pt_to_finger - this_finger_target_contact_point, dim=-1)
         h = norm - contact_patch_radius
+        if finger_name == 'index':
+            print('Closest obj pt to finger:', closest_obj_pt_to_finger[:, -1])
+            print('this finger target contact point:', this_finger_target_contact_point)
+            print('Distance:', norm[:, -1])
+            print('Contact patch radius:', contact_patch_radius)
+            print('h:', h[:, -1])
+            print()
         h[:, :-1] = 0
         # h[:, :] = 0
         # h = h[:, -1].reshape(N, 1)
