@@ -243,26 +243,39 @@ class AllegroScrewDriverDataset(Dataset):
 
                     need_to_continue = False
                     
+                    post_recovery_likelihoods = [i for i in data['final_likelihoods'] if len(i) == 1]
+                    post_recovery_likelihood_bool = []
+                    for fl in post_recovery_likelihoods:
+                        if fl[0] < -1250:
+                            post_recovery_likelihood_bool.append(False)
+                        else:
+                            post_recovery_likelihood_bool.append(True)
                     for t in range(max_T, min_t - 1, -1):
                         # Filter out any trajectories with contact_state [1, 1, 1]
-                        # new_starts = []
-                        # for s in data[t]['starts']:
-                        #     if s.shape[-1] != 36:
-                        #         new_starts.append(s)
-                        # new_plans = []
-                        # for p in data[t]['plans']:
-                        #     if p.shape[-1] != 36:
-                        #         new_plans.append(p)
+                        new_starts = []
+                        for s in data[t]['starts']:
+                            if (s.sum(0) == 0).any():
+                            # if s.shape[-1] != 36:
+                                new_starts.append(s)
+                        new_plans = []
+                        for p in data[t]['plans']:
+                            # if p.shape[-1] != 36:
+                            #     new_plans.append(p)
+                            if (p.sum(0).sum(0) == 0).any():
+                                new_plans.append(p)
+
                         new_cs = []
                         for c in data[t]['contact_state']:
-                            new_cs.append(c.sum())
+                            # new_cs.append(c.sum() != 3)
                             if c.sum() != 3:
-                                if isinstance(c, np.ndarray):
-                                    c = torch.from_numpy(c).float()
+                                # if isinstance(c, np.ndarray):
+                                #     c = torch.from_numpy(c).float()
+                                if torch.is_tensor(c):
+                                    c = c.cpu().numpy()
                                 new_cs.append(c)
-                        data[t]['starts'] = new_starts
-                        data[t]['plans'] = new_plans
-                        data[t]['contact_state'] = new_cs
+                        data[t]['starts'] = np.stack(new_starts, axis=0)[post_recovery_likelihood_bool[-len(new_starts):]]
+                        data[t]['plans'] = np.stack(new_plans, axis=0)[post_recovery_likelihood_bool[-len(new_starts):]]
+                        data[t]['contact_state'] = np.stack(new_cs, axis=0)[post_recovery_likelihood_bool[-len(new_starts):]]
                         if len(data[t]['starts']) == 0:
                             print('No starts')
                             need_to_continue = True

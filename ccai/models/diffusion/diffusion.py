@@ -1,6 +1,7 @@
 from typing import Any, Dict, Optional, Tuple
 import torch
 from torch import nn
+import torch.nn.functional as F
 import numpy as np
 
 from ccai.models.temporal import TemporalUnet, TemporalUNetContext, BinaryClassifier, UnetClassifier
@@ -118,7 +119,8 @@ class GaussianDiffusion(nn.Module):
             model_type='conv_unet',
             context_dropout_p=.25,
             discriminator_guidance=False,
-            new_projection=False
+            new_projection=False,
+            trajectory_condition=False
     ):
         super().__init__()
 
@@ -131,13 +133,15 @@ class GaussianDiffusion(nn.Module):
         # else:
         #     self.model = TransformerForDiffusion(dx + du, dx + du, horizon, 1, cond_dim=context_dim, n_emb=hidden_dim)
         self.new_projection = new_projection
+        self.trajectory_condition = trajectory_condition
         self.horizon = horizon
         self.xu_dim = dx + du
         self.dx = dx
         self.du = du
         self.hidden_dim = hidden_dim
         self.model = TemporalUnet(self.horizon, self.xu_dim, cond_dim=context_dim, dim=hidden_dim,
-                                  context_dropout_p=context_dropout_p)
+                                  context_dropout_p=context_dropout_p,
+                                  trajectory_condition=trajectory_condition)
 
         self.classifier = None
         # if discriminator_guidance:
@@ -584,9 +588,11 @@ class GaussianDiffusion(nn.Module):
         # x[..., 8] = ((x[..., 8] + 1.0) % 2.0) - 1.0
 
         # predict and take gradient step
-        model_out, _ = self.model.compiled_conditional_train(t, x, context)
+        out = self.model.compiled_conditional_train(t, x, context)
+
+        model_out, _ = out
         # TODO need to figure out how to do loss that respects wrap-around
-        loss = self.loss_fn(model_out, noise, reduction='none')
+        loss_diff = self.loss_fn(model_out, noise, reduction='none')
         # diff = model_out - noise
         # # diff is also an angle, so map between [-1, 1]
         # # TODO not sure what this does for gradients??
@@ -602,10 +608,14 @@ class GaussianDiffusion(nn.Module):
             # TODO: I wanted to try this as it makes sense, unfortunately leads to nan loss - not exactly sure why
             # mask should increase weight for turning angle
             # mask[:, :, 14:16] *= 1.5
-            loss = loss * mask
-            loss = loss.reshape(B, -1).sum(dim=1) / mask.reshape(B, -1).sum(dim=1)
+            loss_diff = loss_diff * mask
+            loss_diff = loss_diff.reshape(B, -1).sum(dim=1) / mask.reshape(B, -1).sum(dim=1)
 
-        return loss.mean()
+        loss = loss_diff
+        
+        return {
+            'loss': loss.mean(),
+        }
 
     def loss(self, x, context, mask=None):
         # print('x shape', x.shape, self.dx, self.xu_dim)
@@ -664,7 +674,7 @@ class GaussianDiffusion(nn.Module):
         noise = torch.randn((B, H, self.xu_dim), device=device)
         
         # Projection cutoff timestep (when we switch from conditioned to unconditioned)
-        cutoff_timestep = 64
+        cutoff_timestep = 128
         
         # 2. First denoising pass: T → 50 WITH conditioning
         # Apply the conditioning here to initialize the process properly
@@ -984,7 +994,10 @@ class JointDiffusion(GaussianDiffusion):
             unconditional=True,
             inits_noise=None,
             noise_noise=None,
-            guided=False
+            guided=False,
+            dropout_p=.25,
+            trajectory_condition=True,
+            true_s0=False
     ):
         super().__init__(
             horizon,
@@ -996,17 +1009,23 @@ class JointDiffusion(GaussianDiffusion):
             loss_type=loss_type,
             hidden_dim=hidden_dim,
             unconditional=unconditional,
-            model_type=model_type
+            model_type=model_type,
+            context_dropout_p=dropout_p,
+            trajectory_condition=True
         )
         if model_type not in ['conv_unet', 'transformer']:
             raise ValueError('Invalid model type')
         # model provides score fcn for both trajectory and context
+
+        # If true, we are diffusing trajectory without contact condition and using that to estimate contact
+        # If false, we are diffusing contact without trajectory condition and using that to estimate trajectory
+        self.trajectory_condition = trajectory_condition
+
         if model_type == 'conv_unet':
-            self.model = TemporalUNetContext(horizon, dx + du, context_dim, dim=hidden_dim)
+            self.model = TemporalUNetContext(horizon, dx, du, context_dim, dim=hidden_dim, dropout_p=dropout_p, trajectory_condition=trajectory_condition, true_s0=true_s0)
         else:
             self.model = TransformerContext(dx + du, dx + du, horizon, 1, cond_dim=context_dim, n_emb=hidden_dim)
 
-        self.register_buffer('context_dropout_p', torch.tensor([0.25]))
         self.grad_cost = torch.func.vmap(torch.func.jacrev(self._cost))
         self.cost = torch.func.vmap(self._cost)
 
@@ -1015,6 +1034,7 @@ class JointDiffusion(GaussianDiffusion):
 
         self.guided = guided
 
+
     def model_predictions(self, x, t, context=None):
         B, N = x.shape[:2]
 
@@ -1022,7 +1042,7 @@ class JointDiffusion(GaussianDiffusion):
             context = context.reshape(B * N, -1)
 
         # print(t.reshape(B * N).shape, x.reshape(B * N, -1, self.xu_dim).shape, context.shape)
-        e_x, e_c = self.model(t.reshape(B * N), x.reshape(B * N, -1, self.xu_dim), context)
+        e_x, e_c = self.model.model_pred_for_sample(t.reshape(B * N), x.reshape(B * N, -1, self.xu_dim), context)
         e_x = e_x.reshape(B, N, -1, self.xu_dim)
         e_c = e_c.reshape(B, N, -1)
 
@@ -1094,15 +1114,15 @@ class JointDiffusion(GaussianDiffusion):
                 noise_x[:, i, 0, :self.dx] = noise_x[:, i - 1, -1, :self.dx]
 
         # use same noise vector
-        grad = torch.zeros_like(mu_var['x']['mean'])
-        # add some guidance using gradient - maximise turn angle, keep upright
-        eta = 0.0 if not self.guided else .02
-        grad[:, :, :, self.dx - 3:self.dx - 1] = -2 * 0.1 * (mu_var['x']['mean'][:, :, :, self.dx - 3:self.dx - 1] +
-                                                             self.mu[self.dx - 3:self.dx - 1].to(device=x.device))
-        # grad[:, -1, -1, self.dx - 1] = -eta
-        grad[:, :, :, self.dx - 1] = -1
+        # grad = torch.zeros_like(mu_var['x']['mean'])
+        # # add some guidance using gradient - maximise turn angle, keep upright
+        # eta = 0.0 if not self.guided else .02
+        # grad[:, :, :, self.dx - 3:self.dx - 1] = -2 * 0.1 * (mu_var['x']['mean'][:, :, :, self.dx - 3:self.dx - 1] +
+        #                                                      self.mu[self.dx - 3:self.dx - 1].to(device=x.device))
+        # # grad[:, -1, -1, self.dx - 1] = -eta
+        # grad[:, :, :, self.dx - 1] = -1
         # print(mu_var['x']['logvar'].exp())
-        pred_x = mu_var['x']['mean'] + alpha * (0.5 * mu_var['x']['logvar']).exp() * (noise_x + eta * grad)
+        pred_x = mu_var['x']['mean'] + alpha * (0.5 * mu_var['x']['logvar']).exp() * (noise_x)
         # pred_x = pred_x - 0.01 * self.grad_cost(mu_var['x']['mean'].reshape(b*N, -1, self.xu_dim)).reshape(b, N, -1, self.xu_dim)
         pred_c = mu_var['c']['mean'].squeeze(1) + alpha * (0.5 * mu_var['c']['logvar']).exp().squeeze(1) * noise_c
         # print(self.cost(pred_x).mean())#, self.cost(pred_x).max())
@@ -1163,15 +1183,18 @@ class JointDiffusion(GaussianDiffusion):
             masked_idx[:, 0], masked_idx[:, 1], masked_idx[:, 2]]
 
         # dropout for training to condition on context as well as diffuse context
-        context_mask_dist = torch.distributions.Bernoulli(probs=1 - self.context_dropout_p)
-        context_mask = context_mask_dist.sample((B,))  # .to(device=context.device)
+        # context_mask_dist = torch.distributions.Bernoulli(probs=1 - self.context_dropout_p)
+        # context_mask = context_mask_dist.sample((B,))  # .to(device=context.device)
 
-        # do masking
-        masked_idx = (context_mask == 0).nonzero()
-        c[masked_idx[:, 0], masked_idx[:, 1]] = context[masked_idx[:, 0], masked_idx[:, 1]]
+        # # do masking
+        # masked_idx = (context_mask == 0).nonzero()
+        # c[masked_idx[:, 0], masked_idx[:, 1]] = context[masked_idx[:, 0], masked_idx[:, 1]]
 
         # predict and take gradient step
-        e_x, e_c = self.model(t, x, c)
+        initial_state = x_start[:, 0, :self.dx]
+        e_x, e_c = self.model.compiled_conditional_train(t, x, c, initial_state=initial_state)
+        # e_x, e_c = self.model.forward(t, x, c, dropout=True)
+
         loss_x = self.loss_fn(e_x, noise_x, reduction='none')
         loss_c = self.loss_fn(e_c, noise_c, reduction='none')
         # apply mask
@@ -1179,8 +1202,11 @@ class JointDiffusion(GaussianDiffusion):
             loss_x = loss_x * mask
             loss_x = loss_x.reshape(B, -1).sum(dim=1) / mask.reshape(B, -1).sum(dim=1)
 
-            loss_c = loss_c * context_mask
-            loss = loss_x + torch.sum(loss_c.reshape(B, -1), -1)
+            # loss_c = loss_c * context_mask
+            # loss = loss_x + torch.sum(loss_c.reshape(B, -1), -1)
+
+            loss_c = loss_c.mean(-1)
+            loss = loss_x + loss_c
 
         # print(loss_x.mean(), loss_c.mean())
 
@@ -1190,7 +1216,12 @@ class JointDiffusion(GaussianDiffusion):
         # loss = reduce(loss, 'b ... -> b (...)', 'mean')
         # loss = loss * extract(self.loss_weight, t, loss.shape)
         # exit(0)
-        return loss.mean()
+        losses = {
+            'loss_tau': loss_x.mean().item(),
+            'loss_c': loss_c.mean().item(),
+            'loss': loss.mean()
+        }
+        return losses
 
     def loss(self, x, context, mask=None):
         b = x.shape[0]
@@ -1249,7 +1280,7 @@ class JointDiffusion(GaussianDiffusion):
 
         return ret_x, ret_c
 
-    def sample(self, N, H=None, condition=None, context=None, return_all_timesteps=False):
+    def sample(self, N, H=None, condition=None, context=None, return_all_timesteps=False, no_grad=None, skip_likelihood=None, context_for_likelihood=None):
         B = 1
         if H is None:
             H = self.horizon
@@ -1285,14 +1316,17 @@ class JointDiffusion(GaussianDiffusion):
                                        return_all_timesteps=return_all_timesteps)
         return sample_x, sample_c, self.approximate_likelihood(sample_x, sample_c)
 
+    @torch.no_grad()
     def approximate_likelihood(self, x, context, forward_kl=False):
         B, H, d = x.shape
         device = self.betas.device
         # N = 100
         # we could randomly choose timesteps, or do all of them. For now let's randomly generatre
         # t = torch.randint(0, self.num_timesteps, (N,), device=device).long()
-        t = torch.arange(1, self.num_timesteps, 4, device=device).long()
+        # t = torch.arange(1, self.num_timesteps, 4, device=device).long()
         # t = torch.arange(5, 30, 2, device=device).long()
+        # t = torch.tensor([5, 10, 15], device=device).long()
+        t = torch.arange(1, self.num_timesteps, device=device).long()
 
         N = t.shape[0]
         t = t[None, :].repeat(B, 1).reshape(B * N)
@@ -1310,13 +1344,21 @@ class JointDiffusion(GaussianDiffusion):
 
         # Compute our diffusing step from t to t-1
 
-        batch_size = 64
+        batch_size = 2048
         all_p_next = []
         for i in range(0, B * N, batch_size):
             p_next = self.p_mean_variance(x=x_t[i:i + batch_size], t=t[i:i + batch_size], context=c_t[i:i + batch_size])
             all_p_next.append(p_next)
 
-        p_next = {k: torch.cat([p[k] for p in all_p_next], dim=0) for k in all_p_next[0].keys()}
+        p_next = dict()
+        for key in all_p_next[0].keys():
+            p_next[key] = {'mean': [], 'var': []}
+            for d in all_p_next:
+                p_next[key]['mean'].append(d[key]['mean'])
+                p_next[key]['var'].append(d[key]['var'])
+            p_next[key]['mean'] = torch.cat(p_next[key]['mean'], dim=0)
+            p_next[key]['var'] = torch.cat(p_next[key]['var'], dim=0)
+
 
         if forward_kl:
             kl_x = self._gaussian_kl(p_next['x']['mean'].squeeze(1), p_next['x']['var'].squeeze(1), q_next_x[0],

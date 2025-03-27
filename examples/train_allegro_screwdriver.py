@@ -18,7 +18,7 @@ import pytorch_kinematics.transforms as tf
 from ccai.dataset import AllegroScrewDriverDataset, AllegroScrewDriverStateDataset, FakeDataset, RealAndFakeDataset, PerEpochBalancedSampler
 from isaac_victor_envs.utils import get_assets_dir
 from torch.utils.data import DataLoader, RandomSampler, WeightedRandomSampler
-from ccai.models.trajectory_samplers import TrajectorySampler
+from ccai.models.trajectory_samplers_sac import TrajectorySampler
 from ccai.utils.allegro_utils import partial_to_full_state, visualize_trajectory
 from ccai.allegro_screwdriver_problem_diffusion import AllegroScrewdriverDiff
 import pickle
@@ -45,7 +45,7 @@ def get_args():
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_project_ood_states.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_id_ood_states.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion.yaml')
-    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_5_10_15_7000_training_no_downsample_best_traj_only.yaml')
+    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_5_10_15_7000_training_best_traj_only_diffuse_c_mode_alt_2.yaml')
     return parser.parse_args()
 
 
@@ -92,6 +92,8 @@ def train_model(trajectory_sampler, train_loader, config):
     pbar = tqdm.tqdm(range(epochs))
     for epoch in pbar:
         train_loss = 0.0
+        train_loss_tau = 0.0
+        train_loss_c = 0
         trajectory_sampler.train()
         for trajectories, traj_class, masks in (train_loader):
             trajectories = trajectories.to(device=config['device'])
@@ -101,8 +103,8 @@ def train_model(trajectory_sampler, train_loader, config):
                 traj_class = traj_class.to(device=config['device']).float()
             else:
                 traj_class = None
-            sampler_loss = trajectory_sampler.loss(trajectories, mask=masks, constraints=traj_class)
-            loss = sampler_loss
+            sampler_losses = trajectory_sampler.loss(trajectories, mask=masks, constraints=traj_class)
+            loss = sampler_losses['loss']
             loss.backward()
             # wandb.log({'train_loss': loss.item()})
             # torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
@@ -111,19 +113,33 @@ def train_model(trajectory_sampler, train_loader, config):
             optimizer.step()
             optimizer.zero_grad()
             train_loss += loss.item()
+            train_loss_tau += sampler_losses['loss_tau']
+            train_loss_c += sampler_losses['loss_c']
             step += 1
             if config['use_ema']:
                 if step % 10 == 0:
                     update_ema(trajectory_sampler)
 
         train_loss /= len(train_loader)
+        train_loss_tau /= len(train_loader)
+        train_loss_c /= len(train_loader)
         pbar.set_description(
             f'Train loss {train_loss:.3f}')
         try:
-            wandb.log({'train_loss_epoch': train_loss})
+            wandb.log({
+                'train_loss_epoch': train_loss,
+                'train_loss_diffusion_epoch': train_loss_tau,
+                'train_loss_c_mode_epoch': train_loss_c,
+                'time': time.time()
+                })
         except:
             print('Could not log to wandb')
-            print({'train_loss_epoch': train_loss})
+            print({
+                'train_loss_epoch': train_loss,
+                'train_loss_diffusion_epoch': train_loss_tau,
+                'train_loss_c_mode_epoch': train_loss_c,
+                'time': time.time()
+                })
         # generate samples and plot them
         if (epoch + 1) % config['test_every'] == 0:
 
@@ -1091,7 +1107,7 @@ if __name__ == "__main__":
                               learn_inverse_dynamics=config['inverse_dynamics'],
                               state_only=config['state_only'], state_control_only=config['state_control_only'],
                               problem=problem_for_sampler if config['state_control_only'] else None,
-                              context_dropout_p=config['context_dropout_p'],)
+                              dropout_p=config['context_dropout_p'], trajectory_condition=config['trajectory_condition'],)
 
     data_path = pathlib.Path(f'{CCAI_PATH}/data/training_data/{config["data_directory"]}')
     if config.get('eval_train_likelihood', False) or config.get('id_ood_states', False):

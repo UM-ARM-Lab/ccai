@@ -142,8 +142,8 @@ class TrajectoryFlowModel(nn.Module):
 class TrajectoryDiffusionModel(nn.Module):
 
     def __init__(self, T, dx, du, context_dim, problem=None, timesteps=20, hidden_dim=64, constrained=False,
-                 unconditional=False, generate_context=False, score_model='conv_unet', latent_diffusion=False,
-                 vae=None, inits_noise=None, noise_noise=None, guided=False, new_projection=False):
+                 unconditional=False, generate_context=False, trajectory_condition=True, score_model='conv_unet', latent_diffusion=False,
+                 vae=None, inits_noise=None, noise_noise=None, guided=False, new_projection=False, dropout_p=.25, true_s0=False):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -171,12 +171,14 @@ class TrajectoryDiffusionModel(nn.Module):
                                                         hidden_dim=hidden_dim,
                                                         model_type=score_model,
                                                         inits_noise=inits_noise, noise_noise=noise_noise,
-                                                        guided=guided)
+                                                        guided=guided, dropout_p=dropout_p, trajectory_condition=trajectory_condition,
+                                                        true_s0=true_s0)
                 else:
                     self.diffusion_model = GaussianDiffusion(T, dx, du, context_dim, timesteps=timesteps,
                                                             sampling_timesteps=timesteps, hidden_dim=hidden_dim,
                                                             unconditional=unconditional,
-                                                            model_type=score_model, new_projection=new_projection)
+                                                            model_type=score_model, new_projection=new_projection,
+                                                            context_dropout_p=dropout_p)
 
     def construct_context(self, constraints=None):
         if constraints is not None:
@@ -226,7 +228,7 @@ class TrajectoryDiffusionModel(nn.Module):
         else:
             context = constraints
         # context=None
-        return self.diffusion_model.loss(trajectories, context=context, mask=mask).mean()
+        return self.diffusion_model.loss(trajectories, context=context, mask=mask)#.mean()
 
     def classifier_loss(self, trajectories, mask=None, context=None, label=None):
         return self.diffusion_model.classifier_loss(trajectories, context=context, mask=mask, label=label)
@@ -332,7 +334,8 @@ class TrajectorySampler(nn.Module):
                  constrain=False, unconditional=False, generate_context=False, score_model='conv_unet',
                  latent_diffusion=False, vae=None, inits_noise=None, noise_noise=None, guided=False, discriminator_guidance=False,
                  learn_inverse_dynamics=False, state_only=False, state_control_only=False,
-                 rl_adjustment=False, initial_threshold=-15, new_projection=False):
+                 rl_adjustment=False, initial_threshold=-15, new_projection=False, dropout_p=.25, trajectory_condition=False,
+                 true_s0=False):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -353,7 +356,7 @@ class TrajectorySampler(nn.Module):
         else:
             self.model = TrajectoryDiffusionModel(T, dx, du, context_dim, problem, timesteps, hidden_dim, constrain,
                                                   unconditional, generate_context=generate_context, score_model=score_model,
-                                                  inits_noise=inits_noise, noise_noise=noise_noise, guided=guided, new_projection=new_projection)
+                                                  inits_noise=inits_noise, noise_noise=noise_noise, guided=guided, new_projection=new_projection, dropout_p=dropout_p, trajectory_condition=trajectory_condition, true_s0=true_s0)
 
         self.register_buffer('x_mean', torch.zeros(dx + du))
         self.register_buffer('x_std', torch.ones(dx + du))

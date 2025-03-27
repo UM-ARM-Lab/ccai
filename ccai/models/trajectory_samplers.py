@@ -134,7 +134,7 @@ class TrajectoryDiffusionModel(nn.Module):
 
     def __init__(self, T, dx, du, context_dim, problem=None, timesteps=20, hidden_dim=64, constrained=False,
                  unconditional=False, generate_context=False, score_model='conv_unet', latent_diffusion=False,
-                 vae=None, inits_noise=None, noise_noise=None, guided=False, context_dropout_p=.25):
+                 vae=None, inits_noise=None, noise_noise=None, guided=False, context_dropout_p=.25, trajectory_condition=False):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -162,13 +162,16 @@ class TrajectoryDiffusionModel(nn.Module):
                                                         hidden_dim=hidden_dim,
                                                         model_type=score_model,
                                                         inits_noise=inits_noise, noise_noise=noise_noise,
-                                                        guided=guided)
+                                                        guided=guided,
+                                                        dropout_p=context_dropout_p,
+                                                        trajectory_condition=trajectory_condition)
                 else:
                     self.diffusion_model = GaussianDiffusion(T, dx, du, context_dim, timesteps=timesteps,
                                                             sampling_timesteps=timesteps, hidden_dim=hidden_dim,
                                                             unconditional=unconditional,
                                                             model_type=score_model,
-                                                            context_dropout_p=context_dropout_p)
+                                                            context_dropout_p=context_dropout_p,
+                                                            trajectory_condition=trajectory_condition)
 
     def construct_context(self, constraints=None):
         if constraints is not None:

@@ -13,11 +13,12 @@ from PIL import Image, ImageDraw, ImageFont
 from copy import deepcopy
 
 import imageio
+import pickle
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
-config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-# config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl_wrench_perturb_new_project.yaml').read_text())
+# config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl_wrench_perturb_new_project.yaml').read_text())
 
 
 
@@ -50,10 +51,15 @@ dirpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]
 trial_inds = [int(d.split('_')[-1]) for d in os.listdir(dirpath) if d[:5] == 'trial']
 
 # for trial_num in trial_inds:
-for trial_num in [14, 18]:
+# for trial_num in [2, 3]:
+# for trial_num in [6, 14]:
+for trial_num in [40]:
     fpath = dirpath / f'trial_{trial_num}'
 
-    offset_ind = 6 if config['live_recovery'] else 0
+    with open(fpath / 'traj_data.p', 'rb') as f:
+        data = pickle.load(f)
+        fl = data['final_likelihoods']
+    offset_ind = 8 if config['live_recovery'] else 0
     isaac_imgs = [fpath / img for img in sorted(os.listdir(fpath)) if img[-3:] == 'png'][offset_ind:]
     isaac_imgs = [imageio.imread(img) for img in isaac_imgs]
 
@@ -70,14 +76,25 @@ for trial_num in [14, 18]:
     }
     
     pause_inds = []
+    frame_ind = 0
+    last_text = ''
     for i, (ind, dir_n) in enumerate(c_mode_dirs):
         # pause_inds.append((ind*24-offset_ind, pause_inds_name_dict[dir_n.split('/')[-1][:-2]]))
         if 'turn' in dir_n.split('/')[-1]:
-            pause_inds.append((ind*24-offset_ind, 'all'))
+            num_exec_steps = len(fl[ind-1]) - 1
+            if last_text != 'turn':
+                pause_inds.append((frame_ind, 'turn'))
+            num_frames = num_exec_steps * 3
+            frame_ind += num_frames
+            last_text = 'turn'
         elif 'thumb_middle' in dir_n.split('/')[-1]:
-            pause_inds.append((ind*12-offset_ind, 'index'))
+            pause_inds.append((frame_ind, 'index'))
+            frame_ind += 12
+            last_text = 'index'
         elif 'index' in dir_n.split('/')[-1]:
-            pause_inds.append((ind*12-offset_ind, 'thumb_middle'))
+            pause_inds.append((frame_ind, 'thumb_middle'))
+            frame_ind += 12
+            last_text = 'thumb_middle'
         else:
             raise ValueError(f'Unknown directory name: {dir_n}')
     # Add final pause
@@ -106,7 +123,7 @@ for trial_num in [14, 18]:
     #     pause_inds = [(0, 'turn'), (len(isaac_imgs)-1, ''), (30-6, 'index'), (42-6, 'index'), (54-6, 'turn')]
     
     pause_inds = dict(pause_inds)
-    pause_inds = {}
+    # pause_inds = {}
 
     x0 = 675
     y0 = 750
@@ -129,7 +146,6 @@ for trial_num in [14, 18]:
         idx, img = new_isaac_imgs[i]
         if idx in pause_inds and pause_inds[idx] != '':
             text = pause_inds[idx]
-        text = ''
         # Add elements to full image
         img = Image.fromarray(img)
         draw = ImageDraw.Draw(img)

@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 10
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_data_5_10_15_wrench_perturb_.2_std_link_regrasp_cost_old_projection_.01_cpc_cpc_cost_600_300'
+experiment_name: 'allegro_screwdriver_recovery_data_5_10_15_wrench_perturb_.2_std_link_regrasp_cost_old_projection_.01_cpc_cpc_cost_300_750_honda_mtg_f_.75'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -65,7 +65,7 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:1'
+    device: 'cuda:0'
     online_iters: 20
     warmup_iters: 75
     resample_steps: 16

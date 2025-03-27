@@ -1,5 +1,5 @@
 ---
-model_name: 'allegro_screwdriver_recovery_best_traj_only_5_10_15_15000_training_no_downsample_balance_new_projection_cpc_cost_pred_c_mode'
+model_name: 'allegro_screwdriver_recovery_best_traj_only_5_10_15_15000_training_no_downsample_balance_new_projection_cpc_cost_diffuse_c_mode_alt_1'
 T: 5
 dx: 15
 du: 21
@@ -31,7 +31,8 @@ hidden_dim: 128
 unconditional: True
 sine_cosine: True
 use_class: True
-diffuse_class: False
+diffuse_class: True
+trajectory_condition: False
 best_traj_only: True
 context_dropout_p: .25
 # Only applies to using EMA for training

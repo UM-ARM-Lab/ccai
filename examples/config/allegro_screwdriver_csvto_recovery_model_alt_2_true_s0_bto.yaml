@@ -6,9 +6,9 @@ num_steps: 8
 num_turns: 1
 max_recovery_stages: 4
 num_trials: 10
-num_episodes: 100
+num_episodes: 20
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_data_5_10_15_wrench_perturb_.2_std_link_regrasp_cost_new_projection_.01_cpc_cpc_cost_300_750_honda_mtg_f_1'
+experiment_name: 'allegro_screwdriver_recovery_model_eval_alt_2_noised_s0_bto'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -45,11 +45,16 @@ viz_states: False
 diff_init: True
 live_recovery: True
 new_projection: True
+trajectory_condition: True
+generate_context: True
+true_s0: True
 type: 'diffusion'
+recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_5_10_15_15000_training_no_downsample_balance_new_projection_cpc_cost_diffuse_c_mode_alt_2_noised_s0_diffusion'
+model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_5_10_15_15000_training_no_downsample_balance_new_projection_cpc_cost_diffuse_c_mode_alt_2_noised_s0_diffusion/allegro_screwdriver_diffusion.pt'
 model_dir: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion'
-model_path: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
-model_path_rl_adjusted: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier_rl_adj.pt'
+model_path_orig: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
 likelihood_threshold: -175.0
+# likelihood_threshold: -1.0
 drop_threshold: -1250
 project_threshold: -105.
 sac_batch_size: 64
