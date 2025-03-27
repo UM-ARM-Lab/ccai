@@ -155,25 +155,32 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                  model_name='None0',
                  mode='no_vf',
                  initial_yaw=None,
+                 initial_y=None,
                  vf_weight = 0,
                  other_weight = 0,
                  variance_ratio = 1,
+                 task = None,
                  *args, **kwargs):
         
         self.mode=mode
-        from _value_function.train_value_function_regrasp import load_ensemble, query_ensemble 
+        self.task = task
+        if task == 'card':
+            from card.train_vf_card_index import load_ensemble, query_ensemble 
+        else:
+            from _value_function.train_value_function_regrasp import load_ensemble, query_ensemble 
+
         self.query_ensemble = query_ensemble
         self.vf_weight = vf_weight
         self.other_weight = other_weight
         self.variance_ratio = variance_ratio
-        if mode == 'vf' or mode == "last_step":
-            # print(model_name)
+        if mode == 'vf':
             self.models, self.poses_mean, self.poses_std, self.cost_mean, self.cost_std = load_ensemble(device=device, model_name=model_name)
             self.poses_mean = torch.tensor(self.poses_mean).to(device)
             self.poses_std = torch.tensor(self.poses_std).to(device)
             self.cost_mean = torch.tensor([self.cost_mean]).to(device)
             self.cost_std = torch.tensor([self.cost_std]).to(device)
             self.initial_yaw = initial_yaw
+            self.initial_y = initial_y
         self.full_start = start
 
         """
@@ -425,42 +432,31 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.data[finger]['dJ_dq'] = dJ_dq  # Jacobian of the contact point
 
     def _cost(self, xu, start, goal):
-        # start_q = partial_to_full_state(start[None, :self.num_fingers * 4], self.fingers)[:, self.all_joint_index]
-        # q = partial_to_full_state(xu[:, :self.num_fingers * 4], self.fingers)[:, self.all_joint_index]
-
-        #don't include start_q because this can't be changed
-        # start_q = partial_to_full_state(start[None, :self.num_fingers * 4 + 3], self.fingers)[:, self.all_joint_index]
-        # q = torch.cat((start_q, q), dim=0)
         
         # need to confirm that xu is only fingers of interest
-        q = xu[:, :self.num_fingers * 4 + 3]
-
-        # print("screwdriver state:")
-        # print(q[0][-3:])
+        if self.task == 'card':
+            fingers = xu[:, :8]
+            card_x_y_yaw = xu[:, [8,9,13]]
+            q = torch.cat([fingers, card_x_y_yaw], dim=1)
+        else:
+            q = xu[:, :self.num_fingers * 4 + 3]
         
         delta_q = partial_to_full_state(xu[:, self.dx:self.dx + 4 * self.num_fingers], self.fingers)
         
-        if self.mode == 'vf' or self.mode == "last_step":
+        if self.mode == 'vf':
 
-            # last_state = q[-1,:]
-            # screwdriver = self.full_start[-3:]
-
-            # print("screwdriver: ", screwdriver)
-            # input = torch.cat((last_state, screwdriver))
-            # print("input: ", input)
             n_steps = q.shape[0]
 
             if self.initial_yaw is not None:
                 yaws = self.initial_yaw.to(device=self.device).repeat(n_steps, 1)
                 q = torch.cat([q, yaws], dim=1)
+            if self.initial_y is not None:
+                y = self.initial_y.to(device=self.device).repeat(n_steps, 1)
+                q = torch.cat([q, y], dim=1)
 
             input_norm = ((q - self.poses_mean) / self.poses_std).float()
             indices = torch.arange(n_steps).unsqueeze(1).to(self.device) + 1
             input_norm = torch.cat([q, indices], dim=1)
-
-            # LAST STEP ONLY
-            if self.mode == "last_step":
-                input_norm = input_norm[-1, :].reshape(1, -1)
 
             vf_output_norm = self.query_ensemble(input_norm, self.models, device=self.device)
             vf_output = vf_output_norm * self.cost_std + self.cost_mean
@@ -470,15 +466,10 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             mean_squared_variance = torch.mean((vf_output - mean) ** 2, dim=0)
 
             vf_cost = torch.mean(mse) + torch.mean(mean_squared_variance) * self.variance_ratio
-            # vf_cost = torch.mean(mean_squared_variance) * self.variance_ratio
 
             smoothness_cost = torch.sum((q[1:] - q[-1]) ** 2)
             action_cost = torch.sum(delta_q ** 2)
 
-            # vf_cost = mean[-1] + mean_squared_variance[-1] * self.variance_ratio
-
-            # print(f'vf_cost: {vf_cost.reshape(1)}')
-            # print(f'last step prediction: {mean[-1].reshape(1)}')
             return self.vf_weight*vf_cost + self.other_weight * smoothness_cost + self.other_weight * action_cost
         
         else:
@@ -726,8 +717,10 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                  desired_ee_in_world_frame=False,
                  obj_dof_type=None,
                  model_name='None1',
+                 task = None,
                  mode='no_vf', 
                  initial_yaw=None,
+                 initial_y = None,
                  vf_weight=0, 
                  other_weight=0,
                  last_diffused_q = None,
@@ -762,8 +755,10 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                          moveable_object=moveable_object, optimize_force=optimize_force,
                          contact_fingers=contact_fingers,
                          regrasp_fingers=regrasp_fingers, default_dof_pos=default_dof_pos, *args, 
+                         task = task,
                          model_name=model_name,
                          mode=mode, initial_yaw=initial_yaw,
+                         initial_y = initial_y,
                          vf_weight=vf_weight, other_weight=other_weight,
                          **kwargs)
 
@@ -874,10 +869,10 @@ class AllegroRegraspProblem(AllegroObjectProblem):
     def _cost(self, xu, start, goal):
         if self.num_regrasps == 0:
             return 0.0
-        q = partial_to_full_state(xu[:, :self.num_fingers * 4], self.fingers)  # [:, self.regrasp_idx]
         
         #@adamadamadam
         if self.use_diffusion and self.use_contact_cost:
+            q = partial_to_full_state(xu[:, :self.num_fingers * 4], self.fingers)  # [:, self.regrasp_idx]
 
             theta = xu[:, self.num_fingers * 4:self.num_fingers * 4 + self.obj_dof]
             if self.obj_dof == 3:
@@ -893,12 +888,6 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         
         else:
             return 0.0
-        
-        # elif self.mode == 'vf' or self.mode == "last_step":
-        #     return 0.0
-        
-        # elif self.mode == 'no_vf':
-        #     return 0.0
 
     @regrasp_finger_constraints
     def _contact_avoidance(self, xu, finger_name, compute_grads=True, compute_hess=False, projected_diffusion=False):
@@ -1081,8 +1070,10 @@ class AllegroContactProblem(AllegroObjectProblem):
                  device='cuda:0',
                  min_force_dict=None,
                  model_name='None2',
+                 task = None,
                  mode='no_vf',
                  initial_yaw=None,
+                 initial_y = None,
                  vf_weight = 0,
                  other_weight = 0,
                  **kwargs):
@@ -1109,6 +1100,9 @@ class AllegroContactProblem(AllegroObjectProblem):
                          obj_joint_dim=obj_joint_dim, device=device, moveable_object=True,
                          contact_fingers=contact_fingers, env_force=env_force, optimize_force=optimize_force,
                          regrasp_fingers=regrasp_fingers, min_force_dict=min_force_dict,
+                         # vf stuff
+                         initial_y = initial_y,
+                         task = task,
                          model_name=model_name,
                          mode=mode, vf_weight=vf_weight, other_weight=other_weight, **kwargs)
 
@@ -2157,7 +2151,13 @@ class AllegroContactWithEnvProblem(AllegroContactProblem):
                  obj_joint_dim=0,
                  optimize_force=False,
                  obj_dof_type=None,
-                 device='cuda:0', **kwargs):
+                 device='cuda:0', 
+                 # vf stuff
+                 initial_y = None,
+                 task = None,
+                 model_name = 'None', mode='no_vf', 
+                 vf_weight = 0, other_weight = 10, variance_ratio = 1,
+                 **kwargs):
         self.obj_dof_type = obj_dof_type
         super(AllegroContactWithEnvProblem, self).__init__(start=start, goal=goal, T=T, chain=chain,
                                                            object_location=object_location, object_type=object_type,
@@ -2166,7 +2166,13 @@ class AllegroContactWithEnvProblem(AllegroContactProblem):
                                                            friction_coefficient=friction_coefficient, obj_dof=obj_dof,
                                                            obj_ori_rep=obj_ori_rep, obj_joint_dim=obj_joint_dim,
                                                            optimize_force=optimize_force, device=device, env_force=True, 
-                                                           obj_dof_type=obj_dof_type, **kwargs)
+                                                           obj_dof_type=obj_dof_type, 
+                                                           # vf stuff
+                                                           initial_y = initial_y,
+                                                           task = task,
+                                                           model_name = model_name, mode=mode,
+                                                           vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio,
+                                                           **kwargs)
         self._contact_dg_per_t = self.num_contacts * (1 + 2 + 4) + 3 + 1 # 1 for env friction constraint
         self._contact_dz = (self.friction_polytope_k) * self.num_contacts 
         self._contact_dh = self._contact_dz * T  # inequality
@@ -2404,6 +2410,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                  model_name="None4",
                  mode='no_vf',
                  initial_yaw = None,
+                 initial_y = None,
                  vf_weight = 0,
                  other_weight = 0,
                  variance_ratio = 1,
@@ -2442,6 +2449,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                                         min_force_dict=min_force_dict,
                                         model_name=model_name,
                                         mode=mode, initial_yaw=initial_yaw,
+                                        initial_y=initial_y,
                                         vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio,
                                         **kwargs)
 
@@ -2456,6 +2464,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                                        desired_ee_in_world_frame=desired_ee_in_world_frame,
                                        model_name=model_name,
                                        mode=mode, initial_yaw=initial_yaw,
+                                       initial_y=initial_y,
                                        vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio,
                                        last_diffused_q = last_diffused_q,
                                        **kwargs)
@@ -2588,6 +2597,11 @@ class AllegroRegraspWithEnvProblem(AllegroRegraspProblem):
                  default_dof_pos=None,
                  desired_ee_in_world_frame=False,
                  obj_dof_type='x_y_theta',
+                 # vf stuff
+                 initial_y = None,
+                 task = None,
+                 model_name = 'None', mode='no_vf', 
+                 vf_weight = 0, other_weight = 10, variance_ratio = 1,
                  *args, **kwargs):
         super(AllegroRegraspWithEnvProblem, self).__init__(start=start, goal=goal, T=T, chain=chain,
                                                            object_location=object_location, object_type=object_type,
@@ -2601,6 +2615,10 @@ class AllegroRegraspWithEnvProblem(AllegroRegraspProblem):
                                                            default_dof_pos=default_dof_pos,
                                                            desired_ee_in_world_frame=desired_ee_in_world_frame,
                                                            obj_dof_type=obj_dof_type,
+                                                           task = task,
+                                                           initial_y = initial_y,
+                                                            model_name = model_name, mode = mode,
+                                                            vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio,
                                                            *args, **kwargs)
     def _preprocess_fingers(self, q, theta):
         N, T, _ = q.shape
@@ -2635,7 +2653,13 @@ class AllegroManipulationExternalContactProblem(AllegroContactWithEnvProblem, Al
                  obj_joint_dim=0,
                  optimize_force=False,
                  desired_ee_in_world_frame=False,
-                 device='cuda:0', **kwargs):
+                 device='cuda:0', 
+                 # vf stuff
+                 initial_y = None,
+                 task = None,
+                 model_name = 'None', mode='no_vf', 
+                 vf_weight = 0, other_weight = 10, variance_ratio = 1,
+            **kwargs):
 
         moveable_object = True if len(contact_fingers) > 0 else False
         AllegroContactWithEnvProblem.__init__(self, start=start, goal=goal, T=T, chain=chain,
@@ -2649,6 +2673,11 @@ class AllegroManipulationExternalContactProblem(AllegroContactWithEnvProblem, Al
                                         optimize_force=optimize_force, device=device, 
                                         desired_ee_in_world_frame=desired_ee_in_world_frame,
                                         obj_dof_type='x_y_theta',
+                                        # vf stuff
+                                        initial_y = initial_y,
+                                        task = task,
+                                        model_name=model_name, mode = mode,
+                                        vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio,
                                         **kwargs)
 
         AllegroRegraspWithEnvProblem.__init__(self, start=start, goal=goal, T=T, chain=chain,
@@ -2660,6 +2689,11 @@ class AllegroManipulationExternalContactProblem(AllegroContactWithEnvProblem, Al
                                        obj_ori_rep=obj_ori_rep, obj_joint_dim=obj_joint_dim,
                                        device=device, optimize_force=optimize_force, moveable_object=moveable_object,
                                        desired_ee_in_world_frame=desired_ee_in_world_frame, env_force=True,
+                                       # vf stuff
+                                        initial_y = initial_y,
+                                        task = task,
+                                        model_name=model_name, mode = mode,
+                                        vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio,
                                        **kwargs)
         self.dg, self.dz, self.dh = 0, 0, 0
         if self.num_regrasps > 0:

@@ -41,52 +41,56 @@ def get_initialization(env, sim_device, card_noise_mag0, card_noise_mag1, finger
     solved_initialization = env.get_full_q().to(device=sim_device)
 
     return solved_initialization
+
+# do main code
+
+if __name__ == "__main__":
+            
+    prog_id = 0
+    trials_per_save = 5
+    warmup_iters = 35
+    online_iters = 150
+
+    if len(sys.argv) == 2:
+        config_path = f'card{sys.argv[1]}.yaml'
+    else:
+        config_path = 'card0.yaml'
+
+    visualize = False
+    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer = init_env(visualize=visualize, config_path=config_path)
+    sim_device = config['sim_device']
+    computer_id = config['data_collection_id']
+
+
+    while True:
+
+        pose_tuples = []
         
-prog_id = 0
-trials_per_save = 5
-warmup_iters = 35
-online_iters = 150
+        trials_done = 0
 
-if len(sys.argv) == 2:
-    config_path = f'card{sys.argv[1]}.yaml'
-else:
-    config_path = 'card0.yaml'
+        while trials_done < trials_per_save:
 
-visualize = False
-config, env, sim_env, ros_copy_node, chain, sim, gym, viewer = init_env(visualize=visualize, config_path=config_path)
-sim_device = config['sim_device']
-computer_id = config['data_collection_id']
+            img_save_dir = None
+            env.frame_fpath = img_save_dir
+            env.frame_id = 0
 
+            print(f"Starting Trial {trials_done+1}")
+            initialization = get_initialization(env, sim_device, card_noise_mag0=0.06, card_noise_mag1=0.2, finger_noise_mag=0.2)
+            
+            pose_index1, traj_index1 = pull_index(env, config, chain)
+            print("done index1")
+            pose_middle, traj_middle = pull_middle(env, config, chain)
+            print("done middle")
+            pose_index2, traj_index2 = pull_index(env, config, chain)
+            print("done index2")
 
-while True:
+            pose_tuples.append((initialization, traj_index1, traj_middle, traj_index2, pose_index2))
+            trials_done += 1
 
-    pose_tuples = []
-    
-    trials_done = 0
-
-    while trials_done < trials_per_save:
-
-        img_save_dir = None
-        env.frame_fpath = img_save_dir
-        env.frame_id = 0
-
-        print(f"Starting Trial {trials_done+1}")
-        initialization = get_initialization(env, sim_device, card_noise_mag0=0.06, card_noise_mag1=0.2, finger_noise_mag=0.2)
-        
-        pose_index1, traj_index1 = pull_index(env, config, chain)
-        print("done index1")
-        pose_middle, traj_middle = pull_middle(env, config, chain)
-        print("done middle")
-        pose_index2, traj_index2 = pull_index(env, config, chain)
-        print("done index2")
-
-        pose_tuples.append((initialization, traj_index1, traj_middle, traj_index2, pose_index2))
-        trials_done += 1
-
-    savepath = f'{fpath.resolve()}/card_datasets/card_dataset_{computer_id}_{prog_id}.pkl'
-
-    while Path(savepath).exists():
-        prog_id += 1
         savepath = f'{fpath.resolve()}/card_datasets/card_dataset_{computer_id}_{prog_id}.pkl'
 
-    pkl.dump(pose_tuples, open(savepath, 'wb'))
+        while Path(savepath).exists():
+            prog_id += 1
+            savepath = f'{fpath.resolve()}/card_datasets/card_dataset_{computer_id}_{prog_id}.pkl'
+
+        pkl.dump(pose_tuples, open(savepath, 'wb'))

@@ -65,7 +65,13 @@ class AllegroCard(AllegroManipulationExternalContactProblem):
                  optimize_force=False,
                  turn=False,
                  obj_gravity=False,
-                 device='cuda:0', **kwargs):
+                 device='cuda:0', 
+                 # vf stuff
+                 initial_y = None,
+                 task = None,
+                model_name = 'None', mode='no_vf', 
+                vf_weight = 0, other_weight = 10, variance_ratio = 1,
+                **kwargs):
         self.obj_mass = 0.1
         super(AllegroCard, self).__init__(start=start, goal=goal, T=T, chain=chain,
                                                  object_location=object_location,
@@ -80,7 +86,12 @@ class AllegroCard(AllegroManipulationExternalContactProblem):
                                                  optimize_force=optimize_force, device=device,
                                                  desired_ee_in_world_frame=True,
                                                  turn=turn, obj_gravity=obj_gravity,
-                                                 env_contact=True)
+                                                 env_contact=True,
+                                                 # vf stuff
+                                                 initial_y=initial_y,
+                                                 task=task,
+                                                 model_name=model_name, mode=mode,
+                                                 vf_weight=vf_weight, other_weight=other_weight, variance_ratio=variance_ratio,)
         self.friction_coefficient = friction_coefficient
         
     def get_initial_xu(self, N):

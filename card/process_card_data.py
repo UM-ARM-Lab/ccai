@@ -1,4 +1,4 @@
-from _value_function.screwdriver_problem import init_env
+from card.card_problem import init_env, pull_index, pull_middle
 import pathlib
 import numpy as np
 import pickle as pkl
@@ -28,7 +28,7 @@ def calculate_cost(initial_pose, final_pose):
     goal_cost = ((state[-5] - goal) ** 2)
     # goal_cost = sum(goal_cost)
 
-    return goal_cost
+    return goal_cost*1000
 
 if __name__ == "__main__":
 
@@ -37,13 +37,14 @@ if __name__ == "__main__":
     for file in Path(f'{fpath.resolve()}/card_datasets').glob("card_dataset*.pkl"):
         filenames.append(file)
 
-    combined_index_trajs = np.empty((0, 9, 22))
+    combined_index1_trajs = np.empty((0, 9, 22))
+    combined_index2_trajs = np.empty((0, 9, 22))
     combined_middle_trajs = np.empty((0, 9, 22))
-    # combined_start_yaws = []
+    combined_start_ys = []
     combined_costs = []
 
-    vis = False
-    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer, state2ee_pos_partial = init_env(visualize=vis)
+    # vis = True
+    # config, env, sim_env, ros_copy_node, chain, sim, gym, viewer = init_env(visualize=vis)
 
     for filename in filenames:
         with open(filename, 'rb') as file:
@@ -58,41 +59,63 @@ if __name__ == "__main__":
             traj_middles = [t.reshape(9, 22) for t in traj_middles]
             traj_index2s = [t.reshape(9, 22) for t in traj_index2s]
 
-            original_length = len(traj_index1s)
+            # original_length = len(traj_index1s)
 
-            for i in range(original_length - 1, -1, -1):
-                if traj_index1s[i].shape[0] != 9 or traj_middles[i].shape[0] != 9 or traj_index2s[i].shape[0] != 9:
-                    print("Broken trajectory removed")
+            # for i in range(original_length - 1, -1, -1):
+            #     if traj_index1s[i].shape[0] != 9 or traj_middles[i].shape[0] != 9 or traj_index2s[i].shape[0] != 9:
+            #         print("Broken trajectory removed")
 
-                    start_poses = np.delete(start_poses, i, axis=0)
-                    final_poses = np.delete(final_poses, i, axis=0)
+            #         start_poses = np.delete(start_poses, i, axis=0)
+            #         final_poses = np.delete(final_poses, i, axis=0)
 
-                    traj_index1s.pop(i)
-                    traj_middles.pop(i)
-                    traj_index2s.pop(i)
+            #         traj_index1s.pop(i)
+            #         traj_middles.pop(i)
+            #         traj_index2s.pop(i)
             
-            combined_index_trajs = np.concatenate((combined_index_trajs, np.stack(traj_index1s, axis=0), np.stack(traj_index2s, axis=0)), axis=0)
+            combined_index1_trajs = np.concatenate((combined_index1_trajs, np.stack(traj_index1s, axis=0)), axis=0)
+            combined_index2_trajs = np.concatenate((combined_index2_trajs, np.stack(traj_index2s, axis=0)), axis=0)
             combined_middle_trajs = np.concatenate((combined_middle_trajs, np.stack(traj_middles, axis=0)), axis=0)
             
             costs = []
             
             for i in range(len(start_poses)):
                 cost = calculate_cost(start_poses[i], final_poses[i])
-                # combined_start_yaws.append(final_poses[i][-2])
+                combined_start_ys.append(start_poses[i][-5])
+                
+                # vis for debug
+                # if cost < 2.0:
+                #     print(f'Cost: {cost}')
+                #     import time
+                #     traj = traj_index1s[i]
+                #     for j in range(9):
+                #         pos = traj[j]
+                #         env.reset(dof_pos=torch.tensor(pos).float().reshape(1, -1))
+                #         time.sleep(0.2)
+                #     traj = traj_middles[i]
+                #     for j in range(9):
+                #         pos = traj[j]
+                #         env.reset(dof_pos=torch.tensor(pos).float().reshape(1, -1))
+                #         time.sleep(0.2)
+                #     traj = traj_index2s[i]
+                #     for j in range(9):
+                #         pos = traj[j]
+                #         env.reset(dof_pos=torch.tensor(pos).float().reshape(1, -1))
+                #         time.sleep(0.2)
+                            
 
                 costs.append(cost)
             
             combined_costs.extend(costs)
 
     combined_costs = np.array(combined_costs)
-    # combined_start_yaws = np.array(combined_start_yaws)
+    combined_start_ys = np.array(combined_start_ys)
 
-    if combined_index_trajs.shape[0] > 20000:
-        combined_index_trajs = combined_index_trajs[:20000]
-        combined_middle_trajs = combined_middle_trajs[:10000]
+    # if combined_index_trajs.shape[0] > 20000:
+    #     combined_index_trajs = combined_index_trajs[:20000]
+    #     combined_middle_trajs = combined_middle_trajs[:10000]
 
-    index_dataset = zip(combined_index_trajs, combined_costs)
-    middle_dataset = zip(combined_middle_trajs, combined_costs)
+    index_dataset = zip(combined_index1_trajs, combined_index2_trajs, combined_costs, combined_start_ys)
+    middle_dataset = zip(combined_middle_trajs, combined_costs, combined_start_ys)
     
     index_savepath = f'{fpath.resolve()}/card_datasets/combined_index_dataset.pkl'
     middle_savepath = f'{fpath.resolve()}/card_datasets/combined_middle_dataset.pkl'

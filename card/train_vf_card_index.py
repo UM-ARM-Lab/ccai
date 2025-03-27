@@ -1,26 +1,24 @@
+from card.card_problem import init_env, pull_index, pull_middle
 import pathlib
 import numpy as np
 import pickle as pkl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import random_split, DataLoader, TensorDataset, Subset
-import wandb
+from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MultipleLocator
-from sklearn.model_selection import KFold  
-
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 fpath = pathlib.Path(f'{CCAI_PATH}/data')
 
 def convert_full_to_partial_config(full_config):
     # get index, middle, card x, y, yaw
-    index = full_config[:, 0:4]
+    index = full_config[:, :4]
     middle = full_config[:, 4:8]
-    card = full_config[:, 16:22]
+    card = full_config[:, -6:]
     card_x_y_yaw = card[:, [0, 1, 5]]
     partial_config = np.concatenate([index, middle, card_x_y_yaw], axis=1)
+    # partial_config = card_x_y_yaw
     return partial_config
 
 def stack_trajs(trajs):
@@ -39,18 +37,39 @@ def save_train_test_splits(validation_proportion=0.1, seed=None):
     
     with open(f'{fpath.resolve()}/{filename}', 'rb') as file:
         tuples = pkl.load(file)
-        trajs, costs = zip(*tuples)
+        trajs1, trajs2, costs, start_ys = zip(*tuples)
+        start_ys = np.array(start_ys).flatten()
+
+    # visualize for debug
     
-    T = trajs[0].shape[0]
-    n_trajs = len(trajs)
+    # config, env, sim_env, ros_copy_node, chain, sim, gym, viewer = init_env(visualize=True)
+    # import time
+    # for i in range(len(trajs)):
+    #     if costs[i] < 0.01: # > 3.0:
+    #         print(f'Cost: {costs[i]}')
+    #         traj = trajs[i]
+    #         for j in range(9):
+    #             pos = traj[j]
+    #             env.reset(dof_pos=torch.tensor(pos).float().reshape(1, -1))
+    #             time.sleep(0.2)
+
+    
+    T = trajs1[0].shape[0]*2
+    n_trajs = len(trajs1)
     print(f'Loaded {n_trajs} trials, which will create {n_trajs*T} samples')
 
-    poses = stack_trajs(trajs)
+    poses1 = stack_trajs(trajs1)
+    poses2 = stack_trajs(trajs2)
+    poses = np.stack((poses1, poses2), axis=1).reshape(-1, poses1[0].shape[0])
+    # combine start_ys with poses
+    start_ys = start_ys.repeat(T, axis=0)
+    poses = np.concatenate([poses, np.array(start_ys).reshape(-1, 1)], axis=1)
 
     costs = np.array(costs).flatten()
     costs = np.repeat(costs, T)
 
     assert(len(poses)%T == 0)
+    assert(costs.shape[0] == poses.shape[0])
 
     indices = np.arange(len(poses)//T)
     np.random.shuffle(indices)
@@ -115,7 +134,7 @@ def load_data_from_saved_splits(batch_size = 100):
 
     print(f"Train size: {len(train_dataset)}, Test size: {len(test_dataset)}")
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     return train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std
@@ -134,7 +153,7 @@ class Net(nn.Module):
         return output.squeeze(-1)
     
 def train(batch_size = 100, lr = 0.001, epochs = 205, neurons = 12, verbose="normal"):
-    shape = (12,1)
+    shape = (13,1)
     
     train_loader, test_loader, poses_mean, poses_std, cost_mean, cost_std = load_data_from_saved_splits(batch_size=batch_size)
 
@@ -301,65 +320,27 @@ def eval(model_name):
     
     plot_loader(train_loader, 200, 'Training Set')
     plot_loader(test_loader, 200, 'Test Set')
-    
-    def plot_error_vs_actual(loader, n_samples, title='Error vs Actual Cost'):
-        """Scatters the absolute prediction error (y-axis) against the actual cost (x-axis)."""
-        with torch.no_grad():
-            all_preds = []
-            all_labels = []
-
-            for inputs, labels in loader:
-                ensemble_preds = query_ensemble(inputs, models)
-                preds = ensemble_preds.mean(dim=0)
-                all_preds.append(preds.numpy())
-                all_labels.append(labels.numpy())
-
-            # Convert and flatten
-            all_preds = np.concatenate(all_preds).flatten()
-            all_labels = np.concatenate(all_labels).flatten()
-
-            # Denormalize
-            all_preds = all_preds * cost_std + cost_mean
-            all_labels = all_labels * cost_std + cost_mean
-
-            # Random subsample
-            indices = np.random.choice(len(all_labels), n_samples, replace=False)
-            actual_values = all_labels[indices]
-            predicted_values = all_preds[indices]
-            
-            # Calculate absolute error
-            errors = np.abs(predicted_values - actual_values)
-
-            # Plot
-            plt.figure(figsize=(8,6))
-            plt.scatter(actual_values, errors, alpha=0.6)
-            plt.xlabel('Actual Cost')
-            plt.ylabel('Absolute Error (|Predicted - Actual|)')
-            plt.title(title)
-            plt.show()
-    plot_error_vs_actual(train_loader, 10, 'Error vs. Actual Cost (Training Set)')
-    # plot_error_vs_actual(test_loader, 300, 'Error vs. Actual Cost (Test Set)')
 
 if __name__ == "__main__":
     # Uncomment the following line to generate and save train/test splits.
-    save_train_test_splits(validation_proportion=0.1, seed=None)
-    exit()
+    # save_train_test_splits(validation_proportion=0.1, seed=None)
+    # exit()
 
     path = f'{fpath.resolve()}/value_functions/index_vf.pkl'
     model_name = f"index_vf"
     ensemble = []
-    for i in range(2):
+    for i in range(16):
         print(f"Training model {i}")
-        net, _ = train(epochs=20, neurons=24, verbose='very', lr=1e-3, batch_size=100)
+        net, _ = train(epochs=25, neurons=48, verbose='very', lr=1e-3, batch_size=100)
         ensemble.append(net)
     torch.save(ensemble, path)
     eval(model_name=model_name)
 
     def hyperparam_search(
         lr_candidates=[1e-3],
-        epochs_candidates=[50,100],
-        neurons_candidates=[16, 18],
-        batch_size_candidates=[50],
+        epochs_candidates=[30, 50, 70],
+        neurons_candidates=[24, 32, 48],
+        batch_size_candidates=[100],
         verbose="very"
     ):
         """

@@ -105,11 +105,11 @@ def init_env(visualize=False, config_path = 'card0.yaml'):
     env.reset()
     return config, env, sim_env, ros_copy_node, chain, sim, gym, viewer
 
-def pull_index(env, config, chain, image_path=None, warmup_iters=35, online_iters=150):
-            #  model_name = 'ensemble_rg', mode='no_vf', 
-            #  online_iters = 25,
-            # vf_weight = 0, other_weight = 10, variance_ratio = 1,
-            # image_path = None, iters = 200):
+def pull_index(env, config, chain, image_path=None, warmup_iters=35, online_iters=150,
+            model_name = 'index_vf', mode='no_vf', 
+            vf_weight = 0, other_weight = 10, variance_ratio = 1, 
+            ):
+
     params = config.copy()
     controller = 'csvgd'
     params.pop('controllers')
@@ -125,7 +125,7 @@ def pull_index(env, config, chain, image_path=None, warmup_iters=35, online_iter
     state = env.get_state()
     start = state['q'].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
     
-    middle_problem = AllegroCard(
+    problem = AllegroCard(
         start=start[:4 * num_fingers + obj_dof],
         goal=torch.tensor([0, 0.0, 0]).to(device=params['device']),
         T=params['T'],
@@ -143,9 +143,14 @@ def pull_index(env, config, chain, image_path=None, warmup_iters=35, online_iter
         optimize_force=params['optimize_force'],
         default_dof_pos=env.initial_dof_pos[:, :16],
         obj_gravity=params.get('obj_gravity', False),
+        # vf stuff
+        task = 'card',
+        initial_y = start[-5],
+        model_name = model_name, mode=mode, 
+        vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio,
     )
 
-    planner = PositionControlConstrainedSVGDMPC(middle_problem, params)
+    planner = PositionControlConstrainedSVGDMPC(problem, params)
     planner.warmup_iters = warmup_iters
     planner.online_iters = online_iters
 
@@ -159,7 +164,7 @@ def pull_index(env, config, chain, image_path=None, warmup_iters=35, online_iter
     state = env.get_state()
     state = state['q'].reshape(-1)[:11].to(device=params['device'])
     y = state[-2]
-    print('Current y:', y)
+    # print('Current y:', y)
 
     goal = torch.tensor([0, -0.02 + state[-2], 0]).to(device=params['device'])
 
@@ -213,11 +218,11 @@ def pull_index(env, config, chain, image_path=None, warmup_iters=35, online_iter
    
     return final_state, full_trajectory
 
-def pull_middle(env, config, chain, image_path=None, warmup_iters=35, online_iters=150):
-            #  model_name = 'ensemble_rg', mode='no_vf', 
-            #  online_iters = 25,
-            # vf_weight = 0, other_weight = 10, variance_ratio = 1,
-            # image_path = None, iters = 200):
+def pull_middle(env, config, chain, image_path=None, warmup_iters=35, online_iters=150,
+            model_name = 'middle_vf', mode='no_vf', 
+            vf_weight = 0, other_weight = 10, variance_ratio = 1, 
+            ):
+
     params = config.copy()
     controller = 'csvgd'
     params.pop('controllers')
@@ -233,7 +238,7 @@ def pull_middle(env, config, chain, image_path=None, warmup_iters=35, online_ite
     state = env.get_state()
     start = state['q'].reshape(4 * num_fingers + obj_dof).to(device=params['device'])
     
-    middle_problem = AllegroCard(
+    problem = AllegroCard(
         start=start[:4 * num_fingers + obj_dof],
         goal=torch.tensor([0, 0.0, 0]).to(device=params['device']),
         T=params['T'],
@@ -251,9 +256,14 @@ def pull_middle(env, config, chain, image_path=None, warmup_iters=35, online_ite
         optimize_force=params['optimize_force'],
         default_dof_pos=env.initial_dof_pos[:, :16],
         obj_gravity=params.get('obj_gravity', False),
+        # vf stuff
+        initial_y = start[-5],
+        task = 'card',
+        model_name = model_name, mode=mode, 
+        vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio,
     )
 
-    planner = PositionControlConstrainedSVGDMPC(middle_problem, params)
+    planner = PositionControlConstrainedSVGDMPC(problem, params)
     planner.warmup_iters = warmup_iters
     planner.online_iters = online_iters
 
@@ -267,9 +277,10 @@ def pull_middle(env, config, chain, image_path=None, warmup_iters=35, online_ite
     state = env.get_state()
     state = state['q'].reshape(-1)[:11].to(device=params['device'])
     y = state[-2]
-    print('Current y:', y)
+    # print('Current y:', y)
 
     goal = torch.tensor([0, -0.02 + state[-2], 0]).to(device=params['device'])
+
     state = env.get_state()
     state = state['q'].reshape(-1).to(device=params['device'])
     state = state[:planner.problem.dx]
@@ -343,7 +354,13 @@ if __name__ == "__main__":
     warmup_iters = 35
     online_iters = 150
 
-    
+    vf_weight_i = 0
+    other_weight_i = 10
+    variance_ratio_i = 1
+
+    vf_weight_m = 0
+    other_weight_m = 10
+    variance_ratio_m = 1
 
     full_trajs = []
     for i in range(5):
@@ -353,9 +370,19 @@ if __name__ == "__main__":
         env.frame_id = 0
 
         env.reset()
-        final_state, full_traj0 = pull_index(env, config, chain, img_save_dir, warmup_iters, online_iters)
-        final_state, full_traj1 = pull_middle(env, config, chain, img_save_dir, warmup_iters, online_iters)
-        final_state, full_traj2 = pull_index(env, config, chain, img_save_dir, warmup_iters, online_iters)
+
+        final_state, full_traj0 = pull_index(env, config, chain, img_save_dir, warmup_iters, online_iters,
+                        model_name = 'index_vf', mode='vf', 
+                        vf_weight = vf_weight_i, other_weight = other_weight_i, variance_ratio = variance_ratio_i,
+                        )
+        final_state, full_traj1 = pull_middle(env, config, chain, img_save_dir, warmup_iters, online_iters,
+                        model_name = 'middle_vf', mode='vf', 
+                        vf_weight = vf_weight_m, other_weight = other_weight_m, variance_ratio = variance_ratio_m,
+                        )
+        final_state, full_traj2 = pull_index(env, config, chain, img_save_dir, warmup_iters, online_iters,
+                        model_name = 'index_vf', mode='vf', 
+                        vf_weight = vf_weight_i, other_weight = other_weight_i, variance_ratio = variance_ratio_i,
+                        )
 
         full_traj = torch.cat((full_traj0, full_traj1, full_traj2), dim=0)
         full_trajs.append(full_traj)
