@@ -1107,7 +1107,9 @@ if __name__ == "__main__":
                               learn_inverse_dynamics=config['inverse_dynamics'],
                               state_only=config['state_only'], state_control_only=config['state_control_only'],
                               problem=problem_for_sampler if config['state_control_only'] else None,
-                              dropout_p=config['context_dropout_p'], trajectory_condition=config['trajectory_condition'],)
+                              dropout_p=config['context_dropout_p'], trajectory_condition=config['trajectory_condition'],
+                              true_s0=config['true_s0'], 
+                              )
 
     data_path = pathlib.Path(f'{CCAI_PATH}/data/training_data/{config["data_directory"]}')
     if config.get('eval_train_likelihood', False) or config.get('id_ood_states', False):

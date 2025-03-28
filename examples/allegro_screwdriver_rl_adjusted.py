@@ -61,7 +61,7 @@ print("CCAI_PATH", CCAI_PATH)
 obj_dof = 3
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
-sys.stdout = open('./examples/logs/allegro_screwdriver_recovery_diffusion_eval_weighted_vote_c_mode_selection.log', 'w', buffering=1)
+# sys.stdout = open('./examples/logs/allegro_screwdriver_recovery_diffusion_eval_weighted_vote_c_mode_selection.log', 'w', buffering=1)
 
 def vector_cos(a, b):
     return torch.dot(a.reshape(-1), b.reshape(-1)) / (torch.norm(a.reshape(-1)) * torch.norm(b.reshape(-1)))
@@ -973,54 +973,72 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             state = state[:15]
             start = convert_yaw_to_sine_cosine(state)
             start = start.unsqueeze(0)
-            initial_samples, raw_contact_mode, likelihood = trajectory_sampler.sample(
-                N=params['N'], start=start, H=params['T']+1, constraints=None, project=False)
-            rounded_raw_contact_mode = torch.round(raw_contact_mode)
-            # print('Rounded raw contact mode:', rounded_raw_contact_mode)
-            contact_vec = (rounded_raw_contact_mode + 1) / 2
-            # print('Contact vec:', contact_vec)
-            all_c_mode_str = []
-            for i in range(contact_vec.shape[0]):
-                c_mode_str = contact_state_dict_flip[tuple(contact_vec[i].cpu().numpy())]
-                all_c_mode_str.append(c_mode_str)
-            all_c_mode_str = np.array(all_c_mode_str)
-            likelihood_sort, indices = torch.sort(likelihood, descending=True)
-            indices = indices.cpu().numpy()
+            contact_mode_str_max = 'unknown'  # Default in case we can't find a match
+            while contact_mode_str_max == 'unknown':
+                initial_samples, raw_contact_mode, likelihood = trajectory_sampler.sample(
+                    N=params['N'], start=start, H=params['T']+1, constraints=None, project=False)
+                scaled_raw_contact_mode = (raw_contact_mode + 1) / 2  # Scale to [0, 1] for binning
+                # print('Rounded raw contact mode:', rounded_raw_contact_mode)
+                # rounded_raw_contact_mode = torch.round(raw_contact_mode)
+                # contact_vec = (rounded_raw_contact_mode + 1) / 2
+                contact_vec = torch.round(scaled_raw_contact_mode)
+                # print('Contact vec:', contact_vec)
+                all_c_mode_str = []
+                for i in range(contact_vec.shape[0]):
+                    try:
+                        c_mode_str = contact_state_dict_flip[tuple(contact_vec[i].cpu().numpy())]
+                        all_c_mode_str.append(c_mode_str)
+                    except:
+                        print('Warning: Contact mode not found for:', contact_vec[i].cpu().numpy())
+                        # Fallback to a default if not found
+                        # This should not happen if the model is trained correctly
+                        c_mode_str = 'unknown'
+                        all_c_mode_str.append(c_mode_str)
+                all_c_mode_str = np.array(all_c_mode_str)
+                likelihood_sort, indices = torch.sort(likelihood, descending=True)
+                indices = indices.cpu().numpy()
 
-            # Convert contact mode to string
-            contact_mode_str_sort = all_c_mode_str[indices]
-            contact_mode_str_max = contact_mode_str_sort[0]
+                # Convert contact mode to string
+                contact_mode_str_sort = all_c_mode_str[indices]
+                contact_mode_str_max = contact_mode_str_sort[0]
 
-            initial_samples = initial_samples[indices]
-            initial_samples = convert_sine_cosine_to_yaw(initial_samples)
-            plan_time = time.perf_counter() - start_plan_time
-            print('Likelihoods:', likelihood_sort)
-            print('Contact modes', contact_mode_str_sort)
-            # goal_config = initial_samples[0, -1, :15] # Use highest likelihood trajectory
+                initial_samples = initial_samples[indices]
+                initial_samples = convert_sine_cosine_to_yaw(initial_samples)
+                plan_time = time.perf_counter() - start_plan_time
+                print('Likelihoods:', likelihood_sort)
+                print('Contact modes', contact_mode_str_sort)
+                # goal_config = initial_samples[0, -1, :15] # Use highest likelihood trajectory
 
-            # Compute the average likelihood, grouped by mode
-            likelihood_grouped = {}
-            inds_grouped = {}
-            for i, mode in enumerate(contact_mode_str_sort):
-                if mode not in likelihood_grouped:
-                    likelihood_grouped[mode] = []
-                    inds_grouped[mode] = []
-                likelihood_grouped[mode].append(likelihood_sort[i].item())
-                inds_grouped[mode].append(indices[i])
-            likelihood_mean = {}
-            likelihood_sum = {}
-            for mode in likelihood_grouped:
-                likelihood_mean[mode] = np.mean(np.exp(likelihood_grouped[mode]))
-                likelihood_sum[mode] = np.sum(np.exp(likelihood_grouped[mode]))
-            print('Likelihood grouped mean:', likelihood_mean)
-            print('Likelihood grouped sum:', likelihood_sum)
+                # Compute the average likelihood, grouped by mode
+                likelihood_grouped = {}
+                inds_grouped = {}
+                for i, mode in enumerate(contact_mode_str_sort):
+                    if mode not in likelihood_grouped:
+                        likelihood_grouped[mode] = []
+                        inds_grouped[mode] = []
+                    likelihood_grouped[mode].append(likelihood_sort[i].item())
+                    inds_grouped[mode].append(indices[i])
+                likelihood_mean = {}
+                likelihood_sum = {}
+                for mode in likelihood_grouped:
+                    likelihood_mean[mode] = np.mean(np.exp(likelihood_grouped[mode]))
+                    likelihood_sum[mode] = np.sum(np.exp(likelihood_grouped[mode]))
+                print('Likelihood grouped mean:', likelihood_mean)
+                print('Likelihood grouped sum:', likelihood_sum)
 
-            # Pick mode with highest likelihood sum
-            contact_mode_str_max = max(likelihood_sum, key=likelihood_sum.get)
-            print('Contact mode with highest likelihood sum:', contact_mode_str_max)
-            # goal config is last state of highest likelihood trajectory for contact_mode_str_max. Has to be for the right mode
-            best_traj_idx = inds_grouped[contact_mode_str_max][0]
-            goal_config = initial_samples[best_traj_idx, -1, :15]
+                # Pick mode with highest likelihood sum
+                if 'unknown' in likelihood_sum:
+                    # If 'unknown' is present, fallback to the highest likelihood sum excluding 'unknown'
+                    likelihood_sum.pop('unknown', None)
+                    if not likelihood_sum:
+                        contact_mode_str_max = 'unknown'
+                        print('All modes are unknown')
+                        continue
+                contact_mode_str_max = max(likelihood_sum, key=likelihood_sum.get)
+                print('Contact mode with highest likelihood sum:', contact_mode_str_max)
+                # goal config is last state of highest likelihood trajectory for contact_mode_str_max. Has to be for the right mode
+                best_traj_idx = inds_grouped[contact_mode_str_max][0]
+                goal_config = initial_samples[best_traj_idx, -1, :15]
             
             if params['visualize_contact_plan']:
                 for i in range(params['N']):
@@ -1164,7 +1182,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 
     sample_contact = params.get('sample_contact', False)
-    num_stages = 20
+    num_stages = 15
 
     contact = None
     state = env.get_state()
@@ -1667,8 +1685,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_recovery_model_alt_1_noised_s0_bto.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_recovery_model_alt_2_true_s0_bto.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl_wrench_perturb_new_project.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_perturbed_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_orig_likelihood.yaml').read_text())
@@ -1857,9 +1875,11 @@ if __name__ == "__main__":
         dt = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
         run = wandb.init(project='ccai-screwdriver', entity='abhinavk99', config=config,
                         name=f'{config["experiment_name"]}_{dt}')
-    start_ind = 0
+    start_ind = config.get('start_ind', 0)
     step_size = 1
-    num_episodes = config['num_episodes']+start_ind
+    num_episodes = config['num_episodes']
+    if 'end_ind' in config:
+        num_episodes = config['end_ind']
     for i in tqdm(range(start_ind, num_episodes, step_size)):
         print(f'\nTrial {i+1}')
     # for i in tqdm([1, 2, 4, 7]):

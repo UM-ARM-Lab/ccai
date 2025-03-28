@@ -6,7 +6,7 @@ num_steps: 8
 num_turns: 1
 max_recovery_stages: 4
 num_trials: 10
-num_episodes: 20
+num_episodes: 15
 visualize: True
 experiment_name: 'allegro_screwdriver_recovery_model_eval_alt_2_noised_s0_9000_bto'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'

@@ -856,17 +856,28 @@ class TemporalUNetContext(nn.Module):
         self.pooling = nn.AdaptiveAvgPool1d(trajectory_embed_dim)
         init_state_embed_dim = 512
         self.true_s0 = true_s0
-        if true_s0:
-            if self.trajectory_condition:
+
+        if self.trajectory_condition:
+            if true_s0:
                 traj_hidden_dim = dim_mults[-1] * dim * trajectory_embed_dim + init_state_embed_dim
             else:
-                traj_hidden_dim = init_state_embed_dim
-        else:
-            if self.trajectory_condition:
-                # traj_hidden_dim += dim_mults[-1] * dim * trajectory_embed_dim
                 traj_hidden_dim = dim_mults[-1] * dim * trajectory_embed_dim
+        else:
+            if true_s0:
+                traj_hidden_dim = init_state_embed_dim
             else:
                 traj_hidden_dim = init_state_embed_dim
+        # if true_s0:
+        #     if self.trajectory_condition:
+        #         traj_hidden_dim = dim_mults[-1] * dim * trajectory_embed_dim + init_state_embed_dim
+        #     else:
+        #         traj_hidden_dim = init_state_embed_dim
+        # else:
+        #     if self.trajectory_condition:
+        #         # traj_hidden_dim += dim_mults[-1] * dim * trajectory_embed_dim
+        #         traj_hidden_dim = dim_mults[-1] * dim * trajectory_embed_dim
+        #     else:
+        #         traj_hidden_dim = init_state_embed_dim
 
         print(traj_hidden_dim)
         print(dim_mults[-1], dim, trajectory_embed_dim)
@@ -936,6 +947,9 @@ class TemporalUNetContext(nn.Module):
 
             e_x, h = self.temporal_unet(t, x, dropout=False)
             h = self.pooling(h).reshape(B, -1)
+            if self.true_s0:
+                initial_state_embed = self.initial_state_context_net(x[:, 0, :self.state_dim])
+                h = torch.cat((h, initial_state_embed), dim=-1)
             t = self.time_embedding(t)
 
             h_for_e_c = torch.cat((context, h, t), dim=-1)

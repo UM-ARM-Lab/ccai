@@ -6,7 +6,7 @@ num_steps: 8
 num_turns: 1
 max_recovery_stages: 4
 num_trials: 10
-num_episodes: 20
+num_episodes: 15
 visualize: True
 experiment_name: 'allegro_screwdriver_recovery_model_eval_alt_1_true_s0_bto'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
@@ -57,6 +57,7 @@ likelihood_threshold: -175.0
 drop_threshold: -1250
 project_threshold: -105.
 sac_batch_size: 64
+start_ind: 1
 # likelihood_threshold: -16.0
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
