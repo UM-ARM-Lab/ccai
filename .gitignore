@@ -10,6 +10,8 @@ wandb/*
 data/experiments/imgs
 data/experiments
 data/plots
+data/card/imgs
+data/card/vids
 examples/config/
 data/test/initializations
 data/diffusion_datasets
