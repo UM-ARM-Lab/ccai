@@ -59,14 +59,14 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 't0'
+    test_name = 't_20_100_100'
     checkpoint_path = fpath / 'card' /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    warmup_iters = 35
-    online_iters = 150
+    warmup_iters = 100
+    online_iters = 100
 
-    n_trials = 10
+    n_trials = 20
     n_repeat = 1
     perception_noise = 0.0
     test_time = False
@@ -84,15 +84,33 @@ if __name__ == '__main__':
 
     card_noise_mag0, card_noise_mag1, finger_noise_mag = 0.06, 0.2, 0.2
 
-    vf_weight_i = 5.0
-    other_weight_i = 10.0
-    variance_ratio_i = 2.0
+    vf_weight_i = 3.65
+    other_weight_i = 5.0
+    variance_ratio_i = 6.625
 
-    vf_weight_m = 5.0
-    other_weight_m = 10.0
-    variance_ratio_m = 2.0
+    vf_weight_m = 3.65
+    other_weight_m = 5.0
+    variance_ratio_m = 3.31
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer = init_env(visualize=True, config_path=config_path)
+    # img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/card/imgs/test/trial_{1}')
+    # pathlib.Path.mkdir(img_save_dir, parents=True, exist_ok=True)  
+    # env.frame_fpath = img_save_dir
+    # env.frame_id = 0
+    # initialization = get_initialization(env, None, card_noise_mag0=0.06, card_noise_mag1=0.2, finger_noise_mag=0.2)
+    # final_state, full_traj0 = pull_index(env, config, chain, img_save_dir, warmup_iters, online_iters,
+    #                     model_name = None, mode='no_vf', 
+    #                     # vf_weight = vf_weight_i, other_weight = other_weight_i, variance_ratio = variance_ratio_i,
+    #                     )
+    # final_state, full_traj1 = pull_middle(env, config, chain, img_save_dir, warmup_iters, online_iters,
+    #                 model_name = None, mode='no_vf', 
+    #                 vf_weight = vf_weight_m, other_weight = other_weight_m, variance_ratio = variance_ratio_m,
+    #                 )
+    # final_state, full_traj2 = pull_index(env, config, chain, img_save_dir, warmup_iters, online_iters,
+    #                 model_name = None, mode='no_vf', 
+    #                 # vf_weight = vf_weight_i, other_weight = other_weight_i, variance_ratio = variance_ratio_i,
+    #                 )
+
 
     init_path = fpath / 'card' /'test'/'initializations'/'test_inits.pkl'
 
@@ -118,7 +136,7 @@ if __name__ == '__main__':
 
         print(f"Testing combination {combo_tuple}")
 
-        img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/imgs/trial_{n_repeat*init_index+repeat_index+1}')
+        img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/card/imgs/test/trial_{n_repeat*init_index+repeat_index+1}')
         pathlib.Path.mkdir(img_save_dir, parents=True, exist_ok=True)  
         env.frame_fpath = img_save_dir
         env.frame_id = 0
@@ -126,6 +144,7 @@ if __name__ == '__main__':
         init_pose = inits[init_index]
 
         if calc_vf:
+            
 
             env.reset(dof_pos= init_pose)
         
@@ -134,7 +153,7 @@ if __name__ == '__main__':
                         vf_weight = vf_weight_i, other_weight = other_weight_i, variance_ratio = variance_ratio_i,
                         )
             final_state, full_traj1 = pull_middle(env, config, chain, img_save_dir, warmup_iters, online_iters,
-                            model_name = 'middle_vf', mode='no_vf', 
+                            model_name = 'middle_vf', mode='vf', 
                             vf_weight = vf_weight_m, other_weight = other_weight_m, variance_ratio = variance_ratio_m,
                             )
             final_state, full_traj2 = pull_index(env, config, chain, img_save_dir, warmup_iters, online_iters,

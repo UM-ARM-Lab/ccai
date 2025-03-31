@@ -1191,6 +1191,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         return xu
 
     def _cost(self, xu, start, goal):
+        # print("here876")
         if self.num_contacts == 0:
             return 0.0
         # cost function for valve turning task

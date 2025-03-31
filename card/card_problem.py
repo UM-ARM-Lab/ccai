@@ -102,7 +102,7 @@ def init_env(visualize=False, config_path = 'card0.yaml'):
     chain = pk.build_chain_from_urdf(open(asset).read())
     frame_indices = [chain.frame_to_idx[ee_names[finger]] for finger in config['fingers']]  # combined chain
     frame_indices = torch.tensor(frame_indices)
-    env.reset()
+    # env.reset()
     return config, env, sim_env, ros_copy_node, chain, sim, gym, viewer
 
 def pull_index(env, config, chain, image_path=None, warmup_iters=35, online_iters=150,

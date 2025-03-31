@@ -20,7 +20,7 @@ if __name__ == "__main__":
 
     annotate = True
 
-    experiment_names = ['t0'] 
+    experiment_names = ['t03'] 
     budget = "High Budget"
 
     results = {}
@@ -29,7 +29,7 @@ if __name__ == "__main__":
         file_path = fpath / 'card'/ 'test' / 'test_method' / f'result_{name}.pkl'
         with open(file_path, 'rb') as file:
             single_results = pkl.load(file)
-        
+
         for method, method_results in single_results.items():
 
             if method == "no_vf":
@@ -72,10 +72,10 @@ if __name__ == "__main__":
 
             for repeat_index in range(n_repeat):
 
-                pregrasp_pose, regrasp_pose, regrasp_traj, turn_pose, turn_traj, *initial_samples = \
+                initial_state, final_state, *extra = \
                     results[method_name][(pregrasp_index, repeat_index)]
 
-                d2g = calculate_d2g(regrasp_pose.numpy(), turn_pose)     
+                d2g = calculate_d2g(initial_state, final_state)     
                 all_d2gs.append(d2g)
 
             # Average d2g and standard deviation across repeats
@@ -116,7 +116,7 @@ if __name__ == "__main__":
                 capsize=3,
                 color=colors[method_i]
             )
-        plt.xlabel('Pregrasp Index', fontsize=ts)
+        plt.xlabel('Initial State Index', fontsize=ts)
         plt.ylabel('d2g Value', fontsize=ts)
         plt.title('Turning d2gs by Method', fontsize=ts)
         plt.xticks(fontsize=ts-2)

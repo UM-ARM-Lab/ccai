@@ -1,0 +1,317 @@
+import numpy as np
+import pickle as pkl
+import pathlib
+import sys
+import time
+CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
+sys.path.append(str(CCAI_PATH))
+from tqdm import tqdm
+from pathlib import Path
+from _value_function.screwdriver_problem import emailer, delete_imgs
+from card.card_problem import init_env, pull_index, pull_middle
+from card.train_vf_card_index import load_ensemble, query_ensemble
+fpath = pathlib.Path(f'{CCAI_PATH}/data')
+from card.process_card_data import calculate_cost
+from card.get_card_dataset import get_initialization
+from itertools import product
+fpath = pathlib.Path(f'{CCAI_PATH}/data')
+import torch
+import sys
+if len(sys.argv) == 2:
+    config_path = f'card{sys.argv[1]}.yaml'
+else:
+    config_path = 'card0.yaml'
+
+def load_or_create_checkpoint(starting_values):
+    """
+    Loads the checkpoint if it exists, otherwise creates a new default checkpoint.
+    """
+    if checkpoint_path.exists():
+        print(f"Loading existing checkpoint from {checkpoint_path}")
+        with open(checkpoint_path, 'rb') as f:
+            checkpoint = pkl.load(f)
+    else:
+        print(f"No checkpoint found. Creating a new one at {checkpoint_path}")
+        # Initial bounding ranges
+        vf_bounds = starting_values['vf_bounds']
+        other_bounds = starting_values['other_bounds']
+        variance_ratio_bounds = starting_values['variance_ratio_bounds']
+        grid_size = starting_values['grid_size']
+        
+        # Create initial search grids
+        vf_weights_init = np.logspace(
+            np.log10(vf_bounds[0]),
+            np.log10(vf_bounds[1]),
+            grid_size
+        ).tolist()
+        other_weights_init = np.logspace(
+            np.log10(other_bounds[0]),
+            np.log10(other_bounds[1]),
+            grid_size
+        ).tolist()
+        variance_ratios_init = np.linspace(
+            variance_ratio_bounds[0],
+            variance_ratio_bounds[1],
+            grid_size
+        ).tolist()
+        
+        checkpoint = {
+            'iteration': 0,
+            'max_iterations': 100,
+            
+            # Current best hyperparameters and cost
+            'best_vf_weight': None,
+            'best_other_weight': None,
+            'best_variance_ratio': None,
+            'lowest_total_cost': float('inf'),
+            
+            # Initial bounding ranges
+            'vf_bounds': vf_bounds,
+            'other_bounds': other_bounds,
+            'variance_ratio_bounds': variance_ratio_bounds,
+            
+            # Current search grids
+            'vf_weights': vf_weights_init,
+            'other_weights': other_weights_init,
+            'variance_ratios': variance_ratios_init,
+
+            # The log-space or linear ranges used for refinement
+            'vf_range': np.log10(vf_bounds[1]) - np.log10(vf_bounds[0]),
+            'other_range': np.log10(other_bounds[1]) - np.log10(other_bounds[0]),
+            'variance_ratio_range': variance_ratio_bounds[1] - variance_ratio_bounds[0],
+            
+            # Store final results after each iterations
+            'results': [],  # list of (vf_weight, other_weight, variance_ratio, cost) for the best of each iteration
+            
+            # For partial iteration checkpoints
+            # We'll record tested combinations as a dict: 
+            # { iteration_number: set_of_(vf_weight, other_weight, variance_ratio) }
+            'tested_combinations': {}
+        }
+    return checkpoint
+
+def save_checkpoint(checkpoint):
+    """Saves the checkpoint to file."""
+    with open(checkpoint_path, 'wb') as f:
+        pkl.dump(checkpoint, f)
+
+def test(checkpoint, n_samples): 
+
+    # Load the data or environment objects once upfront
+    inits = pkl.load(open(f'{fpath}/card/test/initializations/weight_sweep_inits.pkl', 'rb'))
+    # We extract frequently used fields from checkpoint for convenience
+    iteration = checkpoint['iteration']
+    max_iterations = checkpoint['max_iterations']
+    
+    # Main loop for adaptive grid refinement
+    while iteration < max_iterations:
+        # For convenience, read from checkpoint on each iteration
+        vf_weights = checkpoint['vf_weights']
+        other_weights = checkpoint['other_weights']
+        variance_ratios = checkpoint['variance_ratios']
+        best_vf_weight = checkpoint['best_vf_weight']
+        best_other_weight = checkpoint['best_other_weight']
+        best_variance_ratio = checkpoint['best_variance_ratio']
+        lowest_total_cost = checkpoint['lowest_total_cost']
+        
+        print("==========================================")
+        print(f"Iteration {iteration+1} / {max_iterations}")
+        print(f"Current search for vf_weights: {vf_weights}")
+        print(f"Current search for other_weights: {other_weights}")
+        print(f"Current search for variance_ratios: {variance_ratios}")
+        print(f"Current best_vf_weight: {best_vf_weight}")
+        print(f"Current best_other_weight: {best_other_weight}")
+        print(f"Current best_variance_ratio: {best_variance_ratio}")
+        print(f"Current lowest_total_cost: {lowest_total_cost}")
+        print("==========================================")
+
+        # Make sure we have a set to track which combos we've already tested
+        if iteration not in checkpoint['tested_combinations']:
+            checkpoint['tested_combinations'][iteration] = set()
+
+        # We'll do a fresh pass at finding the best combination in this iteration
+        iteration_best_cost = float('inf')
+        iteration_best_combo = (None, None, None)
+
+        hyperparameters = [vf_weights, other_weights, variance_ratios]
+
+        # Search over the entire grid but skip combos we've tested already
+        for vf_weight, other_weight, variance_ratio in product(*hyperparameters):
+            # combo_tuple = (vf_weight, other_weight, variance_ratio)
+            combo_tuple = (vf_weight, other_weight, variance_ratio)
+           
+            if combo_tuple in checkpoint['tested_combinations'][iteration]:
+                # Already finished testing this combo in a previous run, skip it
+                continue
+
+            # Evaluate total cost for this combination
+            total_cost = 0.0
+
+            for i in range(n_samples):
+                # Running your environment logic
+                img_save_dir = None
+                env.frame_fpath = img_save_dir
+                env.frame_id = 0
+
+                init = inits[i]
+                env.reset(dof_pos=init)
+                
+                final_state, full_traj0 = pull_index(env, config, chain, img_save_dir, warmup_iters, online_iters,
+                        model_name = 'index_vf', mode='vf', 
+                        vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio,
+                        )
+                final_state, full_traj1 = pull_middle(env, config, chain, img_save_dir, warmup_iters, online_iters,
+                                model_name = 'middle_vf', mode='vf', 
+                                vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio,
+                                )
+                final_state, full_traj2 = pull_index(env, config, chain, img_save_dir, warmup_iters, online_iters,
+                                model_name = 'index_vf', mode='vf', 
+                                vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio,
+                                )
+        
+                turn_cost = calculate_cost(init, final_state)
+                total_cost += turn_cost
+                print(f"Sample {i} -> turn cost: {turn_cost}")
+            
+            # Mark this combo as tested
+            checkpoint['tested_combinations'][iteration].add(combo_tuple)
+            # checkpoint['results'].append((vf_weight, other_weight, variance_ratio, total_cost))
+            save_checkpoint(checkpoint)  # save so we don't re-test if we crash now
+                
+            print(f"Total combinations tested so far: {sum(len(v) for v in checkpoint['tested_combinations'].values())}")
+            print(f"[Iteration {iteration+1}] vf_weight: {vf_weight}, "
+                  f"other_weight: {other_weight}, "
+                  f"variance_ratio: {variance_ratio}, total_cost: {total_cost}")
+
+            # Check if this is better than the best we have so far in *this iteration*
+            if total_cost < iteration_best_cost:
+                iteration_best_cost = total_cost
+                iteration_best_combo = (vf_weight, other_weight, variance_ratio)
+
+            # Also check if this is the best overall across all iterations
+            if total_cost < lowest_total_cost:
+                checkpoint['lowest_total_cost'] = total_cost
+                checkpoint['best_vf_weight'] = vf_weight
+                checkpoint['best_other_weight'] = other_weight
+                checkpoint['best_variance_ratio'] = variance_ratio
+                lowest_total_cost = total_cost
+                best_vf_weight = vf_weight
+                best_other_weight = other_weight
+                best_variance_ratio = variance_ratio
+
+            # Immediately save checkpoint after each combo in case of crash
+            save_checkpoint(checkpoint)
+
+        # -- Finished testing all combos for the current iteration. --
+        # iteration_best_combo holds the best for *this iteration*, iteration_best_cost is its cost.
+        vf_best_iter, other_best_iter, var_best_iter = iteration_best_combo
+        print(f"\nBest in iteration {iteration+1}: ")
+        print(f"  vf={vf_best_iter}, other={other_best_iter}, var_ratio={var_best_iter}, cost={iteration_best_cost}\n")
+
+        # Store best iteration-level result in results list
+        checkpoint['results'].append((
+            vf_best_iter,
+            other_best_iter,
+            var_best_iter,
+            iteration_best_cost
+        ))
+
+        # Refine the grid around the best *overall* combination so far
+        #   (you can also refine around iteration_best_combo if you prefer).
+        #   Here, we refine around checkpoint['best_vf_weight'] etc.
+        checkpoint['vf_range'] = checkpoint['vf_range'] / 2
+        checkpoint['other_range'] = checkpoint['other_range'] / 2
+        checkpoint['variance_ratio_range'] = checkpoint['variance_ratio_range'] / 2
+
+        half_vf = checkpoint['vf_range'] / 2
+        half_other = checkpoint['other_range'] / 2
+        half_var = checkpoint['variance_ratio_range'] / 2
+
+        # Construct new grids. For logs, we do log10 around the best_vf_weight/other_weight
+        checkpoint['vf_weights'] = np.logspace(
+            np.log10(best_vf_weight) - half_vf, 
+            np.log10(best_vf_weight) + half_vf,
+            len(vf_weights)
+        ).tolist()
+
+        checkpoint['other_weights'] = np.logspace(
+            np.log10(best_other_weight) - half_other,
+            np.log10(best_other_weight) + half_other,
+            len(other_weights)
+        ).tolist()
+
+        # Linear refinement for variance ratio
+        checkpoint['variance_ratios'] = np.linspace(
+            best_variance_ratio - half_var,
+            best_variance_ratio + half_var,
+            len(variance_ratios)
+        ).tolist()
+
+        # Bump the iteration count
+        iteration += 1
+        checkpoint['iteration'] = iteration
+
+        # Clear tested combinations for the new iteration
+        checkpoint['tested_combinations'][iteration] = set()
+        
+        # Save the refined checkpoint
+        save_checkpoint(checkpoint)
+        emailer().send()
+        
+    # -- End while loop --
+
+    print("Finished all iterations of adaptive grid search.\n")
+    print("Final checkpoint results in 'results' list:")
+    for row in checkpoint['results']:
+        print(row)
+    print(f"\nBest overall: ")
+    print(f"  best_vf_weight={checkpoint['best_vf_weight']}, "
+          f"best_other_weight={checkpoint['best_other_weight']}, "
+          f"best_variance_ratio={checkpoint['best_variance_ratio']}")
+    print(f"  lowest_total_cost={checkpoint['lowest_total_cost']}")
+
+def get_inits(env, sim_device, n_samples, save=True):
+
+    savepath = f'{fpath.resolve()}/card/test/initializations/weight_sweep_inits.pkl'
+   
+    initializations = []
+    for _ in range(n_samples):
+        initialization = get_initialization(env, sim_device, card_noise_mag0, card_noise_mag1, finger_noise_mag)
+        initializations.append(initialization)
+
+    if save == True:
+        pkl.dump(initializations, open(savepath, 'wb'))
+    return initializations
+
+
+if __name__ == "__main__":
+
+    card_noise_mag0 = 0.06
+    card_noise_mag1 = 0.2
+    finger_noise_mag = 0.05
+
+    warmup_iters = 100
+    online_iters = 100
+    visualize = False   
+
+    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer = init_env(visualize=visualize, config_path=config_path)
+    sim_device = config['sim_device']
+    
+    n_samples = 5
+    name = "100_100"
+
+    checkpoint_path = fpath / 'card'/'test'/ 'weight_sweep'/f'checkpoint_sweep_turning_{name}.pkl'
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+
+    get_inits(env, sim_device, n_samples, save=True)
+
+    starting_values = {
+        'vf_bounds': [3.65/2, 3.65*2],
+        'other_bounds': [0.1, 5.0],
+        'variance_ratio_bounds': [6.625/2, 6.625*2],
+        'grid_size': 3
+    }
+
+    initial_checkpoint = load_or_create_checkpoint(starting_values)
+    
+    test(initial_checkpoint, n_samples)
