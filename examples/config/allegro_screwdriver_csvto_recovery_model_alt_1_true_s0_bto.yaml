@@ -57,7 +57,7 @@ likelihood_threshold: -175.0
 drop_threshold: -1250
 project_threshold: -105.
 sac_batch_size: 64
-start_ind: 1
+start_ind: 5
 # likelihood_threshold: -16.0
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90

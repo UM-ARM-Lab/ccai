@@ -6,9 +6,9 @@ num_steps: 8
 num_turns: 1
 max_recovery_stages: 4
 num_trials: 10
-num_episodes: 15
+num_episodes: 25
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_model_eval_alt_2_noised_s0_6000_bto_task_diff_goal'
+experiment_name: 'allegro_screwdriver_recovery_model_eval_alt_2_noised_s0_9000_bto_task_diff_goal_use_recovery_diff_traj_20_modes'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -48,9 +48,11 @@ new_projection: True
 trajectory_condition: True
 generate_context: True
 true_s0: False
+task_diffuse_goal: True
+recovery_diff_traj: True
 type: 'diffusion'
-recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_5_10_15_15000_training_no_downsample_balance_new_projection_cpc_cost_diffuse_c_mode_alt_2_noised_s0_6000_diffusion'
-model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_5_10_15_15000_training_no_downsample_balance_new_projection_cpc_cost_diffuse_c_mode_alt_2_noised_s0_6000_diffusion/allegro_screwdriver_diffusion.pt'
+recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_5_10_15_15000_training_no_downsample_balance_new_projection_cpc_cost_diffuse_c_mode_alt_2_noised_s0_9000_diffusion'
+model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_5_10_15_15000_training_no_downsample_balance_new_projection_cpc_cost_diffuse_c_mode_alt_2_noised_s0_9000_diffusion/allegro_screwdriver_diffusion.pt'
 model_dir: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion'
 model_path_orig: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
 likelihood_threshold: -175.0

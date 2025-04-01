@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 15
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_model_eval_alt_2_true_s0_9000_bto'
+experiment_name: 'allegro_screwdriver_recovery_model_eval_alt_2_true_s0_9000_bto_task_diff_goal'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -70,7 +70,7 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:1'
+    device: 'cuda:0'
     online_iters: 20
     warmup_iters: 75
     resample_steps: 16

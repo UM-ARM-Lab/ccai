@@ -45,7 +45,7 @@ def get_args():
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_project_ood_states.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_id_ood_states.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion.yaml')
-    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_5_10_15_7000_training_best_traj_only_diffuse_c_mode_alt_2.yaml')
+    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_recovery_best_traj_only_gen_sim_data.yaml')
     return parser.parse_args()
 
 
@@ -1107,8 +1107,8 @@ if __name__ == "__main__":
                               learn_inverse_dynamics=config['inverse_dynamics'],
                               state_only=config['state_only'], state_control_only=config['state_control_only'],
                               problem=problem_for_sampler if config['state_control_only'] else None,
-                              dropout_p=config['context_dropout_p'], trajectory_condition=config['trajectory_condition'],
-                              true_s0=config['true_s0'], 
+                              dropout_p=config.get('context_dropout_p', .25), trajectory_condition=config.get('trajectory_condition', False),
+                              true_s0=config.get('true_s0', False), 
                               )
 
     data_path = pathlib.Path(f'{CCAI_PATH}/data/training_data/{config["data_directory"]}')
@@ -1249,7 +1249,7 @@ if __name__ == "__main__":
             , map_location=config['device'])
         model.model.diffusion_model.classifier = None
         d = {k:v for k, v in d.items() if 'classifier' not in k}
-        model.load_state_dict(d, strict=False)
+        model.load_state_dict(d, strict=True)
         model.send_norm_constants_to_submodels()
 
 
