@@ -150,7 +150,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                  full_dof_goal=False, 
                  project=False,
                  test_recovery_trajectory=False, **kwargs):
-        self.obj_mass = 0.1335
+        self.obj_mass = 0.0851
         self.obj_dof_type = None
         self.object_type = 'screwdriver'
         if obj_dof == 3:
@@ -194,7 +194,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                                                    **kwargs)
         self.friction_coefficient = friction_coefficient
 
-    def _cost(self, xu, start, goal):
+    def _cost(self, xu, rob_link_pts, nearest_robot_pts, start, goal, projected_diffusion=False):
         # TODO: check if the addtional term of the smoothness cost and running goal cost is necessary
         state = xu[:, :self.dx]  # state dim = 9
         state = torch.cat((start.reshape(1, self.dx), state), dim=0)  # combine the first time step into it
@@ -204,7 +204,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
         if not self.project:
             upright_cost = 500 * torch.sum(
                 (state[:, -self.obj_dof:-1] + goal[-self.obj_dof:-1]) ** 2)  # the screwdriver should only rotate in z direction
-        return smoothness_cost + upright_cost + super()._cost(xu, start, goal)
+        return smoothness_cost + upright_cost + super()._cost(xu, rob_link_pts, nearest_robot_pts, start, goal, projected_diffusion=projected_diffusion)
 
 
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noise=None, noise_noise=None, sim=None, seed=None,
@@ -1760,11 +1760,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     #     num_stages = len(contact_sequence)
     elif not sample_contact:
         contact_sequence = ['turn']
-        for k in range(params['num_turns'] - 1):
-            contact_options = ['index', 'thumb_middle']
-            # perm = np.random.permutation(2)
-            perm = [1, 0]
-            contact_sequence += [contact_options[perm[0]], contact_options[perm[1]], 'turn']
+        num_stages = 1
+        # for k in range(params['num_turns'] - 1):
+        #     contact_options = ['index', 'thumb_middle']
+        #     # perm = np.random.permutation(2)
+        #     perm = [1, 0]
+        #     contact_sequence += [contact_options[perm[0]], contact_options[perm[1]], 'turn']
     else:
         contact_sequence = None
 

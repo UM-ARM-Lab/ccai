@@ -243,14 +243,16 @@ class AllegroScrewDriverDataset(Dataset):
 
                     need_to_continue = False
                     
-                    post_recovery_likelihoods = [i for i in data['final_likelihoods'] if len(i) == 1]
-                    post_recovery_likelihood_bool = []
-                    for fl in post_recovery_likelihoods:
-                        if fl[0] < -1250:
-                            post_recovery_likelihood_bool.append(False)
-                        else:
-                            post_recovery_likelihood_bool.append(True)
+                    dropped_recovery = data['dropped_recovery']
+                    # post_recovery_likelihoods = [i for i in data['final_likelihoods'] if len(i) == 1]
+                    # post_recovery_likelihood_bool = []
+                    # for fl in post_recovery_likelihoods:
+                    #     if fl[0] < -1250:
+                    #         post_recovery_likelihood_bool.append(False)
+                    #     else:
+                    #         post_recovery_likelihood_bool.append(True)
                     for t in range(max_T, min_t - 1, -1):
+
                         # Filter out any trajectories with contact_state [1, 1, 1]
                         new_starts = []
                         for s in data[t]['starts']:
@@ -273,9 +275,18 @@ class AllegroScrewDriverDataset(Dataset):
                                 if torch.is_tensor(c):
                                     c = c.cpu().numpy()
                                 new_cs.append(c)
-                        data[t]['starts'] = np.stack(new_starts, axis=0)[post_recovery_likelihood_bool[-len(new_starts):]]
-                        data[t]['plans'] = np.stack(new_plans, axis=0)[post_recovery_likelihood_bool[-len(new_starts):]]
-                        data[t]['contact_state'] = np.stack(new_cs, axis=0)[post_recovery_likelihood_bool[-len(new_starts):]]
+                        if len(new_starts) == 0:
+                            print('No starts')
+                            need_to_continue = True
+                            break
+                        data[t]['starts'] = np.stack(new_starts, axis=0)
+                        data[t]['plans'] = np.stack(new_plans, axis=0)
+                        data[t]['contact_state'] = np.stack(new_cs, axis=0)
+
+                        if dropped_recovery:
+                            data[t]['starts'] = data[t]['starts'][:-1]
+                            data[t]['plans'] = data[t]['plans'][:-1]
+                            data[t]['contact_state'] = data[t]['contact_state'][:-1]
                         if len(data[t]['starts']) == 0:
                             print('No starts')
                             need_to_continue = True

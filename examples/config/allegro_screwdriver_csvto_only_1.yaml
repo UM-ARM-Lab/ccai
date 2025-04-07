@@ -4,9 +4,9 @@ T_orig: 12
 receding_horizon: False
 num_steps: 12
 num_turns: 2
-num_trials: 90
+num_trials: 360
 visualize: True
-experiment_name: 'allegro_screwdriver_data_gen_pi_2'
+experiment_name: 'allegro_screwdriver_data_gen_pi_2_close_contact'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
@@ -36,8 +36,8 @@ shortcut_trajectory: False
 randomize_obj_start: True
 perturb_action: False
 live_recovery: False
-obj_gravity: False
-start_ind: 270
+obj_gravity: True
+start_ind: 57
 # model_path: 'data/training/allegro_screwdriver/allegro_better_model/allegro_screwdriver_diffusion_w_classifier.pt'
 # model_path: 'data/training/allegro_screwdriver/allegro_test_new_data_augment_angle_diffusion/allegro_screwdriver_diffusion.pt'
 controllers:
@@ -49,7 +49,7 @@ controllers:
     step_size: 0.1
     momentum: 0.
     device: 'cuda:1'
-    online_iters: 35
+    online_iters: 30
     warmup_iters: 150
     resample_steps: 16
     resample_sigma: 0.01

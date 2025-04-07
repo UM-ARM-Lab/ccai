@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 25
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_model_eval_alt_2_noised_s0_9000_bto_task_diff_goal_use_recovery_diff_traj_20_modes'
+experiment_name: 'allegro_screwdriver_recovery_model_fixed_cpc_eval_perturb_during_recovery'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -48,11 +48,12 @@ new_projection: True
 trajectory_condition: True
 generate_context: True
 true_s0: False
-task_diffuse_goal: True
+task_diffuse_goal: False
 recovery_diff_traj: True
+obj_gravity: True
 type: 'diffusion'
-recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_5_10_15_15000_training_no_downsample_balance_new_projection_cpc_cost_diffuse_c_mode_alt_2_noised_s0_9000_diffusion'
-model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_5_10_15_15000_training_no_downsample_balance_new_projection_cpc_cost_diffuse_c_mode_alt_2_noised_s0_9000_diffusion/allegro_screwdriver_diffusion.pt'
+recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_5_10_15_15000_training_fixed_cpc_diffusion'
+model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_5_10_15_15000_training_fixed_cpc_diffusion/allegro_screwdriver_diffusion.pt'
 model_dir: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion'
 model_path_orig: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
 likelihood_threshold: -175.0
@@ -64,6 +65,7 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
+# start_ind: 2
 controllers:
   csvgd:
     # N: 16
@@ -73,8 +75,8 @@ controllers:
     step_size: 0.1
     momentum: 0.
     device: 'cuda:0'
-    online_iters: 20
-    warmup_iters: 75
+    online_iters: 25
+    warmup_iters: 50
     resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1

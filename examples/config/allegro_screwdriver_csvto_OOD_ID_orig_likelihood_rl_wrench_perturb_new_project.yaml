@@ -6,9 +6,9 @@ num_steps: 8
 num_turns: 1
 max_recovery_stages: 4
 num_trials: 10
-num_episodes: 100
+num_episodes: 200
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_data_5_10_15_wrench_perturb_.2_std_link_regrasp_cost_new_projection_.01_cpc_cpc_cost_300_750_honda_mtg_f_1'
+experiment_name: 'allegro_screwdriver_recovery_data_pi_6_fixed_cpc'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -23,7 +23,7 @@ prior: 1
 multi_particle_search: True
 replan: False
 visualize_plan: False
-visualize_recovery_plan: True
+visualize_recovery_plan: False
 visualize_contact_plan: True
 optimize_force: True
 exclude_index: False
@@ -45,10 +45,11 @@ viz_states: False
 diff_init: True
 live_recovery: True
 new_projection: True
+task_diffuse_goal: True
+obj_gravity: True
 type: 'diffusion'
-model_dir: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion'
 model_path: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
-model_path_rl_adjusted: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier_rl_adj.pt'
+model_dir: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion'
 likelihood_threshold: -175.0
 drop_threshold: -1250
 project_threshold: -105.
@@ -57,6 +58,8 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
+start_ind: 400
+end_ind: 600
 controllers:
   csvgd:
     # N: 16
@@ -66,8 +69,8 @@ controllers:
     step_size: 0.1
     momentum: 0.
     device: 'cuda:1'
-    online_iters: 20
-    warmup_iters: 75
+    online_iters: 25
+    warmup_iters: 50
     resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1
