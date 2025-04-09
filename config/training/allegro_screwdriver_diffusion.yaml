@@ -18,7 +18,7 @@ lr: 1.0e-4
 model_type: 'diffusion'
 discriminator_guidance: True
 inverse_dynamics: False
-data_directory: 'allegro_screwdriver_pi_2_task'
+data_directory: 'allegro_screwdriver_data_gen_pi_2_close_contact'
 best_traj_only: False
 device: 'cuda:1'
 test_every: 9999999999

@@ -1,5 +1,5 @@
 ---
-T: 4
+T: 2
 T_orig: 12
 receding_horizon: False
 num_steps: 8
@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 25
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_model_fixed_cpc_eval_no_perturb_during_recovery_orig_contact_random_traj_init'
+experiment_name: 'allegro_screwdriver_safe_rl_recovery_rest_offset_0'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -23,8 +23,8 @@ prior: 1
 multi_particle_search: True
 replan: False
 visualize_plan: False
-visualize_recovery_plan: True
-visualize_contact_plan: True
+visualize_recovery_plan: False
+visualize_contact_plan: False
 optimize_force: True
 exclude_index: False
 projected: False
@@ -49,13 +49,10 @@ trajectory_condition: True
 generate_context: True
 true_s0: False
 task_diffuse_goal: False
-recovery_diff_traj: False
+recovery_diff_traj: True
 obj_gravity: True
 type: 'diffusion'
-recovery_controller: 'csvgd'
-recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_5_10_15_15000_training_fixed_cpc_diffusion'
-model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_5_10_15_15000_training_fixed_cpc_diffusion/allegro_screwdriver_diffusion.pt'
-model_dir: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion'
+model_path: '/home/abhinav/Documents/ccai/ccai/recovery_rl/screwdriver/2025-04-09_08-57-03_SAC_screwdriver_Gaussian_RRL_MB/safety_critic.pt'
 model_path_orig: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
 likelihood_threshold: -175.0
 # likelihood_threshold: -1.0
@@ -66,7 +63,9 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
-# start_ind: 5
+start_ind: 1
+device: 'cuda:0'
+recovery_controller: 'mppi'
 controllers:
   csvgd:
     # N: 16
@@ -75,7 +74,6 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:1'
     online_iters: 25
     warmup_iters: 50
     resample_steps: 16

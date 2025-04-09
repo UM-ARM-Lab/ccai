@@ -977,12 +977,18 @@ class AllegroRegraspProblem(AllegroObjectProblem):
 
         self.do_contact_patch_constraint = False
         if self.full_dof_goal and len(self.regrasp_fingers) > 0:
-            self.default_dof_pos = self.goal[: self.num_fingers * 4]
-            # Pad to length 16
-            # self.default_dof_pos = torch.cat((self.default_dof_pos, torch.tensor([-.4, 0.3, 0.2, 1.]).float().to(device=self.device)))
-            self.default_dof_pos = torch.cat((self.default_dof_pos[:8], torch.tensor([0., 0.5, 0.65, 0.65]).float().to(device=self.device), self.default_dof_pos[8:]))
+            if self.goal is not None:
+                self.default_dof_pos = self.goal[: self.num_fingers * 4]
+                # Pad to length 16
+                # self.default_dof_pos = torch.cat((self.default_dof_pos, torch.tensor([-.4, 0.3, 0.2, 1.]).float().to(device=self.device)))
+                self.default_dof_pos = torch.cat((self.default_dof_pos[:8], torch.tensor([0., 0.5, 0.65, 0.65]).float().to(device=self.device), self.default_dof_pos[8:]))
 
-            self.goal_theta = self.goal[self.num_fingers * 4:]
+                self.goal_theta = self.goal[self.num_fingers * 4:]
+            else:
+                self.goal_q = torch.cat((self.default_dof_pos[0, :8], self.default_dof_pos[0, 12:]))
+                self.goal_theta = torch.zeros(self.obj_dof, device=self.device)
+                self.goal_theta[-1] = start[-1]
+                self.goal = torch.cat((self.goal_q, self.goal_theta), dim=-1)
 
             self._preprocess_fingers(self.goal[: self.num_fingers * 4][None, None], self.goal_theta[None, None], compute_closest_obj_point=True)
 
