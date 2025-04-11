@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 500
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_data_new_perturb_profile'
+experiment_name: 'allegro_screwdriver_recovery_data_new_perturb_profile_perturb_during_recovery_rand_pct_.33_fm_3'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -58,8 +58,8 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
-start_ind: 0
-end_ind: 200
+start_ind: 400
+end_ind: 600
 recovery_controller: 'csvgd'
 controllers:
   csvgd:
@@ -69,7 +69,7 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:0'
+    device: 'cuda:1'
     online_iters: 25
     warmup_iters: 50
     resample_steps: 16
