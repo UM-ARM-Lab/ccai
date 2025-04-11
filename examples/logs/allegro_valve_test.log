@@ -1,0 +1,6 @@
+robot pose [ 0.02  -0.35   0.376] [0, 0, 0.7071068, 0.7071068]
+
+Trial 1
+No action perturbation this trial
+Current yaw: tensor([-0.0059], device='cuda:1')
+Backend TkAgg is interactive backend. Turning interactive mode on.

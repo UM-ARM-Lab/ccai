@@ -47,7 +47,7 @@ def get_args():
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_id_ood_states.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_project_ood_states.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_id_ood_states.yaml')
-    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion.yaml')
+    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_5_10_15_7000_training_best_traj_only_diffuse_c_mode_alt_2.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_recovery_best_traj_only_gen_sim_data.yaml')
     return parser.parse_args()
 

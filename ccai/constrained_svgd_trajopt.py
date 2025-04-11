@@ -234,7 +234,7 @@ class ConstrainedSteinTrajOpt:
         N = xuz.shape[0]
         xuz = xuz.to(dtype=torch.float32)
         J = self.problem.get_cost(xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du])
-        C, dC, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1),
+        C, dC, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1),
                                                      compute_grads=True,
                                                      compute_hess=False)
 

@@ -243,7 +243,7 @@ class AllegroScrewDriverDataset(Dataset):
 
                     need_to_continue = False
                     
-                    dropped_recovery = False#data['dropped_recovery']
+                    dropped_recovery = data['dropped_recovery']
                     # post_recovery_likelihoods = [i for i in data['final_likelihoods'] if len(i) == 1]
                     # post_recovery_likelihood_bool = []
                     # for fl in post_recovery_likelihoods:
@@ -256,20 +256,20 @@ class AllegroScrewDriverDataset(Dataset):
                         # Filter out any trajectories with contact_state [1, 1, 1]
                         new_starts = []
                         for s in data[t]['starts']:
-                            if not (s.sum(0) == 0).any():
+                            if (s.sum(0) == 0).any():
                             # if s.shape[-1] != 36:
                                 new_starts.append(s)
                         new_plans = []
                         for p in data[t]['plans']:
                             # if p.shape[-1] != 36:
                             #     new_plans.append(p)
-                            if not (p.sum(0).sum(0) == 0).any():
+                            if (p.sum(0).sum(0) == 0).any():
                                 new_plans.append(p)
 
                         new_cs = []
                         for c in data[t]['contact_state']:
                             # new_cs.append(c.sum() != 3)
-                            if c.sum() == 3:
+                            if c.sum() != 3:
                                 # if isinstance(c, np.ndarray):
                                 #     c = torch.from_numpy(c).float()
                                 if torch.is_tensor(c):

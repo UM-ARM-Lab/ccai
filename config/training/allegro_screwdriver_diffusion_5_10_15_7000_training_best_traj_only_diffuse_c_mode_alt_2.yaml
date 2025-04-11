@@ -1,5 +1,5 @@
 ---
-model_name: 'allegro_screwdriver_recovery_scratch'
+model_name: 'allegro_screwdriver_perturb_during_recovery'
 T: 5
 dx: 15
 du: 21
@@ -18,7 +18,7 @@ lr: 1.0e-4
 model_type: 'diffusion'
 discriminator_guidance: True
 inverse_dynamics: False
-data_directory: 'allegro_screwdriver_recovery_data_pi_6_fixed_cpc'
+data_directory: 'allegro_screwdriver_recovery_data_new_perturb_profile_perturb_during_recovery'
 device: 'cuda:0'
 test_every: 9999999999
 save_every: 500
