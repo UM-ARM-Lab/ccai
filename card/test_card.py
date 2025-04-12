@@ -59,16 +59,15 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 't_20_100_100'
+    test_name = 'newcost03'
     checkpoint_path = fpath / 'card' /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    warmup_iters = 100
-    online_iters = 100
+    warmup_iters = 36
+    online_iters = 150
 
     n_trials = 20
     n_repeat = 1
-    perception_noise = 0.0
     test_time = False
     vf_times = []
     no_vf_times = []
@@ -84,33 +83,15 @@ if __name__ == '__main__':
 
     card_noise_mag0, card_noise_mag1, finger_noise_mag = 0.06, 0.2, 0.2
 
-    vf_weight_i = 3.65
-    other_weight_i = 5.0
-    variance_ratio_i = 6.625
+    vf_weight_i = 5.0
+    other_weight_i = 2
+    variance_ratio_i = 10
 
-    vf_weight_m = 3.65
-    other_weight_m = 5.0
-    variance_ratio_m = 3.31
+    vf_weight_m = vf_weight_i
+    other_weight_m = other_weight_i
+    variance_ratio_m = variance_ratio_i
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer = init_env(visualize=True, config_path=config_path)
-    # img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/card/imgs/test/trial_{1}')
-    # pathlib.Path.mkdir(img_save_dir, parents=True, exist_ok=True)  
-    # env.frame_fpath = img_save_dir
-    # env.frame_id = 0
-    # initialization = get_initialization(env, None, card_noise_mag0=0.06, card_noise_mag1=0.2, finger_noise_mag=0.2)
-    # final_state, full_traj0 = pull_index(env, config, chain, img_save_dir, warmup_iters, online_iters,
-    #                     model_name = None, mode='no_vf', 
-    #                     # vf_weight = vf_weight_i, other_weight = other_weight_i, variance_ratio = variance_ratio_i,
-    #                     )
-    # final_state, full_traj1 = pull_middle(env, config, chain, img_save_dir, warmup_iters, online_iters,
-    #                 model_name = None, mode='no_vf', 
-    #                 vf_weight = vf_weight_m, other_weight = other_weight_m, variance_ratio = variance_ratio_m,
-    #                 )
-    # final_state, full_traj2 = pull_index(env, config, chain, img_save_dir, warmup_iters, online_iters,
-    #                 model_name = None, mode='no_vf', 
-    #                 # vf_weight = vf_weight_i, other_weight = other_weight_i, variance_ratio = variance_ratio_i,
-    #                 )
-
 
     init_path = fpath / 'card' /'test'/'initializations'/'test_inits.pkl'
 
@@ -121,12 +102,14 @@ if __name__ == '__main__':
                             name='test_inits')
    
     inits = pkl.load(open(init_path, 'rb'))
-   
     init_indices = list(range(n_trials))
     repeat_indices = list(range(n_repeat))
     args = [init_indices, repeat_indices]
 
     checkpoint = load_or_create_checkpoint(checkpoint_path=checkpoint_path, method_names=method_names)
+
+    total_vf_cost = 0
+    total_no_vf_cost = 0
 
     for init_index, repeat_index in product(*args):
         combo_tuple = (init_index, repeat_index)
@@ -144,7 +127,6 @@ if __name__ == '__main__':
         init_pose = inits[init_index]
 
         if calc_vf:
-            
 
             env.reset(dof_pos= init_pose)
         
@@ -168,6 +150,7 @@ if __name__ == '__main__':
             checkpoint['results']['vf'][combo_tuple] = result_vf
 
             cost = calculate_cost(init_pose, final_state)
+            total_vf_cost += cost
             print('---------------------------------')
             print(f"VF cost: {cost}")
 
@@ -192,6 +175,7 @@ if __name__ == '__main__':
             checkpoint['results']['no_vf'][combo_tuple] = result_no_vf
 
             cost = calculate_cost(init_pose, final_state)
+            total_no_vf_cost += cost
             print('---------------------------------')
             print(f"no VF cost: {cost}")
         
@@ -207,4 +191,6 @@ if __name__ == '__main__':
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)
 
+    print(f"Avg VF cost: {total_vf_cost/n_trials/n_repeat}")
+    print(f"Avg No VF cost: {total_no_vf_cost/n_trials/n_repeat}")
     emailer().send()

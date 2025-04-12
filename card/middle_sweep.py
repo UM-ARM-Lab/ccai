@@ -169,9 +169,9 @@ def test(checkpoint, n_samples):
                                 vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio,
                                 )
         
-                turn_cost = calculate_cost(init, final_state)
-                total_cost += turn_cost
-                print(f"Sample {i} -> turn cost: {turn_cost}")
+                cost = calculate_cost(init, final_state)
+                total_cost += cost
+                print(f"Sample {i} -> cost: {cost}")
             
             # Mark this combo as tested
             checkpoint['tested_combinations'][iteration].add(combo_tuple)
@@ -288,17 +288,17 @@ if __name__ == "__main__":
 
     card_noise_mag0 = 0.06
     card_noise_mag1 = 0.2
-    finger_noise_mag = 0.05
+    finger_noise_mag = 0.2
 
-    warmup_iters = 100
-    online_iters = 100
+    warmup_iters = 18
+    online_iters = 75
     visualize = False   
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer = init_env(visualize=visualize, config_path=config_path)
     sim_device = config['sim_device']
     
-    n_samples = 5
-    name = "100_100"
+    n_samples = 3
+    name = "low_iter_newcost_3samps_coarse"
 
     checkpoint_path = fpath / 'card'/'test'/ 'weight_sweep'/f'checkpoint_sweep_turning_{name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -306,9 +306,9 @@ if __name__ == "__main__":
     get_inits(env, sim_device, n_samples, save=True)
 
     starting_values = {
-        'vf_bounds': [3.65/2, 3.65*2],
-        'other_bounds': [0.1, 5.0],
-        'variance_ratio_bounds': [6.625/2, 6.625*2],
+        'vf_bounds': [0.1, 100],
+        'other_bounds': [1, 10],
+        'variance_ratio_bounds': [1, 20],
         'grid_size': 3
     }
 

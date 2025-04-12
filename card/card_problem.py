@@ -351,14 +351,14 @@ if __name__ == "__main__":
     fpath = pathlib.Path(f'{CCAI_PATH}/data')
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer = init_env(visualize=True)
    
-    warmup_iters = 35
-    online_iters = 150
+    warmup_iters = 20
+    online_iters = 20
 
-    vf_weight_i = 0
+    vf_weight_i = 1
     other_weight_i = 10
     variance_ratio_i = 1
 
-    vf_weight_m = 0
+    vf_weight_m = 1
     other_weight_m = 10
     variance_ratio_m = 1
 

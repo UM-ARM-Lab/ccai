@@ -20,8 +20,8 @@ if __name__ == "__main__":
 
     annotate = True
 
-    experiment_names = ['t03'] 
-    budget = "High Budget"
+    experiment_names = ['sanity3'] 
+    budget = "Low Budget"
 
     results = {}
 
@@ -76,6 +76,8 @@ if __name__ == "__main__":
                     results[method_name][(pregrasp_index, repeat_index)]
 
                 d2g = calculate_d2g(initial_state, final_state)     
+                # if method_name == "T.O.":
+                #     print(d2g)
                 all_d2gs.append(d2g)
 
             # Average d2g and standard deviation across repeats

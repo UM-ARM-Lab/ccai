@@ -19,16 +19,17 @@ torch.serialization.default_restore_location = lambda storage, loc: storage.cpu(
 
 def calculate_cost(initial_pose, final_pose):
 
-    card_pose = initial_pose.flatten()[-5]
+    # card_pose = initial_pose.flatten()[-5]
+    # goal = desired_delta + initial_pose.flatten()[-5]
     desired_delta = -0.02*3
-    goal = desired_delta + card_pose
-
-    state = final_pose.flatten()
-
-    goal_cost = ((state[-5] - goal) ** 2)
+    goal = torch.tensor([0, desired_delta + initial_pose.flatten()[-5], 0])
+    # state = final_pose.flatten()[-5]
+    state = torch.tensor(final_pose.flatten())[[-6, -5, -1]]
+    state[:2] = state[:2]*100
+    goal[:2] = goal[:2]*100
+    goal_cost = sum((state - goal) ** 2)
     # goal_cost = sum(goal_cost)
-
-    return goal_cost*1000
+    return goal_cost
 
 if __name__ == "__main__":
 
@@ -83,7 +84,7 @@ if __name__ == "__main__":
                 combined_start_ys.append(start_poses[i][-5])
                 
                 # vis for debug
-                # if cost < 2.0:
+                # if cost > 100.0:
                 #     print(f'Cost: {cost}')
                 #     import time
                 #     traj = traj_index1s[i]
@@ -110,9 +111,12 @@ if __name__ == "__main__":
     combined_costs = np.array(combined_costs)
     combined_start_ys = np.array(combined_start_ys)
 
-    # if combined_index_trajs.shape[0] > 20000:
-    #     combined_index_trajs = combined_index_trajs[:20000]
-    #     combined_middle_trajs = combined_middle_trajs[:10000]
+    if combined_costs.shape[0] > 10000:
+        combined_index1_trajs = combined_index1_trajs[:10000]
+        combined_middle_trajs = combined_middle_trajs[:10000]
+        combined_index2_trajs = combined_index2_trajs[:10000]
+        combined_costs = combined_costs[:10000]
+        combined_start_ys = combined_start_ys[:10000]
 
     index_dataset = zip(combined_index1_trajs, combined_index2_trajs, combined_costs, combined_start_ys)
     middle_dataset = zip(combined_middle_trajs, combined_costs, combined_start_ys)
@@ -126,7 +130,7 @@ if __name__ == "__main__":
     print("num samples: ", len(combined_costs))
     
     plt.figure(figsize=(10, 6))
-    plt.hist(combined_costs.flatten(), bins=20, color='blue', label='Costs')
+    plt.hist(combined_costs.flatten(), bins=30, color='blue', label='Costs')
     plt.xlabel('Cost')
     plt.ylabel('Frequency')
     plt.title('Turn 0 Costs')

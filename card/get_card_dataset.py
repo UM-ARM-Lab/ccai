@@ -48,8 +48,8 @@ if __name__ == "__main__":
             
     prog_id = 0
     trials_per_save = 5
-    warmup_iters = 35
-    online_iters = 150
+    # warmup_iters = 35
+    # online_iters = 150
 
     if len(sys.argv) == 2:
         config_path = f'card{sys.argv[1]}.yaml'

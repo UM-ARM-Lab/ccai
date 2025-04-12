@@ -166,6 +166,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         self.task = task
         if task == 'card':
             from card.train_vf_card_index import load_ensemble, query_ensemble 
+        
         else:
             from _value_function.train_value_function_regrasp import load_ensemble, query_ensemble 
 
@@ -445,12 +446,16 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         
         if self.mode == 'vf':
 
+            smoothness_cost = torch.sum((q[1:] - q[-1]) ** 2)
+            action_cost = torch.sum(delta_q ** 2)
+
             n_steps = q.shape[0]
 
             if self.initial_yaw is not None:
                 yaws = self.initial_yaw.to(device=self.device).repeat(n_steps, 1)
                 q = torch.cat([q, yaws], dim=1)
-            if self.initial_y is not None:
+                print("sd task only")
+            elif self.initial_y is not None:
                 y = self.initial_y.to(device=self.device).repeat(n_steps, 1)
                 q = torch.cat([q, y], dim=1)
 
@@ -467,8 +472,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
             vf_cost = torch.mean(mse) + torch.mean(mean_squared_variance) * self.variance_ratio
 
-            smoothness_cost = torch.sum((q[1:] - q[-1]) ** 2)
-            action_cost = torch.sum(delta_q ** 2)
+            # print("predicted cost: ", torch.mean(vf_output))   
 
             return self.vf_weight*vf_cost + self.other_weight * smoothness_cost + self.other_weight * action_cost
         
