@@ -1,0 +1,18 @@
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+
+Trial 1
+No action perturbation this trial
+Loaded trajectory sampler
+Current yaw: tensor([ 5.5207e-05,  1.3631e-02, -4.8130e-02], device='cuda:1')
+Current yaw: tensor([ 5.5207e-05,  1.3631e-02, -4.8130e-02], device='cuda:1')
+1 turn
+Sampling time 5.3425362799316645
+tensor([ 1.5497e-01,  6.1007e-01,  5.7076e-01,  6.1106e-01, -1.1513e-01,
+         5.4013e-01,  8.8512e-01,  9.3454e-01,  1.2569e+00,  2.2909e-01,
+         2.3290e-01,  1.2085e+00,  5.5207e-05,  1.3631e-02, -4.8130e-02,
+         4.4650e-01], device='cuda:1')
+Likelihood residual: -2.8954925710422685e-06
+Original likelihood: -107.05027770996094
+Adjusted likelihood: -107.05028060545351
+Backend TkAgg is interactive backend. Turning interactive mode on.

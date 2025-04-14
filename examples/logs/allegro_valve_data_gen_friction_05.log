@@ -1,0 +1,71 @@
+Importing module 'gym_38' (/home/abhinav/Documents/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Documents/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.1+cu121
+Device count 2
+/home/abhinav/Documents/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+No ROS install found, continuing
+CCAI_PATH /home/abhinav/Documents/ccai
+robot pose [ 0.02  -0.35   0.376] [0, 0, 0.7071068, 0.7071068]
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+
+Trial 1
+No action perturbation this trial
+Current yaw: tensor([1.2851e-11], device='cuda:1')
+Current yaw: tensor([-0.0046], device='cuda:1')
+1 turn
+tensor([ 0.2949,  0.6226,  0.6781,  0.8535, -0.0502,  0.2696,  0.8984,  0.8013,
+         1.2721, -0.0384,  0.2158,  0.5258, -0.0046], device='cuda:1')
+Solve time for step 1 (global step 0) 18.520537839998724
+Current ori: tensor(-0.0046, device='cuda:1')
+Middle force: tensor([0.3159, 1.6387, 1.1509, 2.7612, 1.3024, 1.6875], device='cuda:1')
+Thumb force: tensor([0.2340, 0.2206, 0.7081, 2.0058, 0.1990, 0.0917], device='cuda:1')
+Index force: tensor([1.3824, 1.7539, 2.2939, 1.0969, 3.3721, 2.1410], device='cuda:1')
+tensor([ 0.3008,  0.6688,  0.6784,  0.8441, -0.0360,  0.2821,  1.0155,  0.6368,
+         1.3670, -0.1050,  0.2943,  0.7230, -0.0851], device='cuda:1')
+Solve time for step 2 (global step 1) 5.308509496011538
+Current ori: tensor(-0.0851, device='cuda:1')
+Middle force: tensor([1.4784, 1.0839, 2.4487, 1.1292, 1.4856], device='cuda:1')
+Thumb force: tensor([0.1373, 0.5375, 1.8387, 0.1372, 0.1358], device='cuda:1')
+Index force: tensor([1.5845, 2.0141, 0.9703, 2.9433, 1.8830], device='cuda:1')
+tensor([ 0.2702,  0.7126,  0.7489,  0.7913,  0.0616,  0.3133,  0.9517,  0.6679,
+         1.4539, -0.1050,  0.3384,  0.8616, -0.2330], device='cuda:1')
+Solve time for step 3 (global step 2) 5.204070792999119
+Current ori: tensor(-0.2330, device='cuda:1')
+Middle force: tensor([0.9408, 2.2160, 0.9576, 1.3699], device='cuda:1')
+Thumb force: tensor([0.5157, 1.7376, 0.0275, 0.0834], device='cuda:1')
+Index force: tensor([1.8392, 0.8789, 2.6336, 1.6323], device='cuda:1')
+tensor([ 0.3134,  0.7621,  0.8844,  0.6577,  0.1399,  0.3464,  0.8968,  0.6956,
+         1.5000, -0.1050,  0.2395,  0.9451, -0.4009], device='cuda:1')
+Solve time for step 4 (global step 3) 4.972055618010927
+Current ori: tensor(-0.4009, device='cuda:1')
+Middle force: tensor([2.0301, 0.7911, 1.1780], device='cuda:1')
+Thumb force: tensor([1.5698, 0.0268, 0.1197], device='cuda:1')
+Index force: tensor([0.7091, 2.3338, 1.5418], device='cuda:1')
+tensor([ 0.3140,  0.8658,  0.9091,  0.5592,  0.1925,  0.3618,  0.9051,  0.7360,
+         1.5000, -0.1050,  0.1681,  1.0777, -0.5596], device='cuda:1')
+Solve time for step 5 (global step 4) 5.361737450992223
+Current ori: tensor(-0.5596, device='cuda:1')
+Middle force: tensor([0.5336, 1.0858], device='cuda:1')
+Thumb force: tensor([0.2211, 0.0526], device='cuda:1')
+Index force: tensor([1.8517, 1.2000], device='cuda:1')
+tensor([ 0.3138,  0.8684,  0.9539,  0.3827,  0.1993,  0.3354,  0.9185,  0.7048,
+         1.5001, -0.1050,  0.2108,  1.0004, -0.5235], device='cuda:1')
+Solve time for step 6 (global step 5) 5.4218364259868395
+Current ori: tensor(-0.5235, device='cuda:1')
+Middle force: tensor([1.0826], device='cuda:1')
+Thumb force: tensor([0.0046], device='cuda:1')
+Index force: tensor([1.2374], device='cuda:1')
+Current yaw: tensor([-0.4548], device='cuda:1')
+{}
+
+Trial 2
+No action perturbation this trial
+Current yaw: tensor([1.2851e-11], device='cuda:1')

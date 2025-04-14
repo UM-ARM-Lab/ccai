@@ -64,6 +64,7 @@ class ConstrainedSteinTrajOpt:
         # dC[inactive_constraint_mask.expand(-1, -1, dC.shape[-1])] = 0
 
         grad_J, hess_J, K, grad_K, C, dC, hess_C, t_mask = self.problem.eval(xuz.to(dtype=torch.float32))
+        self.problem.data = {}
         dC_mask = ~(dC == 0).all(dim=-1)
         dC = dC[dC_mask].reshape(N, -1, dC.shape[-1])
         C = C[dC_mask].reshape(N, -1)
@@ -233,7 +234,7 @@ class ConstrainedSteinTrajOpt:
         N = xuz.shape[0]
         xuz = xuz.to(dtype=torch.float32)
         J = self.problem.get_cost(xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du])
-        C, dC, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1),
+        C, dC, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1),
                                                      compute_grads=True,
                                                      compute_hess=False)
 
@@ -341,6 +342,7 @@ class ConstrainedSteinTrajOpt:
 
         # sort particles by penalty
         xuz = xuz.to(dtype=torch.float32)
+        self.problem.preprocess_from_aug(xuz)
         J = self.problem.get_cost(xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du])
         C, _, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1), compute_grads=False, compute_hess=False)
         penalty = J.reshape(N) + self.penalty * torch.sum(C.reshape(N, -1).abs(), dim=1)

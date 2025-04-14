@@ -50,8 +50,7 @@ class Node:
 class GraphSearch(ContactSampler, AStar):
     def __init__(self, start, model, T, problem_dict, max_depth, heuristic_weight, goal, device,
                  num_samples=16,
-                  *args, initial_run=False, multi_particle=False, prior=0, 
-                  sine_cosine=False, model_orig=None, **kwargs):
+                  *args, initial_run=False, multi_particle=False, prior=0, sine_cosine=False, **kwargs):
         ContactSampler.__init__(self, *args, **kwargs)
 
         self.T = T + 1
@@ -59,8 +58,6 @@ class GraphSearch(ContactSampler, AStar):
         self.start = start
         self.start_yaw = start[14].item()
         self.sine_cosine = sine_cosine
-        self.dx_sine_cosine = 16
-        self.dx_no_sine_cosine = 15
 
         if sine_cosine:
             self.start = self.convert_yaw_to_sine_cosine(self.start)
@@ -68,9 +65,6 @@ class GraphSearch(ContactSampler, AStar):
         self.problem_dict = problem_dict
         self.device = device
         self.model = model
-        self.model_orig = model_orig
-
-        self.recovery = self.model_orig is not None
 
         self.num_samples = num_samples
         self.max_depth = max_depth
@@ -107,14 +101,7 @@ class GraphSearch(ContactSampler, AStar):
                 [0, .45, .1, .45],
                 [0, .45, .45, .1]
             ])
-        elif self.model_orig is not None:
-            prior_tensor = torch.tensor([
-                [.25, .25, .25, .25, .25],
-                [.25, .25, .25, .25, .25],
-                [.25, .25, .25, .25, .25],
-                [.25, .25, .25, .25, .25],
-                [.25, .25, .25, .25, .25],
-            ])
+
         self.markov_chain = MarkovChain(
             prior_tensor
             # torch.tensor([
@@ -127,21 +114,12 @@ class GraphSearch(ContactSampler, AStar):
 
         self.goal = float(goal)
 
-        if self.model_orig is None:
-            self.neighbors_c_states = torch.tensor([
-                [-1., -1, -1],
-                [-1, 1, 1],
-                [1, -1, -1],
-                [1, 1, 1]
-            ]).to(self.device)
-        else:
-            self.neighbors_c_states = torch.tensor([
-                [-1., -1, -1],
-                [-1, 1, 1],
-                [1, -1, -1],
-                [1, 1, -1],
-                [1, -1, 1]
-            ]).to(self.device)
+        self.neighbors_c_states = torch.tensor([
+            [-1., -1, -1],
+            [-1, 1, 1],
+            [1, -1, -1],
+            [1, 1, 1]
+        ]).to(self.device)
         
         self.num_c_states = self.neighbors_c_states.shape[0]
         self.neighbors_c_states_orig = self.neighbors_c_states.clone()
@@ -176,37 +154,9 @@ class GraphSearch(ContactSampler, AStar):
         cosine = state[:, 14]
         return torch.atan2(sine, cosine)
     
-    def get_orig_model_sample(self, end_state, contact_mode):
-        context = torch.tensor(contact_mode).unsqueeze(0).repeat(self.num_samples * end_state.shape[0], 1).to(self.device)
-        samples, _, likelihood = self.model_orig.sample(N=self.num_samples * end_state.shape[0], start=end_state.repeat_interleave(self.num_samples, 0).to(self.device),
-                                H=self.model_orig.T, constraints=context)
-        mean_likelihood = likelihood.reshape(end_state.shape[0], self.num_samples).mean(1)
-
-        return samples, mean_likelihood
-
     def _goal_reached(self, current):
-        if not self.recovery:
-            yaw = self.get_expected_yaw(current)
-            return yaw, yaw <= self.goal
-        elif current.trajectory.shape[1] == 0:
-            return -np.inf, False
-        else:
-            contact_mode = current.contact_sequence[-1]
-            end_state = current.trajectory[:, -1, :self.dx_sine_cosine]
-            likelihood_for_average = self.normalize_likelihood(current.likelihoods)
-            _, mean_likelihood = self.get_orig_model_sample(end_state, contact_mode)
-            mean_likelihood = (mean_likelihood.cpu() * likelihood_for_average).sum().item()
-            return mean_likelihood, mean_likelihood >= self.goal
-            # Turn into context tensor
-
-    def get_goal_config(self, current):
-        if current.trajectory.shape[1] == 0:
-            return self.start
-        end_state = current.trajectory[:, -1, :self.dx_sine_cosine]
-        end_state = self.convert_sine_cosine_to_yaw(end_state)
-        likelihood_for_average = self.normalize_likelihood(current.likelihoods)
-        average_end_state = (end_state.cpu() * likelihood_for_average.unsqueeze(-1)).sum(0)
-        return average_end_state
+        yaw = self.get_expected_yaw(current)
+        return yaw, yaw <= self.goal
 
     def is_goal_reached(self, current, goal):
         self.iter += 1
@@ -255,8 +205,7 @@ class GraphSearch(ContactSampler, AStar):
             # last_state = node.trajectory[:, -1, :15]
             last_state = node.trajectory[:, -1, :self.dx]
         last_state = last_state.to(self.device)
-        num_modes = self.num_c_states - 1
-        samples, _, likelihood = self.model.sample(N=num_modes*self.num_samples * self.num_samples_multi, start=last_state.reshape(self.num_samples, -1).repeat(num_modes*self.num_samples_multi, 1),
+        samples, _, likelihood = self.model.sample(N=3*self.num_samples * self.num_samples_multi, start=last_state.reshape(self.num_samples, -1).repeat(3*self.num_samples_multi, 1),
                                     H=self.T, constraints=self.neighbors_c_states[self.num_samples*self.num_samples_multi:])
         
 
@@ -272,20 +221,19 @@ class GraphSearch(ContactSampler, AStar):
             mask, mask_no_z, mask_without_z = self.c_state_mask(c_state)
             problem = self.problem_dict[c_state]
             sample_range_mask = samples[sample_range][: , :, mask_without_z]
+            problem._preprocess(sample_range_mask, projected_diffusion=True)
+
+            J, _, _ = problem._objective(sample_range_mask)
+
             likelihood_this_c = likelihood[sample_range] * self.discount ** (len(cur_seq) - 1 * self.initial_run)
-            if not self.recovery:
-                problem._preprocess(sample_range_mask, projected_diffusion=True)
-
-                J, _, _ = problem._objective(sample_range_mask)
-
             print('likelihood', c_state, likelihood[sample_range])
             # Add node's likelihood to likelihood_this_c
             if node.likelihoods is not None:
                 likelihood_this_c += node.likelihoods.repeat(self.num_samples_multi).to(likelihood_this_c.device)
             # likelihood_this_c = constraint_val
             # top_likelihoods = torch.topk(likelihood_this_c, k=self.num_samples, largest=True)
-            probs = self.normalize_likelihood(likelihood_this_c)
             if self.multi_particle:
+                probs = self.normalize_likelihood(likelihood_this_c)
                 # print(probs)
                 # Sample from the probs
                 top_likelihoods = torch.multinomial(probs, self.num_samples, replacement=True)
@@ -293,19 +241,12 @@ class GraphSearch(ContactSampler, AStar):
                 top_samples = samples[sample_range][top_likelihoods]
                 top_samples_orig = samples_orig[sample_range][top_likelihoods]
 
-                if self.recovery:
-                    _, l = self.get_orig_model_sample(top_samples_orig[:, -1, :self.dx_sine_cosine], c_state)
-                    J = self.goal - l
-                
                 # print(likelihood[sample_range].max().item())
                 # min_violation_ind = top_likelihoods.indices[0]
                 # min_violation_ind = torch.argmin(constraint_val)
                 sample_likelihoods = likelihood_this_c[top_likelihoods].cpu()
                 likelihood_for_average = self.normalize_likelihood(likelihood_this_c[top_likelihoods])
                 cost = (J[top_likelihoods] * likelihood_for_average).sum().item()
-                
-                if self.recovery:
-                    cost -= likelihood[sample_range][top_likelihoods].mean().item()
                 traj_this_step = top_samples_orig
 
                 prior_traj_indices = self.neighbors_c_states_indices[top_likelihoods.cpu()]
@@ -314,12 +255,8 @@ class GraphSearch(ContactSampler, AStar):
             else:
                 # Select argmax likelihood_this_c
                 min_violation_ind = torch.argmax(likelihood_this_c)
+                cost = J[min_violation_ind].item()
                 traj_this_step = samples_orig[sample_range][min_violation_ind]
-                if not self.recovery:
-                    cost = J[min_violation_ind].item()
-                else:
-                    _, cost = self.goal - self.get_orig_model_sample(traj_this_step[-1, :self.dx_sine_cosine], c_state)
-
                 sample_likelihoods = likelihood_this_c[min_violation_ind].cpu()
                 # Ensure that the sample_likelihood is a vector
                 if len(sample_likelihoods.shape) == 0:
@@ -337,8 +274,6 @@ class GraphSearch(ContactSampler, AStar):
         return n2.cost - n1.cost
 
     def heuristic_cost_estimate(self, current, goal):
-        if self.recovery:
-            return 0
         if current.trajectory.shape[0] == 0:
             return self.heuristic_weight * max(0, self.start_yaw - self.goal)
         c_seq = [((np.array(i) + 1) /2).sum().astype(int) for i in current.contact_sequence]
@@ -387,8 +322,6 @@ class GraphSearch(ContactSampler, AStar):
     def sample(self, T, c0, xu0, budget):
         for iter in range(budget):
             pass
-
-
 class GraphSearchCard(ContactSampler, AStar):
     def __init__(self, start, dx, model, T, problem_dict, max_depth, heuristic_weight, goal, device,
                  num_samples=16,

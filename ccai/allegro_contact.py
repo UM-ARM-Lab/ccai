@@ -181,6 +181,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         self.obj_ori_rep = obj_ori_rep
         self.obj_joint_dim = obj_joint_dim
         self.object_location = object_location
+        self.robot_dof = 4 * self.num_fingers
         self.alpha = 10
         self.d = 32 + self.obj_dof
         self._base_dz = self.num_fingers * 8
@@ -229,6 +230,43 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             'ring': 'allegro_hand_kusuri_finger_finger_2_aftc_base_link',
             'thumb': 'allegro_hand_oya_finger_3_aftc_base_link',
         }
+
+        self.collision_link_names = {
+            'index':
+            ['allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
+             'allegro_hand_hitosashi_finger_finger_link_3',
+             'allegro_hand_hitosashi_finger_finger_link_2',
+             'allegro_hand_hitosashi_finger_finger_link_1',
+             'allegro_hand_hitosashi_finger_finger_link_0'],
+             'middle':
+            ['allegro_hand_naka_finger_finger_1_aftc_base_link',
+             'allegro_hand_naka_finger_finger_link_7',
+             'allegro_hand_naka_finger_finger_link_6',
+             'allegro_hand_naka_finger_finger_link_5',
+             'allegro_hand_naka_finger_finger_link_4'],
+                'ring':
+            ['allegro_hand_kusuri_finger_finger_2_aftc_base_link',
+                'allegro_hand_kusuri_finger_finger_link_11',
+                'allegro_hand_kusuri_finger_finger_link_10',
+                'allegro_hand_kusuri_finger_finger_link_9',
+                'allegro_hand_kusuri_finger_finger_link_8'],
+                'thumb':
+            ['allegro_hand_oya_finger_3_aftc_base_link',
+            'allegro_hand_oya_finger_link_15',
+            'allegro_hand_oya_finger_link_14',
+            'allegro_hand_oya_finger_link_13',
+            'allegro_hand_oya_finger_link_12'],
+        }
+        # self.collision_link_names = {
+        #     'index':
+        #     ['allegro_hand_hitosashi_finger_finger_0_aftc_base_link'],
+        #      'middle':
+        #     ['allegro_hand_naka_finger_finger_1_aftc_base_link'],
+        #         'ring':
+        #     ['allegro_hand_kusuri_finger_finger_2_aftc_base_link'],
+        #         'thumb':
+        #     ['allegro_hand_oya_finger_3_aftc_base_link'],
+        # }
         self.ee_link_idx = {finger: chain.frame_to_idx[ee_name] for finger, ee_name in self.ee_names.items()}
         self.frame_indices = torch.tensor([self.ee_link_idx[finger] for finger in self.fingers])
 
@@ -238,16 +276,22 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             asset_object = get_assets_dir() + '/valve/valve_cuboid.urdf'
         elif object_type == 'cylinder_valve':
             asset_object = get_assets_dir() + '/valve/valve_cylinder.urdf'
+        elif object_type == 'valve':
+            asset_object = get_assets_dir() + '/valve/valve_cross.urdf'
         elif object_type == 'screwdriver':
             asset_object = get_assets_dir() + '/screwdriver/screwdriver.urdf'
         elif object_type == "card":
             asset_object = get_assets_dir() + '/card/card.urdf'
+        elif object_type == "peg":
+            asset_object = get_assets_dir() + '/peg/short_peg.urdf'
         self.object_asset_pos = object_asset_pos
         self.moveable_object = moveable_object
         chain_object = pk.build_chain_from_urdf(open(asset_object).read())
         chain_object = chain_object.to(device=device)
         if 'valve' in object_type:
             object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/valve',
+                                     use_collision_geometry=True)
+            object_sdf_for_viz = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/valve',
                                      use_collision_geometry=False)
         elif 'screwdriver' in object_type:
             object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver',
@@ -257,6 +301,11 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         elif 'card' in object_type:
             object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/card',
                                      use_collision_geometry=False)
+        elif 'peg' in object_type:
+            object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/peg',
+                                     use_collision_geometry=True)
+            object_sdf_for_viz = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/peg',
+                                     use_collision_geometry=False)
         self.object_sdf = object_sdf
         robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models',
                                 use_collision_geometry=False)
@@ -265,21 +314,32 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         screwdriver_origin_to_world_trans = pk.Transform3d(device='cpu').translate(object_asset_pos[0], object_asset_pos[1], object_asset_pos[2] + .1 + 0.412*2.54/100)
         scene_trans = world_trans.inverse().compose(obj_to_world_trans)
         object_to_hand_trans = world_trans.inverse().compose(screwdriver_origin_to_world_trans)
-
+        if self.obj_dof == 3:
+            object_link_name = 'screwdriver_body'
+        elif self.obj_dof == 1:
+            object_link_name = 'valve'
+        elif self.obj_dof == 6:
+            object_link_name = 'peg'
+        self.obj_link_name = object_link_name
         # Object to robot transform
         # robot_minus_object = world_trans.to(device=device).compose(obj_to_world_trans.to(device=device).inverse())
         # print(robot_minus_object.get_matrix())
         # contact checking
-        collision_check_links = [self.ee_names[finger] for finger in self.fingers]
+        # collision_check_links = [self.ee_names[finger] for finger in self.fingers]
+        collision_check_links = sum([self.collision_link_names[finger] for finger in self.fingers], [])
         self.contact_scenes = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
                                             collision_check_links=collision_check_links,
                                             softmin_temp=1.0e3,
-                                            points_per_link=1000,
+                                            points_per_link=750,
+                                            links_per_finger=len(self.collision_link_names['index']),
+                                            obj_link_name=self.obj_link_name
                                             )
         self.contact_scenes_for_viz = pv.RobotScene(robot_sdf, object_sdf_for_viz, scene_trans,
                                             collision_check_links=collision_check_links,
                                             softmin_temp=1.0e3,
-                                            points_per_link=1000,
+                                            points_per_link=750,
+                                            links_per_finger=len(self.collision_link_names['index']),
+                                            obj_link_name=self.obj_link_name
                                             )
 
         # self.contact_scenes.visualize_robot(torch.zeros(16).to(self.device), self.start[4*self.num_fingers:].to(self.device))
@@ -322,8 +382,8 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
         #### functorch functions ######
         self.grad_kernel = jacrev(rbf_kernel, argnums=0)
-        self.cost = vmap(partial(self._cost, start=self.start, goal=self.goal), randomness='same')
-        self.grad_cost = vmap(jacrev(partial(self._cost, start=self.start, goal=self.goal)), randomness='same')
+        self.cost = vmap(partial(self._cost, start=self.start, goal=self.goal, ), randomness='same')
+        self.grad_cost = vmap(jacrev(partial(self._cost, start=self.start, goal=self.goal), argnums=(0, 1, 2)), randomness='same')
         self.hess_cost = vmap(hessian(partial(self._cost, start=self.start, goal=self.goal)), randomness='same')
         self.singularity_constr = vmap(self._singularity_constr)
         self.grad_singularity_constr = vmap(jacrev(self._singularity_constr))
@@ -367,12 +427,28 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             theta_obj_joint = torch.zeros((theta_b.shape[0], self.obj_joint_dim),
                                           device=theta_b.device)  # add an additional dimension for the cap of the screw driver
             # the cap does not matter for the task, but needs to be included in the state for the model
-            theta_b = torch.cat((theta_b, theta_obj_joint), dim=1)
+            if self.obj_link_name == 'screwdriver_body':
+                theta_b = torch.cat((theta_b, theta_obj_joint), dim=1)
         full_q = partial_to_full_state(q_b, fingers=self.fingers)
-        ret_scene = self.contact_scenes.scene_collision_check(full_q, theta_b,
-                                                              compute_gradient=True,
-                                                              compute_hessian=False,
-                                                              compute_closest_obj_point=compute_closest_obj_point)
+        if compute_closest_obj_point:
+            ret_scene = self.contact_scenes.scene_collision_check(full_q, theta_b,
+                                                                compute_gradient=True,
+                                                                compute_hessian=False,
+                                                                compute_closest_obj_point=compute_closest_obj_point)
+        elif self.full_dof_goal:
+            ret_scene = self.contact_scenes.scene_collision_check(full_q, theta_b,
+                                                                compute_gradient=True,
+                                                                compute_hessian=True,
+                                                                compute_closest_obj_point=compute_closest_obj_point,
+                                                                rob_link_idx=self.rob_link_idx)
+        else:
+            ret_scene = self.contact_scenes.scene_collision_check(full_q, theta_b,
+                                                                compute_gradient=True,
+                                                                compute_hessian=False,
+                                                                compute_closest_obj_point=compute_closest_obj_point)
+        self.rob_link_pts = []
+        rob_link_idx = []
+        self.nearest_robot_pts = []
         for i, finger in enumerate(self.fingers):
             self.data[finger] = {}
             self.data[finger]['sdf'] = ret_scene['sdf'][:, i].reshape(N, T + 1)
@@ -401,6 +477,24 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             d_contact_loc_denv_q = d_contact_loc_denv_q[:, i, :, :obj_dof].reshape(N, T + 1, 3, obj_dof)
             self.data[finger]['closest_pt_env_q_grad'] = d_contact_loc_denv_q
 
+            d_contact_loc_dq_scene = ret_scene.get('closest_pt_q_grad_object', None)
+            if d_contact_loc_dq_scene is not None:
+                d_contact_loc_dq_scene = d_contact_loc_dq_scene[:, i].reshape(N, T + 1, 3, 16)
+                self.data[finger]['closest_pt_q_grad_object'] = d_contact_loc_dq_scene
+            d_contact_loc_denv_q_scene = ret_scene.get('closest_pt_env_q_grad_object', None)
+            if d_contact_loc_denv_q_scene is not None:
+                d_contact_loc_denv_q_scene = d_contact_loc_denv_q_scene[:, i, :, :obj_dof].reshape(N, T + 1, 3, obj_dof)
+                self.data[finger]['closest_pt_env_q_grad_object'] = d_contact_loc_denv_q_scene
+
+            d_contact_loc_dq_link = ret_scene.get('closest_pt_q_grad_link', None)
+            if d_contact_loc_dq_link is not None:
+                d_contact_loc_dq_link = d_contact_loc_dq_link[:, i].reshape(N, T + 1, 3, 16)
+                self.data[finger]['closest_pt_q_grad_link'] = d_contact_loc_dq_link
+            d_contact_loc_denv_q_link = ret_scene.get('closest_pt_env_q_grad_link', None)
+            if d_contact_loc_denv_q_link is not None:
+                d_contact_loc_denv_q_link = d_contact_loc_denv_q_link[:, i, :, :obj_dof].reshape(N, T + 1, 3, obj_dof)
+                self.data[finger]['closest_pt_env_q_grad_link'] = d_contact_loc_denv_q_link
+
             # gradient of contact normal
             self.data[finger]['dnormal_dq'] = ret_scene['dnormal_dq'][:, i].reshape(N, T + 1, 3, 16)  # [:, :, :,
             # self.all_joint_index]
@@ -410,26 +504,66 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             dJ_dq = contact_hessian
             self.data[finger]['dJ_dq'] = dJ_dq  # Jacobian of the contact point
             if compute_closest_obj_point:
-                self.data[finger]['closest_obj_pt_scene_frame'] = ret_scene['closest_obj_pt_scene_frame'][:, i]
+                self.data[finger]['closest_obj_pt_object'] = ret_scene['closest_obj_pt_object'][:, i]
             
-            self.data[finger]['closest_rob_pt_scene_frame'] = ret_scene['closest_rob_pt_scene_frame'][:, i]
-            
+            self.data[finger]['closest_rob_pt_object'] = ret_scene['closest_rob_pt_object'][:, i]
+            if finger in self.regrasp_fingers and self.full_dof_goal:
+                self.data[finger]['closest_rob_pt_link'] = ret_scene['closest_rob_pt_link'][:, i].reshape(q.shape[0], T+1, 3)
+                self.rob_link_pts.append(self.data[finger]['closest_rob_pt_link'])
+                self.nearest_robot_pts.append(self.data[finger]['closest_rob_pt_object'].reshape(q.shape[0], T+1, 3))
+            if self.full_dof_goal and compute_closest_obj_point:
+                rob_link_idx.append(ret_scene['closest_pt_closest_link'][:, i])
 
-    def _cost(self, xu, start, goal):
+        if len(self.regrasp_fingers) > 0 and self.full_dof_goal:
+            self.rob_link_pts = torch.stack(self.rob_link_pts, dim=1)  # N x num_fingers x T x 3
+            if compute_closest_obj_point:
+                self.rob_link_idx = torch.stack(rob_link_idx).flatten()  # N x num_fingers x T
+            self.nearest_robot_pts = torch.stack(self.nearest_robot_pts, dim=1)  # N x num_fingers x T x 3
+
+    def _cost(self, xu, rob_link_pts, nearest_robot_pts, start, goal, projected_diffusion=False):
         start_q = partial_to_full_state(start[None, :self.num_fingers * 4], self.fingers)[:, self.all_joint_index]
         q = partial_to_full_state(xu[:, :self.num_fingers * 4], self.fingers)[:, self.all_joint_index]
         q = torch.cat((start_q, q), dim=0)
         delta_q = partial_to_full_state(xu[:, self.dx:self.dx + 4 * self.num_fingers], self.fingers)
 
-        smoothness_cost = 10 * torch.sum((q[1:] - q[-1]) ** 2)
-        action_cost = 10 * torch.sum(delta_q ** 2)
+        cost_weight = 10
+        if len(self.regrasp_fingers) > 0:
+            cost_weight = 3
+
+        smoothness_cost = cost_weight * torch.sum((q[1:] - q[-1]) ** 2)
+        action_cost = cost_weight * torch.sum(delta_q ** 2)
         return smoothness_cost + action_cost
 
-    def _objective(self, x):
+
+    def process_cost_grads(self, grad, grad_J, closest_pt_q_grad_name, closest_pt_env_q_grad_name, projected_diffusion=False):
+        T_offset = 0 if projected_diffusion else 1
+        grad_dx = torch.zeros_like(grad_J)
+
+        grad = grad[:, :, T_offset:]
+        for i, finger_name in enumerate(self.regrasp_fingers):
+            this_finger_grad = grad[:, i]
+            grad_ee_q = self.data[finger_name][closest_pt_q_grad_name][:, T_offset:]
+            grad_ee_env_q = self.data[finger_name][closest_pt_env_q_grad_name][:, T_offset:]
+            grad_ee_full_q = torch.cat((grad_ee_q, grad_ee_env_q), dim=-1)
+
+            grad_h_full_q = torch.einsum('abc, abcd -> abd', this_finger_grad, grad_ee_full_q)
+            grad_dx[..., :grad_h_full_q.shape[-1]] += grad_h_full_q
+
+        return grad_dx
+
+    def _objective(self, x, projected_diffusion=False):
+        T_offset = 0 if projected_diffusion else 1
         x = x[:, :, :self.dx + self.du]
         N = x.shape[0]
-        J, grad_J = self.cost(x), self.grad_cost(x)
-
+        J = self.cost(x, self.rob_link_pts, self.nearest_robot_pts)
+        
+        grad_J, grad_rob_link_pts, grad_nearest_robot_pts = self.grad_cost(x, self.rob_link_pts, self.nearest_robot_pts)
+        if self.full_dof_goal:
+            grad_rob_link_pts_dx = self.process_cost_grads(grad_rob_link_pts, grad_J, 'closest_pt_q_grad_link', 'closest_pt_env_q_grad_link', projected_diffusion=projected_diffusion)
+            grad_nearest_robot_pts_dx = 0 #self.process_cost_grads(grad_nearest_robot_pts, grad_J, 
+                # 'closest_pt_q_grad_object', 'closest_pt_env_q_grad_object', projected_diffusion=projected_diffusion)
+            grad_J = grad_J + grad_rob_link_pts_dx + grad_nearest_robot_pts_dx
+            # 
         # x_for_diff = x.clone().detach()
         # x_for_diff.requires_grad_(True)
         # if self.project:
@@ -537,8 +671,9 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         ee_locs = []
 
         for finger in self.regrasp_fingers:
-            ee_locs.append(robot_trans[self.ee_names[finger]].get_matrix()[:, :3, -1])
+            pos = robot_trans[self.ee_names[finger]].get_matrix()[:, :3, -1]
 
+            ee_locs.append(pos)
         ee_locs = torch.stack(ee_locs, dim=1)
 
         # convert to scene base frame
@@ -551,6 +686,31 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             _q_env.reshape(-1, _q_env.shape[-1]))
 
         ee_locs = object_trans[self.obj_link_name].inverse().transform_points(ee_locs)
+
+        if self.full_dof_goal:
+            rpys = []
+            for finger in self.regrasp_fingers:
+
+                T = robot_trans[self.ee_names[finger]]
+                # T_1 = self.contact_scenes.scene_transform.inverse().compose(T)
+
+                # object_trans = self.contact_scenes.scene_sdf.chain.forward_kinematics(
+                # _q_env.reshape(-1, _q_env.shape[-1]))
+
+                # T_2 = object_trans[self.obj_link_name].inverse().compose(T_1)
+                # # if full_dof_goal, include orientation as roll pitch yaw
+                # T_matrix = T_2.get_matrix()
+                # R = T_matrix[:, :3, :3]
+
+                R = T.get_matrix()[:, :3, :3]  # get rotation matrix from the transformation matrix
+                
+                # convert to euler angles
+                rpy = pk.transforms.matrix_to_euler_angles(R, 'ZYZ')
+                rpys.append(rpy)
+            rpys = torch.stack(rpys, dim=1)
+            ee_locs = torch.cat((ee_locs, rpys), dim=-1)
+            return ee_locs.reshape(q_rob.shape[:-1] + (self.num_regrasps, 6))
+
 
         return ee_locs.reshape(q_rob.shape[:-1] + (self.num_regrasps, 3))
     
@@ -634,6 +794,14 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         x_axis = x_axis / torch.norm(x_axis, dim=1, keepdim=True)
         R = torch.stack((x_axis, y_axis, z_axis), dim=2)
         return R
+    
+    def preprocess_from_aug(self, augmented_trajectory):
+        N = augmented_trajectory.shape[0]
+        augmented_trajectory = augmented_trajectory.clone().reshape(N, self.T, -1)
+        x = augmented_trajectory[:, :, :self.dx + self.du]
+
+        # preprocess fingers
+        self._preprocess(x)
 
     def eval(self, augmented_trajectory):
         N = augmented_trajectory.shape[0]
@@ -670,7 +838,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
         # update functions that require start
         self.cost = vmap(partial(self._cost, start=self.start, goal=self.goal), randomness='same')
-        self.grad_cost = vmap(jacrev(partial(self._cost, start=self.start, goal=self.goal)), randomness='same')
+        self.grad_cost = vmap(jacrev(partial(self._cost, start=self.start, goal=self.goal), argnums=(0, 1, 2)), randomness='same')
         self.hess_cost = vmap(hessian(partial(self._cost, start=self.start, goal=self.goal)), randomness='same')
 
         if T is not None:
@@ -678,21 +846,34 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.dh = self.dh_per_t * T + self.dh_constant  # inequality
             self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
         if self.full_dof_goal and len(self.regrasp_fingers) > 0:
-            self.default_dof_pos = self.goal[: self.num_fingers * 4]
-            # Pad to length 16
-            # self.default_dof_pos = torch.cat((self.default_dof_pos, torch.tensor([-.4, 0.3, 0.2, 1.]).float().to(device=self.device)))
-            self.default_dof_pos = torch.cat((self.default_dof_pos[:8], torch.tensor([0., 0.5, 0.65, 0.65]).float().to(device=self.device), self.default_dof_pos[8:]))
+            if self.goal is not None:
+                self.default_dof_pos = self.goal[: self.num_fingers * 4]
+                # Pad to length 16
+                # self.default_dof_pos = torch.cat((self.default_dof_pos, torch.tensor([-.4, 0.3, 0.2, 1.]).float().to(device=self.device)))
+                self.default_dof_pos = torch.cat((self.default_dof_pos[:8], self.default_dof_pos_backup[8:12], self.default_dof_pos[8:]))
 
-            self.goal_theta = self.goal[self.num_fingers * 4:]
+                self.goal_theta = self.goal[-self.obj_dof:]
+            else:
+                self.goal_q = torch.cat((self.default_dof_pos[0, :8], self.default_dof_pos[0, 12:]))
+                self.goal_theta = torch.zeros(self.obj_dof, device=self.device)
+                self.goal_theta[-1] = start[-1]
+                self.goal = torch.cat((self.goal_q, self.goal_theta), dim=-1)
 
             self._preprocess_fingers(self.goal[: self.num_fingers * 4][None, None], self.goal_theta[None, None], compute_closest_obj_point=True)
 
             self.contact_points = {}
+            self.contact_points_rob_link = []
 
             for finger in self.regrasp_fingers:
-                self.contact_points[finger] = (self.data[finger]['closest_obj_pt_scene_frame'].detach(), .015)
+                rad = .0025# if finger != 'index' else .005
+                self.contact_points[finger] = (self.data[finger]['closest_obj_pt_object'].clone().detach(), rad)
+                self.contact_points_rob_link.append(self.data[finger]['closest_rob_pt_link'].clone().detach())
+            self.contact_points_rob_link = torch.cat(self.contact_points_rob_link, dim=0)
 
-            contact_points_object = torch.stack([self.contact_points[finger][0] for finger in self.regrasp_fingers], dim=1)
+            contact_points_object = torch.stack([self.contact_points[finger][0] for finger in self.regrasp_fingers], dim=0)
+            self.contact_points_object = contact_points_object
+
+            self.do_contact_patch_constraint = True
 
         if self.num_regrasps > 0:
             if self.full_dof_goal and contact_points_object is not None:
@@ -803,35 +984,51 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         # self._regrasp_dh += self.num_regrasps
         self._regrasp_dh_constant = 0
         self._regrasp_dh_per_t = self._regrasp_dz
+        if self.object_type == 'screwdriver':
+            self.default_dof_pos_backup = torch.cat((torch.tensor([[0.1, 0.5, 0.5, 0.5]]).float().to(device=self.device),
+                                            torch.tensor([[-0.1, 0.5, 0.65, 0.65]]).float().to(device=self.device),
+                                            torch.tensor([[0., 0.5, 0.65, 0.65]]).float().to(device=self.device),
+                                            torch.tensor([[1.2, 0.3, 0.2, 1.]]).float().to(device=self.device)),
+                                            dim=1).to(self.device).reshape(-1)
+        elif self.object_type == 'valve':
+            self.default_dof_pos_backup = torch.cat((torch.tensor([[0.3, 0.55, 0.7, 0.8]]).float(),
+                                        torch.tensor([[-0.1, 0.2, 0.9, 0.8]]).float(),
+                                        torch.tensor([[0.0, 0.0, 0.0, 0.0]]).float(),
+                                        torch.tensor([[1.0, 0.1, 0.3, 1.0]]).float()),
+                                        dim=1).to(self.device).reshape(-1)
+        else:
+            raise NotImplementedError(f"Object type {self.object_type} not supported")
 
 
         if default_dof_pos is None:
-            self.default_dof_pos = torch.cat((torch.tensor([[0.1, 0.5, 0.5, 0.5]]).float().to(device=self.device),
-                                              torch.tensor([[-0.1, 0.5, 0.65, 0.65]]).float().to(device=self.device),
-                                              torch.tensor([[0., 0.5, 0.65, 0.65]]).float().to(device=self.device),
-                                              torch.tensor([[1.2, 0.3, 0.2, 1.]]).float().to(device=self.device)),
-                                             dim=1).to(self.device).reshape(-1)
+            self.default_dof_pos = self.default_dof_pos_backup
         else:
             self.default_dof_pos = default_dof_pos.to(self.device)
 
         self.do_contact_patch_constraint = False
         if self.full_dof_goal and len(self.regrasp_fingers) > 0:
-            self.default_dof_pos = self.goal[: self.num_fingers * 4]
-            # Pad to length 16
-            # self.default_dof_pos = torch.cat((self.default_dof_pos, torch.tensor([-.4, 0.3, 0.2, 1.]).float().to(device=self.device)))
-            self.default_dof_pos = torch.cat((self.default_dof_pos[:8], torch.tensor([0., 0.5, 0.65, 0.65]).float().to(device=self.device), self.default_dof_pos[8:]))
+            if self.goal is not None:
+                self.default_dof_pos = self.goal[: self.num_fingers * 4]
+                # Pad to length 16
+                # self.default_dof_pos = torch.cat((self.default_dof_pos, torch.tensor([-.4, 0.3, 0.2, 1.]).float().to(device=self.device)))
+                self.default_dof_pos = torch.cat((self.default_dof_pos[:8], self.default_dof_pos_backup[8:12], self.default_dof_pos[8:]))
 
-            self.goal_theta = self.goal[self.num_fingers * 4:]
+                self.goal_theta = self.goal[-self.obj_dof:]
+            else:
+                self.goal_q = torch.cat((self.default_dof_pos[0, :8], self.default_dof_pos[0, 12:]))
+                self.goal_theta = torch.zeros(self.obj_dof, device=self.device)
+                self.goal_theta[-1] = start[-1]
+                self.goal = torch.cat((self.goal_q, self.goal_theta), dim=-1)
 
             self._preprocess_fingers(self.goal[: self.num_fingers * 4][None, None], self.goal_theta[None, None], compute_closest_obj_point=True)
 
             self.contact_points = {}
+            self.contact_points_rob_link = []
 
-            for finger in regrasp_fingers:
-                self.contact_points[finger] = (self.data[finger]['closest_obj_pt_scene_frame'].detach(), .015)
+            self.contact_points_rob_link = torch.cat(self.contact_points_rob_link, dim=0)
 
-            contact_points_object = torch.stack([self.contact_points[finger][0] for finger in regrasp_fingers], dim=1)
-            self._regrasp_dz += self.num_regrasps  # Contact region constraint
+            contact_points_object = torch.stack([self.contact_points[finger][0] for finger in self.regrasp_fingers], dim=0)
+            self.contact_points_object = contact_points_object
             self._regrasp_dh = self._regrasp_dz * T  # inequality
             # self._regrasp_dh += self.num_regrasps
             self._regrasp_dh_constant = 0
@@ -861,26 +1058,31 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         else:
             self.default_ee_locs = None
             self.default_ee_locs_constraint = False
-        if self.obj_dof == 3:
-            object_link_name = 'screwdriver_body'
-        elif self.obj_dof == 1:
-            object_link_name = 'valve'
-        elif self.obj_dof == 6:
-            object_link_name = 'card'
-        self.obj_link_name = object_link_name
+
 
     def randomize_regrasp_points(self):
         self.default_ee_locs = self.default_ee_locs + 0.01 * torch.randn_like(self.default_ee_locs)
 
-    def _cost(self, xu, start, goal):
+    def _cost(self, xu, rob_link_pts, nearest_robot_pts, start, goal, projected_diffusion=False):
+        # return 0
+        if self.num_regrasps == 0:
+            return 0.0
+        if self.full_dof_goal:
+            T_offset = 0 if projected_diffusion else 1
+            rob_link_cost = torch.sum((rob_link_pts[:, -1:] - self.contact_points_rob_link) ** 2)* 100
+
+            closest_obj_pt_to_finger_cost = 0
+            # unit_mult = 10
+            # closest_obj_pt_to_finger_cost = unit_mult ** 2 * torch.sum((nearest_robot_pts[:, -1:] - self.contact_points_object) ** 2) * 250
+            return rob_link_cost + closest_obj_pt_to_finger_cost
+        
         # if self.full_dof_goal:
         #     return 0
         # if self.default_ee_locs_constraint:
         #     return 0
-        if self.num_regrasps == 0:
-            return 0.0
-        q = partial_to_full_state(xu[:, :self.num_fingers * 4], self.fingers)  # [:, self.regrasp_idx]
-        theta = xu[:, self.num_fingers * 4:self.num_fingers * 4 + self.obj_dof]
+
+        q = partial_to_full_state(xu[-1:, :self.num_fingers * 4], self.fingers)  # [:, self.regrasp_idx]
+        theta = xu[-1:, self.num_fingers * 4:self.num_fingers * 4 + self.obj_dof]
 
         # ignore the rotation of the screwdriver
         if self.obj_dof == 3:
@@ -891,11 +1093,22 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         # print('--')
         # print(self._ee_locations_in_screwdriver(q, theta))
         # print(self.default_ee_locs)
-        if self.desired_ee_in_world_frame:
-            return 1000 * torch.sum((self.default_ee_locs - self._ee_locations_in_world(q)) ** 2)
-        else:
-            return 1000 * torch.sum((self.default_ee_locs - self._ee_locations_in_screwdriver(q, theta)) ** 2)
 
+        if self.desired_ee_in_world_frame:
+            ee_pose = self._ee_locations_in_world(q)
+        else:
+            ee_pose = self._ee_locations_in_screwdriver(q, theta)
+
+        goal_cost = (self.default_ee_locs - ee_pose) ** 2
+        goal_cost_weight = torch.ones_like(goal_cost) * 1
+
+        if self.full_dof_goal:
+            goal_cost_weight[...,-3:] = .0
+        goal_cost = goal_cost * goal_cost_weight
+        goal_cost = goal_cost.sum()
+        goal_cost *= 1000
+
+        return goal_cost
         # dof_pos = self.default_dof_pos[None, self.regrasp_idx]
         # return 10 * torch.sum((q - dof_pos) ** 2)
 
@@ -906,7 +1119,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         d = self.d
 
         # TODO: Get the below to work, then think about if we can make it faster by caching stuff in self.data
-        closest_obj_pt_to_finger = self.data[finger_name]['closest_rob_pt_scene_frame'].reshape(N, T + T_offset, 3)[:, T_offset:]
+        closest_obj_pt_to_finger = self.data[finger_name]['closest_rob_pt_object'].reshape(N, T + T_offset, 3)[:, T_offset:]
         # self.contact_points = {
         #     'index': torch.tensor([0.08698072, 0.04505315, 0.06566035], device=xu.device),
         #     'middle': torch.tensor([0.09539521, 0.00712914, 0.04318945], device=xu.device),
@@ -940,9 +1153,25 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         # this_finger_contact_point_robot = self.world_trans.inverse().transform_points(this_finger_contact_point_world)
 
         # this_finger_contact_point_world = self.contact_scenes.scene_transform.transform_points(this_finger_contact_point.unsqueeze(0))[0]
+
         norm = torch.norm(closest_obj_pt_to_finger - this_finger_target_contact_point, dim=-1)
-        h = norm - contact_patch_radius
+
+        unit_mult = 10
+
+        # Evaluate constraint in cm
+        h = (unit_mult*norm)**2 - (unit_mult*contact_patch_radius)**2
+        # h = norm - contact_patch_radius
+        # if finger_name == 'index':
+        # print(f'Finger: {finger_name}')
+        # print('Closest obj pt to finger:', closest_obj_pt_to_finger[:, -1])
+        # print('this finger target contact point:', this_finger_target_contact_point)
+        # print('Distance:', norm[:, -1])
+        # # print('Contact patch radius:', contact_patch_radius)
+        # print('h:', h[:, -1])
+        # print()
         h[:, :-1] = 0
+        # h = h[:, -1].reshape(N, 1)
+
         # h[:, :] = 0
         # h = h[:, -1].reshape(N, 1)
         # print(g[:, -1])
@@ -952,13 +1181,19 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             T_range = torch.arange(T, device=xu.device)
             # compute gradient of sdf
             grad_h = torch.zeros(N, T, T, d, device=xu.device)
-            grad_ee_q = self.data[finger_name]['closest_pt_q_grad'][:, T_offset:]
-            grad_ee_env_q = -self.data[finger_name]['closest_pt_env_q_grad'][:, T_offset:]
+            grad_ee_q = self.data[finger_name]['closest_pt_q_grad_object'][:, T_offset:]
+            grad_ee_env_q = self.data[finger_name]['closest_pt_env_q_grad_object'][:, T_offset:]
 
             grad_ee_full_q = torch.cat((grad_ee_q, grad_ee_env_q), dim=-1)
-            grad_h_full_q = torch.einsum('abc, abcd -> abd', (closest_obj_pt_to_finger - this_finger_target_contact_point)/norm.unsqueeze(-1), grad_ee_full_q)
+            # grad_h_full_q = torch.einsum('abc, abcd -> abd', (closest_obj_pt_to_finger - this_finger_target_contact_point)/norm.unsqueeze(-1), grad_ee_full_q)
+            grad_h_full_q = torch.einsum('abc, abcd -> abd', 2*(closest_obj_pt_to_finger - this_finger_target_contact_point), grad_ee_full_q)
             grad_h[:, T_range, T_range, :16 + self.obj_dof] = grad_h_full_q
-            grad_h[:, :-1] = 0
+            grad_h[:, :-1] = 0#torch.nan
+            # grad_h = grad_h[:, -1]
+            grad_h *= (unit_mult ** 2)
+
+            # Evaluate gradient in cm
+            grad_h *= 1
             # grad_h[:, :] = 0
             # grad_h[:, T_range, T_range, 16: 16 + self.obj_dof] = grad_h_theta.reshape(N, T + T_offset, self.obj_dof)[:, T_offset:]
             grad_h = grad_h.reshape(N, -1, T, d)
@@ -984,6 +1219,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             eps[:, :-1] = 1.5e-2
         else:
             eps[:, :-1] = 1.5e-2
+            # eps[:, :-1] = .5e-2
         h = -h + eps
         if grad_h is not None:
             grad_h = -grad_h
@@ -1056,20 +1292,23 @@ class AllegroRegraspProblem(AllegroObjectProblem):
 
         q = partial_to_full_state(q, fingers=self.fingers)
         delta_q = partial_to_full_state(delta_q, fingers=self.fingers)
-        g_contact, grad_g_contact, hess_g_contact, t_mask_contact = self._terminal_contact_constraint(
-            xu=xu.reshape(N, T, self.dx + self.du),
-            compute_grads=compute_grads,
-            compute_hess=compute_hess,
-            projected_diffusion=projected_diffusion)
-
         g_dynamics, grad_g_dynamics, hess_g_dynamics, t_mask_dynamics = self._free_dynamics_constraints(
             q=q,
             delta_q=delta_q,
             compute_grads=compute_grads,
             compute_hess=compute_hess)
 
+        # if not self.full_dof_goal:
+        g_contact, grad_g_contact, hess_g_contact, t_mask_contact = self._terminal_contact_constraint(
+            xu=xu.reshape(N, T, self.dx + self.du),
+            compute_grads=compute_grads,
+            compute_hess=compute_hess,
+            projected_diffusion=projected_diffusion)
+
+
         g = torch.cat((g_contact, g_dynamics), dim=1)
         t_mask = torch.cat((t_mask_contact, t_mask_dynamics), dim=1)
+
         grad_g, hess_g = None, None
         if compute_grads:
             grad_g = torch.cat((grad_g_contact, grad_g_dynamics), dim=1)
@@ -1079,27 +1318,39 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         return g, grad_g, hess_g, t_mask
 
     def _con_ineq(self, xu, compute_grads=True, compute_hess=False, projected_diffusion=False):
+        # if self.full_dof_goal:
+        #     return None, None, None, None
         N, T = xu.shape[:2]
         h, grad_h, hess_h, t_mask = self._contact_avoidance(xu=xu.reshape(N, T, -1)[:, :, :self.dx + self.du],
                                                                             compute_grads=compute_grads,
                                                                             compute_hess=compute_hess,
                                                                             projected_diffusion=projected_diffusion)
+        
         if len(self.regrasp_fingers) != 3 and self.do_contact_patch_constraint:
-            h_patch, grad_h_contact, hess_h_contact, t_mask_contact = self._contact_patch_constraint(xu=xu.reshape(N, T, -1)[:, :, :self.dx + self.du],
+            h_patch, grad_h_contact, hess_h_contact, t_mask_contact_patch = self._contact_patch_constraint(xu=xu.reshape(N, T, -1)[:, :, :self.dx + self.du],
                                                                                     compute_grads=compute_grads,
                                                                                     compute_hess=compute_hess,
                                                                                     projected_diffusion=projected_diffusion)
             h = torch.cat((h, h_patch), dim=1)
-            t_mask = torch.cat((t_mask, t_mask_contact), dim=1)
+            t_mask = torch.cat((t_mask, t_mask_contact_patch), dim=1)
 
             if compute_grads:
                 grad_h = torch.cat((grad_h, grad_h_contact), dim=1)
             else:
                 grad_h = None
-        if compute_hess:
-            hess_h = torch.cat((hess_h, hess_h_contact), dim=1)
-        else:
-            hess_h = None
+
+            # g = h_patch
+            # t_mask = t_mask_contact
+            # if compute_grads:
+            #     grad_g = grad_h_contact
+            # else:
+            #     grad_g = None
+            if compute_hess:
+                hess_h = torch.cat((hess_h, hess_h_contact), dim=1)
+            else:
+                hess_h = None
+
+
         return h, grad_h, hess_h, t_mask
         # print("avoidance", h_contact.max())
 
@@ -1163,7 +1414,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         else:
             self.force_equlibrium_constr = vmap(self._force_equlibrium_constr_w_force)
             self.grad_force_equlibrium_constr = vmap(
-                jacrev(self._force_equlibrium_constr_w_force, argnums=(0, 1, 2, 3, 4, 5)))
+                jacrev(self._force_equlibrium_constr_w_force, argnums=(0, 1, 2, 3, 4, 5, 6)))
             self.min_force_constr = vmap(self._min_force_constr, randomness='same')
             self.grad_min_force_constr = vmap(jacrev(self._min_force_constr, argnums=(0,)))
 
@@ -1180,6 +1431,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         self.contact_state_indices = [self.joint_index[finger] for finger in contact_fingers]
         self.contact_state_indices = list(itertools.chain.from_iterable(self.contact_state_indices))
         self.contact_control_indices = [16 + self.obj_dof + idx for idx in self.contact_state_indices]
+        self.object_state_indices = [16 + idx for idx in range(self.obj_dof)]
         self.friction_polytope_k = 8
 
         if self.optimize_force:
@@ -1235,7 +1487,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                 idx = self.contact_force_indices_dict[finger]
                 std = .05 if not self.full_dof_goal else .15
                 std = .05 if self.turn else std
-                if finger != 'index' and self.turn and not self.full_dof_goal:
+                if (self.object_type != 'screwdriver') or (finger != 'index' and self.turn and not self.full_dof_goal):
                     u[..., idx] = 1.5 * torch.randn(N, self.T, 3, device=self.device)
                 else:
                     u[..., idx] = std * torch.randn(N, self.T, 3, device=self.device)
@@ -1253,7 +1505,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                 theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
                 theta = theta.unsqueeze(0).repeat((N, 1, 1))
                 # theta = self.start[-self.obj_dof:].unsqueeze(0).repeat((N, self.T, 1))
-                theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
+                # theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
                 x = torch.cat((x, theta), dim=-1)
 
             xu = torch.cat((x, u), dim=2)
@@ -1272,9 +1524,11 @@ class AllegroContactProblem(AllegroObjectProblem):
             x = x[:, 1:]
             u[:, :, :self.num_fingers * 4] = u_from_proj_path[:, :, :self.num_fingers * 4]
             xu = torch.cat((x, u), dim=2)
+
+            # xu += jitter_std * 10 * torch.randn_like(xu)
         return xu
 
-    def _cost(self, xu, start, goal):
+    def _cost(self, xu, rob_link_pts, nearest_robot_pts, start, goal, projected_diffusion=False):
         if self.num_contacts == 0:
             return 0.0
         # cost function for valve turning task
@@ -1283,10 +1537,31 @@ class AllegroContactProblem(AllegroObjectProblem):
         if not self.full_dof_goal:
             theta = xu[:, self.dx - self.obj_dof:self.dx]
 
-            # goal cost
-            cost = 10 * torch.sum((theta[-1] - goal[-self.obj_dof:]) ** 2)
-            cost += torch.sum((3 * (theta[:-1] - goal[-self.obj_dof:]) ** 2))
+            if not self.obj_translational_dim:
+                # goal cost
+                if self.object_type == 'screwdriver':
+                    cost = 10 * torch.sum((theta[-1] - goal[-self.obj_dof:]) ** 2)
+                    cost += torch.sum((3 * (theta[:-1] - goal[-self.obj_dof:]) ** 2))
+                else:
+                    cost = 10 * torch.sum((theta[-1] - goal[-self.obj_dof:]) ** 2)
+                    cost += torch.sum((3 * (theta[:-1] - goal[-self.obj_dof:]) ** 2))
+            else:
+                goal_pos = goal[:self.obj_translational_dim]
+                goal_ori = goal[self.obj_translational_dim:]
+                pos = theta[:, :self.obj_translational_dim]
+                ori = theta[:, self.obj_translational_dim:]
 
+                # Ori cost
+                cost = 10 * torch.sum((ori[-1] - goal_ori) ** 2)
+                cost += torch.sum((3 * (ori[:-1] - goal_ori) ** 2))
+
+                # Keep peg parallel to ground (extra ori cost)
+                upright_cost = torch.sum(ori[:, 2] ** 2 + ori[:, 0] ** 2)
+                cost += 100 * upright_cost
+
+                # Pos cost
+                cost += 50 * torch.sum((pos[-1] - goal_pos) ** 2)
+                cost += torch.sum((15 * (pos[:-1] - goal_pos) ** 2))
 
 
         if self.optimize_force:
@@ -1505,8 +1780,7 @@ class AllegroContactProblem(AllegroObjectProblem):
             return h.reshape(N, -1), grad_h, hess_h, t_mask
         return h.reshape(N, -1), grad_h, None, t_mask
                 
-    def _force_equlibrium_constr_w_force(self, q, u, next_q, force_list, contact_jac_list, contact_point_list):
-        # NOTE: the constriant is defined in the robot frame
+    def _force_equlibrium_constr_w_force(self, q, u, next_q, force_list, contact_jac_list, contact_point_list, next_env_q):
         # NOTE: the constriant is defined in the robot frame
         # the contact jac an contact points are all in the robot frame
         # this will be vmapped, so takes in a 3 vector and a [num_finger x 3 x 8] jacobian and a dq vector
@@ -1526,6 +1800,24 @@ class AllegroContactProblem(AllegroObjectProblem):
             # Force is in the robot frame instead of the world frame.
             # It does not matter for comuputing the force equilibrium constraint
         # force_world_frame = self.world_trans.transform_normals(force.unsqueeze(0)).squeeze(0)
+        if self.obj_gravity:
+            if self.obj_translational_dim > 0:
+                g = self.obj_mass * torch.tensor([0, 0, -9.8], device=self.device, dtype=torch.float32)
+                force_list = torch.cat((force_list, g.unsqueeze(0)))
+                # force_list.append(g)
+            if self.obj_rotational_dim > 0:
+                if self.object_type == 'screwdriver':
+                    # NOTE: only works for the screwdriver now
+                    g = self.obj_mass * torch.tensor([0, 0, -9.8], device=self.device, dtype=torch.float32)
+                    # add the additional dimension for the screwdriver cap
+                    tmp = torch.zeros_like(next_env_q)
+                    next_env_q = torch.cat((next_env_q, tmp[:1]), dim=-1)
+
+                    body_tf = self.contact_scenes.scene_sdf.chain.forward_kinematics(next_env_q)['screwdriver_body']
+                    body_com_pos = body_tf.get_matrix()[:, :3, -1]
+                    torque = torch.linalg.cross(body_com_pos[0], g)
+                    torque_list.append(torque)
+
         torque_list = torch.stack(torque_list, dim=0)
         torque_list = torch.sum(torque_list, dim=0)
         reactional_torque_list = torch.stack(reactional_torque_list, dim=0)
@@ -1537,20 +1829,29 @@ class AllegroContactProblem(AllegroObjectProblem):
         # g = torch.cat((torque_list, residual_list), dim=-1)
         return g
 
-    def _force_equlibrium_constraints_w_force(self, q, delta_q, force, compute_grads=True, compute_hess=False,
+    def _force_equlibrium_constraints_w_force(self, xu, compute_grads=True, compute_hess=False,
                                               projected_diffusion=False):
-        N, T = q.shape[:2]
+        N, T, d = xu.shape
+        device = xu.device
         T_offset = 1 if not projected_diffusion else 0
-        device = q.device
-        d = self.d
+        x = xu[:, :, :self.dx]
 
-        full_start = partial_to_full_state(self.start[None, :self.num_fingers * 4], self.fingers)
-        q = torch.cat((full_start.reshape(1, 1, -1).repeat(N, 1, 1), q), dim=1)
-        next_q = q[:, 1:, self.contact_state_indices]
-        q = q[:, :-1, self.contact_state_indices]
-        u = delta_q[:, :, self.contact_state_indices]
-        force_list = force[:, :, self._contact_force_indices].reshape(force.shape[0], force.shape[1], self.num_contacts,
-                                                                      3)
+        # we want to add the start state to x, this x is now T + 1
+        
+        x = torch.cat((self.start.reshape(1, 1, -1).repeat(N, 1, 1), x), dim=1)
+        q = x[:, :-1, :self.robot_dof]
+        q = partial_to_full_state(q, self.fingers)
+        q = q[:, :, self.contact_state_indices]
+        next_q = x[:, 1:, :self.robot_dof]
+        next_q = partial_to_full_state(next_q, self.fingers)
+        next_q = next_q[:, :, self.contact_state_indices]
+        u = xu[:, :, self.dx: self.dx + self.robot_dof]
+        u = partial_to_full_state(u, self.fingers)
+        u = u[:, :, self.contact_state_indices]
+        next_env_q = x[:, 1:, self.robot_dof:self.robot_dof + self.obj_dof]
+        
+        force = xu[:, :, self.dx + self.robot_dof: self.dx + self.robot_dof + 3 * self.num_fingers]
+        force_list = force.reshape((force.shape[0], force.shape[1], self.num_contacts, 3))
         if self.env_force:
             env_force = force[:, :, -3:]
             force_list = torch.cat((force_list, env_force.unsqueeze(2)), dim=2)
@@ -1577,18 +1878,19 @@ class AllegroContactProblem(AllegroObjectProblem):
                                          next_q.reshape(-1, 4 * self.num_contacts),
                                          force_list.reshape(-1, num_forces, 3),
                                          contact_jac_list,
-                                         contact_point_list).reshape(N, T, -1)
+                                         contact_point_list,
+                                         next_env_q.reshape(-1, self.obj_dof)).reshape(N, T, -1)
         t_mask = torch.ones_like(g, dtype=torch.bool)
         t_mask[:, 0] = False
 
         if compute_grads:
-            dg_dq, dg_du, dg_dnext_q, dg_dforce, dg_djac, dg_dcontact = self.grad_force_equlibrium_constr(
-                q.reshape(-1, 4 * self.num_contacts),
-                u.reshape(-1, 4 * self.num_contacts),
-                next_q.reshape(-1, 4 * self.num_contacts),
-                force_list.reshape(-1, num_forces, 3),
-                contact_jac_list,
-                contact_point_list)
+            dg_dq, dg_du, dg_dnext_q, dg_dforce, dg_djac, dg_dcontact, dg_dnext_env_q = self.grad_force_equlibrium_constr(q.reshape(-1, 4 * self.num_contacts), 
+                                                u.reshape(-1, 4 * self.num_contacts), 
+                                                next_q.reshape(-1, 4 * self.num_contacts), 
+                                                force_list.reshape(-1, num_forces, 3),
+                                                contact_jac_list,
+                                                contact_point_list,
+                                                next_env_q.reshape(-1, self.obj_dof))
             dg_dforce = dg_dforce.reshape(dg_dforce.shape[0], dg_dforce.shape[1], num_forces* 3)
 
             T_range = torch.arange(T, device=device)
@@ -1622,6 +1924,8 @@ class AllegroContactProblem(AllegroObjectProblem):
             mask_force[:, :, :, :, self.contact_force_indices] = True
             mask_control = torch.zeros_like(grad_g).bool()
             mask_control[:, :, :, :, self.contact_control_indices] = True
+            mask_env = torch.zeros_like(grad_g).bool()
+            mask_env[:, :, :, :, self.object_state_indices] = True
 
             # first q is the start
             grad_g[torch.logical_and(mask_t_p, mask_state)] = dg_dq.reshape(N, T,
@@ -1638,6 +1942,8 @@ class AllegroContactProblem(AllegroObjectProblem):
             grad_g[torch.logical_and(mask_t, mask_force)] = dg_dforce.reshape(N, T, -1,
                                                                               num_forces * 3
                                                                               ).transpose(1, 2).reshape(-1)
+            if self.obj_gravity:
+                grad_g[torch.logical_and(mask_t, mask_env)] = dg_dnext_env_q.reshape(N, T, -1, self.obj_dof).transpose(1, 2).reshape(-1)
             grad_g = grad_g.transpose(1, 2)
 
         else:
@@ -1646,7 +1952,7 @@ class AllegroContactProblem(AllegroObjectProblem):
             hess = torch.zeros(N, g.shape[1], T * d, T * d, device=self.device)
             return g.reshape(N, -1), grad_g.reshape(N, -1, T * d), hess, t_mask.reshape(N, -1)
         else:
-            return g.reshape(N, -1), grad_g.reshape(N, -1, T * d), None, t_mask.reshape(N, -1)
+            return g.reshape(N, -1), grad_g.reshape(N, -1, T * self.d), None, t_mask.reshape(N, -1)
 
     def _kinematics_constr(self, current_q,
                            next_q,
@@ -2137,9 +2443,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                 force[:, :, self._contact_force_indices] = xu[:, :, -self.num_contacts * 3:]
 
             g_equil, grad_g_equil, hess_g_equil, t_mask_equil = self._force_equlibrium_constraints_w_force(
-                q=q,
-                delta_q=delta_q,
-                force=force,
+                xu=xu,
                 compute_grads=compute_grads,
                 compute_hess=compute_hess,
                 projected_diffusion=projected_diffusion)
@@ -2504,20 +2808,26 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
 
         self.project = project
 
-    def _cost(self, xu, start, goal):
-        cost = AllegroContactProblem._cost(self, xu, start, goal) + \
-            AllegroObjectProblem._cost(self, xu, start, goal) + AllegroRegraspProblem._cost(self, xu, start, goal)
+    def _cost(self, xu, rob_link_pts, nearest_robot_pts, start, goal, projected_diffusion=False):
+        cost = AllegroContactProblem._cost(self, xu, rob_link_pts, nearest_robot_pts, start, goal, projected_diffusion=projected_diffusion) + \
+            AllegroObjectProblem._cost(self, xu, rob_link_pts, nearest_robot_pts, start, goal, projected_diffusion=projected_diffusion) + AllegroRegraspProblem._cost(self, xu, rob_link_pts, nearest_robot_pts, start, goal, projected_diffusion=projected_diffusion)
+
+        q_cost_weight = .05
+        if 'thumb' in self.regrasp_fingers and 'middle' in self.regrasp_fingers and len(self.regrasp_fingers) == 2:
+            q_cost_weight = 0.1
+
+        q_cost_weight = 0
 
         goal_cost = 0
         if self.full_dof_goal:
             x_last = xu[-1, :self.num_fingers * 4 + self.obj_dof]
             goal_cost = 1 * (x_last - goal).pow(2)
             goal_cost += 1 * (xu[:-1, :self.num_fingers * 4 + self.obj_dof] - goal).pow(2).sum(0)
-            goal_cost_weight = torch.ones_like(goal_cost) * .3
+            goal_cost_weight = torch.ones_like(goal_cost) * q_cost_weight
             goal_cost_weight[-self.obj_dof:] = 2
             goal_cost = goal_cost * goal_cost_weight
             goal_cost = goal_cost.sum()
-            goal_cost *= 100
+            goal_cost *= 150
 
             # x_last = xu[-1, self.num_fingers * 4: self.num_fingers * 4 + self.obj_dof]
             # goal_cost = 10 * (x_last - goal[-self.obj_dof:]).pow(2).sum(dim=-1)#.sum(dim=-1)
@@ -2742,9 +3052,9 @@ class AllegroManipulationExternalContactProblem(AllegroContactWithEnvProblem, Al
         # self.dz += self._base_dz
         # self.dh += self._base_dz * T
 
-    def _cost(self, xu, start, goal):
-        return AllegroContactWithEnvProblem._cost(self, xu, start, goal) + \
-            AllegroObjectProblem._cost(self, xu, start, goal) + AllegroRegraspWithEnvProblem._cost(self, xu, start, goal)
+    def _cost(self, xu, start, goal, rob_link_pts, nearest_robot_pts, projected_diffusion=False):
+        return AllegroContactWithEnvProblem._cost(self, xu, rob_link_pts, nearest_robot_pts, start, goal, projected_diffusion=projected_diffusion) + \
+            AllegroObjectProblem._cost(self, xu, rob_link_pts, nearest_robot_pts, start, goal, projected_diffusion=projected_diffusion) + AllegroRegraspWithEnvProblem._cost(self, xu, rob_link_pts, nearest_robot_pts, start, goal, projected_diffusion=projected_diffusion)
 
     def _con_eq(self, xu, compute_grads=True, compute_hess=False, verbose=False, projected_diffusion=False):
         N, T = xu.shape[:2]

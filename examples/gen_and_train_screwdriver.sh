@@ -1,0 +1,1 @@
+python -u allegro_screwdriver_rl_adjusted.py allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl_wrench_perturb_new_project > ./logs/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl_wrench_perturb_new_project.log

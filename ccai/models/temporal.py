@@ -96,7 +96,8 @@ class TemporalUnet(nn.Module):
             dim=32,
             dim_mults=(1, 2, 4),
             attention=False,
-            context_dropout_p=0.25
+            context_dropout_p=0.25,
+            trajectory_condition=False
     ):
         super().__init__()
 
@@ -105,13 +106,16 @@ class TemporalUnet(nn.Module):
         print(f'[ models/temporal ] Channel dimensions: {in_out}')
 
         self.time_embedding = SinusoidalPosEmb(32)
-        self.constraint_type_embed = nn.Sequential(
-            nn.Linear(cond_dim, 32),
-            Mish()
-        )
+        self.trajectory_condition = trajectory_condition
+        if not trajectory_condition:
+            self.constraint_type_embed = nn.Sequential(
+                nn.Linear(cond_dim, 32),
+                Mish()
+            )
         # self.constraint_type_embed = SinusoidalPosEmb(32)
+        context_hidden_dim = 32 if not trajectory_condition else 0
         self.time_mlp = nn.Sequential(
-            nn.Linear(32 + 32, 256),
+            nn.Linear(32 + context_hidden_dim, 256),
             Mish()
             # nn.Linear(256, 256)
         )
@@ -180,7 +184,6 @@ class TemporalUnet(nn.Module):
             Conv1dBlock(dim, dim, kernel_size=3),
             nn.Conv1d(dim, transition_dim, 1),
         )
-
         # self.context_dropout_p = context_dropout_p
         self.cond_dim = cond_dim
 
@@ -202,7 +205,7 @@ class TemporalUnet(nn.Module):
         x = x.permute(0, 2, 1)
         x = pad_to_multiple(x, m=2 ** len(self.downs))
 
-        if context is not None:
+        if context is not None and not self.trajectory_condition:
             # constraint_type = context[:, -2:]
             # context = context[:, :-2]
             context = context.reshape(B, -1)
@@ -217,8 +220,9 @@ class TemporalUnet(nn.Module):
                 t = torch.cat((t, c), dim=-1)
             else:
                 t = torch.cat((t, c), dim=-1)
-        else:
+        elif not self.trajectory_condition:
             t = torch.cat((t, torch.zeros(B, 32, device=t.device)), dim=-1)
+
         t = self.time_mlp(t)
         #
         h = []
@@ -826,21 +830,55 @@ class TemporalUNetContext(nn.Module):
     def __init__(
             self,
             horizon,
-            transition_dim,
+            state_dim,
+            action_dim,
             cond_dim,
             dim=32,
             dim_mults=(1, 2, 4),
             attention=False,
             dropout_p=0.25,
-            trajectory_embed_dim=4
+            trajectory_embed_dim=4,
+            trajectory_condition=True,
+            true_s0=False
     ):
+        transition_dim = state_dim + action_dim
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+        self.transition_dim = transition_dim
         super().__init__()
+        self.trajectory_condition = trajectory_condition
+        self.register_buffer('dropout_prob', torch.tensor([1.0 - dropout_p]))
+        self.dropout_p = dropout_p
+        self.mask_dist = Bernoulli(probs=1 - self.dropout_p)
         # self.register_buffer('traj_dropout_p', torch.tensor([dropout_p]))
-        self.temporal_unet = TemporalUnet(horizon, transition_dim, cond_dim, dim, dim_mults, attention, dropout_p)
+        self.temporal_unet = TemporalUnet(horizon, transition_dim, cond_dim, dim, dim_mults, attention, dropout_p, trajectory_condition)
         self.time_embedding = SinusoidalPosEmb(32)
         self.pooling = nn.AdaptiveAvgPool1d(trajectory_embed_dim)
+        init_state_embed_dim = 512
+        self.true_s0 = true_s0
 
-        traj_hidden_dim = dim_mults[-1] * dim * trajectory_embed_dim
+        if self.trajectory_condition:
+            if true_s0:
+                traj_hidden_dim = dim_mults[-1] * dim * trajectory_embed_dim + init_state_embed_dim
+            else:
+                traj_hidden_dim = dim_mults[-1] * dim * trajectory_embed_dim
+        else:
+            if true_s0:
+                traj_hidden_dim = init_state_embed_dim
+            else:
+                traj_hidden_dim = init_state_embed_dim
+        # if true_s0:
+        #     if self.trajectory_condition:
+        #         traj_hidden_dim = dim_mults[-1] * dim * trajectory_embed_dim + init_state_embed_dim
+        #     else:
+        #         traj_hidden_dim = init_state_embed_dim
+        # else:
+        #     if self.trajectory_condition:
+        #         # traj_hidden_dim += dim_mults[-1] * dim * trajectory_embed_dim
+        #         traj_hidden_dim = dim_mults[-1] * dim * trajectory_embed_dim
+        #     else:
+        #         traj_hidden_dim = init_state_embed_dim
+
         print(traj_hidden_dim)
         print(dim_mults[-1], dim, trajectory_embed_dim)
         self.context_net = nn.Sequential(
@@ -851,30 +889,108 @@ class TemporalUNetContext(nn.Module):
             nn.Linear(128, cond_dim)
         )
 
-    # @torch.compile(mode='max-autotune')
-    def forward(self, t, x, context, dropout=False):
-        '''
-            x : [ batch x horizon x transition ]
-        '''
+        if not self.trajectory_condition or self.true_s0:
+            self.initial_state_context_net = nn.Sequential(
+                nn.Linear(state_dim, init_state_embed_dim),
+                Mish(),
+                nn.Linear(init_state_embed_dim, init_state_embed_dim),
+                Mish(),
+                nn.Linear(init_state_embed_dim, init_state_embed_dim),
+                # Mish(),
+                # nn.Linear(init_state_embed_dim, init_state_embed_dim),
+            )
 
+    def preprocess_t(self, t, x, context):
         B, H, d = x.shape
         t = t.reshape(-1)
         if t.shape[0] == 1:
             t = t.repeat(B)
-        e_x, h = self.temporal_unet(t, x, context, dropout=dropout)
-        h = self.pooling(h).reshape(B, -1)
+        return B, H, d, t
+    # @torch.compile(mode='max-autotune')
+    def forward(self, t, x, context, dropout=False, initial_state=None):
+        '''
+            x : [ batch x horizon x transition ]
+        '''
+
+        B, H, d, t = self.preprocess_t(t, x, context)
+
+        if self.true_s0 or not self.trajectory_condition:
+            initial_state_embed = self.initial_state_context_net(initial_state)
+
+        if self.trajectory_condition:
+            e_x, h_pre_pool = self.temporal_unet(t, x)
+            h = self.pooling(h_pre_pool).reshape(B, -1)
+            if self.true_s0:
+                h = torch.cat((h, initial_state_embed), dim=-1)
+        else:
+            e_x, _ = self.temporal_unet(t, x, context, dropout=dropout)
+            if self.true_s0:
+                h = self.initial_state_context_net(initial_state) # True initial state for conditioning
+            else:
+                h = self.initial_state_context_net(x[:, 0, :self.state_dim]) # Noised initial state for conditioning
 
         t = self.time_embedding(t)
         # with some probability, dropout trajectory from context diffusion
-        # if dropout:
-        #    mask_dist = Bernoulli(probs=1 - self.traj_dropout_p)
-        #    mask = mask_dist.sample((B,))  # .to(device=context.device)
-        #    h = mask * h
+        if self.trajectory_condition and dropout:
+            mask = torch.bernoulli(self.dropout_prob.expand(B).to(device=h.device))
+            mask = mask.unsqueeze(-1)
+            h = mask * h
         h = torch.cat((context, h, t), dim=-1)
 
         e_c = self.context_net(h)
         return e_x, e_c
+    
+    def model_pred_for_sample(self, t, x, context):
+        #Alt 2
+        B, H, d, t = self.preprocess_t(t, x, context)
+        if self.trajectory_condition:
 
+            e_x, h = self.temporal_unet(t, x, dropout=False)
+            h = self.pooling(h).reshape(B, -1)
+            if self.true_s0:
+                initial_state_embed = self.initial_state_context_net(x[:, 0, :self.state_dim])
+                h = torch.cat((h, initial_state_embed), dim=-1)
+            t = self.time_embedding(t)
+
+            h_for_e_c = torch.cat((context, h, t), dim=-1)
+            uncond_h_for_e_c = torch.cat((context, torch.zeros_like(h), t), dim=-1)
+            unconditional_e_c = self.context_net(uncond_h_for_e_c)
+            conditional_e_c = self.context_net(h_for_e_c)
+
+            w_total = 1.2
+
+            e_c = unconditional_e_c + w_total * (conditional_e_c - unconditional_e_c)
+            return e_x, e_c
+        #Alt 1
+        else:
+            t_embed = self.time_embedding(t)
+            initial_state = x[:, 0, :self.state_dim]
+            inital_state_embed = self.initial_state_context_net(initial_state)
+            h_for_e_c = torch.cat((context, inital_state_embed, t_embed), dim=-1)
+            uncond_h_for_e_c = torch.cat((context, torch.zeros_like(inital_state_embed), t_embed), dim=-1)
+            unconditional_e_c = self.context_net(uncond_h_for_e_c)
+            conditional_e_c = self.context_net(h_for_e_c)
+
+            w_total = 1.2
+            e_c = unconditional_e_c + w_total * (conditional_e_c - unconditional_e_c)
+
+            unconditional_e_x, _ = self.temporal_unet(t, x, context=None, dropout=False)
+            conditional_e_x, _ = self.temporal_unet(t, x, context=context, dropout=False)
+
+            e_x = unconditional_e_x + w_total * (conditional_e_x - unconditional_e_x)
+            return e_x, e_c
+
+    # @torch.compile(mode='max-autotune')
+    def compiled_conditional_test(self, t, x, context):
+        return self(t, x, context, dropout=False)
+
+    # @torch.compile(mode='max-autotune')
+    def compiled_unconditional_test(self, t, x, initial_state=None):
+        return self(t, x, context=None, dropout=False, initial_state=initial_state)
+
+    @torch.compile(mode='max-autotune')
+    def compiled_conditional_train(self, t, x, context, initial_state=None):
+        return self(t, x, context, dropout=True, initial_state=initial_state)
 
 class BinaryClassifier(nn.Module):
     def __init__(self, input_dim=1, hidden_size=64):
@@ -903,7 +1019,7 @@ class UnetClassifier(nn.Module):
             transition_dim,
             cond_dim,
             dim=32,
-            dim_mults=(1, 2),
+            dim_mults=(1, 2, 4),
             attention=False,
     ):
         super().__init__()
@@ -912,17 +1028,17 @@ class UnetClassifier(nn.Module):
         in_out = list(zip(dims[:-1], dims[1:]))
         print(f'[ models/temporal ] Channel dimensions: {in_out}')
 
-        # self.constraint_type_embed = nn.Sequential(
-        #     nn.Linear(cond_dim, 32),
-        #     Mish()
-        # )
-        # # self.constraint_type_embed = SinusoidalPosEmb(32)
-        # self.time_mlp = nn.Sequential(
-        #     nn.Linear(32, 256),
-        #     Mish()
-        # )
+        self.constraint_type_embed = nn.Sequential(
+            nn.Linear(cond_dim, 32),
+            Mish()
+        )
+        # self.constraint_type_embed = SinusoidalPosEmb(32)
+        self.time_mlp = nn.Sequential(
+            nn.Linear(32, 256),
+            Mish()
+        )
 
-        # time_dim = 256
+        time_dim = 256
 
         self.downs = nn.ModuleList([])
         num_resolutions = len(in_out)
@@ -931,8 +1047,8 @@ class UnetClassifier(nn.Module):
             is_last = ind >= (num_resolutions - 1)
             feature_dims.append(np.ceil(feature_dims[-1] / 2))
             self.downs.append(nn.ModuleList([
-                ResidualTemporalBlock(dim_in, dim_out, embed_dim=0, horizon=horizon),
-                ResidualTemporalBlock(dim_out, dim_out, embed_dim=0, horizon=horizon),
+                ResidualTemporalBlock(dim_in, dim_out, embed_dim=time_dim, horizon=horizon),
+                ResidualTemporalBlock(dim_out, dim_out, embed_dim=time_dim, horizon=horizon),
                 Residual(PreNorm(dim_out, LinearAttention(dim_out))) if attention else nn.Identity(),
                 Downsample1d(dim_out) if not is_last else nn.Identity()
                 # nn.Identity()
@@ -942,22 +1058,20 @@ class UnetClassifier(nn.Module):
                 horizon = horizon // 2
 
         mid_dim = dims[-1]
-        self.mid_block1 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=0, horizon=horizon)
+        self.mid_block1 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
         self.mid_attn = Residual(PreNorm(mid_dim, LinearAttention(mid_dim))) if attention else nn.Identity()
-        self.mid_block2 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=0, horizon=horizon)
-        self.mid_block3 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=0, horizon=horizon)
-        self.mid_block4 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=0, horizon=horizon)
+        self.mid_block2 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
+        self.mid_block3 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
+        self.mid_block4 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
         self.pooling = nn.AdaptiveAvgPool1d(1)
         self.output_layer = nn.Linear(mid_dim, 1)
         self.output_act_fn = nn.Sigmoid()
-
-        self.class_layer = nn.Linear(mid_dim, 2)
 
     def vmapped_fwd(self, t, x, context=None):
         return self(t.reshape(1), x.unsqueeze(0), context.unsqueeze(0)).squeeze(0)
 
     # @torch.compile(mode='max-autotune')
-    def forward(self, x, context=None, dropout=False):
+    def forward(self, t, x, context=None, dropout=False):
         '''
             x : [ batch x horizon x transition ]
         '''
@@ -968,35 +1082,33 @@ class UnetClassifier(nn.Module):
         x = x.permute(0, 2, 1)
         x = pad_to_multiple(x, m=2 ** len(self.downs))
 
-        # if context is not None:
-        #     # constraint_type = context[:, -2:]
-        #     # context = context[:, :-2]
-        #     context = context.reshape(B, -1)
-        #     c = self.constraint_type_embed(context)
-        #     # c = context
-        #     # c = torch.cat((context, ctype_embed), dim=-1)
-        #     # need to do dropout on context embedding to train unconditional model alongside conditional
-        #     if dropout:
-        #         mask_dist = Bernoulli(probs=1 - self.context_dropout_p)
-        #         mask = mask_dist.sample((B,))  # .to(device=context.device)
-        #         c = mask * c
-        # else:
-        #     c = torch.zeros(B, 32, device=t.device)
+        if context is not None:
+            # constraint_type = context[:, -2:]
+            # context = context[:, :-2]
+            context = context.reshape(B, -1)
+            c = self.constraint_type_embed(context)
+            # c = context
+            # c = torch.cat((context, ctype_embed), dim=-1)
+            # need to do dropout on context embedding to train unconditional model alongside conditional
+            if dropout:
+                mask_dist = Bernoulli(probs=1 - self.context_dropout_p)
+                mask = mask_dist.sample((B,))  # .to(device=context.device)
+                c = mask * c
 
-        # t = self.time_mlp(c)
+        t = self.time_mlp(c)
         h = []
         for resnet, resnet2, attn, downsample in self.downs:
-            x = resnet(x, None)
-            x = resnet2(x, None)
+            x = resnet(x, t)
+            x = resnet2(x, t)
             # x = attn(x)
             h.append(x)
             x = downsample(x)
 
-        x = self.mid_block1(x, None)
+        x = self.mid_block1(x, t)
         # x = self.mid_attn(x)
-        x = self.mid_block2(x, None)
-        x = self.mid_block3(x, None)
-        x = self.mid_block4(x, None)
+        x = self.mid_block2(x, t)
+        x = self.mid_block3(x, t)
+        x = self.mid_block4(x, t)
         x = self.pooling(x).reshape(B, -1)
         
-        return self.output_act_fn(self.output_layer(x)), self.class_layer(x)
+        return self.output_act_fn(self.output_layer(x))

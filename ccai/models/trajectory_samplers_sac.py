@@ -1,0 +1,537 @@
+from typing import Dict, Tuple, List, Optional, Union
+import numpy as np
+import gpytorch
+import torch
+from torch import nn
+import torch.nn.functional as F
+from torch.distributions import Normal, Categorical
+from torch.optim import Adam
+from gpytorch.optim import NGD
+
+import random
+import time
+import collections
+from collections import deque
+
+from tqdm import tqdm
+from ccai.models.custom_likelihoods import CDFBernoulliLikelihood
+from ccai.models.helpers import MLP
+from ccai.models.likelihood_residual_gp import LikelihoodResidualGP
+
+# Normalizing flow stuff
+# from nflows.flows.base import Flow
+# from nflows.distributions.normal import ConditionalDiagonalNormal
+# from nflows.transforms.base import CompositeTransform
+# from nflows.transforms.coupling import PiecewiseRationalQuadraticCouplingTransform, AffineCouplingTransform
+# from nflows.transforms.lu import LULinear
+# from nflows.nn.nets import ResidualNet
+# from nflows.utils import torchutils
+
+# Diffusion
+from ccai.models.diffusion.diffusion import GaussianDiffusion, ConstrainedDiffusion, JointDiffusion, LatentDiffusion
+from ccai.models.cnf.cnf import TrajectoryCNF
+
+from ccai.models.helpers import MLP
+from ccai.models.likelihood_residual_gp import LikelihoodResidualGP
+from ccai.models.custom_predictive_log_likelihood import CustomPredictiveLogLikelihood
+
+import time
+import collections
+
+# Import fast prediction settings
+from gpytorch.settings import fast_pred_var, fast_pred_samples, cg_tolerance
+
+# Import the new PrioritizedReplayBuffer
+from ccai.models.replay_buffer import PrioritizedReplayBuffer
+
+class TrajectoryFlowModel(nn.Module):
+
+    def __init__(self, T, dx, du, context_dim, dynamics=None):
+        super().__init__()
+        self.T = T
+        self.dx = dx
+        self.du = du
+        split_prior = False
+        if dynamics is not None:
+            flow_dim = T * du
+        else:
+            flow_dim = T * (dx + du)
+
+        self.dynamics = dynamics
+        # self.flow = build_ffjord(T*(dx+du), context_dim, 1)
+        # self.flow = OTFlow(T*(dx+du), 64, 2, context_dim)
+
+        if split_prior or dynamics is not None:
+            prior_dim = T * du
+        else:
+            prior_dim = T * (dx + du)
+
+        def create_transform_net(in_features, out_features):
+            net = ResidualNet(in_features, out_features, hidden_features=64, context_features=context_dim)
+            return net
+
+        # base_dist = StandardNormal(shape=[flow_dim])
+        base_dist = ConditionalDiagonalNormal(shape=[flow_dim], context_encoder=MLP(context_dim,
+                                                                                    2 * flow_dim,
+                                                                                    hidden_size=64)
+                                              )
+
+        transforms = []
+        for _ in range(16):
+            # transforms.append(ReversePermutation(features=flow_dim))
+            # transforms.append(RandomPermutation(features=flow_dim))
+            transforms.append(LULinear(features=flow_dim))
+            # transforms.append(MaskedPiecewiseRationalQuadraticAutoregressiveTransform(features=flow_dim,
+            #                                                                          context_features=context_dim,
+            #                                                                          hidden_features=64,
+            #                                                                          tails='linear',
+            #                                                                          tail_bound=4))
+            mask = torchutils.create_mid_split_binary_mask(flow_dim)
+            # transforms.append(PiecewiseRationalQuadraticCouplingTransform(mask=mask,
+            #                                                              transform_net_create_fn=create_transform_net,
+            #                                                              tails='linear', tail_bound=4))
+            transforms.append(AffineCouplingTransform(mask=mask, transform_net_create_fn=create_transform_net))
+
+        transforms = CompositeTransform(transforms)
+        self.flow = Flow(transforms, base_dist)
+
+
+    def sample(self, N, H=None, start=None, goal=None, constraints=None, T=1):
+        B = 1
+        if start is not None:
+            B = start.shape[0]
+            context = torch.cat((start, goal), dim=1)
+        if constraints is not None:
+            context = torch.cat((context, constraints), dim=1)
+
+        samples = self.flow.sample(num_samples=N, context=context)
+        trajectories = samples.reshape(B, N, self.T, -1)
+
+        if self.dynamics is not None:
+            x = [start.clone()]
+            for t in range(self.T - 1):
+                x.append(self.dynamics(x[-1], trajectories[:, t]))
+            x = torch.stack(x, dim=1)
+            trajectories = torch.cat((x, trajectories), dim=-1)
+
+        trajectories = trajectories.reshape(B, N, self.T, self.dx + self.du)
+        if B == 1:
+            return trajectories[0]
+        return trajectories
+
+    def log_prob(self, trajectories, start=None, goal=None, constraints=None):
+        B = trajectories.shape[0]
+        context = None
+        if start is not None:
+            B = start.shape[0]
+            context = torch.cat((start, goal), dim=1)
+
+        if constraints is not None:
+            context = torch.cat((context, constraints), dim=1)
+
+        if self.dynamics is not None:
+            trajectories = trajectories[:, :, -self.du:]
+
+        log_prob = self.flow.log_prob(trajectories.reshape(B, -1), context=context)
+        return log_prob.reshape(B)
+
+    def loss(self, trajectories, start=None, goal=None, constraints=None):
+        return -self.log_prob(trajectories, start, goal, constraints).mean()
+
+
+class TrajectoryDiffusionModel(nn.Module):
+
+    def __init__(self, T, dx, du, context_dim, problem=None, timesteps=20, hidden_dim=64, constrained=False,
+                 unconditional=False, generate_context=False, trajectory_condition=True, score_model='conv_unet', latent_diffusion=False,
+                 vae=None, inits_noise=None, noise_noise=None, guided=False, new_projection=False, dropout_p=.25, true_s0=False):
+        super().__init__()
+        self.T = T
+        self.dx = dx
+        self.du = du
+        self.context_dim = context_dim
+
+        if latent_diffusion:
+            self.diffusion_model = LatentDiffusion(vae, T, dx, du, context_dim,
+                                                            timesteps=timesteps, sampling_timesteps=timesteps,
+                                                            hidden_dim=hidden_dim,
+                                                            unconditional=unconditional)
+        else:
+            if constrained:
+                self.diffusion_model = ConstrainedDiffusion(T, dx, du, context_dim, problem,
+                                                            timesteps=timesteps, sampling_timesteps=timesteps,
+                                                            constrain=constrained,
+                                                            hidden_dim=hidden_dim,
+                                                            unconditional=unconditional,
+                                                            inits_noise=inits_noise, noise_noise=noise_noise,
+                                                            guided=guided)
+            else:
+                if generate_context:
+                    self.diffusion_model = JointDiffusion(T, dx, du, context_dim, timesteps=timesteps,
+                                                        sampling_timesteps=timesteps,
+                                                        hidden_dim=hidden_dim,
+                                                        model_type=score_model,
+                                                        inits_noise=inits_noise, noise_noise=noise_noise,
+                                                        guided=guided, dropout_p=dropout_p, trajectory_condition=trajectory_condition,
+                                                        true_s0=true_s0)
+                else:
+                    self.diffusion_model = GaussianDiffusion(T, dx, du, context_dim, timesteps=timesteps,
+                                                            sampling_timesteps=timesteps, hidden_dim=hidden_dim,
+                                                            unconditional=unconditional,
+                                                            model_type=score_model, new_projection=new_projection,
+                                                            context_dropout_p=dropout_p)
+
+    def construct_context(self, constraints=None):
+        if constraints is not None:
+            constraints = constraints.reshape(constraints.shape[0], -1, constraints.shape[-1])
+            context = constraints
+            # context = torch.cat((start.unsqueeze(1).repeat(1, N, 1),
+            #                     goal.unsqueeze(1).repeat(1, N, 1),
+            #                     constraints), dim=-1)
+        else:
+            context = None
+
+        return context
+
+    def construct_condition(self, H=None, start=None, goal=None, past=None):
+        condition = {}
+        time_index = 0
+        if past is not None:
+            condition[0] = [0, past]
+            time_index = past.shape[1]
+        if start is not None:
+            condition[time_index] = [0, start]
+        if goal is not None:
+            g = torch.stack((torch.cos(goal), torch.sin(goal)), dim=1).reshape(-1, 2)
+            condition[H - 1] = [14, g]
+        if condition == {}:
+            condition = None
+        return condition
+    
+    def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None, project=False, no_grad=True, skip_likelihood=False, context_for_likelihood=True, residual_gp=None):
+        # B, N, _ = constraints.shape
+        context = self.construct_context(constraints)
+
+        condition = self.construct_condition(H, start, goal, past)
+
+        if project:
+            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.diffusion_model.project(N=N, H=H, context=context, condition=condition, residual_gp=residual_gp)
+            return samples, samples_0, (all_losses, all_samples, all_likelihoods)
+        else:
+            samples = self.diffusion_model.sample(N=N, H=H, context=context, condition=condition, no_grad=no_grad, skip_likelihood=skip_likelihood, context_for_likelihood=context_for_likelihood)  # .reshape(-1, H#,
+        #         self.dx + self.du)
+            return samples
+
+    def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
+        B = trajectories.shape[0]
+        if start is not None:
+            context = torch.cat((start, goal, constraints), dim=1)
+        else:
+            context = constraints
+        # context=None
+        return self.diffusion_model.loss(trajectories, context=context, mask=mask)#.mean()
+
+    def classifier_loss(self, trajectories, mask=None, context=None, label=None):
+        return self.diffusion_model.classifier_loss(trajectories, context=context, mask=mask, label=label)
+
+    def set_norm_constants(self, x_mu, x_std):
+        self.diffusion_model.set_norm_constants(x_mu, x_std)
+
+    def grad(self, trajectories, t, start, goal, constraints):
+        B, N, _ = constraints.shape
+        context = torch.cat((start.unsqueeze(1).repeat(1, N, 1),
+                             goal.unsqueeze(1).repeat(1, N, 1),
+                             constraints), dim=-1)
+        return self.diffusion_model.model_predictions(trajectories, t, context=context).pred_noise
+
+    def resample(self, start, goal, constraints, initial_trajectory, past, timestep):
+        # B, N, _ = constraints.shape
+        N, H, _ = initial_trajectory.shape
+        context = None
+        if constraints is not None:
+            constraints = constraints.reshape(constraints.shape[0], -1, constraints.shape[-1])
+            context = constraints
+        condition = {}
+        time_index = 0
+        if past is not None:
+            condition[0] = [0, past]
+            time_index = past.shape[1]
+        if start is not None:
+            condition[time_index] = [0, start]
+        if goal is not None:
+            condition[-1] = [8, goal]
+        if condition == {}:
+            condition = None
+
+        samples, c = self.diffusion_model.resample(x=initial_trajectory, context=context,
+                                                   condition=condition,
+                                                   timestep=timestep)
+        return samples.reshape(-1, self.T, self.dx + self.du), c.reshape(c.shape[0], -1, self.context_dim)
+
+    def likelihood(self, trajectories, context):
+        return self.diffusion_model.approximate_likelihood(trajectories, context)
+
+
+class TrajectoryCNFModel(TrajectoryCNF):
+
+    def __init__(self, horizon, dx, du, context_dim, problem, hidden_dim=32, state_only=False, state_control_only=False):
+        super().__init__(horizon, dx, du, context_dim, problem, hidden_dim=hidden_dim, state_only=state_only,
+                         state_control_only=state_control_only)
+
+    def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None, project=False):
+        # B, N, _ = constraints.shape
+        if constraints is not None:
+            constraints = constraints.reshape(constraints.shape[0], -1, constraints.shape[-1])
+            context = constraints
+        else:
+            context = None
+        condition = {}
+        time_index = 0
+        mask = torch.ones(N, self.horizon, self.dx + self.du, device=self._grad_mask.device)
+        if past is not None:
+            condition[0] = [0, past]
+            time_index = past.shape[1]
+            mask[:, :time_index] = torch.zeros_like(past)
+        if start is not None:
+            condition[time_index] = [0, start]
+            mask[:, time_index, :start.shape[1]] = torch.zeros_like(start)
+        if goal is not None:
+            condition[-1] = [8, goal]
+        if condition == {}:
+            condition = None
+
+        # TODO: in-painting for sample generation with CNF
+        # I guess just a case of intervening on the required gradient?
+        # initialize trajectory to right amount, set gradient of components to be zero
+        # trajectories, likelihood = self._sample(context=context, condition=condition, mask=mask, H=H)
+        # return (trajectories, context, likelihood), trajectories
+
+        if project:
+            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.project(H=H, context=context, condition=condition)
+        else:
+            samples = self._sample(H=H, context=context, condition=condition)  # .reshape(-1, H#,
+        #         self.dx + self.du)
+        return samples, samples_0, (all_losses, all_samples, all_likelihoods)
+
+
+    def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
+        B = trajectories.shape[0]
+        if start is not None:
+            context = torch.cat((start, goal, constraints), dim=1)
+        else:
+            context = constraints
+        return self.flow_matching_loss(trajectories, context=context, mask=mask)
+
+    def set_norm_constants(self, x_mu, x_std):
+        self.x_mean.data = x_mu.to(device=self.x_mean.device, dtype=self.x_mean.dtype)
+        self.x_std.data = x_std.to(device=self.x_std.device, dtype=self.x_std.dtype)
+
+        self.model.x_mean = self.x_mean
+        self.model.x_std = self.x_std
+
+class TrajectorySampler(nn.Module):
+
+    def __init__(self, T, dx, du, context_dim, type='nf', dynamics=None, problem=None, timesteps=50, hidden_dim=64,
+                 constrain=False, unconditional=False, generate_context=False, score_model='conv_unet',
+                 latent_diffusion=False, vae=None, inits_noise=None, noise_noise=None, guided=False, discriminator_guidance=False,
+                 learn_inverse_dynamics=False, state_only=False, state_control_only=False,
+                 initial_threshold=-15, new_projection=False, dropout_p=.25, trajectory_condition=False,
+                 true_s0=False):
+        super().__init__()
+        self.T = T
+        self.dx = dx
+        self.du = du
+        self.context_dim = context_dim
+        self.inverse_dynamics = None
+        self.type = type
+        assert type in ['nf', 'latent_diffusion', 'diffusion', 'cnf']
+        if type == 'nf':
+            self.model = TrajectoryFlowModel(T, dx, du, context_dim, dynamics)
+        elif type == 'cnf':
+            self.model = TrajectoryCNFModel(T, dx, du, context_dim, problem, hidden_dim=hidden_dim, 
+                                            state_only=state_only, state_control_only=state_control_only)
+        elif type == 'latent_diffusion':
+            self.model = TrajectoryDiffusionModel(T, dx, du, context_dim, problem, timesteps, hidden_dim, constrain,
+                                                  unconditional, generate_context=generate_context, score_model=score_model,
+                                                  latent_diffusion=True, vae=vae)
+        else:
+            self.model = TrajectoryDiffusionModel(T, dx, du, context_dim, problem, timesteps, hidden_dim, constrain,
+                                                  unconditional, generate_context=generate_context, score_model=score_model,
+                                                  inits_noise=inits_noise, noise_noise=noise_noise, guided=guided, new_projection=new_projection, dropout_p=dropout_p, trajectory_condition=trajectory_condition, true_s0=true_s0)
+
+        self.register_buffer('x_mean', torch.zeros(dx + du))
+        self.register_buffer('x_std', torch.ones(dx + du))
+
+        self.gp = None
+
+        self.num_update = 5  # Multiple updates per call
+        self.send_norm_constants_to_submodels()
+
+    def to(self, device: torch.device) -> 'TrajectorySampler':
+        """
+        Move the model to the specified device, including the GP model.
+        
+        Args:
+            device: Device to move the model to
+            
+        Returns:
+            Self for method chaining
+        """
+
+        self.device = device
+        # Move the main model
+        self.model = self.model.to(device)
+        
+        # Move normalization constants
+        self.x_mean = self.x_mean.to(device)
+        self.x_std = self.x_std.to(device)
+                
+        # Update submodels with new device
+        self.send_norm_constants_to_submodels()
+        
+        return self
+
+
+    def set_norm_constants(self, x_mean, x_std):
+        self.x_mean.data = x_mean.to(device=self.x_mean.device, dtype=self.x_mean.dtype)
+        self.x_std.data = x_std.to(device=self.x_std.device, dtype=self.x_std.dtype)
+
+    def send_norm_constants_to_submodels(self):
+        self.model.set_norm_constants(self.x_mean, self.x_std)
+        if self.gp is not None:
+            self.gp.set_norm_constants(self.x_mean, self.x_std)
+        if hasattr(self, 'value_function'):
+            self.value_function.set_norm_constants(self.x_mean, self.x_std)
+            self.value_function_target.set_norm_constants(self.x_mean, self.x_std)
+        if hasattr(self, 'value_function_2'):
+            self.value_function_2.set_norm_constants(self.x_mean, self.x_std)
+            self.value_function_target_2.set_norm_constants(self.x_mean, self.x_std)
+
+    def convert_yaw_to_sine_cosine(self, xu):
+        """
+        xu is shape (N, T, 36)
+        Replace the yaw in xu with sine and cosine and return the new xu
+        """
+        yaw = xu[14]
+        sine = torch.sin(yaw)
+        cosine = torch.cos(yaw)
+        xu_new = torch.cat([xu[:14], cosine.unsqueeze(-1), sine.unsqueeze(-1), xu[15:]], dim=-1)
+        return xu_new
+
+    def check_id(self, state, N, threshold=None, likelihood_only=False, return_samples=False):
+        """
+        Check if the state is in-distribution using the learned model.
+        
+        Args:
+            state: Current state to check
+            N: Number of samples for likelihood estimation
+            threshold: Fallback threshold if not using GP (legacy)
+            return_samples: Whether to return samples
+            deterministic: Whether to use deterministic decision (True) or 
+                          sample from Bernoulli (False)
+            
+        Returns:
+            Tuple of (is_in_distribution, likelihood, [samples if return_samples])
+        """
+        start = state[:4 * 3 + 3]
+        start_sine_cosine = self.convert_yaw_to_sine_cosine(start)
+        
+        # Use GPyTorch's fast prediction settings to speed up sampling
+        with torch.no_grad(), fast_pred_var(), fast_pred_samples(), cg_tolerance(1e-3):
+            samples, _, likelihood = self.sample(N=N, H=self.T, start=start_sine_cosine.reshape(1, -1),
+                    constraints=torch.ones(N, 3).to(device=state.device))
+        
+        likelihood = likelihood.reshape(N).mean()
+        likelihood = likelihood.item()
+        print('Likelihood:', likelihood)
+
+        if threshold is None:
+            threshold = -175  # Default threshold
+        
+        if likelihood_only:
+            if return_samples:
+                return likelihood, samples
+            else:
+                return likelihood
+        if likelihood < threshold:
+            print('State is out of distribution')
+            if return_samples:
+                return False, likelihood, samples
+            else:
+                return False, likelihood
+        if return_samples:
+            return True, likelihood, samples
+        else:
+            return True, likelihood
+
+    def sample(self, N, H=10, start=None, goal=None, constraints=None, past=None, project=False, no_grad=True, skip_likelihood=False, context_for_likelihood=True):
+        norm_start = None
+        norm_past = None
+        if start is not None and self.type != 'latent_diffusion':
+            norm_start = (start - self.x_mean[:self.dx]) / self.x_std[:self.dx]
+        else:
+            norm_start = start
+        if past is not None and self.type != 'latent_diffusion':
+            norm_past = (past - self.x_mean) / self.x_std
+        else:
+            norm_past = past
+        if project:
+            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project, context_for_likelihood=context_for_likelihood, residual_gp=self.gp)
+        else:
+            samples = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project, no_grad=no_grad, skip_likelihood=skip_likelihood, context_for_likelihood=context_for_likelihood)
+        # if len(samples) == N:
+        #     x = samples
+        #     c = None
+        #     likelihood = None
+        if len(samples) == 2:
+            x = samples[0]
+            c = None
+            likelihood = samples[1]
+        else:
+            x, c, likelihood = samples
+            
+        if self.type != 'latent_diffusion':
+            if project:
+                return x * self.x_std + self.x_mean, c, likelihood, None, (all_losses, all_samples, all_likelihoods)
+            elif not no_grad:
+                return x, c, likelihood
+            else:
+                return x * self.x_std + self.x_mean, c, likelihood
+        else:
+            return x, c, likelihood
+
+    def resample(self, start=None, goal=None, constraints=None, initial_trajectory=None, past=None, timestep=10):
+        norm_start = None
+        norm_initial_trajectory = None
+        norm_past = None
+        if start is not None:
+            norm_start = (start - self.x_mean[:self.dx]) / self.x_std[:self.dx]
+        if initial_trajectory is not None:
+            norm_initial_trajectory = (initial_trajectory - self.x_mean) / self.x_std
+        if past is not None:
+            norm_past = (past - self.x_mean) / self.x_std
+
+        x, c = self.model.resample(norm_start, goal, constraints, norm_initial_trajectory, norm_past,
+                                   timestep)
+        return x * self.x_std + self.x_mean, c
+
+    def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
+        loss = self.model.loss(trajectories, mask=mask, start=start, goal=goal, constraints=constraints)
+        if self.inverse_dynamics is not None and False:
+            u = trajectories[:, :-1, self.dx:]
+            x = trajectories[:, :-1, :self.dx]
+            next_x = trajectories[:, 1:, :self.dx]
+            x = torch.cat((x, next_x), dim=-1)
+            pred_u = self.inverse_dynamics(x)
+            loss_id = torch.mean((pred_u - u)**2)
+            loss = loss + 0.1 * loss_id
+        return loss
+
+    def grad(self, trajectories, t, start, goal, constraints=None):
+        return self.model.grad(trajectories, t, start, goal, constraints)
+
+    def likelihood(self, trajectories, mask=None, start=None, goal=None, context=None):
+        norm_traj = (trajectories - self.x_mean) / self.x_std
+        return self.model.likelihood(norm_traj, context)
+
+    def classifier_loss(self, trajectories, mask=None, context=None, label=None):
+        return self.model.classifier_loss(trajectories, context=context, mask=mask, label=label)

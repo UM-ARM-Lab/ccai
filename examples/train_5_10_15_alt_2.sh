@@ -1,0 +1,2 @@
+python train_allegro_screwdriver.py --config allegro_screwdriver_diffusion_5_10_15_7000_training_best_traj_only_diffuse_c_mode_alt_2.yaml
+# python train_allegro_screwdriver.py --config allegro_screwdriver_diffusion_5_10_15_7000_training_all_particles_diffuse_c_mode_alt_2.yaml

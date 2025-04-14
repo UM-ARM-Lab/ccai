@@ -9,6 +9,18 @@ import time
 
 full_finger_list = ['index', 'middle', 'ring', 'thumb']
 
+def get_arm_dof(arm_type):
+    if arm_type == 'robot':
+        arm_dof = 7
+    elif arm_type == 'floating_3d':
+        arm_dof = 3
+    elif arm_type == 'floating_6d':
+        arm_dof = 6
+    elif arm_type == 'None':
+        arm_dof = 0
+    else:
+        raise ValueError('Invalid arm type')
+    return arm_dof
 
 def partial_to_full_state(partial, fingers):
     """
@@ -212,3 +224,55 @@ def axis_angle_to_euler(axis_angle):
     matrix = tf.axis_angle_to_matrix(axis_angle)
     euler = tf.matrix_to_euler_angles(matrix, convention='XYZ')
     return euler
+
+def get_screwdriver_top_in_world(env_q, object_chain, world2robot_trans, object_asset_pos):
+    """
+    env_q: 1 dimension without batch
+    """
+    env_q = torch.cat((env_q, torch.zeros(1, device=env_q.device)), dim=-1) # add the screwdriver cap dim
+    screwdriver_top_obj_frame = object_chain.forward_kinematics(env_q.unsqueeze(0).to(object_chain.device))['screwdriver_cap']
+    screwdriver_top_obj_frame = screwdriver_top_obj_frame.get_matrix().reshape(4, 4)[:3, 3]
+    world2obj_trans = tf.Transform3d(pos=torch.tensor(object_asset_pos, device=object_chain.device).float(),
+                                        rot=torch.tensor([1, 0, 0, 0], device=object_chain.device).float(), device=object_chain.device)
+    screwdriver_top_world_frame = world2obj_trans.transform_points(screwdriver_top_obj_frame.unsqueeze(0)).squeeze(0)
+    return screwdriver_top_world_frame
+
+
+def euler_diff(euler1, euler2, representation='XYZ'):
+    """
+    :params euler1: B x 3
+    :params euler2: B x 3
+    :return diff: B x 1
+    compute the difference between two orientations represented by euler angles
+    """
+    ori1_mat = R.from_euler(representation, euler1).as_matrix()
+    ori2_mat = R.from_euler(representation, euler2).as_matrix()
+    diff = tf.so3_relative_angle(torch.tensor(ori1_mat), torch.tensor(ori2_mat), cos_angle=False).detach().cpu()
+    return diff
+
+def convert_yaw_to_sine_cosine(xu):
+    """
+    xu is shape (N, T, 36)
+    Replace the yaw in xu with sine and cosine and return the new xu
+    """
+    yaw = xu[..., 14]
+    sine = torch.sin(yaw)
+    cosine = torch.cos(yaw)
+    xu_new = torch.cat([xu[..., :14], cosine.unsqueeze(-1), sine.unsqueeze(-1), xu[..., 15:]], dim=-1)
+    return xu_new
+
+def convert_sine_cosine_to_yaw(xu):
+    """
+    xu is shape (N, T, 37)
+    Replace the sine and cosine in xu with yaw and return the new xu
+    """
+    orig_type = torch.is_tensor(xu)
+    if not orig_type:
+        xu = torch.tensor(xu)
+    sine = xu[..., 15]
+    cosine = xu[..., 14]
+    yaw = torch.atan2(sine, cosine)
+    xu_new = torch.cat([xu[..., :14], yaw.unsqueeze(-1), xu[..., 16:]], dim=-1)
+    if not orig_type:
+        xu_new = xu_new.numpy()
+    return xu_new
