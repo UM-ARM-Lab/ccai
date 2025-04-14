@@ -47,7 +47,7 @@ def get_args():
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_id_ood_states.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_project_ood_states.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_id_ood_states.yaml')
-    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_5_10_15_7000_training_best_traj_only_diffuse_c_mode_alt_2.yaml')
+    parser.add_argument('--config', type=str, default='allegro_valve_diffusion.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_recovery_best_traj_only_gen_sim_data.yaml')
     return parser.parse_args()
 
@@ -1074,7 +1074,7 @@ if __name__ == "__main__":
     print(args.config)
     config = yaml.safe_load(
         pathlib.Path(f'{CCAI_PATH}/config/training/{args.config}').read_text())
-
+    dx_original = config['dx']
     if config['sine_cosine']:
         dx = config['dx'] + 1
         config['dx'] = dx
@@ -1258,6 +1258,7 @@ if __name__ == "__main__":
     elif not config.get('project_ood_states', False):
         train_dataset = AllegroScrewDriverDataset([p for p in data_path.glob('*train_data*')],
                                                 config['T']-1,
+                                                dx_original,
                                                 cosine_sine=config['sine_cosine'],
                                                 states_only=config['du'] == 0,
                                                 skip_pregrasp=config['skip_pregrasp'],

@@ -6,9 +6,9 @@ num_steps: 8
 num_turns: 1
 max_recovery_stages: 4
 num_trials: 10
-num_episodes: 25
+num_episodes: 50
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_model_fixed_cpc_eval_no_perturb_during_recovery_orig_contact'
+experiment_name: 'allegro_screwdriver_recovery_model_perturb_during_recovery'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -53,11 +53,11 @@ recovery_diff_traj: True
 obj_gravity: True
 type: 'diffusion'
 recovery_controller: 'csvgd'
-recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_5_10_15_15000_training_fixed_cpc_diffusion'
-model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_5_10_15_15000_training_fixed_cpc_diffusion/allegro_screwdriver_diffusion.pt'
+recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_perturb_during_recovery_diffusion'
+model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_perturb_during_recovery_diffusion/allegro_screwdriver_diffusion.pt'
 model_dir: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion'
 model_path_orig: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
-likelihood_threshold: -175.0
+likelihood_threshold: -160.0
 # likelihood_threshold: -1.0
 drop_threshold: -1250
 project_threshold: -105.
@@ -75,7 +75,7 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:1'
+    device: 'cuda:0'
     online_iters: 25
     warmup_iters: 50
     resample_steps: 16

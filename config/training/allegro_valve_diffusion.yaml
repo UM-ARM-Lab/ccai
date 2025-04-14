@@ -1,17 +1,28 @@
 ---
-model_name: 'allegro_random_sdf_dataset_sine_cosine_256_timesteps_diffuse_class_model_long_train_batch_dropout_p_0.1'
-T: 16
-dx: 9
-du: 8
+model_name: 'allegro_valve_task'
+T: 7
+dx: 13
+du: 21
 load_checkpoint: False
-epochs: 10000
-batch_size: 128
+load_model: False
+train_diffusion: True
+train_classifier: False
+eval_classifier: False
+plot: False
+vis_dataset: False
+epochs: 15000
+balance: 'none'
+classifier_epochs: 100
+batch_size: 256
 lr: 1.0e-4
 model_type: 'diffusion'
-data_directory: 'test_collision_sdf'
-device: 'cuda:0'
-test_every: 500
-save_every: 500
+discriminator_guidance: True
+inverse_dynamics: False
+data_directory: 'allegro_valve_task_data_friction_0'
+best_traj_only: False
+device: 'cuda:1'
+test_every: 9999999999
+save_every: 1000
 normalize_data: True
 constraint_embedding_dim: 64
 constrained: False
@@ -21,12 +32,13 @@ hidden_dim: 128
 unconditional: True
 sine_cosine: True
 use_class: True
-diffuse_class: True
+diffuse_class: False
 # Only applies to using EMA for training
 use_ema: True
 ema_decay: 0.995
 ema_warmup_steps: 1000
 ema_update_every: 10
+skip_pregrasp: True
 
 test_directory: 'quadrotor_compose'
 test_samples: False

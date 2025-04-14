@@ -210,7 +210,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     start = state['q'].reshape(-1, 4 * num_fingers + 4).to(device=params['device'])[0]
 
     if params.get('external_wrench_perturb', False):
-        rand_pct = (np.random.rand()) / 3
+        rand_pct = .25#(np.random.rand()) / (.5-1/4) + 1/4
         print(f'Random perturbation %: {rand_pct:.2f}')
     # if params['compute_recovery_trajectory']:
     #     start_sine_cosine = convert_yaw_to_sine_cosine(start[:4 * num_fingers + obj_dof])
@@ -372,7 +372,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         data['pre_action_likelihoods'].append([])
         data['final_likelihoods'].append([])
         orig_torque_perturb = env.external_wrench_perturb if params['mode'] != 'hardware' else False
-        # if recover and params['mode'] != 'hardware':
+        # if recover and params['mode'] != 'hardware' and not params.get('model_path_orig', None):
         #     env.set_external_wrench_perturb(False)
         # Initialize variables that might be referenced before assignment
         pre_recovery_state = None
@@ -406,7 +406,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         roll_abs = np.abs(state[-3].item())
         pitch_abs = np.abs(state[-2].item())
-        drop_cutoff = .25
+        drop_cutoff = .35
         dropped = (roll_abs > drop_cutoff) or (pitch_abs > drop_cutoff) 
         dropped = dropped and params['recovery_controller'] == 'mppi'
         if dropped:
@@ -688,10 +688,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     id_check, final_likelihood = True, None
                 else:
                     id_check, final_likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15))
-                
+                if final_likelihood is not None:
+                    data['pre_action_likelihoods'][-1].append(final_likelihood)
                 roll_abs = np.abs(state[-3].item())
                 pitch_abs = np.abs(state[-2].item())
-                drop_cutoff = .25
+                drop_cutoff = .35
 
                 # Only return based on dropped if we are using MPPI
                 dropped = (roll_abs > drop_cutoff) or (pitch_abs > drop_cutoff)
@@ -1629,12 +1630,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         roll_abs = np.abs(start[-3].item())
         pitch_abs = np.abs(start[-2].item())
-        drop_cutoff = .25
+        drop_cutoff = .35
         dropped = (roll_abs > drop_cutoff) or (pitch_abs > drop_cutoff)
 
         # dropped = likelihood < -1250
         if dropped:
             print('Probably dropped the object')
+            print(start[-obj_dof:])
             done = True
             # add = False
         data['dropped'] = dropped
@@ -1773,6 +1775,20 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     if params.get('live_recovery', False) and len(data['final_likelihoods'][-1]) == 0:
         id, likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15))
         data['final_likelihoods'][-1].append(likelihood)
+        data_save = deepcopy(data)
+        for t in range(1, 1 + params['T']):
+            try:
+                data_save[t]['plans'] = torch.stack(data_save[t]['plans']).cpu().numpy()
+                data_save[t]['starts'] = torch.stack(data_save[t]['starts']).cpu().numpy()
+                data_save[t]['contact_points'] = torch.stack(data_save[t]['contact_points']).cpu().numpy()
+                data_save[t]['contact_distance'] = torch.stack(data_save[t]['contact_distance']).cpu().numpy()
+                data_save[t]['contact_state'] = torch.stack(data_save[t]['contact_state']).cpu().numpy()
+            except:
+                pass
+        
+        pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
+        pickle.dump(data_save, open(f"{fpath}/traj_data.p", "wb"))
+        del data_save
 
     env.reset()
     return -1#torch.min(final_distance_to_goal).cpu().numpy()
@@ -1783,7 +1799,7 @@ if __name__ == "__main__":
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_safe_rl_recovery.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl_data_gen_wrench_perturb.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl_wrench_perturb_new_project.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl_wrench_perturb_new_project.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_OOD_ID_perturbed_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_OOD_ID_orig_likelihood.yaml').read_text())

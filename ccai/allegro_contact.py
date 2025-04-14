@@ -872,11 +872,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
             contact_points_object = torch.stack([self.contact_points[finger][0] for finger in self.regrasp_fingers], dim=0)
             self.contact_points_object = contact_points_object
-            self._regrasp_dz += self.num_regrasps  # Contact region constraint
-            self._regrasp_dh = self._regrasp_dz * T  # inequality
-            # self._regrasp_dh += self.num_regrasps
-            self._regrasp_dh_constant = 0
-            self._regrasp_dh_per_t = self._regrasp_dz
+
             self.do_contact_patch_constraint = True
 
         if self.num_regrasps > 0:

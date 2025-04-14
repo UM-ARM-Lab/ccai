@@ -63,7 +63,7 @@ print("CCAI_PATH", CCAI_PATH)
 obj_dof = 1
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
-sys.stdout = open('./examples/logs/allegro_valve_test_action_perturb_friction.log', 'w', buffering=1)
+# sys.stdout = open('./examples/logs/allegro_valve_test_action_perturb.log', 'w', buffering=1)
 
 def vector_cos(a, b):
     return torch.dot(a.reshape(-1), b.reshape(-1)) / (torch.norm(a.reshape(-1)) * torch.norm(b.reshape(-1)))
@@ -201,7 +201,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         env.frame_fpath = None
         env.frame_id = None
     start = state['q'].reshape(-1, 4 * num_fingers + obj_dof).to(device=params['device'])[0]
-
+    initial_angle = start[-1]
     if params.get('external_wrench_perturb', False):
         rand_pct = (np.random.rand()) / 3
         print(f'Random perturbation %: {rand_pct:.2f}')
@@ -223,9 +223,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         }
     else:
         min_force_dict = {
-            'thumb': 0,
-            'middle': 0,
-            'index': 0,
+            'thumb': 0.5,
+            'middle': 0.5,
+            'index': 0.5,
         }
 
     # if params.get('compute_recovery_trajectory', False):
@@ -282,12 +282,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     )
 
     index_regrasp_planner = None
-    middle_regrasp_planner = None
-    thumb_regrasp_planner = None
     thumb_and_middle_regrasp_planner = None
     turn_planner = None
-
-
 
     if model_path is not None:
         # if not params.get('live_recovery', False):
@@ -356,6 +352,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # reset planner
         state = env.get_state()
         state = state['q'].reshape(-1, 4 * num_fingers + obj_dof)[0].to(device=params['device'])
+        initial_angle = state[-1]
         planned_trajectories = []
         actual_trajectory = []
         optimizer_paths = []
@@ -487,7 +484,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     proj_path=None,
                     project=True,
                 )
-                planner = PositionControlConstrainedSVGDMPC(middle_regrasp_problem, recovery_params)
+                planner = PositionControlConstrainedSVGDMPC(thumb_and_middle_regrasp_problem, recovery_params)
             elif mode == 'thumb' and planner is None:
                 thumb_regrasp_problem = AllegroValve(
                     start=state[:4 * num_fingers + obj_dof],
@@ -511,7 +508,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     proj_path=None,
                     project=True,
                 )
-                planner = PositionControlConstrainedSVGDMPC(thumb_regrasp_problem, recovery_params)
+                planner = PositionControlConstrainedSVGDMPC(thumb_and_middle_regrasp_problem, recovery_params)
             elif mode == 'turn' and planner is None:
                 tp = AllegroValve(
                     start=state[:4 * num_fingers + obj_dof],
@@ -681,7 +678,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     id_check, final_likelihood = True, None
                 else:
                     id_check, final_likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15))
-                
+                if final_likelihood is not None:
+                    data['pre_action_likelihoods'][-1].append(final_likelihood)
                 # Only return based on dropped if we are using MPPI
                 dropped = False
                 dropped = dropped and params['recovery_controller'] == 'mppi'
@@ -809,10 +807,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             if params.get('perturb_action', False):# and mode == 'turn':
                 # rand_pct = .75 if not params.get('shortcut_trajectory', False) else .25
                 # rand_pct = .75
-                rand_pct = .5
+                rand_pct = 1
                 if np.random.rand() < rand_pct:
                     r = np.random.rand()
-                    std = .2 if perturb_this_trial else .0
+                    std = .1 if perturb_this_trial else .0
                     # if mode != 'turn':
                     #     std /= 4
                     # if r > .66:
@@ -1193,7 +1191,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     # <= so because pregrasp will iterate the all_stage counter
 
     if not params.get('live_recovery', False):
-        contact_sequence = ['turn', 'turn']
+        contact_sequence = ['turn']
 
         # while len(contact_sequence) < 50:
         #     contact_options = ['index', 'middle', 'thumb']
@@ -1616,9 +1614,23 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     if params.get('live_recovery', False) and len(data['final_likelihoods'][-1]) == 0:
         id, likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15))
         data['final_likelihoods'][-1].append(likelihood)
-
+        data_save = deepcopy(data)
+        for t in range(1, 1 + params['T']):
+            try:
+                data_save[t]['plans'] = torch.stack(data_save[t]['plans']).cpu().numpy()
+                data_save[t]['starts'] = torch.stack(data_save[t]['starts']).cpu().numpy()
+                data_save[t]['contact_points'] = torch.stack(data_save[t]['contact_points']).cpu().numpy()
+                data_save[t]['contact_distance'] = torch.stack(data_save[t]['contact_distance']).cpu().numpy()
+                data_save[t]['contact_state'] = torch.stack(data_save[t]['contact_state']).cpu().numpy()
+            except:
+                pass
+        
+        pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
+        pickle.dump(data_save, open(f"{fpath}/traj_data.p", "wb"))
+        del data_save
+        
     env.reset()
-    return -1#torch.min(final_distance_to_goal).cpu().numpy()
+    return (state[-1] - initial_angle).item()
 
 
 if __name__ == "__main__":
@@ -1840,6 +1852,7 @@ if __name__ == "__main__":
     num_episodes = config['num_episodes']
     if 'end_ind' in config:
         num_episodes = config['end_ind']
+    all_turns = []
     for i in tqdm(range(start_ind, num_episodes, step_size)):
         print(f'\nTrial {i+1}')
     # for i in tqdm([1, 2, 4, 7]):
@@ -1877,8 +1890,10 @@ if __name__ == "__main__":
 
             if not perturb_this_trial:
                 print('No action perturbation this trial')
-            final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node,
+            turn_amount = do_trial(env, params, fpath, sim_env, ros_copy_node,
                                             seed=i, proj_path=None, perturb_this_trial=perturb_this_trial)
+            all_turns.append(turn_amount)
+            print(f'Average turn amount: {np.mean(all_turns)} over {len(all_turns)} trials')
             succ = True
 
         print(results)

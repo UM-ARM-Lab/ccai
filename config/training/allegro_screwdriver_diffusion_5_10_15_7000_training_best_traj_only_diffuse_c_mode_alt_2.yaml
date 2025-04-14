@@ -18,7 +18,7 @@ lr: 1.0e-4
 model_type: 'diffusion'
 discriminator_guidance: True
 inverse_dynamics: False
-data_directory: 'allegro_screwdriver_recovery_data_new_perturb_profile_perturb_during_recovery'
+data_directory: 'allegro_screwdriver_recovery_data_new_perturb_profile_perturb_during_recovery_rand_pct_.33_fm_3'
 device: 'cuda:0'
 test_every: 9999999999
 save_every: 500

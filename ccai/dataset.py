@@ -211,7 +211,7 @@ class AllegroValveDataset(Dataset):
 
 class AllegroScrewDriverDataset(Dataset):
 
-    def __init__(self, folders, max_T, cosine_sine=False, states_only=False, 
+    def __init__(self, folders, max_T, dx, cosine_sine=False, states_only=False, 
                  skip_pregrasp=False, type_='diffusion', exec_only=False,
                  best_traj_only=False, q_learning_constraint_violation=False):
         super().__init__()
@@ -224,8 +224,11 @@ class AllegroScrewDriverDataset(Dataset):
         masks = []
 
         min_t = 1
-
+        # if self.cosine_sine:
+        #     dx += 1
+        self.dx = dx
         use_actual_traj = True
+        self.screwdriver = 'screwdriver' in str(folders[0])
         for fpath in folders:
             path = pathlib.Path(fpath)
             plans = []
@@ -243,7 +246,8 @@ class AllegroScrewDriverDataset(Dataset):
 
                     need_to_continue = False
                     
-                    dropped_recovery = data['dropped_recovery']
+                    # dropped_recovery = data['dropped_recovery']
+                    dropped_recovery = False
                     # post_recovery_likelihoods = [i for i in data['final_likelihoods'] if len(i) == 1]
                     # post_recovery_likelihood_bool = []
                     # for fl in post_recovery_likelihoods:
@@ -252,29 +256,33 @@ class AllegroScrewDriverDataset(Dataset):
                     #     else:
                     #         post_recovery_likelihood_bool.append(True)
                     for t in range(max_T, min_t - 1, -1):
-
-                        # Filter out any trajectories with contact_state [1, 1, 1]
-                        new_starts = []
-                        for s in data[t]['starts']:
-                            if (s.sum(0) == 0).any():
-                            # if s.shape[-1] != 36:
-                                new_starts.append(s)
-                        new_plans = []
-                        for p in data[t]['plans']:
-                            # if p.shape[-1] != 36:
-                            #     new_plans.append(p)
-                            if (p.sum(0).sum(0) == 0).any():
-                                new_plans.append(p)
-
                         new_cs = []
+                        cs_bool = []
                         for c in data[t]['contact_state']:
                             # new_cs.append(c.sum() != 3)
-                            if c.sum() != 3:
+                            if not c.sum() != 3:
                                 # if isinstance(c, np.ndarray):
                                 #     c = torch.from_numpy(c).float()
                                 if torch.is_tensor(c):
                                     c = c.cpu().numpy()
                                 new_cs.append(c)
+                                cs_bool.append(True)
+                            else:
+                                cs_bool.append(False)
+                        # Filter out any trajectories with contact_state [1, 1, 1]
+                        new_starts = []
+                        for idx, s in enumerate(data[t]['starts']):
+                            if cs_bool[idx]:
+                            # if s.shape[-1] != 36:
+                                new_starts.append(s)
+                        new_plans = []
+                        for idx, p in enumerate(data[t]['plans']):
+                            # if p.shape[-1] != 36:
+                            #     new_plans.append(p)
+                            if cs_bool[idx]:
+                                new_plans.append(p)
+
+
                         if len(new_starts) == 0:
                             print('No starts')
                             need_to_continue = True
@@ -366,10 +374,10 @@ class AllegroScrewDriverDataset(Dataset):
 
                             if type_ == 'diffusion':
                                 # duplicated first control, rearrange so that it is (x_0, u_0, x_1, u_1, ..., x_{T-1}, u_{T-1}, x_T, 0)
-                                traj[:, :, :-1, 15:] = traj[:, :, 1:, 15:]
-                                traj[:, :, -1, 15:] = 0
+                                traj[:, :, :-1, self.dx:] = traj[:, :, 1:, self.dx:]
+                                traj[:, :, -1, self.dx:] = 0
                             elif type_ == 'cnf':
-                                traj[:, :, 0, 15:] = 0
+                                traj[:, :, 0, self.dx:] = 0
                             trajectories.append(traj)
 
                     # if exec_only:
@@ -407,49 +415,46 @@ class AllegroScrewDriverDataset(Dataset):
         self.trajectories = torch.from_numpy(self.trajectories).float()
         self.masks = torch.from_numpy(self.masks).float()
         if states_only:
-            self.trajectories = self.trajectories[:, :, :15]
+            self.trajectories = self.trajectories[:, :, :self.dx]
         self.trajectory_type = torch.from_numpy(self.trajectory_type)
         self.trajectory_type = 2 * (self.trajectory_type - 0.5)  # scale to be [-1, 1]
 
         print(self.trajectories.shape)
         # TODO consider alternative SO3 representation that is better for learning
-        if self.cosine_sine:
-            dx = self.trajectories.shape[-1] + 1
-        else:
-            dx = self.trajectories.shape[-1]
 
-        self.masks = self.masks[:, :, None].repeat(1, 1, dx)
+
+        self.masks = self.masks[:, :, None].repeat(1, 1, self.trajectories.shape[-1] + int(self.cosine_sine))  # for states
         self.mean = 0
         self.std = 1
 
-        pre_shape = self.trajectories.shape
-        final_roll = self.trajectories[:, -1, 12].abs()
-        final_pitch = self.trajectories[:, -1, 13].abs()
-        dropped = (final_roll > .25) | (final_pitch > .25)
-        self.trajectories = self.trajectories[~dropped]
-        self.masks = self.masks[~dropped]
-        self.trajectory_type = self.trajectory_type[~dropped]
+        # pre_shape = self.trajectories.shape
+        # final_roll = self.trajectories[:, -1, 12].abs()
+        # final_pitch = self.trajectories[:, -1, 13].abs()
+        # dropped = (final_roll > .25) | (final_pitch > .25)
+        # self.trajectories = self.trajectories[~dropped]
+        # self.masks = self.masks[~dropped]
+        # self.trajectory_type = self.trajectory_type[~dropped]
 
-        post_shape = self.trajectories.shape
+        # post_shape = self.trajectories.shape
 
-        print(f'# Trajectories: {pre_shape[0]} -> {post_shape[0]}')
+        # print(f'# Trajectories: {pre_shape[0]} -> {post_shape[0]}')
 
-        final_yaw = self.trajectories[:, -1, -1]
-        initial_yaw = self.trajectories[:, 0, -1]
-        yaw_change = final_yaw - initial_yaw
-        print(yaw_change.mean())
+        # final_yaw = self.trajectories[:, -1, -1]
+        # initial_yaw = self.trajectories[:, 0, -1]
+        # yaw_change = final_yaw - initial_yaw
+        # print(yaw_change.mean())
 
-        bad_turn = yaw_change > -.5
-        self.trajectories = self.trajectories[~bad_turn]
-        self.masks = self.masks[~bad_turn]
-        self.trajectory_type = self.trajectory_type[~bad_turn]
-        post_bad_turn_shape = self.trajectories.shape
+        # bad_turn = yaw_change > -.5
+        # self.trajectories = self.trajectories[~bad_turn]
+        # self.masks = self.masks[~bad_turn]
+        # self.trajectory_type = self.trajectory_type[~bad_turn]
+        # post_bad_turn_shape = self.trajectories.shape
 
-        print(f'# Trajectories: {post_shape[0]} -> {post_bad_turn_shape[0]}')
-        final_yaw = self.trajectories[:, -1, -1]
-        initial_yaw = self.trajectories[:, 0, -1]
-        yaw_change = final_yaw - initial_yaw
-        print(yaw_change.mean())
+        # print(f'# Trajectories: {post_shape[0]} -> {post_bad_turn_shape[0]}')
+        # final_yaw = self.trajectories[:, -1, -1]
+        # initial_yaw = self.trajectories[:, 0, -1]
+        # yaw_change = final_yaw - initial_yaw
+        # print(yaw_change.mean())
         self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.75)
         self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.5)
         self.states_only = states_only
@@ -466,15 +471,15 @@ class AllegroScrewDriverDataset(Dataset):
 
         # TODO: figure out how to do data augmentation on screwdriver angle
         # a little more complex due to rotation representation
-        dx = 15
-
-        ## randomly perturb angle of screwdriver
-        traj[:, dx-1] += 2 * np.pi * (np.random.rand() - 0.5)
+        dx = self.dx
+        if self.screwdriver:
+            ## randomly perturb angle of screwdriver
+            traj[:, dx-1] += 2 * np.pi * (np.random.rand() - 0.5)
 
         if self.cosine_sine:
-                traj_q = traj[:, :14]
-                traj_theta = traj[:, 14][:, None]
-                traj_u = traj[:, 15:]
+                traj_q = traj[:, :(dx-1)]
+                traj_theta = traj[:, (dx-1)][:, None]
+                traj_u = traj[:, dx:]
                 dx = dx + 1
                 traj = torch.cat((traj_q, torch.cos(traj_theta), torch.sin(traj_theta), traj_u), dim=1)
 
@@ -511,56 +516,21 @@ class AllegroScrewDriverDataset(Dataset):
         std = np.sqrt(np.average((x - mean) ** 2, weights=mask, axis=0))
 
         if self.states_only:
-            dim = 15
+            dim = self.dx
         else:
-            dim = 15 + 12 + 9
+            dim =self.dx + 12 + 9
+
+        dxm1 = self.dx-1
+        dxp1 = self.dx+1
 
         # for angle we force to be between [-1, 1]
         if self.cosine_sine:
             self.mean = torch.zeros(dim + 1)
             self.std = torch.ones(dim + 1)
-            self.mean[:14] = mean[:14]
-            self.std[:14] = torch.from_numpy(std[:14]).float()
-            self.mean[16:] = mean[15:]
-            self.std[16:] = torch.from_numpy(std[15:]).float()
-        else:
-            # mean[12:15] = 0
-            # std[12:15] = np.pi
-            # mean[14] = 0
-            # std[14] = np.pi
-            self.mean = mean
-            self.std = torch.from_numpy(std).float()
-
-    def set_norm_constants(self, mean, std):
-        self.mean = mean
-        self.std = std
-
-    def get_norm_constants(self):
-        return self.mean, self.std
-
-    def compute_norm_constants(self):
-        # compute norm constants not including the zero padding
-        x = self.trajectories.clone()
-        # x[:, :, 8] += 2 * np.pi * (torch.rand(x.shape[0], 1) - 0.5)
-        x = x.reshape(-1, x.shape[-1])
-
-        mask = self.masks[:, :, 0].reshape(-1)
-        mean = x.sum(dim=0) / mask.sum()
-        std = np.sqrt(np.average((x - mean) ** 2, weights=mask, axis=0))
-
-        if self.states_only:
-            dim = 15
-        else:
-            dim = 15 + 12 + 9
-
-        # for angle we force to be between [-1, 1]
-        if self.cosine_sine:
-            self.mean = torch.zeros(dim + 1)
-            self.std = torch.ones(dim + 1)
-            self.mean[:14] = mean[:14]
-            self.std[:14] = torch.from_numpy(std[:14]).float()
-            self.mean[16:] = mean[15:]
-            self.std[16:] = torch.from_numpy(std[15:]).float()
+            self.mean[:dxm1] = mean[:dxm1]
+            self.std[:dxm1] = torch.from_numpy(std[:dxm1]).float()
+            self.mean[dxp1:] = mean[self.dx:]
+            self.std[dxp1:] = torch.from_numpy(std[self.dx:]).float()
         else:
             # mean[12:15] = 0
             # std[12:15] = np.pi
