@@ -14,11 +14,21 @@ from functools import partial
 import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import Normal
+import torch.nn.functional as F
+
+from allegro_screwdriver import AllegroScrewdriver
+import copy
+from torch_cg import cg_batch
+
+torch.autograd.set_detect_anomaly(True)
 
 sys.path.append('..')
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
+
+sys.stdout = open('./examples/logs/allegro_screwdriver_td3.log', 'w', 1)
+sys.stdout.reconfigure(line_buffering=True)
 
 class AllegroScrewdriverRLEnv:
     """Custom environment for the Allegro Hand screwdriver turning task"""
@@ -146,7 +156,7 @@ class AllegroScrewdriverRLEnv:
         obs = self._get_obs()
         
         # Calculate reward
-        reward = self._compute_reward(obs)
+        reward = self._compute_reward(obs, action)
         
         # Extract orientation
         orientation = obs[self.control_dim:self.control_dim + self.obj_dof]
@@ -165,19 +175,22 @@ class AllegroScrewdriverRLEnv:
         
         return obs, reward, done
 
-    def _compute_reward(self, obs):
+    def _compute_reward(self, obs, action):
         # Extract orientation
         orientation = obs[self.control_dim:self.control_dim + self.obj_dof]
         roll, pitch, yaw = orientation
         
         # Reward turning (yaw change)
         turn_reward = -(yaw - self.initial_yaw) * 1.0
-        
+        self.initial_yaw = yaw  # Update initial yaw for next step
         # Penalize deviation from upright position
-        upright_penalty = (roll.abs() + pitch.abs()) * 1.0
+        # upright_penalty = (roll.abs() + pitch.abs()) * 1.0
         
         # Calculate total reward
-        reward = turn_reward - upright_penalty
+        reward = turn_reward #- upright_penalty
+
+        # Compute constraint violation penalty
+
         
         return reward
 
@@ -189,18 +202,32 @@ class AllegroScrewdriverRLEnv:
 # Import necessary ODE integration package
 from torchdiffeq import odeint
 
-# Neural network for the actor (policy) using ODE flow
+# Neural network for the actor (deterministic policy)
 class ActorNetwork(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_dim=256, constraint_problem=None):
+    def __init__(self, input_dim, output_dim, force_dim, action_low, action_high, hidden_dim=256, constraint_problem=None):
         super(ActorNetwork, self).__init__()
         
         # Store dimensions
         self.input_dim = input_dim
         self.output_dim = output_dim
-        self.combined_dim = input_dim + output_dim
+        self.force_dim = force_dim
+        self.combined_dim_no_force = input_dim + output_dim
+        self.combined_dim = input_dim + output_dim + force_dim
+
+        self.action_low = action_low
+        self.action_high = action_high
         
         # Vector field network that models the dynamics of the state-action system
         self.vector_field = nn.Sequential(
+            nn.Linear(self.combined_dim*2, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, self.combined_dim*2)
+        )
+
+        # Predicts initial x dot for ODE integration
+        self.xdot0 = nn.Sequential(
             nn.Linear(self.combined_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
@@ -208,44 +235,170 @@ class ActorNetwork(nn.Module):
             nn.Linear(hidden_dim, self.combined_dim)
         )
         
-        # Log standard deviation parameter
-        self.log_std = nn.Parameter(torch.zeros(output_dim))
-        
         # Store constraint problem for projection
         self.constraint_problem = constraint_problem
+
+        self.fingers = ['index', 'middle', 'thumb']
+        index_x_max = torch.tensor([0.47, 1.6099999999, 1.7089999, 1.61799999])
+        index_x_min = torch.tensor([-0.47, -0.195999999999, -0.174000000, -0.227])
+        thumb_x_max = torch.tensor([1.396, 1.1629999999999, 1.644, 1.71899999])
+        thumb_x_min = torch.tensor([0.26, -0.1049999999, -0.1889999999, -0.162])
+        joint_min = {'index': index_x_min, 'middle': index_x_min, 'ring': index_x_min, 'thumb': thumb_x_min}
+        joint_max = {'index': index_x_max, 'middle': index_x_max, 'ring': index_x_max, 'thumb': thumb_x_max}
+        self.x_max = torch.cat([joint_max[finger] for finger in self.fingers])
+        self.x_min = torch.cat([joint_min[finger] for finger in self.fingers])
+        self.robot_joint_x_max = torch.cat([joint_max[finger] for finger in self.fingers]).to('cuda:0')
+        self.robot_joint_x_min = torch.cat([joint_min[finger] for finger in self.fingers]).to('cuda:0')
+
+        self.robot_joint_x_min = torch.cat([self.robot_joint_x_min, torch.tensor([-torch.pi, -torch.pi, -torch.pi]).to('cuda:0')])
+        self.robot_joint_x_max = torch.cat([self.robot_joint_x_max, torch.tensor([torch.pi, torch.pi, torch.pi]).to('cuda:0')])
+
+        self.constrained_dynamics = partial(self.dynamics, constrained=True)
+        self.unconstrained_dynamics = partial(self.dynamics, constrained=False)
         
-    def dynamics(self, t, x):
+        # Add timing metrics dictionary
+        self.timing_metrics = {
+            'total_time': [],
+            'clamp_setup': [],
+            'preprocessing': [],
+            'constraint_computation': [],
+            'masks_creation': [],
+            'matrix_solving': [],
+            'projection_application': [],
+            'calls': 0
+        }
+        
+    def forward(self, x, constrained=True):
+        if len(x.shape) == 1:
+            x = x.unsqueeze(0)
+        
+        batch_size = x.shape[0]
+        
+        # Instead of using stochastic policy, we use a deterministic one for TD3
+        # Generate zero vectors instead of random normal ones
+        z = torch.zeros(batch_size, self.output_dim+self.force_dim, device=x.device)
+        
+        # Concatenate state and zero vector
+        x_z = torch.cat([x, z], dim=-1)
+
+        # x_z_dot0 = self.xdot0(x_z)
+        x_z_dot0 = torch.zeros_like(x_z)
+
+        integration_input = torch.cat([x_z, x_z_dot0], dim=-1)
+        
+        # Integrate ODE from t=0 to t=1
+        integration_times = torch.tensor([0.0, 1.0], device=x.device)
+
+        # Unsqueeze for CSVTO
+        if constrained:
+            dynamics = self.constrained_dynamics
+            integration_input = integration_input.unsqueeze(1)  # Add time dimension for odeint
+        else:
+            dynamics = self.unconstrained_dynamics
+        trajectory = odeint(dynamics, integration_input, integration_times, method='rk4', options={'step_size': .3})
+        if constrained:
+            trajectory = trajectory.squeeze(1)
+        trajectory = trajectory.permute(1, 0, 2)  # Change to (batch_size, time_steps, dim)
+        trajectory[..., self.combined_dim_no_force:self.combined_dim] = torch.clamp(trajectory[..., self.combined_dim_no_force:self.combined_dim].clone(), -2, 2)
+
+        if constrained:
+            self.constraint_problem.start = trajectory[0, 0, :15]
+            self.constraint_problem._preprocess(trajectory[:, 1:2])
+
+            u_hat = self.constraint_problem.solve_for_u_hat(trajectory[:, 1:2])
+            
+            # Extract the final point of the trajectory
+            final_state = trajectory[0, -1]
+
+            final_state[self.input_dim:self.combined_dim_no_force] = u_hat.squeeze(1)
+            
+            # Return deterministic action and force
+            action = final_state[self.input_dim:self.combined_dim_no_force]
+            action = torch.clamp(action, self.action_low, self.action_high)
+            force = final_state[self.combined_dim_no_force:self.combined_dim]
+        else:
+            final_state = trajectory[:, -1]
+            action_ = final_state[:, self.input_dim:self.combined_dim_no_force]
+            action = torch.clamp(action_.clone(), self.action_low, self.action_high)
+            force_ = final_state[:, self.combined_dim_no_force:self.combined_dim]
+            force = torch.clamp(force_.clone(), -2, 2)
+        return action, force
+
+
+    def dynamics(self, t, x, constrained=True):
         """ODE function representing the vector field"""
         # Apply vector field
         dx = self.vector_field(x)
         
         # Apply constraint projection if constraint_problem is available
-        if self.constraint_problem is not None:
+        if self.constraint_problem is not None and constrained:
             dx = self.project_vector_field(x, dx)
             
         return dx
     
+    def compute_constraint_violation(self, obs, action, force):
+        
+        obs = obs.reshape(1, 1, -1)
+        action = action.reshape(1, 1, -1)
+        force = force.reshape(1, 1, -1)
+        decision_variable = torch.cat([obs, action,force], dim=-1)
+        self.constraint_problem._preprocess(decision_variable, projected_diffusion=True)
+        C, _, _ = self.constraint_problem.combined_constraints(
+            decision_variable,
+            compute_hess=False,
+            compute_grads=False,
+            projected_diffusion=True,
+            include_slack=False,
+            compute_inequality=True,
+            include_deriv_grad=False
+        )
+        return C.sum()   
+
     def project_vector_field(self, x, dx):
         """Project vector field to satisfy constraints"""
+        start_time = time.time()
+        self.timing_metrics['calls'] += 1
+        
+        # Phase 1: Initial setup and clipping
+        clamp_start = time.time()
         batch_size = x.shape[0]
+        x_ = x.clone()
+        x_[:, :, :self.input_dim] = torch.clamp(x[:, :, :self.input_dim], self.robot_joint_x_min.to('cuda:0'), self.robot_joint_x_max.to('cuda:0'))
+        x_[:, :, self.input_dim:self.combined_dim_no_force] = torch.clamp(x[:, :, self.input_dim:self.combined_dim_no_force], self.action_low, self.action_high)
+        x_[:, :, self.combined_dim_no_force:] = torch.clamp(x[:, :, self.combined_dim_no_force:], -2, 2)
+        x = x_
+        clamp_end = time.time()
+        self.timing_metrics['clamp_setup'].append(clamp_end - clamp_start)
         
         # Parameters for projection
-        Kh = 3
+        Kh = 1
         Ktheta = 1
-        
+
+        # Phase 2: Preprocessing with constraint problem
+        preprocess_start = time.time()
+        decision_variable = x[:, :, :self.combined_dim]
         # Apply projection
-        self.constraint_problem._preprocess(x, dxu=update_this_c[:, :, :self.transition_dim][:, :, mask_no_z], projected_diffusion=True)
+        self.constraint_problem.start = decision_variable[0, 0, :self.input_dim]
+        self.constraint_problem._preprocess(decision_variable, dxu=x[:, :, self.combined_dim:], projected_diffusion=True)
+        preprocess_end = time.time()
+        self.timing_metrics['preprocessing'].append(preprocess_end - preprocess_start)
         
+        # Phase 3: Computing constraints and derivatives
+        constraint_start = time.time()
         # Get constraints and their derivatives
         C, dC, _ = self.constraint_problem.combined_constraints(
-            x,
+            decision_variable,
             compute_hess=False,
             projected_diffusion=True,
             include_slack=False,
             compute_inequality=True,
             include_deriv_grad=True
         )
+        constraint_end = time.time()
+        self.timing_metrics['constraint_computation'].append(constraint_end - constraint_start)
         
+        # Phase 4: Creating masks for active constraints
+        mask_start = time.time()
         # Create masks for active constraints
         dC_mask = ~(dC == 0).all(dim=-1)
         g_dim = self.constraint_problem.dg
@@ -276,7 +429,11 @@ class ActorNetwork(nn.Module):
         # Add small damping factor for numerical stability
         eye = torch.eye(dh_bar.shape[1]).repeat(batch_size, 1, 1).to(device=C.device)
         eye_0 = eye.clone() * 1e-6
+        mask_end = time.time()
+        self.timing_metrics['masks_creation'].append(mask_end - mask_start)
         
+        # Phase 5: Matrix operations and solving
+        matrix_start = time.time()
         # Compute projection matrix
         dCdCT = dh_bar @ dh_bar.permute(0, 2, 1)
         dCdCT = dCdCT * Ktheta
@@ -290,9 +447,13 @@ class ActorNetwork(nn.Module):
             print(f"Using CG due to error: {e}")
             A_bmm = lambda x: dCdCT @ x
             dCdCT_inv, _ = cg_batch(A_bmm, eye, verbose=False)
+        matrix_end = time.time()
+        self.timing_metrics['matrix_solving'].append(matrix_end - matrix_start)
         
+        # Phase 6: Final projection and clipping
+        projection_start = time.time()
         # Project the vector field
-        dh_bar_dJ = torch.bmm(dh_bar, dx.unsqueeze(-1))
+        dh_bar_dJ = torch.bmm(dh_bar, dx.permute(0, 2, 1))
         second_term = Ktheta * dh_bar_dJ - Kh * h_bar.unsqueeze(-1)
         pi = -dCdCT_inv @ second_term
         
@@ -301,138 +462,437 @@ class ActorNetwork(nn.Module):
         
         # Apply projection
         projected_dx = dx + (dh_bar.permute(0, 2, 1) @ pi).squeeze(-1)
+
+        x_ = x.clone()
+        x_[:, :, :self.input_dim] = torch.clamp(x[:, :, :self.input_dim], self.robot_joint_x_min.to('cuda:0'), self.robot_joint_x_max.to('cuda:0'))
+        x_[:, :, self.input_dim:self.combined_dim_no_force] = torch.clamp(x[:, :, self.input_dim:self.combined_dim_no_force], self.action_low, self.action_high)
+        x_[:, :, self.combined_dim_no_force:] = torch.clamp(x[:, :, self.combined_dim_no_force:], -2, 2)
+
+        x = x_
+        projection_end = time.time()
+        self.timing_metrics['projection_application'].append(projection_end - projection_start)
+        
+        # Record total time
+        end_time = time.time()
+        self.timing_metrics['total_time'].append(end_time - start_time)
+        
+        # Print timing summary every 1 calls
+        if self.timing_metrics['calls'] % 1 == 0:
+            self._print_timing_summary()
         
         return projected_dx
     
-    def forward(self, x):
+    def _print_timing_summary(self):
+        """Print summary of timing metrics for project_vector_field"""
+        calls = self.timing_metrics['calls']
         
-        if len(x.shape) == 1:
-            x = x.unsqueeze(0)
+        # Calculate average times for each phase
+        avg_total = np.mean(self.timing_metrics['total_time'][-100:]) * 1000  # Convert to ms
+        avg_clamp = np.mean(self.timing_metrics['clamp_setup'][-100:]) * 1000
+        avg_preprocess = np.mean(self.timing_metrics['preprocessing'][-100:]) * 1000
+        avg_constraint = np.mean(self.timing_metrics['constraint_computation'][-100:]) * 1000
+        avg_masks = np.mean(self.timing_metrics['masks_creation'][-100:]) * 1000
+        avg_matrix = np.mean(self.timing_metrics['matrix_solving'][-100:]) * 1000
+        avg_projection = np.mean(self.timing_metrics['projection_application'][-100:]) * 1000
         
-        batch_size = x.shape[0]
+        print(f"\n===== project_vector_field Timing Analysis (call {calls}) =====")
+        print(f"Total time:            {avg_total:.2f} ms (100%)")
+        print(f"1. Initial setup:      {avg_clamp:.2f} ms ({avg_clamp/avg_total*100:.1f}%)")
+        print(f"2. Preprocessing:      {avg_preprocess:.2f} ms ({avg_preprocess/avg_total*100:.1f}%)")
+        print(f"3. Constraint comp:    {avg_constraint:.2f} ms ({avg_constraint/avg_total*100:.1f}%)")
+        print(f"4. Masks creation:     {avg_masks:.2f} ms ({avg_masks/avg_total*100:.1f}%)")
+        print(f"5. Matrix operations:  {avg_matrix:.2f} ms ({avg_matrix/avg_total*100:.1f}%)")
+        print(f"6. Final projection:   {avg_projection:.2f} ms ({avg_projection/avg_total*100:.1f}%)")
         
-        # Generate random normal vectors for action space
-        z = torch.randn(batch_size, self.output_dim, device=x.device)
+        # Check for outliers
+        max_time = max(self.timing_metrics['total_time'][-100:]) * 1000
+        if max_time > avg_total * 2:
+            print(f"WARN: Max execution time ({max_time:.2f} ms) is {max_time/avg_total:.1f}x the average")
         
-        # Concatenate state and random noise vector
-        x_z = torch.cat([x, z], dim=-1)
-        
-        # Integrate ODE from t=0 to t=1
-        integration_times = torch.tensor([0.0, 1.0], device=x.device)
-        trajectory = odeint(self.dynamics, x_z, integration_times, method='rk4', options={'step_size': .1})
-        
-        # Extract the final point of the trajectory
-        final_state = trajectory[-1]
-        
-        # Split into state and action components
-        _, action = final_state[:, :self.input_dim], final_state[:, self.input_dim:]
-        
-        # Compute standard deviation
-        std = torch.exp(self.log_std).expand_as(action)
-        
-        return action, std
+        # Clean up old metrics to prevent memory growth
+        if len(self.timing_metrics['total_time']) > 1000:
+            self.timing_metrics['total_time'] = self.timing_metrics['total_time'][-500:]
+            self.timing_metrics['clamp_setup'] = self.timing_metrics['clamp_setup'][-500:]
+            self.timing_metrics['preprocessing'] = self.timing_metrics['preprocessing'][-500:]
+            self.timing_metrics['constraint_computation'] = self.timing_metrics['constraint_computation'][-500:]
+            self.timing_metrics['masks_creation'] = self.timing_metrics['masks_creation'][-500:]
+            self.timing_metrics['matrix_solving'] = self.timing_metrics['matrix_solving'][-500:]
+            self.timing_metrics['projection_application'] = self.timing_metrics['projection_application'][-500:]
 
-# Neural network for the critic (value function)
+# Neural network for the critic (Q-value function) - TD3 uses twin critics
 class CriticNetwork(nn.Module):
-    def __init__(self, input_dim, hidden_dim=256):
+    def __init__(self, state_dim, action_dim, hidden_dim=256):
         super(CriticNetwork, self).__init__()
-        self.network = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
+        
+        # Q1 architecture
+        self.q1 = nn.Sequential(
+            nn.Linear(state_dim + action_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, 1)
         )
         
-    def forward(self, x):
-        return self.network(x)
+        # Q2 architecture
+        self.q2 = nn.Sequential(
+            nn.Linear(state_dim + action_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 1)
+        )
+    
+    def forward(self, state, action):
+        # Concatenate state and action
+        sa = torch.cat([state, action], 1)
+        
+        # Return both Q-values
+        return self.q1(sa), self.q2(sa)
+    
+    def q1_forward(self, state, action):
+        # Return only Q1 value (used for actor updates)
+        sa = torch.cat([state, action], 1)
+        return self.q1(sa)
+    
+    def q2_forward(self, state, action):
+        # Return only Q2 value (used for actor updates)
+        sa = torch.cat([state, action], 1)
+        return self.q2(sa)
+
+# SumTree implementation for efficient priority sampling
+class SumTree:
+    def __init__(self, capacity, device='cpu'):
+        """
+        Initialize SumTree for efficient priority-based sampling
+        
+        Args:
+            capacity: Maximum capacity of the buffer
+            device: Device to store tensors on
+        """
+        self.capacity = capacity
+        self.device = device
+        
+        # Tree structure to store priorities
+        # Size of the tree is 2*capacity - 1
+        # Leaf nodes (priorities): capacity
+        # Internal nodes: capacity - 1
+        self.tree = torch.zeros(2 * capacity - 1, dtype=torch.float32, device=device)
+        
+        # Data write index
+        self.data_pointer = 0
+    
+    def update(self, idx, priority):
+        """Update priority in the tree"""
+        # Convert data index to leaf index
+        tree_idx = idx + self.capacity - 1
+        
+        # Change in priority
+        change = priority - self.tree[tree_idx]
+        
+        # Update leaf node
+        self.tree[tree_idx] = priority
+        
+        # Propagate change through tree
+        while tree_idx != 0:
+            tree_idx = (tree_idx - 1) // 2
+            self.tree[tree_idx] += change
+    
+    def add(self, priority):
+        """Add new priority to tree"""
+        # Get leaf index for data
+        tree_idx = self.data_pointer + self.capacity - 1
+        
+        # Update tree
+        self.update(self.data_pointer, priority)
+        
+        # Update data pointer
+        self.data_pointer = (self.data_pointer + 1) % self.capacity
+        
+        return tree_idx - (self.capacity - 1)
+    
+    def get_leaf(self, v):
+        """
+        Get leaf node and corresponding data index from value v
+        v is a value between 0 and the total sum of priorities
+        """
+        parent_idx = 0
+        
+        while True:
+            left_idx = 2 * parent_idx + 1
+            right_idx = left_idx + 1
+            
+            # If we reach leaf nodes, end search
+            if left_idx >= len(self.tree):
+                leaf_idx = parent_idx
+                break
+            
+            # Otherwise, search left or right child node
+            if v <= self.tree[left_idx]:
+                parent_idx = left_idx
+            else:
+                v -= self.tree[left_idx]
+                parent_idx = right_idx
+        
+        data_idx = leaf_idx - (self.capacity - 1)
+        
+        return leaf_idx, data_idx
+    
+    def total_priority(self):
+        """Return the sum of all priorities (root node value)"""
+        return self.tree[0]
+
+# Updated Replay buffer for prioritized experience replay
+class PrioritizedReplayBuffer:
+    def __init__(self, state_dim, action_dim, max_size=int(1e6), device='cpu', alpha=0.6, beta=0.4, beta_annealing=0.001, epsilon=1e-6):
+        self.max_size = max_size
+        self.size = 0
+        self.device = device
+        
+        # PER hyperparameters
+        self.alpha = alpha  # How much prioritization to use (0=none, 1=full)
+        self.beta = beta    # Importance sampling correction (0=no correction, 1=full correction)
+        self.beta_annealing = beta_annealing  # How much to increase beta each sampling
+        self.epsilon = epsilon  # Small constant to ensure all priorities > 0
+        
+        # Create SumTree for efficient sampling
+        self.sum_tree = SumTree(max_size, device)
+        
+        # Maximum priority for new transitions
+        self.max_priority = 1.0
+        
+        # Storage for transitions
+        self.state = torch.zeros((max_size, state_dim), dtype=torch.float32, device=device)
+        self.action = torch.zeros((max_size, action_dim), dtype=torch.float32, device=device)
+        self.next_state = torch.zeros((max_size, state_dim), dtype=torch.float32, device=device)
+        self.reward = torch.zeros((max_size, 1), dtype=torch.float32, device=device)
+        self.done = torch.zeros((max_size, 1), dtype=torch.float32, device=device)
+    
+    def add(self, state, action, next_state, reward, done):
+        # Convert to tensors if they aren't already
+        if not isinstance(state, torch.Tensor):
+            state = torch.FloatTensor(state).to(self.device)
+        if not isinstance(action, torch.Tensor):
+            action = torch.FloatTensor(action).to(self.device)
+        if not isinstance(next_state, torch.Tensor):
+            next_state = torch.FloatTensor(next_state).to(self.device)
+        if not isinstance(reward, torch.Tensor):
+            reward = torch.FloatTensor([reward]).to(self.device)
+        if not isinstance(done, torch.Tensor):
+            done = torch.FloatTensor([done]).to(self.device)
+        
+        # Get index where to store new transition
+        idx = self.sum_tree.add(self.max_priority ** self.alpha)
+        
+        # Store transition
+        self.state[idx] = state
+        self.action[idx] = action
+        self.next_state[idx] = next_state
+        self.reward[idx] = reward
+        self.done[idx] = done
+        
+        # Update size
+        self.size = min(self.size + 1, self.max_size)
+    
+    def sample(self, batch_size):
+        """Sample a batch based on priorities"""
+        batch_indices = torch.zeros(batch_size, dtype=torch.long, device=self.device)
+        tree_indices = torch.zeros(batch_size, dtype=torch.long, device=self.device)
+        weights = torch.zeros(batch_size, dtype=torch.float32, device=self.device)
+        
+        # Get segment interval
+        segment = self.sum_tree.total_priority() / batch_size
+        
+        # Increase beta over time to reduce bias
+        self.beta = min(1.0, self.beta + self.beta_annealing)
+        
+        # Calculate min priority for importance sampling weights
+        min_prob = torch.min(self.sum_tree.tree[self.sum_tree.capacity - 1:self.sum_tree.capacity - 1 + self.size]) / self.sum_tree.total_priority()
+        if min_prob <= 0:
+            min_prob = self.epsilon
+        
+        # Sample batch and calculate weights
+        for i in range(batch_size):
+            # Sample uniformly within each segment
+            a, b = segment * i, segment * (i + 1)
+            value = torch.rand(1, device=self.device) * (b - a) + a
+            
+            # Get index from sum tree
+            leaf_idx, data_idx = self.sum_tree.get_leaf(value.item())
+            
+            # Store indices
+            tree_indices[i] = leaf_idx
+            batch_indices[i] = data_idx
+            
+            # Calculate importance sampling weight
+            priority = self.sum_tree.tree[leaf_idx]
+            sampling_prob = priority / self.sum_tree.total_priority()
+            weights[i] = (sampling_prob * self.size) ** (-self.beta)
+        
+        # Normalize weights
+        weights = weights / torch.max(weights)
+        
+        return (
+            self.state[batch_indices],
+            self.action[batch_indices],
+            self.next_state[batch_indices],
+            self.reward[batch_indices],
+            self.done[batch_indices],
+            batch_indices,
+            weights
+        )
+    
+    def update_priorities(self, indices, priorities):
+        """Update priorities in the sum tree"""
+        priorities = priorities.detach().cpu().numpy()  # Convert to numpy for easier iteration
+        
+        for idx, priority in zip(indices, priorities):
+            # Add small constant to avoid zero priority
+            priority = max(priority, self.epsilon)
+            
+            # Update max priority
+            self.max_priority = max(self.max_priority, priority)
+            
+            # Update sum tree with priority^alpha
+            self.sum_tree.update(idx, priority.item() ** self.alpha)
+
+# Replay buffer for off-policy learning
+class ReplayBuffer:
+    def __init__(self, state_dim, action_dim, max_size=int(1e6), device='cpu'):
+        self.max_size = max_size
+        self.ptr = 0
+        self.size = 0
+        self.device = device
+        
+        self.state = torch.zeros((max_size, state_dim), dtype=torch.float32, device=device)
+        self.action = torch.zeros((max_size, action_dim), dtype=torch.float32, device=device)
+        self.next_state = torch.zeros((max_size, state_dim), dtype=torch.float32, device=device)
+        self.reward = torch.zeros((max_size, 1), dtype=torch.float32, device=device)
+        self.done = torch.zeros((max_size, 1), dtype=torch.float32, device=device)
+    
+    def add(self, state, action, next_state, reward, done):
+        # Convert to tensors if they aren't already
+        if not isinstance(state, torch.Tensor):
+            state = torch.FloatTensor(state).to(self.device)
+        if not isinstance(action, torch.Tensor):
+            action = torch.FloatTensor(action).to(self.device)
+        if not isinstance(next_state, torch.Tensor):
+            next_state = torch.FloatTensor(next_state).to(self.device)
+        if not isinstance(reward, torch.Tensor):
+            reward = torch.FloatTensor([reward]).to(self.device)
+        if not isinstance(done, torch.Tensor):
+            done = torch.FloatTensor([done]).to(self.device)
+        
+        # Store transition
+        self.state[self.ptr] = state
+        self.action[self.ptr] = action
+        self.next_state[self.ptr] = next_state
+        self.reward[self.ptr] = reward
+        self.done[self.ptr] = done
+        
+        # Update pointer and size
+        self.ptr = (self.ptr + 1) % self.max_size
+        self.size = min(self.size + 1, self.max_size)
+    
+    def sample(self, batch_size):
+        ind = torch.randint(0, self.size, (batch_size,), device=self.device)
+        
+        return (
+            self.state[ind],
+            self.action[ind],
+            self.next_state[ind],
+            self.reward[ind],
+            self.done[ind]
+        )
 
 # Import necessary modules for constraint projection
-from allegro_screwdriver import AllegroScrewdriver
-import copy
-import torch.nn.functional as F
-from torch_cg import cg_batch
 
-class PPO:
+class TD3:
     def __init__(
         self,
-        input_dim,
-        output_dim,
+        state_dim,
+        action_dim,
+        force_dim,
         action_low,
         action_high,
         device,
         lr_actor=3e-4,
         lr_critic=1e-3,
         gamma=0.99,
-        gae_lambda=0.95,
-        clip_param=0.2,
-        value_loss_coef=0.5,
-        entropy_coef=0.01,
-        max_grad_norm=0.5,
-        batch_size=64,
-        num_epochs=10,
+        tau=0.005,
+        policy_noise=0.2,
+        noise_clip=0.5,
+        policy_freq=2,
+        buffer_size=int(1e6),
         use_constraints=False,
-        env=None
+        env=None,
+        use_per=True,  # Flag to use PER
+        per_alpha=0.6,  # PER alpha parameter (prioritization strength)
+        per_beta=0.4,   # PER beta parameter (importance sampling)
+        per_beta_annealing=0.0001  # Beta annealing rate
     ):
         self.device = device
         self.gamma = gamma
-        self.gae_lambda = gae_lambda
-        self.clip_param = clip_param
-        self.value_loss_coef = value_loss_coef
-        self.entropy_coef = entropy_coef
-        self.max_grad_norm = max_grad_norm
-        self.batch_size = batch_size
-        self.num_epochs = num_epochs
-        
-        # Scale actions from [-1, 1] to [low, high]
-        self.action_scale = (action_high - action_low) / 2.0
-        self.action_bias = (action_high + action_low) / 2.0
-        
-        # Policy and value networks
-        self.actor = ActorNetwork(input_dim, output_dim).to(device)
-        self.critic = CriticNetwork(input_dim).to(device)
-        
-        # Optimizers
-        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr_actor)
-        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=lr_critic)
+        self.tau = tau
+        self.policy_noise = policy_noise
+        self.noise_clip = noise_clip
+        self.policy_freq = policy_freq
+        self.action_low = action_low
+        self.action_high = action_high
+        self.total_it = 0
         
         self.use_constraints = use_constraints
+        self.use_per = use_per  # Whether to use PER
         
         # Create constraint problem if constraints are enabled
         constraint_problem = None
         if use_constraints and env is not None:
             constraint_problem = AllegroScrewdriver(
-                start=torch.zeros(input_dim).to('cuda:0'),
+                start=torch.zeros(state_dim).to('cuda:0'),
                 goal=torch.zeros(3).to('cuda:0'),  # Goal will be set dynamically
                 T=1,
                 chain=env.chain,
                 device=torch.device('cuda:0'),
                 object_asset_pos=env.env.table_pose,
-                object_location='screwdriver',
+                object_location=torch.tensor([0, 0, 1.205]).to('cuda:0'),
                 object_type='screwdriver',
                 world_trans=env.env.world_trans,
                 contact_fingers=['index', 'middle', 'thumb'],
                 obj_dof=3,
                 obj_joint_dim=1,
-                optimize_force=False,
-                turn=True
+                optimize_force=True,
+                turn=True,
+                obj_gravity=True
             )
             self.constraint_problem = constraint_problem
         
-        # Policy and value networks
-        self.actor = ActorNetwork(input_dim, output_dim, 
+        # Actor and Critics
+        self.actor = ActorNetwork(state_dim, action_dim, force_dim,
+                                 action_low, action_high,
                                  constraint_problem=constraint_problem).to(device)
-        self.critic = CriticNetwork(input_dim).to(device)
-        
-        # Optimizers
+        self.actor_target = copy.deepcopy(self.actor)
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr_actor)
+        
+        self.critic = CriticNetwork(state_dim, action_dim).to(device)
+        self.critic_target = copy.deepcopy(self.critic)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=lr_critic)
         
-        # Add timing statistics for action prediction
+        # Replay buffer - use PER or standard buffer
+        if use_per:
+            self.replay_buffer = PrioritizedReplayBuffer(
+                state_dim,
+                action_dim,
+                buffer_size,
+                device,
+                alpha=per_alpha,
+                beta=per_beta,
+                beta_annealing=per_beta_annealing
+            )
+        else:
+            self.replay_buffer = ReplayBuffer(state_dim, action_dim, buffer_size, device)
+        
+        # For action selection timing
         self.prediction_times = []
-    
-    # No need for project_action method anymore since projection happens during integration
-    
+
     def select_action(self, state, evaluate=False):
         """Select an action from the policy given the state."""
         with torch.no_grad():
@@ -441,117 +901,108 @@ class PPO:
             # Start timing action prediction
             start_time = time.time()
             
-            mean, std = self.actor(state)
+            action, _ = self.actor(state, constrained=True if self.use_constraints else False)
             
-            if evaluate:
-                # During evaluation, just use the mean
-                action = mean
-            else:
-                # During training, sample from the distribution
-                normal = Normal(mean, std)
-                action = normal.sample()
+            # Add exploration noise when not evaluating
+            if not evaluate:
+                noise = torch.randn_like(action) * self.policy_noise
+                noise = torch.clamp(noise, -self.noise_clip, self.noise_clip)
+                action = action + noise
+                action = torch.clamp(action, self.action_low, self.action_high)
             
             # End timing and record
             end_time = time.time()
             self.prediction_times.append(end_time - start_time)
-                
+        
         return action
-
-    def compute_gae(self, values, rewards, dones, next_value):
-        """Compute generalized advantage estimates."""
-        advantages = []
-        gae = 0
-        
-        for step in reversed(range(len(rewards))):
-            delta = rewards[step] + self.gamma * next_value * (1 - dones[step]) - values[step]
-            gae = delta + self.gamma * self.gae_lambda * (1 - dones[step]) * gae
-            advantages.insert(0, gae)
-            next_value = values[step]
-            
-        advantages = torch.tensor(advantages, dtype=torch.float32).to(self.device)
-        returns = advantages + torch.tensor(values, dtype=torch.float32).to(self.device)
-        
-        return returns, advantages
     
-    def update(self, states, actions, old_log_probs, returns, advantages):
-        """Update policy and value networks."""
-        # Convert to tensors - check if inputs are already tensors and stack them
-        if isinstance(states[0], torch.Tensor):
-            states = torch.stack(states).to(self.device)
-        else:
-            states = torch.tensor(states, dtype=torch.float32).to(self.device)
-            
-        if isinstance(actions[0], torch.Tensor):
-            actions = torch.stack(actions).to(self.device)
-        else:
-            actions = torch.tensor(actions, dtype=torch.float32).to(self.device)
-            
-        if isinstance(old_log_probs[0], torch.Tensor):
-            old_log_probs = torch.tensor(old_log_probs, dtype=torch.float32).to(self.device)
-        else:
-            old_log_probs = torch.tensor(old_log_probs, dtype=torch.float32).to(self.device)
+    def update(self, batch_size=256):
+        self.total_it += 1
         
-        # Normalize advantages
-        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+        # Sample replay buffer
+        if self.use_per:
+            state, action, next_state, reward, done, indices, weights = self.replay_buffer.sample(batch_size)
+            # Convert weights to appropriate shape for loss weighting
+            weights = weights.reshape(-1, 1)
+        else:
+            state, action, next_state, reward, done = self.replay_buffer.sample(batch_size)
+            weights = torch.ones((batch_size, 1), device=self.device)  # Equal weights when not using PER
         
-        # Update for num_epochs
-        for _ in range(self.num_epochs):
-            # Get random minibatch
-            indices = torch.randperm(states.size(0))
-            for start_idx in range(0, states.size(0), self.batch_size):
-                end_idx = min(start_idx + self.batch_size, states.size(0))
-                minibatch_indices = indices[start_idx:end_idx]
-                
-                minibatch_states = states[minibatch_indices]
-                minibatch_actions = actions[minibatch_indices]
-                minibatch_old_log_probs = old_log_probs[minibatch_indices]
-                minibatch_returns = returns[minibatch_indices]
-                minibatch_advantages = advantages[minibatch_indices]
-                
-                # Evaluate actions
-                means, stds = self.actor(minibatch_states)
-                dist = Normal(means, stds)
-                current_log_probs = dist.log_prob(minibatch_actions).sum(dim=-1)
-                entropy = dist.entropy().mean()
-                
-                # Compute value loss
-                values = self.critic(minibatch_states).squeeze(-1)
-                value_loss = nn.MSELoss()(values, minibatch_returns)
-                
-                # Compute policy loss
-                ratios = torch.exp(current_log_probs - minibatch_old_log_probs)
-                surr1 = ratios * minibatch_advantages
-                surr2 = torch.clamp(ratios, 1.0 - self.clip_param, 1.0 + self.clip_param) * minibatch_advantages
-                policy_loss = -torch.min(surr1, surr2).mean()
-                
-                # Total loss
-                loss = policy_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy
-                
-                # Update networks
-                self.actor_optimizer.zero_grad()
-                self.critic_optimizer.zero_grad()
-                loss.backward()
-                nn.utils.clip_grad_norm_(self.actor.parameters(), self.max_grad_norm)
-                nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)
-                self.actor_optimizer.step()
-                self.critic_optimizer.step()
-                
-        return policy_loss.item(), value_loss.item(), entropy.item()
+        # Update critics
+        with torch.no_grad():
+            # Select action according to policy and add clipped noise
+            next_action, _ = self.actor_target(next_state, constrained=False)
+            noise = (torch.randn_like(next_action) * self.policy_noise).clamp(-self.noise_clip, self.noise_clip)
+            next_action = (next_action + noise).clamp(self.action_low, self.action_high)
+            
+            # Compute the target Q value
+            target_q1, target_q2 = self.critic_target(next_state, next_action)
+            target_q = torch.min(target_q1, target_q2)
+            target_q = reward + (1 - done) * self.gamma * target_q
+        
+        # Get current Q estimates
+        current_q1, current_q2 = self.critic(state, action)
+        
+        # Compute TD errors for prioritization (before applying weights to the loss)
+        td_errors = torch.max(
+            torch.abs(target_q - current_q1),
+            torch.abs(target_q - current_q2)
+        ).detach()
+        
+        # Compute critic loss with importance sampling weights
+        critic_loss_q1 = (weights * F.huber_loss(current_q1, target_q, reduction='none')).mean()
+        critic_loss_q2 = (weights * F.huber_loss(current_q2, target_q, reduction='none')).mean()
+        critic_loss = critic_loss_q1 + critic_loss_q2
+        
+        # Optimize the critic
+        self.critic_optimizer.zero_grad()
+        critic_loss.backward()
+        self.critic_optimizer.step()
+        
+        # Update priorities in PER buffer
+        if self.use_per:
+            self.replay_buffer.update_priorities(indices, td_errors)
+        
+        # Delayed policy updates
+        actor_loss = 0
+        if self.total_it % self.policy_freq == 0:
+            # Compute actor loss
+            actor_action, _ = self.actor(state, constrained=False)
+            actor_q1 = self.critic.q1_forward(state, actor_action)
+            actor_q2 = self.critic.q2_forward(state, actor_action)
+            actor_q = torch.min(actor_q1, actor_q2)
+            actor_loss = -(weights * actor_q).mean()  # Apply importance sampling weights
+            
+            # Optimize the actor
+            self.actor_optimizer.zero_grad()
+            actor_loss.backward()
+            self.actor_optimizer.step()
+            
+            # Update the target networks
+            for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
+                target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+            
+            for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
+                target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+        
+        return actor_loss.item() if isinstance(actor_loss, torch.Tensor) else actor_loss, critic_loss.item()
     
     def save(self, path):
-        """Save model weights."""
         torch.save({
             'actor': self.actor.state_dict(),
             'critic': self.critic.state_dict(),
+            'actor_target': self.actor_target.state_dict(),
+            'critic_target': self.critic_target.state_dict(),
             'actor_optimizer': self.actor_optimizer.state_dict(),
             'critic_optimizer': self.critic_optimizer.state_dict(),
         }, path)
     
     def load(self, path):
-        """Load model weights."""
         checkpoint = torch.load(path)
         self.actor.load_state_dict(checkpoint['actor'])
         self.critic.load_state_dict(checkpoint['critic'])
+        self.actor_target.load_state_dict(checkpoint['actor_target'])
+        self.critic_target.load_state_dict(checkpoint['critic_target'])
         self.actor_optimizer.load_state_dict(checkpoint['actor_optimizer'])
         self.critic_optimizer.load_state_dict(checkpoint['critic_optimizer'])
 
@@ -561,9 +1012,9 @@ def make_env(config):
     """
     return AllegroScrewdriverRLEnv(config)
 
-def train_ppo(config, total_timesteps=1000000, save_path=None):
+def train_td3(config, total_timesteps=1000000, save_path=None):
     """
-    Train a PPO agent on the AllegroScrewdriver environment
+    Train a TD3 agent on the AllegroScrewdriver environment
     """
     # Try to import torchdiffeq, install if not available
     try:
@@ -578,160 +1029,146 @@ def train_ppo(config, total_timesteps=1000000, save_path=None):
     
     # Create log directory
     if save_path is None:
-        save_path = f"{CCAI_PATH}/models/allegro_screwdriver_ppo"
+        save_path = f"{CCAI_PATH}/models/allegro_screwdriver_td3"
     os.makedirs(save_path, exist_ok=True)
     
     # Use GPU for neural networks but keep simulation on CPU
     train_device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     print(f"Simulation running on: {config['sim_device']}")
-    print(f"PPO training running on: {train_device}")
+    print(f"TD3 training running on: {train_device}")
     
-    # Initialize PPO agent with constraint projection
-    ppo_agent = PPO(
-        input_dim=env.obs_dim,
-        output_dim=env.control_dim,
+    # Initialize TD3 agent
+    td3_agent = TD3(
+        state_dim=env.obs_dim,
+        action_dim=env.control_dim,
+        force_dim=9,
         action_low=env.action_low,
         action_high=env.action_high,
         device=train_device,
         lr_actor=3e-4,
         lr_critic=1e-3,
         gamma=0.99,
-        gae_lambda=0.95,
-        clip_param=0.2,
-        batch_size=32,
-        num_epochs=10,
+        tau=0.005,
+        policy_noise=0.1,  # relative to the action range
+        noise_clip=0.5,
+        policy_freq=2,
+        buffer_size=config.get('buffer_size', int(1e6)),
         use_constraints=config.get('use_constraints', False),
-        env=env if config.get('use_constraints', False) else None
+        env=env if config.get('use_constraints', False) else None,
+        use_per=config.get('use_per', True),  # Enable PER by default
+        per_alpha=config.get('per_alpha', 0.6),
+        per_beta=config.get('per_beta', 0.4),
+        per_beta_annealing=config.get('per_beta_annealing', 0.0001)
     )
     
-    # Training variables
-    num_steps_per_episode = config.get('max_episode_steps', 100)
-    update_frequency = config.get('update_frequency', 1024)
-    checkpoint_frequency = config.get('checkpoint_frequency', 2048)
+    # Training hyperparameters
+    batch_size = config.get('batch_size', 256)
+    exploration_noise = 0.1
+    start_timesteps =0# config.get('start_timesteps', 25000)  # Timesteps before using policy
+    eval_freq = config.get('eval_freq', 5000)
+    checkpoint_freq = config.get('checkpoint_freq', 10000)
+    max_episode_steps = config.get('max_episode_steps', 100)
     
-    # Initialize tracking variables
-    total_steps = 0
-    best_average_reward = -float('inf')
+    # Tracking variables
+    evaluations = []
+    episode_num = 0
+    episode_reward = 0
+    episode_timesteps = 0
     episode_rewards = []
-    log_interval = config.get('log_interval', 1)
+    exec_timesteps = 0
+    best_avg_reward = -float('inf')
     
-    # Training loop
-    while total_steps < total_timesteps:
-        # Storage for current update
-        states = []
-        actions = []
-        rewards = []
-        dones = []
-        values = []
-        log_probs = []
+    state = env.reset()
+    done = False
+    
+    print(f"Starting training for {total_timesteps} timesteps")
+    while exec_timesteps < total_timesteps:
+        episode_timesteps += 1
+        exec_timesteps += 1
         
-        steps_this_update = 0
-        print(f"\nCollecting {update_frequency} steps of experience...")
+        # Select action with noise for exploration
+        if exec_timesteps < start_timesteps:
+            # Random actions until start_timesteps
+            action = torch.FloatTensor(
+                np.random.uniform(
+                    env.action_low, 
+                    env.action_high, 
+                    size=env.control_dim
+                )
+            ).to(train_device)
+        else:
+            # Use policy with exploration noise
+            action = td3_agent.select_action(state)
+            print(td3_agent.prediction_times)
         
-        while steps_this_update < update_frequency:
+        # Perform action and get next state
+        next_state, reward, done = env.step(action)
+        
+        # For TD3, we need to compute constraint violation as part of the reward
+        # if td3_agent.use_constraints:
+        #     state_tensor = torch.FloatTensor(state).to(train_device)
+        #     action_tensor = action.to(train_device)
+        #     action_detached, force = td3_agent.actor(state_tensor)
+        #     reward += -0.1 * td3_agent.actor.compute_constraint_violation(
+        #         state_tensor, action_detached, force
+        #     ).item()
+        
+        # Store data in replay buffer
+        td3_agent.replay_buffer.add(state, action, next_state, reward, done)
+        
+        state = next_state
+        episode_reward += reward
+        
+        # Train agent after collecting enough samples
+        if exec_timesteps >= start_timesteps:
+            actor_loss, critic_loss = td3_agent.update(batch_size)
+        
+        # If episode is done or max steps reached
+        if done or episode_timesteps >= max_episode_steps:
+            print(f"Episode {episode_num}: {episode_timesteps} steps, reward={episode_reward:.2f}")
+            
             # Reset environment
             state = env.reset()
-            episode_reward = 0
             done = False
-            episode_step = 0
-            episode_start_time = time.time()
+            episode_reward = 0
+            episode_timesteps = 0
+            episode_num += 1
             
-            # Run a single episode until termination or max steps
-            while not done:
-                # Select action
-                with torch.no_grad():
-                    # Move state to the training device (GPU)
-                    state_tensor = torch.FloatTensor(state).to(train_device)
-                    mean, std = ppo_agent.actor(state_tensor)
-                    dist = Normal(mean, std)
-                    action = dist.sample()
-                    log_prob = dist.log_prob(action).sum(dim=-1)
-                    value = ppo_agent.critic(state_tensor).squeeze()
-                
-                # Take action in environment
-                action_np = action
-                next_state, reward, done = env.step(action_np)
-                
-                # Store data
-                states.append(state)
-                actions.append(action_np)
-                rewards.append(reward)
-                dones.append(float(done))  # Convert boolean to float
-                values.append(value.item())
-                log_probs.append(log_prob.item())
-                
-                # Update state and counters
-                state = next_state
-                episode_reward += reward
-                steps_this_update += 1
-                total_steps += 1
-                episode_step += 1
-                
-                # Save checkpoint if needed
-                if total_steps % checkpoint_frequency == 0:
-                    ppo_agent.save(f"{save_path}/model_{total_steps}.pt")
-                    print(f"Checkpoint saved at step {total_steps}")
-                
-                # Break out of episode if we've collected enough steps
-                if steps_this_update >= update_frequency:
-                    break
-            
-            episode_duration = time.time() - episode_start_time
+            # Store episode reward
             episode_rewards.append(episode_reward)
-            print(f"Episode completed: steps={episode_step}, reward={episode_reward:.3f}, duration={episode_duration:.2f}s, total_steps={total_steps}")
         
-        print(f"Experience collection complete. Total steps: {total_steps}, Steps this update: {steps_this_update}")
-        
-        # Compute returns using GAE
-        with torch.no_grad():
-            if done:
-                next_value = 0
-            else:
-                # Move state to the training device (GPU)
-                next_state_tensor = torch.FloatTensor(next_state).to(train_device)
-                next_value = ppo_agent.critic(next_state_tensor).item()
-        
-        returns, advantages = ppo_agent.compute_gae(values, rewards, dones, next_value)
-        
-        # Update PPO agent
-        update_start_time = time.time()
-        policy_loss, value_loss, entropy = ppo_agent.update(
-            states, actions, log_probs, returns, advantages
-        )
-        update_duration = time.time() - update_start_time
-        
-        # Calculate and print average action prediction time
-        avg_prediction_time = np.mean(ppo_agent.prediction_times) * 1000 if ppo_agent.prediction_times else 0
-        max_prediction_time = np.max(ppo_agent.prediction_times) * 1000 if ppo_agent.prediction_times else 0
-        
-        print(f"Network update - time: {update_duration:.2f}s, collected steps: {steps_this_update}")
-        print(f"  Policy loss: {policy_loss:.4f}, Value loss: {value_loss:.4f}, Entropy: {entropy:.4f}")
-        print(f"  Action prediction - avg: {avg_prediction_time:.2f}ms, max: {max_prediction_time:.2f}ms")
-        
-        # Reset prediction times for next update
-        ppo_agent.prediction_times = []
-        
-        # Log progress
-        if len(episode_rewards) % log_interval == 0:
-            avg_reward = np.mean(episode_rewards[-log_interval:])
-            print(f"===== Progress report =====")
-            print(f"Step: {total_steps}/{total_timesteps} ({total_steps/total_timesteps*100:.1f}%)")
-            print(f"Average reward (last {log_interval} episodes): {avg_reward:.2f}")
-            print(f"Best average reward so far: {best_average_reward:.2f}")
-            print(f"Episodes completed: {len(episode_rewards)}")
+        # Evaluate agent periodically
+        if exec_timesteps % eval_freq == 0:
+            print(f"\n--- Evaluation at timestep {exec_timesteps} ---")
+            avg_reward = evaluate_policy(td3_agent, config, num_episodes=5, render=False)
+            evaluations.append(avg_reward)
             
-            if avg_reward > best_average_reward:
-                best_average_reward = avg_reward
-                ppo_agent.save(f"{save_path}/best_model.pt")
+            if avg_reward > best_avg_reward:
+                best_avg_reward = avg_reward
+                td3_agent.save(f"{save_path}/best_model.pt")
                 print(f"New best model saved! Avg reward: {avg_reward:.2f}")
+            
+            # Save evaluation results
+            np.save(f"{save_path}/evaluations.npy", evaluations)
+        
+        # Save checkpoint
+        if exec_timesteps % checkpoint_freq == 0:
+            td3_agent.save(f"{save_path}/model_{exec_timesteps}.pt")
+            print(f"Checkpoint saved at timestep {exec_timesteps}")
+            
+            # Calculate and print average action prediction time
+            avg_prediction_time = np.mean(td3_agent.prediction_times) * 1000 if td3_agent.prediction_times else 0
+            max_prediction_time = np.max(td3_agent.prediction_times) * 1000 if td3_agent.prediction_times else 0
+            print(f"Action prediction - avg: {avg_prediction_time:.2f}ms, max: {max_prediction_time:.2f}ms")
+            
+            # Reset prediction times
+            td3_agent.prediction_times = []
     
-    # Save the final model
-    ppo_agent.save(f"{save_path}/final_model.pt")
-    print(f"Training completed after {total_steps} steps and {len(episode_rewards)} episodes")
-    print(f"Final average reward (last {min(log_interval, len(episode_rewards))} episodes): {np.mean(episode_rewards[-min(log_interval, len(episode_rewards)):]):.2f}")
-    print(f"Best average reward achieved: {best_average_reward:.2f}")
+    # Save final model
+    td3_agent.save(f"{save_path}/final_model.pt")
+    print(f"Training completed. Final model saved at {save_path}/final_model.pt")
     
-    return ppo_agent
+    return td3_agent
 
 def evaluate_policy(model, config, num_episodes=10, render=True):
     """
@@ -780,18 +1217,18 @@ if __name__ == "__main__":
     # Set simulation device to CPU
     config['sim_device'] = 'cpu'
     
-    # Train PPO agent
-    model = train_ppo(
+    # Train TD3 agent (replaced PPO with TD3)
+    model = train_td3(
         config, 
         total_timesteps=config.get('total_timesteps', 1000000),
-        save_path=config.get('save_path', f"{CCAI_PATH}/models/allegro_screwdriver_ppo")
+        save_path=config.get('save_path', f"{CCAI_PATH}/models/allegro_screwdriver_td3")
     )
     
-    # Evaluate the trained policy
-    if config.get('evaluate', True):
-        evaluate_policy(
-            model, 
-            config, 
-            num_episodes=config.get('eval_episodes', 10),
-            render=config.get('render_eval', True)
-        )
+    # # Evaluate the trained policy
+    # if config.get('evaluate', True):
+    #     evaluate_policy(
+    #         model, 
+    #         config, 
+    #         num_episodes=config.get('eval_episodes', 10),
+    #         render=config.get('render_eval', True)
+    #     )

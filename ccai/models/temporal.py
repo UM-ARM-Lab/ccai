@@ -762,7 +762,6 @@ class TemporalUnetStateAction(nn.Module):
                 eye = torch.eye(dh_bar.shape[1]).repeat(N, 1, 1).to(device=C.device, dtype=dx.dtype)
 
                 eye_0 = eye.clone()
-                # eye_0[inactive_constraint_mask_eye] = 0
                 damping_factor = 1e-6
                 eye_0 *= damping_factor
 

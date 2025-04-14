@@ -165,7 +165,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         self.dh_per_t = 0
         self.dh_constant = 0
         self.device = device
-        self.dt = 0.03
+        self.dt = 0.3
         self.T = T
         self.start = start
         self.goal = goal
@@ -229,6 +229,94 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             'ring': 'allegro_hand_kusuri_finger_finger_2_aftc_base_link',
             'thumb': 'allegro_hand_oya_finger_3_aftc_base_link',
         }
+        # self.collision_link_names = {
+        #     'index':
+        #     ['allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
+        #      'allegro_hand_hitosashi_finger_finger_link_3',
+        #      'allegro_hand_hitosashi_finger_finger_link_2',
+        #      'allegro_hand_hitosashi_finger_finger_link_1',
+        #      'allegro_hand_hitosashi_finger_finger_link_0'],
+        #      'middle':
+        #     ['allegro_hand_naka_finger_finger_1_aftc_base_link',
+        #      'allegro_hand_naka_finger_finger_link_7',
+        #      'allegro_hand_naka_finger_finger_link_6',
+        #      'allegro_hand_naka_finger_finger_link_5',
+        #      'allegro_hand_naka_finger_finger_link_4'],
+        #         'ring':
+        #     ['allegro_hand_kusuri_finger_finger_2_aftc_base_link',
+        #         'allegro_hand_kusuri_finger_finger_link_11',
+        #         'allegro_hand_kusuri_finger_finger_link_10',
+        #         'allegro_hand_kusuri_finger_finger_link_9',
+        #         'allegro_hand_kusuri_finger_finger_link_8'],
+        #         'thumb':
+        #     ['allegro_hand_oya_finger_3_aftc_base_link',
+        #     'allegro_hand_oya_finger_link_15',
+        #     'allegro_hand_oya_finger_link_14',
+        #     'allegro_hand_oya_finger_link_13',
+        #     'allegro_hand_oya_finger_link_12'],
+        # }
+        self.collision_link_names = {
+            'index':
+            ['allegro_hand_hitosashi_finger_finger_0_aftc_base_link'],
+             'middle':
+            ['allegro_hand_naka_finger_finger_1_aftc_base_link'],
+                'ring':
+            ['allegro_hand_kusuri_finger_finger_2_aftc_base_link'],
+                'thumb':
+            ['allegro_hand_oya_finger_3_aftc_base_link'],
+        }
+        ##### SDF for robot and environment ######
+        self.world_trans = world_trans.to(device=device)
+        if object_type == 'cuboid_valve':
+            asset_object = get_assets_dir() + '/valve/valve_cuboid.urdf'
+        elif object_type == 'cylinder_valve':
+            asset_object = get_assets_dir() + '/valve/valve_cylinder.urdf'
+        elif object_type == 'screwdriver':
+            asset_object = get_assets_dir() + '/screwdriver/screwdriver.urdf'
+        elif object_type == "card":
+            asset_object = get_assets_dir() + '/card/card.urdf'
+        self.object_asset_pos = object_asset_pos
+        self.moveable_object = moveable_object
+        chain_object = pk.build_chain_from_urdf(open(asset_object).read())
+        chain_object = chain_object.to(device=device)
+        if 'valve' in object_type:
+            object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/valve',
+                                     use_collision_geometry=False)
+        elif 'screwdriver' in object_type:
+            object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver',
+                                     use_collision_geometry=True)
+            object_sdf_for_viz = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver',
+                                     use_collision_geometry=False)
+        elif 'card' in object_type:
+            object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/card',
+                                     use_collision_geometry=False)
+        self.object_sdf = object_sdf
+        robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models',
+                                use_collision_geometry=False)
+
+        obj_to_world_trans = pk.Transform3d(device='cpu').translate(object_asset_pos[0], object_asset_pos[1], object_asset_pos[2])
+        screwdriver_origin_to_world_trans = pk.Transform3d(device='cpu').translate(object_asset_pos[0], object_asset_pos[1], object_asset_pos[2] + .1 + 0.412*2.54/100)
+        scene_trans = world_trans.inverse().compose(obj_to_world_trans)
+        object_to_hand_trans = world_trans.inverse().compose(screwdriver_origin_to_world_trans)
+
+        # Object to robot transform
+        # robot_minus_object = world_trans.to(device=device).compose(obj_to_world_trans.to(device=device).inverse())
+        # print(robot_minus_object.get_matrix())
+        # contact checking
+        # collision_check_links = [self.ee_names[finger] for finger in self.fingers]
+        collision_check_links = sum([self.collision_link_names[finger] for finger in self.fingers], [])
+        self.contact_scenes = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
+                                            collision_check_links=collision_check_links,
+                                            softmin_temp=1.0e3,
+                                            points_per_link=750,
+                                            links_per_finger=len(self.collision_link_names['index'])
+                                            )
+        self.contact_scenes_for_viz = pv.RobotScene(robot_sdf, object_sdf_for_viz, scene_trans,
+                                            collision_check_links=collision_check_links,
+                                            softmin_temp=1.0e3,
+                                            points_per_link=750,
+                                            links_per_finger=len(self.collision_link_names['index'])
+                                            )
         self.ee_link_idx = {finger: chain.frame_to_idx[ee_name] for finger, ee_name in self.ee_names.items()}
         self.frame_indices = torch.tensor([self.ee_link_idx[finger] for finger in self.fingers])
 
@@ -410,7 +498,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.data[finger]['contact_normal'] = ret_scene['contact_normal'][:, i]
 
             d_contact_loc_denv_q = ret_scene.get('closest_pt_env_q_grad', None)
-            d_contact_loc_denv_q = d_contact_loc_denv_q[:, i, :, :obj_dof].reshape(N, T + 1, 3, obj_dof)
+            d_contact_loc_denv_q = d_contact_loc_denv_q[:, i, :, :obj_dof].reshape(N, self.T + T_offset, 3, obj_dof)
             self.data[finger]['closest_pt_env_q_grad'] = d_contact_loc_denv_q
 
             # gradient of contact normal
@@ -595,15 +683,11 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         hess_g_theta = ret_scene.get('hess_env_sdf', None)
 
         # Ignore first value (if not doing projected diffusion), as it is the start state
-        t_mask = torch.ones_like(g[:, T_offset:], dtype=torch.bool)
-        t_mask[:, 0] = False
-        t_mask = t_mask.reshape(N, -1)
         g = g[:, T_offset:].reshape(N, -1)
 
         # If terminal, only consider last state
         if terminal:
             g = g[:, -1].reshape(N, 1)
-            t_mask = t_mask[:, -1].reshape(N, 1)
 
         if not self.moveable_object:
             grad_g_theta = torch.zeros_like(grad_g_theta)
@@ -620,13 +704,13 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             if terminal:
                 grad_g = grad_g[:, -1].reshape(N, 1, T * d)
         else:
-            return g, None, None, t_mask
+            return g, None, None
 
         if compute_hess:
             hess = torch.zeros(N, g.shape[1], T * d, T * d, device=q.device)
-            return g, grad_g, hess, t_mask
+            return g, grad_g, hess
 
-        return g, grad_g, None, t_mask
+        return g, grad_g, None
 
     @staticmethod
     def get_rotation_from_normal(normal_vector):
@@ -674,7 +758,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
         if hessG is not None:
             hessG.detach_()
-        return grad_J.detach(), hess_J, K.detach(), grad_K.detach(), G.detach(), dG.detach(), hessG, t_mask.detach()
+        return grad_J.detach(), hess_J, K.detach(), grad_K.detach(), G.detach(), dG.detach(), hessG
 
     def update(self, start, goal=None, T=None):
         self.start = start
@@ -963,8 +1047,6 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         # h[:, :] = 0
         # h = h[:, -1].reshape(N, 1)
         # print(g[:, -1])
-        t_mask = torch.ones_like(h, dtype=torch.bool)
-        t_mask[:, 0] = False
         if compute_grads:
             T_range = torch.arange(T, device=xu.device)
             # compute gradient of sdf
@@ -982,19 +1064,19 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             grad_h = grad_h.reshape(N, -1, T * d)
             # grad_h = grad_h[:, -1].reshape(N, 1, T * d)
         else:
-            return h, None, None, t_mask
+            return h, None, None
 
         if compute_hess:
             hess = torch.zeros(N, xu.shape[1], T * d, T * d, device=xu.device)
-            return h, grad_h, hess, t_mask
+            return h, grad_h, hess
 
 
         
-        return h, grad_h, None, t_mask
+        return h, grad_h, None
 
     @regrasp_finger_constraints
     def _contact_avoidance(self, xu, finger_name, compute_grads=True, compute_hess=False, projected_diffusion=False):
-        h, grad_h, hess_h, t_mask = self._contact_constraints(xu, finger_name, compute_grads, compute_hess, terminal=False, projected_diffusion=projected_diffusion)
+        h, grad_h, hess_h = self._contact_constraints(xu, finger_name, compute_grads, compute_hess, terminal=False, projected_diffusion=projected_diffusion)
         eps = torch.zeros_like(h)
         eps[:, :-1] = 5e-3
         if self.obj_link_name == 'card':
@@ -1020,8 +1102,8 @@ class AllegroRegraspProblem(AllegroObjectProblem):
 
     @regrasp_finger_constraints
     def _terminal_contact_constraint(self, xu, finger_name, compute_grads=True, compute_hess=False, projected_diffusion=False):
-        g, grad_g, hess_g, t_mask = self._contact_constraints(xu, finger_name, compute_grads, compute_hess, terminal=True, projected_diffusion=projected_diffusion)
-        return g, grad_g, hess_g, t_mask
+        g, grad_g, hess_g = self._contact_constraints(xu, finger_name, compute_grads, compute_hess, terminal=True, projected_diffusion=projected_diffusion)
+        return g, grad_g, hess_g
 
 
     # def _anytime_contact_constr(self, g):
@@ -1067,9 +1149,6 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         x = x[:, :-1]
 
         # compute constraint value - just a linear constraint
-        t_mask = torch.ones_like(x, dtype=torch.bool)
-        t_mask[:, 0] = False
-        t_mask = t_mask.reshape(N, -1)
         g = (next_x - x - u).reshape(N, -1)
         if compute_grads:
             # all gradients are just multiples of identity
@@ -1097,12 +1176,12 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             grad_g[torch.logical_and(mask, mask_joint_index)] = -eye[:, :, 1:].reshape(-1)
             grad_g = grad_g.permute(0, 2, 1, 3, 4).reshape(N, -1, T * d)
         else:
-            return g, None, None, t_mask
+            return g, None, None
 
         if compute_hess:
             hess_g = torch.zeros(N, g.shape[1], T * d, T * d, device=self.device)
-            return g, grad_g, hess_g, t_mask
-        return g, grad_g, None, t_mask
+            return g, grad_g, hess_g
+        return g, grad_g, None
 
     def _con_eq(self, xu, compute_grads=True, compute_hess=False, projected_diffusion=False):
         N, T = xu.shape[:2]
@@ -1111,7 +1190,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
 
         q = partial_to_full_state(q, fingers=self.fingers)
         delta_q = partial_to_full_state(delta_q, fingers=self.fingers)
-        g_contact, grad_g_contact, hess_g_contact, t_mask_contact = self._terminal_contact_constraint(
+        g_contact, grad_g_contact, hess_g_contact = self._terminal_contact_constraint(
             xu=xu.reshape(N, T, self.dx + self.du),
             compute_grads=compute_grads,
             compute_hess=compute_hess,
@@ -1122,7 +1201,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         #     compute_hess=compute_hess,
         #     projected_diffusion=projected_diffusion)
 
-        g_dynamics, grad_g_dynamics, hess_g_dynamics, t_mask_dynamics = self._free_dynamics_constraints(
+        g_dynamics, grad_g_dynamics, hess_g_dynamics = self._free_dynamics_constraints(
             q=q,
             delta_q=delta_q,
             compute_grads=compute_grads,
@@ -1138,23 +1217,22 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             hess_g = torch.cat((hess_g_contact, hess_g_dynamics), dim=1)
             # hess_g = hess_g_contact
 
-        return g, grad_g, hess_g, t_mask
+        return g, grad_g, hess_g
 
     def _con_ineq(self, xu, compute_grads=True, compute_hess=False, projected_diffusion=False):
         # return None, None, None
     
         N, T = xu.shape[:2]
-        h, grad_h, hess_h, t_mask = self._contact_avoidance(xu=xu.reshape(N, T, -1)[:, :, :self.dx + self.du],
+        h, grad_h, hess_h = self._contact_avoidance(xu=xu.reshape(N, T, -1)[:, :, :self.dx + self.du],
                                                                             compute_grads=compute_grads,
                                                                             compute_hess=compute_hess,
                                                                             projected_diffusion=projected_diffusion)
         if len(self.regrasp_fingers) != 3 and self.do_contact_patch_constraint:
-            h_patch, grad_h_contact, hess_h_contact, t_mask_contact = self._contact_patch_constraint(xu=xu.reshape(N, T, -1)[:, :, :self.dx + self.du],
+            h_patch, grad_h_contact, hess_h_contact = self._contact_patch_constraint(xu=xu.reshape(N, T, -1)[:, :, :self.dx + self.du],
                                                                                     compute_grads=compute_grads,
                                                                                     compute_hess=compute_hess,
                                                                                     projected_diffusion=projected_diffusion)
             h = torch.cat((h, h_patch), dim=1)
-            t_mask = torch.cat((t_mask, t_mask_contact), dim=1)
 
             if compute_grads:
                 grad_h = torch.cat((grad_h, grad_h_contact), dim=1)
@@ -1164,7 +1242,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             hess_h = torch.cat((hess_h, hess_h_contact), dim=1)
         else:
             hess_h = None
-        return h, grad_h, hess_h, t_mask
+        return h, grad_h, hess_h
         # print("avoidance", h_contact.max())
 
 class AllegroContactProblem(AllegroObjectProblem):
@@ -1534,9 +1612,6 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         h = self.min_force_constr(force_list.reshape(-1, num_forces, 3),)
         h = h.reshape(N, T, -1)
-        t_mask = torch.ones_like(h, dtype=torch.bool)
-        t_mask[:, 0] = False
-        t_mask = t_mask.reshape(N, -1)
         # dh_dforce = dh_dforce.reshape(N, T, -1, 3)
         if compute_grads:
 
@@ -1567,11 +1642,11 @@ class AllegroContactProblem(AllegroObjectProblem):
             grad_h = grad_h.reshape(N, -1, T * d)
 
         else:
-            return h.reshape(N, -1), None, None, t_mask
+            return h.reshape(N, -1), None, None
         if compute_hess:
             hess_h = torch.zeros(N, h.shape[1], T * 3, T * 3, device=self.device)
-            return h.reshape(N, -1), grad_h, hess_h, t_mask
-        return h.reshape(N, -1), grad_h, None, t_mask
+            return h.reshape(N, -1), grad_h, hess_h
+        return h.reshape(N, -1), grad_h, None
                 
     def _force_equlibrium_constr_w_force(self, q, u, next_q, force_list, contact_jac_list, contact_point_list,
                            delta_q=None,
@@ -1598,6 +1673,24 @@ class AllegroContactProblem(AllegroObjectProblem):
             torque_list.append(torque)
             # Force is in the robot frame instead of the world frame.
             # It does not matter for comuputing the force equilibrium constraint
+
+        # if self.obj_gravity:
+        #     if self.obj_translational_dim > 0:
+        #         g = self.obj_mass * torch.tensor([0, 0, -9.8], device=self.device, dtype=torch.float32)
+        #         force_list = torch.cat((force_list, g.unsqueeze(0)))
+        #         # force_list.append(g)
+        #     if self.obj_rotational_dim > 0:
+        #         if self.object_type == 'screwdriver':
+        #             # NOTE: only works for the screwdriver now
+        #             g = self.obj_mass * torch.tensor([0, 0, -9.8], device=self.device, dtype=torch.float32)
+        #             # add the additional dimension for the screwdriver cap
+        #             tmp = torch.zeros_like(next_env_q)
+        #             next_env_q = torch.cat((next_env_q, tmp[:1]), dim=-1)
+
+        #             body_tf = self.contact_scenes.scene_sdf.chain.forward_kinematics(next_env_q)['screwdriver_body']
+        #             body_com_pos = body_tf.get_matrix()[:, :3, -1]
+        #             torque = torch.linalg.cross(body_com_pos[0], g)
+        #             torque_list.append(torque)
         # force_world_frame = self.world_trans.transform_normals(force.unsqueeze(0)).squeeze(0)
         torque_list = torch.stack(torque_list, dim=0)
         torque_list = torch.sum(torque_list, dim=0)
@@ -1803,7 +1896,7 @@ class AllegroContactProblem(AllegroObjectProblem):
             grad_g = torch.cat((grad_g, grad_g_dqu), dim=-1)
 
         else:
-            return g.reshape(N, -1), None, None, t_mask.reshape(N, -1)
+            return g.reshape(N, -1), None, None
         if compute_hess:
             hess = torch.zeros(N, g.shape[1], mult * T * d, mult * T * d, device=self.device)
             return g.reshape(N, -1), grad_g.reshape(N, -1, mult * T * d), hess
@@ -1981,13 +2074,13 @@ class AllegroContactProblem(AllegroObjectProblem):
                     print('hello kinematics nan')
 
         else:
-            return g, None, None, t_mask
+            return g, None, None
 
         if compute_hess:
             hess = torch.zeros(N, g.shape[1], T * d, T * d, device=device)
-            return g, grad_g, hess, t_mask
+            return g, grad_g, hess
 
-        return g, grad_g, None, t_mask
+        return g, grad_g, None
 
     def _dynamics_constr(self, q, u, next_q, contact_jacobian, contact_normal):
         # this will be vmapped, so takes in a 3 vector and a 3 x 8 jacobian and a dq vector
@@ -2166,9 +2259,6 @@ class AllegroContactProblem(AllegroObjectProblem):
                                      contact_normal.reshape(-1, 3),
                                      contact_jac.reshape(-1, 3, 4 * self.num_contacts),
                                      ).reshape(N, T, -1)
-            t_mask = torch.ones_like(h, dtype=torch.bool)
-            t_mask[:, 0] = False
-            t_mask = t_mask.reshape(N, -1)
             h = h.reshape(N, -1)
         else:
             # compute constraint value
@@ -2176,9 +2266,6 @@ class AllegroContactProblem(AllegroObjectProblem):
                                            contact_normal.reshape(-1, 3),
                                            contact_jac.reshape(-1, 3, 4 * self.num_contacts),
                                            ).reshape(N, T, -1)
-            t_mask = torch.ones_like(h, dtype=torch.bool)
-            t_mask[:, 0] = False
-            t_mask = t_mask.reshape(N, -1)
             h = h.reshape(N, -1)
 
         # compute the gradient
@@ -2231,13 +2318,13 @@ class AllegroContactProblem(AllegroObjectProblem):
                     N, T, dh, 4 * self.num_contacts).transpose(1, 2).reshape(-1)
             grad_h = grad_h.transpose(1, 2).reshape(N, -1, T * d)
         else:
-            return h, None, None, t_mask
+            return h, None, None
 
         if compute_hess:
             hess_h = torch.zeros(N, h.shape[1], T * d, T * d, device=q.device)
-            return h, grad_h, hess_h, t_mask
+            return h, grad_h, hess_h
 
-        return h, grad_h, None, t_mask
+        return h, grad_h, None
 
     def _con_ineq(self, xu, compute_grads=True, compute_hess=False, verbose=False, projected_diffusion=False):
         N = xu.shape[0]
@@ -2257,11 +2344,10 @@ class AllegroContactProblem(AllegroObjectProblem):
                 projected_diffusion=projected_diffusion)
 
             if self.min_force_dict is not None:
-                h_min, grad_h_min, hess_h_min, t_mask_min = self._min_force_constraints(
+                h_min, grad_h_min, hess_h_min = self._min_force_constraints(
                     q, force, compute_grads=compute_grads, compute_hess=compute_hess,
                     projected_diffusion=projected_diffusion)
                 h = torch.cat((h, h_min), dim=1)
-                t_mask = torch.cat((t_mask, t_mask_min), dim=1)
                 if grad_h is not None and grad_h_min is not None:
                     grad_h = torch.cat((grad_h, grad_h_min), dim=1)
             # if grad_h is not None:
@@ -2287,12 +2373,12 @@ class AllegroContactProblem(AllegroObjectProblem):
         if compute_grads:
             grad_h = grad_h.reshape(N, -1, (self.T) * self.d)
         else:
-            return h, None, None, t_mask
+            return h, None, None
         if compute_hess:
             hess_h = torch.zeros(N, h.shape[1], self.T * (self.dx + self.du), self.T * (self.dx + self.du),
                                  device=self.device)
-            return h, grad_h, hess_h, t_mask
-        return h, grad_h, None, t_mask
+            return h, grad_h, hess_h
+        return h, grad_h, None
 
     @contact_finger_constraints
     def _running_contact_constraints(self, q, finger_name, compute_grads=True, compute_hess=False, 
@@ -2309,7 +2395,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         q = partial_to_full_state(q, fingers=self.fingers)
         delta_q = partial_to_full_state(delta_q, fingers=self.fingers)
         theta = xu[:, :, self.num_fingers * 4:self.num_fingers * 4 + self.obj_dof]
-        g_contact, grad_g_contact, hess_g_contact, t_mask_contact = self._running_contact_constraints(q=q,
+        g_contact, grad_g_contact, hess_g_contact = self._running_contact_constraints(q=q,
                                                                                       compute_grads=compute_grads,
                                                                                       compute_hess=compute_hess, 
                                                                                       projected_diffusion=projected_diffusion)
@@ -2323,7 +2409,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                 force = torch.zeros(N, T, 12, device=self.device)
                 force[:, :, self._contact_force_indices] = xu[:, :, -self.num_contacts * 3:]
 
-            g_equil, grad_g_equil, hess_g_equil, t_mask_equil = self._force_equlibrium_constraints_w_force(
+            g_equil, grad_g_equil, hess_g_equil = self._force_equlibrium_constraints_w_force(
                 q=q,
                 delta_q=delta_q,
                 force=force,
@@ -2331,13 +2417,13 @@ class AllegroContactProblem(AllegroObjectProblem):
                 compute_hess=compute_hess,
                 projected_diffusion=projected_diffusion)
         else:
-            g_equil, grad_g_equil, hess_g_equil, t_mask_equil = self._force_equlibrium_constraints(
+            g_equil, grad_g_equil, hess_g_equil = self._force_equlibrium_constraints(
                 q=q, delta_q=delta_q,
                 compute_grads=compute_grads,
                 compute_hess=compute_hess,
                 projected_diffusion=projected_diffusion)
 
-        g_valve, grad_g_valve, hess_g_valve, t_mask_valve = self._kinematics_constraints(
+        g_valve, grad_g_valve, hess_g_valve = self._kinematics_constraints(
             q=q, delta_q=delta_q, theta=theta,
             compute_grads=compute_grads,
             compute_hess=compute_hess,
@@ -2351,7 +2437,6 @@ class AllegroContactProblem(AllegroObjectProblem):
                                g_equil,
                                g_valve,
                                ), dim=1)
-        t_mask = torch.cat((t_mask_contact, t_mask_equil, t_mask_valve), dim=1)
 
         if grad_g_contact is not None:
             max_dim = max(
@@ -2382,7 +2467,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                                         hess_g_valve,
                                         ), dim=1)
 
-        return g_contact, grad_g_contact, hess_g_contact, t_mask
+        return g_contact, grad_g_contact, hess_g_contact
 
 class AllegroContactWithEnvProblem(AllegroContactProblem):
     def __init__(self,
@@ -2714,20 +2799,19 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
         N, T = xu.shape[:2]
         g, grad_g, hess_g = None, None, None
         if self.num_regrasps > 0:
-            g_regrasp, grad_g_regrasp, hess_g_regrasp, t_mask_regrasp = AllegroRegraspProblem._con_eq(self, xu, compute_grads,
+            g_regrasp, grad_g_regrasp, hess_g_regrasp = AllegroRegraspProblem._con_eq(self, xu, compute_grads,
                                                                                       compute_hess, projected_diffusion=projected_diffusion)
         if self.num_contacts > 0:
-            g_contact, grad_g_contact, hess_g_contact, t_mask_contact = AllegroContactProblem._con_eq(self, xu, compute_grads,
+            g_contact, grad_g_contact, hess_g_contact = AllegroContactProblem._con_eq(self, xu, compute_grads,
                                                                                       compute_hess, projected_diffusion=projected_diffusion)
         else:
-            g, grad_g, hess_g, t_mask = g_regrasp, grad_g_regrasp, hess_g_regrasp, t_mask_regrasp
+            g, grad_g, hess_g = g_regrasp, grad_g_regrasp, hess_g_regrasp
 
         if self.num_regrasps == 0:
-            g, grad_g, hess_g, t_mask = g_contact, grad_g_contact, hess_g_contact, t_mask_contact
+            g, grad_g, hess_g = g_contact, grad_g_contact, hess_g_contact
 
         if g is None:
             g = torch.cat((g_regrasp, g_contact), dim=1)
-            t_mask = torch.cat((t_mask_regrasp, t_mask_contact), dim=1)
 
         if compute_grads:
             if grad_g is None:
@@ -2746,7 +2830,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                                                                         T * (self.dx + self.du),
                                                                         T * (self.dx + self.du))
 
-        return g, grad_g, hess_g, t_mask
+        return g, grad_g, hess_g
 
     def _con_ineq(self, xu, compute_grads=True, compute_hess=False, verbose=False, projected_diffusion=False, include_deriv_grad=False):
         # mult = 2 if include_deriv_grad else 1
@@ -2762,7 +2846,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
             hess_h = None
 
         if self.num_regrasps > 0:
-            h_regrasp, grad_h_regrasp, hess_h_regrasp, t_mask_regrasp = AllegroRegraspProblem._con_ineq(self, xu, compute_grads,
+            h_regrasp, grad_h_regrasp, hess_h_regrasp = AllegroRegraspProblem._con_ineq(self, xu, compute_grads,
                                                                                         compute_hess, projected_diffusion=projected_diffusion)
             if h is not None:
                 h = torch.cat((h_regrasp, h), dim=1)
@@ -2771,10 +2855,10 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                 if hess_h is not None:
                     hess_h = torch.cat((hess_h_regrasp, hess_h), dim=1)
             else:
-                h, grad_h, hess_h, t_mask = h_regrasp, grad_h_regrasp, hess_h_regrasp, t_mask_regrasp
+                h, grad_h, hess_h = h_regrasp, grad_h_regrasp, hess_h_regrasp
 
         if self.num_contacts > 0:
-            h_contact, grad_h_contact, hess_h_contact, t_mask_contact = AllegroContactProblem._con_ineq(self, xu, compute_grads,
+            h_contact, grad_h_contact, hess_h_contact = AllegroContactProblem._con_ineq(self, xu, compute_grads,
                                                                                         compute_hess, projected_diffusion=projected_diffusion)
             if h is not None and h_contact is not None:
                 h = torch.cat((h, h_contact), dim=1)
@@ -2782,9 +2866,8 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                     grad_h = torch.cat((grad_h, grad_h_contact), dim=1)
                 if hess_h is not None:
                     hess_h = torch.cat((hess_h, hess_h_contact), dim=1)
-                t_mask = torch.cat((t_mask, t_mask_contact), dim=1)
             elif h is None:
-                h, grad_h, hess_h, t_mask = h_contact, grad_h_contact, hess_h_contact, t_mask_contact
+                h, grad_h, hess_h = h_contact, grad_h_contact, hess_h_contact
 
         # if h is None:
         #    h = torch.cat((h_regrasp, h_contact), dim=1)
@@ -2799,7 +2882,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                                                                     T * (self.dx + self.du),
                                                                     T * (self.dx + self.du))
 
-        return h, grad_h, hess_h, t_mask
+        return h, grad_h, hess_h
 
 class AllegroRegraspWithEnvProblem(AllegroRegraspProblem):
 
