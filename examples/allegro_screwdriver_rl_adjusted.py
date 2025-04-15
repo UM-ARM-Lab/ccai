@@ -372,8 +372,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         data['pre_action_likelihoods'].append([])
         data['final_likelihoods'].append([])
         orig_torque_perturb = env.external_wrench_perturb if params['mode'] != 'hardware' else False
-        # if recover and params['mode'] != 'hardware' and not params.get('model_path_orig', None):
-        #     env.set_external_wrench_perturb(False)
+        if recover and params['mode'] != 'hardware' and not params.get('model_path_orig', None):
+            env.set_external_wrench_perturb(False)
         # Initialize variables that might be referenced before assignment
         pre_recovery_state = None
         pre_recovery_likelihood = None
@@ -929,10 +929,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             except:
                 pass            
             data[t]['starts'].append(traj[i].reshape(1, -1).repeat(plan.shape[0], 1))
+            data[t]['contact_state'].append(contact_state)
             try:
                 data[t]['contact_points'].append(contact_points[t])
                 data[t]['contact_distance'].append(contact_distance[t])
-                data[t]['contact_state'].append(contact_state)
             except:
                 pass
 
