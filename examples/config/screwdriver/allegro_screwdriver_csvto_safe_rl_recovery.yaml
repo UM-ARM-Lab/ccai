@@ -66,6 +66,7 @@ sac_batch_size: 64
 start_ind: 1
 device: 'cuda:0'
 recovery_controller: 'mppi'
+OOD_metric: 'q_function'
 controllers:
   csvgd:
     # N: 16

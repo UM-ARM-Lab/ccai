@@ -194,7 +194,7 @@ class QRiskWrapper:
             else:
                 raise NotImplementedError(
                     "Unsupported environment for plotting")
-
+        return (qf1_loss + qf2_loss).item()
     def get_value(self, states, actions, encoded=False):
         '''
             Arguments:

@@ -76,7 +76,7 @@ class AllegroTrajectoryTransitionDataset(Dataset):
         # Apply cosine/sine transformation if needed
         self.roll = self.next_states[:, -3].clone()
         self.pitch = self.next_states[:, -2].clone()
-        self.dropped = (self.roll.abs() > 0.25) | (self.pitch.abs() > 0.25)
+        self.dropped = (self.roll.abs() > 0.35) | (self.pitch.abs() > 0.35)
         self.dropped = self.dropped.float().reshape(-1)
         if self.cosine_sine:
             self._apply_cosine_sine_transform()
@@ -90,7 +90,10 @@ class AllegroTrajectoryTransitionDataset(Dataset):
 
         s_t, a_t, s_t+1 are np arrays 
         """
-        return [(self.states[i].cpu().numpy(), self.actions[i].cpu().numpy(), self.dropped[i].cpu().item(), self.next_states[i].cpu().numpy(), self.dones[i].cpu().item()) for i in range(len(self))]
+        dataset = [(self.states[i].cpu().numpy(), self.actions[i].cpu().numpy(), self.dropped[i].cpu().item(), self.next_states[i].cpu().numpy(), self.dones[i].cpu().item()) for i in range(len(self))]
+        print(f"Loaded {len(dataset)} transitions")
+        print(f"State shape: {self.states.shape}, Action shape: {self.actions.shape}")
+        return dataset
 
     def _process_trajectory(self, trajectory):
         """

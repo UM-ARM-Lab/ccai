@@ -212,26 +212,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     if params.get('external_wrench_perturb', False):
         rand_pct = .25#(np.random.rand()) / (.5-1/4) + 1/4
         print(f'Random perturbation %: {rand_pct:.2f}')
-    # if params['compute_recovery_trajectory']:
-    #     start_sine_cosine = convert_yaw_to_sine_cosine(start[:4 * num_fingers + obj_dof])
-    #     projected_samples, _, _, _, (all_losses, all_samples, all_likelihoods) = trajectory_sampler_orig.sample(16, H=trajectory_sampler_orig.T, start=start_sine_cosine.reshape(1, -1), project=True,
-    #             constraints=torch.ones(16, 3).to(device=params['device']))
-    #     print('Final likelihood:', all_likelihoods[-1])
-    #     if all_likelihoods[-1].mean().item() < params.get('likelihood_threshold', -15):
-    #         print('1 mode projection failed, trying anyway')
-    #     else:
-    #         print('1 mode projection succeeded')
-    #     goal = convert_sine_cosine_to_yaw(projected_samples[-1][0])[:15]
-    #     goal[-1] = start[-2]
-    #         # index_regrasp_planner.reset(start, goal=goal)
-    #         # thumb_and_middle_regrasp_planner.reset(start, goal=goal)
-    #         # turn_planner.reset(start, goal=goal)
-    #         # thumb_regrasp_planner.reset(start, goal=goal)
-    #         # middle_regrasp_planner.reset(start, goal=goal)
 
-    #     params['valve_goal'] = goal
-
-    #     print('New goal:', goal)
 
     # index finger is used for stability
     if 'index' in params['fingers']:
@@ -315,9 +296,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 
     if model_path is not None:
-        # if not params.get('live_recovery', False):
-        #     index_regrasp_problem.model = trajectory_sampler_orig
-        #     thumb_and_middle_regrasp_problem.model = trajectory_sampler_orig
+
         print('Loaded trajectory sampler')
         trajectory_sampler_orig.model.diffusion_model.classifier = None
         trajectory_sampler_orig.model.diffusion_model.cutoff = params['project_threshold']
@@ -400,7 +379,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         elif not params.get('live_recovery', False):
             id_check, final_likelihood = True, None
         else:
-            id_check, final_likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15))
+            if params['OOD_metric'] == 'likelihood':
+                id_check, final_likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15))
+            elif params['OOD_metric'] == 'q_function':
+                id_check = True
+                final_likelihood = None
         if final_likelihood is not None:
             data['pre_action_likelihoods'][-1].append(final_likelihood)
 
@@ -687,7 +670,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 elif not params.get('live_recovery', False):
                     id_check, final_likelihood = True, None
                 else:
-                    id_check, final_likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15))
+                    if params['OOD_metric'] == 'likelihood':
+                        id_check, final_likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15))
+                    elif params['OOD_metric'] == 'q_function':
+                        id_check = True
+                        final_likelihood = None
                 if final_likelihood is not None:
                     data['pre_action_likelihoods'][-1].append(final_likelihood)
                 roll_abs = np.abs(state[-3].item())
@@ -811,6 +798,24 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 x = best_traj[0, :planner.problem.dx + planner.problem.du]
                 x = x.reshape(1, planner.problem.dx + planner.problem.du)
                 action = x[:, planner.problem.dx:planner.problem.dx + planner.problem.du].to(device=env.device)
+
+            if params['OOD_metric'] == 'q_function' and not recover:
+                q_func_action = action[0, :4 * num_fingers_to_plan].to(params['device'])
+                q_func_action = q_func_action.reshape(1, -1)
+                id_check, q_output = running_cost.check_id(state.unsqueeze(0), q_func_action)
+                data['pre_action_likelihoods'][-1].append(q_output)
+                if not id_check:
+                    print('OOD detected by Q function:', q_output)
+                    if planner is not None:
+                        planner.problem.data = {}
+                    if len(actual_trajectory) > 0:
+                        actual_trajectory = torch.stack(actual_trajectory, dim=0).to(device=params['device'])
+
+                    # Zero obj velocity
+                    env.zero_obj_velocity()
+                    # Return how many steps we've executed for resuming later
+                    return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, True
+
             if params.get('perturb_action', False):# and mode == 'turn':
                 # rand_pct = .75 if not params.get('shortcut_trajectory', False) else .25
                 # rand_pct = .75
@@ -1772,7 +1777,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         if done:
             break
-    if params.get('live_recovery', False) and len(data['final_likelihoods'][-1]) == 0:
+    if params.get('live_recovery', False) and len(data['final_likelihoods'][-1]) == 0 and params['recovery_controller'] != 'mppi':
         id, likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15))
         data['final_likelihoods'][-1].append(likelihood)
         data_save = deepcopy(data)

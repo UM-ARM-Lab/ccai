@@ -13,7 +13,7 @@ def get_model_input_state(state, env, obj_dof):
     obj_state = state[..., 16:16 + obj_dof]
     return torch.cat((finger_states, obj_state), dim=-1)
 class RunningCostSafeRL:
-    def __init__(self, path, env, device, include_velocity=False, cosine_sine=True):
+    def __init__(self, path, cutoff, env, device, include_velocity=False, cosine_sine=True):
         # self.start = start
         self.obj_dof = 3
         self.obj_translational_dim = 0
@@ -26,6 +26,7 @@ class RunningCostSafeRL:
         self.setup_safety_critic(path)
 
         self.env = env
+        self.cutoff = cutoff
     
     def setup_safety_critic(self, path):
         self.safety_critic = QNetworkConstraint(16, 12, 256)
@@ -40,6 +41,14 @@ class RunningCostSafeRL:
         with torch.no_grad():
             safety_critic_output = self.safety_critic(state_sine_cosine, action)
         return safety_critic_output
+    
+    def check_id(self, state, action):
+        q = self.query_safety_critic(state, action)
+        q1, q2 = q
+        q_max = torch.maximum(q1, q2).reshape(state.shape[0])
+        id_ = q_max < self.cutoff
+
+        return id_, q_max
 
     def __call__(self, state, action):
         model_in_state = get_model_input_state(state, self.env, self.obj_dof)

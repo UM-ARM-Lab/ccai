@@ -18,7 +18,7 @@ from recovery_rl.VisualMPC import VisualMPC
 from recovery_rl.model import VisualEncoderAttn, TransitionModel, VisualReconModel
 from recovery_rl.utils import linear_schedule, recovery_config_setup
 from recovery_rl.dataset import AllegroTrajectoryTransitionDataset  # Now you can import directly
-
+import wandb
 
 from env.make_utils import register_env, make_env
 import pathlib
@@ -227,7 +227,7 @@ class Experiment:
                         "rb"))
             elif 'screwdriver' in self.exp_cfg.env_name:
                 dataset = AllegroTrajectoryTransitionDataset(
-                    ['/home/abhinav/Documents/ccai/data/experiments/allegro_screwdriver_q_learning_data_pi_6'],
+                    ['/home/abhinav/Documents/ccai/data/experiments/allegro_screwdriver_safe_rl_recovery_data_pi_6_rand_pct_.25_2_N_r_.5_1_T_3'],
                     cosine_sine=True,
                     action_dim=21
                 )
@@ -303,15 +303,17 @@ class Experiment:
             print("Number of Constraint Violations: ",
                   self.num_constraint_violations)
 
+            wandb.init(project="recovery_rl", entity='abhinavk99', config=self.exp_cfg)
             # Train DDPG recovery policy
             for i in range(self.exp_cfg.critic_safe_pretraining_steps):
                 if i % 100 == 0:
                     print("CRITIC SAFE UPDATE STEP: ", i)
-                self.agent.safety_critic.update_parameters(
+                loss = self.agent.safety_critic.update_parameters(
                     memory=self.recovery_memory,
                     policy=self.agent.policy,
                     batch_size=min(self.exp_cfg.batch_size,
                                    len(self.constraint_demo_data)))
+                wandb.log({"critic_loss": loss})
 
             # Train PETS recovery policy
             # if not (self.exp_cfg.MF_recovery
@@ -340,13 +342,15 @@ class Experiment:
                   self.num_unsafe_transitions)
             print("Number of Constraint Violations: ",
                   self.num_constraint_violations)
+            
+            wandb.init(project="recovery_rl", entity='abhinavk99', config=self.exp_cfg)
             # Pass encoder to safety critic:
             self.agent.safety_critic.encoder = self.recovery_policy.get_encoding
             # Train safety critic on encoded states
             for i in range(self.exp_cfg.critic_safe_pretraining_steps):
                 if i % 100 == 0:
                     print("CRITIC SAFE UPDATE STEP: ", i)
-                self.agent.safety_critic.update_parameters(
+                loss = self.agent.safety_critic.update_parameters(
                     memory=self.recovery_memory,
                     policy=self.agent.policy,
                     batch_size=min(self.exp_cfg.batch_size,

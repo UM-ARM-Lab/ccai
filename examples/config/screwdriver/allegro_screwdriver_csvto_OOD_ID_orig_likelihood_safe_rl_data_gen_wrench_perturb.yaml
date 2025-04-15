@@ -1,5 +1,5 @@
 ---
-T: 4
+T: 3
 T_orig: 12
 receding_horizon: False
 num_steps: 8
@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 500
 visualize: True
-experiment_name: 'allegro_screwdriver_safe_rl_recovery_data_pi_6_rand_pct_.25_2_N_r_.5_1'
+experiment_name: 'allegro_screwdriver_safe_rl_recovery_data_pi_6_rand_pct_.25_2_N_r_.5_1_T_3'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -58,8 +58,8 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
-start_ind: 500
-end_ind: 1000
+start_ind: 0
+end_ind: 500
 recovery_controller: 'csvgd'
 controllers:
   csvgd:

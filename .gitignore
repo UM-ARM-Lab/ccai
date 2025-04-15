@@ -8,3 +8,4 @@ notebooks/diff_gif_imgs/*
 *.pt
 examples/wandb/*
 wandb/*
+ccai/recovery_rl/wandb/*
