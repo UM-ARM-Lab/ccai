@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 500
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_data_new_perturb_profile_perturb_during_recovery_rand_pct_.33_fm_3'
+experiment_name: 'allegro_screwdriver_safe_rl_recovery_data_pi_6_rand_pct_.25_2_N_r_.5_1'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -43,7 +43,7 @@ randomize_obj_start: True
 external_wrench_perturb: True
 viz_states: False
 diff_init: True
-live_recovery: True
+live_recovery: False
 new_projection: True
 task_diffuse_goal: True
 obj_gravity: True
@@ -58,8 +58,8 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
-start_ind: 400
-end_ind: 600
+start_ind: 500
+end_ind: 1000
 recovery_controller: 'csvgd'
 controllers:
   csvgd:
@@ -69,7 +69,7 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:1'
+    device: 'cuda:0'
     online_iters: 25
     warmup_iters: 50
     resample_steps: 16

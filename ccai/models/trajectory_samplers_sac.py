@@ -1,12 +1,12 @@
 from typing import Dict, Tuple, List, Optional, Union
 import numpy as np
-import gpytorch
+# import gpytorch
 import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.distributions import Normal, Categorical
 from torch.optim import Adam
-from gpytorch.optim import NGD
+# from gpytorch.optim import NGD
 
 import random
 import time
@@ -14,9 +14,9 @@ import collections
 from collections import deque
 
 from tqdm import tqdm
-from ccai.models.custom_likelihoods import CDFBernoulliLikelihood
+# from ccai.models.custom_likelihoods import CDFBernoulliLikelihood
 from ccai.models.helpers import MLP
-from ccai.models.likelihood_residual_gp import LikelihoodResidualGP
+# from ccai.models.likelihood_residual_gp import LikelihoodResidualGP
 
 # Normalizing flow stuff
 # from nflows.flows.base import Flow
@@ -32,17 +32,17 @@ from ccai.models.diffusion.diffusion import GaussianDiffusion, ConstrainedDiffus
 from ccai.models.cnf.cnf import TrajectoryCNF
 
 from ccai.models.helpers import MLP
-from ccai.models.likelihood_residual_gp import LikelihoodResidualGP
-from ccai.models.custom_predictive_log_likelihood import CustomPredictiveLogLikelihood
+# from ccai.models.likelihood_residual_gp import LikelihoodResidualGP
+# from ccai.models.custom_predictive_log_likelihood import CustomPredictiveLogLikelihood
 
 import time
 import collections
 
 # Import fast prediction settings
-from gpytorch.settings import fast_pred_var, fast_pred_samples, cg_tolerance
+# from gpytorch.settings import fast_pred_var, fast_pred_samples, cg_tolerance
 
 # Import the new PrioritizedReplayBuffer
-from ccai.models.replay_buffer import PrioritizedReplayBuffer
+# from ccai.models.replay_buffer import PrioritizedReplayBuffer
 
 class TrajectoryFlowModel(nn.Module):
 

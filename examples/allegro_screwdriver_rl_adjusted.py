@@ -52,7 +52,7 @@ from diffusion_mcts import DiffusionMCTS
 
 from ccai.trajectory_shortcut import shortcut_trajectory
 
-from baselines.allegro_screwdriver import RunningCostSafeRL, TerminalCostDiffusionLikelihood
+# from baselines.allegro_screwdriver import RunningCostSafeRL, TerminalCostDiffusionLikelihood
 from baselines.dynamics_model import DynamicsModel
 from baselines.mppi_planner import MPPIPlanner
 
@@ -372,8 +372,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         data['pre_action_likelihoods'].append([])
         data['final_likelihoods'].append([])
         orig_torque_perturb = env.external_wrench_perturb if params['mode'] != 'hardware' else False
-        # if recover and params['mode'] != 'hardware' and not params.get('model_path_orig', None):
-        #     env.set_external_wrench_perturb(False)
+        if recover and params['mode'] != 'hardware' and not params.get('model_path_orig', None):
+            env.set_external_wrench_perturb(False)
         # Initialize variables that might be referenced before assignment
         pre_recovery_state = None
         pre_recovery_likelihood = None
@@ -1796,8 +1796,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_safe_rl_data_gen_wrench_perturb.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_safe_rl_recovery.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl_wrench_perturb_new_project.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl_wrench_perturb_new_project.yaml').read_text())

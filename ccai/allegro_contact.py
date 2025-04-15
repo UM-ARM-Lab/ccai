@@ -1025,10 +1025,16 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             self.contact_points = {}
             self.contact_points_rob_link = []
 
+            for finger in self.regrasp_fingers:
+                rad = .0025# if finger != 'index' else .005
+                self.contact_points[finger] = (self.data[finger]['closest_obj_pt_object'].clone().detach(), rad)
+                self.contact_points_rob_link.append(self.data[finger]['closest_rob_pt_link'].clone().detach())
             self.contact_points_rob_link = torch.cat(self.contact_points_rob_link, dim=0)
 
             contact_points_object = torch.stack([self.contact_points[finger][0] for finger in self.regrasp_fingers], dim=0)
             self.contact_points_object = contact_points_object
+
+            self._regrasp_dz += self.num_regrasps  # Contact region constraint
             self._regrasp_dh = self._regrasp_dz * T  # inequality
             # self._regrasp_dh += self.num_regrasps
             self._regrasp_dh_constant = 0
