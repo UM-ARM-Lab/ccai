@@ -929,10 +929,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             except:
                 pass            
             data[t]['starts'].append(traj[i].reshape(1, -1).repeat(plan.shape[0], 1))
+            data[t]['contact_state'].append(contact_state)
             try:
                 data[t]['contact_points'].append(contact_points[t])
                 data[t]['contact_distance'].append(contact_distance[t])
-                data[t]['contact_state'].append(contact_state)
             except:
                 pass
 

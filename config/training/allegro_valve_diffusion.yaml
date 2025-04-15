@@ -20,7 +20,7 @@ discriminator_guidance: True
 inverse_dynamics: False
 data_directory: 'allegro_valve_task_data_friction_0'
 best_traj_only: False
-device: 'cuda:1'
+device: 'cuda:0'
 test_every: 9999999999
 save_every: 1000
 normalize_data: True

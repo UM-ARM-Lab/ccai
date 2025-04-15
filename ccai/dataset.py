@@ -232,9 +232,9 @@ class AllegroScrewDriverDataset(Dataset):
         for fpath in folders:
             path = pathlib.Path(fpath)
             plans = []
-            traj_data = list(path.rglob('*traj_data.p'))
-            trajectory = list(path.rglob('*trajectory.pkl'))
-            for p, traj_p in zip(traj_data, trajectory):
+            traj_data_all = list(path.rglob('*traj_data.p'))
+            trajectory_all = list(path.rglob('*trajectory.pkl'))
+            for p, traj_p in zip(traj_data_all, trajectory_all):
                 with open(p, 'rb') as f, open(traj_p, 'rb') as f_traj:
                     try:
                         data = pickle.load(f)
@@ -246,8 +246,8 @@ class AllegroScrewDriverDataset(Dataset):
 
                     need_to_continue = False
                     
-                    # dropped_recovery = data['dropped_recovery']
-                    dropped_recovery = False
+                    dropped_recovery = data['dropped_recovery']
+                    # dropped_recovery = False
                     # post_recovery_likelihoods = [i for i in data['final_likelihoods'] if len(i) == 1]
                     # post_recovery_likelihood_bool = []
                     # for fl in post_recovery_likelihoods:
@@ -260,7 +260,7 @@ class AllegroScrewDriverDataset(Dataset):
                         cs_bool = []
                         for c in data[t]['contact_state']:
                             # new_cs.append(c.sum() != 3)
-                            if not c.sum() != 3:
+                            if c.sum() != 3:
                                 # if isinstance(c, np.ndarray):
                                 #     c = torch.from_numpy(c).float()
                                 if torch.is_tensor(c):
@@ -272,14 +272,16 @@ class AllegroScrewDriverDataset(Dataset):
                         # Filter out any trajectories with contact_state [1, 1, 1]
                         new_starts = []
                         for idx, s in enumerate(data[t]['starts']):
-                            if cs_bool[idx]:
+                            # if cs_bool[idx]:
                             # if s.shape[-1] != 36:
+                            if (s.sum(0) == 0).any():
                                 new_starts.append(s)
                         new_plans = []
                         for idx, p in enumerate(data[t]['plans']):
                             # if p.shape[-1] != 36:
                             #     new_plans.append(p)
-                            if cs_bool[idx]:
+                            # if cs_bool[idx]:
+                            if (p.sum(0) == 0).any():
                                 new_plans.append(p)
 
 
