@@ -873,7 +873,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             contact_points_object = torch.stack([self.contact_points[finger][0] for finger in self.regrasp_fingers], dim=0)
             self.contact_points_object = contact_points_object
 
-            self.do_contact_patch_constraint = True
+            self.do_contact_patch_constraint = self.object_type != 'valve'  
 
         if self.num_regrasps > 0:
             if self.full_dof_goal and contact_points_object is not None:
@@ -1006,7 +1006,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             self.default_dof_pos = default_dof_pos.to(self.device)
 
         self.do_contact_patch_constraint = False
-        if self.full_dof_goal and len(self.regrasp_fingers) > 0:
+        if self.full_dof_goal and len(self.regrasp_fingers) > 0 and self.obj_link_name != 'valve':
             if self.goal is not None:
                 self.default_dof_pos = self.goal[: self.num_fingers * 4]
                 # Pad to length 16
@@ -1034,12 +1034,13 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             contact_points_object = torch.stack([self.contact_points[finger][0] for finger in self.regrasp_fingers], dim=0)
             self.contact_points_object = contact_points_object
 
-            self._regrasp_dz += self.num_regrasps  # Contact region constraint
-            self._regrasp_dh = self._regrasp_dz * T  # inequality
-            # self._regrasp_dh += self.num_regrasps
-            self._regrasp_dh_constant = 0
-            self._regrasp_dh_per_t = self._regrasp_dz
-            self.do_contact_patch_constraint = True
+            if self.object_type != 'valve':
+                self._regrasp_dz += self.num_regrasps  # Contact region constraint
+                self._regrasp_dh = self._regrasp_dz * T  # inequality
+                # self._regrasp_dh += self.num_regrasps
+                self._regrasp_dh_constant = 0
+                self._regrasp_dh_per_t = self._regrasp_dz
+                self.do_contact_patch_constraint = True
                        
 
         self.desired_ee_in_world_frame = desired_ee_in_world_frame
@@ -1221,8 +1222,8 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         h, grad_h, hess_h, t_mask = self._contact_constraints(xu, finger_name, compute_grads, compute_hess, terminal=False, projected_diffusion=projected_diffusion)
         eps = torch.zeros_like(h)
         # eps[:, :-1] = 5e-3
-        if self.obj_link_name == 'card':
-            eps[:, :-1] = 1.5e-2
+        if self.obj_link_name == 'valve':
+            eps[:, :-1] = 1e-2
         else:
             eps[:, :-1] = 1.5e-2
             # eps[:, :-1] = .5e-2

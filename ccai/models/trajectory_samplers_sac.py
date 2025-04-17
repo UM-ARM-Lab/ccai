@@ -406,18 +406,18 @@ class TrajectorySampler(nn.Module):
             self.value_function_2.set_norm_constants(self.x_mean, self.x_std)
             self.value_function_target_2.set_norm_constants(self.x_mean, self.x_std)
 
-    def convert_yaw_to_sine_cosine(self, xu):
+    def convert_yaw_to_sine_cosine(self, xu, yaw_idx=14):
         """
         xu is shape (N, T, 36)
         Replace the yaw in xu with sine and cosine and return the new xu
         """
-        yaw = xu[14]
+        yaw = xu[yaw_idx]
         sine = torch.sin(yaw)
         cosine = torch.cos(yaw)
-        xu_new = torch.cat([xu[:14], cosine.unsqueeze(-1), sine.unsqueeze(-1), xu[15:]], dim=-1)
+        xu_new = torch.cat([xu[:yaw_idx], cosine.unsqueeze(-1), sine.unsqueeze(-1), xu[(yaw_idx+1):]], dim=-1)
         return xu_new
 
-    def check_id(self, state, N, threshold=None, likelihood_only=False, return_samples=False):
+    def check_id(self, state, N, threshold=None, likelihood_only=False, return_samples=False, yaw_idx=14, obj_dof=3):
         """
         Check if the state is in-distribution using the learned model.
         
@@ -432,11 +432,11 @@ class TrajectorySampler(nn.Module):
         Returns:
             Tuple of (is_in_distribution, likelihood, [samples if return_samples])
         """
-        start = state[:4 * 3 + 3]
-        start_sine_cosine = self.convert_yaw_to_sine_cosine(start)
+        start = state[:4 * 3 + obj_dof]
+        start_sine_cosine = self.convert_yaw_to_sine_cosine(start,yaw_idx=yaw_idx)
         
         # Use GPyTorch's fast prediction settings to speed up sampling
-        with torch.no_grad(), fast_pred_var(), fast_pred_samples(), cg_tolerance(1e-3):
+        with torch.no_grad():
             samples, _, likelihood = self.sample(N=N, H=self.T, start=start_sine_cosine.reshape(1, -1),
                     constraints=torch.ones(N, 3).to(device=state.device))
         

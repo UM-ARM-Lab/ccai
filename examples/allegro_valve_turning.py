@@ -63,7 +63,7 @@ print("CCAI_PATH", CCAI_PATH)
 obj_dof = 1
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
-# sys.stdout = open('./examples/logs/allegro_valve_test_action_perturb.log', 'w', buffering=1)
+sys.stdout = open('./examples/logs/allegro_valve_data_generation.log', 'w', buffering=1)
 
 def vector_cos(a, b):
     return torch.dot(a.reshape(-1), b.reshape(-1)) / (torch.norm(a.reshape(-1)) * torch.norm(b.reshape(-1)))
@@ -223,9 +223,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         }
     else:
         min_force_dict = {
-            'thumb': 0.5,
-            'middle': 0.5,
-            'index': 0.5,
+            'thumb': .5,
+            'middle': .5,
+            'index': .5,
         }
 
     # if params.get('compute_recovery_trajectory', False):
@@ -282,7 +282,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     )
 
     index_regrasp_planner = None
-    thumb_and_middle_regrasp_planner = None
+    middle_regrasp_planner = None
+    thumb_regrasp_planner = None
     turn_planner = None
 
     if model_path is not None:
@@ -372,7 +373,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         elif not params.get('live_recovery', False):
             id_check, final_likelihood = True, None
         else:
-            id_check, final_likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15))
+            id_check, final_likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15), yaw_idx=12, obj_dof=obj_dof)
         if final_likelihood is not None:
             data['pre_action_likelihoods'][-1].append(final_likelihood)
 
@@ -422,8 +423,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             contact[:, 2] = 1
 
         recovery_params = copy.deepcopy(params)
-        recovery_params['warmup_iters'] = 75 #if not params.get('model_path_orig', None) else 25
-        recovery_params['online_iters'] = 20 #if not params.get('model_path_orig', None) else 0
+        recovery_params['warmup_iters'] = 100 #if not params.get('model_path_orig', None) else 25
+        recovery_params['online_iters'] = 30 #if not params.get('model_path_orig', None) else 0
 
         skip_diff_init = False
         planner_returns_action = False
@@ -536,7 +537,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             
             if recover:
                 planner.problem.goal[-1] = state[-1]
-
+                planner.problem.cost = vmap(partial(planner.problem._cost, start=planner.problem.start, goal=planner.problem.goal, ), randomness='same')
+                planner.problem.grad_cost = vmap(jacrev(partial(planner.problem._cost, start=planner.problem.start, goal=planner.problem.goal), argnums=(0, 1, 2)), randomness='same')
         # contact = -torch.ones(params['N'], 3).to(device=params['device'])
         # contact[:, 0] = 1
         # contact[:, 1] = 1
@@ -677,7 +679,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 elif not params.get('live_recovery', False):
                     id_check, final_likelihood = True, None
                 else:
-                    id_check, final_likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15))
+                    id_check, final_likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15), yaw_idx=12, obj_dof=obj_dof)
                 if final_likelihood is not None:
                     data['pre_action_likelihoods'][-1].append(final_likelihood)
                 # Only return based on dropped if we are using MPPI
@@ -1047,7 +1049,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             
                 if params['task_diffuse_goal']:
                     goal = index_regrasp_planner.problem.goal.clone()
-                    goal[-1] = state[-1]
+                    # goal[-1] = state[-1]
                     initial_samples = []
                     pre_goal_viz = time.perf_counter()
                     plan_time += time.perf_counter() - pre_goal_viz
@@ -1079,7 +1081,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # modes = ['thumb_middle', 'index']
         # for planner in [index_regrasp_planner, thumb_and_middle_regrasp_planner]:
         goal = index_regrasp_planner.problem.goal.clone()
-        goal[-1] = state[-1]
+        # goal[-1] = state[-1]
         initial_samples = []
         pre_goal_viz = time.perf_counter()
         plan_time += time.perf_counter() - pre_goal_viz
@@ -1100,21 +1102,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         post_goal_viz = time.perf_counter()
         dist_min = 3e-3
         mode_skip = []
-        # planner = mode_planner_dict['index']
-        # cur_q = state[:4 * num_fingers]
-        # cur_theta = state[4 * num_fingers: 4 * num_fingers + obj_dof]
-        # planner.problem._preprocess_fingers(cur_q[None, None], cur_theta[None, None], compute_closest_obj_point=True)
-        # print(planner.problem.data['thumb']['sdf'], planner.problem.data['middle']['sdf'], planner.problem.data['index']['sdf'])
-        # for mode in modes:
-        #     if mode == 'index':
-        #         if planner.problem.data['thumb']['sdf'].max() > dist_min or planner.problem.data['middle']['sdf'].max() > dist_min:
-        #             mode_skip.append(mode)
-        #     elif mode == 'thumb_middle':
-        #         if planner.problem.data['index']['sdf'].max() > dist_min:
-        #             mode_skip.append(mode)
 
-        # if 'index' in mode_skip and 'thumb_middle' in mode_skip:
-        #     mode_skip = []
+        
         pre_mode_loop = time.perf_counter()
         plan_time += pre_mode_loop - post_goal_viz
         for mode in modes:
@@ -1125,6 +1114,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             begin_mode_loop = time.perf_counter()
             planner = mode_planner_dict[mode]
             planner.reset(state, T=params['T'], goal=goal)
+            
+            # planner.problem.goal[-1] = state[-1]
+            # planner.problem.cost = vmap(partial(planner.problem._cost, start=planner.problem.start, goal=planner.problem.goal, ), randomness='same')
+            # planner.problem.grad_cost = vmap(jacrev(partial(planner.problem._cost, start=planner.problem.start, goal=planner.problem.goal), argnums=(0, 1, 2)), randomness='same')
+
             # old_warmup_iters = planner.warmup_iters
             planner.warmup_iters = params['warmup_iters']
 
@@ -1138,7 +1132,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             x = xu[:, :planner.problem.num_fingers * 4 + planner.problem.obj_dof]
 
             start = x[-1]
-            likelihood, samples = trajectory_sampler_orig.check_id(start, 8, likelihood_only=True, return_samples=True, threshold=params.get('likelihood_threshold', -15))
+            likelihood, samples = trajectory_sampler_orig.check_id(start, 8, likelihood_only=True, return_samples=True, threshold=params.get('likelihood_threshold', -15), yaw_idx=12, obj_dof=obj_dof)
             distances.append(-likelihood)
             end_mode_loop = time.perf_counter()
             plan_time += end_mode_loop - begin_mode_loop
@@ -1191,7 +1185,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     # <= so because pregrasp will iterate the all_stage counter
 
     if not params.get('live_recovery', False):
-        contact_sequence = ['turn']
+        contact_sequence = ['turn', 'turn', 'turn']
 
         # while len(contact_sequence) < 50:
         #     contact_options = ['index', 'middle', 'thumb']
@@ -1213,7 +1207,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             elif params.get('model_path_orig', None) and params.get('generate_context', False):
                 # Use recovery model to get contact mode'):
                 contact_sequence, goal_config, initial_samples, likelihood, plan_time = plan_recovery_contacts(state, stage)
-                goal_config[-1] = state[-1]
+                # goal_config[-1] = state[-1]
                 if params.get('task_diffuse_goal', False):
                     goal_config = None
                 if not params.get('recovery_diff_traj', False):
@@ -1223,7 +1217,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             elif params.get('model_path_orig', None):
                 # Use recovery model to get contact mode
                 contact_sequence, goal_config, initial_samples, likelihood, plan_time = plan_recovery_contacts_w_model(state)
-                goal_config[-1] = state[-1]
+                # goal_config[-1] = state[-1]
                 # goal_config = None
                 # initial_samples = None
                 planned = True
@@ -1389,7 +1383,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                             traj[..., -3:]), dim=-1)
 
         elif contact == 'turn':
-            _goal = torch.tensor([state[-1] - np.pi / 4]).to(device=params['device'])
+            _goal = torch.tensor([state[-1] - np.pi/4]).to(device=params['device'])
             # _goal = torch.tensor([0.]).to(device=params['device'])
                 
             # If we're recovering and have a saved goal/timesteps, use them
@@ -1453,6 +1447,15 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             # add = False
         data['dropped'] = dropped
         data['dropped_recovery'] = dropped and pre_recover
+        
+        goal_yaw = -np.pi / 3
+        cur_yaw = state[-1].item()
+        
+        cutoff_degrees = 5
+        cutoff_radians = np.deg2rad(cutoff_degrees)
+        if np.abs(cur_yaw - goal_yaw) < cutoff_radians:
+            print('Reached goal yaw')
+            done = True
 
         
         if recover and not done and params.get('task_diffuse_goal', False):
@@ -1479,7 +1482,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 print('1 mode projection succeeded')
                 
             goal = convert_sine_cosine_to_yaw(projected_samples[0][0])[:FULL_DOF]
-            goal[-1] = start[-1]
+            # goal[-1] = start[-1]
 
             params_for_recovery = deepcopy(params)
             if index_regrasp_planner is None:
@@ -1530,9 +1533,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     proj_path=None,
                     project=True,
                 )
-                middle_regrasp_planner = PositionControlConstrainedSVGDMPC(middle_regrasp_problem, recovery_params)
+                middle_regrasp_planner = PositionControlConstrainedSVGDMPC(middle_regrasp_problem, params_for_recovery)
             
-            elif thumb_regrasp_planner is None:
+            if thumb_regrasp_planner is None:
                 thumb_regrasp_problem = AllegroValve(
                     start=state[:4 * num_fingers + obj_dof],
                     goal=goal,
@@ -1612,7 +1615,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         if done:
             break
     if params.get('live_recovery', False) and len(data['final_likelihoods'][-1]) == 0:
-        id, likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15))
+        id, likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15), yaw_idx=12, obj_dof=obj_dof)
         data['final_likelihoods'][-1].append(likelihood)
         data_save = deepcopy(data)
         for t in range(1, 1 + params['T']):
@@ -1637,6 +1640,7 @@ if __name__ == "__main__":
     # get config
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_only.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_recovery_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_safe_rl_recovery.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl_data_gen_wrench_perturb.yaml').read_text())
@@ -1779,6 +1783,8 @@ if __name__ == "__main__":
     params = config.copy()
     params.pop('controllers')
     params.update(config['controllers']['csvgd'])
+    FULL_DOF = 4 * len(config['fingers']) + obj_dof
+
     if model_path is not None:
         problem_for_sampler = None
         if 'type' not in config:
@@ -1823,6 +1829,8 @@ if __name__ == "__main__":
             trajectory_sampler.model.diffusion_model.cutoff = config['project_threshold']
             trajectory_sampler.model.diffusion_model.subsampled_t = '5_10_15' in config['experiment_name']
             trajectory_sampler.model.diffusion_model.classifier = None
+            
+            trajectory_sampler.model.diffusion_model.cutoff_timesteps = 32
 
             return trajectory_sampler
         
@@ -1877,7 +1885,6 @@ if __name__ == "__main__":
         params['chain'] = chain.to(device=params['device'])
         object_location = torch.from_numpy(env.obj_pose).to(device=params['device']).float()  # TODO: confirm if this is the correct location
         params['object_location'] = object_location
-        FULL_DOF = 4 * len(config['fingers']) + obj_dof
 
         # If params['device'] is cuda:1 but the computer only has 1 gpu, change to cuda:0
         succ = False

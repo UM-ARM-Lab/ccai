@@ -6,9 +6,9 @@ num_steps: 8
 num_turns: 1
 max_recovery_stages: 4
 num_trials: 10
-num_episodes: 720
+num_episodes: 200
 visualize: True
-experiment_name: 'allegro_valve_task_data_friction_0.1_pi_5x2'
+experiment_name: 'allegro_valve_recovery_data_'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -22,9 +22,9 @@ goal: -1.5
 prior: 1
 multi_particle_search: True
 replan: False
-visualize_plan: False
-visualize_recovery_plan: False
-visualize_contact_plan: False
+visualize_plan: True
+visualize_recovery_plan: True
+visualize_contact_plan: True
 optimize_force: True
 exclude_index: False
 projected: False
@@ -39,16 +39,18 @@ compute_recovery_trajectory: False
 rl_adjustment: False
 test_recovery_trajectory: False
 perturb_action: False
-randomize_obj_start: False
+randomize_obj_start: True
 external_wrench_perturb: False
 viz_states: False
 diff_init: True
-live_recovery: False
+live_recovery: True
 new_projection: True
 task_diffuse_goal: True
-obj_gravity: False
+obj_gravity: True
 type: 'diffusion'
-likelihood_threshold: -160.0
+model_path: 'data/training/allegro_screwdriver/allegro_valve_task_diffusion/allegro_screwdriver_diffusion.pt'
+model_dir: 'data/training/allegro_screwdriver/allegro_valve_task_diffusion'
+likelihood_threshold: -250.0
 drop_threshold: -1250
 project_threshold: -105.
 sac_batch_size: 64
@@ -56,9 +58,8 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
-start_ind: 248
-end_ind: 496
-recovery_controller: 'csvgd'
+start_ind: 0
+end_ind: 200
 controllers:
   csvgd:
     # N: 16
@@ -69,7 +70,7 @@ controllers:
     momentum: 0.
     online_iters: 25
     warmup_iters: 50
-    resample_steps: 1
+    resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1
     penalty: 1000000
