@@ -508,7 +508,7 @@ def train_classifier(model: TrajectorySampler, train_loader: DataLoader, val_loa
     pathlib.Path.mkdir(pathlib.Path(fpath), parents=True, exist_ok=True)
     
     # Initialize a classifier MLP with appropriate dimensions
-    model.model.diffusion_model.classifier = nn.Sequential(
+    classifier = nn.Sequential(
         nn.Linear(config['dx'], 512),
         nn.ReLU(),
         nn.Linear(512, 512),
@@ -519,13 +519,13 @@ def train_classifier(model: TrajectorySampler, train_loader: DataLoader, val_loa
     ).to(config['device'])
     
     # Setup optimizer
-    optimizer = torch.optim.Adam(model.model.diffusion_model.classifier.parameters(), lr=1e-4)
+    optimizer = torch.optim.Adam(classifier.parameters(), lr=1e-4)
     
     # Use binary cross entropy loss for each dimension
     loss_fn = nn.BCEWithLogitsLoss()
     
     # Training loop
-    model.model.diffusion_model.classifier.train()
+    classifier.train()
     
     num_epochs = config.get('classifier_epochs', config['epochs'])
     pbar = tqdm.tqdm(range(num_epochs))
@@ -553,7 +553,7 @@ def train_classifier(model: TrajectorySampler, train_loader: DataLoader, val_loa
             targets = traj_class.to(device=config['device']).float()
             
             # Forward pass
-            logits = model.model.diffusion_model.classifier(initial_states)
+            logits = classifier(initial_states)
             
             # Calculate loss
             loss = loss_fn(logits, targets)
@@ -581,7 +581,7 @@ def train_classifier(model: TrajectorySampler, train_loader: DataLoader, val_loa
         
         
         # Evaluate on a validation set
-        model.model.diffusion_model.classifier.eval()
+        classifier.eval()
         val_loss = 0.0
         val_accuracy = 0.0
         val_batches = 0
@@ -592,7 +592,7 @@ def train_classifier(model: TrajectorySampler, train_loader: DataLoader, val_loa
                 traj_class = (traj_class + 1) / 2
                 targets = traj_class.to(device=config['device']).float()
                 
-                logits = model.model.diffusion_model.classifier(initial_states)
+                logits = classifier(initial_states)
                 loss = loss_fn(logits, targets)
                 predictions = (torch.sigmoid(logits) > 0.5).float()
                 accuracy = (predictions == targets).all(dim=1).float().mean()
@@ -609,11 +609,11 @@ def train_classifier(model: TrajectorySampler, train_loader: DataLoader, val_loa
         if val_accuracy > best_accuracy:
             best_accuracy = val_accuracy
             best_loss = epoch_loss
-            torch.save(model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}_contact_classifier.pt')
+            torch.save(classifier.state_dict(), f'{fpath}/allegro_screwdriver_contact_classifier.pt')
             print(f'Saved best model with accuracy: {best_accuracy:.4f} and loss: {best_loss:.4f}')
 
     # Evaluate confusion matrix on validation data
-    model.model.diffusion_model.classifier.eval()
+    classifier.eval()
     all_targets = []
     all_predictions = []
     
@@ -622,7 +622,7 @@ def train_classifier(model: TrajectorySampler, train_loader: DataLoader, val_loa
             initial_states = trajectories[:, 0, :config['dx']].to(device=config['device'])
             targets = traj_class.to(device=config['device'])
             
-            logits = model.model.diffusion_model.classifier(initial_states)
+            logits = classifier(initial_states)
             predictions = (torch.sigmoid(logits) > 0.5).float()
             
             all_targets.append(targets.cpu().numpy())

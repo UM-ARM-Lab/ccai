@@ -674,7 +674,7 @@ class GaussianDiffusion(nn.Module):
         noise = torch.randn((B, H, self.xu_dim), device=device)
         
         # Projection cutoff timestep (when we switch from conditioned to unconditioned)
-        cutoff_timestep = 128
+        cutoff_timestep = self.cutoff_timesteps
         
         # 2. First denoising pass: T → 50 WITH conditioning
         # Apply the conditioning here to initialize the process properly

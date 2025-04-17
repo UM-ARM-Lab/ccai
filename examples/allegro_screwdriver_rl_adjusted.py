@@ -12,6 +12,7 @@ from statsmodels.distributions.empirical_distribution import ECDF
 from copy import deepcopy
 
 import torch
+from torch import nn
 import time
 import datetime
 import copy
@@ -52,7 +53,7 @@ from diffusion_mcts import DiffusionMCTS
 
 from ccai.trajectory_shortcut import shortcut_trajectory
 
-# from baselines.allegro_screwdriver import RunningCostSafeRL, TerminalCostDiffusionLikelihood
+from baselines.allegro_screwdriver import RunningCostSafeRL, TerminalCostDiffusionLikelihood
 from baselines.dynamics_model import DynamicsModel
 from baselines.mppi_planner import MPPIPlanner
 
@@ -67,7 +68,7 @@ print("CCAI_PATH", CCAI_PATH)
 obj_dof = 3
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
-# sys.stdout = open('./examples/logs/allegro_screwdriver_safe_rl_recovery.log', 'w', buffering=1)
+# sys.stdout = open('./examples/logs/allegro_screwdriver_recovery_ablate_contact_mlp.log', 'w', buffering=1)
 
 def vector_cos(a, b):
     return torch.dot(a.reshape(-1), b.reshape(-1)) / (torch.norm(a.reshape(-1)) * torch.norm(b.reshape(-1)))
@@ -282,7 +283,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         optimize_force=params['optimize_force'],
         default_dof_pos=env.default_dof_pos[:, :16],
         turn=True,
-        obj_gravity=params.get('obj_gravity', False),
+        obj_gravity=False,#params.get('obj_gravity', False),
         min_force_dict=min_force_dict,
         full_dof_goal=False,
         proj_path=proj_path,
@@ -351,7 +352,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         data['pre_action_likelihoods'].append([])
         data['final_likelihoods'].append([])
         orig_torque_perturb = env.external_wrench_perturb if params['mode'] != 'hardware' else False
-        if recover and params['mode'] != 'hardware' and not params.get('model_path_orig', None):
+        if recover and params['mode'] != 'hardware' and (not params.get('model_path_orig', None)):
             env.set_external_wrench_perturb(False)
         # Initialize variables that might be referenced before assignment
         pre_recovery_state = None
@@ -395,10 +396,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         if dropped:
             print('dropped')
 
-        if params['recovery_controller'] == 'mppi' and recover and id_check:
-            print('MPPI returned state to ID. Exiting recovery loop')
-            return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, False
-        elif not (params['recovery_controller'] == 'mppi' and recover) and not id_check or dropped:
+        # if params['recovery_controller'] == 'mppi' and recover and id_check:
+        #     print('MPPI returned state to ID. Exiting recovery loop')
+        #     return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, False
+        if not (params['recovery_controller'] == 'mppi' and recover) and not id_check or dropped:
             # State is OOD. Save state and likelihood but DON'T collect data for RL yet.
             # We will collect it only AFTER recovery completes
             pre_recovery_state = state[:4 * num_fingers + obj_dof].clone()
@@ -443,7 +444,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         planner_returns_action = False
         if 'mppi' in params['recovery_controller'] and recover:
             ctrl = MPPI(dynamics=dynamics, running_cost=running_cost, terminal_state_cost=terminal_cost, nx=nx, noise_sigma=noise_sigma, 
-                        num_samples=500, horizon=2, lambda_=.01, u_min=u_min, u_max=u_max,
+                        num_samples=500, horizon=params['T'], lambda_=params['lambda_'], u_min=u_min, u_max=u_max,
                         device=params['device'])
             planner = MPPIPlanner(ctrl, 12, params['T'])
             skip_diff_init = True
@@ -516,7 +517,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     optimize_force=params['optimize_force'],
                     default_dof_pos=env.default_dof_pos[:, :16],
                     turn=True,
-                    obj_gravity=params.get('obj_gravity', False),
+                    obj_gravity=False,#params.get('obj_gravity', False),
                     min_force_dict=min_force_dict,
                     full_dof_goal=False,
                     proj_path=proj_path,
@@ -804,6 +805,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 q_func_action = q_func_action.reshape(1, -1)
                 id_check, q_output = running_cost.check_id(state.unsqueeze(0), q_func_action)
                 data['pre_action_likelihoods'][-1].append(q_output)
+                print(f'Q function output: {q_output.item():.2f}')
                 if not id_check:
                     print('OOD detected by Q function:', q_output)
                     if planner is not None:
@@ -813,6 +815,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
                     # Zero obj velocity
                     env.zero_obj_velocity()
+                    planned_trajectories.pop(-1)
                     # Return how many steps we've executed for resuming later
                     return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, True
 
@@ -894,7 +897,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # for memory reasons we clear the data
         if params['controller'] != 'diffusion_policy':
             planner.problem.data = {}
-        env.set_external_wrench_perturb(orig_torque_perturb, rand_pct)
+        if params['external_wrench_perturb']:
+            env.set_external_wrench_perturb(orig_torque_perturb, rand_pct)
         return actual_trajectory, planned_trajectories, initial_samples, sim_rollouts, optimizer_paths, contact_points, contact_distance, recover
 
     data = {}
@@ -987,180 +991,24 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             start_for_diff = convert_yaw_to_sine_cosine(state)
         else:
             start_for_diff = start
+            
+        contact_mode_pred = torch.softmax(classifier(start_for_diff.reshape(1, -1)), 1)
 
-        likelihoods= []
-        mean_obj_configs = {}
-        all_samples = {}
-        all_likelihoods = {}
+        contact_mode_pred = torch.round(contact_mode_pred).repeat(params['N'], 1)
+        contact_mode_pred_tuple = tuple(contact_mode_pred[0].cpu().numpy())
 
-        contact = -torch.ones(params['N']*2, 3).to(device=params['device'])
-        contact[:params['N']*1, 0] = 1
-        contact[params['N']*1:, 1] = 1
-        contact[params['N']*1:, 2] = 1
-
-        mc_samples, _, _likelihoods_t_x = trajectory_sampler.sample(N=contact.shape[0], start=start_for_diff.reshape(1, -1),
-                                                                    constraints=contact,
+        best_mode_traj, _, best_mode_likelihoods = trajectory_sampler.sample(N=contact_mode_pred.shape[0], start=start_for_diff.reshape(1, -1),
+                                                                    constraints=contact_mode_pred,
                                                                     # context_for_likelihood=False,
                                                             H=trajectory_sampler.T)
-        # idx = torch.argsort(_likelihoods_t_x.flatten(), dim=0, descending=True)
-        # mc_samples = mc_samples[idx]
-        # _likelihoods_t_x = _likelihoods_t_x[idx]
-
-        # mc_samples_normalized = (mc_samples - trajectory_sampler.x_mean)/trajectory_sampler.x_std
-        # if params['visualize_contact_plan']:
-        #     # Visualize the params['N'] most likely mc_samples
-        #     # Indices of params['N'] highest likelihood samples
-        #     mc_samples_for_viz = convert_sine_cosine_to_yaw(mc_samples)
-
-        #     for i in range(mc_samples_for_viz.shape[0]):
-        #         viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fpath}/recovery_stage_{all_stage}/mc_samples/{i}")
-        #         img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
-        #         gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
-        #         pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
-        #         pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-        #         mc_sample_for_viz = mc_samples_for_viz[i, :, :15]
-        #         tmp = torch.zeros((mc_sample_for_viz.shape[0], 1),
-        #                             device=x.device)
-        #         mc_sample_for_viz = torch.cat((mc_sample_for_viz, tmp), dim=1)
-        #         visualize_trajectory(mc_sample_for_viz, turn_problem.contact_scenes_for_viz, viz_fpath,
-        #                                 turn_problem.fingers, turn_problem.obj_dof + 1)
-
-        max_likelihood = 0
-        iter = 0
-        # while max_likelihood < .5 and iter < 3:
-        likelihood_list = []
-        for i, mode in enumerate(modes):
-            # likelihood = calc_samples_likeilhoods(mode, start_for_diff, state, mc_samples_normalized[params['N']*2*i:params['N']*2*(i+1)], _likelihoods_t_x[params['N']*2*i:params['N']*2*(i+1)])
-            # likelihood = calc_samples_likeilhoods(mode, start_for_diff, state, mc_samples_normalized, _likelihoods_t_x)
-
-            mean_likelihood = _likelihoods_t_x[params['N']*1*i:params['N']*1*(i+1)].mean().item()
-            # Look up mean_likelihood in corresponding ecdf
-            print(f'Mean likelihood for {mode}:', mean_likelihood)
-            likelihood = ecdf_data[mode](mean_likelihood)
-            likelihoods.append(likelihood)
-            likelihood_list.append(likelihood)
-
-        # # mean_obj_configs.append(mean_obj_config)
-        # # all_samples_[mode] = all_samples.detach().cpu()
-        # # all_likelihoods_[mode] = all_likelihoods.detach().cpu()
-
-        # iter += 1
-        # max_likelihood = max(likelihood_list)
-        # pcts = torch.tensor([3584, 1928, 2592.])/torch.tensor([3584, 1928, 2592.]).sum()
-        # pcts = torch.tensor([3112, 4424.])/torch.tensor([3112, 4424.]).sum()
-        # pcts = torch.tensor([8888, 5616.])/torch.tensor([8888, 5616.]).sum() # Weighted training should technically have a uniform prior
-
-        # KL Divergence between likelihoods and prior
-        # likelihood_normalized = torch.exp(torch.tensor(likelihoods)) / torch.exp(torch.tensor(likelihoods)).sum()
-        # logits_unnormalized = classifier(start_for_diff.reshape(1, -1)).squeeze(0)
-        # likelihood_normalized = torch.softmax(logits_unnormalized, dim=0)
-
-        # likelihoods = []
-        # for mode in modes:
-        #     mean_obj_config, all_samples_, all_likelihoods_ = get_init_for_c(mode, start_for_diff)
-        #     start_sine_cosine = convert_yaw_to_sine_cosine(mean_obj_config)
-        #     _, _, likelihood = trajectory_sampler_orig.sample(N=params['N'], H=trajectory_sampler_orig.T, start=start_sine_cosine.reshape(1, -1),
-        #     constraints=torch.ones(params['N'], 3).to(device=params['device']))
-        #     likelihood = likelihood.mean().item()
-        #     likelihoods.append(likelihood)
-        #     mean_obj_configs[mode] = mean_obj_config
-        #     all_samples[mode] = all_samples_.detach().cpu()
-        #     all_likelihoods[mode] = all_likelihoods_.detach().cpu()
-        for mode in modes:
-            print(f'Unnormalized likelihood for {mode}:', likelihoods[modes.index(mode)])
-        likelihood_normalized = torch.tensor(likelihoods)
-        likelihood_normalized = torch.softmax(likelihood_normalized, dim=0)
-
-        for mode in modes:
-            print(f'Normalized likelihood for {mode}:', likelihood_normalized[modes.index(mode)].item())
-
-        # mode_override = input('Override mode? Blank for no: ')
-        mode_override = ''
-        if mode_override != '':
-            mode = mode_override
-            print('Overriding mode to:', mode_override)
-        else:
-            likelihood_normalized = likelihood_normalized.cpu().numpy()
-            mode = modes[np.argmax(likelihood_normalized)]
-        # del mc_samples, mc_samples_normalized, _likelihoods_t_x
-
-        # goal_obj_config, all_samples, all_likelihoods = get_init_for_c(mode, start_for_diff)
-        traj_set_ind = modes.index(mode)
-
-        best_mode_traj = mc_samples[params['N']*1*traj_set_ind:params['N']*1*(traj_set_ind+1)]
+        
+        
         best_mode_traj = convert_sine_cosine_to_yaw(best_mode_traj)
-        best_mode_likelihoods = _likelihoods_t_x[params['N']*1*traj_set_ind:params['N']*1*(traj_set_ind+1)]
         highest_likelihood_traj_idx = best_mode_likelihoods.argmax(0)
         goal_obj_config = best_mode_traj[highest_likelihood_traj_idx, -1, :4 * num_fingers + obj_dof].squeeze()
         # del mc_samples, _likelihoods_t_x
+        mode = contact_state_dict_flip[contact_mode_pred_tuple]
         return [mode], goal_obj_config, best_mode_traj, best_mode_likelihoods, time.perf_counter() - start_plan_time
-
-
-        return [mode], mean_obj_configs[mode], all_samples, all_likelihoods
-
-    @torch.no_grad()
-    def get_init_for_c(mode, start_for_diff):
-        N_ = params['N'] * 1
-        contact = -torch.ones(N_, 3).to(device=params['device'])
-        if mode == 'thumb_middle':
-            contact[:, 0] = 1
-        elif mode == 'index':
-            contact[:, 1] = 1
-            contact[:, 2] = 1
-        elif mode =='turn':
-            contact[:, 0] = 1
-            contact[:, 1] = 1
-            contact[:, 2] = 1
-
-        samples, _, _likelihoods_t_x_c = trajectory_sampler.sample(N=N_, start=start_for_diff.reshape(1, -1),
-                                                            H=trajectory_sampler.T,
-                                                            constraints=contact,
-                                                            skip_likelihood=False)
-        samples = convert_sine_cosine_to_yaw(samples)
-        highest_likelihood_idx = _likelihoods_t_x_c.flatten().argmax(0)
-
-        # problem = mode_problem_dict[mode]
-        # problem.start = convert_sine_cosine_to_yaw(start_for_diff)
-        # initial_samples = _full_to_partial(samples, mode)
-        # initial_x = initial_samples[:, 1:, :problem.dx]
-        # initial_u = initial_samples[:, :-1, -problem.du:]
-        # initial_samples = torch.cat((initial_x, initial_u), dim=-1)
-        # initial_z = mode_problem_dict[mode].get_initial_z(initial_samples)
-        # augmented_x = torch.cat((initial_samples, initial_z), dim=-1)
-
-        # constraint_violation, _, _, _ = mode_problem_dict[mode].combined_constraints(augmented_x, compute_grads=False, compute_hess=False)
-        # constraint_violation = constraint_violation.abs().sum(-1)
-        # highest_likelihood_idx = constraint_violation.argmin(0)
-
-        if params['visualize_contact_plan']:
-            traj_for_viz = samples[highest_likelihood_idx, :, :15]
-            if params['exclude_index']:
-                traj_for_viz = torch.cat((state[4:15].unsqueeze(0), traj_for_viz), dim=0)
-            else:
-                traj_for_viz = torch.cat((state[:15].unsqueeze(0), traj_for_viz), dim=0)
-            tmp = torch.zeros((traj_for_viz.shape[0], 1),
-                                device=x.device)  # add the joint for the screwdriver cap
-            traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
-            # traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof] = axis_angle_to_euler(traj_for_viz[:, 4 * num_fingers: 4 * num_fingers + obj_dof])
-
-            viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fpath}/recovery_stage_{all_stage}/{mode}")
-
-            img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
-            gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
-            pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
-            pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-            visualize_trajectory(traj_for_viz, turn_problem.contact_scenes_for_viz, viz_fpath,
-                                    turn_problem.fingers, turn_problem.obj_dof + 1)
-            
-        goal_obj_config = samples[highest_likelihood_idx, -1, :4 * num_fingers + obj_dof].squeeze()
-
-        # sorted_idx = constraint_violation.argsort(0)
-        # samples = samples[sorted_idx]
-        sorted_idx = _likelihoods_t_x_c.argsort(0, descending=True)
-        samples = samples[sorted_idx]
-        _likelihoods_t_x_c = _likelihoods_t_x_c[sorted_idx]
-
-        return goal_obj_config, {mode: samples}, {mode: _likelihoods_t_x_c}
 
 
     def plan_recovery_contacts(state, stage):
@@ -1504,7 +1352,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 input("Pregrasp complete. Ready to execute. Press <ENTER> to continue.")
             stage += 1
             all_stage += 1
-            if params['mode'] != 'hardware':
+            if params['mode'] != 'hardware' and params['external_wrench_perturb']:
                 env.set_external_wrench_perturb(orig_torque_perturb, rand_pct)
             continue
         else:
@@ -1580,7 +1428,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 6).to(device=params['device'])), dim=-1)
 
         elif contact == 'turn':
-            _goal = torch.tensor([0, 0, state[-1] - np.pi / 6]).to(device=params['device'])
+            _goal = torch.tensor([0, 0, state[-1] - np.pi / 2]).to(device=params['device'])
                 
             # If we're recovering and have a saved goal/timesteps, use them
             start_timestep = 0
@@ -1801,9 +1649,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_safe_rl_data_gen_wrench_perturb.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_safe_rl_recovery.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_mppi_safe_rl_recovery.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_mppi_likelihood_recovery.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_model_mlp_ablation.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl_wrench_perturb_new_project.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl_wrench_perturb_new_project.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_OOD_ID_perturbed_data_gen.yaml').read_text())
@@ -1982,6 +1831,7 @@ if __name__ == "__main__":
             # else:
             
             trajectory_sampler.model.diffusion_model.classifier = None
+            # else:
             d = {k:v for k, v in d.items() if 'classifier' not in k}
             trajectory_sampler.load_state_dict(d, strict=recovery)
             trajectory_sampler.to(device=params['device'])
@@ -1991,6 +1841,7 @@ if __name__ == "__main__":
             trajectory_sampler.model.diffusion_model.subsampled_t = '5_10_15' in config['experiment_name']
             trajectory_sampler.model.diffusion_model.classifier = None
 
+            trajectory_sampler.model.diffusion_model.cutoff_timesteps = 128
             return trajectory_sampler
         
         if params['recovery_controller'] != 'mppi':
@@ -2000,36 +1851,55 @@ if __name__ == "__main__":
         if model_path_orig is not None:
             trajectory_sampler_orig = load_sampler(model_path_orig, dim_mults=(1,2,4), T=config['T_orig'], recovery=False)
             if not config.get('generate_context', False):
-                with open(f'{CCAI_PATH}/{params["recovery_model_dir"]}/gen_train_likelihoods_by_mode.pkl', 'rb') as f:
-                    ecdf_raw_data = pickle.load(f)
-                ecdf_data = {}
-
-                plot_mode_dict = {
-                    'index': 'Thumb Middle',
-                    'thumb_middle': 'Index',
-                }
-                for k, v in ecdf_raw_data.items():
-                    ecdf_data[k] = ECDF(v)
+                classifier = nn.Sequential(
+                    nn.Linear(16, 512),
+                    nn.ReLU(),
+                    nn.Linear(512, 512),
+                    nn.ReLU(),
+                    nn.Linear(512, 512),
+                    nn.ReLU(),
+                    nn.Linear(512, 3),  # 3 binary outputs for contact mode
+                ).to(params['device'])
                 
-                    # Plot likelihood histogram
+                model_path_classifier = config.get('model_path_classifier', None)
+                classifier_d = torch.load(f'{CCAI_PATH}/{model_path_classifier}', map_location=torch.device(params['device']))
+                classifier.load_state_dict(classifier_d)
+                classifier.eval()
 
-                    # plot_mode = plot_mode_dict[k]
-                    # plt.hist(v, bins=100)
-                    # plt.title(f'{plot_mode} Training Data Likelihoods')
-                    # plt.xlabel('Likelihood')
-                    # plt.ylabel('Frequency')
-                    # plt.savefig(f'{CCAI_PATH}/data/experiments/{params["experiment_name"]}/likelihood_hist_{plot_mode}.png')
-                    # plt.close()
+                # with open(f'{CCAI_PATH}/{params["recovery_model_dir"]}/gen_train_likelihoods_by_mode.pkl', 'rb') as f:
+                #     ecdf_raw_data = pickle.load(f)
+                # ecdf_data = {}
+
+                # plot_mode_dict = {
+                #     'index': 'Thumb Middle',
+                #     'thumb_middle': 'Index',
+                # }
+                # for k, v in ecdf_raw_data.items():
+                #     ecdf_data[k] = ECDF(v)
+                
+                #     # Plot likelihood histogram
+
+                #     # plot_mode = plot_mode_dict[k]
+                #     # plt.hist(v, bins=100)
+                #     # plt.title(f'{plot_mode} Training Data Likelihoods')
+                #     # plt.xlabel('Likelihood')
+                #     # plt.ylabel('Frequency')
+                #     # plt.savefig(f'{CCAI_PATH}/data/experiments/{params["experiment_name"]}/likelihood_hist_{plot_mode}.png')
+                #     # plt.close()
         else:
             trajectory_sampler_orig = trajectory_sampler
 
         if config['recovery_controller'] == 'mppi':
             dynamics = DynamicsModel(env, num_fingers=len(config['fingers']), include_velocity=True, obj_joint_dim=1, hardware=False)
             safety_critic_path = config['model_path']
-            running_cost = RunningCostSafeRL(safety_critic_path, env, config['device'], include_velocity=True)
-            terminal_cost = None
-            # running_cost = lambda x, y: 0
-            # terminal_cost = TerminalCostDiffusionLikelihood(trajectory_sampler_orig, env, config['device'])
+            if params['OOD_metric'] == 'q_function':
+                running_cost = RunningCostSafeRL(safety_critic_path, params['q_cutoff'], env, config['device'], include_velocity=True)
+                terminal_cost = None
+            elif params['OOD_metric'] == 'likelihood':
+                running_cost = lambda x, y: 0
+                terminal_cost = TerminalCostDiffusionLikelihood(trajectory_sampler_orig, env, config['device'])
+            else:
+                raise ValueError('Invalid OOD metric')
             u_max = torch.ones(4 * len(config['fingers'])) * np.pi / 5 
             u_min = - torch.ones(4 * len(config['fingers'])) * np.pi / 5
             noise_sigma = torch.eye(4 * len(config['fingers'])).to(config['device']) * .005
