@@ -63,7 +63,7 @@ print("CCAI_PATH", CCAI_PATH)
 obj_dof = 1
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
-sys.stdout = open('./examples/logs/allegro_valve_recovery_data_generation_100_thresh_fixed_cpc.log', 'w', buffering=1)
+sys.stdout = open('./examples/logs/allegro_valve_no_recovery.log', 'w', buffering=1)
 
 def vector_cos(a, b):
     return torch.dot(a.reshape(-1), b.reshape(-1)) / (torch.norm(a.reshape(-1)) * torch.norm(b.reshape(-1)))
@@ -510,7 +510,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     proj_path=None,
                     project=True,
                 )
-                planner = PositionControlConstrainedSVGDMPC(thumb_and_middle_regrasp_problem, recovery_params)
+                planner = PositionControlConstrainedSVGDMPC(middle_regrasp_problem, recovery_params)
             elif mode == 'thumb' and planner is None:
                 thumb_regrasp_problem = AllegroValve(
                     start=state[:4 * num_fingers + obj_dof],
@@ -534,7 +534,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     proj_path=None,
                     project=True,
                 )
-                planner = PositionControlConstrainedSVGDMPC(thumb_and_middle_regrasp_problem, recovery_params)
+                planner = PositionControlConstrainedSVGDMPC(thumb_regrasp_problem, recovery_params)
             elif mode == 'turn' and planner is None:
                 tp = AllegroValve(
                     start=state[:4 * num_fingers + obj_dof],
@@ -1177,7 +1177,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             xu, plans = planner.step(state)
             planner.problem.data = {}
 
-            # planner.warmup_iters = old_warmup_iters
+            planner.warmup_iters = 0
             initial_samples.append(plans)
             # x_last = xu[-1, :planner.problem.num_fingers * 4 + planner.problem.obj_dof-1]
             # goal_cost = (x_last - planner.problem.goal[:-1]).pow(2).sum(dim=-1)#.sum(dim=-1)
@@ -1237,13 +1237,16 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     # <= so because pregrasp will iterate the all_stage counter
 
     if not params.get('live_recovery', False):
-        contact_sequence = ['turn', 'turn', 'turn']
+        contact_sequence = ['turn']
 
-        # while len(contact_sequence) < 50:
-        #     contact_options = ['index', 'middle', 'thumb']
-        #     perm = np.random.permutation(2)
-        #     # perm = [1, 0]
-        #     contact_sequence += [contact_options[perm[0]], contact_options[perm[1]], 'turn']
+        while len(contact_sequence) < 50:
+            contact_options = ['index', 'middle', 'thumb']
+            perm = np.random.permutation(3)
+            # perm = [1, 0]
+            for idx in perm:
+                contact = contact_options[idx]
+                contact_sequence.append(contact)
+            contact_sequence.append('turn')
     while episode_num_steps < max_episode_num_steps:
         sample_contact = params['sample_contact'] and not recover
         initial_samples = None
@@ -1690,9 +1693,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_only.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_recovery_data_gen.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_recovery_data_gen.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_safe_rl_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_safe_rl_recovery.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl_data_gen_wrench_perturb.yaml').read_text())

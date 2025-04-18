@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 200
 visualize: True
-experiment_name: 'allegro_valve_no_recovery_std_.15'
+experiment_name: 'allegro_valve_random_recovery_sequence'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -43,7 +43,7 @@ randomize_obj_start: False
 external_wrench_perturb: False
 viz_states: False
 diff_init: True
-live_recovery: True
+live_recovery: False
 new_projection: True
 task_diffuse_goal: True
 obj_gravity: True
