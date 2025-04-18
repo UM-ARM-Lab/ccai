@@ -1197,7 +1197,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             xu, plans = planner.step(state)
             planner.problem.data = {}
 
-            # planner.warmup_iters = old_warmup_iters
+            planner.warmup_iters = 0
             initial_samples.append(plans)
             # x_last = xu[-1, :planner.problem.num_fingers * 4 + planner.problem.obj_dof-1]
             # goal_cost = (x_last - planner.problem.goal[:-1]).pow(2).sum(dim=-1)#.sum(dim=-1)

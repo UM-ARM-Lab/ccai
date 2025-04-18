@@ -606,9 +606,9 @@ def train_classifier(model: TrajectorySampler, train_loader: DataLoader, val_loa
         
         print(f'Validation loss: {val_loss:.4f} | Validation accuracy: {val_accuracy:.4f}')
         # Save best model
-        if val_accuracy > best_accuracy:
+        if val_loss < best_loss:
+            best_loss = val_loss
             best_accuracy = val_accuracy
-            best_loss = epoch_loss
             torch.save(classifier.state_dict(), f'{fpath}/allegro_screwdriver_contact_classifier.pt')
             print(f'Saved best model with accuracy: {best_accuracy:.4f} and loss: {best_loss:.4f}')
 

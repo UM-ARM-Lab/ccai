@@ -58,9 +58,10 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
-start_ind: 0
+start_ind: 64
 end_ind: 500
 recovery_controller: 'csvgd'
+OOD_metric: 'likelihood'
 controllers:
   csvgd:
     # N: 16

@@ -63,7 +63,7 @@ print("CCAI_PATH", CCAI_PATH)
 obj_dof = 1
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
-sys.stdout = open('./examples/logs/allegro_valve_data_generation.log', 'w', buffering=1)
+sys.stdout = open('./examples/logs/allegro_valve_recovery_data_generation_100_thresh_fixed_cpc.log', 'w', buffering=1)
 
 def vector_cos(a, b):
     return torch.dot(a.reshape(-1), b.reshape(-1)) / (torch.norm(a.reshape(-1)) * torch.norm(b.reshape(-1)))
@@ -378,12 +378,34 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             data['pre_action_likelihoods'][-1].append(final_likelihood)
 
         dropped = False
+
+        
         dropped = dropped and params['recovery_controller'] == 'mppi'
         if dropped:
             print('dropped')
 
+        goal_yaw = -np.pi / 3
+        cur_yaw = state[-1].item()
+        
+        cutoff_degrees = 5
+        cutoff_radians = np.deg2rad(cutoff_degrees)
+        done = False
+        if (cur_yaw - goal_yaw) < cutoff_radians:
+            print('Reached goal yaw')
+            done = True
+
+        if done:
+            if planner is not None:
+                planner.problem.data = {}
+            if len(actual_trajectory) > 0:
+                actual_trajectory = torch.stack(actual_trajectory, dim=0).to(device=params['device'])
+
+            return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, False
         if params['recovery_controller'] == 'mppi' and recover and id_check:
             print('MPPI returned state to ID. Exiting recovery loop')
+            if len(actual_trajectory) > 0:
+                actual_trajectory = torch.stack(actual_trajectory, dim=0).to(device=params['device'])
+
             return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, False
         elif not (params['recovery_controller'] == 'mppi' and recover) and not id_check or dropped:
             # State is OOD. Save state and likelihood but DON'T collect data for RL yet.
@@ -403,6 +425,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, True
         elif dropped:
             print('dropped')
+            if len(actual_trajectory) > 0:
+                actual_trajectory = torch.stack(actual_trajectory, dim=0).to(device=params['device'])
+
             return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, False
   
 
@@ -423,8 +448,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             contact[:, 2] = 1
 
         recovery_params = copy.deepcopy(params)
-        recovery_params['warmup_iters'] = 100 #if not params.get('model_path_orig', None) else 25
-        recovery_params['online_iters'] = 30 #if not params.get('model_path_orig', None) else 0
+        # recovery_params['warmup_iters'] = 100 #if not params.get('model_path_orig', None) else 25
+        # recovery_params['online_iters'] = 30 #if not params.get('model_path_orig', None) else 0
 
         skip_diff_init = False
         planner_returns_action = False
@@ -535,10 +560,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 )
                 planner = PositionControlConstrainedSVGDMPC(tp, params)
             
-            if recover:
-                planner.problem.goal[-1] = state[-1]
-                planner.problem.cost = vmap(partial(planner.problem._cost, start=planner.problem.start, goal=planner.problem.goal, ), randomness='same')
-                planner.problem.grad_cost = vmap(jacrev(partial(planner.problem._cost, start=planner.problem.start, goal=planner.problem.goal), argnums=(0, 1, 2)), randomness='same')
+            # if recover:
+            #     planner.problem.goal[-1] = state[-1]
+            #     planner.problem.cost = vmap(partial(planner.problem._cost, start=planner.problem.start, goal=planner.problem.goal, ), randomness='same')
+            #     planner.problem.grad_cost = vmap(jacrev(partial(planner.problem._cost, start=planner.problem.start, goal=planner.problem.goal), argnums=(0, 1, 2)), randomness='same')
         # contact = -torch.ones(params['N'], 3).to(device=params['device'])
         # contact[:, 0] = 1
         # contact[:, 1] = 1
@@ -687,8 +712,30 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 dropped = dropped and params['recovery_controller'] == 'mppi'
                 if dropped:
                     print('dropped')
+
+                goal_yaw = -np.pi / 3
+                cur_yaw = state[-1].item()
+                
+                cutoff_degrees = 5
+                cutoff_radians = np.deg2rad(cutoff_degrees)
+                done = False
+                if (cur_yaw - goal_yaw) < cutoff_radians:
+                    print('Reached goal yaw')
+                    done = True
+
+                if done:
+                    if planner is not None:
+                        planner.problem.data = {}
+                    if len(actual_trajectory) > 0:
+                        actual_trajectory = torch.stack(actual_trajectory, dim=0).to(device=params['device'])
+
+                    return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, False
+
                 if params['recovery_controller'] == 'mppi' and recover and id_check:
                     print('MPPI returned state to ID. Exiting recovery loop')
+                    if len(actual_trajectory) > 0:
+                        actual_trajectory = torch.stack(actual_trajectory, dim=0).to(device=params['device'])
+
                     return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, False
                 elif not (params['recovery_controller'] == 'mppi' and recover) and not id_check:
                     # State is OOD. Save state and likelihood but DON'T collect data for RL yet.
@@ -708,6 +755,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, True
                 elif dropped:
                     print('dropped')
+                    if planner is not None:
+                        planner.problem.data = {}
+                    if len(actual_trajectory) > 0:
+                        actual_trajectory = torch.stack(actual_trajectory, dim=0).to(device=params['device'])
+
                     return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, False
 
             # We're in distribution, collect data for staying (action=0)
@@ -820,13 +872,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     # elif r > .4 and r < .7:
                     #     action[:, 4 * 1: 4*3] += std * torch.randn_like(action[:, 4 * 1: 4*3])
                     # else:
-                    if mode == 'turn':
+                    # if mode == 'turn':
                         # if r < .4:
                         # action[:, :4 * 1] += std * torch.randn_like(action[:, :4 * 1])
                         # if r < .4 and r > .8:
                         #     action[:, 4 * 1: 4*3] += std * torch.randn_like(action[:, 4 * 1: 4*3])
                         # else:
-                        action[:, :4 * num_fingers_to_plan] += std * torch.randn_like(action[:, :4 * num_fingers_to_plan])
+                    action[:, :4 * num_fingers_to_plan] += std * torch.randn_like(action[:, :4 * num_fingers_to_plan])
 
             xu = torch.cat((state.cpu(), action[0].cpu()))
             actual_trajectory.append(xu)
@@ -1120,7 +1172,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             # planner.problem.grad_cost = vmap(jacrev(partial(planner.problem._cost, start=planner.problem.start, goal=planner.problem.goal), argnums=(0, 1, 2)), randomness='same')
 
             # old_warmup_iters = planner.warmup_iters
-            planner.warmup_iters = params['warmup_iters']
+            planner.warmup_iters = 75
 
             xu, plans = planner.step(state)
             planner.problem.data = {}
@@ -1453,7 +1505,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         
         cutoff_degrees = 5
         cutoff_radians = np.deg2rad(cutoff_degrees)
-        if np.abs(cur_yaw - goal_yaw) < cutoff_radians:
+        if (cur_yaw - goal_yaw) < cutoff_radians:
             print('Reached goal yaw')
             done = True
 
@@ -1639,8 +1691,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 if __name__ == "__main__":
     # get config
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_only.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_recovery_data_gen.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_only.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_recovery_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_safe_rl_recovery.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl_data_gen_wrench_perturb.yaml').read_text())
@@ -1830,7 +1882,7 @@ if __name__ == "__main__":
             trajectory_sampler.model.diffusion_model.subsampled_t = '5_10_15' in config['experiment_name']
             trajectory_sampler.model.diffusion_model.classifier = None
             
-            trajectory_sampler.model.diffusion_model.cutoff_timesteps = 32
+            trajectory_sampler.model.diffusion_model.cutoff_timesteps = 192
 
             return trajectory_sampler
         

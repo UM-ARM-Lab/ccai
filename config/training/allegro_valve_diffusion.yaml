@@ -1,5 +1,5 @@
 ---
-model_name: 'allegro_valve_task'
+model_name: 'allegro_valve_task_filtered_traj'
 T: 7
 dx: 13
 du: 21
@@ -18,7 +18,7 @@ lr: 1.0e-4
 model_type: 'diffusion'
 discriminator_guidance: True
 inverse_dynamics: False
-data_directory: 'allegro_valve_task_data_friction_0'
+data_directory: 'allegro_valve_task_data_friction_0.1_pi_5x2'
 best_traj_only: False
 device: 'cuda:0'
 test_every: 9999999999

@@ -292,7 +292,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/valve',
                                      use_collision_geometry=True)
             object_sdf_for_viz = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/valve',
-                                     use_collision_geometry=False)
+                                     use_collision_geometry=True) # Use collision geometry for visualization to check fidelity of contact mesh
         elif 'screwdriver' in object_type:
             object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver',
                                      use_collision_geometry=True)
@@ -317,7 +317,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         if self.obj_dof == 3:
             object_link_name = 'screwdriver_body'
         elif self.obj_dof == 1:
-            object_link_name = 'valve'
+            object_link_name = 'cross_1'
         elif self.obj_dof == 6:
             object_link_name = 'peg'
         self.obj_link_name = object_link_name
@@ -865,7 +865,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.contact_points_rob_link = []
 
             for finger in self.regrasp_fingers:
-                rad = .0025# if finger != 'index' else .005
+                rad = .0025 if self.object_type == 'screwdriver' else .0025
                 self.contact_points[finger] = (self.data[finger]['closest_obj_pt_object'].clone().detach(), rad)
                 self.contact_points_rob_link.append(self.data[finger]['closest_rob_pt_link'].clone().detach())
             self.contact_points_rob_link = torch.cat(self.contact_points_rob_link, dim=0)
@@ -873,7 +873,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             contact_points_object = torch.stack([self.contact_points[finger][0] for finger in self.regrasp_fingers], dim=0)
             self.contact_points_object = contact_points_object
 
-            self.do_contact_patch_constraint = self.object_type != 'valve'  
+            self.do_contact_patch_constraint = True# self.object_type != 'valve'  
 
         if self.num_regrasps > 0:
             if self.full_dof_goal and contact_points_object is not None:
@@ -1006,7 +1006,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             self.default_dof_pos = default_dof_pos.to(self.device)
 
         self.do_contact_patch_constraint = False
-        if self.full_dof_goal and len(self.regrasp_fingers) > 0 and self.obj_link_name != 'valve':
+        if self.full_dof_goal and len(self.regrasp_fingers) > 0:# and self.obj_link_name != 'valve':
             if self.goal is not None:
                 self.default_dof_pos = self.goal[: self.num_fingers * 4]
                 # Pad to length 16
@@ -1026,7 +1026,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             self.contact_points_rob_link = []
 
             for finger in self.regrasp_fingers:
-                rad = .0025# if finger != 'index' else .005
+                rad = .0025 if self.object_type == 'screwdriver' else .0025
                 self.contact_points[finger] = (self.data[finger]['closest_obj_pt_object'].clone().detach(), rad)
                 self.contact_points_rob_link.append(self.data[finger]['closest_rob_pt_link'].clone().detach())
             self.contact_points_rob_link = torch.cat(self.contact_points_rob_link, dim=0)
@@ -1034,13 +1034,13 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             contact_points_object = torch.stack([self.contact_points[finger][0] for finger in self.regrasp_fingers], dim=0)
             self.contact_points_object = contact_points_object
 
-            if self.object_type != 'valve':
-                self._regrasp_dz += self.num_regrasps  # Contact region constraint
-                self._regrasp_dh = self._regrasp_dz * T  # inequality
-                # self._regrasp_dh += self.num_regrasps
-                self._regrasp_dh_constant = 0
-                self._regrasp_dh_per_t = self._regrasp_dz
-                self.do_contact_patch_constraint = True
+            # if self.object_type != 'valve':
+            self._regrasp_dz += self.num_regrasps  # Contact region constraint
+            self._regrasp_dh = self._regrasp_dz * T  # inequality
+            # self._regrasp_dh += self.num_regrasps
+            self._regrasp_dh_constant = 0
+            self._regrasp_dh_per_t = self._regrasp_dz
+            self.do_contact_patch_constraint = True
                        
 
         self.desired_ee_in_world_frame = desired_ee_in_world_frame
@@ -1076,7 +1076,9 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             return 0.0
         if self.full_dof_goal:
             T_offset = 0 if projected_diffusion else 1
-            rob_link_cost = torch.sum((rob_link_pts[:, -1:] - self.contact_points_rob_link) ** 2)* 100
+
+            link_cost_weight = 100 if self.object_type == 'screwdriver' else 1000
+            rob_link_cost = torch.sum((rob_link_pts[:, -1:] - self.contact_points_rob_link) ** 2)* link_cost_weight
 
             closest_obj_pt_to_finger_cost = 0
             # unit_mult = 10
@@ -1163,12 +1165,12 @@ class AllegroRegraspProblem(AllegroObjectProblem):
 
         norm = torch.norm(closest_obj_pt_to_finger - this_finger_target_contact_point, dim=-1)
 
-        unit_mult = 10
+        unit_mult = 10 if self.object_type == 'screwdriver' else 10
 
         # Evaluate constraint in cm
         h = (unit_mult*norm)**2 - (unit_mult*contact_patch_radius)**2
         # h = norm - contact_patch_radius
-        # if finger_name == 'index':
+        # if finger_name == 'thumb':
         # print(f'Finger: {finger_name}')
         # print('Closest obj pt to finger:', closest_obj_pt_to_finger[:, -1])
         # print('this finger target contact point:', this_finger_target_contact_point)
@@ -1222,7 +1224,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         h, grad_h, hess_h, t_mask = self._contact_constraints(xu, finger_name, compute_grads, compute_hess, terminal=False, projected_diffusion=projected_diffusion)
         eps = torch.zeros_like(h)
         # eps[:, :-1] = 5e-3
-        if self.obj_link_name == 'valve':
+        if self.object_type == 'valve':
             eps[:, :-1] = 1e-2
         else:
             eps[:, :-1] = 1.5e-2

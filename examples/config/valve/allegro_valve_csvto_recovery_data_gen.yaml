@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 200
 visualize: True
-experiment_name: 'allegro_valve_recovery_data_'
+experiment_name: 'allegro_valve_no_recovery'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -38,8 +38,8 @@ project_state: False
 compute_recovery_trajectory: False
 rl_adjustment: False
 test_recovery_trajectory: False
-perturb_action: False
-randomize_obj_start: True
+perturb_action: True
+randomize_obj_start: False
 external_wrench_perturb: False
 viz_states: False
 diff_init: True
@@ -48,9 +48,9 @@ new_projection: True
 task_diffuse_goal: True
 obj_gravity: True
 type: 'diffusion'
-model_path: 'data/training/allegro_screwdriver/allegro_valve_task_diffusion/allegro_screwdriver_diffusion.pt'
-model_dir: 'data/training/allegro_screwdriver/allegro_valve_task_diffusion'
-likelihood_threshold: -250.0
+model_path: 'data/training/allegro_screwdriver/allegro_valve_task_filtered_traj_diffusion/allegro_screwdriver_diffusion.pt'
+model_dir: 'data/training/allegro_screwdriver/allegro_valve_task_filtered_traj_diffusion'
+likelihood_threshold: -10000000000.0
 drop_threshold: -1250
 project_threshold: -105.
 sac_batch_size: 64
@@ -68,8 +68,8 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    online_iters: 25
-    warmup_iters: 50
+    online_iters: 50
+    warmup_iters: 25
     resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1

@@ -4,12 +4,7 @@ import pickle
 import pathlib
 import numpy as np
 from torch.utils.data import Dataset
-import io
-class CPU_Unpickler(pickle.Unpickler):
-    def find_class(self, module, name):
-        if module == 'torch.storage' and name == '_load_from_bytes':
-            return lambda b: torch.load(io.BytesIO(b), map_location='cpu')
-        else: return super().find_class(module, name)
+
 
 class AllegroValveDataset(Dataset):
 
@@ -234,9 +229,7 @@ class AllegroScrewDriverDataset(Dataset):
         self.dx = dx
         use_actual_traj = True
         self.screwdriver = 'screwdriver' in str(folders[0])
-        print(f'Screwdriver: {self.screwdriver}')
-        
-        total_num_removed = 0
+        print(f'Using screwdriver: {self.screwdriver}')
         for fpath in folders:
             path = pathlib.Path(fpath)
             plans = []
@@ -244,40 +237,24 @@ class AllegroScrewDriverDataset(Dataset):
             trajectory_all = list(path.rglob('*trajectory.pkl'))
             for p, traj_p in zip(traj_data_all, trajectory_all):
                 with open(p, 'rb') as f, open(traj_p, 'rb') as f_traj:
-                    # data = CPU_Unpickler(f).load()
                     try:
-                        data = CPU_Unpickler(f).load()
-                        traj_data = CPU_Unpickler(f_traj).load()
+                        data = pickle.load(f)
+                        traj_data = pickle.load(f_traj)
                     except:
                         print('Fail')
                         continue
                     actual_traj = []
 
                     need_to_continue = False
-                    
+                    final_yaw = traj_data[-1][-1]
+                    cutoff_degrees = 5
+                    cutoff_rad = np.deg2rad(cutoff_degrees)
+                    goal_yaw = -np.pi/3
+                    if not self.screwdriver:
+                        if final_yaw - goal_yaw > cutoff_rad:
+                            print('Not close to goal')
+                            continue
                     dropped_recovery = data['dropped_recovery']
-                    
-                    fl = data['final_likelihoods']
-                    pre_action_likelihoods = data['pre_action_likelihoods']
-                    fl = [l for l in fl if None not in l and len(l)>0]
-                    for k in range(len(fl)):
-                        if len(fl[k]) == 0 and len(pre_action_likelihoods[k]) > 0:
-                            fl[k].append(pre_action_likelihoods[k][-1])
-                    
-                    fl = np.array(fl).flatten()
-                    fl_delta = []
-                    executed_recovery_modes = [m for m in data['executed_contacts'] if m != 'turn']
-                    for i in range(len(executed_recovery_modes)):
-                        pre_mode_likelihood = fl[i-1]
-                        post_mode_likelihood = fl[i]
-                        likelihood_delta = post_mode_likelihood - pre_mode_likelihood
-                        fl_delta.append(likelihood_delta)
-                    fl_improvement_bool = np.array(fl_delta) > 0
-                    num_removed = np.sum(~fl_improvement_bool)
-                    if num_removed > 0:
-                        total_num_removed += num_removed
-                        print(f'Num removed: {num_removed}, Total removed: {total_num_removed}')
-                    
                     # dropped_recovery = False
                     # post_recovery_likelihoods = [i for i in data['final_likelihoods'] if len(i) == 1]
                     # post_recovery_likelihood_bool = []
@@ -291,7 +268,7 @@ class AllegroScrewDriverDataset(Dataset):
                         cs_bool = []
                         for c in data[t]['contact_state']:
                             # new_cs.append(c.sum() != 3)
-                            if c.sum() != 3:
+                            if True or c.sum() != 3:
                                 # if isinstance(c, np.ndarray):
                                 #     c = torch.from_numpy(c).float()
                                 if torch.is_tensor(c):
@@ -305,14 +282,14 @@ class AllegroScrewDriverDataset(Dataset):
                         for idx, s in enumerate(data[t]['starts']):
                             # if cs_bool[idx]:
                             # if s.shape[-1] != 36:
-                            if (s.sum(0) == 0).any():
+                            if True or (s.sum(0) == 0).any():
                                 new_starts.append(s)
                         new_plans = []
                         for idx, p in enumerate(data[t]['plans']):
                             # if p.shape[-1] != 36:
                             #     new_plans.append(p)
                             # if cs_bool[idx]:
-                            if (p.sum(0) == 0).any():
+                            if True or (p.sum(0) == 0).any():
                                 new_plans.append(p)
 
 
@@ -335,13 +312,10 @@ class AllegroScrewDriverDataset(Dataset):
                             data[t]['plans'] = new_plans.cpu().numpy()
                             data[t]['contact_state'] = new_cs.cpu().numpy()
 
-                        data[t]['starts'] = data[t]['starts'][fl_improvement_bool]
-                        data[t]['plans'] = data[t]['plans'][fl_improvement_bool]
-                        data[t]['contact_state'] = data[t]['contact_state'][fl_improvement_bool]
-                        # if dropped_recovery:
-                        #     data[t]['starts'] = data[t]['starts'][:-1]
-                        #     data[t]['plans'] = data[t]['plans'][:-1]
-                        #     data[t]['contact_state'] = data[t]['contact_state'][:-1]
+                        if dropped_recovery:
+                            data[t]['starts'] = data[t]['starts'][:-1]
+                            data[t]['plans'] = data[t]['plans'][:-1]
+                            data[t]['contact_state'] = data[t]['contact_state'][:-1]
                         if len(data[t]['starts']) == 0:
                             print('No starts')
                             need_to_continue = True

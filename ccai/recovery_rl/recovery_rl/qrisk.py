@@ -106,16 +106,32 @@ class QRiskWrapper:
             batch_size=batch_size, pos_fraction=self.pos_fraction)
         state_batch = torch.FloatTensor(state_batch).to(self.device)
         next_state_batch = torch.FloatTensor(next_state_batch).to(self.device)
+
+        yaw_delta = next_state_batch[:, -1] - state_batch[:, -1]
+        rand_init_yaw = torch.rand(state_batch.shape[0]) * 2 * np.pi - np.pi
+        rand_init_yaw = rand_init_yaw.to(self.device)
+        rand_next_yaw = rand_init_yaw + yaw_delta
+        rand_init_yaw_cosine_sine = torch.cat(
+            (torch.cos(rand_init_yaw).unsqueeze(1),
+             torch.sin(rand_init_yaw).unsqueeze(1)), dim=1)
+        rand_next_yaw_cosine_sine = torch.cat(
+            (torch.cos(rand_next_yaw).unsqueeze(1),
+             torch.sin(rand_next_yaw).unsqueeze(1)), dim=1)
+        state_batch = torch.cat(
+            (state_batch[:, :-1], rand_init_yaw_cosine_sine), dim=1)
+        next_state_batch = torch.cat(
+            (next_state_batch[:, :-1], rand_next_yaw_cosine_sine), dim=1)
+
         action_batch = torch.FloatTensor(action_batch).to(self.device)
         mask_batch = torch.FloatTensor(mask_batch).to(self.device).unsqueeze(1)
         constraint_batch = torch.FloatTensor(constraint_batch).to(
             self.device).unsqueeze(1)
         
-        if 'screwdriver' in self.logdir:
-            rand_yaw = torch.rand(state_batch.shape[0]) * 2 * np.pi - np.pi
-            rand_yaw = rand_yaw.to(self.device)
-            state_batch[:, -1] = rand_yaw
-            next_state_batch[:, -1] = rand_yaw
+        # if 'screwdriver' in self.logdir:
+        #     rand_yaw = torch.rand(state_batch.shape[0]) * 2 * np.pi - np.pi
+        #     rand_yaw = rand_yaw.to(self.device)
+        #     state_batch[:, -1] = rand_yaw
+        #     next_state_batch[:, -1] = rand_yaw
         
         # Print all shapes
         # print(f"state_batch shape: {state_batch.shape}")

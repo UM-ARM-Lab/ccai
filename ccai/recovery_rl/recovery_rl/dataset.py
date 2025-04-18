@@ -78,8 +78,8 @@ class AllegroTrajectoryTransitionDataset(Dataset):
         self.pitch = self.next_states[:, -2].clone()
         self.dropped = (self.roll.abs() > 0.35) | (self.pitch.abs() > 0.35)
         self.dropped = self.dropped.float().reshape(-1)
-        if self.cosine_sine:
-            self._apply_cosine_sine_transform()
+        # if self.cosine_sine:
+        #     self._apply_cosine_sine_transform()
             
         print(f"Loaded {len(self.states)} transitions")
         print(f"State shape: {self.states.shape}, Action shape: {self.actions.shape}")

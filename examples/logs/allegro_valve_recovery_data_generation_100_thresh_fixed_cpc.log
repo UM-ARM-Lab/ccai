@@ -1,0 +1,19 @@
+robot pose [ 0.02  -0.35   0.376] [0, 0, 0.7071068, 0.7071068]
+[ models/temporal ] Channel dimensions: [(35, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(35, 128), (128, 256), (256, 512)]
+
+Trial 1
+Loaded trajectory sampler
+Current yaw: tensor([1.2851e-11], device='cuda:0')
+Current yaw: tensor([-0.0004], device='cuda:0')
+1 turn
+Likelihood: -28.578271865844727
+Sampling time 4.337495373009006
+tensor([ 2.9113e-01,  6.1794e-01,  6.8541e-01,  8.4627e-01, -5.3923e-02,
+         2.7468e-01,  9.2955e-01,  8.1161e-01,  1.2705e+00, -3.6908e-02,
+         7.0066e-02,  4.0494e-01, -3.7960e-04], device='cuda:0')
+Solve time for step 1 (global step 0) 4.724695810000412
+Current ori: tensor(-0.0004, device='cuda:0')
+Middle force: tensor([2.1402, 2.1985, 2.2979, 1.1238, 2.0644, 2.3898], device='cuda:0')
+Thumb force: tensor([1.8643, 0.0502, 0.0555, 0.3223, 0.6528, 0.3214], device='cuda:0')
+Index force: tensor([1.1156, 0.9748, 0.9737, 0.9432, 2.0177, 1.0718], device='cuda:0')
