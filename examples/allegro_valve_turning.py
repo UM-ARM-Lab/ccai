@@ -63,7 +63,7 @@ print("CCAI_PATH", CCAI_PATH)
 obj_dof = 1
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
-sys.stdout = open('./examples/logs/allegro_valve_no_recovery.log', 'w', buffering=1)
+# sys.stdout = open('./examples/logs/allegro_valve_no_recovery.log', 'w', buffering=1)
 
 def vector_cos(a, b):
     return torch.dot(a.reshape(-1), b.reshape(-1)) / (torch.norm(a.reshape(-1)) * torch.norm(b.reshape(-1)))
@@ -1693,7 +1693,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/{sys.argv[1]}.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_only.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_recovery_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_safe_rl_data_gen.yaml').read_text())
@@ -1886,7 +1886,7 @@ if __name__ == "__main__":
             trajectory_sampler.model.diffusion_model.subsampled_t = '5_10_15' in config['experiment_name']
             trajectory_sampler.model.diffusion_model.classifier = None
             
-            trajectory_sampler.model.diffusion_model.cutoff_timesteps = 192
+            trajectory_sampler.model.diffusion_model.cutoff_timesteps = 128
 
             return trajectory_sampler
         
