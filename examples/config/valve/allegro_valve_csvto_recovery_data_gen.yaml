@@ -50,7 +50,7 @@ obj_gravity: True
 type: 'diffusion'
 model_path: 'data/training/allegro_screwdriver/allegro_valve_task_filtered_traj_diffusion/allegro_screwdriver_diffusion.pt'
 model_dir: 'data/training/allegro_screwdriver/allegro_valve_task_filtered_traj_diffusion'
-likelihood_threshold: -100.0
+likelihood_threshold: -85.0
 drop_threshold: -1250
 project_threshold: -105.
 sac_batch_size: 64
@@ -58,8 +58,8 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
-start_ind: 700
-end_ind: 1000
+start_ind: 1000
+end_ind: 1300
 controllers:
   csvgd:
     # N: 16
