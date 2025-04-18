@@ -145,8 +145,7 @@ def test(checkpoint, n_samples):
                 continue
 
             # Evaluate total cost for this combination
-            total_cost = 0.0
-
+            costs = []
             for i in range(n_samples):
                 # Running your environment logic
                 img_save_dir = None
@@ -157,22 +156,23 @@ def test(checkpoint, n_samples):
                 env.reset(dof_pos=init)
                 
                 final_state, full_traj0 = pull_index(env, config, chain, img_save_dir, warmup_iters, online_iters,
-                        model_name = 'index_vf', mode='vf', 
+                        model_name = 'index_vf', mode='vf', task = 'index1',
                         vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio,
                         )
                 final_state, full_traj1 = pull_middle(env, config, chain, img_save_dir, warmup_iters, online_iters,
-                                model_name = 'middle_vf', mode='vf', 
+                                model_name = 'middle_vf', mode='vf', task = 'middle',
                                 vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio,
                                 )
                 final_state, full_traj2 = pull_index(env, config, chain, img_save_dir, warmup_iters, online_iters,
-                                model_name = 'index_vf', mode='vf', 
+                                model_name = 'index_vf', mode='vf', task = 'index2',
                                 vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio,
                                 )
         
                 cost = calculate_cost(init, final_state)
-                total_cost += cost
+                costs.append(cost)
                 print(f"Sample {i} -> cost: {cost}")
-            
+            mean_cost = np.mean(costs)
+            median_cost = np.median(costs)
             # Mark this combo as tested
             checkpoint['tested_combinations'][iteration].add(combo_tuple)
             # checkpoint['results'].append((vf_weight, other_weight, variance_ratio, total_cost))
@@ -181,20 +181,20 @@ def test(checkpoint, n_samples):
             print(f"Total combinations tested so far: {sum(len(v) for v in checkpoint['tested_combinations'].values())}")
             print(f"[Iteration {iteration+1}] vf_weight: {vf_weight}, "
                   f"other_weight: {other_weight}, "
-                  f"variance_ratio: {variance_ratio}, total_cost: {total_cost}")
+                  f"variance_ratio: {variance_ratio}, total_cost: {median_cost}")
 
             # Check if this is better than the best we have so far in *this iteration*
-            if total_cost < iteration_best_cost:
-                iteration_best_cost = total_cost
+            if median_cost < iteration_best_cost:
+                iteration_best_cost = median_cost
                 iteration_best_combo = (vf_weight, other_weight, variance_ratio)
 
             # Also check if this is the best overall across all iterations
-            if total_cost < lowest_total_cost:
-                checkpoint['lowest_total_cost'] = total_cost
+            if median_cost < lowest_total_cost:
+                checkpoint['lowest_total_cost'] = median_cost
                 checkpoint['best_vf_weight'] = vf_weight
                 checkpoint['best_other_weight'] = other_weight
                 checkpoint['best_variance_ratio'] = variance_ratio
-                lowest_total_cost = total_cost
+                lowest_total_cost = median_cost
                 best_vf_weight = vf_weight
                 best_other_weight = other_weight
                 best_variance_ratio = variance_ratio
@@ -290,15 +290,15 @@ if __name__ == "__main__":
     card_noise_mag1 = 0.2
     finger_noise_mag = 0.2
 
-    warmup_iters = 18
-    online_iters = 75
+    warmup_iters = 50
+    online_iters = 20
     visualize = False   
 
     config, env, sim_env, ros_copy_node, chain, sim, gym, viewer = init_env(visualize=visualize, config_path=config_path)
     sim_device = config['sim_device']
     
-    n_samples = 3
-    name = "low_iter_newcost_3samps_coarse"
+    n_samples = 9
+    name = "superlowiterbugfixed3"
 
     checkpoint_path = fpath / 'card'/'test'/ 'weight_sweep'/f'checkpoint_sweep_turning_{name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -306,9 +306,9 @@ if __name__ == "__main__":
     get_inits(env, sim_device, n_samples, save=True)
 
     starting_values = {
-        'vf_bounds': [0.1, 100],
+        'vf_bounds': [10, 1000],
         'other_bounds': [1, 10],
-        'variance_ratio_bounds': [1, 20],
+        'variance_ratio_bounds': [1, 50],
         'grid_size': 3
     }
 

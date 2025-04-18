@@ -44,8 +44,7 @@ if __name__ == "__main__":
     combined_start_ys = []
     combined_costs = []
 
-    # vis = True
-    # config, env, sim_env, ros_copy_node, chain, sim, gym, viewer = init_env(visualize=vis)
+    config, env, sim_env, ros_copy_node, chain, sim, gym, viewer = init_env(visualize=True)
 
     for filename in filenames:
         with open(filename, 'rb') as file:
@@ -84,24 +83,25 @@ if __name__ == "__main__":
                 combined_start_ys.append(start_poses[i][-5])
                 
                 # vis for debug
-                # if cost > 100.0:
-                #     print(f'Cost: {cost}')
-                #     import time
-                #     traj = traj_index1s[i]
-                #     for j in range(9):
-                #         pos = traj[j]
-                #         env.reset(dof_pos=torch.tensor(pos).float().reshape(1, -1))
-                #         time.sleep(0.2)
-                #     traj = traj_middles[i]
-                #     for j in range(9):
-                #         pos = traj[j]
-                #         env.reset(dof_pos=torch.tensor(pos).float().reshape(1, -1))
-                #         time.sleep(0.2)
-                #     traj = traj_index2s[i]
-                #     for j in range(9):
-                #         pos = traj[j]
-                #         env.reset(dof_pos=torch.tensor(pos).float().reshape(1, -1))
-                #         time.sleep(0.2)
+                dt = 0.1
+                if cost > 30.0:
+                    print(f'Cost: {cost}')
+                    import time
+                    traj = traj_index1s[i]
+                    for j in range(9):
+                        pos = traj[j]
+                        env.reset(dof_pos=torch.tensor(pos).float().reshape(1, -1))
+                        time.sleep(dt)
+                    traj = traj_middles[i]
+                    for j in range(9):
+                        pos = traj[j]
+                        env.reset(dof_pos=torch.tensor(pos).float().reshape(1, -1))
+                        time.sleep(dt)
+                    traj = traj_index2s[i]
+                    for j in range(9):
+                        pos = traj[j]
+                        env.reset(dof_pos=torch.tensor(pos).float().reshape(1, -1))
+                        time.sleep(dt)
                             
 
                 costs.append(cost)

@@ -20,7 +20,7 @@ if __name__ == "__main__":
 
     annotate = True
 
-    experiment_names = ['sanity3'] 
+    experiment_names = ['testswap'] 
     budget = "Low Budget"
 
     results = {}

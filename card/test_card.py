@@ -59,14 +59,14 @@ def save_checkpoint(checkpoint):
 
 if __name__ == '__main__':
 
-    test_name = 'newcost03'
+    test_name = 'testswap2'
     checkpoint_path = fpath / 'card' /'test'/'test_method'/f'checkpoint_{test_name}.pkl'
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-    warmup_iters = 36
-    online_iters = 150
+    warmup_iters = 50
+    online_iters = 20
 
-    n_trials = 20
+    n_trials = 50
     n_repeat = 1
     test_time = False
     vf_times = []
@@ -83,9 +83,9 @@ if __name__ == '__main__':
 
     card_noise_mag0, card_noise_mag1, finger_noise_mag = 0.06, 0.2, 0.2
 
-    vf_weight_i = 5.0
-    other_weight_i = 2
-    variance_ratio_i = 10
+    vf_weight_i = 100.0
+    other_weight_i = 1.3
+    variance_ratio_i = 32.0
 
     vf_weight_m = vf_weight_i
     other_weight_m = other_weight_i
@@ -131,15 +131,15 @@ if __name__ == '__main__':
             env.reset(dof_pos= init_pose)
         
             final_state, full_traj0 = pull_index(env, config, chain, img_save_dir, warmup_iters, online_iters,
-                        model_name = 'index_vf', mode='vf', 
+                        model_name = 'index_vf', mode='vf', task = 'index1',
                         vf_weight = vf_weight_i, other_weight = other_weight_i, variance_ratio = variance_ratio_i,
                         )
             final_state, full_traj1 = pull_middle(env, config, chain, img_save_dir, warmup_iters, online_iters,
-                            model_name = 'middle_vf', mode='vf', 
+                            model_name = 'middle_vf', mode='vf', task = 'middle_vf',
                             vf_weight = vf_weight_m, other_weight = other_weight_m, variance_ratio = variance_ratio_m,
                             )
             final_state, full_traj2 = pull_index(env, config, chain, img_save_dir, warmup_iters, online_iters,
-                            model_name = 'index_vf', mode='vf', 
+                            model_name = 'index_vf', mode='vf', task = 'index2',
                             vf_weight = vf_weight_i, other_weight = other_weight_i, variance_ratio = variance_ratio_i,
                             )
 

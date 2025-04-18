@@ -164,7 +164,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         
         self.mode=mode
         self.task = task
-        if task == 'card':
+        if task == 'card' or task == 'index1' or task == 'index2' or task == 'middle':
             from card.train_vf_card_index import load_ensemble, query_ensemble 
         
         else:
@@ -435,7 +435,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
     def _cost(self, xu, start, goal):
         
         # need to confirm that xu is only fingers of interest
-        if self.task == 'card':
+        if self.task == 'index1' or self.task == 'index2' or self.task == 'middle':
             fingers = xu[:, :8]
             card_x_y_yaw = xu[:, [8,9,13]]
             q = torch.cat([fingers, card_x_y_yaw], dim=1)
@@ -460,7 +460,9 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                 q = torch.cat([q, y], dim=1)
 
             input_norm = ((q - self.poses_mean) / self.poses_std).float()
-            indices = torch.arange(n_steps).unsqueeze(1).to(self.device) + 1
+            indices = torch.arange(n_steps).unsqueeze(1).to(self.device)
+            if self.task == "index2":
+                indices = indices + 9
             input_norm = torch.cat([q, indices], dim=1)
 
             vf_output_norm = self.query_ensemble(input_norm, self.models, device=self.device)

@@ -106,7 +106,7 @@ def init_env(visualize=False, config_path = 'card0.yaml'):
     return config, env, sim_env, ros_copy_node, chain, sim, gym, viewer
 
 def pull_index(env, config, chain, image_path=None, warmup_iters=35, online_iters=150,
-            model_name = 'index_vf', mode='no_vf', 
+            model_name = 'index_vf', mode='no_vf', task = None,
             vf_weight = 0, other_weight = 10, variance_ratio = 1, 
             ):
 
@@ -144,7 +144,7 @@ def pull_index(env, config, chain, image_path=None, warmup_iters=35, online_iter
         default_dof_pos=env.initial_dof_pos[:, :16],
         obj_gravity=params.get('obj_gravity', False),
         # vf stuff
-        task = 'card',
+        task = task,
         initial_y = start[-5],
         model_name = model_name, mode=mode, 
         vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio,
@@ -219,7 +219,7 @@ def pull_index(env, config, chain, image_path=None, warmup_iters=35, online_iter
     return final_state, full_trajectory
 
 def pull_middle(env, config, chain, image_path=None, warmup_iters=35, online_iters=150,
-            model_name = 'middle_vf', mode='no_vf', 
+            model_name = 'middle_vf', mode='no_vf', task = None,
             vf_weight = 0, other_weight = 10, variance_ratio = 1, 
             ):
 
@@ -258,7 +258,7 @@ def pull_middle(env, config, chain, image_path=None, warmup_iters=35, online_ite
         obj_gravity=params.get('obj_gravity', False),
         # vf stuff
         initial_y = start[-5],
-        task = 'card',
+        task = task,
         model_name = model_name, mode=mode, 
         vf_weight = vf_weight, other_weight = other_weight, variance_ratio = variance_ratio,
     )
