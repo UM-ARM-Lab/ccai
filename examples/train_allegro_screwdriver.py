@@ -1247,16 +1247,16 @@ if __name__ == "__main__":
                               true_s0=config.get('true_s0', False), 
                               )
 
-    data_path = pathlib.Path(f'{CCAI_PATH}/data/training_data/{config["data_directory"]}')
+    data_path = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["data_directory"]}')
     if config.get('eval_train_likelihood', False) or config.get('id_ood_states', False):
-        train_dataset = AllegroScrewDriverStateDataset([p for p in data_path.glob('*train_data*')],
+        train_dataset = AllegroScrewDriverStateDataset([p for p in data_path.glob('*csvgd*')],
                                                 config['T']-1,
                                                 cosine_sine=config['sine_cosine'],
                                                 states_only=config['du'] == 0,
                                                 skip_pregrasp=config['skip_pregrasp'],
                                                 type=config['model_type'],)
     elif not config.get('project_ood_states', False):
-        train_dataset = AllegroScrewDriverDataset([p for p in data_path.glob('*train_data*')],
+        train_dataset = AllegroScrewDriverDataset([p for p in data_path.glob('*csvgd*')],
                                                 config['T']-1,
                                                 dx_original,
                                                 cosine_sine=config['sine_cosine'],
