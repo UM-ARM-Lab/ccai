@@ -20,3 +20,25 @@ Found existing convex decomposition for mesh '/home/abhinav/Documents/git_packag
 Trial 701
 Loaded trajectory sampler
 Current yaw: tensor([1.2851e-11], device='cuda:0')
+Current yaw: tensor([-0.0004], device='cuda:0')
+1 turn
+Likelihood: -13.417062759399414
+Sampling time 3.603995657991618
+tensor([ 3.0828e-01,  6.1273e-01,  7.0933e-01,  8.0763e-01, -4.3934e-02,
+         2.4023e-01,  8.9592e-01,  8.6028e-01,  1.2699e+00,  2.3346e-02,
+         1.3571e-01,  4.0966e-01, -3.9406e-04], device='cuda:0')
+Solve time for step 1 (global step 0) 7.455485451006098
+Current ori: tensor(-0.0004, device='cuda:0')
+Middle force: tensor([0.5709, 0.6195, 0.8760, 0.6283, 2.2356, 2.3730], device='cuda:0')
+Thumb force: tensor([0.9708, 0.9703, 0.6669, 1.3434, 0.8901, 1.7530], device='cuda:0')
+Index force: tensor([0.5713, 0.5470, 1.3499, 1.4419, 1.4596, 0.8019], device='cuda:0')
+tensor([ 0.1923,  0.5839,  0.8169,  0.7201, -0.0291,  0.2960,  0.8499,  0.7555,
+         1.3047,  0.0133,  0.1563,  0.6494, -0.0435], device='cuda:0')
+Likelihood: -33.08127975463867
+Solve time for step 2 (global step 1) 6.777717532997485
+Current ori: tensor(-0.0435, device='cuda:0')
+Middle force: tensor([1.3600, 1.3107, 0.9961, 0.8423, 2.2367], device='cuda:0')
+Thumb force: tensor([1.4695, 0.2850, 0.3472, 0.4536, 0.1206], device='cuda:0')
+Index force: tensor([0.6269, 1.3022, 1.4569, 1.4747, 1.0115], device='cuda:0')
+tensor([ 0.2176,  0.6355,  0.8198,  0.8354,  0.0600,  0.2634,  1.0146,  0.6692,
+         1.2860,  0.0035,  0.0854,  0.9106, -0.2159], device='cuda:0')
