@@ -24,7 +24,6 @@ camera-calibration==1.17.0
 camera-calibration-parsers==1.12.0
 catkin==0.8.10
 catkin-pkg==1.0.0
--e git+ssh://git@github.com/UM-ARM-Lab/ccai.git@5c791a5197aeb79e640651a5a52f9cf0905d61b5#egg=ccai
 certifi==2024.7.4
 cffi==1.17.0
 charset-normalizer==3.3.2
@@ -49,7 +48,6 @@ diagnostic-analysis==1.11.0
 diagnostic-common-diagnostics==1.11.0
 diagnostic-updater==1.11.0
 diffusers==0.30.0
--e git+ssh://git@github.com/real-stanford/diffusion_policy.git@548a52bbb105518058e27bf34dcf90bf6f73681a#egg=diffusion_policy
 dill==0.3.8
 distro==1.9.0
 docker-pycreds==0.4.0
@@ -96,9 +94,6 @@ interactive-markers==1.12.0
 ipykernel==6.29.5
 ipython==8.12.3
 ipywidgets==8.1.3
--e git+ssh://git@github.com/UM-ARM-Lab/isaacgym-arm-envs.git@cf8cde09544891a26f64bbbbeadd4b3c5b38eacb#egg=isaac_victor_envs
-# Editable install with no version control (isaacgym==1.0rc4)
--e /home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python
 itsdangerous==2.2.0
 jedi==0.19.1
 Jinja2==3.1.4
@@ -126,10 +121,10 @@ MarkupSafe==2.1.5
 matplotlib==3.7.5
 matplotlib-inline==0.1.7
 message-filters==1.16.0
-moveit-commander==1.1.14
-moveit-core==1.1.14
-moveit-ros-planning-interface==1.1.14
-moveit-ros-visualization==1.1.14
+# moveit-commander==1.1.14
+# moveit-core==1.1.14
+# moveit-ros-planning-interface==1.1.14
+# moveit-ros-visualization==1.1.14
 moviepy==1.0.3
 mpmath==1.3.0
 mujoco==3.2.2
@@ -158,7 +153,6 @@ nvidia-nvjitlink-cu12==12.6.20
 nvidia-nvtx-cu12==12.1.105
 oauthlib==3.2.2
 omegaconf==2.3.0
-open3d==0.18.0
 opencv-python==4.10.0.84
 osqp==0.6.7.post1
 packaging==24.1
@@ -196,9 +190,6 @@ python-dateutil==2.9.0.post0
 python-qt-binding==0.4.4
 pytorch-lightning==1.9.5
 pytorch-seed==0.2.0
--e git+ssh://git@github.com/UM-ARM-Lab/pytorch_kinematics.git@d1bf113fffdaf9e3fe4ab3c4ff7ec4f1d3d93baf#egg=pytorch_kinematics
--e git+ssh://git@github.com/UM-ARM-Lab/pytorch_mppi.git@fe1465028170c3d318c1794584d6f890af6d7498#egg=pytorch_mppi
--e git+ssh://git@github.com/UM-ARM-Lab/pytorch_volumetric.git@03301be50882c23b3d3274a39249c2435760d9cd#egg=pytorch_volumetric
 pytz==2024.1
 PyWavelets==1.4.1
 PyYAML==6.0.2
@@ -272,7 +263,7 @@ rqt_top==0.4.10
 rqt_topic==0.4.13
 rqt_web==0.4.10
 rsa==4.9
-rviz==1.14.25
+# rviz==1.14.25
 safetensors==0.4.4
 scanpy==1.9.8
 scikit-image==0.21.0
@@ -291,7 +282,7 @@ smach-ros==2.5.2
 smclib==1.8.6
 smmap==5.0.1
 sortedcontainers==2.4.0
-sound-play==0.3.18
+# sound-play==0.3.18
 srdfdom==0.6.4
 stack-data==0.6.3
 statsmodels==0.14.1
@@ -312,7 +303,7 @@ tifffile==2023.7.10
 tomlkit==0.13.2
 topic-tools==1.16.0
 torch==2.4.0
-torch-cg==1.0.1
+# torch-cg==1.0.1
 torchcde==0.2.5
 torchcfm==1.0.5
 torchdiffeq==0.2.4
@@ -335,7 +326,8 @@ wandb==0.17.7
 wcwidth==0.2.13
 Werkzeug==3.0.3
 widgetsnbextension==4.0.11
-xacro==1.14.18
+# xacro==1.14.18
 yarl==1.13.1
 zarr==2.16.1
 zipp==3.19.2
+open3d
