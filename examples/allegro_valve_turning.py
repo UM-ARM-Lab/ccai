@@ -864,7 +864,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 rand_pct = 1
                 if np.random.rand() < rand_pct:
                     r = np.random.rand()
-                    std = .1 if perturb_this_trial else .0
+                    std = .2 if perturb_this_trial else .0
                     # if mode != 'turn':
                     #     std /= 4
                     # if r > .66:
@@ -1237,16 +1237,16 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     # <= so because pregrasp will iterate the all_stage counter
 
     if not params.get('live_recovery', False):
-        contact_sequence = ['turn']
+        contact_sequence = ['turn']*50
 
-        while len(contact_sequence) < 50:
-            contact_options = ['index', 'middle', 'thumb']
-            perm = np.random.permutation(3)
-            # perm = [1, 0]
-            for idx in perm:
-                contact = contact_options[idx]
-                contact_sequence.append(contact)
-            contact_sequence.append('turn')
+        # while len(contact_sequence) < 50:
+        #     contact_options = ['index', 'middle', 'thumb']
+        #     perm = np.random.permutation(3)
+        #     # perm = [1, 0]
+        #     for idx in perm:
+        #         contact = contact_options[idx]
+        #         contact_sequence.append(contact)
+        #     contact_sequence.append('turn')
     while episode_num_steps < max_episode_num_steps:
         sample_contact = params['sample_contact'] and not recover
         initial_samples = None
