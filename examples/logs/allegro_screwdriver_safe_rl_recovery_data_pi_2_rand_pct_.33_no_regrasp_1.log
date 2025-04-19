@@ -15591,3 +15591,28 @@ Current ori: tensor([-1.4256,  0.5687, -3.0003], device='cuda:0')
 Middle force: tensor([1.6831, 0.9696, 1.6330], device='cuda:0')
 Thumb force: tensor([0.8401, 0.5121, 1.3356], device='cuda:0')
 Index force: tensor([0.6320, 0.5094, 0.6367], device='cuda:0')
+tensor([-0.4700,  1.4381,  0.1914,  0.4820, -0.4700,  1.6100,  0.7526,  1.0228,
+         1.4331,  0.6789,  0.2027,  1.2129, -1.5881,  0.5756, -3.0003],
+       device='cuda:0')
+Solve time for step 11 (global step 58) 6.184993700997438
+Current ori: tensor([-1.5881,  0.5756, -3.0003], device='cuda:0')
+Middle force: tensor([0.9564, 1.6564], device='cuda:0')
+Thumb force: tensor([0.5094, 1.3288], device='cuda:0')
+Index force: tensor([0.5100, 0.6465], device='cuda:0')
+tensor([-0.4700,  1.2816,  0.4598,  0.5375, -0.4700,  1.6100,  1.0220,  0.7893,
+         1.3568,  0.7902,  0.3160,  1.3425, -1.6510,  0.5696, -3.0004],
+       device='cuda:0')
+Solve time for step 12 (global step 59) 5.681541392987128
+Current ori: tensor([-1.6510,  0.5696, -3.0004], device='cuda:0')
+Middle force: tensor([0.6966], device='cuda:0')
+Thumb force: tensor([1.0113], device='cuda:0')
+Index force: tensor([0.7240], device='cuda:0')
+Probably dropped the object
+tensor([-1.6623,  0.5604, -3.0004], device='cuda:0')
+{}
+
+Trial 525
+No action perturbation this trial
+Random perturbation %: 0.33
+Loaded trajectory sampler
+Current yaw: tensor([0.0036, 0.0076, 2.5474], device='cuda:0')
