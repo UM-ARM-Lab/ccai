@@ -1,0 +1,24 @@
+Importing module 'gym_38' (/home/abhinavkumar/Downloads/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinavkumar/Downloads/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.0+cu121
+Device count 4
+/home/abhinavkumar/Downloads/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinavkumar/Documents/ccai
+robot pose [ 0.02  -0.35   0.376] [0, 0, 0.7071068, 0.7071068]
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinavkumar/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinavkumar/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinavkumar/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinavkumar/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+
+Trial 801
+No action perturbation this trial
+Current yaw: tensor([0.5230], device='cuda:0')
+Current yaw: tensor([0.5173], device='cuda:0')
+1 turn
+tensor([ 0.3494,  0.6634,  0.9591,  0.6516, -0.0415,  0.2962,  0.8009,  0.8039,
+         1.2873,  0.0155,  0.3976,  0.3737,  0.5173], device='cuda:0')

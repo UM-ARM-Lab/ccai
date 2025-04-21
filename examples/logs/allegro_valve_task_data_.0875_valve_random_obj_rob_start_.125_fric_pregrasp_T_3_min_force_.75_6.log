@@ -1,0 +1,90 @@
+Importing module 'gym_38' (/home/abhinavkumar/Downloads/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinavkumar/Downloads/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.0+cu121
+Device count 4
+/home/abhinavkumar/Downloads/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+CCAI_PATH /home/abhinavkumar/Documents/ccai
+robot pose [ 0.02  -0.35   0.376] [0, 0, 0.7071068, 0.7071068]
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinavkumar/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinavkumar/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinavkumar/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinavkumar/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+
+Trial 1201
+No action perturbation this trial
+Current yaw: tensor([0.5775], device='cuda:2')
+Current yaw: tensor([0.5762], device='cuda:2')
+1 turn
+tensor([ 0.2197,  0.5393,  0.6984,  0.8741, -0.1209,  0.2939,  0.8331,  0.8722,
+         1.3143,  0.0484,  0.3844,  0.3560,  0.5762], device='cuda:2')
+Solve time for step 1 (global step 0) 45.96015932317823
+Current ori: tensor(0.5762, device='cuda:2')
+Middle force: tensor([1.1857, 1.5401, 0.5346, 0.9744, 1.5264, 1.5758], device='cuda:2')
+Thumb force: tensor([0.4844, 0.0874, 1.4754, 0.8660, 1.4502, 1.8414], device='cuda:2')
+Index force: tensor([1.8285, 0.9497, 1.4471, 1.5602, 0.6282, 1.3986], device='cuda:2')
+tensor([ 0.2297,  0.5795,  0.6433,  0.9188, -0.1210,  0.2982,  0.8217,  0.8834,
+         1.3311,  0.0477,  0.3565,  0.3909,  0.5762], device='cuda:2')
+Solve time for step 2 (global step 1) 21.91400204366073
+Current ori: tensor(0.5762, device='cuda:2')
+Middle force: tensor([1.3424, 0.5749, 0.9636, 1.5565, 1.2893], device='cuda:2')
+Thumb force: tensor([0.1929, 1.5230, 0.8293, 1.3692, 1.9402], device='cuda:2')
+Index force: tensor([0.8945, 1.1889, 1.3436, 0.5770, 1.3739], device='cuda:2')
+tensor([ 0.2317,  0.5829,  0.6542,  0.8947, -0.1247,  0.3554,  0.6537,  1.0856,
+         1.3143,  0.0241,  0.3574,  0.4151,  0.5761], device='cuda:2')
+Solve time for step 3 (global step 2) 21.67768483562395
+Current ori: tensor(0.5761, device='cuda:2')
+Middle force: tensor([0.5479, 1.0080, 1.5351, 1.2363], device='cuda:2')
+Thumb force: tensor([1.4842, 0.8710, 1.3215, 1.8936], device='cuda:2')
+Index force: tensor([1.1719, 1.1750, 0.6120, 1.3996], device='cuda:2')
+tensor([ 0.2441,  0.5925,  0.6471,  0.9308, -0.1098,  0.2973,  0.7923,  0.9335,
+         1.3300, -0.0170,  0.2997,  0.5348,  0.5760], device='cuda:2')
+Solve time for step 4 (global step 3) 19.924464992247522
+Current ori: tensor(0.5760, device='cuda:2')
+Middle force: tensor([0.9882, 1.4922, 1.2157], device='cuda:2')
+Thumb force: tensor([0.8447, 1.2992, 1.8258], device='cuda:2')
+Index force: tensor([1.1497, 0.6310, 1.3806], device='cuda:2')
+tensor([ 0.2499,  0.5932,  0.6551,  0.9339, -0.1089,  0.2600,  0.8852,  0.8413,
+         1.3277, -0.0200,  0.2819,  0.5727,  0.5760], device='cuda:2')
+Solve time for step 5 (global step 4) 18.834201890043914
+Current ori: tensor(0.5760, device='cuda:2')
+Middle force: tensor([1.4636, 1.1315], device='cuda:2')
+Thumb force: tensor([1.2780, 1.7927], device='cuda:2')
+Index force: tensor([0.5866, 1.3645], device='cuda:2')
+tensor([ 0.2565,  0.6165,  0.6540,  0.8999, -0.1087,  0.2712,  0.8569,  0.8695,
+         1.3582, -0.0493,  0.2331,  0.6404,  0.5759], device='cuda:2')
+Solve time for step 6 (global step 5) 15.1373679228127
+Current ori: tensor(0.5759, device='cuda:2')
+Middle force: tensor([1.2093], device='cuda:2')
+Thumb force: tensor([1.7380], device='cuda:2')
+Index force: tensor([1.3059], device='cuda:2')
+Failed to turn past .15 rad
+Average turn amount: 0.5757822394371033 over 1 trials
+{}
+
+Trial 1202
+No action perturbation this trial
+Current yaw: tensor([0.6303], device='cuda:2')
+Current yaw: tensor([0.6298], device='cuda:2')
+1 turn
+tensor([ 0.3108,  0.5641,  0.8735,  0.7730, -0.0795,  0.1262,  1.0713,  0.7876,
+         1.2772,  0.0638,  0.4205,  0.3275,  0.6298], device='cuda:2')
+Solve time for step 1 (global step 0) 43.30439733620733
+Current ori: tensor(0.6298, device='cuda:2')
+Middle force: tensor([1.4190, 3.3014, 1.1216, 0.4270, 0.4490, 2.4530], device='cuda:2')
+Thumb force: tensor([0.6742, 0.5921, 0.0755, 1.7594, 0.9753, 0.3507], device='cuda:2')
+Index force: tensor([1.0777, 3.2022, 1.7838, 2.0712, 0.9355, 1.0515], device='cuda:2')
+tensor([ 0.3187,  0.5710,  0.8930,  0.7900, -0.0798,  0.1177,  1.0937,  0.7639,
+         1.1826,  0.3060,  0.3452,  0.3979,  0.6297], device='cuda:2')
+Solve time for step 2 (global step 1) 23.25324589200318
+Current ori: tensor(0.6297, device='cuda:2')
+Middle force: tensor([2.5886, 2.4824, 1.7666, 1.6059, 2.8076], device='cuda:2')
+Thumb force: tensor([0.4767, 3.0608, 0.4203, 1.2364, 0.9842], device='cuda:2')
+Index force: tensor([1.3412, 1.6048, 1.3813, 1.5897, 1.5428], device='cuda:2')
+tensor([ 3.3268e-01,  6.1274e-01,  9.4722e-01,  7.6956e-01, -8.7069e-02,
+         1.0991e-01,  1.1398e+00,  6.9362e-01,  1.2449e+00,  6.0303e-04,
+         3.2957e-01,  5.6946e-01,  6.2974e-01], device='cuda:2')

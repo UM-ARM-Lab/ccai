@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 25
 visualize: True
-experiment_name: 'allegro_screwdriver_likelihood_mppi_recovery'
+experiment_name: 'allegro_screwdriver_likelihood_mppi_recovery_damping_.1'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']

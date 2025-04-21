@@ -1,5 +1,5 @@
 ---
-T: 2
+T: 3
 T_orig: 12
 receding_horizon: False
 num_steps: 8
@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 25
 visualize: True
-experiment_name: 'allegro_screwdriver_safe_rl_recovery'
+experiment_name: 'allegro_screwdriver_safe_rl_recovery_damping_.1'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -53,8 +53,8 @@ recovery_diff_traj: True
 obj_gravity: True
 type: 'diffusion'
 model_path: '/home/abhinav/Documents/ccai/data/training/allegro_screwdriver/safe_rl/safety_critic.pt'
-model_path_orig: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
-likelihood_threshold: -175.0
+model_path_orig: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion/allegro_screwdriver_diffusion.pt'
+likelihood_threshold: -160.0
 # likelihood_threshold: -1.0
 drop_threshold: -1250
 project_threshold: -105.
@@ -64,10 +64,11 @@ sac_batch_size: 64
 # project_threshold: -90
 # parity: 654
 start_ind: 0
+end_ind: 50
 device: 'cuda:1'
 recovery_controller: 'mppi'
 OOD_metric: 'q_function'
-lanbda_: .01
+lambda_: .01
 q_cutoff: .1
 controllers:
   csvgd:
@@ -78,7 +79,7 @@ controllers:
     step_size: 0.1
     momentum: 0.
     online_iters: 25
-    warmup_iters: 50
+    warmup_iters: 25
     resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1

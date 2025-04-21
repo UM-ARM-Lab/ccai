@@ -223,9 +223,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         }
     else:
         min_force_dict = {
-            'thumb': .5,
-            'middle': .5,
-            'index': .5,
+            'thumb': 1,
+            'middle': 1,
+            'index': 1,
         }
 
     # if params.get('compute_recovery_trajectory', False):
@@ -239,7 +239,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     pregrasp_problem = AllegroValve(
         start=start[:4 * num_fingers + obj_dof],
         goal=goal_pregrasp,
-        T=2,
+        T=3,
         chain=pregrasp_params['chain'],
         device=pregrasp_params['device'],
         object_asset_pos=env.obj_pose,
@@ -343,6 +343,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         nonlocal episode_num_steps
         data['pre_action_likelihoods'].append([])
         data['final_likelihoods'].append([])
+        data['action_perturbations'].append([])
+        data['csvto_times'].append([])
         orig_torque_perturb = env.external_wrench_perturb if params['mode'] != 'hardware' else False
         # if recover and params['mode'] != 'hardware':
         #     env.set_external_wrench_perturb(False)
@@ -722,6 +724,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 if (cur_yaw - goal_yaw) < cutoff_radians:
                     print('Reached goal yaw')
                     done = True
+                # If we are generating task data (there is no diff_init), we don't want to return
+                done = done and params['diff_init']
 
                 if done:
                     if planner is not None:
@@ -805,7 +809,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             # else:
             #     best_traj = best_traj[1:]
             #     plans = plans[:, 1:]
-            print(f'Solve time for step {k+1} (global step {episode_num_steps})', time.perf_counter() - s)
+            csvto_time = time.perf_counter() - s
+            data['csvto_times'][-1].append(csvto_time)
+            print(f'Solve time for step {k+1} (global step {episode_num_steps})', csvto_time)
 
             planned_trajectories.append(plans)
             optimizer_paths.append(copy.deepcopy(planner.path))
@@ -858,13 +864,16 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 x = best_traj[0, :planner.problem.dx + planner.problem.du]
                 x = x.reshape(1, planner.problem.dx + planner.problem.du)
                 action = x[:, planner.problem.dx:planner.problem.dx + planner.problem.du].to(device=env.device)
+
+            xu = torch.cat((state.cpu(), action[0].cpu()))
+            actual_trajectory.append(xu)
             if params.get('perturb_action', False):# and mode == 'turn':
                 # rand_pct = .75 if not params.get('shortcut_trajectory', False) else .25
                 # rand_pct = .75
                 rand_pct = 1
                 if np.random.rand() < rand_pct:
                     r = np.random.rand()
-                    std = .1 if perturb_this_trial else .0
+                    std = .15 if perturb_this_trial else .0
                     # if mode != 'turn':
                     #     std /= 4
                     # if r > .66:
@@ -878,10 +887,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                         # if r < .4 and r > .8:
                         #     action[:, 4 * 1: 4*3] += std * torch.randn_like(action[:, 4 * 1: 4*3])
                         # else:
-                    action[:, :4 * num_fingers_to_plan] += std * torch.randn_like(action[:, :4 * num_fingers_to_plan])
+                    noise = std * torch.randn_like(action[:, :4 * num_fingers_to_plan])
+                    data['action_perturbations'][-1].append(noise.cpu())
+                    action[:, :4 * num_fingers_to_plan] += noise
 
-            xu = torch.cat((state.cpu(), action[0].cpu()))
-            actual_trajectory.append(xu)
 
             action = action[:, :4 * num_fingers_to_plan]
 
@@ -949,6 +958,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     data['pre_action_likelihoods'] = []
     data['final_likelihoods'] = []
     data['project_times'] = []
+    data['csvto_times'] = []
+    data['action_perturbations'] = []
     data['all_samples_'] = []
     data['all_likelihoods_'] = []
     data['contact_plan_times'] = []
@@ -1172,7 +1183,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             # planner.problem.grad_cost = vmap(jacrev(partial(planner.problem._cost, start=planner.problem.start, goal=planner.problem.goal), argnums=(0, 1, 2)), randomness='same')
 
             # old_warmup_iters = planner.warmup_iters
-            planner.warmup_iters = 75
+            planner.warmup_iters = 100
 
             xu, plans = planner.step(state)
             planner.problem.data = {}
@@ -1237,16 +1248,16 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     # <= so because pregrasp will iterate the all_stage counter
 
     if not params.get('live_recovery', False):
-        contact_sequence = ['turn']
+        contact_sequence = ['turn']*2
 
-        while len(contact_sequence) < 50:
-            contact_options = ['index', 'middle', 'thumb']
-            perm = np.random.permutation(3)
-            # perm = [1, 0]
-            for idx in perm:
-                contact = contact_options[idx]
-                contact_sequence.append(contact)
-            contact_sequence.append('turn')
+        # while len(contact_sequence) < 50:
+        #     contact_options = ['index', 'middle', 'thumb']
+        #     perm = np.random.permutation(3)
+        #     # perm = [1, 0]
+        #     for idx in perm:
+        #         contact = contact_options[idx]
+        #         contact_sequence.append(contact)
+        #     contact_sequence.append('turn')
     while episode_num_steps < max_episode_num_steps:
         sample_contact = params['sample_contact'] and not recover
         initial_samples = None
@@ -1367,6 +1378,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         state = state['q'].reshape(-1, FULL_DOF)[0].to(device=params['device'])
 
         pre_recover = recover
+        pre_mode_yaw = state[-1]
         if contact == 'index':
             _goal = None
             if params.get('model_path_orig', None):
@@ -1510,6 +1522,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         cutoff_radians = np.deg2rad(cutoff_degrees)
         if (cur_yaw - goal_yaw) < cutoff_radians:
             print('Reached goal yaw')
+            done = True
+        
+        # If first mode didn't turn, end episode to save compute (TASK DATA GEN ONLY)
+
+        if not params['diff_init'] and (pre_mode_yaw - cur_yaw) < .15:
+            print('Failed to turn past .15 rad')
             done = True
 
         
@@ -1776,8 +1794,8 @@ if __name__ == "__main__":
                                            joint_stiffness=config['kp'],
                                            fingers=config['fingers'],
                                            gravity=True, 
-                                           randomize_obj_start=False,
-                                           randomize_rob_start=False
+                                           randomize_obj_start=config['randomize_obj_start'],
+                                           randomize_rob_start=config['randomize_rob_start']
                                            )
         if config['mode'] == 'hardware':
             nx = sim_viz_env.dof_states.shape[1] * 2

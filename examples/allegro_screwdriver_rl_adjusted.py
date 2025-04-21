@@ -214,7 +214,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         rand_pct = 1/3#(np.random.rand()) / (.5-1/4) + 1/4
         print(f'Random perturbation %: {rand_pct:.2f}')
 
-
+    mppi_ctrl = None
     # index finger is used for stability
     if 'index' in params['fingers']:
         fingers = params['fingers']
@@ -321,7 +321,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     info_list = []
     
     def execute_traj(planner, mode, goal=None, fname=None, initial_samples=None, recover=False, 
-                     start_timestep=0, max_timesteps=None):
+                     start_timestep=0, max_timesteps=None, ctrl=None, mppi_warmup=False):
         """
         Execute a trajectory with the given planner and mode.
         
@@ -438,16 +438,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             contact[:, 2] = 1
 
         recovery_params = copy.deepcopy(params)
-        recovery_params['warmup_iters'] = 75 #if not params.get('model_path_orig', None) else 25
-        recovery_params['online_iters'] = 20 #if not params.get('model_path_orig', None) else 0
+        # recovery_params['warmup_iters'] = 75 #if not params.get('model_path_orig', None) else 25
+        # recovery_params['online_iters'] = 20 #if not params.get('model_path_orig', None) else 0
 
         skip_diff_init = False
         planner_returns_action = False
         if 'mppi' in params['recovery_controller'] and recover:
-            ctrl = MPPI(dynamics=dynamics, running_cost=running_cost, terminal_state_cost=terminal_cost, nx=nx, noise_sigma=noise_sigma, 
-                        num_samples=500, horizon=params['T'], lambda_=params['lambda_'], u_min=u_min, u_max=u_max,
-                        device=params['device'])
-            planner = MPPIPlanner(ctrl, 12, params['T'])
+            planner = MPPIPlanner(ctrl, 12, params['T'], warmup=mppi_warmup)
             skip_diff_init = True
             planner_returns_action = True
         else:
@@ -1432,6 +1429,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 6).to(device=params['device'])), dim=-1)
 
         elif contact == 'turn':
+            mppi_ctrl = None
             _goal = torch.tensor([0, 0, state[-1] - np.pi / 2]).to(device=params['device'])
                 
             # If we're recovering and have a saved goal/timesteps, use them
@@ -1449,10 +1447,16 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
         
         elif contact == 'mppi':
+            if mppi_ctrl is None:
+                mppi_ctrl = MPPI(dynamics=dynamics, running_cost=running_cost, terminal_state_cost=terminal_cost, nx=nx, noise_sigma=noise_sigma, 
+                            num_samples=500, horizon=params['T'], lambda_=params['lambda_'], u_min=u_min, u_max=u_max,
+                            device=params['device'])
+                mppi_needs_warmup = True
             result = execute_traj(
                 None, mode='mppi', goal=None, fname=f'mppi_{all_stage}', initial_samples=initial_samples,
-                recover=recover)
-           
+                recover=recover, ctrl=mppi_ctrl, mppi_warmup=mppi_needs_warmup)
+            mppi_needs_warmup = False
+
         # done = False
         add = not recover or params['live_recovery']
         state = env.get_state()
