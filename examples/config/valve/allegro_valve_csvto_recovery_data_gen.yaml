@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 200
 visualize: True
-experiment_name: 'allegro_valve_recovery_data_generation'
+experiment_name: 'allegro_valve_recovery_data_generation_std_.15_thresh_95'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -50,7 +50,7 @@ obj_gravity: True
 type: 'diffusion'
 model_path: 'data/training/allegro_screwdriver/allegro_valve_task_filtered_traj_diffusion/allegro_screwdriver_diffusion.pt'
 model_dir: 'data/training/allegro_screwdriver/allegro_valve_task_filtered_traj_diffusion'
-likelihood_threshold: -90.0
+likelihood_threshold: -95.0
 drop_threshold: -1250
 project_threshold: -105.
 sac_batch_size: 64
@@ -58,8 +58,8 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
-start_ind: 700
-end_ind: 1000
+start_ind: 0
+end_ind: 250
 controllers:
   csvgd:
     # N: 16

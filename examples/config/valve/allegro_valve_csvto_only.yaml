@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 720
 visualize: True
-experiment_name: 'allegro_valve_task_data_friction_0.1_pi_5x2'
+experiment_name: 'allegro_valve_task_data_friction_0.15_pi_5x2_.0875_valve_random_obj_rob_start_.125_fric_pregrasp_T_3_min_force_.75'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -39,10 +39,11 @@ compute_recovery_trajectory: False
 rl_adjustment: False
 test_recovery_trajectory: False
 perturb_action: False
-randomize_obj_start: False
+randomize_obj_start: True
+randomize_rob_start: True
 external_wrench_perturb: False
 viz_states: False
-diff_init: True
+diff_init: False
 live_recovery: False
 new_projection: True
 task_diffuse_goal: True
@@ -56,8 +57,8 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
-start_ind: 248
-end_ind: 496
+start_ind: 1400
+end_ind: 1600
 recovery_controller: 'csvgd'
 controllers:
   csvgd:
@@ -75,4 +76,4 @@ controllers:
     penalty: 1000000
     collision_checking: False
     random_init_every_iter: False
-    device: 'cuda:0'
+    device: 'cuda:3'

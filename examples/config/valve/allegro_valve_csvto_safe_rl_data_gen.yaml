@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 200
 visualize: True
-experiment_name: 'allegro_valve_random_recovery_sequence'
+experiment_name: 'allegro_valve_safe_rl_data_gen_std_.15_save_perturbation'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -22,9 +22,9 @@ goal: -1.5
 prior: 1
 multi_particle_search: True
 replan: False
-visualize_plan: True
-visualize_recovery_plan: True
-visualize_contact_plan: True
+visualize_plan: False
+visualize_recovery_plan: False
+visualize_contact_plan: False
 optimize_force: True
 exclude_index: False
 projected: False
@@ -59,7 +59,7 @@ sac_batch_size: 64
 # project_threshold: -90
 # parity: 654
 start_ind: 0
-end_ind: 200
+end_ind: 250
 controllers:
   csvgd:
     # N: 16
@@ -76,4 +76,4 @@ controllers:
     penalty: 1000000
     collision_checking: False
     random_init_every_iter: False
-    device: 'cuda:0'
+    device: 'cuda:1'

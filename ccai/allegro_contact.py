@@ -1519,6 +1519,8 @@ class AllegroContactProblem(AllegroObjectProblem):
 
             xu = torch.cat((x, u), dim=2)
         else:
+            if self.object_type == 'valve':
+                jitter_std = .05
             # The initialization should be an interpolation from the initial state to the goal state, perturbed by random noise.
             x_all = torch.nn.functional.interpolate(torch.stack([self.start, self.goal]).unsqueeze(0).permute(0, 2, 1), 
                                                   size=self.T+1, 
