@@ -255,7 +255,7 @@ class AllegroScrewDriverDataset(Dataset):
 
                     need_to_continue = False
                     
-                    dropped_recovery = data['dropped_recovery']
+                    # dropped_recovery = data['dropped_recovery']
                     
                     # fl = data['final_likelihoods']
                     # pre_action_likelihoods = data['pre_action_likelihoods']
@@ -291,7 +291,7 @@ class AllegroScrewDriverDataset(Dataset):
                         cs_bool = []
                         for c in data[t]['contact_state']:
                             # new_cs.append(c.sum() != 3)
-                            if c.sum() != 3:
+                            if True or c.sum() != 3:
                                 # if isinstance(c, np.ndarray):
                                 #     c = torch.from_numpy(c).float()
                                 if torch.is_tensor(c):
@@ -305,14 +305,14 @@ class AllegroScrewDriverDataset(Dataset):
                         for idx, s in enumerate(data[t]['starts']):
                             # if cs_bool[idx]:
                             # if s.shape[-1] != 36:
-                            if (s.sum(0) == 0).any():
+                            if True or (s.sum(0) == 0).any():
                                 new_starts.append(s)
                         new_plans = []
                         for idx, p in enumerate(data[t]['plans']):
                             # if p.shape[-1] != 36:
                             #     new_plans.append(p)
                             # if cs_bool[idx]:
-                            if (p.sum(0) == 0).any():
+                            if True or (p.sum(0) == 0).any():
                                 new_plans.append(p)
 
 
@@ -338,10 +338,10 @@ class AllegroScrewDriverDataset(Dataset):
                         # data[t]['starts'] = data[t]['starts'][fl_improvement_bool]
                         # data[t]['plans'] = data[t]['plans'][fl_improvement_bool]
                         # data[t]['contact_state'] = data[t]['contact_state'][fl_improvement_bool]
-                        if dropped_recovery:
-                            data[t]['starts'] = data[t]['starts'][:-1]
-                            data[t]['plans'] = data[t]['plans'][:-1]
-                            data[t]['contact_state'] = data[t]['contact_state'][:-1]
+                        # if dropped_recovery:
+                        #     data[t]['starts'] = data[t]['starts'][:-1]
+                        #     data[t]['plans'] = data[t]['plans'][:-1]
+                        #     data[t]['contact_state'] = data[t]['contact_state'][:-1]
                         if len(data[t]['starts']) == 0:
                             print('No starts')
                             need_to_continue = True
@@ -463,34 +463,52 @@ class AllegroScrewDriverDataset(Dataset):
         self.mean = 0
         self.std = 1
 
-        # pre_shape = self.trajectories.shape
-        # final_roll = self.trajectories[:, -1, 12].abs()
-        # final_pitch = self.trajectories[:, -1, 13].abs()
-        # dropped = (final_roll > .25) | (final_pitch > .25)
-        # self.trajectories = self.trajectories[~dropped]
-        # self.masks = self.masks[~dropped]
-        # self.trajectory_type = self.trajectory_type[~dropped]
+        if self.screwdriver:
+            pre_shape = self.trajectories.shape
+            final_roll = self.trajectories[:, -1, 12].abs()
+            final_pitch = self.trajectories[:, -1, 13].abs()
+            dropped = (final_roll > .25) | (final_pitch > .25)
+            self.trajectories = self.trajectories[~dropped]
+            self.masks = self.masks[~dropped]
+            self.trajectory_type = self.trajectory_type[~dropped]
 
-        # post_shape = self.trajectories.shape
+            post_shape = self.trajectories.shape
 
-        # print(f'# Trajectories: {pre_shape[0]} -> {post_shape[0]}')
+            print(f'# Trajectories: {pre_shape[0]} -> {post_shape[0]}')
 
-        # final_yaw = self.trajectories[:, -1, -1]
-        # initial_yaw = self.trajectories[:, 0, -1]
-        # yaw_change = final_yaw - initial_yaw
-        # print(yaw_change.mean())
+            final_yaw = self.trajectories[:, -1, -1]
+            initial_yaw = self.trajectories[:, 0, -1]
+            yaw_change = final_yaw - initial_yaw
+            print(yaw_change.mean())
 
-        # bad_turn = yaw_change > -.5
-        # self.trajectories = self.trajectories[~bad_turn]
-        # self.masks = self.masks[~bad_turn]
-        # self.trajectory_type = self.trajectory_type[~bad_turn]
-        # post_bad_turn_shape = self.trajectories.shape
+            bad_turn = yaw_change > -.5
+            self.trajectories = self.trajectories[~bad_turn]
+            self.masks = self.masks[~bad_turn]
+            self.trajectory_type = self.trajectory_type[~bad_turn]
+            post_bad_turn_shape = self.trajectories.shape
 
-        # print(f'# Trajectories: {post_shape[0]} -> {post_bad_turn_shape[0]}')
-        # final_yaw = self.trajectories[:, -1, -1]
-        # initial_yaw = self.trajectories[:, 0, -1]
-        # yaw_change = final_yaw - initial_yaw
-        # print(yaw_change.mean())
+            print(f'# Trajectories: {post_shape[0]} -> {post_bad_turn_shape[0]}')
+            final_yaw = self.trajectories[:, -1, -1]
+            initial_yaw = self.trajectories[:, 0, -1]
+            yaw_change = final_yaw - initial_yaw
+            print(yaw_change.mean())
+            
+        else:
+            pre_shape = self.trajectories.shape
+            final_yaw = self.trajectories[:, -1, 12]
+            initial_yaw = self.trajectories[:, 0, 12]
+            yaw_change = final_yaw - initial_yaw
+            bad_turn = yaw_change > -np.pi/8
+            self.trajectories = self.trajectories[~bad_turn]
+            self.masks = self.masks[~bad_turn]
+            self.trajectory_type = self.trajectory_type[~bad_turn]
+            post_shape = self.trajectories.shape
+            print(f'# Trajectories: {pre_shape[0]} -> {post_shape[0]}')
+            final_yaw = self.trajectories[:, -1, 12]
+            initial_yaw = self.trajectories[:, 0, 12]
+            yaw_change = final_yaw - initial_yaw
+            print('Average yaw change:', yaw_change.mean())     
+        
         self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.75)
         self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.5)
         self.states_only = states_only
