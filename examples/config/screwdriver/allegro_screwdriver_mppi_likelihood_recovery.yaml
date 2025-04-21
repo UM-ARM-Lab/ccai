@@ -53,8 +53,8 @@ recovery_diff_traj: True
 obj_gravity: True
 type: 'diffusion'
 model_path: '/home/abhinav/Documents/ccai/data/training/allegro_screwdriver/safe_rl/safety_critic.pt'
-model_path_orig: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
-likelihood_threshold: -160.0
+model_path_orig: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion/allegro_screwdriver_diffusion.pt'
+likelihood_threshold: -170.0
 # likelihood_threshold: -1.0
 drop_threshold: -1250
 project_threshold: -105.
@@ -64,7 +64,7 @@ sac_batch_size: 64
 # project_threshold: -90
 # parity: 654
 start_ind: 0
-device: 'cuda:1'
+device: 'cuda:0'
 recovery_controller: 'mppi'
 OOD_metric: 'likelihood'
 lambda_: .1
@@ -78,7 +78,7 @@ controllers:
     step_size: 0.1
     momentum: 0.
     online_iters: 25
-    warmup_iters: 50
+    warmup_iters: 25
     resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1

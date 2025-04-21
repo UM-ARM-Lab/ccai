@@ -1,11 +1,9 @@
-import cv2
 import numpy as np
 from scipy.spatial.transform import Rotation as R
-from .allegro_ros import RosNode
 import rospy
-from shapely.geometry import Polygon
 import pathlib
 from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
+from allegro_ros import RosNode
 import torch
 import yaml
 from lightweight_vicon_bridge.msg import MocapState
@@ -18,7 +16,7 @@ img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 
 class ObjectPoseReader:
     def __init__(self, obj='valve', mode='relative', device='cpu') -> None:
-        # rospy.init_node('object_pose_reader')
+        rospy.init_node('object_pose_reader')
         self.mode = mode
         self.obj = obj
         self.device=device
@@ -77,12 +75,14 @@ class ObjectPoseReader:
 
         # Object trans is difference between object position and hand position
 
-        print('obj_trans pre', self.obj_trans_)
+        # Skip below to get world position of object
+        
+        # print('obj_trans pre', self.obj_trans_)
         self.obj_trans_[-1] -= .1 + 0.412*2.54/100
-        print('obj_trans post z offset', self.obj_trans_)
+        # print('obj_trans post z offset', self.obj_trans_)
         self.obj_trans_ = self.obj_trans_ - self.hand_to_mocap_world_position
-        print('obj_trans post hand offset', self.obj_trans_)
-        print('hand to mocap world position', self.hand_to_mocap_world_position)
+        # print('obj_trans post hand offset', self.obj_trans_)
+        # print('hand to mocap world position', self.hand_to_mocap_world_position)
 
         return self.obj_trans_, self.obj_euler_
     
@@ -115,7 +115,7 @@ class HardwareEnv:
         self.ori_only = ori_only
     
     def get_state(self):
-        rospy.sleep(0.5)
+        # rospy.sleep(0.5)
         try:
             robot_state = self.__ros_node.allegro_joint_pos.float()
         except:
@@ -195,7 +195,7 @@ if __name__ == "__main__":
     """
     Calculate the arm config that aligns the hand with the object in hardware, matching alignment in simulation
     """
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_only.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_only.yaml').read_text())
     default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
                                 torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float(),
                                 torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
@@ -232,7 +232,7 @@ if __name__ == "__main__":
                             # init_for_non_serial_chain=
                             lr=0.2)
     while True:
-        root_coor, root_ori = obj_reader.get_state()
+        root_coor, root_ori = obj_reader.get_state_world_frame_pos()
 
 
         # num goals x num retries x DOF tensor of joint angles; if not converged, best solution found so far

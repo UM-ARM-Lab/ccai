@@ -227,7 +227,7 @@ class Experiment:
                         "rb"))
             elif 'screwdriver' in self.exp_cfg.env_name:
                 dataset = AllegroTrajectoryTransitionDataset(
-                    ['/home/abhinav/Documents/ccai/data/experiments/allegro_screwdriver_safe_rl_recovery_data_pi_6_rand_pct_.25_2_N_r_.5_1_T_3'],
+                    ['/home/abhinav/Documents/ccai/data/experiments/allegro_screwdriver_safe_rl_recovery_data_pi_2_damping_.1'],
                     cosine_sine=True,
                     action_dim=21
                 )

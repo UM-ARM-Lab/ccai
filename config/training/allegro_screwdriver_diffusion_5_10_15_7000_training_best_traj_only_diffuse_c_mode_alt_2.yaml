@@ -1,5 +1,5 @@
 ---
-model_name: 'allegro_screwdriver_recovery_fixed_rand_pct_.33_pi_2_perturb_during_recovery'
+model_name: 'allegro_screwdriver_recovery_pi_2_low_damping_all_data'
 T: 4
 dx: 15
 du: 21
@@ -18,7 +18,7 @@ lr: 1.0e-4
 model_type: 'diffusion'
 discriminator_guidance: True
 inverse_dynamics: False
-data_directory: 'allegro_screwdriver_recovery_data_rand_pct_.33_1.75_N_pi_2_9000_160_thresh_low_budget_perturb_during_recovery'
+data_directory: 'allegro_screwdriver_recovery_data_rand_pct_.33_1.5_N_pi_2_9000_170_thresh_low_budget_perturb_during_recovery_damping_.1'
 device: 'cuda:0'
 test_every: 9999999999
 save_every: 500

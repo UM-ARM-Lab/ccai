@@ -211,7 +211,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     start = state['q'].reshape(-1, 4 * num_fingers + 4).to(device=params['device'])[0]
 
     if params.get('external_wrench_perturb', False):
-        rand_pct = .25#(np.random.rand()) / (.5-1/4) + 1/4
+        rand_pct = 1/3#(np.random.rand()) / (.5-1/4) + 1/4
         print(f'Random perturbation %: {rand_pct:.2f}')
 
 
@@ -351,9 +351,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         nonlocal episode_num_steps
         data['pre_action_likelihoods'].append([])
         data['final_likelihoods'].append([])
+        data['csvto_times'].append([])
         orig_torque_perturb = env.external_wrench_perturb if params['mode'] != 'hardware' else False
-        if recover and params['mode'] != 'hardware' and (not params.get('model_path_orig', None)):
-            env.set_external_wrench_perturb(False)
+        # if recover and params['mode'] != 'hardware' and (not params.get('model_path_orig', None)):
+        #     env.set_external_wrench_perturb(False)
         # Initialize variables that might be referenced before assignment
         pre_recovery_state = None
         pre_recovery_likelihood = None
@@ -753,7 +754,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             # else:
             #     best_traj = best_traj[1:]
             #     plans = plans[:, 1:]
-            print(f'Solve time for step {k+1} (global step {episode_num_steps})', time.perf_counter() - s)
+            csvto_time = time.perf_counter() - s
+            data['csvto_times'][-1].append(csvto_time)
+            print(f'Solve time for step {k+1} (global step {episode_num_steps})', csvto_time)
 
             planned_trajectories.append(plans)
             optimizer_paths.append(copy.deepcopy(planner.path))
@@ -909,6 +912,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         data[t] = {'plans': [], 'starts': [], 'inits': [], 'init_sim_rollouts': [], 'optimizer_paths': [], 'contact_points': [], 'contact_distance': [], 'contact_state': []}
     data['pre_action_likelihoods'] = []
     data['final_likelihoods'] = []
+    data['csvto_times'] = []
     data['project_times'] = []
     data['all_samples_'] = []
     data['all_likelihoods_'] = []
@@ -1272,12 +1276,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     # <= so because pregrasp will iterate the all_stage counter
 
     if not params.get('live_recovery', False):
-        contact_sequence = ['turn']
-        while len(contact_sequence) < 50:
-            contact_options = ['index', 'thumb_middle']
-            perm = np.random.permutation(2)
-            # perm = [1, 0]
-            contact_sequence += [contact_options[perm[0]], contact_options[perm[1]], 'turn']
+        contact_sequence = ['turn'] * 50
+        # while len(contact_sequence) < 50:
+        #     contact_options = ['index', 'thumb_middle']
+        #     perm = np.random.permutation(2)
+        #     # perm = [1, 0]
+        #     contact_sequence += [contact_options[perm[0]], contact_options[perm[1]], 'turn']
     while episode_num_steps < max_episode_num_steps:
         sample_contact = params['sample_contact'] and not recover
         initial_samples = None
