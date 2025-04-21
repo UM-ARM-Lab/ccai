@@ -5,6 +5,7 @@ import pathlib
 import numpy as np
 from torch.utils.data import Dataset
 import io
+import matplotlib.pyplot as plt
 class CPU_Unpickler(pickle.Unpickler):
     def find_class(self, module, name):
         if module == 'torch.storage' and name == '_load_from_bytes':
@@ -508,6 +509,12 @@ class AllegroScrewDriverDataset(Dataset):
             initial_yaw = self.trajectories[:, 0, 12]
             yaw_change = final_yaw - initial_yaw
             print('Average yaw change:', yaw_change.mean())     
+            yaw_for_plot = initial_yaw.cpu().numpy()
+            plt.hist(yaw_for_plot, bins=100)
+            plt.title('Final Yaw')
+            plt.xlabel('Yaw')
+            plt.ylabel('Count')
+            plt.show()
         
         self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.75)
         self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.5)
@@ -529,6 +536,12 @@ class AllegroScrewDriverDataset(Dataset):
         if self.screwdriver:
             ## randomly perturb angle of screwdriver
             traj[:, dx-1] += 2 * np.pi * (np.random.rand() - 0.5)
+        # else:
+        #     # Randomly add a multiple of pi/2 to the yaw angle to account for the valve symmetry
+        #     traj[:, 12] += (np.random.randint(-3, 4) * np.pi / 2)
+            
+        #     # modulo to make sure between [-pi and pi]. Original range was arbitrary
+        #     traj[:, 12] = (traj[:, 12] + np.pi) % (2.0 * np.pi) - np.pi  # subtract to make [-pi, pi]
 
         if self.cosine_sine:
                 traj_q = traj[:, :(dx-1)]

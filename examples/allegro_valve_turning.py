@@ -202,6 +202,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         env.frame_id = None
     start = state['q'].reshape(-1, 4 * num_fingers + obj_dof).to(device=params['device'])[0]
     initial_angle = start[-1]
+    goal_yaw = start[-1] - np.pi / 3
     if params.get('external_wrench_perturb', False):
         rand_pct = (np.random.rand()) / 3
         print(f'Random perturbation %: {rand_pct:.2f}')
@@ -386,7 +387,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         if dropped:
             print('dropped')
 
-        goal_yaw = -np.pi / 3
         cur_yaw = state[-1].item()
         
         cutoff_degrees = 5
@@ -395,6 +395,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         if (cur_yaw - goal_yaw) < cutoff_radians:
             print('Reached goal yaw')
             done = True
+        # # If we are generating task data (there is no diff_init), we don't want to return
+        done = done and params['diff_init']
 
         if done:
             if planner is not None:
@@ -715,7 +717,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 if dropped:
                     print('dropped')
 
-                goal_yaw = -np.pi / 3
                 cur_yaw = state[-1].item()
                 
                 cutoff_degrees = 5
@@ -873,7 +874,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 rand_pct = 1
                 if np.random.rand() < rand_pct:
                     r = np.random.rand()
-                    std = .15 if perturb_this_trial else .0
+                    std = .1 if perturb_this_trial else .0
                     # if mode != 'turn':
                     #     std /= 4
                     # if r > .66:
@@ -1515,15 +1516,14 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         data['dropped'] = dropped
         data['dropped_recovery'] = dropped and pre_recover
         
-        goal_yaw = -np.pi / 3
         cur_yaw = state[-1].item()
         
         cutoff_degrees = 5
         cutoff_radians = np.deg2rad(cutoff_degrees)
-        if (cur_yaw - goal_yaw) < cutoff_radians:
+        if params['diff_init'] and (cur_yaw - goal_yaw) < cutoff_radians:
             print('Reached goal yaw')
             done = True
-        
+       
         # If first mode didn't turn, end episode to save compute (TASK DATA GEN ONLY)
 
         if not params['diff_init'] and (pre_mode_yaw - cur_yaw) < .15:
