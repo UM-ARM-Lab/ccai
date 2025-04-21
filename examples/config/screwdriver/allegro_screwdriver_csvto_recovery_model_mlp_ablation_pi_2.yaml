@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 50
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_model_mlp_ablation_fixed_rand_pct_pi_2_eval'
+experiment_name: 'allegro_screwdriver_recovery_model_mlp_ablation_fixed_rand_pct_pi_2_damping_.1_eval'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -54,12 +54,12 @@ obj_gravity: True
 type: 'diffusion'
 OOD_metric: 'likelihood'
 recovery_controller: 'csvgd'
-recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_best_traj_only_mlp_ablation_diffusion'
-model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_best_traj_only_mlp_ablation_diffusion/allegro_screwdriver_diffusion.pt'
-model_path_classifier: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_best_traj_only_mlp_ablation_diffusion/allegro_screwdriver_contact_classifier.pt'
+recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_mlp_ablation_low_damping_diffusion'
+model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_mlp_ablation_low_damping_diffusion/allegro_screwdriver_diffusion.pt'
+model_path_classifier: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_mlp_ablation_low_damping_diffusion/allegro_screwdriver_contact_classifier.pt'
 model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion'
 model_path_orig: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion/allegro_screwdriver_diffusion.pt'
-likelihood_threshold: -160.0
+likelihood_threshold: -170.0
 # likelihood_threshold: -1.0
 drop_threshold: -1250
 project_threshold: -105.
@@ -68,8 +68,8 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
-start_ind: 857
-end_ind: 1000
+start_ind: 0
+end_ind: 50
 controllers:
   csvgd:
     # N: 16

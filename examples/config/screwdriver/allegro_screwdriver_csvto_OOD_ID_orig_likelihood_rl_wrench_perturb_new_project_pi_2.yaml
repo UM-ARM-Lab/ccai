@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 200
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_data_rand_pct_.33_1.75_N_pi_2_9000_160_thresh_low_budget_perturb_during_recovery'
+experiment_name: 'allegro_screwdriver_recovery_data_rand_pct_.33_1.5_N_pi_2_9000_170_thresh_low_budget_perturb_during_recovery_damping_.1'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -52,7 +52,7 @@ OOD_metric: 'likelihood'
 recovery_controller: 'csvgd'
 model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion'
 model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion/allegro_screwdriver_diffusion.pt'
-likelihood_threshold: -160.0
+likelihood_threshold: -170.0
 drop_threshold: -1250
 project_threshold: -105.
 sac_batch_size: 64
@@ -60,8 +60,8 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
-start_ind: 600
-end_ind: 800
+start_ind: 75
+end_ind: 200
 controllers:
   csvgd:
     # N: 16

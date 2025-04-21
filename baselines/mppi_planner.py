@@ -5,11 +5,11 @@ class DummyProblem:
         self.T = T
         self.data = {}
 class MPPIPlanner:
-    def __init__(self, ctrl, dx, T):
+    def __init__(self, ctrl, dx, T, warmup=False):
         self.ctrl = ctrl
         self.problem = DummyProblem(dx, T)
 
-        self.warmed_up = False
+        self.warmed_up = not warmup
         self.path = []
     
     def step(self, state):

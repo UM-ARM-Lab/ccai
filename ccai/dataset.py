@@ -257,26 +257,26 @@ class AllegroScrewDriverDataset(Dataset):
                     
                     dropped_recovery = data['dropped_recovery']
                     
-                    fl = data['final_likelihoods']
-                    pre_action_likelihoods = data['pre_action_likelihoods']
-                    fl = [l for l in fl if None not in l and len(l)>0]
-                    for k in range(len(fl)):
-                        if len(fl[k]) == 0 and len(pre_action_likelihoods[k]) > 0:
-                            fl[k].append(pre_action_likelihoods[k][-1])
+                    # fl = data['final_likelihoods']
+                    # pre_action_likelihoods = data['pre_action_likelihoods']
+                    # fl = [l for l in fl if None not in l and len(l)>0]
+                    # for k in range(len(fl)):
+                    #     if len(fl[k]) == 0 and len(pre_action_likelihoods[k]) > 0:
+                    #         fl[k].append(pre_action_likelihoods[k][-1])
                     
-                    fl = np.array(fl).flatten()
-                    fl_delta = []
-                    executed_recovery_modes = [m for m in data['executed_contacts'] if m != 'turn']
-                    for i in range(len(executed_recovery_modes)):
-                        pre_mode_likelihood = fl[i-1]
-                        post_mode_likelihood = fl[i]
-                        likelihood_delta = post_mode_likelihood - pre_mode_likelihood
-                        fl_delta.append(likelihood_delta)
-                    fl_improvement_bool = np.array(fl_delta) > 0
-                    num_removed = np.sum(~fl_improvement_bool)
-                    if num_removed > 0:
-                        total_num_removed += num_removed
-                        print(f'Num removed: {num_removed}, Total removed: {total_num_removed}')
+                    # fl = np.array(fl).flatten()
+                    # fl_delta = []
+                    # executed_recovery_modes = [m for m in data['executed_contacts'] if m != 'turn']
+                    # for i in range(len(executed_recovery_modes)):
+                    #     pre_mode_likelihood = fl[i-1]
+                    #     post_mode_likelihood = fl[i]
+                    #     likelihood_delta = post_mode_likelihood - pre_mode_likelihood
+                    #     fl_delta.append(likelihood_delta)
+                    # fl_improvement_bool = np.array(fl_delta) > 0
+                    # num_removed = np.sum(~fl_improvement_bool)
+                    # if num_removed > 0:
+                    #     total_num_removed += num_removed
+                    #     print(f'Num removed: {num_removed}, Total removed: {total_num_removed}')
                     
                     # dropped_recovery = False
                     # post_recovery_likelihoods = [i for i in data['final_likelihoods'] if len(i) == 1]
@@ -335,13 +335,13 @@ class AllegroScrewDriverDataset(Dataset):
                             data[t]['plans'] = new_plans.cpu().numpy()
                             data[t]['contact_state'] = new_cs.cpu().numpy()
 
-                        data[t]['starts'] = data[t]['starts'][fl_improvement_bool]
-                        data[t]['plans'] = data[t]['plans'][fl_improvement_bool]
-                        data[t]['contact_state'] = data[t]['contact_state'][fl_improvement_bool]
-                        # if dropped_recovery:
-                        #     data[t]['starts'] = data[t]['starts'][:-1]
-                        #     data[t]['plans'] = data[t]['plans'][:-1]
-                        #     data[t]['contact_state'] = data[t]['contact_state'][:-1]
+                        # data[t]['starts'] = data[t]['starts'][fl_improvement_bool]
+                        # data[t]['plans'] = data[t]['plans'][fl_improvement_bool]
+                        # data[t]['contact_state'] = data[t]['contact_state'][fl_improvement_bool]
+                        if dropped_recovery:
+                            data[t]['starts'] = data[t]['starts'][:-1]
+                            data[t]['plans'] = data[t]['plans'][:-1]
+                            data[t]['contact_state'] = data[t]['contact_state'][:-1]
                         if len(data[t]['starts']) == 0:
                             print('No starts')
                             need_to_continue = True

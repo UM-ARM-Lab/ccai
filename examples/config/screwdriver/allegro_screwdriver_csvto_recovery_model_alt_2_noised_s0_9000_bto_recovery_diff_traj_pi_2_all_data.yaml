@@ -6,9 +6,9 @@ num_steps: 8
 num_turns: 1
 max_recovery_stages: 4
 num_trials: 10
-num_episodes: 25
+num_episodes: 50
 visualize: True
-experiment_name: 'allegro_screwdriver_safe_rl_recovery_damping_.1'
+experiment_name: 'allegro_screwdriver_recovery_model_fixed_rand_pct_pi_2_damping_.1_correct_thresh_all_data_eval'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -18,13 +18,13 @@ friction_coefficient: 1.0
 kp: 3.0
 heuristic: 1000
 max_depth: 11
-goal: -1.5
+goal: -.5
 prior: 1
 multi_particle_search: True
 replan: False
 visualize_plan: False
-visualize_recovery_plan: False
-visualize_contact_plan: False
+visualize_recovery_plan: True
+visualize_contact_plan: True
 optimize_force: True
 exclude_index: False
 projected: False
@@ -52,9 +52,13 @@ task_diffuse_goal: False
 recovery_diff_traj: True
 obj_gravity: True
 type: 'diffusion'
-model_path: '/home/abhinav/Documents/ccai/data/training/allegro_screwdriver/safe_rl/safety_critic.pt'
+OOD_metric: 'likelihood'
+recovery_controller: 'csvgd'
+recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_low_damping_all_data_diffusion'
+model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_low_damping_all_data_diffusion/allegro_screwdriver_diffusion.pt'
+model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion'
 model_path_orig: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion/allegro_screwdriver_diffusion.pt'
-likelihood_threshold: -160.0
+likelihood_threshold: -170.0
 # likelihood_threshold: -1.0
 drop_threshold: -1250
 project_threshold: -105.
@@ -65,11 +69,6 @@ sac_batch_size: 64
 # parity: 654
 start_ind: 0
 end_ind: 50
-device: 'cuda:1'
-recovery_controller: 'mppi'
-OOD_metric: 'q_function'
-lambda_: .01
-q_cutoff: .1
 controllers:
   csvgd:
     # N: 16
@@ -78,6 +77,7 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
+    device: 'cuda:1'
     online_iters: 25
     warmup_iters: 25
     resample_steps: 16

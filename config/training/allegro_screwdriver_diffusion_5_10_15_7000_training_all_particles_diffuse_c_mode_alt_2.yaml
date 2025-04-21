@@ -1,6 +1,6 @@
 ---
-model_name: 'allegro_screwdriver_recovery_all_particles_5_10_15_15000_training_no_downsample_balance_new_projection_cpc_cost_diffuse_c_mode_alt_2'
-T: 5
+model_name: 'allegro_screwdriver_recovery_pi_2_low_damping_all_data_all_particles'
+T: 4
 dx: 15
 du: 21
 load_checkpoint: False
@@ -18,7 +18,7 @@ lr: 1.0e-4
 model_type: 'diffusion'
 discriminator_guidance: True
 inverse_dynamics: False
-data_directory: 'allegro_screwdriver_recovery_data_5_10_15_new_projection_cpc_cost'
+data_directory: 'allegro_screwdriver_recovery_data_rand_pct_.33_1.5_N_pi_2_9000_170_thresh_low_budget_perturb_during_recovery_damping_.1'
 device: 'cuda:1'
 test_every: 9999999999
 save_every: 500
@@ -33,6 +33,7 @@ sine_cosine: True
 use_class: True
 diffuse_class: True
 trajectory_condition: True
+true_s0: False
 best_traj_only: False
 context_dropout_p: .25
 # Only applies to using EMA for training
