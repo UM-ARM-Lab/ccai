@@ -223,9 +223,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         }
     else:
         min_force_dict = {
-            'thumb': .75,
-            'middle': .75,
-            'index': .75,
+            'thumb': 1,
+            'middle': 1,
+            'index': 1,
         }
 
     # if params.get('compute_recovery_trajectory', False):

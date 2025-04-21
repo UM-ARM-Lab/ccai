@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 720
 visualize: True
-experiment_name: 'allegro_valve_task_data_friction_0.15_pi_5x2_.0875_valve_random_obj_rob_start_.125_fric_pregrasp_T_3_min_force_.75'
+experiment_name: 'allegro_valve_task_data_friction_0.125_pi_5x2_.1_valve_random_obj_rob_start_.125_fric_pregrasp_T_3_min_force_1'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -57,8 +57,8 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
-start_ind: 1400
-end_ind: 1600
+start_ind: 600
+end_ind: 800
 recovery_controller: 'csvgd'
 controllers:
   csvgd:
