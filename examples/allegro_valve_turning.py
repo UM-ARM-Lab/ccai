@@ -117,7 +117,7 @@ class AllegroValve(AllegroManipulationProblem):
                  object_asset_pos,
                  regrasp_fingers=[],
                  contact_fingers=['index', 'middle', 'ring', 'thumb'],
-                 friction_coefficient=0.95,
+                 friction_coefficient=0.95*.1,
                 #  friction_coefficient=0.5,
                 #  friction_coefficient=1000,
                  obj_dof=1,
@@ -236,11 +236,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     pregrasp_params = copy.deepcopy(params)
     pregrasp_params['warmup_iters'] = 80
 
-    start[-4:] = 0
     pregrasp_problem = AllegroValve(
         start=start[:4 * num_fingers + obj_dof],
-        goal=goal_pregrasp,
-        T=3,
+        goal=start[-obj_dof:],
+        T=2,
         chain=pregrasp_params['chain'],
         device=pregrasp_params['device'],
         object_asset_pos=env.obj_pose,
@@ -874,7 +873,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 rand_pct = 1
                 if np.random.rand() < rand_pct:
                     r = np.random.rand()
-                    std = .1 if perturb_this_trial else .0
+                    std = .05 if perturb_this_trial else .0
                     # if mode != 'turn':
                     #     std /= 4
                     # if r > .66:

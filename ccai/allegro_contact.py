@@ -1225,7 +1225,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         eps = torch.zeros_like(h)
         # eps[:, :-1] = 5e-3
         if self.object_type == 'valve':
-            eps[:, :-1] = 1e-2
+            eps[:, :-1] = 1.5e-2
         else:
             eps[:, :-1] = 1.5e-2
             # eps[:, :-1] = .5e-2
