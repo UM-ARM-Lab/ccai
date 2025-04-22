@@ -63,7 +63,7 @@ print("CCAI_PATH", CCAI_PATH)
 obj_dof = 1
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
-# sys.stdout = open('./examples/logs/allegro_valve_no_recovery.log', 'w', buffering=1)
+# sys.stdout = open('./examples/logs/allegro_valve_recovery_data_gen_thresh_40.log', 'w', buffering=1)
 
 def vector_cos(a, b):
     return torch.dot(a.reshape(-1), b.reshape(-1)) / (torch.norm(a.reshape(-1)) * torch.norm(b.reshape(-1)))
@@ -281,6 +281,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         project=False,
     )
 
+    all_regrasp_planner = None
     index_regrasp_planner = None
     middle_regrasp_planner = None
     thumb_regrasp_planner = None
@@ -538,6 +539,31 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     project=True,
                 )
                 planner = PositionControlConstrainedSVGDMPC(thumb_regrasp_problem, recovery_params)
+                
+            elif mode == 'all' and planner is None:
+                all_regrasp_problem = AllegroValve(
+                    start=state[:4 * num_fingers + obj_dof],
+                    goal=goal,
+                    T=params['T'],
+                    chain=params['chain'],
+                    device=params['device'],
+                    object_asset_pos=env.obj_pose,
+                    object_location=params['object_location'],
+                    object_type=params['object_type'],
+                    world_trans=env.world_trans,
+                    contact_fingers=[],
+                    regrasp_fingers=['index', 'middle', 'thumb'],
+                    obj_dof=obj_dof,
+                    obj_joint_dim=1,
+                    optimize_force=params['optimize_force'],
+                    default_dof_pos=env.default_dof_pos[:, :16],
+                    obj_gravity=params.get('obj_gravity', False),
+                    min_force_dict=min_force_dict,
+                    full_dof_goal=True,
+                    proj_path=None,
+                    project=True,
+                )
+                planner = PositionControlConstrainedSVGDMPC(all_regrasp_problem, recovery_params)
             elif mode == 'turn' and planner is None:
                 tp = AllegroValve(
                     start=state[:4 * num_fingers + obj_dof],
@@ -574,7 +600,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # generate initial samples with diffusion model
         sim_rollouts = None
         initial_samples_0 = None
-        new_T = params['T'] if (mode in ['index', 'thumb', 'middle']) else params['T_orig']
+        new_T = params['T'] if (mode in ['index', 'thumb', 'middle', 'all']) else params['T_orig']
         # if trajectory_sampler is not None and params.get('diff_init', True) and initial_samples is None:
         if not skip_diff_init and trajectory_sampler is not None and params.get('diff_init', True) and initial_samples is None and (not params.get('model_path_orig', None) or not recover) and (not (mode != 'turn' and not params.get('live_recovery'))):
 
@@ -1001,7 +1027,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                               traj[..., -6:]), dim=-1)
         if mode == 'thumb_middle':
             traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 6).to(device=params['device'])), dim=-1)
-        if mode == 'pregrasp':
+        if mode == 'pregrasp' or mode == 'all':
             traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 9).to(device=params['device'])), dim=-1)
         if mode == 'thumb':
             traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 3).to(device=params['device'])), dim=-1)
@@ -1015,7 +1041,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             traj = torch.cat((traj[..., :-9], traj[..., -6:]), dim=-1)
         if mode == 'thumb_middle':
             traj = traj[..., :-6]
-        if mode == 'pregrasp':
+        if mode == 'pregrasp' or mode == 'all':
             traj = traj[..., :-9]
         if mode == 'thumb':
             traj = traj[..., :-3]
@@ -1139,6 +1165,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         plan_time = 0
         start_plan_time = time.perf_counter()
         distances = []
+        # modes = ['all', 'index', 'middle', 'thumb']
         modes = ['index', 'middle', 'thumb']
         # modes = ['thumb_middle', 'index', 'turn']
         # modes = ['thumb_middle', 'index']
@@ -1361,7 +1388,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         torch.cuda.empty_cache()
 
         contact_state_dict = {
-            'pregrasp': torch.tensor([0.0, 0.0, 0.0]),
+            'all': torch.tensor([0.0, 0.0, 0.0]),
             'index': torch.tensor([0.0, 1.0, 1.0]),
             'thumb_middle': torch.tensor([1.0, 0.0, 0.0]),
             'turn': torch.tensor([1.0, 1.0, 1.0]),
@@ -1448,6 +1475,26 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                             dim=-1) for plan in plans]
             traj = torch.cat((traj[..., :-3], torch.zeros(*traj.shape[:-1], 3).to(device=params['device']),
                             traj[..., -3:]), dim=-1)
+
+        elif contact == 'all':
+            _goal = None
+            if params.get('model_path_orig', None):
+                _goal = goal_config
+            result = execute_traj(
+                all_regrasp_planner, mode='all', goal=_goal, 
+                fname=f'all_regrasp_{all_stage}', initial_samples=initial_samples, 
+                recover=recover, start_timestep=start_timestep, max_timesteps=max_timesteps)
+            state = env.get_state()
+            state = state['q'].reshape(-1, FULL_DOF)[0].to(device=params['device'])
+
+            traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
+
+            plans = [torch.cat((plan,
+                                torch.zeros(*plan.shape[:-1], 9).to(device=params['device']),
+                                ),
+                            dim=-1) for plan in plans]
+            traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 9).to(device=params['device']),
+                            ), dim=-1)
 
         elif contact == 'turn':
             _goal = torch.tensor([state[-1] - np.pi/4]).to(device=params['device'])
@@ -1541,8 +1588,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             # Project the state back into distribution if we are computing recovery trajectories
             pre_project_time = time.perf_counter()
             projected_samples, _, _, _, (all_losses, all_samples, all_likelihoods) = trajectory_sampler_orig.sample(
-                16, H=trajectory_sampler_orig.T, start=start_sine_cosine.reshape(1, -1), project=True,
-                constraints=torch.ones(16, 3).to(device=params['device'])
+                8, H=trajectory_sampler_orig.T, start=start_sine_cosine.reshape(1, -1), project=True,
+                constraints=torch.ones(8, 3).to(device=params['device'])
             )
             data['project_times'].append(time.perf_counter() - pre_project_time)
             print('Final likelihood:', all_likelihoods[-1])
@@ -1631,8 +1678,34 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     project=True,
                 )
                 thumb_regrasp_planner = PositionControlConstrainedSVGDMPC(thumb_regrasp_problem, params_for_recovery)
+                
+            if all_regrasp_planner is None:
+                all_regrasp_problem = AllegroValve(
+                    start=state[:4 * num_fingers + obj_dof],
+                    goal=goal,
+                    T=params['T'],
+                    chain=params['chain'],
+                    device=params['device'],
+                    object_asset_pos=env.obj_pose,
+                    object_location=params['object_location'],
+                    object_type=params['object_type'],
+                    world_trans=env.world_trans,
+                    contact_fingers=[],
+                    regrasp_fingers=['index', 'middle', 'thumb'],
+                    obj_dof=obj_dof,
+                    obj_joint_dim=1,
+                    optimize_force=params['optimize_force'],
+                    default_dof_pos=env.default_dof_pos[:, :16],
+                    obj_gravity=params.get('obj_gravity', False),
+                    min_force_dict=min_force_dict,
+                    full_dof_goal=True,
+                    proj_path=None,
+                    project=True,
+                )
+                all_regrasp_planner = PositionControlConstrainedSVGDMPC(all_regrasp_problem, params_for_recovery)
 
             mode_planner_dict = {
+                'all': all_regrasp_planner,
                 'index': index_regrasp_planner,
                 'middle': middle_regrasp_planner,
                 'thumb': thumb_regrasp_planner,
@@ -1640,9 +1713,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             index_regrasp_planner.reset(start, goal=goal)
             middle_regrasp_planner.reset(start, goal=goal)
             thumb_regrasp_planner.reset(start, goal=goal)
-            # turn_planner.reset(start, goal=goal)
-            # thumb_regrasp_planner.reset(start, goal=goal)
-            # middle_regrasp_planner.reset(start, goal=goal)
+            all_regrasp_planner.reset(start, goal=goal)
+
             print('New goal:', goal)
 
             if torch.allclose(start, goal):
@@ -1710,9 +1782,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/{sys.argv[1]}.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/{sys.argv[1]}.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_only.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_recovery_data_gen.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_recovery_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_safe_rl_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_safe_rl_recovery.yaml').read_text())

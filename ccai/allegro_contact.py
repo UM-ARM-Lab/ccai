@@ -865,7 +865,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.contact_points_rob_link = []
 
             for finger in self.regrasp_fingers:
-                rad = .0025 if self.object_type == 'screwdriver' else .0025
+                rad = .0025 if self.object_type == 'screwdriver' else .001
                 self.contact_points[finger] = (self.data[finger]['closest_obj_pt_object'].clone().detach(), rad)
                 self.contact_points_rob_link.append(self.data[finger]['closest_rob_pt_link'].clone().detach())
             self.contact_points_rob_link = torch.cat(self.contact_points_rob_link, dim=0)
@@ -1026,7 +1026,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             self.contact_points_rob_link = []
 
             for finger in self.regrasp_fingers:
-                rad = .0025 if self.object_type == 'screwdriver' else .0025
+                rad = .0025 if self.object_type == 'screwdriver' else .001
                 self.contact_points[finger] = (self.data[finger]['closest_obj_pt_object'].clone().detach(), rad)
                 self.contact_points_rob_link.append(self.data[finger]['closest_rob_pt_link'].clone().detach())
             self.contact_points_rob_link = torch.cat(self.contact_points_rob_link, dim=0)
@@ -1225,7 +1225,11 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         eps = torch.zeros_like(h)
         # eps[:, :-1] = 5e-3
         if self.object_type == 'valve':
+<<<<<<< HEAD
             eps[:, :-1] = 1.5e-2
+=======
+            eps[:, :-1] = 1.25e-2
+>>>>>>> a2b919f2 (valve cpc tuning, optional all regrasp recovery mode)
         else:
             eps[:, :-1] = 1.5e-2
             # eps[:, :-1] = .5e-2
@@ -1335,7 +1339,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                                                                             compute_hess=compute_hess,
                                                                             projected_diffusion=projected_diffusion)
         
-        if len(self.regrasp_fingers) != 3 and self.do_contact_patch_constraint:
+        if self.do_contact_patch_constraint:
             h_patch, grad_h_contact, hess_h_contact, t_mask_contact_patch = self._contact_patch_constraint(xu=xu.reshape(N, T, -1)[:, :, :self.dx + self.du],
                                                                                     compute_grads=compute_grads,
                                                                                     compute_hess=compute_hess,
