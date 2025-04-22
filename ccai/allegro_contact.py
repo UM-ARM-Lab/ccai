@@ -1225,11 +1225,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         eps = torch.zeros_like(h)
         # eps[:, :-1] = 5e-3
         if self.object_type == 'valve':
-<<<<<<< HEAD
-            eps[:, :-1] = 1.5e-2
-=======
             eps[:, :-1] = 1.25e-2
->>>>>>> a2b919f2 (valve cpc tuning, optional all regrasp recovery mode)
         else:
             eps[:, :-1] = 1.5e-2
             # eps[:, :-1] = .5e-2
