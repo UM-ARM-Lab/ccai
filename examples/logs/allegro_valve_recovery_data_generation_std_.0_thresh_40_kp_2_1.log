@@ -1,0 +1,48 @@
+Importing module 'gym_38' (/home/abhinav/Documents/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Documents/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.1+cu121
+Device count 2
+/home/abhinav/Documents/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+No ROS install found, continuing
+CCAI_PATH /home/abhinav/Documents/ccai
+robot pose [ 0.02  -0.35   0.376] [0, 0, 0.7071068, 0.7071068]
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(35, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(35, 128), (128, 256), (256, 512)]
+
+Trial 3501
+No action perturbation this trial
+Loaded trajectory sampler
+Current yaw: tensor([-0.6999], device='cuda:0')
+Current yaw: tensor([-0.6999], device='cuda:0')
+1 turn
+Likelihood: -27.95777130126953
+Sampling time 3.660182705963962
+tensor([ 0.3023,  0.6262,  0.7166,  0.8731, -0.0192,  0.2727,  0.9051,  0.7284,
+         1.2755,  0.0998,  0.3611,  0.3451, -0.6999], device='cuda:0')
+Solve time for step 1 (global step 0) 5.991041800007224
+Current ori: tensor(-0.6999, device='cuda:0')
+Middle force: tensor([3.1051, 1.2672, 0.7181, 1.0910, 1.0929, 1.2887], device='cuda:0')
+Thumb force: tensor([1.6493, 0.6361, 1.5121, 0.2995, 0.3287, 0.6219], device='cuda:0')
+Index force: tensor([0.7373, 1.3634, 2.3641, 1.0763, 1.0707, 1.2466], device='cuda:0')
+tensor([ 0.2200,  0.7104,  0.3661,  1.1731, -0.0021,  0.3071,  0.9416,  0.7934,
+         1.3343, -0.1050,  0.5809,  0.0066, -0.5070], device='cuda:0')
+Likelihood: -88.51824951171875
+State is out of distribution
+Final likelihood: tensor([-0.8130, -0.8400, -0.8416, -0.8763, -1.0419, -1.2575, -1.3658, -2.2224],
+       device='cuda:0', grad_fn=<IndexBackward0>)
+Final likelihood: tensor([-0.8130, -0.8400, -0.8416, -0.8763, -1.0419, -1.2575, -1.3658, -2.2224],
+       device='cuda:0', grad_fn=<IndexBackward0>)
+1 mode projection succeeded
+New goal: tensor([ 0.2847,  0.6552,  0.7456,  0.8264, -0.0076,  0.1991,  0.9998,  0.7124,
+         1.2968,  0.0799,  0.4032,  0.3555, -0.1101], device='cuda:0')
+Likelihood: -105.18482971191406
+Likelihood: -80.57061767578125

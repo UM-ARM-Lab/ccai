@@ -499,6 +499,7 @@ class AllegroScrewDriverDataset(Dataset):
             final_yaw = self.trajectories[:, -1, 12]
             initial_yaw = self.trajectories[:, 0, 12]
             yaw_change = final_yaw - initial_yaw
+            
             bad_turn = yaw_change > -np.pi/8
             self.trajectories = self.trajectories[~bad_turn]
             self.masks = self.masks[~bad_turn]
@@ -511,7 +512,7 @@ class AllegroScrewDriverDataset(Dataset):
             print('Average yaw change:', yaw_change.mean())     
             yaw_for_plot = initial_yaw.cpu().numpy()
             plt.hist(yaw_for_plot, bins=100)
-            plt.title('Final Yaw')
+            plt.title('Yaw Change')
             plt.xlabel('Yaw')
             plt.ylabel('Count')
             plt.show()

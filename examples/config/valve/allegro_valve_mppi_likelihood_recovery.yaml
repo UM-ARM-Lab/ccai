@@ -1,14 +1,14 @@
 ---
 T: 3
-T_orig: 6
+T_orig: 12
 receding_horizon: False
 num_steps: 8
 num_turns: 1
 max_recovery_stages: 4
 num_trials: 10
-num_episodes: 200
+num_episodes: 25
 visualize: True
-experiment_name: 'allegro_valve_recovery_data_generation_std_.0_thresh_60'
+experiment_name: 'allegro_valve_likelihood_mppi_recovery'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -24,7 +24,7 @@ multi_particle_search: True
 replan: False
 visualize_plan: False
 visualize_recovery_plan: False
-visualize_contact_plan: True
+visualize_contact_plan: False
 optimize_force: True
 exclude_index: False
 projected: False
@@ -46,12 +46,17 @@ viz_states: False
 diff_init: True
 live_recovery: True
 new_projection: True
-task_diffuse_goal: True
+trajectory_condition: True
+generate_context: True
+true_s0: False
+task_diffuse_goal: False
+recovery_diff_traj: True
 obj_gravity: True
 type: 'diffusion'
 model_path: 'data/training/allegro_screwdriver/allegro_short_valve_task_low_friction_diffusion/allegro_screwdriver_diffusion.pt'
-model_dir: 'data/training/allegro_screwdriver/allegro_short_valve_task_low_friction_diffusion'
-likelihood_threshold: -60.0
+model_path_orig: 'data/training/allegro_screwdriver/allegro_short_valve_task_low_friction_diffusion/allegro_screwdriver_diffusion.pt'
+likelihood_threshold: -50.0
+# likelihood_threshold: -1.0
 drop_threshold: -1250
 project_threshold: -105.
 sac_batch_size: 64
@@ -59,15 +64,18 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
+start_ind: 0
+end_ind: 50
+device: 'cuda:0'
+recovery_controller: 'mppi'
 OOD_metric: 'likelihood'
-recovery_controller: 'csvgd'
-start_ind: 6000
-end_ind: 6250
+lambda_: .3
+q_cutoff: .1
 controllers:
   csvgd:
     # N: 16
     N: 16
-    alpha_J: 5.0e-3
+    alpha_J: 1.0e-2
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
@@ -78,5 +86,4 @@ controllers:
     resample_temperature: 0.1
     penalty: 1000000
     collision_checking: False
-    random_init_every_iter: False
-    device: 'cuda:1'
+    joint_friction: 0.0

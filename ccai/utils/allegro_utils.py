@@ -9,6 +9,15 @@ import time
 
 full_finger_list = ['index', 'middle', 'ring', 'thumb']
 
+def get_model_input_state(state, env, obj_dof):
+    all_idx = []
+    for finger in ['index', 'middle', 'thumb']:
+        this_finger_idx = env.finger_to_joint_index[finger]
+        all_idx += this_finger_idx
+    finger_states = state[..., all_idx]
+    obj_state = state[..., 16:16 + obj_dof]
+    return torch.cat((finger_states, obj_state), dim=-1)
+
 def get_arm_dof(arm_type):
     if arm_type == 'robot':
         arm_dof = 7
@@ -250,29 +259,32 @@ def euler_diff(euler1, euler2, representation='XYZ'):
     diff = tf.so3_relative_angle(torch.tensor(ori1_mat), torch.tensor(ori2_mat), cos_angle=False).detach().cpu()
     return diff
 
-def convert_yaw_to_sine_cosine(xu):
+def convert_yaw_to_sine_cosine(xu, yaw_idx=14):
     """
     xu is shape (N, T, 36)
     Replace the yaw in xu with sine and cosine and return the new xu
     """
-    yaw = xu[..., 14]
+    yawp1 = yaw_idx + 1
+    yaw = xu[..., yaw_idx]
     sine = torch.sin(yaw)
     cosine = torch.cos(yaw)
-    xu_new = torch.cat([xu[..., :14], cosine.unsqueeze(-1), sine.unsqueeze(-1), xu[..., 15:]], dim=-1)
+    xu_new = torch.cat([xu[..., :yaw_idx], cosine.unsqueeze(-1), sine.unsqueeze(-1), xu[..., yawp1:]], dim=-1)
     return xu_new
 
-def convert_sine_cosine_to_yaw(xu):
+def convert_sine_cosine_to_yaw(xu, yaw_idx=14):
     """
     xu is shape (N, T, 37)
     Replace the sine and cosine in xu with yaw and return the new xu
     """
+    yawp1 = yaw_idx + 1
+    yawp2 = yaw_idx + 2
     orig_type = torch.is_tensor(xu)
     if not orig_type:
         xu = torch.tensor(xu)
-    sine = xu[..., 15]
-    cosine = xu[..., 14]
+    sine = xu[..., yawp1]
+    cosine = xu[..., yaw_idx]
     yaw = torch.atan2(sine, cosine)
-    xu_new = torch.cat([xu[..., :14], yaw.unsqueeze(-1), xu[..., 16:]], dim=-1)
+    xu_new = torch.cat([xu[..., :yaw_idx], yaw.unsqueeze(-1), xu[..., yawp2:]], dim=-1)
     if not orig_type:
         xu_new = xu_new.numpy()
     return xu_new

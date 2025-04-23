@@ -1,17 +1,10 @@
 import torch
 import numpy as np
-from ccai.utils.allegro_utils import get_screwdriver_top_in_world, convert_sine_cosine_to_yaw, convert_yaw_to_sine_cosine
+from ccai.utils.allegro_utils import get_screwdriver_top_in_world, convert_sine_cosine_to_yaw, convert_yaw_to_sine_cosine, get_model_input_state
 
 from ccai.recovery_rl.recovery_rl.model import QNetworkConstraint
 
-def get_model_input_state(state, env, obj_dof):
-    all_idx = []
-    for finger in ['index', 'middle', 'thumb']:
-        this_finger_idx = env.finger_to_joint_index[finger]
-        all_idx += this_finger_idx
-    finger_states = state[..., all_idx]
-    obj_state = state[..., 16:16 + obj_dof]
-    return torch.cat((finger_states, obj_state), dim=-1)
+
 class RunningCostSafeRL:
     def __init__(self, path, cutoff, env, device, include_velocity=False, cosine_sine=True):
         # self.start = start

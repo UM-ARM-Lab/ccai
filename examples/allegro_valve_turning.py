@@ -63,7 +63,7 @@ print("CCAI_PATH", CCAI_PATH)
 obj_dof = 1
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
-# sys.stdout = open('./examples/logs/allegro_valve_recovery_data_gen_thresh_40.log', 'w', buffering=1)
+# sys.stdout = open('./examples/logs/allegro_valve_recovery_data_gen_.1_len_thresh_40.log', 'w', buffering=1)
 
 def vector_cos(a, b):
     return torch.dot(a.reshape(-1), b.reshape(-1)) / (torch.norm(a.reshape(-1)) * torch.norm(b.reshape(-1)))
@@ -206,7 +206,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     if params.get('external_wrench_perturb', False):
         rand_pct = (np.random.rand()) / 3
         print(f'Random perturbation %: {rand_pct:.2f}')
-
+        
+    mppi_ctrl = None
     # index finger is used for stability
     if 'index' in params['fingers']:
         fingers = params['fingers']
@@ -314,7 +315,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     info_list = []
     
     def execute_traj(planner, mode, goal=None, fname=None, initial_samples=None, recover=False, 
-                     start_timestep=0, max_timesteps=None):
+                     start_timestep=0, max_timesteps=None, ctrl=None, mppi_warmup=False):
         """
         Execute a trajectory with the given planner and mode.
         
@@ -376,7 +377,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         elif not params.get('live_recovery', False):
             id_check, final_likelihood = True, None
         else:
-            id_check, final_likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15), yaw_idx=12, obj_dof=obj_dof)
+            if params['OOD_metric'] == 'likelihood':
+                id_check, final_likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15), yaw_idx=12)
+            elif params['OOD_metric'] == 'q_function':
+                id_check = True
+                final_likelihood = None
         if final_likelihood is not None:
             data['pre_action_likelihoods'][-1].append(final_likelihood)
 
@@ -458,10 +463,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         skip_diff_init = False
         planner_returns_action = False
         if 'mppi' in params['recovery_controller'] and recover:
-            ctrl = MPPI(dynamics=dynamics, running_cost=running_cost, terminal_state_cost=terminal_cost, nx=nx, noise_sigma=noise_sigma, 
-                        num_samples=500, horizon=2, lambda_=.01, u_min=u_min, u_max=u_max,
-                        device=params['device'])
-            planner = MPPIPlanner(ctrl, 12, params['T'])
+            planner = MPPIPlanner(ctrl, 12, params['T'], warmup=mppi_warmup)
             skip_diff_init = True
             planner_returns_action = True
         else:
@@ -1497,6 +1499,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                             ), dim=-1)
 
         elif contact == 'turn':
+            mppi_ctrl = None
             _goal = torch.tensor([state[-1] - np.pi/4]).to(device=params['device'])
             # _goal = torch.tensor([0.]).to(device=params['device'])
                 
@@ -1515,9 +1518,15 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
         
         elif contact == 'mppi':
+            if mppi_ctrl is None:
+                mppi_ctrl = MPPI(dynamics=dynamics, running_cost=running_cost, terminal_state_cost=terminal_cost, nx=nx, noise_sigma=noise_sigma, 
+                            num_samples=50, horizon=params['T'], lambda_=params['lambda_'], u_min=u_min, u_max=u_max,
+                            device=params['device'])
+                mppi_needs_warmup = True
             result = execute_traj(
                 None, mode='mppi', goal=None, fname=f'mppi_{all_stage}', initial_samples=initial_samples,
-                recover=recover)
+                recover=recover, ctrl=mppi_ctrl, mppi_warmup=mppi_needs_warmup)
+            mppi_needs_warmup = False
            
         # done = False
         add = not recover or params['live_recovery']
@@ -1588,8 +1597,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             # Project the state back into distribution if we are computing recovery trajectories
             pre_project_time = time.perf_counter()
             projected_samples, _, _, _, (all_losses, all_samples, all_likelihoods) = trajectory_sampler_orig.sample(
-                8, H=trajectory_sampler_orig.T, start=start_sine_cosine.reshape(1, -1), project=True,
-                constraints=torch.ones(8, 3).to(device=params['device'])
+                2, H=trajectory_sampler_orig.T, start=start_sine_cosine.reshape(1, -1), project=True,
+                constraints=torch.ones(2, 3).to(device=params['device'])
             )
             data['project_times'].append(time.perf_counter() - pre_project_time)
             print('Final likelihood:', all_likelihoods[-1])
@@ -1758,7 +1767,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         if done:
             break
-    if params.get('live_recovery', False) and len(data['final_likelihoods'][-1]) == 0:
+    if params.get('live_recovery', False) and len(data['final_likelihoods'][-1]) == 0 and params['recovery_controller'] != 'mppi':
         id, likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15), yaw_idx=12, obj_dof=obj_dof)
         data['final_likelihoods'][-1].append(likelihood)
         data_save = deepcopy(data)
@@ -1782,10 +1791,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/{sys.argv[1]}.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/{sys.argv[1]}.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_only.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_recovery_data_gen.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_recovery_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_safe_rl_data_gen.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_mppi_likelihood_recovery.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_safe_rl_recovery.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl_data_gen_wrench_perturb.yaml').read_text())
@@ -1854,7 +1864,7 @@ if __name__ == "__main__":
         if not config['visualize']:
             img_save_dir = None
 
-        num_envs = 500 if 'mppi' in config['recovery_controller'] else 1
+        num_envs = 50 if 'mppi' in config['recovery_controller'] else 1
         env = AllegroValveTurningEnv(num_envs, control_mode='joint_impedance',
                                            use_cartesian_controller=False,
                                            viewer=config['visualize'],
@@ -1975,7 +1985,7 @@ if __name__ == "__main__":
             trajectory_sampler.model.diffusion_model.subsampled_t = '5_10_15' in config['experiment_name']
             trajectory_sampler.model.diffusion_model.classifier = None
             
-            trajectory_sampler.model.diffusion_model.cutoff_timesteps = 128
+            trajectory_sampler.model.diffusion_model.cutoff_timesteps = 64
 
             return trajectory_sampler
         
@@ -1989,15 +1999,19 @@ if __name__ == "__main__":
             trajectory_sampler_orig = trajectory_sampler
 
         if config['recovery_controller'] == 'mppi':
-            dynamics = DynamicsModel(env, num_fingers=len(config['fingers']), include_velocity=True, obj_joint_dim=1, hardware=False)
+            dynamics = DynamicsModel(env, num_fingers=len(config['fingers']), include_velocity=True, obj_joint_dim=0, hardware=False)
             safety_critic_path = config['model_path']
-            running_cost = RunningCostSafeRL(safety_critic_path, env, config['device'], include_velocity=True)
-            terminal_cost = None
-            # running_cost = lambda x, y: 0
-            # terminal_cost = TerminalCostDiffusionLikelihood(trajectory_sampler_orig, env, config['device'])
+            if params['OOD_metric'] == 'q_function':
+                running_cost = RunningCostSafeRL(safety_critic_path, params['q_cutoff'], env, config['device'], include_velocity=True)
+                terminal_cost = None
+            elif params['OOD_metric'] == 'likelihood':
+                running_cost = lambda x, y: 0
+                terminal_cost = TerminalCostDiffusionLikelihood(trajectory_sampler_orig, env, config['device'])
+            else:
+                raise ValueError('Invalid OOD metric')
             u_max = torch.ones(4 * len(config['fingers'])) * np.pi / 5 
             u_min = - torch.ones(4 * len(config['fingers'])) * np.pi / 5
-            noise_sigma = torch.eye(4 * len(config['fingers'])).to(config['device']) * .005
+            noise_sigma = torch.eye(4 * len(config['fingers'])).to(config['device']) * .01
 
 
     start_ind = config.get('start_ind', 0)

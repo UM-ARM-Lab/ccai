@@ -69,7 +69,7 @@ sac_batch_size: 64
 # project_threshold: -90
 # parity: 654
 start_ind: 0
-end_ind: 50
+end_ind: 25
 controllers:
   csvgd:
     # N: 16

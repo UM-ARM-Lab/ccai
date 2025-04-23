@@ -1,0 +1,579 @@
+Importing module 'gym_38' (/home/abhinav/Documents/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/abhinav/Documents/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.4.1+cu121
+Device count 2
+/home/abhinav/Documents/isaacgym/python/isaacgym/_bindings/src/gymtorch
+ninja: no work to do.
+No ROS install found, continuing
+CCAI_PATH /home/abhinav/Documents/ccai
+robot pose [ 0.02  -0.35   0.376] [0, 0, 0.7071068, 0.7071068]
+Not connected to PVD
+Physics Engine: PhysX
+Physics Device: cpu
+GPU Pipeline: disabled
+Using VHACD cache directory '/home/abhinav/.isaacgym/vhacd'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/base_ns.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/allegro/link_1.0.stl'
+Found existing convex decomposition for mesh '/home/abhinav/Documents/github/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/mesh/ft_c.stl'
+[ models/temporal ] Channel dimensions: [(35, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(35, 128), (128, 256), (256, 512)]
+
+Trial 4501
+No action perturbation this trial
+Loaded trajectory sampler
+Current yaw: tensor([0.7512], device='cuda:1')
+Current yaw: tensor([0.7513], device='cuda:1')
+1 turn
+Likelihood: -32.15317153930664
+Sampling time 4.226335937040858
+tensor([ 0.3017,  0.4979,  0.7540,  0.7953, -0.0203,  0.2275,  0.9185,  0.6791,
+         1.2464,  0.1012,  0.3387,  0.3786,  0.7513], device='cuda:1')
+Solve time for step 1 (global step 0) 5.895181481959298
+Current ori: tensor(0.7513, device='cuda:1')
+Middle force: tensor([2.5899, 2.6311, 1.2078, 1.7523, 2.1087, 3.2873], device='cuda:1')
+Thumb force: tensor([0.3132, 0.2395, 0.9317, 0.4214, 0.1124, 1.0764], device='cuda:1')
+Index force: tensor([1.4434, 1.4827, 1.6679, 1.7674, 1.1833, 1.4510], device='cuda:1')
+tensor([0.3131, 0.5176, 0.7475, 0.8056, 0.0467, 0.2358, 0.9506, 0.6577, 1.2953,
+        0.0417, 0.2498, 0.5263, 0.7514], device='cuda:1')
+Likelihood: -45.484825134277344
+State is out of distribution
+Final likelihood: tensor([-0.8611, -0.9574, -0.9900, -1.0835, -1.1139, -1.1615, -1.2294, -1.7370],
+       device='cuda:1', grad_fn=<IndexBackward0>)
+Final likelihood: tensor([-0.8611, -0.9574, -0.9900, -1.0835, -1.1139, -1.1615, -1.2294, -1.7370],
+       device='cuda:1', grad_fn=<IndexBackward0>)
+1 mode projection succeeded
+New goal: tensor([ 0.2480,  0.6284,  0.6411,  0.8645, -0.0711,  0.1880,  1.0207,  0.7148,
+         1.2828,  0.1150,  0.4338,  0.2907,  0.0508], device='cuda:1')
+Likelihood: -110.18753051757812
+Likelihood: -104.37438201904297
+Likelihood: -92.89678955078125
+Likelihood: -63.06884002685547
+{'all': 110.18753051757812,
+ 'index': 104.37438201904297,
+ 'middle': 92.89678955078125,
+ 'thumb': 63.06884002685547}
+Plan time: 81.46442736301105
+Current yaw: tensor([0.7514], device='cuda:1')
+2 thumb
+tensor([0.3132, 0.5178, 0.7475, 0.8057, 0.0471, 0.2354, 0.9507, 0.6577, 1.2955,
+        0.0416, 0.2496, 0.5267, 0.7514], device='cuda:1')
+Solve time for step 1 (global step 1) 0.32513941708020866
+Current ori: tensor(0.7514, device='cuda:1')
+Index force: tensor([1.4208, 1.0555, 1.2824], device='cuda:1')
+Middle force: tensor([1.4208, 1.0555, 1.2824], device='cuda:1')
+tensor([0.3087, 0.5247, 0.7346, 0.7941, 0.0698, 0.2278, 1.0245, 0.5855, 1.2281,
+        0.0058, 0.2098, 0.3684, 0.7515], device='cuda:1')
+Solve time for step 2 (global step 2) 4.697878688923083
+Current ori: tensor(0.7515, device='cuda:1')
+Index force: tensor([1.0465, 1.2483], device='cuda:1')
+Middle force: tensor([1.0465, 1.2483], device='cuda:1')
+tensor([ 0.3243,  0.5726,  0.7082,  0.8153,  0.0728,  0.2630,  0.9576,  0.6427,
+         1.1591, -0.0099,  0.3312,  0.2560,  0.7515], device='cuda:1')
+Solve time for step 3 (global step 3) 4.206074528046884
+Current ori: tensor(0.7515, device='cuda:1')
+Index force: tensor([1.1704], device='cuda:1')
+Middle force: tensor([1.1704], device='cuda:1')
+Current yaw: tensor([0.7515], device='cuda:1')
+3 turn
+Likelihood: -67.29888916015625
+State is out of distribution
+Final likelihood: tensor([-0.7292, -0.7720, -0.9762, -1.0024, -1.0131, -1.2707, -1.3409, -1.3861],
+       device='cuda:1', grad_fn=<IndexBackward0>)
+Final likelihood: tensor([-0.7292, -0.7720, -0.9762, -1.0024, -1.0131, -1.2707, -1.3409, -1.3861],
+       device='cuda:1', grad_fn=<IndexBackward0>)
+1 mode projection succeeded
+New goal: tensor([ 0.2972,  0.5873,  0.7676,  0.8714, -0.0432,  0.2658,  0.9939,  0.8163,
+         1.2936,  0.1050,  0.4233,  0.2920, -0.0213], device='cuda:1')
+Likelihood: -111.36715698242188
+Likelihood: -60.0904541015625
+Likelihood: -100.6705093383789
+Likelihood: -81.11781311035156
+{'all': 111.36715698242188,
+ 'index': 60.0904541015625,
+ 'middle': 100.6705093383789,
+ 'thumb': 81.11781311035156}
+Plan time: 83.85865673201624
+Current yaw: tensor([0.7515], device='cuda:1')
+4 index
+tensor([ 0.3311,  0.5961,  0.7250,  0.7799,  0.0830,  0.2825,  0.9555,  0.6263,
+         1.1388, -0.0146,  0.6173,  0.0480,  0.7515], device='cuda:1')
+Solve time for step 1 (global step 4) 0.34282954898662865
+Current ori: tensor(0.7515, device='cuda:1')
+Middle force: tensor([1.7745, 1.0364, 2.3085], device='cuda:1')
+Thumb force: tensor([0.1159, 0.2663, 0.0622], device='cuda:1')
+tensor([0.4226, 0.5763, 0.6803, 0.7627, 0.1054, 0.2718, 1.0717, 0.4747, 0.9785,
+        0.2998, 0.6140, 0.1230, 0.7516], device='cuda:1')
+Solve time for step 2 (global step 5) 4.309488439001143
+Current ori: tensor(0.7516, device='cuda:1')
+Middle force: tensor([1.6781, 2.9223], device='cuda:1')
+Thumb force: tensor([1.3457, 1.2741], device='cuda:1')
+tensor([0.3851, 0.5817, 0.6248, 0.7033, 0.1380, 0.2784, 1.1043, 0.4790, 1.0762,
+        0.2215, 0.5343, 0.2307, 0.7516], device='cuda:1')
+Solve time for step 3 (global step 6) 4.680958674987778
+Current ori: tensor(0.7516, device='cuda:1')
+Middle force: tensor([2.8168], device='cuda:1')
+Thumb force: tensor([1.1849], device='cuda:1')
+Current yaw: tensor([0.7517], device='cuda:1')
+5 turn
+Likelihood: -85.60310363769531
+State is out of distribution
+Final likelihood: tensor([-0.5626, -0.6243, -0.7510, -0.8592, -0.9239, -0.9301, -1.0448, -1.1821],
+       device='cuda:1', grad_fn=<IndexBackward0>)
+Final likelihood: tensor([-0.5626, -0.6243, -0.7510, -0.8592, -0.9239, -0.9301, -1.0448, -1.1821],
+       device='cuda:1', grad_fn=<IndexBackward0>)
+1 mode projection succeeded
+New goal: tensor([ 0.2251,  0.6235,  0.6495,  0.8683, -0.0782,  0.2942,  0.9371,  0.7901,
+         1.3231,  0.0196,  0.3951,  0.3222,  0.0405], device='cuda:1')
+Likelihood: -98.40760040283203
+Likelihood: -135.130126953125
+Likelihood: -77.34672546386719
+Likelihood: -94.76095581054688
+{'all': 98.40760040283203,
+ 'index': 135.130126953125,
+ 'middle': 77.34672546386719,
+ 'thumb': 94.76095581054688}
+Plan time: 84.42586661118548
+Current yaw: tensor([0.7517], device='cuda:1')
+6 middle
+tensor([0.1426, 0.4939, 0.5863, 0.7404, 0.1483, 0.3397, 0.9200, 0.7320, 1.1071,
+        0.2673, 0.5434, 0.1338, 0.7517], device='cuda:1')
+Solve time for step 1 (global step 7) 0.34987838694360107
+Current ori: tensor(0.7517, device='cuda:1')
+Thumb force: tensor([1.0369, 1.3479, 1.0042], device='cuda:1')
+tensor([0.1857, 0.5066, 0.6323, 0.7235, 0.0062, 0.1544, 0.8769, 0.6927, 1.1488,
+        0.2474, 0.3848, 0.3977, 0.7516], device='cuda:1')
+Solve time for step 2 (global step 8) 4.692443254054524
+Current ori: tensor(0.7516, device='cuda:1')
+Thumb force: tensor([1.9572, 0.2497], device='cuda:1')
+tensor([ 0.2568,  0.5476,  0.6474,  0.7637, -0.1068,  0.0958,  0.9021,  0.7871,
+         1.1347,  0.3089,  0.2520,  0.6667,  0.7515], device='cuda:1')
+Solve time for step 3 (global step 9) 4.326608814066276
+Current ori: tensor(0.7515, device='cuda:1')
+Thumb force: tensor([0.2284], device='cuda:1')
+Current yaw: tensor([0.7520], device='cuda:1')
+7 turn
+Likelihood: -86.09381866455078
+State is out of distribution
+Final likelihood: tensor([ -1.1365,  -1.4166,  -1.5976,  -1.8388,  -2.0560,  -2.0738,  -2.2462,
+        -12.8103], device='cuda:1', grad_fn=<IndexBackward0>)
+Final likelihood: tensor([ -1.1365,  -1.4166,  -1.5976,  -1.8388,  -2.0560,  -2.0738,  -2.2462,
+        -12.8103], device='cuda:1', grad_fn=<IndexBackward0>)
+1 mode projection succeeded
+New goal: tensor([ 0.3444,  0.6106,  0.7728,  0.7955, -0.0650,  0.2457,  0.9938,  0.8621,
+         1.2979,  0.0704,  0.4270,  0.3303,  0.0309], device='cuda:1')
+Likelihood: -107.95600891113281
+Likelihood: -96.83575439453125
+Likelihood: -113.03380584716797
+Likelihood: -54.996849060058594
+{'all': 107.95600891113281,
+ 'index': 96.83575439453125,
+ 'middle': 113.03380584716797,
+ 'thumb': 54.996849060058594}
+Plan time: 82.91268107993528
+Current yaw: tensor([0.7520], device='cuda:1')
+8 thumb
+tensor([ 0.2688,  0.5607,  0.6484,  0.7587, -0.3135,  0.2020,  1.0851,  0.9211,
+         1.1922,  0.1697,  0.1685,  0.7765,  0.7520], device='cuda:1')
+Solve time for step 1 (global step 10) 0.3167208170052618
+Current ori: tensor(0.7520, device='cuda:1')
+Index force: tensor([1.1629, 1.1578, 1.6096], device='cuda:1')
+Middle force: tensor([1.1629, 1.1578, 1.6096], device='cuda:1')
+tensor([ 0.2804,  0.5501,  0.7134,  0.6873, -0.3134,  0.1921,  1.1112,  0.8927,
+         1.1094,  0.1407,  0.1778,  0.6011,  0.7519], device='cuda:1')
+Solve time for step 2 (global step 11) 4.557188900071196
+Current ori: tensor(0.7519, device='cuda:1')
+Index force: tensor([1.1545, 1.7073], device='cuda:1')
+Middle force: tensor([1.1545, 1.7073], device='cuda:1')
+tensor([ 0.2863,  0.5592,  0.7433,  0.6210, -0.3134,  0.1602,  1.2008,  0.7912,
+         1.1400,  0.0699,  0.2671,  0.3578,  0.7518], device='cuda:1')
+Solve time for step 3 (global step 12) 4.131463302997872
+Current ori: tensor(0.7518, device='cuda:1')
+Index force: tensor([1.8486], device='cuda:1')
+Middle force: tensor([1.8486], device='cuda:1')
+Current yaw: tensor([0.7516], device='cuda:1')
+9 turn
+Likelihood: -78.0311508178711
+State is out of distribution
+Final likelihood: tensor([-0.6375, -0.7958, -0.9429, -1.0364, -1.0576, -1.1185, -1.2924, -2.1591],
+       device='cuda:1', grad_fn=<IndexBackward0>)
+Final likelihood: tensor([-0.6375, -0.7958, -0.9429, -1.0364, -1.0576, -1.1185, -1.2924, -2.1591],
+       device='cuda:1', grad_fn=<IndexBackward0>)
+1 mode projection succeeded
+New goal: tensor([ 0.3443,  0.6108,  0.7731,  0.7943, -0.0654,  0.2461,  0.9933,  0.8626,
+         1.2981,  0.0704,  0.4276,  0.3298,  0.0313], device='cuda:1')
+Likelihood: -109.22286224365234
+Likelihood: -85.70751190185547
+Likelihood: -98.3747787475586
+Likelihood: -47.56703186035156
+{'all': 109.22286224365234,
+ 'index': 85.70751190185547,
+ 'middle': 98.3747787475586,
+ 'thumb': 47.56703186035156}
+Plan time: 84.02831169916317
+Current yaw: tensor([0.7516], device='cuda:1')
+10 thumb
+tensor([ 0.2944,  0.5378,  0.7956,  0.5892, -0.2993,  0.2338,  0.9705,  1.0381,
+         1.1391,  0.0140,  0.5525,  0.1578,  0.7516], device='cuda:1')
+Solve time for step 1 (global step 13) 0.40693711501080543
+Current ori: tensor(0.7516, device='cuda:1')
+Index force: tensor([1.0649, 1.4352, 1.5263], device='cuda:1')
+Middle force: tensor([1.0649, 1.4352, 1.5263], device='cuda:1')
+tensor([ 0.3224,  0.5974,  0.7818,  0.6007, -0.2993,  0.1796,  1.1131,  0.8856,
+         1.0462,  0.0584,  0.4598,  0.2472,  0.7516], device='cuda:1')
+Solve time for step 2 (global step 14) 4.647559213917702
+Current ori: tensor(0.7516, device='cuda:1')
+Index force: tensor([1.5110, 1.5618], device='cuda:1')
+Middle force: tensor([1.5110, 1.5618], device='cuda:1')
+tensor([ 0.3309,  0.6332,  0.7561,  0.6240, -0.2991,  0.1798,  1.1127,  0.8860,
+         1.0714, -0.0559,  0.5058,  0.2179,  0.7515], device='cuda:1')
+Solve time for step 3 (global step 15) 4.236701968009584
+Current ori: tensor(0.7515, device='cuda:1')
+Index force: tensor([1.6244], device='cuda:1')
+Middle force: tensor([1.6244], device='cuda:1')
+Current yaw: tensor([0.7514], device='cuda:1')
+11 turn
+Likelihood: -66.1812744140625
+State is out of distribution
+Final likelihood: tensor([-0.7260, -0.7471, -1.0521, -1.1037, -1.1165, -1.4698, -1.6083, -2.4642],
+       device='cuda:1', grad_fn=<IndexBackward0>)
+Final likelihood: tensor([-0.7260, -0.7471, -1.0521, -1.1037, -1.1165, -1.4698, -1.6083, -2.4642],
+       device='cuda:1', grad_fn=<IndexBackward0>)
+1 mode projection succeeded
+New goal: tensor([ 0.3443,  0.6114,  0.7731,  0.7960, -0.0644,  0.2454,  0.9939,  0.8613,
+         1.2978,  0.0709,  0.4277,  0.3297,  0.0306], device='cuda:1')
+Likelihood: -107.67158508300781
+Likelihood: -131.51132202148438
+Likelihood: -115.79607391357422
+Likelihood: -51.198787689208984
+{'all': 107.67158508300781,
+ 'index': 131.51132202148438,
+ 'middle': 115.79607391357422,
+ 'thumb': 51.198787689208984}
+Plan time: 83.11043096904177
+Current yaw: tensor([0.7514], device='cuda:1')
+12 thumb
+tensor([ 0.3300,  0.6736,  0.6544,  0.7377, -0.2900,  0.1930,  1.0560,  0.9471,
+         1.1508, -0.0232,  0.5537,  0.1639,  0.7514], device='cuda:1')
+Solve time for step 1 (global step 16) 0.3287713130703196
+Current ori: tensor(0.7514, device='cuda:1')
+Index force: tensor([1.4990, 1.0942, 1.2030], device='cuda:1')
+Middle force: tensor([1.4990, 1.0942, 1.2030], device='cuda:1')
+tensor([ 0.3405,  0.6777,  0.6979,  0.7288, -0.2798,  0.1656,  1.1066,  0.8906,
+         1.0511, -0.0797,  0.5844,  0.2063,  0.7513], device='cuda:1')
+Solve time for step 2 (global step 17) 4.659947759937495
+Current ori: tensor(0.7513, device='cuda:1')
+Index force: tensor([1.1214, 1.2605], device='cuda:1')
+Middle force: tensor([1.1214, 1.2605], device='cuda:1')
+tensor([ 0.3422,  0.7264,  0.6997,  0.7509, -0.2794,  0.1804,  1.0669,  0.9322,
+         1.0611, -0.0177,  0.4926,  0.2111,  0.7512], device='cuda:1')
+Solve time for step 3 (global step 18) 4.234753020922653
+Current ori: tensor(0.7512, device='cuda:1')
+Index force: tensor([1.3844], device='cuda:1')
+Middle force: tensor([1.3844], device='cuda:1')
+Current yaw: tensor([0.7511], device='cuda:1')
+13 turn
+Likelihood: -71.29965209960938
+State is out of distribution
+Final likelihood: tensor([-0.6865, -0.8153, -0.9692, -0.9957, -1.0102, -1.1057, -1.1905, -1.3272],
+       device='cuda:1', grad_fn=<IndexBackward0>)
+Final likelihood: tensor([-0.6865, -0.8153, -0.9692, -0.9957, -1.0102, -1.1057, -1.1905, -1.3272],
+       device='cuda:1', grad_fn=<IndexBackward0>)
+1 mode projection succeeded
+New goal: tensor([ 0.3443,  0.6094,  0.7733,  0.7960, -0.0656,  0.2453,  0.9946,  0.8610,
+         1.2976,  0.0706,  0.4277,  0.3284,  0.0325], device='cuda:1')
+Likelihood: -119.05587768554688
+Likelihood: -65.88407897949219
+Likelihood: -81.41574096679688
+Likelihood: -63.646392822265625
+{'all': 119.05587768554688,
+ 'index': 65.88407897949219,
+ 'middle': 81.41574096679688,
+ 'thumb': 63.646392822265625}
+Plan time: 81.8245587979909
+Current yaw: tensor([0.7511], device='cuda:1')
+14 thumb
+tensor([ 0.3411,  0.7349,  0.7427,  0.7016, -0.2749,  0.1740,  1.0747,  0.9222,
+         1.1502, -0.0173,  0.5610,  0.1524,  0.7511], device='cuda:1')
+Solve time for step 1 (global step 19) 0.3926607599714771
+Current ori: tensor(0.7511, device='cuda:1')
+Index force: tensor([1.2686, 1.0087, 1.1841], device='cuda:1')
+Middle force: tensor([1.2686, 1.0087, 1.1841], device='cuda:1')
+tensor([ 0.3385,  0.7796,  0.7436,  0.7633, -0.2700,  0.2027,  0.9895,  1.0086,
+         1.1156,  0.0100,  0.4239,  0.1456,  0.7510], device='cuda:1')
+Solve time for step 2 (global step 20) 4.402656535967253
+Current ori: tensor(0.7510, device='cuda:1')
+Index force: tensor([1.0324, 1.2066], device='cuda:1')
+Middle force: tensor([1.0324, 1.2066], device='cuda:1')
+tensor([ 0.3224,  0.8442,  0.7869,  0.7140, -0.2705,  0.1537,  1.1216,  0.8662,
+         1.1117,  0.0149,  0.4478,  0.0959,  0.7511], device='cuda:1')
+Solve time for step 3 (global step 21) 4.441495791892521
+Current ori: tensor(0.7511, device='cuda:1')
+Index force: tensor([1.3016], device='cuda:1')
+Middle force: tensor([1.3016], device='cuda:1')
+Current yaw: tensor([0.7510], device='cuda:1')
+15 turn
+Likelihood: -81.74407958984375
+State is out of distribution
+Final likelihood: tensor([-0.5509, -0.6173, -0.9163, -1.0612, -1.1553, -1.3878, -1.8356, -1.8876],
+       device='cuda:1', grad_fn=<IndexBackward0>)
+Final likelihood: tensor([-0.5509, -0.6173, -0.9163, -1.0612, -1.1553, -1.3878, -1.8356, -1.8876],
+       device='cuda:1', grad_fn=<IndexBackward0>)
+1 mode projection succeeded
+New goal: tensor([ 0.2972,  0.5856,  0.7681,  0.8708, -0.0428,  0.2659,  0.9944,  0.8141,
+         1.2942,  0.1035,  0.4245,  0.2912, -0.0217], device='cuda:1')
+Likelihood: -125.80452728271484
+Likelihood: -90.75825500488281
+Likelihood: -89.34132385253906
+Likelihood: -72.00584411621094
+{'all': 125.80452728271484,
+ 'index': 90.75825500488281,
+ 'middle': 89.34132385253906,
+ 'thumb': 72.00584411621094}
+Plan time: 82.22848578798585
+Current yaw: tensor([0.7510], device='cuda:1')
+16 thumb
+tensor([ 0.3223,  0.8869,  0.8075,  0.7315, -0.2689,  0.1994,  0.9969,  0.9973,
+         1.1465,  0.0013,  0.6063,  0.0259,  0.7510], device='cuda:1')
+Solve time for step 1 (global step 22) 0.31937116594053805
+Current ori: tensor(0.7510, device='cuda:1')
+Index force: tensor([1.3455, 1.4875, 1.1974], device='cuda:1')
+Middle force: tensor([1.3455, 1.4875, 1.1974], device='cuda:1')
+tensor([ 0.3195,  0.9734,  0.7840,  0.5536, -0.2658,  0.2054,  0.9760,  1.0154,
+         1.1503,  0.0234,  0.4210,  0.0536,  0.7509], device='cuda:1')
+Solve time for step 2 (global step 23) 4.413069347967394
+Current ori: tensor(0.7509, device='cuda:1')
+Index force: tensor([1.6531, 1.2326], device='cuda:1')
+Middle force: tensor([1.6531, 1.2326], device='cuda:1')
+tensor([ 0.2973,  1.0204,  0.7918,  0.7367, -0.2537,  0.1314,  1.1494,  0.8299,
+         1.1207,  0.0522,  0.4406,  0.0528,  0.7508], device='cuda:1')
+Solve time for step 3 (global step 24) 4.47277500492055
+Current ori: tensor(0.7508, device='cuda:1')
+Index force: tensor([1.4576], device='cuda:1')
+Middle force: tensor([1.4576], device='cuda:1')
+Current yaw: tensor([0.7236], device='cuda:1')
+17 turn
+Likelihood: -97.3384780883789
+State is out of distribution
+Final likelihood: tensor([-0.5985, -0.7776, -0.8216, -0.9446, -0.9743, -0.9967, -1.1548, -1.7563],
+       device='cuda:1', grad_fn=<IndexBackward0>)
+Final likelihood: tensor([-0.5985, -0.7776, -0.8216, -0.9446, -0.9743, -0.9967, -1.1548, -1.7563],
+       device='cuda:1', grad_fn=<IndexBackward0>)
+1 mode projection succeeded
+New goal: tensor([ 0.2482,  0.6304,  0.6413,  0.8626, -0.0710,  0.1893,  1.0185,  0.7158,
+         1.2824,  0.1170,  0.4342,  0.2911,  0.0480], device='cuda:1')
+Likelihood: -112.11997985839844
+Likelihood: -70.84864807128906
+Likelihood: -138.36233520507812
+Likelihood: -80.81793212890625
+{'all': 112.11997985839844,
+ 'index': 70.84864807128906,
+ 'middle': 138.36233520507812,
+ 'thumb': 80.81793212890625}
+Plan time: 82.51618509495165
+Current yaw: tensor([0.7249], device='cuda:1')
+18 index
+tensor([ 0.2901,  1.0047,  0.9582,  0.5073, -0.2183,  0.0544,  1.2295,  0.7640,
+         1.1623,  0.0115,  0.5634, -0.0825,  0.7249], device='cuda:1')
+Solve time for step 1 (global step 25) 0.36330578196793795
+Current ori: tensor(0.7249, device='cuda:1')
+Middle force: tensor([5.0159, 1.7572, 1.0312], device='cuda:1')
+Thumb force: tensor([1.7025, 1.5632, 0.9911], device='cuda:1')
+tensor([ 0.4700,  0.8490,  0.7642,  0.5832, -0.1854,  0.0089,  1.4047,  0.5741,
+         1.1597,  0.3179,  0.5588, -0.0336,  0.7311], device='cuda:1')
+Solve time for step 2 (global step 26) 4.596943152952008
+Current ori: tensor(0.7311, device='cuda:1')
+Middle force: tensor([1.7711, 1.0204], device='cuda:1')
+Thumb force: tensor([1.6745, 1.0492], device='cuda:1')
+tensor([ 0.3245,  0.5704,  0.6078,  0.6906, -0.1725,  0.0898,  1.1197,  0.9050,
+         1.0943,  0.5843,  0.4792,  0.2553,  0.7273], device='cuda:1')
+Solve time for step 3 (global step 27) 4.39289858401753
+Current ori: tensor(0.7273, device='cuda:1')
+Middle force: tensor([1.0786], device='cuda:1')
+Thumb force: tensor([0.9937], device='cuda:1')
+Current yaw: tensor([0.7273], device='cuda:1')
+19 turn
+Likelihood: -110.42434692382812
+State is out of distribution
+Final likelihood: tensor([-0.5791, -0.8152, -0.8818, -0.9614, -0.9810, -1.3675, -1.7439, -6.1804],
+       device='cuda:1', grad_fn=<IndexBackward0>)
+Final likelihood: tensor([-0.5791, -0.8152, -0.8818, -0.9614, -0.9810, -1.3675, -1.7439, -6.1804],
+       device='cuda:1', grad_fn=<IndexBackward0>)
+1 mode projection succeeded
+New goal: tensor([ 0.2477,  0.6295,  0.6402,  0.8639, -0.0707,  0.1892,  1.0193,  0.7153,
+         1.2822,  0.1183,  0.4352,  0.2890,  0.0504], device='cuda:1')
+Likelihood: -109.15219116210938
+Likelihood: -137.49966430664062
+Likelihood: -89.59361267089844
+Likelihood: -68.92070007324219
+{'all': 109.15219116210938,
+ 'index': 137.49966430664062,
+ 'middle': 89.59361267089844,
+ 'thumb': 68.92070007324219}
+Plan time: 82.3276556271594
+Current yaw: tensor([0.7273], device='cuda:1')
+20 thumb
+tensor([ 0.1209,  0.5977,  0.4391,  0.6937, -0.1421, -0.0100,  1.4211,  0.5888,
+         1.1817,  0.4954,  0.3440,  0.4412,  0.7273], device='cuda:1')
+Solve time for step 1 (global step 28) 0.3418971919454634
+Current ori: tensor(0.7273, device='cuda:1')
+Index force: tensor([1.0628, 1.3384, 1.1096], device='cuda:1')
+Middle force: tensor([1.0628, 1.3384, 1.1096], device='cuda:1')
+tensor([ 0.1605,  0.6169,  0.4718,  0.6806, -0.1403,  0.0366,  1.2534,  0.7927,
+         1.1052,  0.3228,  0.2884,  0.3094,  0.7272], device='cuda:1')
+Solve time for step 2 (global step 29) 4.627179741975851
+Current ori: tensor(0.7272, device='cuda:1')
+Index force: tensor([1.4955, 1.0811], device='cuda:1')
+Middle force: tensor([1.4955, 1.0811], device='cuda:1')
+tensor([ 0.1717,  0.6145,  0.4811,  0.6994, -0.1295,  0.0149,  1.3095,  0.7227,
+         1.0773,  0.2330,  0.3068,  0.3428,  0.7271], device='cuda:1')
+Solve time for step 3 (global step 30) 4.3979657150339335
+Current ori: tensor(0.7271, device='cuda:1')
+Index force: tensor([1.0683], device='cuda:1')
+Middle force: tensor([1.0683], device='cuda:1')
+Current yaw: tensor([0.7271], device='cuda:1')
+21 turn
+Likelihood: -69.15306854248047
+State is out of distribution
+Final likelihood: tensor([ -0.8774,  -0.9509,  -1.3030,  -1.7554,  -1.8481,  -2.1671,  -7.8185,
+        -13.6175], device='cuda:1', grad_fn=<IndexBackward0>)
+Final likelihood: tensor([ -0.8774,  -0.9509,  -1.3030,  -1.7554,  -1.8481,  -2.1671,  -7.8185,
+        -13.6175], device='cuda:1', grad_fn=<IndexBackward0>)
+1 mode projection succeeded
+New goal: tensor([ 0.3608,  0.6719,  0.7081,  0.8278, -0.0325,  0.1745,  0.9448,  0.8154,
+         1.3119,  0.1026,  0.3516,  0.3401,  0.0186], device='cuda:1')
+Likelihood: -103.0368881225586
+Likelihood: -81.90341186523438
+Likelihood: -86.75486755371094
+Likelihood: -40.779869079589844
+{'all': 103.0368881225586,
+ 'index': 81.90341186523438,
+ 'middle': 86.75486755371094,
+ 'thumb': 40.779869079589844}
+Plan time: 82.03577943018172
+Current yaw: tensor([0.7271], device='cuda:1')
+22 thumb
+tensor([ 0.1831,  0.6308,  0.4783,  0.6927, -0.1320,  0.0836,  1.1003,  0.9591,
+         1.1028,  0.0848,  0.5256,  0.2342,  0.7271], device='cuda:1')
+Solve time for step 1 (global step 31) 0.35868201893754303
+Current ori: tensor(0.7271, device='cuda:1')
+Index force: tensor([1.4734, 1.5985, 1.0676], device='cuda:1')
+Middle force: tensor([1.4734, 1.5985, 1.0676], device='cuda:1')
+tensor([ 0.2020,  0.6393,  0.4722,  0.7333, -0.1104,  0.0280,  1.2401,  0.7996,
+         1.0806,  0.1049,  0.3936,  0.2351,  0.7270], device='cuda:1')
+Solve time for step 2 (global step 32) 4.815945356036536
+Current ori: tensor(0.7270, device='cuda:1')
+Index force: tensor([1.8539, 1.1057], device='cuda:1')
+Middle force: tensor([1.8539, 1.1057], device='cuda:1')
+tensor([ 0.2194,  0.6438,  0.4724,  0.7689, -0.0443,  0.0789,  1.0509,  0.9986,
+         1.1083,  0.0456,  0.3800,  0.2236,  0.7261], device='cuda:1')
+Solve time for step 3 (global step 33) 4.491412568022497
+Current ori: tensor(0.7261, device='cuda:1')
+Index force: tensor([1.1677], device='cuda:1')
+Middle force: tensor([1.1677], device='cuda:1')
+Current yaw: tensor([0.7260], device='cuda:1')
+23 turn
+Likelihood: -74.77571105957031
+State is out of distribution
+Final likelihood: tensor([ -0.8742,  -1.1854,  -1.3424,  -1.4259,  -2.1540, -11.3549, -12.3292,
+        -12.8521], device='cuda:1', grad_fn=<IndexBackward0>)
+Final likelihood: tensor([ -0.8742,  -1.1854,  -1.3424,  -1.4259,  -2.1540, -11.3549, -12.3292,
+        -12.8521], device='cuda:1', grad_fn=<IndexBackward0>)
+1 mode projection succeeded
+New goal: tensor([ 0.2751,  0.7288,  0.6230,  0.7540, -0.0390,  0.2758,  0.9470,  0.8466,
+         1.3084,  0.0706,  0.3910,  0.3061, -0.0405], device='cuda:1')
+Likelihood: -114.94905090332031
+Likelihood: -149.76217651367188
+Likelihood: -126.6041030883789
+Likelihood: -73.95387268066406
+{'all': 114.94905090332031,
+ 'index': 149.76217651367188,
+ 'middle': 126.6041030883789,
+ 'thumb': 73.95387268066406}
+Plan time: 81.80429374496453
+Current yaw: tensor([0.7260], device='cuda:1')
+24 thumb
+tensor([ 0.2245,  0.6437,  0.4726,  0.7828, -0.0307,  0.0686,  1.0798,  0.9623,
+         1.1397,  0.0130,  0.5644,  0.1098,  0.7260], device='cuda:1')
+Solve time for step 1 (global step 34) 0.42221420304849744
+Current ori: tensor(0.7260, device='cuda:1')
+Index force: tensor([0.9981, 1.3457, 1.0902], device='cuda:1')
+Middle force: tensor([0.9981, 1.3457, 1.0902], device='cuda:1')
+tensor([ 0.2439,  0.6605,  0.4812,  0.7751, -0.0258,  0.0769,  1.0586,  0.9719,
+         1.1157,  0.0390,  0.4380,  0.1135,  0.7260], device='cuda:1')
+Solve time for step 2 (global step 35) 4.672949594911188
+Current ori: tensor(0.7260, device='cuda:1')
+Index force: tensor([1.5539, 1.1230], device='cuda:1')
+Middle force: tensor([1.5539, 1.1230], device='cuda:1')
+tensor([ 0.2638,  0.6620,  0.5291,  0.7325,  0.0425,  0.1155,  1.0408,  0.9577,
+         1.0941, -0.0144,  0.4717,  0.0928,  0.7260], device='cuda:1')
+Solve time for step 3 (global step 36) 4.347417838056572
+Current ori: tensor(0.7260, device='cuda:1')
+Index force: tensor([1.1199], device='cuda:1')
+Middle force: tensor([1.1199], device='cuda:1')
+Current yaw: tensor([0.7260], device='cuda:1')
+25 turn
+Likelihood: -87.35728454589844
+State is out of distribution
+Final likelihood: tensor([-0.9065, -1.0285, -1.1017, -1.1314, -1.2677, -1.3887, -1.4245, -1.8097],
+       device='cuda:1', grad_fn=<IndexBackward0>)
+Final likelihood: tensor([-0.9065, -1.0285, -1.1017, -1.1314, -1.2677, -1.3887, -1.4245, -1.8097],
+       device='cuda:1', grad_fn=<IndexBackward0>)
+1 mode projection succeeded
+New goal: tensor([ 0.2780,  0.5583,  0.6794,  0.8409, -0.1340,  0.2382,  0.8888,  0.7639,
+         1.2820,  0.0471,  0.3871,  0.3004,  0.1937], device='cuda:1')
+Likelihood: -95.98844909667969
+Likelihood: -120.47820281982422
+Likelihood: -60.171112060546875
+Likelihood: -81.47469329833984
+{'all': 95.98844909667969,
+ 'index': 120.47820281982422,
+ 'middle': 60.171112060546875,
+ 'thumb': 81.47469329833984}
+Plan time: 82.14685958612245
+Current yaw: tensor([0.7260], device='cuda:1')
+26 middle
+tensor([ 0.2721,  0.6618,  0.5385,  0.7364,  0.0660,  0.1040,  1.1027,  0.8828,
+         1.1341,  0.0123,  0.6284, -0.0140,  0.7260], device='cuda:1')
+Solve time for step 1 (global step 37) 0.3520844359882176
+Current ori: tensor(0.7260, device='cuda:1')
+Thumb force: tensor([0.7957, 1.0549, 1.4129], device='cuda:1')
+tensor([ 0.2842,  0.6782,  0.5313,  0.7406, -0.0163,  0.0565,  0.9370,  0.8535,
+         1.1100,  0.1881,  0.5447,  0.1560,  0.7259], device='cuda:1')
+Solve time for step 2 (global step 38) 4.752341869054362
+Current ori: tensor(0.7259, device='cuda:1')
+Thumb force: tensor([1.1000, 1.4177], device='cuda:1')
+tensor([ 0.2955,  0.6866,  0.5422,  0.7282, -0.2017,  0.1543,  0.8472,  0.8528,
+         1.1889,  0.0962,  0.4567,  0.2426,  0.7258], device='cuda:1')
+Solve time for step 3 (global step 39) 4.284122299985029
+Current ori: tensor(0.7258, device='cuda:1')
+Thumb force: tensor([1.3875], device='cuda:1')
+Current yaw: tensor([0.7258], device='cuda:1')
+27 turn
+Likelihood: -55.69630813598633
+State is out of distribution
+Final likelihood: tensor([ -0.4550,  -0.5797,  -0.9294,  -1.2892,  -1.2974,  -1.8691,  -1.9634,
+        -13.4259], device='cuda:1', grad_fn=<IndexBackward0>)
+Final likelihood: tensor([ -0.4550,  -0.5797,  -0.9294,  -1.2892,  -1.2974,  -1.8691,  -1.9634,
+        -13.4259], device='cuda:1', grad_fn=<IndexBackward0>)
+1 mode projection succeeded
+New goal: tensor([ 0.3223,  0.6053,  0.6996,  0.8080, -0.1289,  0.2674,  0.9346,  0.8443,
+         1.3031,  0.0539,  0.3318,  0.3941,  0.1391], device='cuda:1')
+Likelihood: -101.1832275390625
+Likelihood: -85.2293472290039
+Likelihood: -80.799072265625
+Likelihood: -44.39564895629883
+{'all': 101.1832275390625,
+ 'index': 85.2293472290039,
+ 'middle': 80.799072265625,
+ 'thumb': 44.39564895629883}
+Plan time: 82.6146488430677
+Current yaw: tensor([0.7258], device='cuda:1')
+28 thumb
+tensor([ 0.3029,  0.6930,  0.5646,  0.7110, -0.3454,  0.3220,  0.9472,  0.8251,
+         1.2071,  0.1125,  0.4384,  0.2410,  0.7258], device='cuda:1')
+Solve time for step 1 (global step 40) 0.32596399902831763
+Current ori: tensor(0.7258, device='cuda:1')
+Index force: tensor([1.3996, 1.4620, 1.5569], device='cuda:1')
+Middle force: tensor([1.3996, 1.4620, 1.5569], device='cuda:1')
+tensor([ 0.3129,  0.6866,  0.5890,  0.7085, -0.3352,  0.3167,  0.9454,  0.8160,
+         1.1438, -0.0047,  0.3622,  0.2059,  0.7255], device='cuda:1')
