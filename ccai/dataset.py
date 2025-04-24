@@ -257,27 +257,34 @@ class AllegroScrewDriverDataset(Dataset):
                     need_to_continue = False
                     
                     # dropped_recovery = data['dropped_recovery']
+                    yaw_change = traj_data[-1][12]-traj_data[0][0, 12]
+                    success_cutoff_degrees = 5
+                    success_cutoff_rad = np.deg2rad(success_cutoff_degrees)
+                    success = yaw_change < (-np.pi/3 + success_cutoff_rad)
                     
-                    # fl = data['final_likelihoods']
-                    # pre_action_likelihoods = data['pre_action_likelihoods']
-                    # fl = [l for l in fl if None not in l and len(l)>0]
-                    # for k in range(len(fl)):
-                    #     if len(fl[k]) == 0 and len(pre_action_likelihoods[k]) > 0:
-                    #         fl[k].append(pre_action_likelihoods[k][-1])
+                    fl = data['final_likelihoods']
+                    pre_action_likelihoods = data['pre_action_likelihoods']
+                    fl = [l for l in fl if None not in l and len(l)>0]
+                    for k in range(len(fl)):
+                        if len(fl[k]) == 0 and len(pre_action_likelihoods[k]) > 0:
+                            fl[k].append(pre_action_likelihoods[k][-1])
                     
-                    # fl = np.array(fl).flatten()
-                    # fl_delta = []
-                    # executed_recovery_modes = [m for m in data['executed_contacts'] if m != 'turn']
-                    # for i in range(len(executed_recovery_modes)):
-                    #     pre_mode_likelihood = fl[i-1]
-                    #     post_mode_likelihood = fl[i]
-                    #     likelihood_delta = post_mode_likelihood - pre_mode_likelihood
-                    #     fl_delta.append(likelihood_delta)
-                    # fl_improvement_bool = np.array(fl_delta) > 0
-                    # num_removed = np.sum(~fl_improvement_bool)
-                    # if num_removed > 0:
-                    #     total_num_removed += num_removed
-                    #     print(f'Num removed: {num_removed}, Total removed: {total_num_removed}')
+                    fl = np.array(fl).flatten()
+                    fl_delta = []
+                    executed_recovery_modes = [m for m in data['executed_contacts'] if m != 'turn']
+                    for i in range(len(executed_recovery_modes)):
+                        pre_mode_likelihood = fl[i-1]
+                        post_mode_likelihood = fl[i]
+                        likelihood_delta = post_mode_likelihood - pre_mode_likelihood
+                        fl_delta.append(likelihood_delta)
+                    fl_improvement_bool = np.array(fl_delta) > 0
+                    if len(executed_recovery_modes) > 0 and executed_recovery_modes[-1] != 'turn':
+                        fl_improvement_bool[-1] = False
+                        print('Overrode last recovery mode')
+                    num_removed = np.sum(~fl_improvement_bool)
+                    if num_removed > 0:
+                        total_num_removed += num_removed
+                        print(f'Num removed: {num_removed}, Total removed: {total_num_removed}')
                     
                     # dropped_recovery = False
                     # post_recovery_likelihoods = [i for i in data['final_likelihoods'] if len(i) == 1]
@@ -292,7 +299,7 @@ class AllegroScrewDriverDataset(Dataset):
                         cs_bool = []
                         for c in data[t]['contact_state']:
                             # new_cs.append(c.sum() != 3)
-                            if True or c.sum() != 3:
+                            if c.sum() != 3:
                                 # if isinstance(c, np.ndarray):
                                 #     c = torch.from_numpy(c).float()
                                 if torch.is_tensor(c):
@@ -306,14 +313,14 @@ class AllegroScrewDriverDataset(Dataset):
                         for idx, s in enumerate(data[t]['starts']):
                             # if cs_bool[idx]:
                             # if s.shape[-1] != 36:
-                            if True or (s.sum(0) == 0).any():
+                            if (s.sum(0) == 0).any():
                                 new_starts.append(s)
                         new_plans = []
                         for idx, p in enumerate(data[t]['plans']):
                             # if p.shape[-1] != 36:
                             #     new_plans.append(p)
                             # if cs_bool[idx]:
-                            if True or (p.sum(0) == 0).any():
+                            if (p.sum(0) == 0).any():
                                 new_plans.append(p)
 
 
@@ -336,9 +343,21 @@ class AllegroScrewDriverDataset(Dataset):
                             data[t]['plans'] = new_plans.cpu().numpy()
                             data[t]['contact_state'] = new_cs.cpu().numpy()
 
-                        # data[t]['starts'] = data[t]['starts'][fl_improvement_bool]
-                        # data[t]['plans'] = data[t]['plans'][fl_improvement_bool]
-                        # data[t]['contact_state'] = data[t]['contact_state'][fl_improvement_bool]
+                        try:
+                            data[t]['contact_state'] = data[t]['contact_state'][fl_improvement_bool]
+
+                        except:
+                            data[t]['contact_state'] = data[t]['contact_state'][fl_improvement_bool[:-1]]
+                            
+                        try:
+                            data[t]['starts'] = data[t]['starts'][fl_improvement_bool]
+                        except:
+                            data[t]['starts'] = data[t]['starts'][fl_improvement_bool[:-1]]
+                            
+                        try:
+                            data[t]['plans'] = data[t]['plans'][fl_improvement_bool]
+                        except:
+                            data[t]['plans'] = data[t]['plans'][fl_improvement_bool[:-1]]
                         # if dropped_recovery:
                         #     data[t]['starts'] = data[t]['starts'][:-1]
                         #     data[t]['plans'] = data[t]['plans'][:-1]
@@ -494,7 +513,7 @@ class AllegroScrewDriverDataset(Dataset):
             yaw_change = final_yaw - initial_yaw
             print(yaw_change.mean())
             
-        else:
+        elif 'recovery' not in str(folders[0]):
             pre_shape = self.trajectories.shape
             final_yaw = self.trajectories[:, -1, 12]
             initial_yaw = self.trajectories[:, 0, 12]

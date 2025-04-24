@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 200
 visualize: True
-experiment_name: 'allegro_valve_safe_rl_data_gen_std_.15_save_perturbation'
+experiment_name: 'allegro_valve_safe_rl_data_gen_std_.03_save_perturbation'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -39,7 +39,8 @@ compute_recovery_trajectory: False
 rl_adjustment: False
 test_recovery_trajectory: False
 perturb_action: True
-randomize_obj_start: False
+randomize_obj_start: True
+randomize_rob_start: True
 external_wrench_perturb: False
 viz_states: False
 diff_init: True
@@ -48,8 +49,8 @@ new_projection: True
 task_diffuse_goal: True
 obj_gravity: True
 type: 'diffusion'
-model_path: 'data/training/allegro_screwdriver/allegro_valve_task_filtered_traj_diffusion/allegro_screwdriver_diffusion.pt'
-model_dir: 'data/training/allegro_screwdriver/allegro_valve_task_filtered_traj_diffusion'
+model_path: 'data/training/allegro_screwdriver/allegro_short_valve_task_low_friction_diffusion/allegro_screwdriver_diffusion.pt'
+model_dir: 'data/training/allegro_screwdriver/allegro_short_valve_task_low_friction_diffusion'
 likelihood_threshold: -10000000000.0
 drop_threshold: -1250
 project_threshold: -105.
@@ -76,4 +77,4 @@ controllers:
     penalty: 1000000
     collision_checking: False
     random_init_every_iter: False
-    device: 'cuda:1'
+    device: 'cuda:0'

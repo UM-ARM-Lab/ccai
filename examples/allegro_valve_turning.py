@@ -901,7 +901,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 rand_pct = 1
                 if np.random.rand() < rand_pct:
                     r = np.random.rand()
-                    std = .05 if perturb_this_trial else .0
+                    std = .03 if perturb_this_trial else .0
                     # if mode != 'turn':
                     #     std /= 4
                     # if r > .66:
@@ -1277,7 +1277,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     # <= so because pregrasp will iterate the all_stage counter
 
     if not params.get('live_recovery', False):
-        contact_sequence = ['turn']*2
+        contact_sequence = ['turn']*100
 
         # while len(contact_sequence) < 50:
         #     contact_options = ['index', 'middle', 'thumb']
@@ -1597,8 +1597,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             # Project the state back into distribution if we are computing recovery trajectories
             pre_project_time = time.perf_counter()
             projected_samples, _, _, _, (all_losses, all_samples, all_likelihoods) = trajectory_sampler_orig.sample(
-                2, H=trajectory_sampler_orig.T, start=start_sine_cosine.reshape(1, -1), project=True,
-                constraints=torch.ones(2, 3).to(device=params['device'])
+                4, H=trajectory_sampler_orig.T, start=start_sine_cosine.reshape(1, -1), project=True,
+                constraints=torch.ones(4, 3).to(device=params['device'])
             )
             data['project_times'].append(time.perf_counter() - pre_project_time)
             print('Final likelihood:', all_likelihoods[-1])
@@ -1985,7 +1985,7 @@ if __name__ == "__main__":
             trajectory_sampler.model.diffusion_model.subsampled_t = '5_10_15' in config['experiment_name']
             trajectory_sampler.model.diffusion_model.classifier = None
             
-            trajectory_sampler.model.diffusion_model.cutoff_timesteps = 64
+            trajectory_sampler.model.diffusion_model.cutoff_timesteps = 96
 
             return trajectory_sampler
         
