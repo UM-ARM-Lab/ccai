@@ -12,6 +12,7 @@ from statsmodels.distributions.empirical_distribution import ECDF
 from copy import deepcopy
 
 import torch
+from torch import nn
 import time
 import datetime
 import copy
@@ -286,6 +287,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     index_regrasp_planner = None
     middle_regrasp_planner = None
     thumb_regrasp_planner = None
+    index_thumb_regrasp_planner = None
+    index_middle_regrasp_planner = None
     turn_planner = None
 
     if model_path is not None:
@@ -455,6 +458,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         elif mode == 'middle':
             contact[:, 0] = 1
             contact[:, 2] = 1
+        elif mode == 'index_thumb':
+            contact[:, 1] = 1
+        elif mode == 'index_middle':
+            contact[:, 2] = 1
 
         recovery_params = copy.deepcopy(params)
         # recovery_params['warmup_iters'] = 100 #if not params.get('model_path_orig', None) else 25
@@ -566,6 +573,56 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     project=True,
                 )
                 planner = PositionControlConstrainedSVGDMPC(all_regrasp_problem, recovery_params)
+                
+            elif mode == 'index_thumb' and planner is None:
+                index_thumb_regrasp_problem = AllegroValve(
+                    start=state[:4 * num_fingers + obj_dof],
+                    goal=goal,
+                    T=params['T'],
+                    chain=params['chain'],
+                    device=params['device'],
+                    object_asset_pos=env.obj_pose,
+                    object_location=params['object_location'],
+                    object_type=params['object_type'],
+                    world_trans=env.world_trans,
+                    contact_fingers=['middle'],
+                    regrasp_fingers=['index', 'thumb'],
+                    obj_dof=obj_dof,
+                    obj_joint_dim=1,
+                    optimize_force=params['optimize_force'],
+                    default_dof_pos=env.default_dof_pos[:, :16],
+                    obj_gravity=params.get('obj_gravity', False),
+                    min_force_dict=min_force_dict,
+                    full_dof_goal=True,
+                    proj_path=None,
+                    project=True,
+                )
+                planner = PositionControlConstrainedSVGDMPC(index_thumb_regrasp_problem, recovery_params)
+                
+            elif mode == 'index_middle' and planner is None:
+                index_middle_regrasp_problem = AllegroValve(
+                    start=state[:4 * num_fingers + obj_dof],
+                    goal=goal,
+                    T=params['T'],
+                    chain=params['chain'],
+                    device=params['device'],
+                    object_asset_pos=env.obj_pose,
+                    object_location=params['object_location'],
+                    object_type=params['object_type'],
+                    world_trans=env.world_trans,
+                    contact_fingers=['thumb'],
+                    regrasp_fingers=['index', 'middle'],
+                    obj_dof=obj_dof,
+                    obj_joint_dim=1,
+                    optimize_force=params['optimize_force'],
+                    default_dof_pos=env.default_dof_pos[:, :16],
+                    obj_gravity=params.get('obj_gravity', False),
+                    min_force_dict=min_force_dict,
+                    full_dof_goal=True,
+                    proj_path=None,
+                    project=True,
+                )
+                planner = PositionControlConstrainedSVGDMPC(index_middle_regrasp_problem, recovery_params)
             elif mode == 'turn' and planner is None:
                 tp = AllegroValve(
                     start=state[:4 * num_fingers + obj_dof],
@@ -602,7 +659,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # generate initial samples with diffusion model
         sim_rollouts = None
         initial_samples_0 = None
-        new_T = params['T'] if (mode in ['index', 'thumb', 'middle', 'all']) else params['T_orig']
+        new_T = params['T'] if (mode in ['index', 'thumb', 'middle', 'all', 'index_thumb', 'index_middle']) else params['T_orig']
         # if trajectory_sampler is not None and params.get('diff_init', True) and initial_samples is None:
         if not skip_diff_init and trajectory_sampler is not None and params.get('diff_init', True) and initial_samples is None and (not params.get('model_path_orig', None) or not recover) and (not (mode != 'turn' and not params.get('live_recovery'))):
 
@@ -1036,6 +1093,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         if mode == 'middle':
             traj = torch.cat((traj[..., :-3], torch.zeros(*traj.shape[:-1], 3).to(device=params['device']),
                               traj[..., -3:]), dim=-1)
+        if mode == 'index_thumb':
+            traj = torch.cat((traj[..., :-3], torch.zeros(*traj.shape[:-1], 3).to(device=params['device']),
+                              traj[..., -3:], torch.zeros(*traj.shape[:-1], 3).to(device=params['device'])), dim=-1)
+        if mode == 'index_middle':
+            traj = torch.cat((traj[..., :-3], torch.zeros(*traj.shape[:-1], 6).to(device=params['device']),
+                              traj[..., -3:]), dim=-1)
         return traj
 
     def _full_to_partial(traj, mode):
@@ -1049,6 +1112,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             traj = traj[..., :-3]
         if mode == 'middle':
             traj = torch.cat((traj[..., :-6], traj[..., -3:]), dim=-1)
+        if mode == 'index_thumb':
+            traj = torch.cat((traj[..., :-9], traj[..., -6:-3]), dim=-1)
+        if mode == 'index_middle':
+            traj = torch.cat((traj[..., :-9], traj[..., -3:]), dim=-1)
         return traj
 
     def visualize_trajectory_wrapper(traj, contact_scenes, fname, plan_or_init, index, fingers, obj_dof, k):
@@ -1058,6 +1125,33 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
         pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
         visualize_trajectory(traj, contact_scenes, viz_fpath, fingers, obj_dof + 1)
+
+    @torch.no_grad()
+    def plan_recovery_contacts_w_model(state):
+        start_plan_time = time.perf_counter()
+        if params['sine_cosine']:
+            start_for_diff = convert_yaw_to_sine_cosine(state)
+        else:
+            start_for_diff = start
+            
+        contact_mode_pred = torch.softmax(classifier(start_for_diff.reshape(1, -1)), 1)
+
+        contact_mode_pred = torch.round(contact_mode_pred).repeat(params['N'], 1)
+        contact_mode_pred_tuple = tuple(contact_mode_pred[0].cpu().numpy())
+
+        best_mode_traj, _, best_mode_likelihoods = trajectory_sampler.sample(N=contact_mode_pred.shape[0], start=start_for_diff.reshape(1, -1),
+                                                                    constraints=contact_mode_pred,
+                                                                    # context_for_likelihood=False,
+                                                            H=trajectory_sampler.T)
+        
+        
+        best_mode_traj = convert_sine_cosine_to_yaw(best_mode_traj)
+        highest_likelihood_traj_idx = best_mode_likelihoods.argmax(0)
+        goal_obj_config = best_mode_traj[highest_likelihood_traj_idx, -1, :4 * num_fingers + obj_dof].squeeze()
+        # del mc_samples, _likelihoods_t_x
+        mode = contact_state_dict_flip[contact_mode_pred_tuple]
+        return [mode], goal_obj_config, best_mode_traj, best_mode_likelihoods, time.perf_counter() - start_plan_time
+
 
     def plan_recovery_contacts(state, stage):
         start_plan_time = time.perf_counter()
@@ -1396,6 +1490,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             'turn': torch.tensor([1.0, 1.0, 1.0]),
             'thumb': torch.tensor([1.0, 1.0, 0.0]),
             'middle': torch.tensor([1.0, 0.0, 1.0]),
+            'index_thumb': torch.tensor([.0, 1.0, .0]),
+            'index_middle': torch.tensor([0., 0, 1])
             # 'mppi': None
         }
 
@@ -1497,6 +1593,41 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                             dim=-1) for plan in plans]
             traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 9).to(device=params['device']),
                             ), dim=-1)
+            
+        elif contact == 'index_thumb':
+            _goal = None
+            if params.get('model_path_orig', None):
+                _goal = goal_config
+            result = execute_traj(
+                index_thumb_regrasp_planner, mode='index_thumb', goal=_goal, 
+                fname=f'index_thumb_regrasp_{all_stage}', initial_samples=initial_samples, 
+                recover=recover, start_timestep=start_timestep, max_timesteps=max_timesteps)
+            state = env.get_state()
+            state = state['q'].reshape(-1, FULL_DOF)[0].to(device=params['device'])
+            traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
+            plans = [torch.cat((plan[..., :-3],
+                                torch.zeros(*plan.shape[:-1], 3).to(device=params['device']),
+                                plan[..., -3:], torch.zeros(*plan.shape[:-1], 3).to(device=params['device'])),
+                            dim=-1) for plan in plans]
+            traj = torch.cat((traj[..., :-3], torch.zeros(*traj.shape[:-1], 3).to(device=params['device']),
+                              traj[..., -3:], torch.zeros(*traj.shape[:-1], 3).to(device=params['device'])), dim=-1)
+        elif contact == 'index_middle':
+            _goal = None
+            if params.get('model_path_orig', None):
+                _goal = goal_config
+            result = execute_traj(
+                index_middle_regrasp_planner, mode='index_middle', goal=_goal, 
+                fname=f'index_middle_regrasp_{all_stage}', initial_samples=initial_samples, 
+                recover=recover, start_timestep=start_timestep, max_timesteps=max_timesteps)
+            state = env.get_state()
+            state = state['q'].reshape(-1, FULL_DOF)[0].to(device=params['device'])
+            traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
+            plans= [torch.cat((plan[..., :-3], 
+                                torch.zeros(*plan.shape[:-1], 6).to(device=params['device']),
+                                plan[..., -3:]),
+                            dim=-1) for plan in plans]
+            traj = torch.cat((traj[..., :-3], torch.zeros(*traj.shape[:-1], 6).to(device=params['device']),
+                                traj[..., -3:]), dim=-1)
 
         elif contact == 'turn':
             mppi_ctrl = None
@@ -1527,6 +1658,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 None, mode='mppi', goal=None, fname=f'mppi_{all_stage}', initial_samples=initial_samples,
                 recover=recover, ctrl=mppi_ctrl, mppi_warmup=mppi_needs_warmup)
             mppi_needs_warmup = False
+            traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
+            plans = [torch.cat((plan[..., :-9],
+                                torch.zeros(*plan.shape[:-1], 9).to(device=params['device']),
+                                plan[..., -9:]),
+                            dim=-1) for plan in plans]
+            traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 9).to(device=params['device'])), dim=-1)
+
            
         # done = False
         add = not recover or params['live_recovery']
@@ -1767,7 +1905,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         if done:
             break
-    if params.get('live_recovery', False) and len(data['final_likelihoods'][-1]) == 0 and params['recovery_controller'] != 'mppi':
+    if params.get('live_recovery', False) and len(data['final_likelihoods'][-1]) == 0 and params['OOD_metric'] != 'q_function':
         id, likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15), yaw_idx=12, obj_dof=obj_dof)
         data['final_likelihoods'][-1].append(likelihood)
         data_save = deepcopy(data)
@@ -1791,11 +1929,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/{sys.argv[1]}.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/{sys.argv[1]}.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_only.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_recovery_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_safe_rl_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_mppi_likelihood_recovery.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_mppi_safe_rl_recovery.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_safe_rl_recovery.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl_data_gen_wrench_perturb.yaml').read_text())
@@ -1995,6 +2134,22 @@ if __name__ == "__main__":
 
         if model_path_orig is not None:
             trajectory_sampler_orig = load_sampler(model_path_orig, dim_mults=(1,2,4), T=config['T_orig'], recovery=False)
+            if not config.get('generate_context', False):
+                classifier = nn.Sequential(
+                    nn.Linear(14, 512),
+                    nn.ReLU(),
+                    nn.Linear(512, 512),
+                    nn.ReLU(),
+                    nn.Linear(512, 512),
+                    nn.ReLU(),
+                    nn.Linear(512, 3),  # 3 binary outputs for contact mode
+                ).to(params['device'])
+                
+                model_path_classifier = config.get('model_path_classifier', None)
+                classifier_d = torch.load(f'{CCAI_PATH}/{model_path_classifier}', map_location=torch.device(params['device']))
+                classifier.load_state_dict(classifier_d)
+                classifier.eval()
+
         else:
             trajectory_sampler_orig = trajectory_sampler
 
