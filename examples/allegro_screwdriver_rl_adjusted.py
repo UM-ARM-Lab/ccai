@@ -419,6 +419,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, True
         elif dropped:
             print('dropped')
+            if len(actual_trajectory) > 0:
+                actual_trajectory = torch.stack(actual_trajectory, dim=0).to(device=params['device'])
             return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, False
   
 
@@ -714,6 +716,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     print('dropped')
                 if params['recovery_controller'] == 'mppi' and recover and id_check:
                     print('MPPI returned state to ID. Exiting recovery loop')
+                    if len(actual_trajectory) > 0:
+                        actual_trajectory = torch.stack(actual_trajectory, dim=0).to(device=params['device'])
                     return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, False
                 elif not (params['recovery_controller'] == 'mppi' and recover) and not id_check:
                     # State is OOD. Save state and likelihood but DON'T collect data for RL yet.
@@ -733,6 +737,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, True
                 elif dropped:
                     print('dropped')
+                    if len(actual_trajectory) > 0:
+                        actual_trajectory = torch.stack(actual_trajectory, dim=0).to(device=params['device'])
                     return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, False
 
             # We're in distribution, collect data for staying (action=0)
@@ -1503,6 +1509,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             result = execute_traj(
                 None, mode='mppi', goal=None, fname=f'mppi_{all_stage}', initial_samples=initial_samples,
                 recover=recover, ctrl=mppi_ctrl, mppi_warmup=mppi_needs_warmup)
+            traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
             mppi_needs_warmup = False
             plans = [torch.cat((plan[..., :-9],
                                 torch.zeros(*plan.shape[:-1], 9).to(device=params['device']),
