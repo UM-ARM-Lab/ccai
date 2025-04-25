@@ -18,16 +18,16 @@ def extract_solve_times(log_file_path: str) -> List[float]:
     # Regex to match the contact mode line (e.g., "14 index" or "16 thumb_middle")
     contact_mode_regex = re.compile(r'^\d+ (index|thumb_middle)$')
     # Regex to extract the time from the "Solve time" line
-    solve_time_regex = re.compile(r'Solve time for step 1.*?([\d.]+)$')
+    solve_time_regex = re.compile(r'Solve time for step 3.*?([\d.]+)$')
 
     try:
         with open(log_file_path, 'r') as f:
             # Use deque to efficiently keep track of the last 3 lines
-            lines_buffer = deque(maxlen=5)
+            lines_buffer = deque(maxlen=17)
             for line in f:
                 lines_buffer.append(line.strip())
-                if len(lines_buffer) == 5:
-                    current_line = lines_buffer[4]
+                if len(lines_buffer) == 17:
+                    current_line = lines_buffer[16]
                     line_minus_2 = lines_buffer[0]
 
                     # Check if the current line is a "Solve time for step 1" line
@@ -54,7 +54,8 @@ def extract_solve_times(log_file_path: str) -> List[float]:
 
 # --- Main execution ---
 if __name__ == "__main__":
-    LOG_FILE = "/home/abhinav/Documents/ccai/examples/logs/corl_screwdriver/allegro_screwdriver_recovery_model_mlp_ablation_fixed_rand_pct_pi_2_damping_.1_eval.log"
+    # LOG_FILE = "/home/abhinav/Documents/ccai/examples/logs/corl_screwdriver/allegro_screwdriver_recovery_model_mlp_ablation_fixed_rand_pct_pi_2_damping_.1_eval.log"
+    LOG_FILE = "/home/abhinav/Documents/ccai/examples/logs/corl_screwdriver/allegro_screwdriver_recovery_model_fixed_rand_pct_pi_2_damping_.1_14999_ckpt_eval.log"
     OUTPUT_FILE = "/home/abhinav/Documents/ccai/extracted_solve_times_list.py"
 
     extracted_times = extract_solve_times(LOG_FILE)

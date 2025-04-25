@@ -1,3 +1,4 @@
+from recovery_rl.dataset import AllegroTrajectoryTransitionDataset  # Now you can import directly
 import datetime
 import os
 import os.path as osp
@@ -17,7 +18,6 @@ from recovery_rl.MPC import MPC
 from recovery_rl.VisualMPC import VisualMPC
 from recovery_rl.model import VisualEncoderAttn, TransitionModel, VisualReconModel
 from recovery_rl.utils import linear_schedule, recovery_config_setup
-from recovery_rl.dataset import AllegroTrajectoryTransitionDataset  # Now you can import directly
 import wandb
 
 from env.make_utils import register_env, make_env
@@ -164,7 +164,7 @@ class Experiment:
             register_env(self.exp_cfg.env_name)
             env = make_env(self.exp_cfg.env_name)
         self.env = DummyEnv(
-            16,
+            14,
             12
         ) 
         # self.recovery_policy = recovery_policy
@@ -227,7 +227,8 @@ class Experiment:
                         "rb"))
             elif 'screwdriver' in self.exp_cfg.env_name:
                 dataset = AllegroTrajectoryTransitionDataset(
-                    ['/home/abhinav/Documents/ccai/data/experiments/allegro_screwdriver_safe_rl_recovery_data_pi_2_damping_.1'],
+                    # ['/home/abhinav/Documents/ccai/data/experiments/allegro_screwdriver_safe_rl_recovery_data_pi_2_damping_.1'],
+                    ['/home/abhinav/Documents/ccai/data/experiments/allegro_valve_safe_rl_data_gen_std_.03_save_perturbation'],
                     cosine_sine=True,
                     action_dim=21
                 )

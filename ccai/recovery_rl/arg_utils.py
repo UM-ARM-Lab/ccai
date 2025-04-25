@@ -136,7 +136,7 @@ def get_args():
                         help='number of unsafe transitions')
     parser.add_argument('--critic_safe_pretraining_steps',
                         type=int,
-                        default=20000,
+                        default=100000,
                         help='gradient steps for Qrisk pretraining')
 
     ################### Recovery RL ###################

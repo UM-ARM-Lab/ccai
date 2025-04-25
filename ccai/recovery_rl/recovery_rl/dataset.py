@@ -1,9 +1,16 @@
+from isaacgym import gymapi
+from isaac_victor_envs.utils import get_assets_dir
 from typing import Optional
 import torch
 import pickle
 import pathlib
 import numpy as np
 from torch.utils.data import Dataset
+import pytorch_volumetric as pv
+import pytorch_kinematics.transforms as tf
+import pytorch_kinematics as pk
+from ccai.utils.allegro_utils import partial_to_full_state
+from tqdm import tqdm
 
 
 class AllegroTrajectoryTransitionDataset(Dataset):
@@ -24,7 +31,7 @@ class AllegroTrajectoryTransitionDataset(Dataset):
                  cosine_sine: bool = False, 
                  states_only: bool = False,
                  action_dim: Optional[int] = None,
-                 state_dim: int = 15,
+                 state_dim: int = 13,
                  transform_fn = None,
                  num_fingers=3):
         super().__init__()
@@ -43,9 +50,10 @@ class AllegroTrajectoryTransitionDataset(Dataset):
         for folder in folders:
             path = pathlib.Path(folder)
             trajectory_files = list(path.rglob('*trajectory.pkl'))
+            full_data_files = list(path.rglob('*traj_data.p'))
             
-            for traj_file in trajectory_files:
-                with open(traj_file, 'rb') as f:
+            for traj_file, full_data_file in zip(trajectory_files, full_data_files):
+                with open(traj_file, 'rb') as f, open(full_data_file, 'rb') as f2:
                     trajectory = pickle.load(f)
                     
                     # Process trajectory to extract transitions
@@ -55,6 +63,9 @@ class AllegroTrajectoryTransitionDataset(Dataset):
                         actions.extend(traj_actions)
                         next_states.extend(traj_next_states)
                         dones.extend(traj_dones)
+                        
+                    # data = pickle.load(f2)
+                    # for t in range(3, 0, -1)
                 # except Exception as e:
                 #     print(f"Error loading {traj_file}: {e}")
         
@@ -67,22 +78,194 @@ class AllegroTrajectoryTransitionDataset(Dataset):
         self.next_states = torch.stack(next_states)
         self.dones = torch.tensor(dones).float()
         
+        print(self.states.shape, self.actions.shape, self.next_states.shape)
+        
         # Infer action dimension if not provided
         if action_dim is None:
             self.action_dim = self.actions.shape[1]
         else:
             self.action_dim = action_dim
             
+        self.device='cuda:0'
+        device = 'cuda:0'
+        self.robot_p = np.array([0.02, -0.35, .376]).astype(np.float32)
+        self.robot_r = [0, 0, 0.7071068, 0.7071068]
+        pose = gymapi.Transform()
+        pose.p = gymapi.Vec3(*self.robot_p)
+        # NOTE: for isaac gym quat, angle goes last, but for pytorch kinematics, angle goes first 
+        pose.r = gymapi.Quat(*self.robot_r)
+        world_trans = tf.Transform3d(pos=torch.tensor(self.robot_p, device=self.device),
+                                          rot=torch.tensor(
+                                              [self.robot_r[3], self.robot_r[0], self.robot_r[1], self.robot_r[2]],
+                                              device=self.device), device=self.device)
+            
+        self.ee_names = {
+            'index': 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
+            'middle': 'allegro_hand_naka_finger_finger_1_aftc_base_link',
+            'ring': 'allegro_hand_kusuri_finger_finger_2_aftc_base_link',
+            'thumb': 'allegro_hand_oya_finger_3_aftc_base_link',
+        }
+
+        self.collision_link_names = {
+            'index':
+            ['allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
+             'allegro_hand_hitosashi_finger_finger_link_3',
+             'allegro_hand_hitosashi_finger_finger_link_2',
+             'allegro_hand_hitosashi_finger_finger_link_1',
+             'allegro_hand_hitosashi_finger_finger_link_0'],
+             'middle':
+            ['allegro_hand_naka_finger_finger_1_aftc_base_link',
+             'allegro_hand_naka_finger_finger_link_7',
+             'allegro_hand_naka_finger_finger_link_6',
+             'allegro_hand_naka_finger_finger_link_5',
+             'allegro_hand_naka_finger_finger_link_4'],
+                'ring':
+            ['allegro_hand_kusuri_finger_finger_2_aftc_base_link',
+                'allegro_hand_kusuri_finger_finger_link_11',
+                'allegro_hand_kusuri_finger_finger_link_10',
+                'allegro_hand_kusuri_finger_finger_link_9',
+                'allegro_hand_kusuri_finger_finger_link_8'],
+                'thumb':
+            ['allegro_hand_oya_finger_3_aftc_base_link',
+            'allegro_hand_oya_finger_link_15',
+            'allegro_hand_oya_finger_link_14',
+            'allegro_hand_oya_finger_link_13',
+            'allegro_hand_oya_finger_link_12'],
+        }
+        # self.collision_link_names = {
+        #     'index':
+        #     ['allegro_hand_hitosashi_finger_finger_0_aftc_base_link'],
+        #      'middle':
+        #     ['allegro_hand_naka_finger_finger_1_aftc_base_link'],
+        #         'ring':
+        #     ['allegro_hand_kusuri_finger_finger_2_aftc_base_link'],
+        #         'thumb':
+        #     ['allegro_hand_oya_finger_3_aftc_base_link'],
+        # }
+        asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
+        ee_names = {
+            'index': 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
+            'middle': 'allegro_hand_naka_finger_finger_1_aftc_base_link',
+            'ring': 'allegro_hand_kusuri_finger_finger_2_aftc_base_link',
+            'thumb': 'allegro_hand_oya_finger_3_aftc_base_link',
+        }
+        valve_asset = f'{get_assets_dir()}/valve/valve_cross.urdf'
+
+        chain = pk.build_chain_from_urdf(open(asset).read()).to(device=device)
+        self.fingers = ['index', 'middle', 'thumb']
+        self.ee_link_idx = {finger: chain.frame_to_idx[ee_name] for finger, ee_name in self.ee_names.items()}
+        self.frame_indices = torch.tensor([self.ee_link_idx[finger] for finger in self.fingers])
+
+        object_type = 'valve'
+        ##### SDF for robot and environment ######
+        if object_type == 'cuboid_valve':
+            asset_object = get_assets_dir() + '/valve/valve_cuboid.urdf'
+        elif object_type == 'cylinder_valve':
+            asset_object = get_assets_dir() + '/valve/valve_cylinder.urdf'
+        elif object_type == 'valve':
+            asset_object = get_assets_dir() + '/valve/valve_cross.urdf'
+        elif object_type == 'screwdriver':
+            asset_object = get_assets_dir() + '/screwdriver/screwdriver.urdf'
+        elif object_type == "card":
+            asset_object = get_assets_dir() + '/card/card.urdf'
+        elif object_type == "peg":
+            asset_object = get_assets_dir() + '/peg/short_peg.urdf'
+        self.object_asset_pos = np.array([0.0, 0.0, 0.40])
+        object_asset_pos = np.array([0.0, 0.0, 0.40])
+
+        chain_object = pk.build_chain_from_urdf(open(asset_object).read())
+        chain_object = chain_object.to(device=device)
+        if 'valve' in object_type:
+            object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/valve',
+                                     use_collision_geometry=True)
+            object_sdf_for_viz = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/valve',
+                                     use_collision_geometry=True) # Use collision geometry for visualization to check fidelity of contact mesh
+        elif 'screwdriver' in object_type:
+            object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver',
+                                     use_collision_geometry=True)
+            object_sdf_for_viz = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver',
+                                     use_collision_geometry=False)
+        elif 'card' in object_type:
+            object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/card',
+                                     use_collision_geometry=False)
+        elif 'peg' in object_type:
+            object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/peg',
+                                     use_collision_geometry=True)
+            object_sdf_for_viz = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/peg',
+                                     use_collision_geometry=False)
+        self.object_sdf = object_sdf
+        robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models',
+                                use_collision_geometry=False)
+        
+        obj_to_world_trans = pk.Transform3d(device='cuda:0').translate(object_asset_pos[0], object_asset_pos[1], object_asset_pos[2])
+        screwdriver_origin_to_world_trans = pk.Transform3d(device='cuda:0').translate(object_asset_pos[0], object_asset_pos[1], object_asset_pos[2] + .1 + 0.412*2.54/100)
+        scene_trans = world_trans.inverse().compose(obj_to_world_trans).to(device=device)
+        object_to_hand_trans = world_trans.inverse().compose(screwdriver_origin_to_world_trans)
+        
+        self.obj_dof = 1
+        if self.obj_dof == 3:
+            object_link_name = 'screwdriver_body'
+        elif self.obj_dof == 1:
+            object_link_name = 'cross_1'
+        elif self.obj_dof == 6:
+            object_link_name = 'peg'
+        self.obj_link_name = object_link_name
+        # Object to robot transform
+        # robot_minus_object = world_trans.to(device=device).compose(obj_to_world_trans.to(device=device).inverse())
+        # print(robot_minus_object.get_matrix())
+        # contact checking
+        # collision_check_links = [self.ee_names[finger] for finger in self.fingers]
+        collision_check_links = sum([self.collision_link_names[finger] for finger in self.fingers], [])
+            
+        self.contact_scene = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
+                                            collision_check_links=collision_check_links,
+                                            softmin_temp=1.0e3,
+                                            points_per_link=750,
+                                            links_per_finger=len(self.collision_link_names['index']),
+                                            obj_link_name=self.obj_link_name
+                                            )
+        self.dropped = self.calc_constraints()
+            
         # Apply cosine/sine transformation if needed
-        self.roll = self.next_states[:, -3].clone()
-        self.pitch = self.next_states[:, -2].clone()
-        self.dropped = (self.roll.abs() > 0.35) | (self.pitch.abs() > 0.35)
-        self.dropped = self.dropped.float().reshape(-1)
+        # self.roll = self.next_states[:, -3].clone()
+        # self.pitch = self.next_states[:, -2].clone()
+        # self.dropped = (self.roll.abs() > 0.35) | (self.pitch.abs() > 0.35)
+        # self.dropped = self.dropped.float().reshape(-1)
         # if self.cosine_sine:
         #     self._apply_cosine_sine_transform()
             
         print(f"Loaded {len(self.states)} transitions")
         print(f"State shape: {self.states.shape}, Action shape: {self.actions.shape}")
+    
+    
+    def calc_constraints(self):
+        """
+            Uses self.contact_scene.scene_get_sdf to get sdf values for the fingers
+            Uses a batch size of 128
+        """
+        batch_size = 1024
+        num_batches = int(np.ceil(len(self.states) / batch_size))
+        constraints = []
+        for i in tqdm(range(num_batches)):
+            start_idx = i * batch_size
+            end_idx = min((i + 1) * batch_size, len(self.states))
+            next_states_batch = self.next_states[start_idx:end_idx]
+            next_states_q = next_states_batch[:, :12].to(self.device)
+            next_states_q = partial_to_full_state(next_states_q, fingers=['index', 'middle','thumb'])
+            next_states_theta = next_states_batch[:, 12:13].to(self.device)
+            rvals = self.contact_scene.scene_get_sdf(next_states_q, next_states_theta)
+            sdf = rvals['sdf']
+            sdf = sdf.reshape(-1, 3).max(1)[0]
+            # print(sdf)
+            constraint = (sdf > .003).float().cpu()
+            # print(constraint)
+            constraints.append(constraint)
+        
+        ret =  torch.cat(constraints, dim=0)
+        print(ret.mean())
+        return ret
+        
+            
     
     def return_as_numpy(self):
         """

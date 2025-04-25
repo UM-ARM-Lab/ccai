@@ -661,7 +661,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         initial_samples_0 = None
         new_T = params['T'] if (mode in ['index', 'thumb', 'middle', 'all', 'index_thumb', 'index_middle']) else params['T_orig']
         # if trajectory_sampler is not None and params.get('diff_init', True) and initial_samples is None:
-        if not skip_diff_init and trajectory_sampler is not None and params.get('diff_init', True) and initial_samples is None and (not params.get('model_path_orig', None) or not recover) and (not (mode != 'turn' and not params.get('live_recovery'))):
+        if not skip_diff_init and (trajectory_sampler is not None or trajectory_sampler_orig is not None) and params.get('diff_init', True) and initial_samples is None and (not params.get('model_path_orig', None) or not recover) and (not (mode != 'turn' and not params.get('live_recovery'))):
 
             sampler = trajectory_sampler if recover else trajectory_sampler_orig
             # with torch.no_grad():
@@ -792,7 +792,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 elif not params.get('live_recovery', False):
                     id_check, final_likelihood = True, None
                 else:
-                    id_check, final_likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15), yaw_idx=12, obj_dof=obj_dof)
+                    if params['OOD_metric'] == 'likelihood':
+                        id_check, final_likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15))
+                    elif params['OOD_metric'] == 'q_function':
+                        id_check = True
+                        final_likelihood = None
                 if final_likelihood is not None:
                     data['pre_action_likelihoods'][-1].append(final_likelihood)
                 # Only return based on dropped if we are using MPPI
@@ -952,6 +956,25 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
             xu = torch.cat((state.cpu(), action[0].cpu()))
             actual_trajectory.append(xu)
+            if params['OOD_metric'] == 'q_function' and not recover:
+                q_func_action = action[0, :4 * num_fingers_to_plan].to(params['device'])
+                q_func_action = q_func_action.reshape(1, -1)
+                id_check, q_output = running_cost.check_id(state.unsqueeze(0), q_func_action)
+                data['pre_action_likelihoods'][-1].append(q_output)
+                print(f'Q function output: {q_output.item():.2f}')
+                if not id_check:
+                    print('OOD detected by Q function:', q_output)
+                    if planner is not None:
+                        planner.problem.data = {}
+                    if len(actual_trajectory) > 0:
+                        actual_trajectory = torch.stack(actual_trajectory, dim=0).to(device=params['device'])
+
+                    # Zero obj velocity
+                    env.zero_obj_velocity()
+                    planned_trajectories.pop(-1)
+                    # Return how many steps we've executed for resuming later
+                    return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, True
+
             if params.get('perturb_action', False):# and mode == 'turn':
                 # rand_pct = .75 if not params.get('shortcut_trajectory', False) else .25
                 # rand_pct = .75

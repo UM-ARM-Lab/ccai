@@ -20,6 +20,8 @@ class DynamicsModel:
                 self.env.set_pose(state, semantic_order=False, zero_velocity=False, ignore_img=True)
             action = self.env.get_state()['q'][0, : 4 * self.num_fingers].to(action.device) + action
             action = action.to(self.env.device)
+            
+            action += torch.randn_like(action) * .03
             self.env.step(action, ignore_img=True)
             ret = self.env.dof_states.clone().reshape(N, -1)
         else:

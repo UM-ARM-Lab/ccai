@@ -562,7 +562,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         initial_samples_0 = None
         new_T = params['T'] if (mode in ['index', 'thumb_middle', 'all']) else params['T_orig']
         # if trajectory_sampler is not None and params.get('diff_init', True) and initial_samples is None:
-        if not skip_diff_init and trajectory_sampler is not None and params.get('diff_init', True) and initial_samples is None and (not params.get('model_path_orig', None) or not recover) and (not (mode != 'turn' and not params.get('live_recovery'))):
+        if not skip_diff_init and (trajectory_sampler is not None or trajectory_sampler_orig is not None) and params.get('diff_init', True) and initial_samples is None and (not params.get('model_path_orig', None) or not recover) and (not (mode != 'turn' and not params.get('live_recovery'))):
 
             sampler = trajectory_sampler if recover else trajectory_sampler_orig
             # with torch.no_grad():
@@ -1504,6 +1504,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 None, mode='mppi', goal=None, fname=f'mppi_{all_stage}', initial_samples=initial_samples,
                 recover=recover, ctrl=mppi_ctrl, mppi_warmup=mppi_needs_warmup)
             mppi_needs_warmup = False
+            plans = [torch.cat((plan[..., :-9],
+                                torch.zeros(*plan.shape[:-1], 9).to(device=params['device']),
+                                plan[..., -9:]),
+                            dim=-1) for plan in plans]
+            traj = torch.cat((traj, torch.zeros(*traj.shape[:-1], 9).to(device=params['device'])), dim=-1)
 
         # done = False
         add = not recover or params['live_recovery']
@@ -1706,7 +1711,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         if done:
             break
-    if params.get('live_recovery', False) and len(data['final_likelihoods'][-1]) == 0 and params['recovery_controller'] != 'mppi':
+    if params.get('live_recovery', False) and len(data['final_likelihoods'][-1]) == 0 and params['OOD_metric'] != 'q_function':
         id, likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15))
         data['final_likelihoods'][-1].append(likelihood)
         data_save = deepcopy(data)
