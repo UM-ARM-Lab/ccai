@@ -413,8 +413,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             if len(actual_trajectory) > 0:
                 actual_trajectory = torch.stack(actual_trajectory, dim=0).to(device=params['device'])
 
-            # Zero obj velocity
-            env.zero_obj_velocity()
+            if params['mode'] != 'hardware':
+                # Zero obj velocity
+                env.zero_obj_velocity()
             # Return how many steps we've executed for resuming later
             return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, True
         elif dropped:
@@ -731,8 +732,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     if len(actual_trajectory) > 0:
                         actual_trajectory = torch.stack(actual_trajectory, dim=0).to(device=params['device'])
 
-                    # Zero obj velocity
-                    env.zero_obj_velocity()
+                    if params['mode'] != 'hardware':
+                        # Zero obj velocity
+                        env.zero_obj_velocity()
                     # Return how many steps we've executed for resuming later
                     return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, True
                 elif dropped:
@@ -846,8 +848,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     if len(actual_trajectory) > 0:
                         actual_trajectory = torch.stack(actual_trajectory, dim=0).to(device=params['device'])
 
-                    # Zero obj velocity
-                    env.zero_obj_velocity()
+                    if params['mode'] != 'hardware':
+                        # Zero obj velocity
+                        env.zero_obj_velocity()
                     planned_trajectories.pop(-1)
                     # Return how many steps we've executed for resuming later
                     return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, True
@@ -886,9 +889,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
             if params['mode'] == 'hardware':
                 set_state = env.get_state()['q']
-                set_state = set_state.reshape(-1, 4 * num_fingers + 4)[0, :15].to(device=params['device'])
+                set_state = set_state.reshape(-1, 4 * num_fingers + 4)[0].to(device=params['device'])
                 # print(set_state.shape)
-                sim_viz_env.set_pose(set_state)
+                sim_viz_env.set_pose(set_state.cpu())
                 sim_viz_env.write_image()
 
                 state = sim_viz_env.get_state()['q'].reshape(-1).to(device=params['device'])
@@ -1367,22 +1370,23 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
                 env.step(action)
                 # After stepping, reset the screwdriver to where it was initially
-                s = env.get_state()['q'].reshape(-1, 4 * num_fingers + 4).to(device=params['device'])[0]
-                s[-4:] = start[-4:]
-                env.set_pose(s.to(device=env.device))
+                if params['mode'] != 'hardware':
+                    s = env.get_state()['q'].reshape(-1, 4 * num_fingers + 4).to(device=params['device'])[0]
+                    s[-4:] = start[-4:]
+                    env.set_pose(s.to(device=env.device))
 
-                if params['mode'] == 'hardware':
-                    set_state = env.get_state()['q'].to(device=env.device)
-                    # print(set_state.shape)
-                    sim_viz_env.set_pose(set_state)  
-
-                    state = sim_viz_env.get_state()['q'].reshape(-1).to(device=params['device'])
-                    print(state[:15][-3:])
             # for _ in range(50):
             #     env._step_sim()
             post_pregrasp_state = env.get_state()['q'].reshape(-1, 4 * num_fingers + 4).to(device=params['device'])[0]
+            post_pregrasp_state_for_viz = post_pregrasp_state.clone()
             post_pregrasp_state = post_pregrasp_state[:15]
             if params['mode'] == 'hardware':
+                # print(set_state.shape)
+                sim_viz_env.set_pose(post_pregrasp_state_for_viz.cpu())  
+                sim_viz_env.write_image()
+
+                state = sim_viz_env.get_state()['q'].reshape(-1).to(device=params['device'])
+                print(state[:15][-3:])
                 input("Pregrasp complete. Ready to execute. Press <ENTER> to continue.")
             stage += 1
             all_stage += 1
@@ -1742,17 +1746,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_mppi_safe_rl_recovery.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_mppi_likelihood_recovery.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_model_mlp_ablation.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl_wrench_perturb_new_project.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl_wrench_perturb_new_project.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_OOD_ID_perturbed_data_gen.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_OOD_ID_orig_likelihood.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_OOD_ID_live_recovery_shortcut_0.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_diff_demo.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_OOD_ID_live_recovery_shortcut_hardware.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_hardware.yaml').read_text())
 
     from tqdm import tqdm
 
@@ -1768,12 +1763,13 @@ if __name__ == "__main__":
         default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
                                     torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float(),
                                     torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
-                                    torch.tensor([[1.2, 0.3, 3, 1.2]]).float()),
+                                    torch.tensor([[1.2, 0.3, .3, 1.2]]).float()),
                                     dim=1)
+
         env = HardwareEnv(default_dof_pos[:, :16], 
                           finger_list=config['fingers'], 
                           kp=config['kp'], 
-                          obj='screwdriver',
+                          obj='blue_screwdriver',
                           mode='relative',
                           gradual_control=True,
                           num_repeat=10)
@@ -1877,6 +1873,12 @@ if __name__ == "__main__":
         now = datetime.datetime.now().strftime("%m.%d.%y:%I:%M:%S")
         now_ = '.' + now
         now = now_
+        sys.stdout = open(f'./logs/corl_screwdriver/hardware/hardware{now}.log', 'w')
+        # sys.stderr = open(f'./logs/corl_screwdriver/hardware/hardware{now}.log', 'w')
+        print('Hardware mode')
+        print('Datetime:', now)
+        print('Config:', config)
+
     else:
         now = ''
 
@@ -1983,7 +1985,7 @@ if __name__ == "__main__":
             trajectory_sampler_orig = trajectory_sampler
 
         if config['recovery_controller'] == 'mppi':
-            dynamics = DynamicsModel(env, num_fingers=len(config['fingers']), include_velocity=True, obj_joint_dim=1, hardware=False)
+            dynamics = DynamicsModel(env, num_fingers=len(config['fingers']), include_velocity=True, obj_joint_dim=1, hardware=config['mode'] == 'hardware' )
             safety_critic_path = config['model_path']
             if params['OOD_metric'] == 'q_function':
                 running_cost = RunningCostSafeRL(safety_critic_path, params['q_cutoff'], env, config['device'], include_velocity=True)
@@ -2025,7 +2027,9 @@ if __name__ == "__main__":
         params['controller'] = 'csvgd'
         params['valve_goal'] = goal.to(device=params['device'])
         params['chain'] = chain.to(device=params['device'])
-        params['object_location'] = env.obj_pose.to(device=params['device'])
+        params['object_location'] = torch.tensor([0, 0, 1.205]).to(
+            params['device'])  # TODO: confirm if this is the correct location
+
         # If params['device'] is cuda:1 but the computer only has 1 gpu, change to cuda:0
         succ = False
         while not succ:
