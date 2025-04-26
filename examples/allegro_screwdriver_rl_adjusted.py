@@ -374,6 +374,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         mode_fpath = f'{fpath}/{fname}'
         pathlib.Path.mkdir(pathlib.Path(mode_fpath), parents=True, exist_ok=True)
+        
+        mode_fpath_goal = f'{mode_fpath}/{mode}/goal'
+        pathlib.Path.mkdir(pathlib.Path(mode_fpath_goal), parents=True, exist_ok=True)
+        with open(f"{mode_fpath_goal}/goal_info.pkl", "wb") as f:
+            pkl.dump((goal, state), f)
+
 
         if recover and params['recovery_controller'] != 'mppi':
             id_check, final_likelihood = True, None
@@ -1200,6 +1206,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             visualize_trajectory(traj_for_viz
             , turn_problem.contact_scenes_for_viz, viz_fpath,
                                 turn_problem.fingers, turn_problem.obj_dof + 1)
+            with open(f"{viz_fpath}/goal_info.pkl", "wb") as f:
+                pkl.dump((goal, state), f)
         post_goal_viz = time.perf_counter()
         dist_min = 3e-3
         mode_skip = []

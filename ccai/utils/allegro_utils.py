@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import pathlib
 import pytorch_kinematics.transforms as tf
 import time
+import pickle
 
 full_finger_list = ['index', 'middle', 'ring', 'thumb']
 
@@ -146,6 +147,9 @@ def state2ee_pos(state, finger_name, fingers, chain, frame_indices, world_trans)
 
 is_visible = False
 def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headless=False, task='screwdriver', pcd=None):
+    
+    with open(f'{scene_fpath}/traj.pkl', 'wb') as f:
+        pickle.dump(trajectory.cpu().numpy(), f)
     num_fingers = len(fingers)
     # for a single trajectory
     T, dxu = trajectory.shape

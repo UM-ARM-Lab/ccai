@@ -372,7 +372,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         mode_fpath = f'{fpath}/{fname}'
         pathlib.Path.mkdir(pathlib.Path(mode_fpath), parents=True, exist_ok=True)
+        
+        mode_fpath_goal = f'{mode_fpath}/{mode}/goal'
+        pathlib.Path.mkdir(pathlib.Path(mode_fpath_goal), parents=True, exist_ok=True)
+        with open(f"{mode_fpath_goal}/goal_info.pkl", "wb") as f:
+            pkl.dump((goal, state), f)
 
+        
         if recover and params['recovery_controller'] != 'mppi':
             id_check, final_likelihood = True, None
         elif recover and params['recovery_controller'] == 'mppi':
@@ -793,7 +799,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     id_check, final_likelihood = True, None
                 else:
                     if params['OOD_metric'] == 'likelihood':
-                        id_check, final_likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15), yaw_idx=12)
+                        id_check, final_likelihood = trajectory_sampler_orig.check_id(state, 8, yaw_idx=12, threshold=params.get('likelihood_threshold', -15))
                     elif params['OOD_metric'] == 'q_function':
                         id_check = True
                         final_likelihood = None

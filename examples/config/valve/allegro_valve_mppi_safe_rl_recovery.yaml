@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 25
 visualize: True
-experiment_name: 'allegro_valve_safe_rl_mppi_recovery'
+experiment_name: 'allegro_valve_safe_rl_mppi_recovery_new'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -64,9 +64,9 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
-start_ind: 16
-end_ind: 25
-device: 'cuda:1'
+start_ind: 41
+end_ind: 50
+device: 'cuda:0'
 recovery_controller: 'mppi'
 OOD_metric: 'q_function'
 lambda_: .01
@@ -75,7 +75,7 @@ controllers:
   csvgd:
     # N: 16
     N: 16
-    alpha_J: 1.0e-2
+    alpha_J: 5.0e-3
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
