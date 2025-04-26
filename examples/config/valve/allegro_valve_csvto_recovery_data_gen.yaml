@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 200
 visualize: True
-experiment_name: 'allegro_valve_recovery_data_generation_std_.0_thresh_70_cutoff_96_N_4'
+experiment_name: 'allegro_valve_recovery_data_for_viz'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -61,7 +61,7 @@ sac_batch_size: 64
 # parity: 654
 OOD_metric: 'likelihood'
 recovery_controller: 'csvgd'
-start_ind: 8750
+start_ind: 0
 end_ind: 9000
 controllers:
   csvgd:
@@ -79,4 +79,4 @@ controllers:
     penalty: 1000000
     collision_checking: False
     random_init_every_iter: False
-    device: 'cuda:0'
+    device: 'cuda:1'

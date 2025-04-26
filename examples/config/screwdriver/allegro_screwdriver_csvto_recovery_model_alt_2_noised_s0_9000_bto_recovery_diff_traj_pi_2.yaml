@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 50
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_model_fixed_rand_pct_pi_2_damping_.1_correct_thresh_eval'
+experiment_name: 'allegro_screwdriver_recovery_model_for_viz'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
