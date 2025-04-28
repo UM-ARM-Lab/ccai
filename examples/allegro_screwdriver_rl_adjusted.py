@@ -226,9 +226,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     min_force_dict = None
     if params['mode'] == 'hardware':
         min_force_dict = {
-            'thumb': .5,
-            'middle': .5,
-            'index': .5,
+            'thumb': 1.,
+            'middle': 1.,
+            'index': 1.,
         }
     else:
         min_force_dict = {
@@ -422,6 +422,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             if params['mode'] != 'hardware':
                 # Zero obj velocity
                 env.zero_obj_velocity()
+            else:
+                sim_viz_env.zero_obj_velocity()
             # Return how many steps we've executed for resuming later
             return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, True
         elif dropped:
@@ -690,7 +692,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # Get max steps to execute
         total_steps = planner.problem.T if max_timesteps is None else max_timesteps
         if params['recovery_controller'] == 'mppi' and recover:
-            total_steps = 100 - episode_num_steps
+            total_steps = max_episode_num_steps - episode_num_steps
         
         # Skip to start_timestep if resuming after recovery
         best_traj = None
@@ -741,6 +743,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     if params['mode'] != 'hardware':
                         # Zero obj velocity
                         env.zero_obj_velocity()
+                    else:
+                        sim_viz_env.zero_obj_velocity()
                     # Return how many steps we've executed for resuming later
                     return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, True
                 elif dropped:
@@ -857,6 +861,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     if params['mode'] != 'hardware':
                         # Zero obj velocity
                         env.zero_obj_velocity()
+                    else:
+                        sim_viz_env.zero_obj_velocity()
                     planned_trajectories.pop(-1)
                     # Return how many steps we've executed for resuming later
                     return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, True
@@ -929,7 +935,21 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 visualize_trajectory(traj_for_viz, turn_problem.contact_scenes_for_viz, viz_fpath,
                                      turn_problem.fingers, turn_problem.obj_dof + 1)
 
+
+            if params['external_wrench_perturb'] and params['mode'] == 'hardware':
+                rand_pct = 1/3
+                if np.random.rand() < rand_pct:
+                    in_or_side = np.random.rand() < .5
+                    if in_or_side:
+                        loc_str = '**INTO PALM**'
+                    else:
+                        loc_str = '**TO SIDE OF OBJECT**'
+                    input(f'Apply perturbation now {loc_str}. Press <ENTER> to continue')
+            if params['mode'] == 'hardware':
+                action = action[0]
             env.step(action.to(device=env.device))
+            # if params['mode'] == 'hardware' and params['recovery_controller'] == 'mppi':
+            #     sim_viz_env.step(action)
             episode_num_steps += 1
             executed_steps = k + 1
 
@@ -939,7 +959,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # for memory reasons we clear the data
         if params['controller'] != 'diffusion_policy':
             planner.problem.data = {}
-        if params['external_wrench_perturb']:
+        if params['external_wrench_perturb'] and params['mode'] != 'hardware':
             env.set_external_wrench_perturb(orig_torque_perturb, rand_pct)
         return actual_trajectory, planned_trajectories, initial_samples, sim_rollouts, optimizer_paths, contact_points, contact_distance, recover
 
@@ -1035,7 +1055,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         else:
             start_for_diff = start
             
-        contact_mode_pred = torch.softmax(classifier(start_for_diff.reshape(1, -1)), 1)
+        contact_mode_pred = torch.sigmoid(classifier(start_for_diff.reshape(1, -1)), 1)
 
         contact_mode_pred = torch.round(contact_mode_pred).repeat(params['N'], 1)
         contact_mode_pred_tuple = tuple(contact_mode_pred[0].cpu().numpy())
@@ -1312,7 +1332,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     stage = 0
     all_stage = 0
     done = False
-    max_episode_num_steps = 100
+    max_episode_num_steps = 100 if not params['mode'] == 'hardware' else 50
     # for stage in range(num_stages):
     # <= so because pregrasp will iterate the all_stage counter
 
@@ -1371,6 +1391,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             orig_torque_perturb = env.external_wrench_perturb if params['mode'] != 'hardware' else False
             if params['mode'] != 'hardware':
                 env.set_external_wrench_perturb(False)
+            else:
+                input('Ready to pregrasp. Press <ENTER> to continue.')
             contact = 'pregrasp'
             start = env.get_state()['q'].reshape(-1, 4 * num_fingers + 4).to(device=params['device'])[0]
             best_traj, _ = pregrasp_planner.step(start[:pregrasp_planner.problem.dx])
@@ -1699,7 +1721,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             actual_trajectory.append(traj)
         # change to numpy and save data
 
-        pickle.dump(env.wrench_perturb_inds, open(f"{fpath}/wrench_perturb_inds.p", "wb"))
+        if params['mode'] != 'hardware':
+            pickle.dump(env.wrench_perturb_inds, open(f"{fpath}/wrench_perturb_inds.p", "wb"))
         
         data_save = deepcopy(data)
         for t in range(1, 1 + params['T']):
@@ -1754,8 +1777,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_hardware.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_hardware.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_mppi_safe_rl_recovery_hardware.yaml').read_text())
 
     from tqdm import tqdm
 
@@ -1764,6 +1788,7 @@ if __name__ == "__main__":
 
     if 'recovery_controller' not in config:
         config['recovery_controller'] = 'csvgd'
+    num_envs = 500 if 'mppi' in config['recovery_controller'] else 1
 
     if config['mode'] == 'hardware':
         # roslaunch allegro_hand allegro_hand_modified.launch
@@ -1790,7 +1815,7 @@ if __name__ == "__main__":
         # robot_p = np.array([-0.025, -0.1, 1.33])
         robot_p = np.array([0, -0.095, 1.33])
         root_coor = root_coor + robot_p
-        sim_env = RosAllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
+        sim_env = RosAllegroScrewdriverTurningEnv(num_envs, control_mode='joint_impedance',
                                  use_cartesian_controller=False,
                                  viewer=True,
                                  steps_per_action=60,
@@ -1816,7 +1841,6 @@ if __name__ == "__main__":
         if not config['visualize']:
             img_save_dir = None
 
-        num_envs = 500 if 'mppi' in config['recovery_controller'] else 1
         env = AllegroScrewdriverTurningEnv(num_envs, control_mode='joint_impedance',
                                            use_cartesian_controller=False,
                                            viewer=config['visualize'],
@@ -1832,10 +1856,10 @@ if __name__ == "__main__":
                                            randomize_rob_start=config.get('randomize_rob_start', False),
                                            external_wrench_perturb=config.get('external_wrench_perturb', False),
                                            )
-        if config['mode'] == 'hardware':
-            nx = sim_viz_env.dof_states.shape[1] * 2
-        else:
-            nx = env.dof_states.shape[1] * 2
+    if config['mode'] == 'hardware':
+        nx = sim_env.dof_states.shape[1] * 2
+    else:
+        nx = env.dof_states.shape[1] * 2
 
 
         sim, gym, viewer = env.get_sim()
@@ -1881,8 +1905,7 @@ if __name__ == "__main__":
         now = datetime.datetime.now().strftime("%m.%d.%y:%I:%M:%S")
         now_ = '.' + now
         now = now_
-        sys.stdout = open(f'./logs/corl_screwdriver/hardware/hardware{now}.log', 'w')
-        # sys.stderr = open(f'./logs/corl_screwdriver/hardware/hardware{now}.log', 'w')
+        sys.stdout = open(f'./logs/corl_screwdriver/hardware/{config["experiment_name"]}_{now}.log', 'w', buffering=1)
         print('Hardware mode')
         print('Datetime:', now)
         print('Config:', config)
@@ -1993,14 +2016,15 @@ if __name__ == "__main__":
             trajectory_sampler_orig = trajectory_sampler
 
         if config['recovery_controller'] == 'mppi':
-            dynamics = DynamicsModel(env, num_fingers=len(config['fingers']), include_velocity=True, obj_joint_dim=1, hardware=config['mode'] == 'hardware' )
+            env_for_mppi = env if config['mode'] != 'hardware' else sim_env
+            dynamics = DynamicsModel(env_for_mppi, num_fingers=len(config['fingers']), include_velocity=True, obj_joint_dim=1)
             safety_critic_path = config['model_path']
             if params['OOD_metric'] == 'q_function':
-                running_cost = RunningCostSafeRL(safety_critic_path, params['q_cutoff'], env, config['device'], include_velocity=True)
+                running_cost = RunningCostSafeRL(safety_critic_path, params['q_cutoff'], env_for_mppi, config['device'], include_velocity=True)
                 terminal_cost = None
             elif params['OOD_metric'] == 'likelihood':
                 running_cost = lambda x, y: 0
-                terminal_cost = TerminalCostDiffusionLikelihood(trajectory_sampler_orig, env, config['device'])
+                terminal_cost = TerminalCostDiffusionLikelihood(trajectory_sampler_orig, env_for_mppi, config['device'])
             else:
                 raise ValueError('Invalid OOD metric')
             u_max = torch.ones(4 * len(config['fingers'])) * np.pi / 5 
@@ -2016,9 +2040,9 @@ if __name__ == "__main__":
     for i in tqdm(range(start_ind, num_episodes, step_size)):
         print(f'\nTrial {i+1}')
     # for i in tqdm([1, 2, 4, 7]):
-        if config['mode'] != 'hardware':
-            torch.manual_seed(i)
-            np.random.seed(i)
+        # if config['mode'] != 'hardware':
+        # torch.manual_seed(i)
+        # np.random.seed(i)
         # 8709 11200
 
         env.reset()
