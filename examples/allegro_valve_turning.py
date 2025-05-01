@@ -282,6 +282,18 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         proj_path=proj_path,
         project=False,
     )
+    traj_fpath = fpath/'recovery_stage_6/goal/traj.pkl'
+    a = pickle.load(open(traj_fpath, 'rb'))
+    traj_for_viz = torch.tensor(a)
+    fname = 'recovery_stage_6'
+    k = 0    
+    viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/goal")
+    img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
+    gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
+    pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
+    pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
+    visualize_trajectory(traj_for_viz, turn_problem.contact_scenes_for_viz, viz_fpath,
+                            turn_problem.fingers, turn_problem.obj_dof + 1)
 
     all_regrasp_planner = None
     index_regrasp_planner = None
@@ -289,6 +301,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     thumb_regrasp_planner = None
     index_thumb_regrasp_planner = None
     index_middle_regrasp_planner = None
+    no_regrasp_planner = None
     turn_planner = None
 
     if model_path is not None:
@@ -456,7 +469,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         elif mode == 'index':
             contact[:, 1] = 1
             contact[:, 2] = 1
-        elif mode == 'turn':
+        elif mode == 'turn' or mode == 'no':
             contact[:, :] = 1
         elif mode == 'thumb':
             contact[:, 0] = 1
@@ -629,6 +642,31 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     project=True,
                 )
                 planner = PositionControlConstrainedSVGDMPC(index_middle_regrasp_problem, recovery_params)
+                
+            elif mode == 'no' and planner is None:
+                no_regrasp_problem = AllegroValve(
+                    start=state[:4 * num_fingers + obj_dof],
+                    goal=goal,
+                    T=params['T'],
+                    chain=params['chain'],
+                    device=params['device'],
+                    object_asset_pos=env.obj_pose,
+                    object_location=params['object_location'],
+                    object_type=params['object_type'],
+                    world_trans=env.world_trans,
+                    contact_fingers=['index', 'middle','thumb'],
+                    regrasp_fingers=[],
+                    obj_dof=obj_dof,
+                    obj_joint_dim=1,
+                    optimize_force=params['optimize_force'],
+                    default_dof_pos=env.default_dof_pos[:, :16],
+                    obj_gravity=params.get('obj_gravity', False),
+                    min_force_dict=min_force_dict,
+                    full_dof_goal=True,
+                    proj_path=None,
+                    project=True,
+                )
+                planner = PositionControlConstrainedSVGDMPC(no_regrasp_problem, recovery_params)
             elif mode == 'turn' and planner is None:
                 tp = AllegroValve(
                     start=state[:4 * num_fingers + obj_dof],
@@ -665,7 +703,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # generate initial samples with diffusion model
         sim_rollouts = None
         initial_samples_0 = None
-        new_T = params['T'] if (mode in ['index', 'thumb', 'middle', 'all', 'index_thumb', 'index_middle']) else params['T_orig']
+        new_T = params['T'] if (mode in ['index', 'thumb', 'middle', 'all', 'index_thumb', 'index_middle', 'no']) else params['T_orig']
         # if trajectory_sampler is not None and params.get('diff_init', True) and initial_samples is None:
         if not skip_diff_init and (trajectory_sampler is not None or trajectory_sampler_orig is not None) and params.get('diff_init', True) and initial_samples is None and (not params.get('model_path_orig', None) or not recover) and (not (mode != 'turn' and not params.get('live_recovery'))):
 
@@ -1163,7 +1201,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         else:
             start_for_diff = start
             
-        contact_mode_pred = torch.softmax(classifier(start_for_diff.reshape(1, -1)), 1)
+        mean = trajectory_sampler.x_mean[:14]
+        std = trajectory_sampler.x_std[:14]
+        start_for_diff_normalized = (start_for_diff - mean) / std
+        contact_mode_pred = torch.sigmoid(classifier(start_for_diff_normalized.reshape(1, -1)))
 
         contact_mode_pred = torch.round(contact_mode_pred).repeat(params['N'], 1)
         contact_mode_pred_tuple = tuple(contact_mode_pred[0].cpu().numpy())
@@ -1520,7 +1561,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             'thumb': torch.tensor([1.0, 1.0, 0.0]),
             'middle': torch.tensor([1.0, 0.0, 1.0]),
             'index_thumb': torch.tensor([.0, 1.0, .0]),
-            'index_middle': torch.tensor([0., 0, 1])
+            'index_middle': torch.tensor([0., 0, 1]),
+            'no': torch.tensor([1.0, 1.0, 1.0])
             # 'mppi': None
         }
 
@@ -1528,6 +1570,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         contact_state_dict = defaultdict(lambda: None, contact_state_dict)
 
         contact_state_dict_flip = dict([(tuple(v.numpy()),k) for k, v in contact_state_dict.items()])
+        
         state = env.get_state()
         state = state['q'].reshape(-1, FULL_DOF)[0].to(device=params['device'])
 
@@ -1658,6 +1701,20 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             traj = torch.cat((traj[..., :-3], torch.zeros(*traj.shape[:-1], 6).to(device=params['device']),
                                 traj[..., -3:]), dim=-1)
 
+        elif contact == 'no':
+            _goal = None
+            if params.get('model_path_orig', None):
+                _goal = goal_config
+            result = execute_traj(
+                no_regrasp_planner, mode='no', goal=_goal, 
+                fname=f'no_regrasp_{all_stage}', initial_samples=initial_samples, 
+                recover=recover, start_timestep=start_timestep, max_timesteps=max_timesteps)
+            state = env.get_state()
+            state = state['q'].reshape(-1, FULL_DOF)[0].to(device=params['device'])
+
+            # Backward compatibility with old return format
+            traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
+
         elif contact == 'turn':
             mppi_ctrl = None
             _goal = torch.tensor([state[-1] - np.pi/4]).to(device=params['device'])
@@ -1708,6 +1765,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 # if all_stage == 1:
                 if len(data['pre_action_likelihoods'][-1]) > 1:
                     data['final_likelihoods'][-1].append(likelihood)
+                # TODO: Fix
                 else:
                     data['final_likelihoods'][-1].append(None)
                 # skip_first_likelihood_eval = False
@@ -1958,9 +2016,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/{sys.argv[1]}.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/{sys.argv[1]}.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_only.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_recovery_data_gen.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_recovery_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_safe_rl_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_mppi_likelihood_recovery.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_mppi_safe_rl_recovery.yaml').read_text())

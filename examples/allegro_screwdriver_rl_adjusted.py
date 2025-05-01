@@ -289,7 +289,18 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         proj_path=proj_path,
         project=False,
     )
-
+    traj_fpath = fpath/'recovery_stage_4/goal/traj.pkl'
+    a = pickle.load(open(traj_fpath, 'rb'))
+    traj_for_viz = torch.tensor(a)
+    fname = 'recovery_stage_4'
+    k = 0    
+    viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/goal")
+    img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
+    gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
+    pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
+    pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
+    visualize_trajectory(traj_for_viz, turn_problem.contact_scenes_for_viz, viz_fpath,
+                            turn_problem.fingers, turn_problem.obj_dof + 1)
     index_regrasp_planner = None
     thumb_and_middle_regrasp_planner = None
     turn_planner = None
@@ -1061,7 +1072,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         else:
             start_for_diff = start
             
-        contact_mode_pred = torch.sigmoid(classifier(start_for_diff.reshape(1, -1)), 1)
+        mean = trajectory_sampler.x_mean[:16]
+        std = trajectory_sampler.x_std[:16]
+        start_for_diff_normalized = (start_for_diff - mean) / std
+        contact_mode_pred = torch.sigmoid(classifier(start_for_diff_normalized.reshape(1, -1)))
 
         contact_mode_pred = torch.round(contact_mode_pred).repeat(params['N'], 1)
         contact_mode_pred_tuple = tuple(contact_mode_pred[0].cpu().numpy())
@@ -1573,6 +1587,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 # if all_stage == 1:
                 if len(data['pre_action_likelihoods'][-1]) > 1:
                     data['final_likelihoods'][-1].append(likelihood)
+                # TODO: Fix
                 else:
                     data['final_likelihoods'][-1].append(None)
                 # skip_first_likelihood_eval = False

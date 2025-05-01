@@ -435,7 +435,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                                                                 compute_gradient=True,
                                                                 compute_hessian=False,
                                                                 compute_closest_obj_point=compute_closest_obj_point)
-        elif self.full_dof_goal:
+        elif self.full_dof_goal and len(self.regrasp_fingers) > 0:
             ret_scene = self.contact_scenes.scene_collision_check(full_q, theta_b,
                                                                 compute_gradient=True,
                                                                 compute_hessian=True,
@@ -511,7 +511,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                 self.data[finger]['closest_rob_pt_link'] = ret_scene['closest_rob_pt_link'][:, i].reshape(q.shape[0], T+1, 3)
                 self.rob_link_pts.append(self.data[finger]['closest_rob_pt_link'])
                 self.nearest_robot_pts.append(self.data[finger]['closest_rob_pt_object'].reshape(q.shape[0], T+1, 3))
-            if self.full_dof_goal and compute_closest_obj_point:
+            if self.full_dof_goal and compute_closest_obj_point and len(self.regrasp_fingers) > 0:
                 rob_link_idx.append(ret_scene['closest_pt_closest_link'][:, i])
 
         if len(self.regrasp_fingers) > 0 and self.full_dof_goal:
@@ -558,7 +558,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         J = self.cost(x, self.rob_link_pts, self.nearest_robot_pts)
         
         grad_J, grad_rob_link_pts, grad_nearest_robot_pts = self.grad_cost(x, self.rob_link_pts, self.nearest_robot_pts)
-        if self.full_dof_goal:
+        if self.full_dof_goal and len(self.regrasp_fingers) > 0:
             grad_rob_link_pts_dx = self.process_cost_grads(grad_rob_link_pts, grad_J, 'closest_pt_q_grad_link', 'closest_pt_env_q_grad_link', projected_diffusion=projected_diffusion)
             grad_nearest_robot_pts_dx = 0 #self.process_cost_grads(grad_nearest_robot_pts, grad_J, 
                 # 'closest_pt_q_grad_object', 'closest_pt_env_q_grad_object', projected_diffusion=projected_diffusion)

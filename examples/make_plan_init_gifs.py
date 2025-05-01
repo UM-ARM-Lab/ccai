@@ -18,7 +18,9 @@ import pickle
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
 # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/allegro_screwdriver_csvto_OOD_ID_orig_likelihood_rl_wrench_perturb_new_project.yaml').read_text())
+config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_recovery_model.yaml').read_text())
+# config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj_pi_2.yaml').read_text())
+# config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj_pi_2.yaml').read_text())
 
 
 
@@ -53,18 +55,18 @@ trial_inds = [int(d.split('_')[-1]) for d in os.listdir(dirpath) if d[:5] == 'tr
 # for trial_num in trial_inds:
 # for trial_num in [2, 3]:
 # for trial_num in [6, 14]:
-for trial_num in [40]:
+for trial_num in [49]:
     fpath = dirpath / f'trial_{trial_num}'
 
     with open(fpath / 'traj_data.p', 'rb') as f:
         data = pickle.load(f)
-        fl = data['final_likelihoods']
-    offset_ind = 8 if config['live_recovery'] else 0
+        fl = data['pre_action_likelihoods']
+    offset_ind = 5 if 'valve' in config['experiment_name'] else 8
     isaac_imgs = [fpath / img for img in sorted(os.listdir(fpath)) if img[-3:] == 'png'][offset_ind:]
     isaac_imgs = [imageio.imread(img) for img in isaac_imgs]
 
     # Read the names of all directories in fpath
-    c_mode_dirs = [str(d) for d in fpath.iterdir() if d.is_dir() and 'turn' in str(d).split('/')[-1] or 'thumb_middle' in str(d).split('/')[-1] or 'index' in str(d).split('/')[-1]]
+    c_mode_dirs = [str(d) for d in fpath.iterdir() if d.is_dir() and 'turn' in str(d).split('/')[-1] or 'thumb_middle' in str(d).split('/')[-1] or 'index' in str(d).split('/')[-1] or 'thumb' in str(d).split('/')[-1] or 'middle' in str(d).split('/')[-1] or 'mppi' in str(d).split('/')[-1]]
     # Each element of c_mode_dirs has structure mode_ind. We want to sort by ind
     c_mode_dirs = sorted([(int(dir_n.split('_')[-1]), dir_n) for dir_n in c_mode_dirs if dir_n[-2] == '_' or dir_n[-3] == '_'])
 
@@ -82,19 +84,37 @@ for trial_num in [40]:
         # pause_inds.append((ind*24-offset_ind, pause_inds_name_dict[dir_n.split('/')[-1][:-2]]))
         if 'turn' in dir_n.split('/')[-1]:
             num_exec_steps = len(fl[ind-1]) - 1
-            if last_text != 'turn':
-                pause_inds.append((frame_ind, 'turn'))
+            if num_exec_steps == config['T_orig'] - 1:
+                num_exec_steps += 1
+            if num_exec_steps <= 0:
+                print(num_exec_steps)
+                continue
+            if last_text != 'Turn':
+                pause_inds.append((frame_ind, 'Turn'))
             num_frames = num_exec_steps * 3
             frame_ind += num_frames
-            last_text = 'turn'
+            last_text = 'Turn'
         elif 'thumb_middle' in dir_n.split('/')[-1]:
-            pause_inds.append((frame_ind, 'index'))
-            frame_ind += 12
-            last_text = 'index'
+            pause_inds.append((frame_ind, 'Thumb/middle reset'))
+            frame_ind += 9
+            last_text = 'Thumb/middle reset'
         elif 'index' in dir_n.split('/')[-1]:
-            pause_inds.append((frame_ind, 'thumb_middle'))
-            frame_ind += 12
-            last_text = 'thumb_middle'
+            pause_inds.append((frame_ind, 'Index reset'))
+            frame_ind += 9
+            last_text = 'Index reset'
+        elif 'thumb' in dir_n.split('/')[-1]:
+            pause_inds.append((frame_ind, 'Thumb reset'))
+            frame_ind += 9
+            last_text = 'Thumb reset'
+        elif 'middle' in dir_n.split('/')[-1]:
+            pause_inds.append((frame_ind, 'Middle reset'))
+            frame_ind += 9
+            last_text = 'Middle reset'
+        elif 'mppi' in dir_n.split('/')[-1]:
+            if last_text != 'Recovery':
+                pause_inds.append((frame_ind, 'Recovery'))
+            frame_ind += 3
+            last_text = 'Recovery'
         else:
             raise ValueError(f'Unknown directory name: {dir_n}')
     # Add final pause
@@ -125,15 +145,24 @@ for trial_num in [40]:
     pause_inds = dict(pause_inds)
     # pause_inds = {}
 
-    x0 = 675
-    y0 = 750
-    width = 300
-    text_y = y0 - 450  # Adjust text position relative to progress bar
-    progress_bar_y = y0 + 20
+    if 'screwdriver' in config['experiment_name']:
+        x0 = 675
+        y0 = 750
+        width = 300
+        text_y = y0 - 450  # Adjust text position relative to progress bar
+        progress_bar_y = y0 + 20
+        font_size=30
+    elif 'valve' in config['experiment_name']:
+        x0 = 800
+        y0 = 750
+        width = 500
+        text_y = y0 - 675  # Adjust text position relative to progress bar
+        progress_bar_y = y0 + 20
+        font_size=50
     progress_bar_x = x0 + width
     # Add a progress bar to the gif by editing each image. Overwrite the original images
     imgs_with_progress_bar = []
-    start_end_buffer = 15
+    start_end_buffer = 10
     new_isaac_imgs = []
 
     for j in range(len(isaac_imgs)):
@@ -155,8 +184,12 @@ for trial_num in [40]:
                       fill='green')
         
         # Draw text
-        font = ImageFont.load_default(size=30)
-        draw.text((x0 + width//2, text_y), text, (255, 0, 0), 
+        font = ImageFont.load_default(size=font_size)
+        if text == 'Turn':
+            rgb = (0, 255, 0)
+        else:
+            rgb = (255, 0, 0)
+        draw.text((x0 + width//2, text_y), text, rgb, 
                  font=font, anchor="mm")
                  
         # Convert to numpy
