@@ -698,7 +698,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         best_traj = None
         for k in range(start_timestep, total_steps):
             state = env.get_state()
-            state = state['q'].reshape(-1, 4 * num_fingers + 4)[0, :15].to(device=params['device'])
+            state_16 = state['q'].reshape(-1, 4 * num_fingers + 4).to(device=params['device'])[0]
+            state = state_16[:15]
+            # state = state['q'].reshape(-1, 4 * num_fingers + 4)[0, :15].to(device=params['device'])
             print(state)
 
             if k > 0:
@@ -790,6 +792,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     planner.x = initial_samples[:, k:]
 
             s = time.perf_counter()
+            if params['mode'] == 'hardware':
+                # print(set_state.shape)
+                sim_viz_env.set_pose(state_16.cpu())
+                sim_viz_env.zero_obj_velocity()
             best_traj, plans = planner.step(state)
             # if best_traj is None or not recover:
             #     best_traj, plans = planner.step(state)
@@ -1259,6 +1265,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             # old_warmup_iters = planner.warmup_iters
             planner.warmup_iters = params['warmup_iters']
 
+
+
             xu, plans = planner.step(state)
             planner.problem.data = {}
 
@@ -1306,7 +1314,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             return [modes[np.argmin(distances)]], initial_samples[np.argmin(distances)], plan_time
 
     state = env.get_state()
-    state = state['q'].reshape(-1, 4 * num_fingers + 4).to(device=params['device'])[0, :15]
+    state_16 = state['q'].reshape(-1, 4 * num_fingers + 4).to(device=params['device'])[0]
+    state = state_16[:15]
 
 
     contact_label_to_vec = {'pregrasp': 0,
