@@ -60,7 +60,7 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
-start_ind: 0
+start_ind: 22
 end_ind: 200
 controllers:
   csvgd:

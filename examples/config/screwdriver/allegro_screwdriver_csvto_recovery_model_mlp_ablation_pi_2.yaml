@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 50
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_model_mlp_ablation_fixed_rand_pct_pi_2_damping_.1_eval'
+experiment_name: 'allegro_screwdriver_recovery_model_mlp_ablation_eval_sigmoid_fix_normalized'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -68,8 +68,8 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
-start_ind: 0
-end_ind: 25
+start_ind: 25
+end_ind: 50
 controllers:
   csvgd:
     # N: 16
@@ -78,7 +78,7 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:0'
+    device: 'cuda:1'
     online_iters: 25
     warmup_iters: 25
     resample_steps: 16

@@ -9,3 +9,4 @@ notebooks/diff_gif_imgs/*
 examples/wandb/*
 wandb/*
 ccai/recovery_rl/wandb/*
+examples/videos/*

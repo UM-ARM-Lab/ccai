@@ -61,7 +61,7 @@ sac_batch_size: 64
 # parity: 654
 OOD_metric: 'likelihood'
 recovery_controller: 'csvgd'
-start_ind: 0
+start_ind: 7
 end_ind: 9000
 controllers:
   csvgd:

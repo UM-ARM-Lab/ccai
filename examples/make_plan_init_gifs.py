@@ -18,8 +18,9 @@ import pickle
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 
 # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
-config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_recovery_model.yaml').read_text())
-# config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj_pi_2.yaml').read_text())
+# config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_recovery_model.yaml').read_text())
+# config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_mppi_safe_rl_recovery.yaml').read_text())
+config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj_pi_2.yaml').read_text())
 # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj_pi_2.yaml').read_text())
 
 
@@ -55,7 +56,7 @@ trial_inds = [int(d.split('_')[-1]) for d in os.listdir(dirpath) if d[:5] == 'tr
 # for trial_num in trial_inds:
 # for trial_num in [2, 3]:
 # for trial_num in [6, 14]:
-for trial_num in [49]:
+for trial_num in [10]:
     fpath = dirpath / f'trial_{trial_num}'
 
     with open(fpath / 'traj_data.p', 'rb') as f:
@@ -84,10 +85,10 @@ for trial_num in [49]:
         # pause_inds.append((ind*24-offset_ind, pause_inds_name_dict[dir_n.split('/')[-1][:-2]]))
         if 'turn' in dir_n.split('/')[-1]:
             num_exec_steps = len(fl[ind-1]) - 1
+            
             if num_exec_steps == config['T_orig'] - 1:
                 num_exec_steps += 1
             if num_exec_steps <= 0:
-                print(num_exec_steps)
                 continue
             if last_text != 'Turn':
                 pause_inds.append((frame_ind, 'Turn'))
@@ -171,6 +172,7 @@ for trial_num in [49]:
         for _ in range(num_adds):
             new_isaac_imgs.append((j, img))
 
+    text = 'Turn'
     for i in range(len(new_isaac_imgs)):
         idx, img = new_isaac_imgs[i]
         if idx in pause_inds and pause_inds[idx] != '':
@@ -204,9 +206,16 @@ for trial_num in [49]:
         imgs_with_progress_bar.append(img)
 
     if len(imgs_with_progress_bar) > 0:
-        imageio.mimsave(f'{fpath}/isaac_extra_pause_text.gif', imgs_with_progress_bar, loop=0)
+        imageio.mimsave(f'{fpath}/{config["experiment_name"]}_{trial_num}.gif', imgs_with_progress_bar, loop=0)
 
-    writer = imageio.get_writer(f'{fpath}/isaac_extra_pause_text.mp4', fps=10)
+    writer = imageio.get_writer(f'{fpath}/{config["experiment_name"]}_{trial_num}_hq.mp4', fps=10,
+                                    codec='libx264',  # Ensure to use a good codec
+                                    quality=10,  # Use a scale of 1-10, where 10 is maximum quality in some encoders
+                                    pixelformat='yuv420p',  # Pixel format compatible with most players
+                                    ffmpeg_params=[
+                                        '-crf', '17',  # Constant Rate Factor for quality (lower is better quality, 17-23 is common)
+                                        '-preset', 'slow'  # Adjust encoder speed/efficiency, 'slow' offers better compression and quality
+                                    ])
     for img in imgs_with_progress_bar:
         writer.append_data(np.array(img, np.uint8))
     writer.close()
