@@ -6,11 +6,12 @@ from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
 from allegro_ros import RosNode
 import torch
 import yaml
-from lightweight_vicon_bridge.msg import MocapState
 from tf.transformations import euler_from_quaternion
+import tf
 import pytorch_kinematics as pk
+from typing import Tuple, Optional
 
-urdf_path = "/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/victor_allegro_stalk.urdf"
+urdf_path = "/home/collaborator/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/victor_allegro_stalk.urdf"
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 
@@ -19,82 +20,88 @@ class ObjectPoseReader:
         rospy.init_node('object_pose_reader')
         self.mode = mode
         self.obj = obj
-        self.device=device
+        self.listener = tf.TransformListener()
+        self.device = device
+        self.screwdriver_pose_in_arm = None
 
-        self.mocap_sub = rospy.Subscriber('/mocap_tracking', MocapState, self.mocap_callback)
 
         self.object_to_hand_matrix = torch.tensor([[[ 5.9605e-08,  1.0000e+00,  0.0000e+00,  9.5000e-02],
          [-7.6604e-01,  5.9605e-08,  6.4279e-01, -9.3431e-03],
          [ 6.4279e-01,  0.0000e+00,  7.6604e-01, -1.1135e-02],
          [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  1.0000e+00]]], device=device) #scene_trans
-        
-        self.arm_mocap_to_arm_victor_matrix = torch.tensor([[[ 0.99973467,  0.01829301,  0.0139986 , -0.01603915],
-                                                            [-0.01838437,  0.99981035,  0.00642524,  0.00957037],
-                                                            [-0.01387841, -0.00668089,  0.99988137,  0.03222477],
-                                                            [ 0.        ,  0.        ,  0.        ,  1.        ]]])
-                                                                        
+                                                                                
         self.object_to_hand_trans = pk.Transform3d(matrix=self.object_to_hand_matrix)
-        self.hand_to_object_trans = self.object_to_hand_trans.inverse()
+        self.hand_to_object_trans = self.object_to_hand_trans.inverse().get_matrix()
 
-        self.arm_mocap_to_arm_victor_trans = pk.Transform3d(matrix=self.arm_mocap_to_arm_victor_matrix)
-
-    def euler_trans_from_segment(self, segment):
-        transform = segment.transform
-        obj_quat = (transform.rotation)
-        # obj_euler = np.array(euler_from_quaternion([obj_quat.x, obj_quat.y, obj_quat.z, obj_quat.w], axes='rxyz'))
-        obj_euler = np.array(euler_from_quaternion([obj_quat.x, obj_quat.y, obj_quat.z, obj_quat.w], axes='rxyz'))
-        obj_trans = np.array([transform.translation.x, transform.translation.y, transform.translation.z])
-        return obj_euler, obj_trans
-
-    def mocap_callback(self, data):
-        self.arm_base = [i for i in data.tracked_objects if i.name == 'right_arm_base'][0]
-        self.mocap_obj = [i for i in data.tracked_objects if i.name == self.obj][0]
-        self.obj_euler_, self.obj_trans_ = self.euler_trans_from_segment(self.mocap_obj.segments[0])
-        
-        # self.obj_euler_[0] -= .03
+    def update_obj_pose_from_tf(self) -> None:
+        """
+        Updates self.obj_trans_ and self.obj_euler_ with the current pose of the screwdriver
+        in the FR_left_base frame using tf.
+        """
+        try:
+            self.listener.waitForTransform('FR_left_base', 'Umich_screwdriver', rospy.Time(0), rospy.Duration(1.0))
+            trans, rot = self.listener.lookupTransform('FR_left_base', 'Umich_screwdriver', rospy.Time(0))
+            self.obj_trans_ = np.array(trans)
+            self.obj_euler_ = np.array(euler_from_quaternion(rot, axes='rxyz'))
+        except (tf.Exception, tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+            rospy.logwarn("TF lookup failed for Umich_screwdriver in FR_left_base.")
+            self.obj_trans_ = None
+            self.obj_euler_ = None
 
     def get_state(self):
+        self.update_obj_pose_from_tf()
         return self.obj_trans_, self.obj_euler_
-    
-    def get_state_world_frame_pos(self):
-        self.obj_to_mocap_world_trans = pk.Transform3d(pos=torch.tensor(self.obj_trans_, device=self.device, dtype=self.object_to_hand_trans.dtype), rot=torch.tensor(np.zeros_like(self.obj_euler_), device=self.device, dtype=self.object_to_hand_trans.dtype))
-        
-        self.arm_base_euler, self.arm_base_trans = self.euler_trans_from_segment(self.arm_base.segments[0])
+      
+    def update_screwdriver_pose(self) -> None:
+        """
+        Updates the pose of the Umich_screwdriver in the FR_left_base frame.
+        """
+        try:
+            self.listener.waitForTransform('FR_left_base', 'Umich_screwdriver', rospy.Time(0), rospy.Duration(1.0))
+            (trans, rot) = self.listener.lookupTransform('FR_left_base', 'Umich_screwdriver', rospy.Time(0))
+            pose = self._to_homogeneous_matrix(trans, rot)
+            self.screwdriver_pose_in_arm = torch.tensor(pose, device=self.device, dtype=torch.float32)
+        except (tf.Exception, tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+            rospy.logwarn("TF lookup failed for Umich_screwdriver in FR_left_base.")
 
-        self.arm_mocap_to_mocap_world_trans = pk.Transform3d(pos=torch.tensor(self.arm_base_trans, device=self.device, dtype=self.object_to_hand_trans.dtype), rot=torch.tensor(self.arm_base_euler, device=self.device, dtype=self.object_to_hand_trans.dtype))
-        
-        #    C to A                 = B to A * C to B
-        #    obj to arm_mocap        = mocap_world_to_arm_mocap * obj to mocap_world
-        self.obj_to_arm_mocap_trans = self.arm_mocap_to_mocap_world_trans.inverse().compose(self.obj_to_mocap_world_trans)
-        self.obj_trans_robot_frame = self.obj_to_arm_mocap_trans.get_matrix()[0][:3, 3]
-        self.obj_euler_robot_frame_for_IK = self.obj_to_arm_mocap_trans.get_matrix()[0][:3, :3]
-        self.hand_to_arm_mocap = self.obj_to_arm_mocap_trans.compose(self.hand_to_object_trans)
+    def get_state_world_frame_pos(self) -> Optional[torch.Tensor]:
+        """
+        Computes and returns the hand's pose in the arm's frame.
 
-        self.hand_to_mocap_world_trans = self.arm_mocap_to_mocap_world_trans.compose(self.hand_to_arm_mocap)
-        self.hand_to_mocap_world_position = self.hand_to_mocap_world_trans.get_matrix()[0][:3, 3].cpu().numpy()
+        Returns:
+            Optional[torch.Tensor]: 4x4 transformation matrix of the hand in the arm's frame, or None if unavailable.
+        """
+        self.update_screwdriver_pose()
+        if self.screwdriver_pose_in_arm is not None:
+            hand_pose = self.screwdriver_pose_in_arm @ torch.linalg.inv(self.hand_to_object_trans)
+            hand_pose_np = hand_pose.cpu().numpy()
+            trans = hand_pose_np[0, :3, 3]
+            rot_mat = hand_pose_np[0, :3, :3]
+            euler = R.from_matrix(rot_mat).as_euler('xyz')
+            return trans, euler
+        return None
 
-        # Object trans is difference between object position and hand position
+    @staticmethod
+    def _to_homogeneous_matrix(trans: Tuple[float, float, float], rot: Tuple[float, float, float, float]) -> torch.Tensor:
+        """
+        Converts translation and quaternion rotation to a 4x4 homogeneous transformation matrix.
 
-        # Skip below to get world position of object
-        
-        # print('obj_trans pre', self.obj_trans_)
-        self.obj_trans_[-1] -= .1 + 0.412*2.54/100
-        # print('obj_trans post z offset', self.obj_trans_)
-        self.obj_trans_ = self.obj_trans_ - self.hand_to_mocap_world_position
-        # print('obj_trans post hand offset', self.obj_trans_)
-        # print('hand to mocap world position', self.hand_to_mocap_world_position)
+        Args:
+            trans (tuple): Translation (x, y, z).
+            rot (tuple): Quaternion (x, y, z, w).
 
-        return self.obj_trans_, self.obj_euler_
+        Returns:
+            torch.Tensor: 4x4 transformation matrix.
+        """
+        import numpy as np
+        import tf.transformations as tft
+        mat = tft.quaternion_matrix(rot)
+        mat[:3, 3] = trans
+        return mat
     
     def get_target_IK_pose(self):
-        # Create pk Transform3D from self obj_trans and obj_euler
 
-        #    C to A                 = B to A * C to B
-        # C=hand, A=arm_victor, B=arm_mocap
-        # C to A = hand_to_arm_victor, B to A = arm_mocap_to_arm_victor, C to B = hand_to_arm_mocap
-        hand_to_arm_victor = self.arm_mocap_to_arm_victor_trans.compose(self.hand_to_arm_mocap)
-
-        return (hand_to_arm_victor)
+        return (self.hand_to_arm_mocap)
 
 
 # tensor([[[ 7.9061e-01, -4.7014e-01,  3.9230e-01,  2.2960e-01],
@@ -135,7 +142,7 @@ class HardwareEnv:
             ori = self.obj_reader.get_state()
             ori = torch.tensor([ori]).float().to(self.device)
             q.append(ori)
-        elif self.obj == 'screwdriver':
+        elif 'screwdriver' in self.obj:
             pos, ori = self.obj_reader.get_state()
             pos = torch.tensor(pos).float().to(self.device)
             ori = torch.tensor(ori).float().to(self.device)
@@ -232,8 +239,8 @@ if __name__ == "__main__":
                             # init_for_non_serial_chain=
                             lr=0.2)
     while True:
-        root_coor, root_ori = obj_reader.get_state_world_frame_pos()
-
+        root_coor, root_ori = obj_reader.get_state()
+        print(root_ori)
 
         # num goals x num retries x DOF tensor of joint angles; if not converged, best solution found so far
         # print(sol.solutions)
@@ -241,19 +248,19 @@ if __name__ == "__main__":
         # print(sol.converged)
         # num goals x num retries can look at errors directly
         # print(root_ori)
-        if np.abs(root_ori[0]) < .02 and np.abs(root_ori[1]) < .02:
+        # if np.abs(root_ori[0]) < .02 and np.abs(root_ori[1]) < .02:
 
-            # Get converged solutions
-            tgt_ik_pose = obj_reader.get_target_IK_pose()
-            sol = ik.solve(tgt_ik_pose.to(chain.device))
-            converged_sol = sol.solutions[sol.converged]
+        #     # Get converged solutions
+        #     tgt_ik_pose = obj_reader.get_target_IK_pose()
+        #     sol = ik.solve(tgt_ik_pose.to(chain.device))
+        #     converged_sol = sol.solutions[sol.converged]
             
-            if converged_sol.shape[0] > 0:
-                converged_sol = converged_sol[0]
+        #     if converged_sol.shape[0] > 0:
+        #         converged_sol = converged_sol[0]
        
-                print(converged_sol / np.pi * 180)
-                print(sol.err_pos[sol.converged][0])
-                print(sol.err_rot[sol.converged][0])
+        #         print(converged_sol / np.pi * 180)
+        #         print(sol.err_pos[sol.converged][0])
+        #         print(sol.err_rot[sol.converged][0])
 
         cur_pose = sim_env.get_state()['q'].reshape(-1)
         

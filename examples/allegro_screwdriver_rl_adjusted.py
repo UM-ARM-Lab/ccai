@@ -289,18 +289,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         proj_path=proj_path,
         project=False,
     )
-    traj_fpath = fpath/'recovery_stage_4/goal/traj.pkl'
-    a = pickle.load(open(traj_fpath, 'rb'))
-    traj_for_viz = torch.tensor(a)
-    fname = 'recovery_stage_4'
-    k = 0    
-    viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/goal")
-    img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
-    gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
-    pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
-    pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-    visualize_trajectory(traj_for_viz, turn_problem.contact_scenes_for_viz, viz_fpath,
-                            turn_problem.fingers, turn_problem.obj_dof + 1)
+
     index_regrasp_planner = None
     thumb_and_middle_regrasp_planner = None
     turn_planner = None
@@ -360,6 +349,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             pre_recovery_state: State before recovery
             pre_recovery_likelihood: Likelihood before recovery
         """
+        
+        rand_pct = 1/3
         nonlocal episode_num_steps
         data['pre_action_likelihoods'].append([])
         data['final_likelihoods'].append([])
@@ -1801,9 +1792,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_hardware.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_mppi_safe_rl_recovery_hardware.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj_pi_2.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_hardware.yaml').read_text())
 
     from tqdm import tqdm
 
@@ -1816,7 +1807,7 @@ if __name__ == "__main__":
 
     if config['mode'] == 'hardware':
         # roslaunch allegro_hand allegro_hand_modified.launch
-        from hardware.hardware_env import HardwareEnv
+        from hardware.hardware_env_hri import HardwareEnv
         default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
                                     torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float(),
                                     torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
@@ -1929,7 +1920,7 @@ if __name__ == "__main__":
         now = datetime.datetime.now().strftime("%m.%d.%y:%I:%M:%S")
         now_ = '.' + now
         now = now_
-        sys.stdout = open(f'./logs/corl_screwdriver/hardware/{config["experiment_name"]}_{now}.log', 'w', buffering=1)
+        # sys.stdout = open(f'./logs/hri_screwdriver/hardware/{config["experiment_name"]}_{now}.log', 'w', buffering=1)
         print('Hardware mode')
         print('Datetime:', now)
         print('Config:', config)
