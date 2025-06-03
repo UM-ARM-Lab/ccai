@@ -1,0 +1,117 @@
+Hardware mode
+Datetime: .04.27.25:10:21:23
+Config: {'T': 3, 'T_orig': 12, 'receding_horizon': False, 'num_steps': 8, 'num_turns': 1, 'max_recovery_stages': 4, 'num_trials': 10, 'num_episodes': 50, 'visualize': True, 'experiment_name': 'allegro_screwdriver_recovery_model_hardware', 'mode': 'hardware', 'fingers': ['index', 'middle', 'thumb'], 'object_type': 'screwdriver', 'sim_device': 'cpu', 'friction_coefficient': 1.0, 'kp': 3.0, 'heuristic': 1000, 'max_depth': 11, 'goal': '-.5', 'prior': 1, 'multi_particle_search': True, 'replan': False, 'visualize_plan': False, 'visualize_recovery_plan': True, 'visualize_contact_plan': True, 'optimize_force': True, 'exclude_index': False, 'projected': False, 'use_saved_plans': True, 'use_saved_noise': False, 'use_guidance': False, 'sample_contact': False, 'use_partial_constraint': True, 'sine_cosine': True, 'project_state': False, 'compute_recovery_trajectory': False, 'rl_adjustment': False, 'test_recovery_trajectory': False, 'perturb_action': False, 'randomize_obj_start': False, 'external_wrench_perturb': True, 'viz_states': False, 'diff_init': True, 'live_recovery': True, 'new_projection': True, 'trajectory_condition': True, 'generate_context': True, 'true_s0': False, 'task_diffuse_goal': False, 'recovery_diff_traj': True, 'obj_gravity': True, 'type': 'diffusion', 'OOD_metric': 'likelihood', 'recovery_controller': 'csvgd', 'recovery_model_dir': 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_low_damping_diffusion', 'model_path': 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_low_damping_diffusion/allegro_screwdriver_diffusion.pt', 'model_dir': 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion', 'model_path_orig': 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion/allegro_screwdriver_diffusion.pt', 'likelihood_threshold': -170.0, 'drop_threshold': -1250, 'project_threshold': -105.0, 'sac_batch_size': 64, 'start_ind': 0, 'end_ind': 50, 'controllers': {'csvgd': {'N': 16, 'alpha_J': 0.01, 'alpha_C': 1, 'step_size': 0.1, 'momentum': 0.0, 'device': 'cuda:0', 'online_iters': 25, 'warmup_iters': 25, 'resample_steps': 16, 'resample_sigma': 0.01, 'resample_temperature': 0.1, 'penalty': 1000000, 'collision_checking': False, 'joint_friction': 0.0}}, 'ee_names': {'index': 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link', 'middle': 'allegro_hand_naka_finger_finger_1_aftc_base_link', 'ring': 'allegro_hand_kusuri_finger_finger_2_aftc_base_link', 'thumb': 'allegro_hand_oya_finger_3_aftc_base_link'}, 'obj_dof': 3}
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+2048
+4 128 4
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+[ models/temporal ] Channel dimensions: [(37, 128), (128, 256), (256, 512)]
+
+Trial 1
+No action perturbation this trial
+Random perturbation %: 0.33
+Loaded trajectory sampler
+Current yaw: tensor([-0.0239,  0.0310, -1.1320], device='cuda:0')
+Ready to pregrasp. Press <ENTER> to continue.tensor([ 4.7315e-03, -1.0765e-03, -1.1257e+00], device='cuda:0')
+Pregrasp complete. Ready to execute. Press <ENTER> to continue.Current yaw: tensor([ 3.7976e-03,  3.7951e-04, -1.1285e+00], device='cuda:0')
+1 turn
+Likelihood: -75.54452514648438
+Sampling time 3.5961751269642264
+tensor([ 1.3115e-01,  5.2868e-01,  6.4383e-01,  6.5256e-01, -1.2148e-01,
+         4.7970e-01,  1.0072e+00,  9.1126e-01,  1.2166e+00,  3.3584e-01,
+         2.4085e-01,  1.1322e+00,  3.0684e-03, -5.7117e-04, -1.1287e+00],
+       device='cuda:0')
+Solve time for step 1 (global step 0) 8.739763411926106
+Current ori: tensor([ 3.6563e-03, -5.0944e-04, -1.1284e+00], device='cuda:0')
+Middle force: tensor([1.0541, 0.9618, 1.0433, 1.0118, 0.9807, 1.7053, 0.9239, 1.0866, 1.0463,
+        1.2141, 1.0093, 1.4161], device='cuda:0')
+Thumb force: tensor([1.1136, 1.0751, 1.0459, 3.0359, 1.2018, 1.1726, 1.0494, 1.7916, 1.0319,
+        1.0977, 1.9227, 1.6203], device='cuda:0')
+Index force: tensor([1.0371, 1.0643, 1.0494, 1.0518, 1.0679, 1.0299, 1.0616, 1.2617, 1.0295,
+        1.0182, 1.0297, 1.0363], device='cuda:0')
+tensor([ 3.6563e-03, -5.0944e-04, -1.1284e+00], device='cuda:0')
+tensor([ 0.1195,  0.5418,  0.6290,  0.6211, -0.1256,  0.4640,  1.0067,  0.9590,
+         1.2296,  0.3926,  0.3177,  0.9205, -0.0200, -0.0134, -1.2924],
+       device='cuda:0')
+Likelihood: -125.18060302734375
+Solve time for step 2 (global step 1) 7.671185145969503
+Current ori: tensor([-0.0212, -0.0133, -1.2938], device='cuda:0')
+Middle force: tensor([1.0310, 1.0570, 1.0101, 1.0122, 1.6778, 1.0431, 1.0922, 1.0442, 1.2043,
+        1.0078, 1.3831], device='cuda:0')
+Thumb force: tensor([1.0499, 1.0270, 2.9540, 1.1852, 1.1577, 1.0437, 1.7280, 1.0267, 1.0874,
+        1.8680, 1.5831], device='cuda:0')
+Index force: tensor([1.0612, 1.0449, 1.0444, 1.0637, 1.0265, 1.0566, 1.2311, 1.0256, 1.0159,
+        1.0251, 1.0315], device='cuda:0')
+tensor([-0.0212, -0.0133, -1.2938], device='cuda:0')
+tensor([ 0.1175,  0.5415,  0.6266,  0.6207, -0.1262,  0.4562,  1.0105,  0.9873,
+         1.2987,  0.3066,  0.3161,  0.8225, -0.0030,  0.0044, -1.3579],
+       device='cuda:0')
+Likelihood: -118.12837219238281
+Solve time for step 3 (global step 2) 7.147218819940463
+Current ori: tensor([-1.1308e-03,  7.8788e-03, -1.3627e+00], device='cuda:0')
+Middle force: tensor([1.0072, 2.0309, 1.0259, 1.9744, 1.0178, 1.0125, 1.0001, 1.4562, 1.3592,
+        1.0971], device='cuda:0')
+Thumb force: tensor([1.0059, 1.9074, 1.3592, 1.4626, 1.1724, 1.1889, 1.0246, 1.0033, 1.0018,
+        1.0019], device='cuda:0')
+Index force: tensor([1.0064, 1.2563, 1.0273, 1.0078, 1.0206, 1.0013, 1.0011, 1.0158, 1.0294,
+        1.0025], device='cuda:0')
+tensor([-1.1308e-03,  7.8788e-03, -1.3627e+00], device='cuda:0')
+tensor([ 1.1433e-01,  5.7946e-01,  5.8909e-01,  5.9093e-01, -1.2637e-01,
+         4.3853e-01,  1.0289e+00,  1.0402e+00,  1.3960e+00,  2.0570e-01,
+         3.4199e-01,  6.1857e-01, -1.1781e-02,  2.1292e-04, -1.5306e+00],
+       device='cuda:0')
+Likelihood: -168.68310546875
+Solve time for step 4 (global step 3) 6.7898513961117715
+Current ori: tensor([-1.1604e-02, -1.0205e-03, -1.5295e+00], device='cuda:0')
+Middle force: tensor([1.8999, 1.0426, 1.4227, 1.0243, 1.0160, 1.0046, 1.0156, 1.4796, 1.3251],
+       device='cuda:0')
+Thumb force: tensor([1.7454, 1.1694, 1.0004, 1.0030, 1.4090, 1.0286, 1.0092, 1.0144, 1.8372],
+       device='cuda:0')
+Index force: tensor([1.1907, 1.0244, 1.0051, 1.0115, 1.0194, 1.0023, 1.0192, 1.0151, 1.0060],
+       device='cuda:0')
+tensor([-1.1604e-02, -1.0205e-03, -1.5295e+00], device='cuda:0')
+Apply perturbation now **INTO PALM**. Press <ENTER> to continuetensor([ 1.1517e-01,  5.7428e-01,  5.9150e-01,  5.8857e-01, -1.2099e-01,
+         4.2473e-01,  1.0348e+00,  1.1080e+00,  1.4369e+00,  1.7369e-01,
+         4.2659e-01,  3.7330e-01, -2.0624e-02,  1.6234e-03, -1.6430e+00],
+       device='cuda:0')
+Likelihood: -222.91073608398438
+State is out of distribution
+Likelihoods: tensor([-3.6413, -3.6925, -3.7525, -3.7811, -3.8014, -3.8042, -3.8425, -3.8449,
+        -3.8464, -3.9312, -3.9604, -4.0308, -4.0923, -4.2154, -4.3519, -4.3842],
+       device='cuda:0')
+Contact modes ['thumb_middle' 'thumb_middle' 'thumb_middle' 'thumb_middle'
+ 'thumb_middle' 'thumb_middle' 'thumb_middle' 'thumb_middle'
+ 'thumb_middle' 'thumb_middle' 'thumb_middle' 'thumb_middle'
+ 'thumb_middle' 'thumb_middle' 'thumb_middle' 'thumb_middle']
+Likelihood grouped mean: {'thumb_middle': 0.01996509061878537}
+Likelihood grouped sum: {'thumb_middle': 0.31944144990056594}
+Contact mode with highest likelihood sum: thumb_middle
+Plan time: 1.861865340033546
+Current yaw: tensor([-0.0157,  0.0052, -1.6478], device='cuda:0')
+2 thumb_middle
+tensor([ 0.1151,  0.5742,  0.5916,  0.5885, -0.1212,  0.4249,  1.0308,  1.1093,
+         1.4370,  0.1733,  0.4270,  0.3733, -0.0146,  0.0066, -1.6498],
+       device='cuda:0')
+Solve time for step 1 (global step 4) 3.966960203018971
+Current ori: tensor([-0.0162,  0.0056, -1.6484], device='cuda:0')
+Index force: tensor([1.0633, 1.0642, 1.0653], device='cuda:0')
+tensor([-0.0162,  0.0056, -1.6484], device='cuda:0')
+Apply perturbation now **TO SIDE OF OBJECT**. Press <ENTER> to continuetensor([ 0.1238,  0.5813,  0.5903,  0.5977, -0.2253,  0.4422,  0.9260,  1.0041,
+         1.3059,  0.1886,  0.3067,  0.6339,  0.0730, -0.0509, -1.9078],
+       device='cuda:0')
+Solve time for step 2 (global step 5) 3.879456963040866
+Current ori: tensor([ 0.0717, -0.0464, -1.9030], device='cuda:0')
+Index force: tensor([1.0553, 1.0570], device='cuda:0')
+tensor([ 0.0717, -0.0464, -1.9030], device='cuda:0')
+tensor([ 0.0700,  0.5833,  0.5525,  0.5625, -0.2259,  0.4760,  0.9258,  0.9291,
+         1.2472,  0.2260,  0.3068,  0.8635,  0.0490, -0.0243, -1.9982],
+       device='cuda:0')
+Solve time for step 3 (global step 6) 3.484031832078472
+Current ori: tensor([ 0.0478, -0.0246, -1.9972], device='cuda:0')
+Index force: tensor([1.0406], device='cuda:0')
+tensor([ 0.0478, -0.0246, -1.9972], device='cuda:0')
+Current yaw: tensor([ 0.0272,  0.0070, -1.8107], device='cuda:0')
+3 turn
+Likelihood: -68.33223724365234

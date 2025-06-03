@@ -6,25 +6,25 @@ num_steps: 8
 num_turns: 1
 max_recovery_stages: 4
 num_trials: 10
-num_episodes: 25
+num_episodes: 50
 visualize: True
-experiment_name: 'allegro_valve_likelihood_mppi_recovery_bugfix'
-mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
+experiment_name: 'allegro_screwdriver_recovery_model_hardware'
+mode: 'hardware'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
-object_type: 'valve'
+object_type: 'screwdriver'
 sim_device: 'cpu'
-friction_coefficient: .1
+friction_coefficient: 1.0
 kp: 3.0
 heuristic: 1000
 max_depth: 11
-goal: -1.5
+goal: -.5
 prior: 1
 multi_particle_search: True
 replan: False
 visualize_plan: False
-visualize_recovery_plan: False
-visualize_contact_plan: False
+visualize_recovery_plan: True
+visualize_contact_plan: True
 optimize_force: True
 exclude_index: False
 projected: False
@@ -39,9 +39,8 @@ compute_recovery_trajectory: False
 rl_adjustment: False
 test_recovery_trajectory: False
 perturb_action: False
-randomize_obj_start: True
-randomize_rob_start: True
-external_wrench_perturb: False
+randomize_obj_start: False
+external_wrench_perturb: True
 viz_states: False
 diff_init: True
 live_recovery: True
@@ -53,9 +52,13 @@ task_diffuse_goal: False
 recovery_diff_traj: True
 obj_gravity: True
 type: 'diffusion'
-model_path: 'data/training/allegro_screwdriver/allegro_short_valve_task_low_friction_diffusion/allegro_screwdriver_diffusion.pt'
-model_path_orig: 'data/training/allegro_screwdriver/allegro_short_valve_task_low_friction_diffusion/allegro_screwdriver_diffusion.pt'
-likelihood_threshold: -70.0
+OOD_metric: 'likelihood'
+recovery_controller: 'csvgd'
+recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_low_damping_diffusion'
+model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_low_damping_diffusion/allegro_screwdriver_diffusion.pt'
+model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion'
+model_path_orig: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion/allegro_screwdriver_diffusion.pt'
+likelihood_threshold: -170.0
 # likelihood_threshold: -1.0
 drop_threshold: -1250
 project_threshold: -105.
@@ -65,20 +68,16 @@ sac_batch_size: 64
 # project_threshold: -90
 # parity: 654
 start_ind: 0
-end_ind: 25
-device: 'cuda:0'
-recovery_controller: 'mppi'
-OOD_metric: 'likelihood'
-lambda_: .3
-q_cutoff: .1
+end_ind: 50
 controllers:
   csvgd:
     # N: 16
     N: 16
-    alpha_J: 5.0e-3
+    alpha_J: 1.0e-2
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
+    device: 'cuda:0'
     online_iters: 25
     warmup_iters: 25
     resample_steps: 16

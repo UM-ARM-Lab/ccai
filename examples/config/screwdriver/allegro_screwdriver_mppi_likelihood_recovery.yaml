@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 25
 visualize: True
-experiment_name: 'allegro_screwdriver_likelihood_mppi_recovery_damping_.1'
+experiment_name: 'allegro_screwdriver_likelihood_mppi_recovery_damping_.1_new'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -64,6 +64,7 @@ sac_batch_size: 64
 # project_threshold: -90
 # parity: 654
 start_ind: 0
+end_ind: 25
 device: 'cuda:0'
 recovery_controller: 'mppi'
 OOD_metric: 'likelihood'

@@ -6,7 +6,7 @@ from ccai.recovery_rl.recovery_rl.model import QNetworkConstraint
 
 
 class RunningCostSafeRL:
-    def __init__(self, path, cutoff, env, device, include_velocity=False, cosine_sine=True):
+    def __init__(self, path, cutoff, env, device, include_velocity=False, cosine_sine=True, hardware=False):
         # self.start = start
         self.obj_dof = 3
         self.obj_translational_dim = 0
@@ -19,7 +19,9 @@ class RunningCostSafeRL:
         self.setup_safety_critic(path)
 
         self.env = env
-        self.cutoff = cutoff
+        self.cutoff = float(cutoff)
+
+        self.hardware = hardware
     
     def setup_safety_critic(self, path):
         self.safety_critic = QNetworkConstraint(16, 12, 256)
