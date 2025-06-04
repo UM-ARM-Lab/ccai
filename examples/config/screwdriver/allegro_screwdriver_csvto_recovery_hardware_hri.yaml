@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 50
 visualize: True
-experiment_name: 'allegro_screwdriver_hri_hardware_0_csvto_angle_check'
+experiment_name: 'allegro_screwdriver_hri_hardware_low_budget'
 mode: 'hardware'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -59,27 +59,21 @@ model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2
 model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion'
 model_path_orig: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion/allegro_screwdriver_diffusion.pt'
 likelihood_threshold: -170.0
-# likelihood_threshold: -1.0
-drop_threshold: -1250
-project_threshold: -105.
 sac_batch_size: 64
-# likelihood_threshold: -16.0
-# likelihood_threshold: -136.6758056640625
-# project_threshold: -90
-# parity: 654
+likelihood_num_samples: 4 # Number of samples to use for likelihood computation. Lower is faster
 start_ind: 0
 end_ind: 50
 controllers:
   csvgd:
     # N: 16
-    N: 16
+    N: 8 # Number of parallel particles used for trajectory optimization. Lower is faster
     alpha_J: 1.0e-2
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
     device: 'cuda:0'
-    online_iters: 0
-    warmup_iters: 0
+    online_iters: 15 # Optimization budget for trajectory optimization. Lower is faster
+    warmup_iters: 15 # Optimization budget for trajectory optimization. Lower is faster
     resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1

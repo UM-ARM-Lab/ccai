@@ -301,7 +301,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         print('Loaded trajectory sampler')
         trajectory_sampler_orig.model.diffusion_model.classifier = None
-        trajectory_sampler_orig.model.diffusion_model.cutoff = params['project_threshold']
+        # trajectory_sampler_orig.model.diffusion_model.cutoff = params['project_threshold']
 
     state = env.get_state()
     start = state['q'].reshape(-1, 4 * num_fingers + 4).to(device=params['device'])[0]
@@ -391,7 +391,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             id_check, final_likelihood = True, None
         else:
             if params['OOD_metric'] == 'likelihood':
-                id_check, final_likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15))
+                id_check, final_likelihood = trajectory_sampler_orig.check_id(state, params['likelihood_num_samples'], threshold=params.get('likelihood_threshold', -15))
             elif params['OOD_metric'] == 'q_function':
                 id_check = True
                 final_likelihood = None
@@ -712,7 +712,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     id_check, final_likelihood = True, None
                 else:
                     if params['OOD_metric'] == 'likelihood':
-                        id_check, final_likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15))
+                        id_check, final_likelihood = trajectory_sampler_orig.check_id(state, params['likelihood_num_samples'], threshold=params.get('likelihood_threshold', -15))
                     elif params['OOD_metric'] == 'q_function':
                         id_check = True
                         final_likelihood = None
@@ -1282,7 +1282,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             x = xu[:, :planner.problem.num_fingers * 4 + planner.problem.obj_dof]
 
             start = x[-1]
-            likelihood, samples = trajectory_sampler_orig.check_id(start, 8, likelihood_only=True, return_samples=True, threshold=params.get('likelihood_threshold', -15))
+            likelihood, samples = trajectory_sampler_orig.check_id(start, params['likelihood_num_samples'], likelihood_only=True, return_samples=True, threshold=params.get('likelihood_threshold', -15))
             distances.append(-likelihood)
             end_mode_loop = time.perf_counter()
             plan_time += end_mode_loop - begin_mode_loop
@@ -1769,7 +1769,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         if done:
             break
     if params.get('live_recovery', False) and len(data['final_likelihoods'][-1]) == 0 and params['OOD_metric'] != 'q_function':
-        id, likelihood = trajectory_sampler_orig.check_id(state, 8, threshold=params.get('likelihood_threshold', -15))
+        id, likelihood = trajectory_sampler_orig.check_id(state, params['likelihood_num_samples'], threshold=params.get('likelihood_threshold', -15))
         data['final_likelihoods'][-1].append(likelihood)
         data_save = deepcopy(data)
         for t in range(1, 1 + params['T']):
@@ -1794,7 +1794,7 @@ if __name__ == "__main__":
     # get config
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj_pi_2.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_hardware.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_hardware_hri.yaml').read_text())
 
     from tqdm import tqdm
 
@@ -1978,7 +1978,7 @@ if __name__ == "__main__":
             trajectory_sampler.to(device=params['device'])
             trajectory_sampler.send_norm_constants_to_submodels()
             # if config['project_state'] or config['compute_recovery_trajectory'] or config['test_recovery_trajectory']:
-            trajectory_sampler.model.diffusion_model.cutoff = config['project_threshold']
+            # trajectory_sampler.model.diffusion_model.cutoff = config['project_threshold']
             trajectory_sampler.model.diffusion_model.subsampled_t = '5_10_15' in config['experiment_name']
             trajectory_sampler.model.diffusion_model.classifier = None
 

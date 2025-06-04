@@ -3,7 +3,10 @@ from scipy.spatial.transform import Rotation as R
 import rospy
 import pathlib
 from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
-from allegro_ros import RosNode
+if __name__ == '__main__':
+    from allegro_ros import RosNode
+else:
+    from .allegro_ros import RosNode
 import torch
 import yaml
 from tf.transformations import euler_from_quaternion
@@ -11,13 +14,14 @@ import tf
 import pytorch_kinematics as pk
 from typing import Tuple, Optional
 
-urdf_path = "/home/collaborator/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/victor_allegro_stalk.urdf"
+urdf_path = "/home/saguilera/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/victor_allegro_stalk.urdf"
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 
 class ObjectPoseReader:
     def __init__(self, obj='valve', mode='relative', device='cpu') -> None:
-        rospy.init_node('object_pose_reader')
+        if __name__ == '__main__':
+            rospy.init_node('object_pose_reader')
         self.mode = mode
         self.obj = obj
         self.listener = tf.TransformListener()
