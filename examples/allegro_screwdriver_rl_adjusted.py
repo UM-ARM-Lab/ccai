@@ -1247,7 +1247,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             with open(f"{viz_fpath}/goal_info.pkl", "wb") as f:
                 pkl.dump((goal, state), f)
         post_goal_viz = time.perf_counter()
-        dist_min = 3e-3
+        dist_min = 5e-3
         mode_skip = []
         planner = mode_planner_dict['index']
         cur_q = state[:4 * num_fingers]
@@ -1364,8 +1364,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         #     perm = np.random.permutation(2)
         #     # perm = [1, 0]
         #     contact_sequence += [contact_options[perm[0]], contact_options[perm[1]], 'turn']
-    # while episode_num_steps < max_episode_num_steps:
-    while all_stage < num_stages:
+    while episode_num_steps < max_episode_num_steps:
+    # while all_stage < num_stages:
         sample_contact = params['sample_contact'] and not recover
         initial_samples = None
         state = env.get_state()
@@ -1800,8 +1800,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_only.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_only.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj_pi_2.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_hardware_hri.yaml').read_text())
 
@@ -1875,7 +1875,7 @@ if __name__ == "__main__":
                                            joint_stiffness=config['kp'],
                                            fingers=config['fingers'],
                                            gradual_control=False,
-                                           gravity=False, 
+                                           gravity=True, 
                                            randomize_obj_start=config.get('randomize_obj_start', False),
                                            randomize_rob_start=config.get('randomize_rob_start', False),
                                            external_wrench_perturb=config.get('external_wrench_perturb', False),
