@@ -3,10 +3,10 @@ T: 4
 T_orig: 12
 receding_horizon: False
 num_steps: 12
-num_turns: 2
-num_trials: 90
+num_turns: 1
+num_episodes: 180
 visualize: True
-experiment_name: 'allegro_screwdriver_data_gen_pi_2'
+experiment_name: 'touchlegro_screwdriver_data_gen_pi_2'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
@@ -37,13 +37,15 @@ randomize_obj_start: True
 perturb_action: False
 live_recovery: False
 obj_gravity: True
-start_ind: 180
+external_wrench_perturb: False
+start_ind: 1
+diff_init: False
 # model_path: 'data/training/allegro_screwdriver/allegro_better_model/allegro_screwdriver_diffusion_w_classifier.pt'
 # model_path: 'data/training/allegro_screwdriver/allegro_test_new_data_augment_angle_diffusion/allegro_screwdriver_diffusion.pt'
 controllers:
   csvgd:
-    # N: 16
     N: 16
+    # N: 16
     alpha_J: 1.0e-2
     alpha_C: 1
     step_size: 0.1

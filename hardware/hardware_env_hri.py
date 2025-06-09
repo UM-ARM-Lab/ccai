@@ -14,9 +14,11 @@ import tf
 import pytorch_kinematics as pk
 from typing import Tuple, Optional
 
-urdf_path = "/home/saguilera/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/victor_allegro_stalk.urdf"
+urdf_path = "/home/roboguest/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/victor_allegro_stalk.urdf"
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
+
+BASE_FRAME = 'world'
 
 class ObjectPoseReader:
     def __init__(self, obj='valve', mode='relative', device='cpu') -> None:
@@ -40,33 +42,34 @@ class ObjectPoseReader:
     def update_obj_pose_from_tf(self) -> None:
         """
         Updates self.obj_trans_ and self.obj_euler_ with the current pose of the screwdriver
-        in the FR_left_base frame using tf.
+        in the BASE_FRAME frame using tf.
         """
         try:
-            self.listener.waitForTransform('FR_left_base', 'Umich_screwdriver', rospy.Time(0), rospy.Duration(1.0))
-            trans, rot = self.listener.lookupTransform('FR_left_base', 'Umich_screwdriver', rospy.Time(0))
+            self.listener.waitForTransform(BASE_FRAME, 'Umich_screwdriver', rospy.Time(0), rospy.Duration(1.0))
+            trans, rot = self.listener.lookupTransform(BASE_FRAME, 'Umich_screwdriver', rospy.Time(0))
             self.obj_trans_ = np.array(trans)
             self.obj_euler_ = np.array(euler_from_quaternion(rot, axes='rxyz'))
         except (tf.Exception, tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-            rospy.logwarn("TF lookup failed for Umich_screwdriver in FR_left_base.")
+            rospy.logwarn(f"TF lookup failed for Umich_screwdriver in {BASE_FRAME}.")
             self.obj_trans_ = None
             self.obj_euler_ = None
 
     def get_state(self):
         self.update_obj_pose_from_tf()
+        self.obj_euler_[0] += np.pi/2
         return self.obj_trans_, self.obj_euler_
       
     def update_screwdriver_pose(self) -> None:
         """
-        Updates the pose of the Umich_screwdriver in the FR_left_base frame.
+        Updates the pose of the Umich_screwdriver in the BASE_FRAME.
         """
         try:
-            self.listener.waitForTransform('FR_left_base', 'Umich_screwdriver', rospy.Time(0), rospy.Duration(1.0))
-            (trans, rot) = self.listener.lookupTransform('FR_left_base', 'Umich_screwdriver', rospy.Time(0))
+            self.listener.waitForTransform(BASE_FRAME, 'Umich_screwdriver', rospy.Time(0), rospy.Duration(1.0))
+            (trans, rot) = self.listener.lookupTransform(BASE_FRAME, 'Umich_screwdriver', rospy.Time(0))
             pose = self._to_homogeneous_matrix(trans, rot)
             self.screwdriver_pose_in_arm = torch.tensor(pose, device=self.device, dtype=torch.float32)
         except (tf.Exception, tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-            rospy.logwarn("TF lookup failed for Umich_screwdriver in FR_left_base.")
+            rospy.logwarn(f"TF lookup failed for Umich_screwdriver in {BASE_FRAME}.")
 
     def get_state_world_frame_pos(self) -> Optional[torch.Tensor]:
         """
@@ -243,8 +246,8 @@ if __name__ == "__main__":
                             # init_for_non_serial_chain=
                             lr=0.2)
     while True:
-        root_coor, root_ori = obj_reader.get_state()
-        print(root_ori)
+        # root_coor, root_ori = obj_reader.get_state()
+        root_ori = [0, 0, 0]
 
         # num goals x num retries x DOF tensor of joint angles; if not converged, best solution found so far
         # print(sol.solutions)
@@ -271,4 +274,13 @@ if __name__ == "__main__":
         cur_pose[-4:-1] = torch.tensor(root_ori, dtype=cur_pose.dtype)
         
         sim_env.set_pose(cur_pose.reshape(1,-1))
+        
+        print(sim_env.get_state()['q'])
+        print('index', sim_env.get_state()['index_q'])
+        print('middle', sim_env.get_state()['middle_q'])
+        # print(sim_env.get_state()['ring_q'])
+        print('thumb', sim_env.get_state()['thumb_q'])
+        
+        print(sim_env._q)
+        print()
 

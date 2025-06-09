@@ -224,39 +224,79 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                 self.contact_force_indices += [32 + self.obj_dof + 12, 32 + self.obj_dof + 13, 32 + self.obj_dof + 14]
             self.all_var_index = self.all_var_index + self.contact_force_indices
 
+        # self.ee_names = {
+        #     'index': 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
+        #     'middle': 'allegro_hand_naka_finger_finger_1_aftc_base_link',
+        #     'ring': 'allegro_hand_kusuri_finger_finger_2_aftc_base_link',
+        #     'thumb': 'allegro_hand_oya_finger_3_aftc_base_link',
+        # }
+
+        # self.collision_link_names = {
+        #     'index':
+        #     ['allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
+        #      'allegro_hand_hitosashi_finger_finger_link_3',
+        #      'allegro_hand_hitosashi_finger_finger_link_2',
+        #      'allegro_hand_hitosashi_finger_finger_link_1',
+        #      'allegro_hand_hitosashi_finger_finger_link_0'],
+        #      'middle':
+        #     ['allegro_hand_naka_finger_finger_1_aftc_base_link',
+        #      'allegro_hand_naka_finger_finger_link_7',
+        #      'allegro_hand_naka_finger_finger_link_6',
+        #      'allegro_hand_naka_finger_finger_link_5',
+        #      'allegro_hand_naka_finger_finger_link_4'],
+        #         'ring':
+        #     ['allegro_hand_kusuri_finger_finger_2_aftc_base_link',
+        #         'allegro_hand_kusuri_finger_finger_link_11',
+        #         'allegro_hand_kusuri_finger_finger_link_10',
+        #         'allegro_hand_kusuri_finger_finger_link_9',
+        #         'allegro_hand_kusuri_finger_finger_link_8'],
+        #         'thumb':
+        #     ['allegro_hand_oya_finger_3_aftc_base_link',
+        #     'allegro_hand_oya_finger_link_15',
+        #     'allegro_hand_oya_finger_link_14',
+        #     'allegro_hand_oya_finger_link_13',
+        #     'allegro_hand_oya_finger_link_12'],
+        # }
+        
         self.ee_names = {
-            'index': 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
-            'middle': 'allegro_hand_naka_finger_finger_1_aftc_base_link',
-            'ring': 'allegro_hand_kusuri_finger_finger_2_aftc_base_link',
-            'thumb': 'allegro_hand_oya_finger_3_aftc_base_link',
+            'index': 'link_3_tip',
+            'middle': 'link_7_tip',
+            'ring': 'link_11_tip',
+            'thumb': 'link_15_tip',
         }
 
         self.collision_link_names = {
             'index':
-            ['allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
-             'allegro_hand_hitosashi_finger_finger_link_3',
-             'allegro_hand_hitosashi_finger_finger_link_2',
-             'allegro_hand_hitosashi_finger_finger_link_1',
-             'allegro_hand_hitosashi_finger_finger_link_0'],
+            ['link_3_tip',
+             'link_touchlegro_3',
+             'link_touchlegro_2',
+             'link_touchlegro_1',
+             'link_touchlegro_0'
+             ],
              'middle':
-            ['allegro_hand_naka_finger_finger_1_aftc_base_link',
-             'allegro_hand_naka_finger_finger_link_7',
-             'allegro_hand_naka_finger_finger_link_6',
-             'allegro_hand_naka_finger_finger_link_5',
-             'allegro_hand_naka_finger_finger_link_4'],
+            ['link_7_tip',
+            'link_touchlegro_7',
+            'link_touchlegro_6',
+            'link_touchlegro_5',
+            'link_touchlegro_4'
+            ],
                 'ring':
-            ['allegro_hand_kusuri_finger_finger_2_aftc_base_link',
-                'allegro_hand_kusuri_finger_finger_link_11',
-                'allegro_hand_kusuri_finger_finger_link_10',
-                'allegro_hand_kusuri_finger_finger_link_9',
-                'allegro_hand_kusuri_finger_finger_link_8'],
+            ['link_11_tip',
+                'link_touchlegro_11',
+                'link_touchlegro_10',
+                'link_touchlegro_9',
+                'link_touchlegro_8'
+                ],
                 'thumb':
-            ['allegro_hand_oya_finger_3_aftc_base_link',
-            'allegro_hand_oya_finger_link_15',
-            'allegro_hand_oya_finger_link_14',
-            'allegro_hand_oya_finger_link_13',
-            'allegro_hand_oya_finger_link_12'],
+            ['link_15_tip',
+            'link_touchlegro_15',
+            'link_touchlegro_14',
+            'link_touchlegro_13',
+            'link_touchlegro_12'
+            ],
+                
         }
+        
         # self.collision_link_names = {
         #     'index':
         #     ['allegro_hand_hitosashi_finger_finger_0_aftc_base_link'],
@@ -307,7 +347,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             object_sdf_for_viz = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/peg',
                                      use_collision_geometry=False)
         self.object_sdf = object_sdf
-        robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models',
+        robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/touchlegro',
                                 use_collision_geometry=False)
 
         obj_to_world_trans = pk.Transform3d(device='cpu').translate(object_asset_pos[0], object_asset_pos[1], object_asset_pos[2])
@@ -985,11 +1025,16 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         self._regrasp_dh_constant = 0
         self._regrasp_dh_per_t = self._regrasp_dz
         if self.object_type == 'screwdriver':
-            self.default_dof_pos_backup = torch.cat((torch.tensor([[0.1, 0.5, 0.5, 0.5]]).float().to(device=self.device),
-                                            torch.tensor([[-0.1, 0.5, 0.65, 0.65]]).float().to(device=self.device),
-                                            torch.tensor([[0., 0.5, 0.65, 0.65]]).float().to(device=self.device),
-                                            torch.tensor([[1.2, 0.3, 0.2, 1.]]).float().to(device=self.device)),
-                                            dim=1).to(self.device).reshape(-1)
+            # self.default_dof_pos_backup = torch.cat((torch.tensor([[0.1, 0.5, 0.5, 0.5]]).float().to(device=self.device),
+            #                                 torch.tensor([[-0.1, 0.5, 0.65, 0.65]]).float().to(device=self.device),
+            #                                 torch.tensor([[0., 0.5, 0.65, 0.65]]).float().to(device=self.device),
+            #                                 torch.tensor([[1.2, 0.3, 0.2, 1.]]).float().to(device=self.device)),
+            #                                 dim=1).to(self.device).reshape(-1)
+            self.default_dof_pos_backup = torch.cat((torch.tensor([[0.0819, 0.3365, 0.7289, 0.7333]]).float().to(device=self.device),
+                                    torch.tensor([[-.0578, 0.7718, 0.5937, 0.7523]]).float().to(device=self.device),
+                                    torch.tensor([[0., 0.5, 0.65, 0.65]]).float().to(device=self.device),
+                                    torch.tensor([[.7946, 0.8216, 0.7075, .8364]]).float().to(device=self.device)),
+                                    dim=1).to(self.device).reshape(-1)
         elif self.object_type == 'valve':
             self.default_dof_pos_backup = torch.cat((torch.tensor([[0.3, 0.55, 0.7, 0.8]]).float(),
                                         torch.tensor([[-0.1, 0.2, 0.9, 0.8]]).float(),
@@ -3599,7 +3644,7 @@ if __name__ == "__main__":
     results = {}
 
     # set up the kinematic chain
-    asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
+    asset = f'{get_assets_dir()}/touchlegro/allegro_hand_right.urdf'
     ee_names = {
         'index': 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
         'middle': 'allegro_hand_naka_finger_finger_1_aftc_base_link',

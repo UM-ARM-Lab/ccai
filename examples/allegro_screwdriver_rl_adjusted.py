@@ -226,9 +226,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     min_force_dict = None
     if params['mode'] == 'hardware':
         min_force_dict = {
-            'thumb': 1.,
-            'middle': 1.,
-            'index': 1.,
+            'thumb': 1,
+            'middle': 1,
+            'index': 1,
         }
     else:
         min_force_dict = {
@@ -575,7 +575,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         initial_samples_0 = None
         new_T = params['T'] if (mode in ['index', 'thumb_middle', 'all']) else params['T_orig']
         # if trajectory_sampler is not None and params.get('diff_init', True) and initial_samples is None:
-        if not skip_diff_init and (trajectory_sampler is not None or trajectory_sampler_orig is not None) and params.get('diff_init', True) and initial_samples is None and (not params.get('model_path_orig', None) or not recover) and (not (mode != 'turn' and not params.get('live_recovery'))):
+        if params.get('diff_init', True) and not skip_diff_init and (trajectory_sampler is not None or trajectory_sampler_orig is not None)  and initial_samples is None and (not params.get('model_path_orig', None) or not recover) and (not (mode != 'turn' and not params.get('live_recovery'))):
 
             sampler = trajectory_sampler if recover else trajectory_sampler_orig
             # with torch.no_grad():
@@ -852,8 +852,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 x = best_traj[0, :planner.problem.dx + planner.problem.du]
                 x = x.reshape(1, planner.problem.dx + planner.problem.du)
                 action = x[:, planner.problem.dx:planner.problem.dx + planner.problem.du].to(device=env.device)
+                
 
-            if params['OOD_metric'] == 'q_function' and not recover:
+            if params['live_recovery'] and params['OOD_metric'] == 'q_function' and not recover:
                 q_func_action = action[0, :4 * num_fingers_to_plan].to(params['device'])
                 q_func_action = q_func_action.reshape(1, -1)
                 id_check, q_output = running_cost.check_id(state.unsqueeze(0), q_func_action)
@@ -900,7 +901,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             actual_trajectory.append(xu)
 
             action = action[:, :4 * num_fingers_to_plan]
-
+            # action[:, [4, 5, 6, 7, 8, 9, 10, 11]] = action[:, [8, 9, 10, 11, 4, 5, 6, 7]]
             if params['exclude_index']:
                 action = state.unsqueeze(0)[:, 4:4 * num_fingers] + action
                 action = torch.cat((state.unsqueeze(0)[:, :4], action), dim=1)  # add the index finger back
@@ -955,6 +956,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     input(f'Apply perturbation now {loc_str}. Press <ENTER> to continue')
             if params['mode'] == 'hardware':
                 action = action[0]
+                
+            # best_traj[:, [0, 1, 2, 3, 4, 5, 6, 7]] = best_traj[:, [4, 5, 6, 7, 0, 1, 2, 3]]
+            # action = best_traj[1:2, :12]
+                
+
             env.step(action.to(device=env.device))
             # if params['mode'] == 'hardware' and params['recovery_controller'] == 'mppi':
             #     sim_viz_env.step(action)
@@ -1095,7 +1101,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             contact_mode_str_max = 'unknown'  # Default in case we can't find a match
             while contact_mode_str_max == 'unknown':
                 initial_samples, raw_contact_mode, likelihood = trajectory_sampler.sample(
-                    N=params['N'], start=start, H=params['T']+1, constraints=None, project=False)
+                    N=params['N_contact_plan'], start=start, H=params['T']+1, constraints=None, project=False)
                 scaled_raw_contact_mode = (raw_contact_mode + 1) / 2  # Scale to [0, 1] for binning
                 # print('Rounded raw contact mode:', rounded_raw_contact_mode)
                 # rounded_raw_contact_mode = torch.round(raw_contact_mode)
@@ -1157,8 +1163,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 print('Contact mode with highest likelihood sum:', contact_mode_str_max)
 
                 # # Pick mode of the highest likelihood trajectory
-                # contact_mode_str_max = contact_mode_str_sort[0]
-                # print('Contact mode with highest likelihood trajectory:', contact_mode_str_max)
+                contact_mode_str_max = contact_mode_str_sort[0]
+                print('Contact mode with highest likelihood trajectory:', contact_mode_str_max)
 
                 # goal config is last state of highest likelihood trajectory for contact_mode_str_max. Has to be for the right mode
                 best_traj_idx = inds_grouped[contact_mode_str_max][0]
@@ -1187,6 +1193,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                         , turn_problem.contact_scenes_for_viz, viz_fpath,
                                             turn_problem.fingers, turn_problem.obj_dof + 1)
 
+            initial_samples = initial_samples[:params['N']]
             # if params['visualize_contact_plan']:
             #     for i in range(params['N']):
             #         this_traj_diffused_mode = contact_mode_str_sort[i]
@@ -1334,7 +1341,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 
     sample_contact = params.get('sample_contact', False)
-    num_stages = 20
+    num_stages = 2
 
     contact = None
     state = env.get_state()
@@ -1357,7 +1364,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         #     perm = np.random.permutation(2)
         #     # perm = [1, 0]
         #     contact_sequence += [contact_options[perm[0]], contact_options[perm[1]], 'turn']
-    while episode_num_steps < max_episode_num_steps:
+    # while episode_num_steps < max_episode_num_steps:
+    while all_stage < num_stages:
         sample_contact = params['sample_contact'] and not recover
         initial_samples = None
         state = env.get_state()
@@ -1793,8 +1801,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 if __name__ == "__main__":
     # get config
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_only.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj_pi_2.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_hardware_hri.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_hardware_hri.yaml').read_text())
 
     from tqdm import tqdm
 
@@ -1841,7 +1850,7 @@ if __name__ == "__main__":
                                  joint_stiffness=config['kp'],
                                  fingers=config['fingers'],
                                  table_pose=None, # Since I ran the IK before the sim, I shouldn't need to set the table pose. 
-                                 gravity=False
+                                 gravity=True,
                                  )
         
         sim, gym, viewer = sim_env.get_sim()
@@ -1866,7 +1875,7 @@ if __name__ == "__main__":
                                            joint_stiffness=config['kp'],
                                            fingers=config['fingers'],
                                            gradual_control=False,
-                                           gravity=True, 
+                                           gravity=False, 
                                            randomize_obj_start=config.get('randomize_obj_start', False),
                                            randomize_rob_start=config.get('randomize_rob_start', False),
                                            external_wrench_perturb=config.get('external_wrench_perturb', False),
@@ -1883,29 +1892,16 @@ if __name__ == "__main__":
 
 
     results = {}
+   
+    asset = f'{get_assets_dir()}/touchlegro/touchlegro_hand_description_right.urdf'
 
-    # set up the kinematic chain
-    asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
-    ee_names = {
-        'index': 'allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
-        'middle': 'allegro_hand_naka_finger_finger_1_aftc_base_link',
-        'ring': 'allegro_hand_kusuri_finger_finger_2_aftc_base_link',
-        'thumb': 'allegro_hand_oya_finger_3_aftc_base_link',
-    }
-    config['ee_names'] = ee_names
     config['obj_dof'] = 3
 
     screwdriver_asset = f'{get_assets_dir()}/screwdriver/screwdriver.urdf'
 
     chain = pk.build_chain_from_urdf(open(asset).read())
-    screwdriver_chain = pk.build_chain_from_urdf(open(screwdriver_asset).read())
-    frame_indices = [chain.frame_to_idx[ee_names[finger]] for finger in config['fingers']]  # combined chain
-    frame_indices = torch.tensor(frame_indices)
-    state2ee_pos = partial(state2ee_pos, fingers=config['fingers'], chain=chain, frame_indices=frame_indices,
-                           world_trans=env.world_trans)
 
-    forward_kinematics = partial(chain.forward_kinematics,
-                                 frame_indices=frame_indices)  # full_to= _partial_state = partial(full_to_partial_state, fingers=config['fingers'])
+
     partial_to_full_state = partial(partial_to_full_state, fingers=config['fingers'])
     
 

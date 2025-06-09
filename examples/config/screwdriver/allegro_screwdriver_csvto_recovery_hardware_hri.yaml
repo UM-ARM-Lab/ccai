@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 50
 visualize: True
-experiment_name: 'allegro_screwdriver_hri_hardware_low_budget'
+experiment_name: 'allegro_screwdriver_hri_hardware_low_budget_faster_computer'
 mode: 'hardware'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -60,14 +60,15 @@ model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion
 model_path_orig: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion/allegro_screwdriver_diffusion.pt'
 likelihood_threshold: -170.0
 sac_batch_size: 64
-likelihood_num_samples: 4 # Number of samples to use for likelihood computation. Lower is faster
+likelihood_num_samples: 8 # Number of samples to use for likelihood computation. Lower is faster
 start_ind: 0
 end_ind: 50
+N_contact_plan: 32
 controllers:
   csvgd:
     # N: 16
-    N: 8 # Number of parallel particles used for trajectory optimization. Lower is faster
-    alpha_J: 1.0e-2
+    N: 16 
+    alpha_J: 1.5e-2
     alpha_C: 1
     step_size: 0.1
     momentum: 0.

@@ -35,7 +35,9 @@ import time
 
 import wandb
 from sklearn.metrics import confusion_matrix
-
+import os
+os.environ['TORCH_LOGS'] = '+dynamo'
+os.environ['TORCHDYNAMO_VERBOSE'] = '1'
 TORCH_LOGS = "+dynamo"
 TORCHDYNAMO_VERBOSE = 1
 fingers = ['index', 'middle', 'thumb']
@@ -43,11 +45,11 @@ fingers = ['index', 'middle', 'thumb']
 
 def get_args():
     parser = argparse.ArgumentParser()
-    # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_eval_train_likelihood.yaml')
+    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_id_ood_states.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_project_ood_states.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_id_ood_states.yaml')
-    parser.add_argument('--config', type=str, default='allegro_valve_recovery_diffusion.yaml')
+    # parser.add_argument('--config', type=str, default='allegro_valve_recovery_diffusion.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_recovery_best_traj_only_gen_sim_data.yaml')
     return parser.parse_args()
 
@@ -1254,7 +1256,8 @@ if __name__ == "__main__":
                                                 cosine_sine=config['sine_cosine'],
                                                 states_only=config['du'] == 0,
                                                 skip_pregrasp=config['skip_pregrasp'],
-                                                type=config['model_type'],)
+                                                type=config['model_type'],
+                                                recovery=config.get('recovery', False))
     elif not config.get('project_ood_states', False):
         train_dataset = AllegroScrewDriverDataset([p for p in data_path.glob('*csvgd*')],
                                                 config['T']-1,
