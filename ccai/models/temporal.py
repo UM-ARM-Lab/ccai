@@ -260,7 +260,7 @@ class TemporalUnet(nn.Module):
     def compiled_unconditional_test(self, t, x):
         return self(t, x, context=None, dropout=False)
 
-    @torch.compile(mode='max-autotune')
+    @torch.compile(backend='inductor')
     def compiled_conditional_train(self, t, x, context):
         return self(t, x, context, dropout=True)
 

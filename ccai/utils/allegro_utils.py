@@ -292,3 +292,68 @@ def convert_sine_cosine_to_yaw(xu, yaw_idx=14):
     if not orig_type:
         xu_new = xu_new.numpy()
     return xu_new
+
+def vector_cos(a, b):
+    """Compute cosine similarity between two vectors."""
+    return torch.dot(a.reshape(-1), b.reshape(-1)) / (torch.norm(a.reshape(-1)) * torch.norm(b.reshape(-1)))
+
+def euler_to_quat(euler):
+    """Convert Euler angles to quaternion."""
+    matrix = tf.euler_angles_to_matrix(euler, convention='XYZ')
+    quat = tf.matrix_to_quaternion(matrix)
+    return quat
+
+def euler_to_angular_velocity(current_euler, next_euler):
+    """Convert Euler angles to angular velocity."""
+    current_quat = euler_to_quat(current_euler)
+    next_quat = euler_to_quat(next_euler)
+    dquat = next_quat - current_quat
+    con_quat = - current_quat  # conjugate
+    con_quat[..., 0] = current_quat[..., 0]
+    omega = 2 * tf.quaternion_raw_multiply(dquat, con_quat)[..., 1:]
+    return omega
+
+def dec2bin(x, bits):
+    """Convert decimal to binary representation."""
+    mask = 2 ** torch.arange(bits).to(x.device, x.dtype)
+    return x.unsqueeze(-1).bitwise_and(mask).ne(0).float()
+
+def bin2dec(b, bits):
+    """Convert binary to decimal representation."""
+    mask = 2 ** torch.arange(bits).to(b.device, b.dtype)
+    return torch.sum(b * mask, dim=-1)
+
+def extract_state_vector(state, num_fingers, device, obj_dof=3, slice_end=None, hardcoded_dim=None):
+    """
+    Helper function to extract and process state vector from environment state.
+    
+    Args:
+        state: Environment state dictionary
+        num_fingers: Number of fingers 
+        device: Target device for the tensor
+        obj_dof: Object degrees of freedom (default: 3)
+        slice_end: Optional end index for slicing (e.g., 15)
+        hardcoded_dim: Optional hardcoded dimension instead of calculating from num_fingers
+    
+    Returns:
+        Processed state tensor
+    """
+    if hardcoded_dim is not None:
+        state_tensor = state['q'].reshape(-1, hardcoded_dim)
+    else:
+        # Calculate dimension based on fingers and object DOF
+        if obj_dof == 3:
+            dim = 4 * num_fingers + 4  # Most common case
+        else:
+            dim = 4 * num_fingers + obj_dof + 1
+        state_tensor = state['q'].reshape(-1, dim)
+    
+    # Extract first element
+    state_tensor = state_tensor[0]
+    
+    # Apply slicing if specified
+    if slice_end is not None:
+        state_tensor = state_tensor[:slice_end]
+    
+    # Move to device
+    return state_tensor.to(device=device)

@@ -49,6 +49,8 @@ class ObjectPoseReader:
             trans, rot = self.listener.lookupTransform(BASE_FRAME, 'Umich_screwdriver', rospy.Time(0))
             self.obj_trans_ = np.array(trans)
             self.obj_euler_ = np.array(euler_from_quaternion(rot, axes='rxyz'))
+            
+            # self.obj_euler_[1] += .05
         except (tf.Exception, tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             rospy.logwarn(f"TF lookup failed for Umich_screwdriver in {BASE_FRAME}.")
             self.obj_trans_ = None
@@ -246,15 +248,15 @@ if __name__ == "__main__":
                             # init_for_non_serial_chain=
                             lr=0.2)
     while True:
-        # root_coor, root_ori = obj_reader.get_state()
-        root_ori = [0, 0, 0]
+        root_coor, root_ori = obj_reader.get_state()
+        # root_ori = [0, 0, 0]
 
         # num goals x num retries x DOF tensor of joint angles; if not converged, best solution found so far
         # print(sol.solutions)
         # num goals x num retries can check for the convergence of each run
         # print(sol.converged)
         # num goals x num retries can look at errors directly
-        # print(root_ori)
+        print(root_ori)
         # if np.abs(root_ori[0]) < .02 and np.abs(root_ori[1]) < .02:
 
         #     # Get converged solutions
@@ -275,12 +277,12 @@ if __name__ == "__main__":
         
         sim_env.set_pose(cur_pose.reshape(1,-1))
         
-        print(sim_env.get_state()['q'])
-        print('index', sim_env.get_state()['index_q'])
-        print('middle', sim_env.get_state()['middle_q'])
-        # print(sim_env.get_state()['ring_q'])
-        print('thumb', sim_env.get_state()['thumb_q'])
+        # print(sim_env.get_state()['q'])
+        # print('index', sim_env.get_state()['index_q'])
+        # print('middle', sim_env.get_state()['middle_q'])
+        # # print(sim_env.get_state()['ring_q'])
+        # print('thumb', sim_env.get_state()['thumb_q'])
         
-        print(sim_env._q)
-        print()
+        # print(sim_env._q)
+        # print()
 
