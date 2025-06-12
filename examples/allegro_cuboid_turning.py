@@ -421,8 +421,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             contact[:, 2] = 1
 
         recovery_params = copy.deepcopy(params)
-        recovery_params['warmup_iters'] = 75 #if not params.get('model_path_orig', None) else 25
-        recovery_params['online_iters'] = 20 #if not params.get('model_path_orig', None) else 0
+        recovery_params['warmup_iters'] = 75 #if not params.get('task_model_path', None) else 25
+        recovery_params['online_iters'] = 20 #if not params.get('task_model_path', None) else 0
 
         skip_diff_init = False
         planner_returns_action = False
@@ -545,7 +545,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         initial_samples_0 = None
         new_T = params['T'] if (mode in ['index', 'thumb', 'middle']) else params['T_orig']
         # if trajectory_sampler is not None and params.get('diff_init', True) and initial_samples is None:
-        if not skip_diff_init and trajectory_sampler is not None and params.get('diff_init', True) and initial_samples is None and (not params.get('model_path_orig', None) or not recover) and (not (mode != 'turn' and not params.get('live_recovery'))):
+        if not skip_diff_init and trajectory_sampler is not None and params.get('diff_init', True) and initial_samples is None and (not params.get('task_model_path', None) or not recover) and (not (mode != 'turn' and not params.get('live_recovery'))):
 
             sampler = trajectory_sampler if recover else trajectory_sampler_orig
             # with torch.no_grad():
@@ -620,8 +620,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             # for i in range(params['N']):
             #     sim_rollout = rollout_trajectory_in_sim(env_sim_rollout, initial_samples[i])
             #     sim_rollouts[i] = sim_rollout
-        # if initial_samples is not None and params.get('diff_init', True) and (not recover or params.get('model_path_orig', None)):
-        if not skip_diff_init and (not (mode != 'turn' and not params.get('live_recovery'))) and initial_samples is not None and params.get('diff_init', True) and (not recover or params.get('model_path_orig', None)):
+        # if initial_samples is not None and params.get('diff_init', True) and (not recover or params.get('task_model_path', None)):
+        if not skip_diff_init and (not (mode != 'turn' and not params.get('live_recovery'))) and initial_samples is not None and params.get('diff_init', True) and (not recover or params.get('task_model_path', None)):
             # if params['mode'] == 'hardware' and mode == 'turn':
             #     initial_samples[..., 30:] = 1.5 * torch.randn(params['N'], initial_samples.shape[1], 6, device=initial_samples.device)
             # elif params['mode'] == 'hardware':
@@ -962,7 +962,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
     def plan_recovery_contacts(state, stage):
         start_plan_time = time.perf_counter()
-        if params.get('model_path_orig', None):
+        if params.get('task_model_path', None):
             # Use recovery model to get contact mode
             state = state[:FULL_DOF]
             start = convert_yaw_to_sine_cosine(state)
@@ -1204,7 +1204,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 goal_config = None
                 initial_samples = None
                 likelihood = None
-            elif params.get('model_path_orig', None) and params.get('generate_context', False):
+            elif params.get('task_model_path', None) and params.get('generate_context', False):
                 # Use recovery model to get contact mode'):
                 contact_sequence, goal_config, initial_samples, likelihood, plan_time = plan_recovery_contacts(state, stage)
                 goal_config[-1] = state[-1]
@@ -1214,7 +1214,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     initial_samples = None
                 data['all_likelihoods_'].append(likelihood)
                 planned = True
-            elif params.get('model_path_orig', None):
+            elif params.get('task_model_path', None):
                 # Use recovery model to get contact mode
                 contact_sequence, goal_config, initial_samples, likelihood, plan_time = plan_recovery_contacts_w_model(state)
                 goal_config[-1] = state[-1]
@@ -1301,7 +1301,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         pre_recover = recover
         if contact == 'index':
             _goal = None
-            if params.get('model_path_orig', None):
+            if params.get('task_model_path', None):
                 _goal = goal_config
             # If we're recovering and have a saved goal/timesteps, use them
             start_timestep = 0
@@ -1325,7 +1325,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         if contact == 'thumb':
             _goal = None
-            if params.get('model_path_orig', None):
+            if params.get('task_model_path', None):
                 _goal = goal_config
             # If we're recovering and have a saved goal/timesteps, use them
             start_timestep = 0
@@ -1347,7 +1347,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         if contact == 'middle':
             _goal = None
-            if params.get('model_path_orig', None):
+            if params.get('task_model_path', None):
                 _goal = goal_config
             # If we're recovering and have a saved goal/timesteps, use them
             start_timestep = 0
@@ -1743,7 +1743,7 @@ if __name__ == "__main__":
 
     trajectory_sampler = None
     model_path = config.get('model_path', None)
-    model_path_orig = config.get('model_path_orig', None)
+    task_model_path = config.get('task_model_path', None)
     model_path_rl_adjusted = config.get('model_path_rl_adjusted', None)
 
     params = config.copy()
@@ -1754,7 +1754,7 @@ if __name__ == "__main__":
         if 'type' not in config:
             config['type'] = 'diffusion'
 
-        loading_recovery_model = params.get('model_path_orig', None) is not None
+        loading_recovery_model = params.get('task_model_path', None) is not None
         vae = None
         model_t = config['type'] == 'latent_diffusion'
         if model_t:
@@ -1800,8 +1800,8 @@ if __name__ == "__main__":
             T_for_diff = config['T'] if loading_recovery_model else config['T_orig']
             trajectory_sampler = load_sampler(model_path, dim_mults=(1,2,4), T=T_for_diff, recovery=loading_recovery_model)
 
-        if model_path_orig is not None:
-            trajectory_sampler_orig = load_sampler(model_path_orig, dim_mults=(1,2,4), T=config['T_orig'], recovery=False)
+        if task_model_path is not None:
+            trajectory_sampler_orig = load_sampler(task_model_path, dim_mults=(1,2,4), T=config['T_orig'], recovery=False)
         else:
             trajectory_sampler_orig = trajectory_sampler
 

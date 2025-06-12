@@ -257,7 +257,7 @@ class TrajectoryExecutor:
             torch.cuda.empty_cache()
 
             if (not skip_diff_init and self.params.get('diff_init', True) and 
-                (not recover or self.params.get('model_path_orig', None))):
+                (not recover or self.params.get('task_model_path', None))):
                 initial_samples = full_to_partial_trajectory(initial_samples, mode)
                 initial_x = initial_samples[:, 1:, :planner.problem.dx]
                 initial_u = initial_samples[:, :-1, -planner.problem.du:]

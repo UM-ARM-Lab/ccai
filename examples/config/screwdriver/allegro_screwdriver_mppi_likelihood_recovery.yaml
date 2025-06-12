@@ -53,7 +53,7 @@ recovery_diff_traj: True
 obj_gravity: True
 type: 'diffusion'
 model_path: '/home/abhinav/Documents/ccai/data/training/allegro_screwdriver/safe_rl/safety_critic.pt'
-model_path_orig: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion/allegro_screwdriver_diffusion.pt'
+task_model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion/allegro_screwdriver_diffusion.pt'
 likelihood_threshold: -170.0
 # likelihood_threshold: -1.0
 drop_threshold: -1250

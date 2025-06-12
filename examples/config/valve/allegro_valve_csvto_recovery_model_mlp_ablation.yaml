@@ -59,7 +59,7 @@ recovery_model_dir: 'data/training/allegro_screwdriver/allegro_valve_recovery_be
 model_path: 'data/training/allegro_screwdriver/allegro_valve_recovery_best_traj_only_mlp_ablation_diffusion/allegro_screwdriver_diffusion.pt'
 model_path_classifier: 'data/training/allegro_screwdriver/allegro_valve_recovery_best_traj_only_mlp_ablation_diffusion/allegro_screwdriver_contact_classifier.pt'
 model_dir: 'data/training/allegro_screwdriver/allegro_short_valve_task_low_friction_diffusion'
-model_path_orig: 'data/training/allegro_screwdriver/allegro_short_valve_task_low_friction_diffusion/allegro_screwdriver_diffusion.pt'
+task_model_path: 'data/training/allegro_screwdriver/allegro_short_valve_task_low_friction_diffusion/allegro_screwdriver_diffusion.pt'
 likelihood_threshold: -70.0
 # likelihood_threshold: -1.0
 drop_threshold: -1250

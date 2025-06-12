@@ -58,7 +58,7 @@ recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recov
 model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_mlp_ablation_diffusion/allegro_screwdriver_diffusion.pt'
 model_path_classifier: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_best_traj_only_mlp_ablation_diffusion/allegro_screwdriver_contact_classifier.pt'
 model_dir: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion'
-model_path_orig: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
+task_model_path: 'data/training/allegro_screwdriver/allegro_high_force_high_eps_pi_6_diffusion/allegro_screwdriver_diffusion_w_classifier.pt'
 likelihood_threshold: -160.0
 # likelihood_threshold: -1.0
 drop_threshold: -1250

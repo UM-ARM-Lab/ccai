@@ -25,23 +25,23 @@ class ModelManager:
         classifier = None
         
         model_path = self.config.get('model_path', None)
-        model_path_orig = self.config.get('model_path_orig', None)
+        task_model_path = self.config.get('task_model_path', None)
         
         if model_path is not None:
             problem_for_sampler = None
             if 'type' not in self.config:
                 self.config['type'] = 'diffusion'
 
-            loading_recovery_model = self.params.get('model_path_orig', None) is not None
+            loading_recovery_model = self.params.get('task_model_path', None) is not None
             
             if self.params['recovery_controller'] != 'mppi':
                 T_for_diff = self.config['T'] if loading_recovery_model else self.config['T_orig']
                 trajectory_sampler = self._load_sampler(
                     model_path, dim_mults=(1,2,4), T=T_for_diff, recovery=loading_recovery_model)
 
-            if model_path_orig is not None:
+            if task_model_path is not None:
                 trajectory_sampler_orig = self._load_sampler(
-                    model_path_orig, dim_mults=(1,2,4), T=self.config['T_orig'], recovery=False)
+                    task_model_path, dim_mults=(1,2,4), T=self.config['T_orig'], recovery=False)
                 
                 if not self.config.get('generate_context', False):
                     classifier = self._create_classifier()

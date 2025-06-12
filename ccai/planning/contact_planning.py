@@ -64,7 +64,7 @@ class ContactPlanner:
         start_plan_time = time.perf_counter()
         
         # If we have a recovery model, use it to get contact mode
-        if self.params.get('model_path_orig', None):
+        if self.params.get('task_model_path', None):
             # Use recovery model to get contact mode
             state = state[:15]
             start = convert_yaw_to_sine_cosine(state)

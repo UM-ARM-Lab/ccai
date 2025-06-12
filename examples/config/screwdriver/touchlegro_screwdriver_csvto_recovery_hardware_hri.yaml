@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 50
 visualize: True
-experiment_name: 'touchlegro_screwdriver_hri_hardware_low_budget_faster_computer'
+experiment_name: 'touchlegro_screwdriver_hri_hardware_10000_120_model_100_thresh'
 mode: 'hardware'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -57,8 +57,8 @@ recovery_controller: 'csvgd'
 recovery_model_dir: 'data/training/allegro_screwdriver/touchlegro_screwdriver_recovery_pi_2_25_downweight_diffusion'
 model_path: 'data/training/allegro_screwdriver/touchlegro_screwdriver_recovery_pi_2_25_downweight_diffusion/allegro_screwdriver_diffusion.pt'
 model_dir: 'data/training/allegro_screwdriver/touchlegro_screwdriver_pi_2_best_traj_only_diffusion'
-model_path_orig: 'data/training/allegro_screwdriver/touchlegro_screwdriver_pi_2_best_traj_only_diffusion/allegro_screwdriver_diffusion.pt'
-likelihood_threshold: -120.0
+task_model_path: 'data/training/allegro_screwdriver/touchlegro_screwdriver_pi_2_best_traj_only_diffusion/allegro_screwdriver_diffusion.pt'
+likelihood_threshold: -100.0
 likelihood_num_samples: 8 # Number of samples to use for likelihood computation. Lower is faster
 start_ind: 0
 end_ind: 50

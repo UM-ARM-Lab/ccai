@@ -41,7 +41,7 @@ recovery_controller: 'csvgd'
 recovery_model_dir: 'data/training/allegro_screwdriver/touchlegro_screwdriver_recovery_pi_2_25_downweight_diffusion'
 model_path: 'data/training/allegro_screwdriver/touchlegro_screwdriver_recovery_pi_2_25_downweight_diffusion/allegro_screwdriver_diffusion.pt'
 model_dir: 'data/training/allegro_screwdriver/touchlegro_screwdriver_pi_2_best_traj_only_diffusion'
-model_path_orig: 'data/training/allegro_screwdriver/touchlegro_screwdriver_pi_2_best_traj_only_diffusion/allegro_screwdriver_diffusion.pt'
+task_model_path: 'data/training/allegro_screwdriver/touchlegro_screwdriver_pi_2_best_traj_only_diffusion/allegro_screwdriver_diffusion.pt'
 likelihood_threshold: -120.0
 start_ind: 0
 end_ind: 50
