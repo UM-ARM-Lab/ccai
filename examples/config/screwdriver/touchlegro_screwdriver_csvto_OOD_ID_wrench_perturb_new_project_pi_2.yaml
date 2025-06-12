@@ -6,7 +6,7 @@ num_turns: 1
 max_recovery_stages: 4
 num_episodes: 200
 visualize: True
-experiment_name: 'touchlegro_screwdriver_recovery_data_1_N'
+experiment_name: 'touchlegro_screwdriver_recovery_data_100'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -36,7 +36,7 @@ OOD_metric: 'likelihood'
 recovery_controller: 'csvgd'
 model_dir: 'data/training/allegro_screwdriver/touchlegro_screwdriver_pi_2_best_traj_only_diffusion'
 model_path: 'data/training/allegro_screwdriver/touchlegro_screwdriver_pi_2_best_traj_only_diffusion/allegro_screwdriver_diffusion.pt'
-likelihood_threshold: -120.0
+likelihood_threshold: -100.0
 likelihood_num_samples: 8
 start_ind: 200
 end_ind: 400

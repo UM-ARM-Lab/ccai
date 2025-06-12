@@ -62,6 +62,8 @@ class ContactPlanner:
     def plan_recovery_contacts(self, state, stage, fpath, all_stage, index_regrasp_planner):
         """Plan recovery contacts using recovery model."""
         start_plan_time = time.perf_counter()
+        
+        # If we have a recovery model, use it to get contact mode
         if self.params.get('model_path_orig', None):
             # Use recovery model to get contact mode
             state = state[:15]
@@ -102,7 +104,7 @@ class ContactPlanner:
                 print('Likelihoods:', likelihood_sort)
                 print('Contact modes', contact_mode_str_sort)
 
-                # Compute the average likelihood, grouped by mode
+                # Compute the summed likelihood, grouped by mode
                 likelihood_grouped = {}
                 inds_grouped = {}
                 for i, mode in enumerate(contact_mode_str_sort):
@@ -138,6 +140,7 @@ class ContactPlanner:
                 best_traj_idx = inds_grouped[contact_mode_str_max][0]
                 goal_config = initial_samples[best_traj_idx, -1, :15]
             
+                # Use the goal from the planner if using the task model to diffuse the goal
                 if self.params['task_diffuse_goal']:
                     goal = index_regrasp_planner.problem.goal.clone()
                     goal[-1] = state[-1]
@@ -150,15 +153,16 @@ class ContactPlanner:
 
             initial_samples = initial_samples[:self.params['N']]
             return [contact_mode_str_max], goal_config, initial_samples, likelihood, plan_time
+        # If we don't have a recovery model, use the task model to plan contacts
         else:
             return self.plan_recovery_contacts_offline(state, stage, fpath, all_stage)
 
     def plan_recovery_contacts_offline(self, state, stage, fpath, all_stage):
-        """Plan recovery contacts using offline planning."""
+        """Plan recovery contacts using CSVTO + likelihood estimation"""
         plan_time = 0
-        start_plan_time = time.perf_counter()
         distances = []
 
+        # Hardcoded modes for screwdriver for now
         modes = ['thumb_middle', 'index']
         goal = self.mode_planner_dict['index'].problem.goal.clone()
         goal[-1] = state[-1]
@@ -175,13 +179,15 @@ class ContactPlanner:
         mode_skip = []
         planner = self.mode_planner_dict['index']
         
+        
+        # Filter contact modes based on which fingers are in contact with the object. Contact fingers for each mode must be less than dist_min away from the object.
         num_fingers = len(self.params['fingers'])
         obj_dof = 3
         cur_q = state[:4 * num_fingers]
         cur_theta = state[4 * num_fingers: 4 * num_fingers + obj_dof]
         planner.problem._preprocess_fingers(cur_q[None, None], cur_theta[None, None], compute_closest_obj_point=True)
         
-        print(planner.problem.data['thumb']['sdf'], planner.problem.data['middle']['sdf'], planner.problem.data['index']['sdf'])
+        print(planner.problem.data['index']['sdf'], planner.problem.data['middle']['sdf'], planner.problem.data['thumb']['sdf'])
         
         for mode in modes:
             if mode == 'index':
@@ -208,15 +214,18 @@ class ContactPlanner:
             planner.reset(state, T=self.params['T'], goal=goal)
             planner.warmup_iters = self.params['warmup_iters']
 
+            # Run CSVTO to plan trajectory
             xu, plans = planner.step(state)
             planner.problem.data = {}
             planner.warmup_iters = 0
             initial_samples.append(plans)
             
             x = xu[:, :planner.problem.num_fingers * 4 + planner.problem.obj_dof]
-            start = x[-1]
+            end = x[-1]
+            
+            # Estimate likelihood of the end state
             likelihood, samples = self.trajectory_sampler_orig.check_id(
-                start, self.params['likelihood_num_samples'], likelihood_only=True, 
+                end, self.params['likelihood_num_samples'], likelihood_only=True, 
                 return_samples=True, threshold=self.params.get('likelihood_threshold', -15))
             distances.append(-likelihood)
             
@@ -234,6 +243,7 @@ class ContactPlanner:
         dists_dict = dict(zip(modes, distances))
         pprint(dists_dict)
 
+        # Return the mode that achieves the highest likelihood state
         if all(d == float('inf') for d in distances):
             return ['turn'], None, plan_time
         else:

@@ -6,9 +6,7 @@ except:
     print('No ROS install found, continuing')
 
 import numpy as np
-import pickle as pkl
 import pickle
-from statsmodels.distributions.empirical_distribution import ECDF
 from copy import deepcopy
 
 import torch
@@ -19,9 +17,7 @@ import copy
 import yaml
 import pathlib
 from functools import partial
-from pprint import pprint
 import sys
-import os
 sys.path.append('..')
 
 import pytorch_kinematics as pk
@@ -60,8 +56,6 @@ print("CCAI_PATH", CCAI_PATH)
 
 # Degrees of freedom of the object
 obj_dof = 3
-
-
 
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
@@ -271,13 +265,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         """
         nonlocal episode_num_steps
         
-        # Create data dictionary for storing execution metrics
-        data = {
-            'pre_action_likelihoods': [[]],
-            'final_likelihoods': [[]],
-            'csvto_times': [[]]
-        }
-        
+
         # Execute trajectory using TrajectoryExecutor
         actual_trajectory, planned_trajectories, initial_samples, sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = trajectory_executor.execute_traj(
             planner=planner,
@@ -305,17 +293,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             proj_path=proj_path,
             AllegroScrewdriver=AllegroScrewdriver
         )
-        
-        # Calculate executed steps
-        executed_steps = len(actual_trajectory) if isinstance(actual_trajectory, list) else actual_trajectory.shape[0]
-        
-        # Get pre-recovery state and likelihood if available
-        pre_recovery_state = None
-        pre_recovery_likelihood = None
-        if len(data['pre_action_likelihoods']) > 0 and len(data['pre_action_likelihoods'][-1]) > 0:
-            pre_recovery_likelihood = data['pre_action_likelihoods'][-1][0]
-        
-        return actual_trajectory, planned_trajectories, initial_samples, sim_rollouts, optimizer_paths, contact_points, contact_distance, recover, executed_steps, pre_recovery_state, pre_recovery_likelihood
+               
+        return actual_trajectory, planned_trajectories, initial_samples, sim_rollouts, optimizer_paths, contact_points, contact_distance, recover
 
     data = {}
     t_range = params['T']
@@ -379,11 +358,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                             'thumb': 4,
                             'middle': 5
                             }
-    contact_vec_to_label = dict((v, k) for k, v in contact_label_to_vec.items())
-
-
-    sample_contact = params.get('sample_contact', False)
-    num_stages = 2
 
     contact = None
     state = env.get_state()
@@ -598,6 +572,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 
             state = env.get_state()
             state = extract_state_vector(state, num_fingers, params['device'], slice_end=15)
+            
+            traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
 
         elif contact == 'mppi':
             # Use baseline MPPI controller
@@ -825,7 +801,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         del data_save
 
     env.reset()
-    return -1#torch.min(final_distance_to_goal).cpu().numpy()
+    return 0
 
 
 if __name__ == "__main__":
@@ -833,7 +809,7 @@ if __name__ == "__main__":
     config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_only.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/touchlegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj_pi_2.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_hardware_hri.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/touchlegro_screwdriver_csvto_recovery_hardware_hri.yaml').read_text())
 
     from tqdm import tqdm
 
