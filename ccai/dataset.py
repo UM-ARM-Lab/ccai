@@ -259,6 +259,7 @@ class AllegroScrewDriverDataset(Dataset):
                 
                     # intiialize fl_improvement_bool as all True
                     if recovery:
+                        # TODO. This logic needs to be double-checked. Potentially incorrect.
                         fl = data['final_likelihoods']
                         pre_action_likelihoods = data['pre_action_likelihoods']
                         fl = [l for l in fl if None not in l and len(l)>0]
@@ -269,6 +270,7 @@ class AllegroScrewDriverDataset(Dataset):
                         fl = np.array(fl).flatten()
                         fl_delta = []
                         executed_recovery_modes = [m for m in data['executed_contacts'] if m != 'turn']
+                        
                         for i in range(len(executed_recovery_modes)):
                             pre_mode_likelihood = fl[i-1]
                             post_mode_likelihood = fl[i]

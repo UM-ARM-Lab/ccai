@@ -173,11 +173,13 @@ def train_model(trajectory_sampler, train_loader, config):
         if (epoch + 1) % config['save_every'] == 0:
             if config['use_ema']:
                 torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}_{epoch}.pt')
+                torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
             else:
                 torch.save(model.state_dict(),
                            f'{fpath}/allegro_screwdriver_{config["model_type"]}_{epoch}.pt')
     if config['use_ema']:
         torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}_{epoch}.pt')
+        torch.save(ema_model.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}.pt')
     else:
         torch.save(model.state_dict(),
                    f'{fpath}/allegro_screwdriver_{config["model_type"]}_{epoch}.pt')
@@ -384,9 +386,9 @@ if __name__ == "__main__":
                               discriminator_guidance=config['discriminator_guidance'],
                               learn_inverse_dynamics=config['inverse_dynamics'],
                               state_only=config['state_only'], state_control_only=config['state_control_only'],
-                              problem=problem_for_sampler if config['state_control_only'] else None,
+                              problem= None,
                               dropout_p=config.get('context_dropout_p', .25), trajectory_condition=config.get('trajectory_condition', False),
-                              true_s0=config.get('true_s0', False), 
+                              true_s0=False 
                               )
 
     data_path = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["data_directory"]}')

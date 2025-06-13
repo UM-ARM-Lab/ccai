@@ -1030,11 +1030,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             #                                 torch.tensor([[0., 0.5, 0.65, 0.65]]).float().to(device=self.device),
             #                                 torch.tensor([[1.2, 0.3, 0.2, 1.]]).float().to(device=self.device)),
             #                                 dim=1).to(self.device).reshape(-1)
-            self.default_dof_pos_backup = torch.cat((torch.tensor([[0.0819, 0.3365, 0.7289, 0.7333]]).float().to(device=self.device),
-                                    torch.tensor([[-.0578, 0.7718, 0.5937, 0.7523]]).float().to(device=self.device),
-                                    torch.tensor([[0., 0.5, 0.65, 0.65]]).float().to(device=self.device),
-                                    torch.tensor([[.7946, 0.8216, 0.7075, .8364]]).float().to(device=self.device)),
-                                    dim=1).to(self.device).reshape(-1)
+            self.default_dof_pos_backup = default_dof_pos.clone().reshape(-1)
         elif self.object_type == 'valve':
             self.default_dof_pos_backup = torch.cat((torch.tensor([[0.3, 0.55, 0.7, 0.8]]).float(),
                                         torch.tensor([[-0.1, 0.2, 0.9, 0.8]]).float(),

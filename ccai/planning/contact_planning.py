@@ -151,7 +151,30 @@ class ContactPlanner:
                     if self.params['visualize_contact_plan']:
                         self._visualize_goal(fpath, all_stage, goal, state)
 
+            
+            # Visualize all planning samples if requested
+            if self.params.get('visualize_recovery_planning_samples', False):
+                viz_fpath = pathlib.Path(fpath) / f"recovery_stage_{all_stage}" / "planning_samples"
+                viz_fpath.mkdir(parents=True, exist_ok=True)
+                
+                # Visualize each trajectory in initial_samples
+                for i, (traj, mode) in enumerate(zip(initial_samples, contact_mode_str_sort[:self.params['N']])):
+                    traj_for_viz = traj[:, :self.turn_problem.dx]
+                    traj_for_viz = torch.cat((state[:self.turn_problem.dx].unsqueeze(0), traj_for_viz), dim=0)
+                    tmp = torch.zeros((traj_for_viz.shape[0], 1), device=traj.device)
+                    traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
+                    
+                    sample_fpath = viz_fpath / f"{mode}_sample_{i}"
+                    sample_fpath.mkdir(parents=True, exist_ok=True)
+                    sample_fpath_img = sample_fpath / "img"
+                    sample_fpath_img.mkdir(parents=True, exist_ok=True)
+                    sample_fpath_gif = sample_fpath / "gif"
+                    sample_fpath_gif.mkdir(parents=True, exist_ok=True)
+                    visualize_trajectory(traj_for_viz, self.turn_problem.contact_scenes_for_viz, sample_fpath,
+                                      self.turn_problem.fingers, self.turn_problem.obj_dof + 1)
+            
             initial_samples = initial_samples[:self.params['N']]
+            
             return [contact_mode_str_max], goal_config, initial_samples, likelihood, plan_time
         # If we don't have a recovery model, use the task model to plan contacts
         else:
@@ -270,11 +293,8 @@ class ContactPlanner:
     def _visualize_contact_plan(self, viz_fpath, x, state, planner):
         """Visualize contact plan trajectory."""
         traj_for_viz = x[:, :planner.problem.dx]
-        
-        if self.params['exclude_index']:
-            traj_for_viz = torch.cat((state[4:4 + planner.problem.dx].unsqueeze(0), traj_for_viz), dim=0)
-        else:
-            traj_for_viz = torch.cat((state[:planner.problem.dx].unsqueeze(0), traj_for_viz), dim=0)
+
+        traj_for_viz = torch.cat((state[:planner.problem.dx].unsqueeze(0), traj_for_viz), dim=0)
             
         tmp = torch.zeros((traj_for_viz.shape[0], 1), device=x.device)
         traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)

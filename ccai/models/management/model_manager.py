@@ -67,12 +67,12 @@ class ModelManager:
             hidden_dim=128,
             context_dim=3, 
             problem=None,
-            guided=self.config['use_guidance'],
+            guided=self.config.get('use_guidance', False),
             state_control_only=self.config.get('state_control_only', False),
             initial_threshold=self.config.get('likelihood_threshold', -15),
             new_projection=True,
-            generate_context=self.config.get('generate_context', False) if recovery else False,
-            trajectory_condition=self.config.get('trajectory_condition', False) if recovery else False,
+            generate_context=recovery,
+            trajectory_condition=True,
         )
         
         d = torch.load(f'{self.ccai_path}/{path}', map_location=torch.device(self.params['device']))

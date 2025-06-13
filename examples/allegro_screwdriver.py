@@ -84,6 +84,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                  proj_path=None,
                  full_dof_goal=False, 
                  project=False,
+                 default_dof_pos=None,
                  **kwargs):
         # Mass of the object. Hardcoded for now.
         self.obj_mass = 0.0851
@@ -94,13 +95,22 @@ class AllegroScrewdriver(AllegroManipulationProblem):
         self.obj_rotational_dim = 3
         self.obj_link_name = object_link_name
 
-
         self.contact_points = None
         contact_points_object = None
         if proj_path is not None:
             self.proj_path = proj_path.to(device=device)
         else:
             self.proj_path = None
+
+        # Set default DOF positions if not provided
+        if default_dof_pos is None:
+            self.default_dof_pos = torch.cat((torch.tensor([[0.0819, 0.3447, 0.7860, 0.7333]]).float().to(device=device),
+                                        torch.tensor([[-.0578, 0.7718, 0.5937, 0.7523]]).float().to(device=device),
+                                        torch.tensor([[0., 0.5, 0.65, 0.65]]).float().to(device=device),
+                                        torch.tensor([[.7946, 0.8216, 0.7075, .8364]]).float().to(device=device)),
+                                        dim=1).to(device)
+        else:
+            self.default_dof_pos = default_dof_pos
 
         super(AllegroScrewdriver, self).__init__(start=start, goal=goal, T=T, chain=chain,
                                                  object_location=object_location,
@@ -153,7 +163,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     start = extract_state_vector(state, num_fingers, params['device'])
 
     if params.get('external_wrench_perturb', False):
-        rand_pct = 1/3
+        rand_pct = params.get('rand_pct', 1/3)  # Get from params with default value
         print(f'Random perturbation %: {rand_pct:.2f}')
 
     # Initialize baseline controller if needed
@@ -175,9 +185,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     min_force_dict = None
     if params['mode'] == 'hardware':
         min_force_dict = {
-            'thumb': 1,
-            'middle': 1,
-            'index': 1,
+            'thumb': 1.5,
+            'middle': 1.5,
+            'index': 1.5,
         }
     else:
         min_force_dict = {
@@ -314,50 +324,20 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     state = env.get_state()
     state = extract_state_vector(state, num_fingers, params['device'])
 
-    def dec2bin(x, bits):
-        mask = 2 ** torch.arange(bits - 1, -1, -1).to(x.device, x.dtype)
-        return x.unsqueeze(-1).bitwise_and(mask).ne(0).float()
-
-    def bin2dec(b, bits):
-        mask = 2 ** torch.arange(bits - 1, -1, -1).to(b.device, b.dtype)
-        return torch.sum(mask * b, -1)
-
     def _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, contact_state):
         add_to_dataset(data, traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, contact_state)
 
-    def _partial_to_full(traj, mode):
-        return partial_to_full_trajectory(traj, mode, params['device'])
-
-    def _full_to_partial(traj, mode):
-        return full_to_partial_trajectory(traj, mode)
-
-    def visualize_trajectory_wrapper(traj, contact_scenes, fname, plan_or_init, index, fingers, obj_dof, k):
-        viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/{plan_or_init}/{index}/timestep_{k}")
-        img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
-        gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
-        pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
-        pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-        visualize_trajectory(traj, contact_scenes, viz_fpath, fingers, obj_dof + 1)
-
-    # Replace the large contact planning functions with contact planner methods
     def plan_recovery_contacts_w_model(state):
         return contact_planner.plan_recovery_contacts_w_model(state, contact_state_dict_flip, classifier)
 
     def plan_recovery_contacts(state, stage):
         return contact_planner.plan_recovery_contacts(state, stage, fpath, all_stage, index_regrasp_planner)
 
+
+
     state = env.get_state()
     state_16 = extract_state_vector(state, num_fingers, params['device'])
     state = state_16[:15]
-
-
-    contact_label_to_vec = {'pregrasp': 0,
-                            'thumb_middle': 1,
-                            'index': 2,
-                            'turn': 3,
-                            'thumb': 4,
-                            'middle': 5
-                            }
 
     contact = None
     state = env.get_state()
@@ -370,19 +350,19 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     all_stage = 0
     done = False
     max_episode_num_steps = 100 if params['mode'] != 'hardware' else 50
-    # for stage in range(num_stages):
-    # <= so because pregrasp will iterate the all_stage counter
+    max_stages = 2  # Maximum number of stages for non-live recovery mode
+
+    def should_continue_loop():
+        if params.get('live_recovery', False):
+            return episode_num_steps < max_episode_num_steps
+        return all_stage < max_stages
+
     contact_planner = None
     if not params.get('live_recovery', False):
-        contact_sequence = ['turn'] * 50
-        # while len(contact_sequence) < 50:
-        #     contact_options = ['index', 'thumb_middle']
-        #     perm = np.random.permutation(2)
-        #     # perm = [1, 0]
-        #     contact_sequence += [contact_options[perm[0]], contact_options[perm[1]], 'turn']
-    while episode_num_steps < max_episode_num_steps:
-    # while all_stage < num_stages:
-        sample_contact = params['sample_contact'] and not recover
+        contact_sequence = ['turn'] * (max_stages - 1) # minus 1 because pregrasp will iterate the all_stage counter
+
+    while should_continue_loop():
+
         initial_samples = None
         state = env.get_state()
         state = extract_state_vector(state, num_fingers, params['device'], slice_end=15)
@@ -392,9 +372,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             goal_config = None
             initial_samples = None
             likelihood = None
-            if contact_planner is None:
-                contact_planner = ContactPlanner(params, env, trajectory_sampler, trajectory_sampler_orig, 
-                                turn_problem)
+
             if params['recovery_controller'] == 'mppi':
                 # MPPI baseline - no additional planning needed
                 pass
@@ -403,8 +381,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
                 contact_sequence, goal_config, initial_samples, likelihood, plan_time = plan_recovery_contacts(state, stage)
                 goal_config[-1] = state[-1]
-                if not params.get('recovery_diff_traj', False):
-                    initial_samples = None
+
                 data['all_likelihoods_'].append(likelihood)
                 planned = True
             elif params.get('task_model_path', None):
@@ -461,7 +438,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 input("Pregrasp complete. Ready to execute. Press <ENTER> to continue.")
             stage += 1
             all_stage += 1
-            if params['mode'] != 'hardware' and params['external_wrench_perturb']:
+            if params['mode'] != 'hardware' and params.get('external_wrench_perturb', False):
                 env.set_external_wrench_perturb(orig_torque_perturb, rand_pct)
             continue
         else:
@@ -736,6 +713,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             thumb_and_middle_regrasp_planner.reset(start, goal=goal)
             all_regrasp_planner.reset(start, goal=goal)
 
+            if contact_planner is None:
+                contact_planner = ContactPlanner(params, env, trajectory_sampler, trajectory_sampler_orig, 
+                                turn_problem,
+                                mode_planner_dict)
+            
             print('New goal:', goal)
 
 
@@ -743,6 +725,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             if torch.allclose(start, goal):
                 print('Goal is the same as current state')
                 recover = False
+        elif recover and not done and params.get('task_model_path', None) and contact_planner is None:
+            contact_planner = ContactPlanner(params, env, trajectory_sampler, trajectory_sampler_orig, 
+                                turn_problem,
+                                )
+
         if add:
             _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance,
                             contact_state=contact_state_dict[contact])
@@ -805,8 +792,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 
 if __name__ == "__main__":
-    # get config
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
+    # get config. First option is to get the config from the command line.
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/touchlegro/{sys.argv[1]}.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_only.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/touchlegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj_pi_2.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/touchlegro_screwdriver_csvto_recovery_hardware_hri.yaml').read_text())
@@ -819,15 +806,15 @@ if __name__ == "__main__":
     if 'recovery_controller' not in config:
         config['recovery_controller'] = 'csvgd'
     num_envs = get_num_envs_for_baseline(config)
-
+    
+    default_dof_pos = torch.cat((torch.tensor([[0.0819, 0.3447, 0.7860, 0.7333]]).float(),
+                                torch.tensor([[-.0578, 0.7718, 0.5937, 0.7523]]).float(),
+                                torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
+                                torch.tensor([[.7946, 0.8216, 0.7075, .8364]]).float()),
+                                dim=1)
     if config['mode'] == 'hardware':
         # roslaunch allegro_hand allegro_hand_modified.launch
         from hardware.hardware_env_hri import HardwareEnv
-        default_dof_pos = torch.cat((torch.tensor([[0.0819, 0.3447, 0.7860, 0.7333]]).float(),
-                                    torch.tensor([[-.0578, 0.7718, 0.5937, 0.7523]]).float(),
-                                    torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
-                                    torch.tensor([[.7946, 0.8216, 0.7075, .8364]]).float()),
-                                    dim=1)
 
         env = HardwareEnv(default_dof_pos[:, :16], 
                           finger_list=config['fingers'], 
@@ -857,6 +844,8 @@ if __name__ == "__main__":
                                  fingers=config['fingers'],
                                  table_pose=None, # Since I ran the IK before the sim, I shouldn't need to set the table pose. 
                                  gravity=True,
+                                 random_force_magnitude=config.get('random_force_magnitude', 1.5),
+                                 default_dof_pos=default_dof_pos
                                  )
         
         sim, gym, viewer = sim_env.get_sim()
@@ -885,6 +874,8 @@ if __name__ == "__main__":
                                            randomize_obj_start=config.get('randomize_obj_start', False),
                                            randomize_rob_start=config.get('randomize_rob_start', False),
                                            external_wrench_perturb=config.get('external_wrench_perturb', False),
+                                           random_force_magnitude=config.get('random_force_magnitude', 1.5),
+                                           default_dof_pos=default_dof_pos
                                            )
 
 
@@ -944,7 +935,7 @@ if __name__ == "__main__":
 
 
         env.reset()
-        goal = torch.tensor([0, 0, float(config['goal'])])
+        goal = torch.tensor([0, 0, float(config['goal'])]) # Ignore. Deprecated
         # goal = goal + 0.025 * torch.randn(1) + 0.2
 
         fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}{now}/csvgd/trial_{i + 1}')
@@ -962,7 +953,7 @@ if __name__ == "__main__":
 
         succ = False
         while not succ:
-            perturb_this_trial = (np.random.rand() < .1 or params['perturb_action']) and params['perturb_action']
+            perturb_this_trial = params['perturb_action']
 
             if config['mode']  == 'hardware':
                 params['perturb_action'] = False

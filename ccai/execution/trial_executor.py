@@ -36,7 +36,7 @@ class TrajectoryExecutor:
                     min_force_dict=None, proj_path=None, AllegroScrewdriver=None):
         """Execute a trajectory with the given planner and mode."""
         
-        rand_pct = 1/3
+        rand_pct = self.params.get('rand_pct', 1/3)
         data['pre_action_likelihoods'].append([])
         data['final_likelihoods'].append([])
         data['csvto_times'].append([])
@@ -50,7 +50,6 @@ class TrajectoryExecutor:
         optimizer_paths = []
         contact_points = {}
         contact_distance = {}
-        plans = None
 
         paths = create_experiment_paths(fpath, fname, mode, create_goal_subdir=True)
         mode_fpath = paths['mode_fpath']
@@ -159,8 +158,8 @@ class TrajectoryExecutor:
         # Cleanup
         if self.params['controller'] != 'diffusion_policy':
             planner.problem.data = {}
-        if self.params['external_wrench_perturb'] and self.params['mode'] != 'hardware':
-            rand_pct = 1/3
+        if self.params.get('external_wrench_perturb') and self.params['mode'] != 'hardware':
+            rand_pct = self.params.get('rand_pct', 1/3)
             self.env.set_external_wrench_perturb(orig_torque_perturb, rand_pct)
             
         return actual_trajectory, planned_trajectories, initial_samples, sim_rollouts, optimizer_paths, contact_points, contact_distance, recover
@@ -226,13 +225,10 @@ class TrajectoryExecutor:
                 start_for_diff = start
                 
             ret = sampler.sample(N=self.params['N'], start=start_for_diff.reshape(1, -1),
-                               H=sampler.T, constraints=contact, project=self.params['project_state'])
+                               H=sampler.T, constraints=contact)
             
             print('Sampling time', time.perf_counter() - a)
-            if self.params['project_state']:
-                initial_samples, _, _, initial_samples_0, (all_losses, all_samples, all_likelihoods) = ret
-            else:
-                initial_samples, _, likelihood = ret
+            initial_samples, _, likelihood = ret
                 
             if self.params['sine_cosine']:
                 initial_samples = convert_sine_cosine_to_yaw(initial_samples)
@@ -242,11 +238,7 @@ class TrajectoryExecutor:
         if initial_samples is not None:
             initial_samples = initial_samples.to(device=self.params['device'])
             mode_fpath.mkdir(parents=True, exist_ok=True)
-            
-            if self.params['project_state']:
-                save_projection_results(mode_fpath, initial_samples, initial_samples_0, 
-                                      all_losses, all_samples, all_likelihoods)
-                                      
+
             if self.params.get('shortcut_trajectory', False) and mode != 'turn':
                 s = time.perf_counter()
                 initial_samples = shortcut_trajectory(initial_samples, 4 * num_fingers, obj_dof, epsilon=.04)
@@ -467,7 +459,7 @@ class TrajectoryExecutor:
         """Handle action computation and execution."""
         # Handle action perturbation
         if self.params.get('perturb_action', False):
-            rand_pct = 1/3
+            rand_pct = self.params.get('rand_pct', 1/3)
             if np.random.rand() < rand_pct:
                 std = .1 if self.params.get('perturb_this_trial', False) else .0
                 if mode == 'turn':
@@ -494,8 +486,8 @@ class TrajectoryExecutor:
             self._handle_visualization(best_traj, planner, state, turn_problem, fpath, fname, k, num_fingers)
 
         # Hardware-specific handling
-        if self.params['external_wrench_perturb'] and self.params['mode'] == 'hardware':
-            rand_pct = 1/3
+        if self.params.get('external_wrench_perturb') and self.params['mode'] == 'hardware':
+            rand_pct = self.params.get('rand_pct', 1/3)
             if np.random.rand() < rand_pct:
                 in_or_side = np.random.rand() < .5
                 loc_str = '**INTO PALM**' if in_or_side else '**TO SIDE OF OBJECT**'
