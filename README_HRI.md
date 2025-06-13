@@ -52,8 +52,9 @@ There are multiple things that need to be set up before running the `allegro_scr
 ## Mocap
 To receive mocap data, run the following:
 ```
-roslaunch vrpn_client_ros sample.launch server:=172.16.2.209
+roslaunch vrpn_client_ros sample.launch server:=<IP>
 ```
+The \<IP> is the IP address of the motion capture server. Last used value: 172.16.2.209
 ## Hand controller
 To launch the hand controller, run the following:
 ```
@@ -61,7 +62,7 @@ roslaunch allegro_hand allegro_hand_modified.launch
 ```
 Press \<h> to put the hand in the "home pose" before launching the `allegro_screwdriver` script.
 Alternatively, pressing \<z> will put the hand in gravity compensation mode, where the fingers can be moved around. Joint commands sent in gravity compensation mode will not be respected. This mode is useful for manually adjusting configurations, after which the joint values can be read out using `rostopic echo /allegroHand/joint_states` or `rostopic echo /allegroHand_right/joint_states`.
-
+## Task + Recovery Script
 To evaluate the trained recovery model on hardware, run the following:
 ```
 python -u allegro_screwdriver.py touchlegro_screwdriver_recovery_model_hardware_eval > ./logs/touchlegro_screwdriver_recovery_model_hardware_eval.log
