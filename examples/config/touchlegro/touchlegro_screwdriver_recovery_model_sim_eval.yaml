@@ -47,8 +47,6 @@ OOD_metric: 'likelihood'
 recovery_controller: 'csvgd'
 likelihood_threshold: -100
 likelihood_num_samples: 8 # Number of samples to use for likelihood computation. Lower is faster
-start_ind: 0
-end_ind: 50
 N_contact_plan: 64 # Number of (contact mode, trajectory) samples to generate before recovery. Higher is better, but slower and uses more GPU memory
 controllers:
   csvgd:
