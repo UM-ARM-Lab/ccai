@@ -4,10 +4,10 @@ Github:
 - Isaac Gym (https://developer.nvidia.com/isaac-gym)
 - Pytorch Volumetric (collision_cost_closest_point branch) https://github.com/UM-ARM-Lab/pytorch-volumetric
 - Pytorch Kinematics (chain_jacobian_at_links_IK branch) https://github.com/UM-ARM-Lab/pytorch-kinematics
-- isaacgym-arm-envs (touchlegro branch) https://github.com/UM-ARM-Lab/isaacgym-arm-envs
-    - This repository is only accessible by members of the University of Michigan ARM Lab. Please contact Abhinav Kumar (abhin@umich.edu) for the code or copy it from the HRI computer it is installed on (802680).
+- isaacgym-arm-envs (touchlegro branch) https://github.com/honda-research-institute/isaacgym-arm-envs
 - torch_cg https://github.com/sbarrat/torch_cg
-Navigate to directory and install with `pip install -r requirements.txt`
+
+After installing the above packages, install other requirements with `xargs -a requirements.txt -n 1 -I {} sh -c 'pip install "{}" || echo "Failed to install {}"'`. Compared to the default `pip install -r requirements.txt`, this command will not halt installation if a single requirement fails, which might occur due to some packages being installed through ROS instead.
 
 # Installation
 The ccai package itself also needs to be installed. Install with `pip install -e .` 
@@ -15,8 +15,6 @@ The ccai package itself also needs to be installed. Install with `pip install -e
 # Overview
 This document provides instructions on how to generate data for training the task and recovery diffusion models as well as how to deploy them. 
 
-# Python environment setup
-Make sure the `ccai` virtual environment is activated. On this computer on the roboguest account, it should automatically be activated as part of the `~/.bashrc`.
 # Task Data Generation
 Task data is generated under nominal conditions, without perturbation.
 To generate task data for the Allegro hand with Touchlab sensors, run the following:
