@@ -99,7 +99,7 @@ class TrajectoryExecutor:
             else:
                 self.sim_viz_env.zero_obj_velocity()
             
-            return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, not id_check
+            return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, not id_check, episode_num_steps
 
         # generate context from mode
         contact = -torch.ones(self.params['N'], 3).to(device=self.params['device'])
@@ -148,7 +148,7 @@ class TrajectoryExecutor:
             initial_samples = planner.x.detach().clone()
         
         # Execute trajectory steps
-        actual_trajectory, planned_trajectories, optimizer_paths, contact_points, contact_distance, recover = self._execute_trajectory_steps(
+        actual_trajectory, planned_trajectories, optimizer_paths, contact_points, contact_distance, recover, episode_num_steps = self._execute_trajectory_steps(
             planner, mode, state, goal, initial_samples, start_timestep, max_timesteps,
             num_fingers, obj_dof, episode_num_steps, max_episode_num_steps, fpath, fname,
             baseline_controller, baseline_ood_detector, data, trajectory_sampler,
@@ -162,7 +162,7 @@ class TrajectoryExecutor:
             rand_pct = self.params.get('rand_pct', 1/3)
             self.env.set_external_wrench_perturb(orig_torque_perturb, rand_pct)
             
-        return actual_trajectory, planned_trajectories, initial_samples, sim_rollouts, optimizer_paths, contact_points, contact_distance, recover
+        return actual_trajectory, planned_trajectories, initial_samples, sim_rollouts, optimizer_paths, contact_points, contact_distance, recover, episode_num_steps
 
     def _create_mode_planner(self, mode, planner, state, goal, num_fingers, obj_dof, 
                            recovery_params, min_force_dict, proj_path, max_timesteps, 
@@ -287,7 +287,7 @@ class TrajectoryExecutor:
                                              baseline_controller, recover, data, actual_trajectory, 
                                              planned_trajectories, initial_samples)
                 if exit_:
-                    return actual_trajectory, planned_trajectories, optimizer_paths, contact_points, contact_distance, recover_
+                    return actual_trajectory, planned_trajectories, optimizer_paths, contact_points, contact_distance, recover_, episode_num_steps
 
             current_state = state[:4 * num_fingers + obj_dof].clone()
             state = state[:planner.problem.dx]
@@ -326,18 +326,21 @@ class TrajectoryExecutor:
             # Check Q-function OOD detection
             if self._check_q_function_ood(baseline_ood_detector, state, best_traj, num_fingers, data, 
                                         planner, actual_trajectory, planned_trajectories, initial_samples, recover):
-                return actual_trajectory, planned_trajectories, optimizer_paths, contact_points, contact_distance, True
+                return actual_trajectory, planned_trajectories, optimizer_paths, contact_points, contact_distance, True, episode_num_steps
 
             # Handle action perturbation and execution
             self._handle_action_execution(best_traj, planner_returns_action, planner, state, 
                                         num_fingers, actual_trajectory, mode, k, turn_problem, 
                                         fpath, fname, state_16, recover)
+            
+            # Increment episode_num_steps after successful step
+            episode_num_steps += 1
 
         # Stack actual trajectory
         if len(actual_trajectory) > 0:
             actual_trajectory = torch.stack(actual_trajectory, dim=0).to(device=self.params['device'])
         
-        return actual_trajectory, planned_trajectories, optimizer_paths, contact_points, contact_distance, False
+        return actual_trajectory, planned_trajectories, optimizer_paths, contact_points, contact_distance, False, episode_num_steps
 
     def _check_exit_conditions(self, k, state, baseline_ood_detector, trajectory_sampler_orig, 
                              baseline_controller, recover, data, actual_trajectory, 

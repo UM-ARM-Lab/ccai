@@ -18,6 +18,7 @@ import yaml
 import pathlib
 from functools import partial
 import sys
+
 sys.path.append('..')
 
 import pytorch_kinematics as pk
@@ -277,7 +278,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         
 
         # Execute trajectory using TrajectoryExecutor
-        actual_trajectory, planned_trajectories, initial_samples, sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = trajectory_executor.execute_traj(
+        actual_trajectory, planned_trajectories, initial_samples, sim_rollouts, optimizer_paths, contact_points, contact_distance, recover, episode_num_steps = trajectory_executor.execute_traj(
             planner=planner,
             mode=mode,
             goal=goal,
