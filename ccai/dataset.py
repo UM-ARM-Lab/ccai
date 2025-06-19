@@ -277,7 +277,8 @@ class AllegroScrewDriverDataset(Dataset):
                             likelihood_delta = post_mode_likelihood - pre_mode_likelihood
                             fl_delta.append(likelihood_delta)
                         fl_improvement_bool = np.array(fl_delta) > 0
-                        if len(executed_recovery_modes) > 0 and executed_recovery_modes[-1] != 'turn':
+                        # if len(executed_recovery_modes) > 0 and executed_recovery_modes[-1] != 'turn':
+                        if data['dropped_recovery'] and fl_improvement_bool[-1]:
                             fl_improvement_bool[-1] = False
                             print('Overrode last recovery mode')
                         num_removed = np.sum(~fl_improvement_bool)
@@ -285,14 +286,7 @@ class AllegroScrewDriverDataset(Dataset):
                             total_num_removed += num_removed
                             print(f'Num removed: {num_removed}, Total removed: {total_num_removed}')
                     
-                    # dropped_recovery = False
-                    # post_recovery_likelihoods = [i for i in data['final_likelihoods'] if len(i) == 1]
-                    # post_recovery_likelihood_bool = []
-                    # for fl in post_recovery_likelihoods:
-                    #     if fl[0] < -1250:
-                    #         post_recovery_likelihood_bool.append(False)
-                    #     else:
-                    #         post_recovery_likelihood_bool.append(True)
+
                     for t in range(max_T, min_t - 1, -1):
                         if not recovery:
                             fl_improvement_bool = np.ones(len(data[t]['contact_state']), dtype=bool)
@@ -367,37 +361,7 @@ class AllegroScrewDriverDataset(Dataset):
                             print('No starts')
                             need_to_continue = True
                             break
-                        # for key in ['starts', 'plans']:
-                        #     new_data = []
-                        #     new_cs = []
-                        #     for d, c in zip(data[t][key], data[t]['contact_state']):
 
-                        #         # If d is np array, convert to tensor
-                        #         if isinstance(d, np.ndarray):
-                        #             d = torch.from_numpy(d).float()
-                        #         if c.sum() == 1:
-                        #             new_data.append(
-                        #                 torch.cat((d, torch.torch.zeros(*d.shape[:-1], 6).to(device=d.device)), dim=-1).cpu()
-                        #             )
-                        #         elif c.sum() == 2:
-                        #             new_data.append(
-                        #                 torch.cat(
-                        #                     (d[..., :-6],
-                        #             torch.zeros(*d.shape[:-1], 3).to(device=d.device),
-                        #             d[..., -6:]), dim=-1
-                        #                 ).cpu()
-                        #             )
-                        #     data[t][key] = torch.stack(new_data, dim=0)
-                            
-                        # data[t]['contact_state'] = torch.stack(data[t]['contact_state'], dim=0)                   
-                        
-                        # for key in ['starts', 'plans', 'contact_state']:
-                        #     data[t][key] = data[t][key].cpu().numpy()
-
-                        # if len(data['final_likelihoods']) == 1 and data['final_likelihoods'][0] < -45:
-                        #     print('No Data')
-                        #     need_to_continue = True
-                        #     break
                     if need_to_continue:
                         continue
                     for t in range(max_T, min_t - 1, -1):
@@ -484,7 +448,7 @@ class AllegroScrewDriverDataset(Dataset):
         self.mean = 0
         self.std = 1
 
-        if self.screwdriver:
+        if self.screwdriver and not recovery:
             pre_shape = self.trajectories.shape
             final_roll = self.trajectories[:, -1, 12].abs()
             final_pitch = self.trajectories[:, -1, 13].abs()

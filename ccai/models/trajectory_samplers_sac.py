@@ -28,7 +28,7 @@ from ccai.models.helpers import MLP
 # from nflows.utils import torchutils
 
 # Diffusion
-from ccai.models.diffusion.diffusion import GaussianDiffusion, ConstrainedDiffusion, JointDiffusion, LatentDiffusion
+from ccai.models.diffusion.diffusion import GaussianDiffusion, JointDiffusion
 from ccai.models.cnf.cnf import TrajectoryCNF
 
 from ccai.models.helpers import MLP
@@ -180,6 +180,7 @@ class TrajectoryDiffusionModel(nn.Module):
                                                             model_type=score_model, new_projection=new_projection,
                                                             context_dropout_p=dropout_p)
 
+    # @torch.compile(mode='reduce-overhead')
     def construct_context(self, constraints=None):
         if constraints is not None:
             constraints = constraints.reshape(constraints.shape[0], -1, constraints.shape[-1])
@@ -192,6 +193,7 @@ class TrajectoryDiffusionModel(nn.Module):
 
         return context
 
+    # @torch.compile(mode='reduce-overhead')
     def construct_condition(self, H=None, start=None, goal=None, past=None):
         condition = {}
         time_index = 0
@@ -207,6 +209,7 @@ class TrajectoryDiffusionModel(nn.Module):
             condition = None
         return condition
     
+    # @torch.compile(mode='reduce-overhead')
     def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None, project=False, no_grad=True, skip_likelihood=False, context_for_likelihood=True, residual_gp=None):
         # B, N, _ = constraints.shape
         context = self.construct_context(constraints)
@@ -221,6 +224,7 @@ class TrajectoryDiffusionModel(nn.Module):
         #         self.dx + self.du)
             return samples
 
+    # @torch.compile(mode='reduce-overhead')
     def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
         B = trajectories.shape[0]
         if start is not None:
@@ -243,6 +247,7 @@ class TrajectoryDiffusionModel(nn.Module):
                              constraints), dim=-1)
         return self.diffusion_model.model_predictions(trajectories, t, context=context).pred_noise
 
+    # @torch.compile(mode='reduce-overhead')
     def resample(self, start, goal, constraints, initial_trajectory, past, timestep):
         # B, N, _ = constraints.shape
         N, H, _ = initial_trajectory.shape
@@ -335,7 +340,7 @@ class TrajectorySampler(nn.Module):
                  latent_diffusion=False, vae=None, inits_noise=None, noise_noise=None, guided=False, discriminator_guidance=False,
                  learn_inverse_dynamics=False, state_only=False, state_control_only=False,
                  initial_threshold=-15, new_projection=False, dropout_p=.25, trajectory_condition=False,
-                 true_s0=False):
+                 true_s0=False, use_mixed_precision=False):
         super().__init__()
         self.T = T
         self.dx = dx
@@ -364,6 +369,12 @@ class TrajectorySampler(nn.Module):
         self.gp = None
 
         self.num_update = 5  # Multiple updates per call
+        
+        # Mixed precision and warmup settings
+        self.set_mixed_precision(use_mixed_precision)   
+        self.warmup_completed = False
+        self.warmup_samples = 3  # Number of warmup runs
+        
         self.send_norm_constants_to_submodels()
 
     def to(self, device: torch.device) -> 'TrajectorySampler':
@@ -390,6 +401,105 @@ class TrajectorySampler(nn.Module):
         
         return self
 
+    def set_mixed_precision(self, enabled: bool):
+        """Enable or disable mixed precision training/inference and propagate to all submodels."""
+        self.use_mixed_precision = enabled
+        print(f"Mixed precision {'enabled' if enabled else 'disabled'}")
+        # Propagate to submodels if available
+        if hasattr(self.model, 'set_mixed_precision'):
+            self.model.set_mixed_precision(enabled)
+        # For TrajectoryDiffusionModel, propagate to diffusion_model and its submodels
+        if hasattr(self.model, 'diffusion_model'):
+            if hasattr(self.model.diffusion_model, 'set_mixed_precision'):
+                self.model.diffusion_model.set_mixed_precision(enabled)
+            # For GaussianDiffusion or JointDiffusion, propagate to .model (TemporalUnet/TemporalUNetContext)
+            if hasattr(self.model.diffusion_model, 'model') and hasattr(self.model.diffusion_model.model, 'set_mixed_precision'):
+                self.model.diffusion_model.model.set_mixed_precision(enabled)
+
+    def enable_mixed_precision_all(self, enabled: bool = True):
+        """
+        Enable or disable mixed precision across all model components.
+        Args:
+            enabled: Whether to enable mixed precision
+        """
+        self.set_mixed_precision(enabled)
+        print(f"Mixed precision {'enabled' if enabled else 'disabled'} across all model components")
+
+    def auto_warmup_and_optimize(self, warmup_batch_size=16, enable_mixed_precision=True):
+        """
+        Automatically enable optimizations and warm up the model.
+        Args:
+            warmup_batch_size: Batch size for warmup runs
+            enable_mixed_precision: Whether to enable mixed precision
+        """
+        print("Auto-optimizing diffusion model...")
+        # Enable mixed precision if requested
+        if enable_mixed_precision:
+            self.enable_mixed_precision_all(True)
+        # Perform warmup
+        self.warmup_model(warmup_batch_size=warmup_batch_size)
+        print("Auto-optimization completed!")
+
+    def get_optimization_stats(self):
+        """
+        Get current optimization status.
+        
+        Returns:
+            dict: Dictionary containing optimization status
+        """
+        return {
+            'mixed_precision_enabled': self.use_mixed_precision,
+            'warmup_completed': self.warmup_completed,
+            'warmup_samples': self.warmup_samples,
+            'model_type': self.type,
+            'device': str(next(self.model.parameters()).device) if hasattr(self.model, 'parameters') else 'unknown'
+        }
+
+    def warmup_model(self, warmup_batch_size=16, warmup_horizon=None):
+        """
+        Warm up the model by running a few inference steps to trigger JIT compilation.
+        This should be called after moving the model to device and before actual inference.
+        
+        Args:
+            warmup_batch_size: Batch size for warmup runs
+            warmup_horizon: Horizon length for warmup (defaults to self.T)
+        """
+        if self.warmup_completed:
+            return
+            
+        print("Warming up diffusion model for optimal performance...")
+        
+        if warmup_horizon is None:
+            warmup_horizon = self.T
+            
+        # Create dummy inputs for warmup
+        device = next(self.model.parameters()).device if hasattr(self.model, 'parameters') else 'cpu'
+        
+        dummy_start = torch.randn(1, self.dx, device=device)
+        dummy_constraints = torch.ones(warmup_batch_size, 3, device=device)
+        
+        # Normalize dummy inputs
+        norm_start = (dummy_start - self.x_mean[:self.dx]) / self.x_std[:self.dx]
+        
+        # Run warmup iterations
+        with torch.no_grad():
+            for i in range(self.warmup_samples):
+                try:
+                    if self.use_mixed_precision:
+                        with torch.autocast(device_type='cuda' if 'cuda' in str(device) else 'cpu'):
+                            _ = self.model.sample(N=warmup_batch_size, H=warmup_horizon, 
+                                                start=norm_start, constraints=dummy_constraints,
+                                                no_grad=True, skip_likelihood=True)
+                    else:
+                        _ = self.model.sample(N=warmup_batch_size, H=warmup_horizon, 
+                                            start=norm_start, constraints=dummy_constraints,
+                                            no_grad=True, skip_likelihood=True)
+                    print(f"Warmup iteration {i+1}/{self.warmup_samples} completed")
+                except Exception as e:
+                    print(f"Warning: Warmup iteration {i+1} failed: {e}")
+                    
+        self.warmup_completed = True
+        print("Model warmup completed successfully!")
 
     def set_norm_constants(self, x_mean, x_std):
         self.x_mean.data = x_mean.to(device=self.x_mean.device, dtype=self.x_mean.dtype)
@@ -435,10 +545,15 @@ class TrajectorySampler(nn.Module):
         start = state[:4 * 3 + obj_dof]
         start_sine_cosine = self.convert_yaw_to_sine_cosine(start,yaw_idx=yaw_idx)
         
-        # Use GPyTorch's fast prediction settings to speed up sampling
+        # Use mixed precision for inference
         with torch.no_grad():
-            samples, _, likelihood = self.sample(N=N, H=self.T, start=start_sine_cosine.reshape(1, -1),
-                    constraints=torch.ones(N, 3).to(device=state.device))
+            if self.use_mixed_precision:
+                with torch.autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):
+                    samples, _, likelihood = self.sample(N=N, H=self.T, start=start_sine_cosine.reshape(1, -1),
+                            constraints=torch.ones(N, 3).to(device=state.device))
+            else:
+                samples, _, likelihood = self.sample(N=N, H=self.T, start=start_sine_cosine.reshape(1, -1),
+                        constraints=torch.ones(N, 3).to(device=state.device))
         
         likelihood = likelihood.reshape(N).mean()
         likelihood = likelihood.item()
@@ -463,7 +578,21 @@ class TrajectorySampler(nn.Module):
         else:
             return True, likelihood
 
+    @torch.inference_mode()
     def sample(self, N, H=10, start=None, goal=None, constraints=None, past=None, project=False, no_grad=True, skip_likelihood=False, context_for_likelihood=True):
+        # Clone tensors outside compiled function to avoid CUDA Graph overwrites
+        start_cloned = start.clone() if start is not None else None
+        past_cloned = past.clone() if past is not None else None
+        # Mark CUDA Graph step before compiled function
+        if torch.cuda.is_available():
+            torch.compiler.cudagraph_mark_step_begin()
+        return self._compiled_sample(N, H, start_cloned, goal, constraints, past_cloned, project, no_grad, skip_likelihood, context_for_likelihood)
+
+    # @torch.compile(mode='reduce-overhead')
+    def _compiled_sample(self, N, H=10, start=None, goal=None, constraints=None, past=None, project=False, no_grad=True, skip_likelihood=False, context_for_likelihood=True):
+        # Ensure warmup is completed before inference
+        if not self.warmup_completed and not project:  # Skip warmup for projection mode
+            print("Warning: Model not warmed up. Consider calling warmup_model() for optimal performance.")
         norm_start = None
         norm_past = None
         if start is not None and self.type != 'latent_diffusion':
@@ -474,21 +603,25 @@ class TrajectorySampler(nn.Module):
             norm_past = (past - self.x_mean) / self.x_std
         else:
             norm_past = past
-        if project:
-            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project, context_for_likelihood=context_for_likelihood, residual_gp=self.gp)
+        # Use mixed precision for inference
+        if self.use_mixed_precision and no_grad:
+            with torch.autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):
+                if project:
+                    samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project, context_for_likelihood=context_for_likelihood, residual_gp=self.gp)
+                else:
+                    samples = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project, no_grad=no_grad, skip_likelihood=skip_likelihood, context_for_likelihood=context_for_likelihood)
         else:
-            samples = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project, no_grad=no_grad, skip_likelihood=skip_likelihood, context_for_likelihood=context_for_likelihood)
-        # if len(samples) == N:
-        #     x = samples
-        #     c = None
-        #     likelihood = None
+            if project:
+                samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project, context_for_likelihood=context_for_likelihood, residual_gp=self.gp)
+            else:
+                samples = self.model.sample(N, H, norm_start, goal, constraints, norm_past, project, no_grad=no_grad, skip_likelihood=skip_likelihood, context_for_likelihood=context_for_likelihood)
+        # Handle return values
         if len(samples) == 2:
             x = samples[0]
             c = None
             likelihood = samples[1]
         else:
             x, c, likelihood = samples
-            
         if self.type != 'latent_diffusion':
             if project:
                 return x * self.x_std + self.x_mean, c, likelihood, None, (all_losses, all_samples, all_likelihoods)
@@ -500,6 +633,15 @@ class TrajectorySampler(nn.Module):
             return x, c, likelihood
 
     def resample(self, start=None, goal=None, constraints=None, initial_trajectory=None, past=None, timestep=10):
+        start_cloned = start.clone() if start is not None else None
+        initial_trajectory_cloned = initial_trajectory.clone() if initial_trajectory is not None else None
+        past_cloned = past.clone() if past is not None else None
+        if torch.cuda.is_available():
+            torch.compiler.cudagraph_mark_step_begin()
+        return self._compiled_resample(start_cloned, goal, constraints, initial_trajectory_cloned, past_cloned, timestep)
+
+    # @torch.compile(mode='reduce-overhead')
+    def _compiled_resample(self, start=None, goal=None, constraints=None, initial_trajectory=None, past=None, timestep=10):
         norm_start = None
         norm_initial_trajectory = None
         norm_past = None
@@ -509,11 +651,10 @@ class TrajectorySampler(nn.Module):
             norm_initial_trajectory = (initial_trajectory - self.x_mean) / self.x_std
         if past is not None:
             norm_past = (past - self.x_mean) / self.x_std
-
-        x, c = self.model.resample(norm_start, goal, constraints, norm_initial_trajectory, norm_past,
-                                   timestep)
+        x, c = self.model.resample(norm_start, goal, constraints, norm_initial_trajectory, norm_past, timestep)
         return x * self.x_std + self.x_mean, c
 
+    # @torch.compile(mode='reduce-overhead')
     def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
         loss = self.model.loss(trajectories, mask=mask, start=start, goal=goal, constraints=constraints)
         if self.inverse_dynamics is not None and False:
@@ -529,6 +670,7 @@ class TrajectorySampler(nn.Module):
     def grad(self, trajectories, t, start, goal, constraints=None):
         return self.model.grad(trajectories, t, start, goal, constraints)
 
+    # @torch.compile(mode='reduce-overhead')
     def likelihood(self, trajectories, mask=None, start=None, goal=None, context=None):
         norm_traj = (trajectories - self.x_mean) / self.x_std
         return self.model.likelihood(norm_traj, context)

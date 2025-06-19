@@ -6,9 +6,9 @@ num_steps: 8
 num_turns: 1
 max_recovery_stages: 4
 num_trials: 10
-num_episodes: 50
+num_episodes: 1
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_model_touchlegro_test'
+experiment_name: 'allegro_screwdriver_recovery_model_profile'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -67,10 +67,8 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
-start_ind: 0
-end_ind: 50
 N_contact_plan: 32
-likelihood_num_samples: 4
+likelihood_num_samples: 8
 controllers:
   csvgd:
     # N: 16

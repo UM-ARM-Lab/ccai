@@ -149,7 +149,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
              proj_path=None, perturb_this_trial=False, trajectory_sampler=None, trajectory_sampler_orig=None, config=None, classifier=None):
     
     episode_num_steps = 0
-    max_episode_num_steps = 100
+    max_episode_num_steps = 25
     num_fingers = len(params['fingers'])
     state = env.get_state()
     if params['visualize']:
@@ -186,9 +186,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     min_force_dict = None
     if params['mode'] == 'hardware':
         min_force_dict = {
-            'thumb': 1.5,
-            'middle': 1.5,
-            'index': 1.5,
+            'thumb': 1.,
+            'middle': 1.,
+            'index': 1.,
         }
     else:
         min_force_dict = {
@@ -350,7 +350,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     stage = 0
     all_stage = 0
     done = False
-    max_episode_num_steps = 100 if params['mode'] != 'hardware' else 50
+    max_episode_num_steps = 25#100 if params['mode'] != 'hardware' else 50
     max_stages = 2  # Maximum number of stages for non-live recovery mode
 
     def should_continue_loop():
@@ -794,9 +794,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config. First option is to get the config from the command line.
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/touchlegro/{sys.argv[1]}.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_only.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/touchlegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj_pi_2.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj_pi_2.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/touchlegro_screwdriver_csvto_recovery_hardware_hri.yaml').read_text())
 
     from tqdm import tqdm
@@ -808,10 +808,10 @@ if __name__ == "__main__":
         config['recovery_controller'] = 'csvgd'
     num_envs = get_num_envs_for_baseline(config)
     
-    default_dof_pos = torch.cat((torch.tensor([[0.0819, 0.3447, 0.7860, 0.7333]]).float(),
-                                torch.tensor([[-.0578, 0.7718, 0.5937, 0.7523]]).float(),
+    default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
+                                torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float(),
                                 torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
-                                torch.tensor([[.7946, 0.8216, 0.7075, .8364]]).float()),
+                                torch.tensor([[1.2, 0.3, 0.3, 1.2]]).float()),
                                 dim=1)
     if config['mode'] == 'hardware':
         # roslaunch allegro_hand allegro_hand_modified.launch
@@ -888,7 +888,7 @@ if __name__ == "__main__":
 
     results = {}
    
-    asset = f'{get_assets_dir()}/touchlegro/touchlegro_hand_description_right.urdf'
+    asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
 
     config['obj_dof'] = 3
 

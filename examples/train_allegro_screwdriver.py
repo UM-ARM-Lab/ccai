@@ -45,7 +45,7 @@ fingers = ['index', 'middle', 'thumb']
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion.yaml')
+    parser.add_argument('--config', type=str, default='TODR_128_steps.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_id_ood_states.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_project_ood_states.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_id_ood_states.yaml')
@@ -385,10 +385,11 @@ if __name__ == "__main__":
                               generate_context=config['diffuse_class'],
                               discriminator_guidance=config['discriminator_guidance'],
                               learn_inverse_dynamics=config['inverse_dynamics'],
-                              state_only=config['state_only'], state_control_only=config['state_control_only'],
+                            #   state_only=config['state_only'], state_control_only=config['state_control_only'],
                               problem= None,
                               dropout_p=config.get('context_dropout_p', .25), trajectory_condition=config.get('trajectory_condition', False),
-                              true_s0=False 
+                              true_s0=False ,
+                              use_mixed_precision=config['use_mixed_precision']
                               )
 
     data_path = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["data_directory"]}')
@@ -401,7 +402,8 @@ if __name__ == "__main__":
                                             skip_pregrasp=config['skip_pregrasp'],
                                             type_=config['model_type'],
                                             exec_only=config.get('train_classifier', False) or config.get('likelihood_ecdf_calc', False),
-                                            best_traj_only=config['best_traj_only'])
+                                            best_traj_only=config['best_traj_only'],
+                                            recovery=config['recovery'])
                                                 
     if config['normalize_data']:
         # normalize data
@@ -411,7 +413,7 @@ if __name__ == "__main__":
         print('Dset size', len(train_dataset))
         
         print(train_dataset.mean)
-    if 'recovery' in config['data_directory']:
+    if config['recovery']:
         classes = train_dataset.trajectory_type
         print(torch.unique(classes, dim=0, return_counts=True))
         if config['balance'] == 'weighted_random':
