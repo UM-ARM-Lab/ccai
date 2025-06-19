@@ -259,25 +259,30 @@ class AllegroScrewDriverDataset(Dataset):
                 
                     # intiialize fl_improvement_bool as all True
                     if recovery:
-                        # TODO. This logic needs to be double-checked. Potentially incorrect.
+
                         fl = data['final_likelihoods']
-                        pre_action_likelihoods = data['pre_action_likelihoods']
+                        
+                        # Masks out turns that are exited due to OOD without anything being executed
+                        executed_mode_bool = [i[0] is not None for i in fl]
+                        executed_modes = [data['executed_contacts'][i] for i in range(len(data['executed_contacts'])) if executed_mode_bool[i]]
                         fl = [l for l in fl if None not in l and len(l)>0]
+                        
+                        # Legacy code to handle the case where final likelihoods were not properly stored
+                        pre_action_likelihoods = data['pre_action_likelihoods']
                         for k in range(len(fl)):
                             if len(fl[k]) == 0 and len(pre_action_likelihoods[k]) > 0:
                                 fl[k].append(pre_action_likelihoods[k][-1])
                         
                         fl = np.array(fl).flatten()
-                        fl_delta = []
-                        executed_recovery_modes = [m for m in data['executed_contacts'] if m != 'turn']
                         
-                        for i in range(len(executed_recovery_modes)):
-                            pre_mode_likelihood = fl[i-1]
-                            post_mode_likelihood = fl[i]
-                            likelihood_delta = post_mode_likelihood - pre_mode_likelihood
-                            fl_delta.append(likelihood_delta)
+                        fl_delta = []
+                        for i in range(len(executed_modes)):
+                            if executed_modes[i] != 'turn':
+                                pre_mode_likelihood = fl[i-1]
+                                post_mode_likelihood = fl[i]
+                                likelihood_delta = post_mode_likelihood - pre_mode_likelihood
+                                fl_delta.append(likelihood_delta)
                         fl_improvement_bool = np.array(fl_delta) > 0
-                        # if len(executed_recovery_modes) > 0 and executed_recovery_modes[-1] != 'turn':
                         if data['dropped_recovery'] and fl_improvement_bool[-1]:
                             fl_improvement_bool[-1] = False
                             print('Overrode last recovery mode')
