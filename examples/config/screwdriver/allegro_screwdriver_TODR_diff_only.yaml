@@ -6,9 +6,9 @@ num_steps: 8
 num_turns: 1
 max_recovery_stages: 4
 num_trials: 10
-num_episodes: 1
+num_episodes: 50
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_model_profile'
+experiment_name: 'allegro_screwdriver_recovery_model_diff_only'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -22,9 +22,9 @@ goal: -.5
 prior: 1
 multi_particle_search: True
 replan: False
-visualize_plan: True
-visualize_recovery_plan: True
-visualize_contact_plan: True
+visualize_plan: False
+visualize_recovery_plan: False
+visualize_contact_plan: False
 optimize_force: True
 exclude_index: False
 projected: False
@@ -51,11 +51,14 @@ true_s0: False
 task_diffuse_goal: False
 recovery_diff_traj: True
 obj_gravity: True
+
+contact_constraint_only: False
+
 type: 'diffusion'
 OOD_metric: 'likelihood'
 recovery_controller: 'csvgd'
-recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_low_damping_diffusion'
-model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_low_damping_diffusion/allegro_screwdriver_diffusion.pt'
+recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_256_steps_diffusion'
+model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_256_steps_diffusion/allegro_screwdriver_diffusion.pt'
 model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion'
 task_model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion/allegro_screwdriver_diffusion.pt'
 likelihood_threshold: -170.0
@@ -69,10 +72,12 @@ sac_batch_size: 64
 # parity: 654
 N_contact_plan: 32
 likelihood_num_samples: 8
+start_ind: 20
+end_ind: 50
 controllers:
   csvgd:
     # N: 16
-    N: 4
+    N: 1
     alpha_J: 1.0e-2
     alpha_C: 1
     step_size: 0.1

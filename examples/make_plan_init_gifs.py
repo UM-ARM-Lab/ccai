@@ -20,7 +20,7 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
 # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_recovery_model.yaml').read_text())
 # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_mppi_safe_rl_recovery.yaml').read_text())
-config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj_pi_2.yaml').read_text())
+config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_TODR_diff_only.yaml').read_text())
 # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj_pi_2.yaml').read_text())
 
 
@@ -56,7 +56,7 @@ trial_inds = [int(d.split('_')[-1]) for d in os.listdir(dirpath) if d[:5] == 'tr
 # for trial_num in trial_inds:
 # for trial_num in [2, 3]:
 # for trial_num in [6, 14]:
-for trial_num in [10]:
+for trial_num in [2]:
     fpath = dirpath / f'trial_{trial_num}'
 
     with open(fpath / 'traj_data.p', 'rb') as f:

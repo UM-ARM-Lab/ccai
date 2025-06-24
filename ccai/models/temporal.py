@@ -105,6 +105,11 @@ class TemporalUnet(nn.Module):
         in_out = list(zip(dims[:-1], dims[1:]))
         print(f'[ models/temporal ] Channel dimensions: {in_out}')
 
+        # Mixed precision settings
+        self.use_mixed_precision = True
+        self.compute_dtype = torch.float16  # Will be used for compute operations
+        self.param_dtype = torch.float32    # Will be used for parameter storage
+
         self.time_embedding = SinusoidalPosEmb(32)
         self.trajectory_condition = trajectory_condition
         if not trajectory_condition:
@@ -120,7 +125,7 @@ class TemporalUnet(nn.Module):
             # nn.Linear(256, 256)
         )
 
-        self.register_buffer('context_dropout_p', torch.tensor([context_dropout_p]))
+        self.register_buffer('context_dropout_p', torch.tensor([context_dropout_p], dtype=self.param_dtype))
 
         self.mask_dist = Bernoulli(probs=1 - context_dropout_p)
 
@@ -187,18 +192,30 @@ class TemporalUnet(nn.Module):
         # self.context_dropout_p = context_dropout_p
         self.cond_dim = cond_dim
         
-        # Mixed precision settings
-        self.use_mixed_precision = True
-
     def set_mixed_precision(self, enabled: bool):
         """Enable or disable mixed precision for this model."""
         self.use_mixed_precision = enabled
+        self.compute_dtype = torch.float16 if enabled else torch.float32
+        
+        # # Propagate to submodules that support mixed precision
+        # for module in self.modules():
+        #     if hasattr(module, 'set_mixed_precision'):
+        #         module.set_mixed_precision(enabled)
 
-    def vmapped_fwd(self, t, x, context=None):
-        return self(t.reshape(1), x.unsqueeze(0), context.unsqueeze(0)).squeeze(0)
+    def to_compute_dtype(self, x):
+        """Convert input tensor to compute dtype if mixed precision is enabled."""
+        if self.use_mixed_precision and x.dtype == torch.float32:
+            return x.to(self.compute_dtype)
+        return x
 
-    # @torch.compile(mode='max-autotune')
-    def forward(self, t, x, context=None, dropout=False):
+    def forward(self, *args, **kwargs):
+        """Forward pass with automatic dtype conversion for mixed precision."""
+        if self.use_mixed_precision:
+            args = [self.to_compute_dtype(arg) if torch.is_tensor(arg) else arg for arg in args]
+            kwargs = {k: self.to_compute_dtype(v) if torch.is_tensor(v) else v for k, v in kwargs.items()}
+        return self._forward(*args, **kwargs)
+
+    def _forward(self, t, x, context=None, dropout=False):
         '''
             x : [ batch x horizon x transition ]
         '''
@@ -262,6 +279,7 @@ class TemporalUnet(nn.Module):
 
     # @torch.compile(mode='max-autotune')
     # @torch.compile(mode='reduce-overhead')
+    @torch.compile(mode='max-autotune')
     def compiled_conditional_test(self, t, x, context):
         if self.use_mixed_precision:
             with torch.autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):
@@ -271,6 +289,7 @@ class TemporalUnet(nn.Module):
 
     # @torch.compile(mode='max-autotune')
     # @torch.compile(mode='reduce-overhead')
+    @torch.compile(mode='max-autotune')
     def compiled_unconditional_test(self, t, x):
         if self.use_mixed_precision:
             with torch.autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):
@@ -278,7 +297,7 @@ class TemporalUnet(nn.Module):
         else:
             return self(t, x, context=None, dropout=False)
 
-    @torch.compile(backend='inductor')
+    @torch.compile(mode='max-autotune')
     def compiled_conditional_train(self, t, x, context):
         return self(t, x, context, dropout=True)
 
@@ -1019,8 +1038,8 @@ class TemporalUNetContext(nn.Module):
             e_x = unconditional_e_x + w_total * (conditional_e_x - unconditional_e_x)
             return e_x, e_c
 
-    # @torch.compile(mode='max-autotune')
     # @torch.compile(mode='reduce-overhead')
+    @torch.compile(mode='max-autotune')
     def compiled_conditional_test(self, t, x, context):
         if self.use_mixed_precision:
             with torch.autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):
@@ -1028,8 +1047,8 @@ class TemporalUNetContext(nn.Module):
         else:
             return self(t, x, context, dropout=False)
 
-    # @torch.compile(mode='max-autotune')
     # @torch.compile(mode='reduce-overhead')
+    @torch.compile(mode='max-autotune')
     def compiled_unconditional_test(self, t, x, initial_state=None):
         if self.use_mixed_precision:
             with torch.autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):

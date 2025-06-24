@@ -347,6 +347,8 @@ class ConstrainedSteinTrajOpt:
         C, _, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1), compute_grads=False, compute_hess=False)
         penalty = J.reshape(N) + self.penalty * torch.sum(C.reshape(N, -1).abs(), dim=1)
         idx = torch.argsort(penalty, descending=False)
+        self.idx = idx
+        self.best_idx = idx[0]
         path = torch.stack(path, dim=0).reshape(len(path), N, self.T, -1)[:, :, :, :self.dx + self.du]
         path = path[:, idx]
         # self.dual = self.dual[idx]

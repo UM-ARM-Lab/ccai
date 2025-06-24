@@ -38,10 +38,12 @@ class ModelManager:
                 T_for_diff = self.config['T'] if loading_recovery_model else self.config['T_orig']
                 trajectory_sampler = self._load_sampler(
                     model_path, dim_mults=(1,2,4), T=T_for_diff, recovery=loading_recovery_model)
+                trajectory_sampler.warmup_model(warmup_batch_size=16, warmup_horizon=None)
 
             if task_model_path is not None:
                 trajectory_sampler_orig = self._load_sampler(
                     task_model_path, dim_mults=(1,2,4), T=self.config['T_orig'], recovery=False)
+                trajectory_sampler_orig.warmup_model(warmup_batch_size=16, warmup_horizon=None)
                 
                 if not self.config.get('generate_context', False):
                     classifier = self._create_classifier()
@@ -63,7 +65,7 @@ class ModelManager:
             dx=dx, 
             du=21, 
             type=self.config['type'],
-            timesteps=256, 
+            timesteps=256,#128 if recovery else 256, 
             hidden_dim=128,
             context_dim=3, 
             problem=None,

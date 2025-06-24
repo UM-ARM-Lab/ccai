@@ -86,6 +86,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                  full_dof_goal=False, 
                  project=False,
                  default_dof_pos=None,
+                 contact_constraint_only=False,
                  **kwargs):
         # Mass of the object. Hardcoded for now.
         self.obj_mass = 0.0851
@@ -129,6 +130,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                                                   contact_points_object=contact_points_object,
                                                   contact_points_dict = self.contact_points,
                                                   project=project,
+                                                  contact_constraint_only=contact_constraint_only,
                                                    **kwargs)
         self.friction_coefficient = friction_coefficient
 
@@ -149,7 +151,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
              proj_path=None, perturb_this_trial=False, trajectory_sampler=None, trajectory_sampler_orig=None, config=None, classifier=None):
     
     episode_num_steps = 0
-    max_episode_num_steps = 25
+    max_episode_num_steps = 100
     num_fingers = len(params['fingers'])
     state = env.get_state()
     if params['visualize']:
@@ -350,7 +352,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     stage = 0
     all_stage = 0
     done = False
-    max_episode_num_steps = 25#100 if params['mode'] != 'hardware' else 50
+    max_episode_num_steps = 100 if params['mode'] != 'hardware' else 50
     max_stages = 2  # Maximum number of stages for non-live recovery mode
 
     def should_continue_loop():
@@ -794,9 +796,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config. First option is to get the config from the command line.
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_only.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj_pi_2.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_TODR_contact_constraint_only.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/touchlegro_screwdriver_csvto_recovery_hardware_hri.yaml').read_text())
 
     from tqdm import tqdm

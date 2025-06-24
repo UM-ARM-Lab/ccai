@@ -93,6 +93,7 @@ def create_allegro_screwdriver_problem(problem_type, start, goal, params, env, d
         'optimize_force': params['optimize_force'],
         'default_dof_pos': env.default_dof_pos[:, :16],
         'obj_gravity': params.get('obj_gravity', False),
+        'contact_constraint_only': params.get('contact_constraint_only', False),
     }
     
     # Problem-specific configurations

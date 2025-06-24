@@ -13,6 +13,8 @@ def median(tensor):
     else:
         n = tensor.shape[0]
         tensor = tensor.unsqueeze(0)
+    if n == 1:
+        return tensor.median(dim=1).values
     m = tensor.shape[0]
     idx = torch.triu_indices(n, n, 1)
     tensor = tensor[:, idx[0], idx[1]]
@@ -36,8 +38,10 @@ def rbf_kernel(X, Xbar, Q=None):
 
     scaled_diff = (scaled_diff.reshape(-1, 1, d) @ diff.reshape(-1, d, 1)).reshape(n, n)
     h = median(torch.sqrt(scaled_diff)) ** 2
-    h = h / np.log(n) + EPS
+    h = h / (np.log(n) + EPS)
     # h = 0.1
+    if n == 1:
+        h = 1.
     return torch.exp(-scaled_diff / h)
 
 

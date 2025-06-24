@@ -90,8 +90,21 @@ def train_model(trajectory_sampler, train_loader, config):
             ema.update_model_average(ema_model, model)
 
     optimizer = torch.optim.Adam(trajectory_sampler.parameters(), lr=config['lr'])
-
+    
+    # Initialize gradient scaler for mixed precision training
+    scaler = torch.amp.GradScaler(enabled=config['use_mixed_precision'])
+    
+    # Warmup steps for more stable mixed precision training
+    warmup_steps = 100 if config['use_mixed_precision'] else 0
+    
     step = 0
+    
+    # Set tensor core matmul precision
+    if config['use_mixed_precision']:
+        torch.set_float32_matmul_precision('high')
+        # Move model to CUDA and enable cudnn benchmarking
+        trajectory_sampler = trajectory_sampler.to(device=config['device'])
+        torch.backends.cudnn.benchmark = True
 
     epochs = config['epochs']
     pbar = tqdm.tqdm(range(epochs))
@@ -100,23 +113,41 @@ def train_model(trajectory_sampler, train_loader, config):
         train_loss_tau = 0.0
         train_loss_c = 0
         trajectory_sampler.train()
+        
         for trajectories, traj_class, masks in (train_loader):
-            trajectories = trajectories.to(device=config['device'])
-            masks = masks.to(device=config['device'])
+            # Move data to GPU before autocast
+            trajectories = trajectories.to(device=config['device'], non_blocking=True)
+            masks = masks.to(device=config['device'], non_blocking=True)
             B, T, dxu = trajectories.shape
+            
             if config['use_class']:
-                traj_class = traj_class.to(device=config['device']).float()
+                traj_class = traj_class.to(device=config['device'], non_blocking=True).float()
             else:
                 traj_class = None
-            sampler_losses = trajectory_sampler.loss(trajectories, mask=masks, constraints=traj_class)
-            loss = sampler_losses['loss']
-            loss.backward()
-            # wandb.log({'train_loss': loss.item()})
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
-            # for param in trajectory_sampler.parameters():
-            #    print(param.grad)
-            optimizer.step()
-            optimizer.zero_grad()
+                
+            # Adjust learning rate during warmup
+            if step < warmup_steps:
+                lr_scale = min(1., float(step + 1) / warmup_steps)
+                for pg in optimizer.param_groups:
+                    pg['lr'] = config['lr'] * lr_scale
+                
+            # Use autocast for mixed precision training
+            with torch.amp.autocast(device_type='cuda', dtype=torch.float16, enabled=config['use_mixed_precision']):
+                sampler_losses = trajectory_sampler.loss(trajectories, mask=masks, constraints=traj_class)
+                loss = sampler_losses['loss']
+            
+            # Scale loss and call backward
+            scaler.scale(loss).backward()
+            
+            # Unscale gradients and step optimizer
+            if config['use_mixed_precision']:
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(trajectory_sampler.parameters(), max_norm=1.0)
+            
+            scaler.step(optimizer)
+            scaler.update()
+            optimizer.zero_grad(set_to_none=True)  # More efficient than zero_grad()
+            
             train_loss += loss.item()
             if config['diffuse_class']:
                 train_loss_tau += sampler_losses['loss_tau']
