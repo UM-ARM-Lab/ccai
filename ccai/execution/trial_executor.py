@@ -102,7 +102,7 @@ class TrajectoryExecutor:
             return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, not id_check, episode_num_steps
 
         # generate context from mode
-        contact = -torch.ones(self.params['N'], 3).to(device=self.params['device'])
+        contact = -torch.ones(self.params['N_contact_plan'], 3).to(device=self.params['device'])
         if mode == 'thumb_middle':
             contact[:, 0] = 1
         elif mode == 'index':
@@ -224,11 +224,14 @@ class TrajectoryExecutor:
             else:
                 start_for_diff = start
                 
-            ret = sampler.sample(N=self.params['N'], start=start_for_diff.reshape(1, -1),
+            ret = sampler.sample(N=self.params['N_contact_plan'], start=start_for_diff.reshape(1, -1),
                                H=sampler.T, constraints=contact)
             
             print('Sampling time', time.perf_counter() - a)
             initial_samples, _, likelihood = ret
+            
+            max_likelihood_idx = likelihood.argsort(descending=True)
+            initial_samples = initial_samples[max_likelihood_idx][:self.params['N']]
                 
             if self.params['sine_cosine']:
                 initial_samples = convert_sine_cosine_to_yaw(initial_samples)
@@ -303,6 +306,14 @@ class TrajectoryExecutor:
                 self.sim_viz_env.zero_obj_velocity()
                 
             best_traj, plans = planner.step(state)
+            
+            if self.params['contact_constraint_only']:
+                u_hat = planner.problem.solve_for_u_hat(best_traj.unsqueeze(0), planner.solver.best_idx).squeeze(0)
+                
+                num_contact_fingers = len(planner.problem.contact_fingers)
+                
+                best_traj = torch.cat((best_traj[:, :planner.problem.dx], u_hat, best_traj[:, -num_contact_fingers*3:]), dim=-1)
+                
             csvto_time = time.perf_counter() - s
             data['csvto_times'][-1].append(csvto_time)
             print(f'Solve time for step {k+1} (global step {episode_num_steps})', csvto_time)
@@ -403,12 +414,13 @@ class TrajectoryExecutor:
                 planner.problem.data['middle']['sdf'][:, -T-1:].reshape(N, T + 1),
                 planner.problem.data['thumb']['sdf'][:, -T-1:].reshape(N, T + 1)
             ), dim=1).detach().cpu()
-
-            contact_points[T] = torch.stack((
-                planner.problem.data['index']['closest_pt_world'].reshape(N, -1, 3)[:, -T-1:],
-                planner.problem.data['middle']['closest_pt_world'].reshape(N, -1, 3)[:, -T-1:],
-                planner.problem.data['thumb']['closest_pt_world'].reshape(N, -1, 3)[:, -T-1:]
-            ), dim=2).detach().cpu()
+    
+            if not planner.problem.contact_constraint_only:
+                contact_points[T] = torch.stack((
+                    planner.problem.data['index']['closest_pt_world'].reshape(N, -1, 3)[:, -T-1:],
+                    planner.problem.data['middle']['closest_pt_world'].reshape(N, -1, 3)[:, -T-1:],
+                    planner.problem.data['thumb']['closest_pt_world'].reshape(N, -1, 3)[:, -T-1:]
+                ), dim=2).detach().cpu()
 
     def _print_force_info(self, mode, best_traj):
         """Print force information for different modes."""
