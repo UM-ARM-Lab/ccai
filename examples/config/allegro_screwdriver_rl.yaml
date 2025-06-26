@@ -32,8 +32,7 @@ use_partial_constraint: True
 sine_cosine: False
 shortcut_trajectory: False
 use_constraints: True
-update_frequency: 2
-batch_size: 2
+batch_size: 32
 # model_path: 'data/training/allegro_screwdriver/allegro_better_model/allegro_screwdriver_diffusion_w_classifier.pt'
 # model_path: 'data/training/allegro_screwdriver/allegro_test_new_data_augment_angle_diffusion/allegro_screwdriver_diffusion.pt'
 controllers:

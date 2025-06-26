@@ -303,7 +303,7 @@ class ActorNetwork(nn.Module):
 
         if constrained:
             self.constraint_problem.start = trajectory[0, 0, :15]
-            self.constraint_problem._preprocess(trajectory[:, 1:2])
+            self.constraint_problem._preprocess(trajectory[:, 1:2], contact_constraint_only=True)
 
             u_hat = self.constraint_problem.solve_for_u_hat(trajectory[:, 1:2])
             
@@ -352,7 +352,7 @@ class ActorNetwork(nn.Module):
             compute_inequality=True,
             include_deriv_grad=False
         )
-        return C.sum()   
+        return C.pow(2).sum()   
 
     def project_vector_field(self, x, dx):
         """Project vector field to satisfy constraints"""
@@ -371,7 +371,7 @@ class ActorNetwork(nn.Module):
         self.timing_metrics['clamp_setup'].append(clamp_end - clamp_start)
         
         # Parameters for projection
-        Kh = 1
+        Kh = 3
         Ktheta = 1
 
         # Phase 2: Preprocessing with constraint problem
@@ -750,7 +750,7 @@ class PrioritizedReplayBuffer:
             priority = max(priority, self.epsilon)
             
             # Update max priority
-            self.max_priority = max(self.max_priority, priority)
+            self.max_priority = max(self.max_priority, priority.item())
             
             # Update sum tree with priority^alpha
             self.sum_tree.update(idx, priority.item() ** self.alpha)
@@ -901,7 +901,7 @@ class TD3:
             # Start timing action prediction
             start_time = time.time()
             
-            action, _ = self.actor(state, constrained=True if self.use_constraints else False)
+            action, force = self.actor(state, constrained=False)#True if self.use_constraints else False)
             
             # Add exploration noise when not evaluating
             if not evaluate:
@@ -914,7 +914,7 @@ class TD3:
             end_time = time.time()
             self.prediction_times.append(end_time - start_time)
         
-        return action
+        return action, force
     
     def update(self, batch_size=256):
         self.total_it += 1
@@ -1064,7 +1064,7 @@ def train_td3(config, total_timesteps=1000000, save_path=None):
     # Training hyperparameters
     batch_size = config.get('batch_size', 256)
     exploration_noise = 0.1
-    start_timesteps =0# config.get('start_timesteps', 25000)  # Timesteps before using policy
+    start_timesteps =128# config.get('start_timesteps', 25000)  # Timesteps before using policy
     eval_freq = config.get('eval_freq', 5000)
     checkpoint_freq = config.get('checkpoint_freq', 10000)
     max_episode_steps = config.get('max_episode_steps', 100)
@@ -1087,31 +1087,29 @@ def train_td3(config, total_timesteps=1000000, save_path=None):
         exec_timesteps += 1
         
         # Select action with noise for exploration
-        if exec_timesteps < start_timesteps:
-            # Random actions until start_timesteps
-            action = torch.FloatTensor(
-                np.random.uniform(
-                    env.action_low, 
-                    env.action_high, 
-                    size=env.control_dim
-                )
-            ).to(train_device)
-        else:
+        # if exec_timesteps < start_timesteps:
+        #     # Random actions until start_timesteps
+        #     action = torch.FloatTensor(
+        #         np.random.uniform(
+        #             env.action_low, 
+        #             env.action_high, 
+        #             size=env.control_dim
+        #         )
+        #     ).to(train_device)
+        # else:
             # Use policy with exploration noise
-            action = td3_agent.select_action(state)
-            print(td3_agent.prediction_times)
+        action, force = td3_agent.select_action(state)
         
         # Perform action and get next state
         next_state, reward, done = env.step(action)
         
         # For TD3, we need to compute constraint violation as part of the reward
-        # if td3_agent.use_constraints:
-        #     state_tensor = torch.FloatTensor(state).to(train_device)
-        #     action_tensor = action.to(train_device)
-        #     action_detached, force = td3_agent.actor(state_tensor)
-        #     reward += -0.1 * td3_agent.actor.compute_constraint_violation(
-        #         state_tensor, action_detached, force
-        #     ).item()
+        if td3_agent.use_constraints:
+            state_tensor = torch.FloatTensor(state).to(train_device)
+            action_tensor = action.to(train_device)
+            reward += -10 * td3_agent.actor.compute_constraint_violation(
+                state_tensor, action_tensor, force
+            ).item()
         
         # Store data in replay buffer
         td3_agent.replay_buffer.add(state, action, next_state, reward, done)
@@ -1184,7 +1182,7 @@ def evaluate_policy(model, config, num_episodes=10, render=True):
         episode_start_time = time.time()
         
         while not done:
-            action = model.select_action(obs, evaluate=True)
+            action, force = model.select_action(obs, evaluate=True)
             obs, reward, done = env.step(action)
             episode_reward += reward
             

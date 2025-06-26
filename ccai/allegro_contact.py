@@ -1705,8 +1705,10 @@ class AllegroContactProblem(AllegroObjectProblem):
         return g
 
     def solve_for_u_hat(self, xu):
+
         T_offset = 1
         q = xu[:, :, :self.num_fingers * 4]
+        u_orig = xu[:, :, self.num_fingers * 4 + self.obj_dof:self.num_fingers * 8 + self.obj_dof]
         q = partial_to_full_state(q, fingers=self.fingers)
         N, T = q.shape[:2]
         force = torch.zeros(N, T, 12, device=self.device)
@@ -1716,8 +1718,8 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         full_start = partial_to_full_state(self.start[None, :self.num_fingers * 4], self.fingers)
         q = torch.cat((full_start.reshape(1, 1, -1).repeat(N, 1, 1), q), dim=1)
-        next_q = q[:, 1:, self.contact_state_indices]
-        q = q[:, :-1, self.contact_state_indices]
+        next_q = q[:, 1:]
+        q = q[:, :-1]
         force_list = force[:, :, self._contact_force_indices].reshape(force.shape[0], force.shape[1], self.num_contacts,
                                                                       3)
         mult = 1
@@ -1730,29 +1732,45 @@ class AllegroContactProblem(AllegroObjectProblem):
             num_forces = self.num_contacts + 1
         else:
             num_forces = self.num_contacts
-        force_list = force_list.reshape(-1, num_forces, 3)[0]
+        force_list = force_list[0]
         # retrieve contact jacobians and points
         contact_jac_list = []
         for finger in self.contact_fingers:
-            jac = self.data[finger]['contact_jacobian'].reshape(N, T + T_offset, 3, -1)[:, T_offset:, :, self.contact_state_indices]
-            contact_jac_list.append(jac.reshape(N * T, 3, -1))
+            jac = self.data[finger]['contact_jacobian'][best_idx].reshape(T + T_offset, 3, -1)[T_offset:, :, self.contact_state_indices]
+            contact_jac_list.append(jac.reshape(T, 3, -1))
 
-        contact_jac_list = torch.stack(contact_jac_list, dim=1).to(device=device)[0]
+        contact_jac_list = torch.stack(contact_jac_list, dim=1).to(device=device)
 
-        q_delta = next_q - q
         reactional_torque_list = []
         for i, finger_name in enumerate(self.contact_fingers):
-            # TODO: Assume that all the fingers are having an equlibrium, maybe we should change so that index finger is not considered
-            contact_jacobian = contact_jac_list[i]
-            force_robot_frame = self.world_trans.inverse().transform_normals(force_list[i].unsqueeze(0)).squeeze(0)
-            reactional_torque_list.append(contact_jacobian.T @ -force_robot_frame)
-        reactional_torque_list = torch.stack(reactional_torque_list, dim=0)
+            # if finger_name == 'index':
+            #     # Skip index finger because it is canceled out by unmodeled environmental forces
+            #     continue
+            contact_jacobian = contact_jac_list[:, i]
+            force_robot_frame = self.world_trans.inverse().transform_normals(force_list[:, i].unsqueeze(0)).squeeze(0).unsqueeze(-1)
+            # reactional_torque_list.append(contact_jacobian.T @ -force_robot_frame)
+            reactional_torque_list.append(torch.bmm(contact_jacobian.transpose(1, 2), -force_robot_frame))
+        reactional_torque_list = torch.stack(reactional_torque_list, dim=0).squeeze(-1)
 
         sum_reactional_torque = torch.sum(reactional_torque_list, dim=0)
 
-        u_hat = q_delta + sum_reactional_torque/3.0
+        # TODO: Maybe a math issue? Either that or diffused forces are bad. Try including other force balance constraints **IF** including them does not require other constraints to be changed.
+        u_hat = (next_q - q)
+        contact_indices = []
+        contact_indices_used = []
+        for i, finger_name in enumerate(self.contact_fingers):
+            contact_indices.extend(self.joint_index[finger_name])
+            contact_indices_used.extend(self.joint_index_used_fingers[finger_name])
+        u_hat[0, :, contact_indices] -= sum_reactional_torque / 3.0
+        u_orig[0, :, contact_indices_used] = u_hat[0, :, contact_indices]
+        
+            
+        for i, finger_name in enumerate(self.regrasp_fingers):
+            u_orig[:, :, self.joint_index_used_fingers[finger_name]] = (next_q - q)[:, :, self.joint_index[finger_name]]
+        # u_hat = u_hat.reshape(N, T, -1)
+        
 
-        return u_hat
+        return u_orig
 
     def update_grad_g(self, num_forces, gshape2, device, grad_g, N, T, d_offset, dg_dq, dg_du, dg_dnext_q, dg_dforce):
         T_range = torch.arange(T, device=device)
