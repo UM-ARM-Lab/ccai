@@ -46,3 +46,6 @@ skip_pregrasp: True
 test_directory: 'quadrotor_compose'
 test_samples: False
 test_name: None
+
+use_mixed_precision: False
+recovery: True

@@ -290,6 +290,8 @@ class TrajectoryExecutor:
                                              baseline_controller, recover, data, actual_trajectory, 
                                              planned_trajectories, initial_samples)
                 if exit_:
+                    if len(actual_trajectory) > 0:
+                        actual_trajectory = torch.stack(actual_trajectory, dim=0).to(device=self.params['device'])
                     return actual_trajectory, planned_trajectories, optimizer_paths, contact_points, contact_distance, recover_, episode_num_steps
 
             current_state = state[:4 * num_fingers + obj_dof].clone()
@@ -307,12 +309,12 @@ class TrajectoryExecutor:
                 
             best_traj, plans = planner.step(state)
             
-            if self.params['contact_constraint_only']:
-                u_hat = planner.problem.solve_for_u_hat(best_traj.unsqueeze(0), planner.solver.best_idx).squeeze(0)
+            # if self.params['contact_constraint_only']:
+            #     u_hat = planner.problem.solve_for_u_hat(best_traj.unsqueeze(0), planner.solver.best_idx).squeeze(0)
                 
-                num_contact_fingers = len(planner.problem.contact_fingers)
+            #     num_contact_fingers = len(planner.problem.contact_fingers)
                 
-                best_traj = torch.cat((best_traj[:, :planner.problem.dx], u_hat, best_traj[:, -num_contact_fingers*3:]), dim=-1)
+            #     best_traj = torch.cat((best_traj[:, :planner.problem.dx], u_hat, best_traj[:, -num_contact_fingers*3:]), dim=-1)
                 
             csvto_time = time.perf_counter() - s
             data['csvto_times'][-1].append(csvto_time)
@@ -337,6 +339,8 @@ class TrajectoryExecutor:
             # Check Q-function OOD detection
             if self._check_q_function_ood(baseline_ood_detector, state, best_traj, num_fingers, data, 
                                         planner, actual_trajectory, planned_trajectories, initial_samples, recover):
+                if len(actual_trajectory) > 0:
+                    actual_trajectory = torch.stack(actual_trajectory, dim=0).to(device=self.params['device'])
                 return actual_trajectory, planned_trajectories, optimizer_paths, contact_points, contact_distance, True, episode_num_steps
 
             # Handle action perturbation and execution
@@ -478,16 +482,15 @@ class TrajectoryExecutor:
             if np.random.rand() < rand_pct:
                 std = .1 if self.params.get('perturb_this_trial', False) else .0
                 if mode == 'turn':
-                    best_traj[:, :4 * 1] += std * torch.randn_like(best_traj[:, :4 * 1])
+                    best_traj[:, planner.problem.dx:planner.problem.dx + planner.problem.du] += std * torch.randn_like(best_traj[:, planner.problem.dx:planner.problem.dx + planner.problem.du])
 
-        xu = torch.cat((state.cpu(), best_traj[0].cpu()))
+        xu = torch.cat((state.cpu(), best_traj[0, planner.problem.dx:planner.problem.dx + planner.problem.du].cpu()))
         actual_trajectory.append(xu)
 
         # Compute action
         if planner_returns_action or self.params['controller'] == 'diffusion_policy':
             action = best_traj
         else:
-            action = best_traj[0, planner.problem.dx:planner.problem.dx + planner.problem.du]
             x = best_traj[0, :planner.problem.dx + planner.problem.du]
             x = x.reshape(1, planner.problem.dx + planner.problem.du)
             action = x[:, planner.problem.dx:planner.problem.dx + planner.problem.du].to(device=self.env.device)

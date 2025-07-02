@@ -1,12 +1,12 @@
 from typing import Dict
 import numpy as np
-import gpytorch
+# import gpytorch
 import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.distributions import Normal
 from torch.optim import Adam
-from gpytorch.optim import NGD
+# from gpytorch.optim import NGD
 
 from tqdm import tqdm
 from ccai.models.custom_likelihoods import CDFBernoulliLikelihood

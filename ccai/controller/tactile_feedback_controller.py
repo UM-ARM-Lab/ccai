@@ -10,6 +10,7 @@ The controller supports:
 - Coupling effect modeling
 - Model Predictive Control (MPC)
 - Adaptive weighting matrix determination
+- Integration with AllegroManipulationProblem preprocessing
 """
 
 import numpy as np
@@ -289,8 +290,24 @@ class ModelPredictiveController:
         K_P = system_matrices.get('K_P', self.config.K_P * torch.eye(n_q, device=self.device))  # Proportional gain matrix
         K_D = system_matrices.get('K_D', self.config.K_D * torch.eye(n_q, device=self.device))  # Damping gain matrix
         
-        G_o = system_matrices['G_o']
-        K_coup = self.K_bar + self.K_bar * G_o.T @ torch.inverse(self.K_bar *G_o @ G_o.T) @ G_o * self.K_bar
+        # Handle K_coup computation for AllegroManipulationProblem
+        if 'K_coup' in system_matrices:
+            K_coup = system_matrices['K_coup']
+        else:
+            # Compute K_coup using the coupling formula
+            G_o = system_matrices.get('G_o', J_q)  # Use Jacobian as default G_o
+            K_bar = self.config.K_e * torch.eye(3 * n_c, device=self.device)
+            
+            if n_c > 0 and G_o.numel() > 0:
+                try:
+                    G_o_Kbar = K_bar @ G_o  # [3*n_c, n_q]
+                    middle_term = G_o_Kbar @ G_o.T  # [3*n_c, 3*n_c]
+                    middle_inv = torch.inverse(middle_term + 1e-6 * torch.eye(3*n_c, device=self.device))
+                    K_coup = K_bar + G_o_Kbar.T @ middle_inv @ G_o_Kbar
+                except:
+                    K_coup = K_bar
+            else:
+                K_coup = K_bar
         
         # 1. q̇ = u + K_D^(-1)(K_P(q_d - q) - J(q)^T λ_ext)
         try:
@@ -313,7 +330,9 @@ class ModelPredictiveController:
         J_q_d = system_matrices.get('J_q_d', J_q)  # Default to J(q) if J(q_d) not provided
         
         if n_c > 0 and J_q_d.numel() > 0:
-            # J(q_d) @ u gives [3*n_c], K_coup @ (J(q_d) @ u) gives [3*n_c]
+            # For AllegroManipulationProblem integration, we may need to handle varying contact states
+            if hasattr(J_q_d, 'shape') and len(J_q_d.shape) > 2:
+                J_q_d = J_q_d.reshape(3*n_c, n_q)  # Ensure correct shape
             lambda_ext_dot = K_coup @ (J_q_d @ u)
         else:
             lambda_ext_dot = torch.zeros(3*n_c, device=self.device)
@@ -422,12 +441,12 @@ class ModelPredictiveController:
             total_cost = 0.0
             
             for t in range(self.horizon):
-                # Get references for current time step
-                current_refs = {
-                    'q_d': q_ref[t] if t < q_ref.shape[0] else q_ref[-1],
-                    'P_d': contact_references.get('P_d', contact_positions),
-                    'P_c': contact_positions  # Current contact positions
-                }
+                # Get references for current time step using helper method
+                current_refs = self._extract_allegro_references(
+                    {'q_ref': q_ref, **contact_references}, t
+                )
+                # Add current contact positions
+                current_refs['P_c'] = contact_positions
                 
                 # Integrate dynamics using equation (24): ẍ = g(x, u)
                 x_pred[t + 1] = self.integrate_dynamics(
@@ -568,11 +587,11 @@ class ModelPredictiveController:
             total_cost = 0.0
             
             for t in range(self.horizon):
-                current_refs = {
-                    'q_d': q_ref[t] if t < q_ref.shape[0] else q_ref[-1],
-                    'P_d': contact_references.get('P_d', contact_positions),
-                    'P_c': contact_positions
-                }
+                # Get references for current time step using helper method
+                current_refs = self._extract_allegro_references(
+                    {'q_ref': q_ref, **contact_references}, t
+                )
+                current_refs['P_c'] = contact_positions
                 
                 x_pred[t + 1] = self.integrate_dynamics(
                     x_pred[t], u_tensor[t], system_matrices, current_refs, n_q, n_c
@@ -602,11 +621,11 @@ class ModelPredictiveController:
             total_cost = 0.0
             
             for t in range(self.horizon):
-                current_refs = {
-                    'q_d': q_ref[t] if t < q_ref.shape[0] else q_ref[-1],
-                    'P_d': contact_references.get('P_d', contact_positions),
-                    'P_c': contact_positions
-                }
+                # Get references for current time step using helper method
+                current_refs = self._extract_allegro_references(
+                    {'q_ref': q_ref, **contact_references}, t
+                )
+                current_refs['P_c'] = contact_positions
                 
                 x_pred[t + 1] = self.integrate_dynamics(
                     x_pred[t], u_tensor[t], system_matrices, current_refs, n_q, n_c
@@ -809,6 +828,177 @@ class ModelPredictiveController:
         # Return optimal control sequence
         return u_flat.reshape(self.horizon, control_dim).detach()
 
+    def _extract_allegro_references(self, reference_trajectory: Dict[str, torch.Tensor], 
+                                   t: int) -> Dict[str, torch.Tensor]:
+        """
+        Extract references for current time step, compatible with AllegroManipulationProblem.
+        
+        Args:
+            reference_trajectory: Reference trajectory dictionary
+            t: Current time step
+            
+        Returns:
+            current_refs: References for current time step
+        """
+        current_refs = {}
+        
+        # Extract joint position references
+        if 'q_ref' in reference_trajectory:
+            q_ref = reference_trajectory['q_ref']
+            if len(q_ref.shape) > 1:
+                current_refs['q_d'] = q_ref[t] if t < q_ref.shape[0] else q_ref[-1]
+            else:
+                current_refs['q_d'] = q_ref
+        
+        # Extract contact position references
+        if 'P_d' in reference_trajectory:
+            current_refs['P_d'] = reference_trajectory['P_d']
+        elif 'contact_positions' in reference_trajectory:
+            current_refs['P_d'] = reference_trajectory['contact_positions']
+        
+        # Extract object state references if available
+        if 'theta_ref' in reference_trajectory:
+            theta_ref = reference_trajectory['theta_ref']
+            if len(theta_ref.shape) > 1:
+                current_refs['theta_d'] = theta_ref[t] if t < theta_ref.shape[0] else theta_ref[-1]
+            else:
+                current_refs['theta_d'] = theta_ref
+        
+        return current_refs
+
+
+class AllegroContactDataExtractor:
+    """
+    Extracts system matrices and contact data from AllegroManipulationProblem preprocessing.
+    """
+    
+    def __init__(self, problem, config: ControllerConfig):
+        self.problem = problem
+        self.config = config
+        self.device = config.device
+        
+    def extract_system_matrices(self, state: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        """
+        Extract system matrices from preprocessed contact data.
+        
+        Args:
+            state: Current robot state containing q, q_dot, contact data
+            
+        Returns:
+            system_matrices: Dictionary containing matrices for dynamics equation (24)
+        """
+        q = state['q']
+        n_q = len(q)
+        n_contacts = len(self.problem.contact_fingers) if hasattr(self.problem, 'contact_fingers') else 0
+        
+        # Extract contact Jacobians from preprocessed data
+        contact_jacobians = []
+        if hasattr(self.problem, 'data') and n_contacts > 0:
+            for finger in self.problem.contact_fingers:
+                if finger in self.problem.data:
+                    # Get contact Jacobian from preprocessing - shape [N, T+1, 3, 16]
+                    jac = self.problem.data[finger]['contact_jacobian']
+                    if len(jac.shape) == 4:  # [N, T+1, 3, 16]
+                        jac = jac[0, -1]  # Take current timestep [3, 16]
+                    elif len(jac.shape) == 3:  # [3, 16] already
+                        pass
+                    else:
+                        jac = jac.reshape(3, -1)  # Ensure [3, 16]
+                    
+                    # Extract relevant joint indices for this finger
+                    if hasattr(self.problem, 'joint_index') and finger in self.problem.joint_index:
+                        joint_indices = self.problem.joint_index[finger]
+                        jac_reduced = jac[:, joint_indices]  # [3, 4] for this finger
+                        contact_jacobians.append(jac_reduced)
+        
+        # Combine Jacobians into overall contact Jacobian
+        if contact_jacobians:
+            jacobian = torch.block_diag(*contact_jacobians)  # [3*n_c, 4*n_c]
+            # Pad to full size if needed
+            if jacobian.shape[1] < n_q:
+                padding = torch.zeros(jacobian.shape[0], n_q - jacobian.shape[1], device=self.device)
+                jacobian = torch.cat([jacobian, padding], dim=1)
+        else:
+            jacobian = torch.zeros(3 * n_contacts, n_q, device=self.device)
+            
+        # Create gain matrices
+        K_P = self.config.K_P * torch.eye(n_q, device=self.device)
+        K_D = self.config.K_D * torch.eye(n_q, device=self.device)
+        
+        # Create G_o matrix (grasp matrix)
+        G_o = jacobian  # Use contact Jacobian as grasp matrix
+        
+        # Create coupling matrix K_coup for equation (24)
+        # K_coup = K_bar + K_bar * G_o^T * (K_bar * G_o * G_o^T)^(-1) * G_o * K_bar
+        K_bar = self.config.K_e * torch.eye(3 * n_contacts, device=self.device)
+        if n_contacts > 0 and G_o.numel() > 0:
+            try:
+                G_o_Kbar = K_bar @ G_o  # [3*n_c, n_q]
+                middle_term = G_o_Kbar @ G_o.T  # [3*n_c, 3*n_c]
+                middle_inv = torch.inverse(middle_term + 1e-6 * torch.eye(3*n_contacts, device=self.device))
+                K_coup = K_bar + G_o_Kbar.T @ middle_inv @ G_o_Kbar
+            except:
+                K_coup = K_bar
+        else:
+            K_coup = K_bar
+            
+        # Create stiffness matrix
+        stiffness_matrix = torch.eye(3 * n_contacts, device=self.device) * self.config.K_e
+        
+        # J(q_d) - Jacobian evaluated at desired positions (default to current)
+        J_q_d = jacobian.clone()
+        
+        system_matrices = {
+            'jacobian': jacobian,
+            'K_P': K_P,
+            'K_D': K_D,
+            'G_o': G_o,
+            'K_coup': K_coup,
+            'J_q_d': J_q_d,
+            'stiffness_matrix': stiffness_matrix
+        }
+        
+        return system_matrices
+    
+    def extract_contact_positions(self) -> Dict[str, torch.Tensor]:
+        """
+        Extract current contact positions from preprocessed data.
+        
+        Returns:
+            contact_data: Dictionary containing contact positions and normals
+        """
+        contact_positions = []
+        contact_normals = []
+        
+        if hasattr(self.problem, 'data') and hasattr(self.problem, 'contact_fingers'):
+            for finger in self.problem.contact_fingers:
+                if finger in self.problem.data:
+                    # Get closest point on object surface
+                    if 'closest_pt_world' in self.problem.data[finger]:
+                        pos = self.problem.data[finger]['closest_pt_world']
+                        if len(pos.shape) > 1:
+                            pos = pos[0, -1]  # Take current timestep
+                        contact_positions.append(pos)
+                    
+                    # Get contact normal
+                    if 'contact_normal' in self.problem.data[finger]:
+                        normal = self.problem.data[finger]['contact_normal']
+                        if len(normal.shape) > 1:
+                            normal = normal[0, -1]  # Take current timestep
+                        contact_normals.append(normal)
+        
+        if contact_positions:
+            P_c = torch.cat(contact_positions, dim=0)  # [3*n_c]
+            normals = torch.stack(contact_normals, dim=0) if contact_normals else torch.zeros_like(contact_positions[0]).unsqueeze(0).repeat(len(contact_positions), 1)  # [n_c, 3]
+        else:
+            P_c = torch.zeros(0, device=self.device)
+            normals = torch.zeros(0, 3, device=self.device)
+            
+        return {
+            'P_c': P_c,
+            'contact_normals': normals
+        }
+
 
 class TactileFeedbackController:
     """
@@ -817,20 +1007,150 @@ class TactileFeedbackController:
     Integrates all components for complete controller functionality.
     """
     
-    def __init__(self, config: ControllerConfig):
+    def __init__(self, config: ControllerConfig, problem=None):
         self.config = config
         self.device = config.device
+        self.problem = problem  # AllegroManipulationProblem instance
         
         # Initialize subcomponents
         self.force_motion_model = ForceMotionModel(config)
         self.weighting_determiner = WeightingMatrixDeterminer(config)
         self.mpc_controller = ModelPredictiveController(config)
         
+        # Initialize contact data extractor if problem is provided
+        if self.problem is not None:
+            self.contact_extractor = AllegroContactDataExtractor(problem, config)
+        else:
+            self.contact_extractor = None
+        
         # Controller state
         self.current_mode = "multi_contact"  # "single_contact" or "multi_contact"
         self.contact_history = []
         
         logger.info(f"Initialized TactileFeedbackController with config: {config}")
+    
+    def set_problem(self, problem):
+        """Set the AllegroManipulationProblem instance."""
+        self.problem = problem
+        self.contact_extractor = AllegroContactDataExtractor(problem, self.config)
+    
+    def preprocess_with_problem(self, state: Dict[str, torch.Tensor]):
+        """
+        Use AllegroManipulationProblem preprocessing to populate contact data.
+        
+        Args:
+            state: Current robot state with q, q_dot, contact positions, etc.
+        """
+        if self.problem is None:
+            raise ValueError("No AllegroManipulationProblem instance set. Call set_problem() first.")
+        
+        # Extract joint positions and object state
+        q = state['q']
+        if 'theta' in state:
+            theta = state['theta']
+        else:
+            # Extract object DOF from state if available
+            if hasattr(self.problem, 'obj_dof') and len(q) > self.problem.robot_dof:
+                theta = q[self.problem.robot_dof:self.problem.robot_dof + self.problem.obj_dof]
+                q = q[:self.problem.robot_dof]
+            else:
+                theta = torch.zeros(getattr(self.problem, 'obj_dof', 1), device=self.device)
+        
+        # Reshape for preprocessing (expects [N, T, dim])
+        if len(q.shape) == 1:
+            q = q.unsqueeze(0).unsqueeze(0)  # [1, 1, n_joints]
+        if len(theta.shape) == 1:
+            theta = theta.unsqueeze(0).unsqueeze(0)  # [1, 1, obj_dof]
+            
+        # Call the problem's preprocessing
+        self.problem._preprocess_fingers(q, theta)
+    
+    def update_with_allegro_integration(self, state: Dict[str, torch.Tensor], 
+                                      reference_trajectory: Dict[str, torch.Tensor],
+                                      contact_references: Dict[str, torch.Tensor] = None) -> Dict[str, torch.Tensor]:
+        """
+        Update controller using AllegroManipulationProblem preprocessing and MPC.
+        
+        Args:
+            state: Current robot state
+            reference_trajectory: Desired trajectory over horizon
+            contact_references: Desired contact forces over horizon (optional)
+            
+        Returns:
+            control_output: Control commands
+        """
+        # Use problem preprocessing to populate contact data
+        self.preprocess_with_problem(state)
+        
+        # Extract system matrices from preprocessed data
+        if self.contact_extractor is None:
+            raise ValueError("No contact extractor available. Set problem first.")
+            
+        system_matrices = self.contact_extractor.extract_system_matrices(state)
+        contact_data = self.contact_extractor.extract_contact_positions()
+        
+        # Update contact references with current contact positions
+        if contact_references is None:
+            contact_references = {}
+        contact_references.update(contact_data)
+        
+        # Solve MPC optimization using equation (24) dynamics
+        optimal_control = self.mpc_controller.solve_mpc(
+            state, reference_trajectory, contact_references, system_matrices
+        )
+        
+        # Extract first control action
+        control_action = optimal_control[0]  # First time step
+        
+        return {
+            'joint_torques': control_action,
+            'optimal_control_sequence': optimal_control,
+            'mpc_horizon': self.config.horizon_length,
+            'system_matrices': system_matrices,
+            'contact_data': contact_data
+        }
+    
+    def update_with_mpc(self, state: Dict[str, torch.Tensor], 
+                       reference_trajectory: Dict[str, torch.Tensor],
+                       contact_references: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        """
+        Update controller using Model Predictive Control.
+        
+        Args:
+            state: Current robot state
+            reference_trajectory: Desired trajectory over horizon
+            contact_references: Desired contact forces over horizon
+            
+        Returns:
+            control_output: Control commands
+        """
+        # Prepare system matrices for equation (24)
+        q = state['q']
+        n_contacts = len(state['contact_positions']) // 3 if 'contact_positions' in state else 0
+        system_matrices = {
+            'jacobian': state.get('jacobian', torch.zeros(3*n_contacts, len(q), device=self.device)),  # J(q)
+            'K_P': state.get('K_P', self.config.K_P * torch.eye(len(q), device=self.device)),  # Proportional gain matrix
+            'K_D': state.get('K_D', self.config.K_D * torch.eye(len(q), device=self.device)),  # Damping gain matrix
+            'G_o': state.get('G_o', torch.eye(len(q), device=self.device)),  # G_o matrix for coupling
+            'K_coup': state.get('K_coup', torch.eye(3*n_contacts, device=self.device)),  # Coupling matrix [3*n_c, 3*n_c]
+            'J_q_d': state.get('J_q_d', state.get('jacobian', torch.zeros(3*n_contacts, len(q), device=self.device))),  # J(q_d) - Jacobian evaluated at q_d (defaults to J(q))
+            'stiffness_matrix': state.get('stiffness_matrix', 
+                                        torch.eye(3*n_contacts, device=self.device))
+        }
+        
+        # Solve MPC optimization
+        optimal_control = self.mpc_controller.solve_mpc(
+            state, reference_trajectory, contact_references, system_matrices
+        )
+        
+        # Extract first control action
+        control_action = optimal_control[0]  # First time step
+        
+        return {
+            'joint_torques': control_action,
+            'optimal_control_sequence': optimal_control,
+            'mpc_horizon': self.config.horizon_length
+        }
     
     def set_mode(self, mode: str):
         """Set controller mode (single_contact or multi_contact)."""
@@ -936,50 +1256,10 @@ class TactileFeedbackController:
             'joint_accelerations': q_ddot
         }
     
-    def update_with_mpc(self, state: Dict[str, torch.Tensor], 
-                       reference_trajectory: Dict[str, torch.Tensor],
-                       contact_references: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        """
-        Update controller using Model Predictive Control.
-        
-        Args:
-            state: Current robot state
-            reference_trajectory: Desired trajectory over horizon
-            contact_references: Desired contact forces over horizon
-            
-        Returns:
-            control_output: Control commands
-        """
-        # Prepare system matrices for equation (24)
-        n_contacts = len(state['contact_positions']) // 3
-        system_matrices = {
-            'jacobian': state['jacobian'],  # J(q)
-            'K_P': state.get('K_P', self.config.K_P * torch.eye(len(q), device=self.device)),  # Proportional gain matrix
-            'K_D': state.get('K_D', self.config.K_D * torch.eye(len(q), device=self.device)),  # Damping gain matrix
-            'G_o': state.get('G_o', torch.eye(len(q), device=self.device)),  # G_o matrix for coupling
-            'K_coup': state.get('K_coup', torch.eye(len(state['contact_positions']), device=self.device)),  # Coupling matrix [3*n_c, 3*n_c]
-            'J_q_d': state.get('J_q_d', state['jacobian']),  # J(q_d) - Jacobian evaluated at q_d (defaults to J(q))
-            'stiffness_matrix': state.get('stiffness_matrix', 
-                                        torch.eye(len(state['contact_positions']), device=self.device))
-        }
-        
-        # Solve MPC optimization
-        optimal_control = self.mpc_controller.solve_mpc(
-            state, reference_trajectory, contact_references, system_matrices
-        )
-        
-        # Extract first control action
-        control_action = optimal_control[0]  # First time step
-        
-        return {
-            'joint_torques': control_action,
-            'optimal_control_sequence': optimal_control,
-            'mpc_horizon': self.config.horizon_length
-        }
-    
     def update(self, state: Dict[str, torch.Tensor], 
               references: Dict[str, torch.Tensor],
-              use_mpc: bool = False) -> Dict[str, torch.Tensor]:
+              use_mpc: bool = False,
+              use_allegro_integration: bool = True) -> Dict[str, torch.Tensor]:
         """
         Main update function for the controller.
         
@@ -987,6 +1267,7 @@ class TactileFeedbackController:
             state: Current robot state
             references: Desired references (can be single step or trajectory)
             use_mpc: Whether to use MPC (requires trajectory references)
+            use_allegro_integration: Whether to use AllegroManipulationProblem integration
             
         Returns:
             control_output: Control commands and auxiliary information
@@ -995,7 +1276,13 @@ class TactileFeedbackController:
         state = self._ensure_tensors(state)
         references = self._ensure_tensors(references)
         
-        if use_mpc:
+        if use_allegro_integration and self.problem is not None:
+            # Use integrated approach with AllegroManipulationProblem
+            reference_trajectory = references.get('trajectory', references)
+            contact_references = references.get('contact_trajectory', {})
+            return self.update_with_allegro_integration(state, reference_trajectory, contact_references)
+            
+        elif use_mpc:
             # MPC mode requires trajectory references
             reference_trajectory = references.get('trajectory', references)
             contact_references = references.get('contact_trajectory', references)
@@ -1119,74 +1406,151 @@ def compute_contact_jacobian(joint_positions: torch.Tensor,
     return J
 
 
+def create_allegro_compatible_state(problem, q_current: torch.Tensor, 
+                                  q_dot_current: torch.Tensor = None) -> Dict[str, torch.Tensor]:
+    """
+    Create a state dictionary compatible with both TactileFeedbackController and AllegroManipulationProblem.
+    
+    Args:
+        problem: AllegroManipulationProblem instance
+        q_current: Current joint positions
+        q_dot_current: Current joint velocities (optional)
+        
+    Returns:
+        state: State dictionary with all necessary fields
+    """
+    device = q_current.device
+    
+    if q_dot_current is None:
+        q_dot_current = torch.zeros_like(q_current)
+    
+    # Split joint positions into robot and object parts
+    if hasattr(problem, 'robot_dof'):
+        robot_dof = problem.robot_dof
+        q_robot = q_current[:robot_dof]
+        if len(q_current) > robot_dof:
+            theta = q_current[robot_dof:robot_dof + getattr(problem, 'obj_dof', 1)]
+        else:
+            theta = torch.zeros(getattr(problem, 'obj_dof', 1), device=device)
+    else:
+        q_robot = q_current
+        theta = torch.zeros(1, device=device)
+    
+    # Initialize contact data (will be populated by preprocessing)
+    n_contacts = len(getattr(problem, 'contact_fingers', []))
+    
+    state = {
+        'q': q_current,
+        'q_dot': q_dot_current,
+        'q_robot': q_robot,
+        'theta': theta,
+        'contact_positions': torch.zeros(3 * n_contacts, device=device),
+        'contact_forces': torch.zeros(n_contacts, 3, device=device),
+        'contact_normals': torch.zeros(n_contacts, 3, device=device),
+        'jacobian': torch.zeros(3 * n_contacts, len(q_robot), device=device),
+    }
+    
+    return state
+
+
 if __name__ == "__main__":
-    # Example usage with different solvers
+    # Example usage with AllegroManipulationProblem integration
     
-    print("=== MPC Solver Comparison ===")
-    print("Available solvers:")
-    print("  - 'lbfgs': L-BFGS (default, best for smooth nonlinear problems)")
-    print("  - 'osqp': OSQP quadratic programming (fast for QP approximations)")  
-    print("  - 'scipy': SciPy SLSQP (robust for constrained optimization)")
-    print("  - 'augmented_lagrangian': Augmented Lagrangian method (handles constraints explicitly)")
-    print("  - 'adam': Adam optimizer (for comparison, not recommended)")
-    print()
+    print("=== Tactile Feedback Controller with Allegro Integration ===")
     
-    # Test different solvers
-    solvers = ['lbfgs', 'osqp', 'scipy', 'augmented_lagrangian']
+    # Configuration
+    config = ControllerConfig(
+        K_e=1000.0,
+        K_r=100.0,
+        K_P=1000.0,
+        force_threshold=0.5,
+        horizon_length=10,
+        mpc_solver='lbfgs'
+    )
     
-    for solver in solvers:
-        print(f"Testing {solver.upper()} solver:")
-        
-        config = ControllerConfig(
-            K_e=1000.0,
-            K_r=100.0,
-            K_P=1000.0,
-            force_threshold=0.5,
-            horizon_length=10,
-            mpc_solver=solver  # Specify solver
-        )
-        
-        controller = TactileFeedbackController(config)
-        
-        # Example state and references
-        n_joints = 7
-        n_contacts = 2
-        
-        state = {
-            'q': torch.randn(n_joints),
-            'q_dot': torch.randn(n_joints),
-            'contact_positions': torch.randn(n_contacts * 3),
-            'contact_forces': torch.randn(n_contacts, 3),
-            'contact_normals': torch.randn(n_contacts, 3),
-            'jacobian': torch.randn(n_contacts * 3, n_joints),  # J(q)
-            # For equation (24) dynamics:
-            'K_P': torch.eye(n_joints) * 1000.0,  # Proportional gain matrix
-            'K_D': torch.eye(n_joints) * 50.0,    # Damping gain matrix
-            'G_o': torch.eye(n_joints),  # G_o matrix for coupling
-            'K_coup': torch.eye(n_contacts * 3),  # Coupling matrix [3*n_c, 3*n_c]
-            'J_q_d': torch.randn(n_contacts * 3, n_joints),  # J(q_d) - Jacobian evaluated at q_d
-        }
-        
-        references = {
-            'desired_contact_positions': torch.randn(n_contacts * 3),
-            'desired_joint_positions': torch.randn(n_joints),
-            'desired_joint_velocities': torch.randn(n_joints)
-        }
-        
-        # Run controller
-        controller.set_mode("multi_contact")
-        
-        import time
-        start_time = time.time()
-        output = controller.update(state, references, use_mpc=True)
-        solve_time = time.time() - start_time
-        
-        print(f"  ✓ Solved in {solve_time:.4f}s")
-        print(f"  ✓ Output keys: {list(output.keys())}")
-        print(f"  ✓ Joint torques shape: {output['joint_torques'].shape}")
-        print()
+    # Create controller (problem will be set later)
+    controller = TactileFeedbackController(config)
     
-    print("Recommendations:")
-    print("  - Use 'lbfgs' for most applications")
-    print("  - Use 'osqp' for real-time control") 
-    print("  - Use 'augmented_lagrangian' for problems with complex constraints") 
+    print("Controller initialized and ready for AllegroManipulationProblem integration")
+    print("Use controller.set_problem(problem) to set the manipulation problem")
+    print("Then use controller.update(..., use_allegro_integration=True) for control")
+    
+    # Example integration workflow:
+    print("\n=== Example Integration Workflow ===")
+    print("""
+    # 1. Create AllegroManipulationProblem
+    from ccai.allegro_contact import AllegroManipulationProblem
+    
+    problem = AllegroManipulationProblem(
+        start=start_state,
+        goal=goal_state,
+        T=horizon_length,
+        chain=kinematic_chain,
+        object_location=object_location,
+        object_type='screwdriver',  # or 'valve', etc.
+        world_trans=world_transform,
+        object_asset_pos=object_position,
+        contact_fingers=['index', 'middle', 'ring', 'thumb'],
+        regrasp_fingers=[],  # or subset of fingers
+        optimize_force=True,
+        device='cuda'
+    )
+    
+    # 2. Set up controller with problem
+    controller.set_problem(problem)
+    
+    # 3. Create state from current robot configuration
+    current_state = create_allegro_compatible_state(
+        problem, 
+        q_current=torch.tensor([...]),  # current joint positions
+        q_dot_current=torch.tensor([...])  # current joint velocities
+    )
+    
+    # 4. Define reference trajectory
+    reference_trajectory = {
+        'q_ref': torch.zeros((horizon_length, n_joints)),  # desired joint trajectory
+        'theta_ref': torch.zeros((horizon_length, obj_dof)),  # desired object trajectory
+    }
+    
+    # 5. Run controller with integrated preprocessing
+    control_output = controller.update(
+        state=current_state,
+        references={'trajectory': reference_trajectory},
+        use_allegro_integration=True
+    )
+    
+    # 6. Extract control commands
+    joint_torques = control_output['joint_torques']  # Apply to robot
+    optimal_sequence = control_output['optimal_control_sequence']  # Full horizon plan
+    system_matrices = control_output['system_matrices']  # Extracted matrices
+    contact_data = control_output['contact_data']  # Contact information
+    
+    # Key benefits of this integration:
+    # - Automatic extraction of contact Jacobians from preprocessing
+    # - Proper handling of contact forces and positions
+    # - Seamless integration with existing AllegroManipulationProblem
+    # - Support for different object types and contact configurations
+    # - Advanced MPC with multiple solver options
+    """)
+    
+    print("\n=== Available MPC Solvers ===")
+    print("- 'lbfgs': L-BFGS (recommended for most applications)")
+    print("- 'osqp': OSQP quadratic programming (fast for real-time)")
+    print("- 'scipy': SciPy SLSQP (robust for constrained problems)")
+    print("- 'augmented_lagrangian': Augmented Lagrangian (complex constraints)")
+    print("- 'adam': Adam optimizer (for comparison)")
+    
+    print("\n=== Configuration Options ===")
+    print("Key parameters to tune:")
+    print("- K_e, K_r: Environment and robot stiffness")
+    print("- K_P, K_D: Proportional and damping gains")
+    print("- force_threshold: Contact classification threshold")
+    print("- w_motion, w_contact, w_smooth: Cost function weights")
+    print("- horizon_length: MPC prediction horizon")
+    
+    print("\n=== Contact Modes ===")
+    print("- Single contact: Use update_single_contact() for single finger contact")
+    print("- Multi contact: Use update_multi_contact() for multiple finger contacts")
+    print("- MPC mode: Use update_with_allegro_integration() for full MPC with preprocessing")
+    
+    print("\nReady for integration with AllegroManipulationProblem!") 

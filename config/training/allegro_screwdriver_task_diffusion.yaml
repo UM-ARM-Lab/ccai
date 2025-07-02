@@ -1,7 +1,7 @@
 ---
-model_name: 'allegro_valve_recovery_best_traj_only'
-T: 4
-dx: 13
+model_name: 'allegro_screwdriver_task_model_pi_2_fixed_data_filtering'
+T: 13
+dx: 15
 du: 21
 load_checkpoint: False
 load_model: False
@@ -18,10 +18,12 @@ lr: 1.0e-4
 model_type: 'diffusion'
 discriminator_guidance: True
 inverse_dynamics: False
-data_directory: 'allegro_valve_recovery_data_generation_std_.0_thresh_70_cutoff_96_N_4'
+data_directory: 'allegro_screwdriver_data_gen_pi_2_close_contact'
+best_traj_only: True
+recovery: False
 device: 'cuda:0'
 test_every: 9999999999
-save_every: 500
+save_every: 1000
 normalize_data: True
 constraint_embedding_dim: 64
 constrained: False
@@ -31,11 +33,7 @@ hidden_dim: 128
 unconditional: True
 sine_cosine: True
 use_class: True
-diffuse_class: True
-trajectory_condition: True
-true_s0: False
-best_traj_only: True
-context_dropout_p: .25
+diffuse_class: False
 # Only applies to using EMA for training
 use_ema: True
 ema_decay: 0.995
@@ -47,5 +45,5 @@ test_directory: 'quadrotor_compose'
 test_samples: False
 test_name: None
 
-recovery: True
 use_mixed_precision: False
+recovery: False

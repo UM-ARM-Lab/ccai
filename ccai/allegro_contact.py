@@ -130,7 +130,8 @@ class PositionControlConstrainedSVGDMPC(Constrained_SVGD_MPC):
     def __init__(self, problem, params):
         super().__init__(problem, params)
         self.solver = PositionControlConstrainedSteinTrajOpt(problem, params)
-
+contact_scenes = None
+contact_scenes_for_viz = None
 
 class AllegroObjectProblem(ConstrainedSVGDProblem):
 
@@ -288,27 +289,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         self.moveable_object = moveable_object
         chain_object = pk.build_chain_from_urdf(open(asset_object).read())
         chain_object = chain_object.to(device=device)
-        if 'valve' in object_type:
-            object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/valve',
-                                     use_collision_geometry=True)
-            object_sdf_for_viz = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/valve',
-                                     use_collision_geometry=True) # Use collision geometry for visualization to check fidelity of contact mesh
-        elif 'screwdriver' in object_type:
-            object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver',
-                                     use_collision_geometry=True)
-            object_sdf_for_viz = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver',
-                                     use_collision_geometry=False)
-        elif 'card' in object_type:
-            object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/card',
-                                     use_collision_geometry=False)
-        elif 'peg' in object_type:
-            object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/peg',
-                                     use_collision_geometry=True)
-            object_sdf_for_viz = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/peg',
-                                     use_collision_geometry=False)
-        self.object_sdf = object_sdf
-        robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models',
-                                use_collision_geometry=False)
+
 
         obj_to_world_trans = pk.Transform3d(device='cpu').translate(object_asset_pos[0], object_asset_pos[1], object_asset_pos[2])
         screwdriver_origin_to_world_trans = pk.Transform3d(device='cpu').translate(object_asset_pos[0], object_asset_pos[1], object_asset_pos[2] + .1 + 0.412*2.54/100)
@@ -326,21 +307,49 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         # print(robot_minus_object.get_matrix())
         # contact checking
         # collision_check_links = [self.ee_names[finger] for finger in self.fingers]
-        collision_check_links = sum([self.collision_link_names[finger] for finger in self.fingers], [])
-        self.contact_scenes = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
-                                            collision_check_links=collision_check_links,
-                                            softmin_temp=1.0e3,
-                                            points_per_link=750,
-                                            links_per_finger=len(self.collision_link_names['index']),
-                                            obj_link_name=self.obj_link_name
-                                            )
-        self.contact_scenes_for_viz = pv.RobotScene(robot_sdf, object_sdf_for_viz, scene_trans,
-                                            collision_check_links=collision_check_links,
-                                            softmin_temp=1.0e3,
-                                            points_per_link=750,
-                                            links_per_finger=len(self.collision_link_names['index']),
-                                            obj_link_name=self.obj_link_name
-                                            )
+        global contact_scenes, contact_scenes_for_viz
+        if contact_scenes is None:
+            if 'valve' in object_type:
+                object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/valve',
+                                        use_collision_geometry=True)
+                object_sdf_for_viz = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/valve',
+                                        use_collision_geometry=True) # Use collision geometry for visualization to check fidelity of contact mesh
+            elif 'screwdriver' in object_type:
+                object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver',
+                                        use_collision_geometry=True)
+                object_sdf_for_viz = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver',
+                                        use_collision_geometry=False)
+            elif 'card' in object_type:
+                object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/card',
+                                        use_collision_geometry=False)
+            elif 'peg' in object_type:
+                object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/peg',
+                                        use_collision_geometry=True)
+                object_sdf_for_viz = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/peg',
+                                        use_collision_geometry=False)
+            self.object_sdf = object_sdf
+            robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models',
+                                    use_collision_geometry=False)
+            collision_check_links = sum([self.collision_link_names[finger] for finger in self.fingers], [])
+            contact_scenes = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
+                                                collision_check_links=collision_check_links,
+                                                softmin_temp=1.0e3,
+                                                points_per_link=750,
+                                                links_per_finger=len(self.collision_link_names['index']),
+                                                obj_link_name=self.obj_link_name
+                                                )
+            contact_scenes_for_viz = pv.RobotScene(robot_sdf, object_sdf_for_viz, scene_trans,
+                                                collision_check_links=collision_check_links,
+                                                softmin_temp=1.0e3,
+                                                points_per_link=750,
+                                                links_per_finger=len(self.collision_link_names['index']),
+                                                obj_link_name=self.obj_link_name
+                                                )
+            self.contact_scenes = contact_scenes
+            self.contact_scenes_for_viz = contact_scenes_for_viz
+        else:
+            self.contact_scenes = contact_scenes
+            self.contact_scenes_for_viz = contact_scenes_for_viz
 
         # self.contact_scenes.visualize_robot(torch.zeros(16).to(self.device), self.start[4*self.num_fingers:].to(self.device))
         ###### Joint limits ########
@@ -439,7 +448,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         elif self.full_dof_goal and len(self.regrasp_fingers) > 0:
             ret_scene = self.contact_scenes.scene_collision_check(full_q, theta_b,
                                                                 compute_gradient=True,
-                                                                compute_hessian=True,
+                                                                compute_hessian=False,
                                                                 compute_closest_obj_point=compute_closest_obj_point,
                                                                 rob_link_idx=None if self.contact_constraint_only else self.rob_link_idx,
                                                                 contact_constraint_only=self.contact_constraint_only)
@@ -464,32 +473,46 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.data[finger]['contact_jacobian'] = contact_jacobian[:, i].reshape(N, T + 1, 3, 16)
             self.data[finger]['grad_env_sdf'] = ret_scene['grad_env_sdf'][:, i, :obj_dof]
 
+            if compute_closest_obj_point:
+                self.data[finger]['closest_obj_pt_object'] = ret_scene['closest_obj_pt_object'][:, i]
+            
+            self.data[finger]['closest_rob_pt_object'] = ret_scene['closest_rob_pt_object'][:, i]
+            if finger in self.regrasp_fingers and self.full_dof_goal:
+                self.nearest_robot_pts.append(self.data[finger]['closest_rob_pt_object'].reshape(q.shape[0], T+1, 3))
+
+            d_contact_loc_dq_scene = ret_scene.get('closest_pt_q_grad_object', None)
+            if d_contact_loc_dq_scene is not None:
+                d_contact_loc_dq_scene = d_contact_loc_dq_scene[:, i].reshape(N, T + 1, 3, 16)
+                self.data[finger]['closest_pt_q_grad_object'] = d_contact_loc_dq_scene
+
+            d_contact_loc_denv_q_scene = ret_scene.get('closest_pt_env_q_grad_object', None)
+            if d_contact_loc_denv_q_scene is not None:
+                d_contact_loc_denv_q_scene = d_contact_loc_denv_q_scene[:, i, :, :obj_dof].reshape(N, T + 1, 3, obj_dof)
+                self.data[finger]['closest_pt_env_q_grad_object'] = d_contact_loc_denv_q_scene
+            self.data[finger]['closest_pt_world'] = ret_scene['closest_pt_world'][:, i]
+            
+            contact_hessian = ret_scene.get('contact_hessian', None)
+            contact_hessian = contact_hessian[:, i].reshape(N, T + 1, 3, 16, 16)  # [:, :, :, self.all_joint_index]
+
+            dJ_dq = contact_hessian
+            self.data[finger]['dJ_dq'] = dJ_dq  # Jacobian of the contact point
+            # gradient of contact point
+            d_contact_loc_dq = ret_scene.get('closest_pt_q_grad', None)
+            d_contact_loc_dq = d_contact_loc_dq[:, i].reshape(N, T + 1, 3, 16)  # [:, :, :, self.all_joint_index]
+            self.data[finger]['closest_pt_q_grad'] = d_contact_loc_dq
+            self.data[finger]['contact_hessian'] = contact_hessian
             if not self.contact_constraint_only:
                 # contact hessian
-                contact_hessian = ret_scene.get('contact_hessian', None)
-                contact_hessian = contact_hessian[:, i].reshape(N, T + 1, 3, 16, 16)  # [:, :, :, self.all_joint_index]
                 # contact_hessian = contact_hessian[:, :, :, :, self.all_joint_index]  # shape (N, T+1, 3, 8, 8)
 
-                # gradient of contact point
-                d_contact_loc_dq = ret_scene.get('closest_pt_q_grad', None)
-                d_contact_loc_dq = d_contact_loc_dq[:, i].reshape(N, T + 1, 3, 16)  # [:, :, :, self.all_joint_index]
-                self.data[finger]['closest_pt_q_grad'] = d_contact_loc_dq
-                self.data[finger]['contact_hessian'] = contact_hessian
-                self.data[finger]['closest_pt_world'] = ret_scene['closest_pt_world'][:, i]
+
                 self.data[finger]['contact_normal'] = ret_scene['contact_normal'][:, i]
 
                 d_contact_loc_denv_q = ret_scene.get('closest_pt_env_q_grad', None)
                 d_contact_loc_denv_q = d_contact_loc_denv_q[:, i, :, :obj_dof].reshape(N, T + 1, 3, obj_dof)
                 self.data[finger]['closest_pt_env_q_grad'] = d_contact_loc_denv_q
 
-                d_contact_loc_dq_scene = ret_scene.get('closest_pt_q_grad_object', None)
-                if d_contact_loc_dq_scene is not None:
-                    d_contact_loc_dq_scene = d_contact_loc_dq_scene[:, i].reshape(N, T + 1, 3, 16)
-                    self.data[finger]['closest_pt_q_grad_object'] = d_contact_loc_dq_scene
-                d_contact_loc_denv_q_scene = ret_scene.get('closest_pt_env_q_grad_object', None)
-                if d_contact_loc_denv_q_scene is not None:
-                    d_contact_loc_denv_q_scene = d_contact_loc_denv_q_scene[:, i, :, :obj_dof].reshape(N, T + 1, 3, obj_dof)
-                    self.data[finger]['closest_pt_env_q_grad_object'] = d_contact_loc_denv_q_scene
+
 
                 d_contact_loc_dq_link = ret_scene.get('closest_pt_q_grad_link', None)
                 if d_contact_loc_dq_link is not None:
@@ -505,16 +528,10 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                 # self.all_joint_index]
 
                 self.data[finger]['dnormal_denv_q'] = ret_scene['dnormal_denv_q'][:, i, :, :obj_dof]
-                dJ_dq = contact_hessian
-                self.data[finger]['dJ_dq'] = dJ_dq  # Jacobian of the contact point
-                if compute_closest_obj_point:
-                    self.data[finger]['closest_obj_pt_object'] = ret_scene['closest_obj_pt_object'][:, i]
-                
-                self.data[finger]['closest_rob_pt_object'] = ret_scene['closest_rob_pt_object'][:, i]
+
                 if finger in self.regrasp_fingers and self.full_dof_goal:
                     self.data[finger]['closest_rob_pt_link'] = ret_scene['closest_rob_pt_link'][:, i].reshape(q.shape[0], T+1, 3)
                     self.rob_link_pts.append(self.data[finger]['closest_rob_pt_link'])
-                    self.nearest_robot_pts.append(self.data[finger]['closest_rob_pt_object'].reshape(q.shape[0], T+1, 3))
                 if self.full_dof_goal and compute_closest_obj_point and len(self.regrasp_fingers) > 0:
                     rob_link_idx.append(ret_scene['closest_pt_closest_link'][:, i])
 
@@ -557,20 +574,20 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
     def _objective(self, x, projected_diffusion=False):
         T_offset = 0 if projected_diffusion else 1
         x = x[:, :, :self.dx + self.du]
-        if not self.contact_constraint_only:
-            N = x.shape[0]
-            J = self.cost(x, self.rob_link_pts, self.nearest_robot_pts)
-            
-            grad_J, grad_rob_link_pts, grad_nearest_robot_pts = self.grad_cost(x, self.rob_link_pts, self.nearest_robot_pts)
-            if self.full_dof_goal and len(self.regrasp_fingers) > 0:
-                grad_rob_link_pts_dx = self.process_cost_grads(grad_rob_link_pts, grad_J, 'closest_pt_q_grad_link', 'closest_pt_env_q_grad_link', projected_diffusion=projected_diffusion)
-                grad_nearest_robot_pts_dx = 0 #self.process_cost_grads(grad_nearest_robot_pts, grad_J, 
-                    # 'closest_pt_q_grad_object', 'closest_pt_env_q_grad_object', projected_diffusion=projected_diffusion)
-                grad_J = grad_J + grad_rob_link_pts_dx + grad_nearest_robot_pts_dx
-        else:
-            N = x.shape[0]
-            J = torch.zeros(N, device=x.device)
-            grad_J = torch.zeros(N, self.T * x.shape[-1], device=x.device)
+        # if False: #not self.contact_constraint_only:
+        N = x.shape[0]
+        J = self.cost(x, self.rob_link_pts, self.nearest_robot_pts)
+        
+        grad_J, grad_rob_link_pts, grad_nearest_robot_pts = self.grad_cost(x, self.rob_link_pts, self.nearest_robot_pts)
+        if self.full_dof_goal and len(self.regrasp_fingers) > 0:
+            grad_rob_link_pts_dx = self.process_cost_grads(grad_rob_link_pts, grad_J, 'closest_pt_q_grad_link', 'closest_pt_env_q_grad_link', projected_diffusion=projected_diffusion)
+            grad_nearest_robot_pts_dx = 0 #self.process_cost_grads(grad_nearest_robot_pts, grad_J, 
+                # 'closest_pt_q_grad_object', 'closest_pt_env_q_grad_object', projected_diffusion=projected_diffusion)
+            grad_J = grad_J + grad_rob_link_pts_dx + grad_nearest_robot_pts_dx
+        # else:
+        #     N = x.shape[0]
+        #     J = torch.zeros(N, device=x.device)
+        #     grad_J = torch.zeros(N, self.T * x.shape[-1], device=x.device)
 
         return (self.alpha * J.reshape(N),
                 self.alpha * ((grad_J).reshape(N, -1)),
@@ -833,7 +850,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.T = T
             self.dh = self.dh_per_t * T + self.dh_constant  # inequality
             self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
-        if self.full_dof_goal and len(self.regrasp_fingers) > 0 and not self.contact_constraint_only:
+        if self.full_dof_goal and len(self.regrasp_fingers) > 0:
             if self.goal is not None:
                 self.default_dof_pos = self.goal[: self.num_fingers * 4]
                 # Pad to length 16
@@ -850,20 +867,24 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self._preprocess_fingers(self.goal[: self.num_fingers * 4][None, None], self.goal_theta[None, None], compute_closest_obj_point=True)
 
             self.contact_points = {}
-            self.contact_points_rob_link = []
+            if not self.contact_constraint_only:
+                self.contact_points_rob_link = []
 
             for finger in self.regrasp_fingers:
                 rad = .0025 if self.object_type == 'screwdriver' else .001
                 self.contact_points[finger] = (self.data[finger]['closest_obj_pt_object'].clone().detach(), rad)
-                self.contact_points_rob_link.append(self.data[finger]['closest_rob_pt_link'].clone().detach())
-            self.contact_points_rob_link = torch.cat(self.contact_points_rob_link, dim=0)
+                if not self.contact_constraint_only:
+                    self.contact_points_rob_link.append(self.data[finger]['closest_rob_pt_link'].clone().detach())
+
+            if not self.contact_constraint_only:
+                self.contact_points_rob_link = torch.cat(self.contact_points_rob_link, dim=0)
 
             contact_points_object = torch.stack([self.contact_points[finger][0] for finger in self.regrasp_fingers], dim=0)
             self.contact_points_object = contact_points_object
 
             self.do_contact_patch_constraint = True# self.object_type != 'valve'  
 
-        if self.num_regrasps > 0 and not self.contact_constraint_only:
+        if self.num_regrasps > 0:
             if self.full_dof_goal and contact_points_object is not None:
                 self.default_ee_locs = self._ee_locations_in_screwdriver(self.default_dof_pos,
                                                                     self.goal_theta).detach()
@@ -962,7 +983,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         self.num_regrasps = len(regrasp_fingers)
         self.regrasp_idx = [self.joint_index[finger] for finger in regrasp_fingers]
         self.regrasp_idx = list(itertools.chain.from_iterable(self.regrasp_idx))
-        self._regrasp_dg_per_t = self.num_regrasps * 4 if not self.contact_constraint_only else 0
+        self._regrasp_dg_per_t = self.num_regrasps * 4 #if not self.contact_constraint_only else 0
         self._regrasp_dg_constant = self.num_regrasps
         self._regrasp_dg = self._regrasp_dg_per_t * T + self._regrasp_dg_constant
         self._regrasp_dz = self.num_regrasps  # one contact constraints per finger
@@ -997,7 +1018,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             self.default_dof_pos = default_dof_pos.to(self.device)
 
         self.do_contact_patch_constraint = False
-        if self.full_dof_goal and len(self.regrasp_fingers) > 0 and not self.contact_constraint_only:# and self.obj_link_name != 'valve':
+        if self.full_dof_goal and len(self.regrasp_fingers) > 0:# and self.obj_link_name != 'valve':
             if self.goal is not None:
                 self.default_dof_pos = self.goal[: self.num_fingers * 4]
                 # Pad to length 16
@@ -1014,13 +1035,17 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             self._preprocess_fingers(self.goal[: self.num_fingers * 4][None, None], self.goal_theta[None, None], compute_closest_obj_point=True)
 
             self.contact_points = {}
-            self.contact_points_rob_link = []
+            if not self.contact_constraint_only:
+                self.contact_points_rob_link = []
 
             for finger in self.regrasp_fingers:
                 rad = .0025 if self.object_type == 'screwdriver' else .001
                 self.contact_points[finger] = (self.data[finger]['closest_obj_pt_object'].clone().detach(), rad)
-                self.contact_points_rob_link.append(self.data[finger]['closest_rob_pt_link'].clone().detach())
-            self.contact_points_rob_link = torch.cat(self.contact_points_rob_link, dim=0)
+                if not self.contact_constraint_only:
+                    self.contact_points_rob_link.append(self.data[finger]['closest_rob_pt_link'].clone().detach())
+
+            if not self.contact_constraint_only:
+                self.contact_points_rob_link = torch.cat(self.contact_points_rob_link, dim=0)
 
             contact_points_object = torch.stack([self.contact_points[finger][0] for finger in self.regrasp_fingers], dim=0)
             self.contact_points_object = contact_points_object
@@ -1035,7 +1060,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                        
 
         self.desired_ee_in_world_frame = desired_ee_in_world_frame
-        if self.num_regrasps > 0 and not self.contact_constraint_only:
+        if self.num_regrasps > 0:
             if contact_points_object is not None and contact_points_robot is not None:
                 raise ValueError("Cannot specify contact points in both object and robot frame")
             if contact_points_object is not None:
@@ -1300,8 +1325,8 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             compute_hess=compute_hess,
             projected_diffusion=projected_diffusion)
         
-        if self.contact_constraint_only:
-            return g_contact, grad_g_contact, hess_g_contact, t_mask_contact
+        # if self.contact_constraint_only:
+        #     return g_contact, grad_g_contact, hess_g_contact, t_mask_contact
         
         g_dynamics, grad_g_dynamics, hess_g_dynamics, t_mask_dynamics = self._free_dynamics_constraints(
             q=q,
@@ -1447,22 +1472,22 @@ class AllegroContactProblem(AllegroObjectProblem):
             else:
                 self._contact_dg_per_t = self.num_contacts * (1 + 2) + 3
         else:
-            self._contact_dg_per_t = self.num_contacts
+            # self._contact_dg_per_t = self.num_contacts * (1) + 3
+            self._contact_dg_per_t = self.num_contacts * (1 + 4) + 3
 
         self._contact_dg_constant = 0
         self._contact_dh_constant = 0
         self._contact_dg = self._contact_dg_per_t * T + self._contact_dg_constant  # terminal contact points, terminal sdf=0, and dynamics
 
-        if not self.contact_constraint_only:
-            self._contact_dz = (self.friction_polytope_k) * self.num_contacts 
 
-            if self.min_force_dict is not None:
-                self.min_force_dict = {k:v for k, v in self.min_force_dict.items() if k in self.contact_fingers}
-                self._contact_dz += 1 * len(self.min_force_dict)
-            self._contact_dh_per_t = self._contact_dz
-        else:
-            self._contact_dz = 0
-            self._contact_dh_per_t = 0
+        self._contact_dz = 0
+        if self.min_force_dict is not None:
+            self.min_force_dict = {k:v for k, v in self.min_force_dict.items() if k in self.contact_fingers}
+            self._contact_dz += 1 * len(self.min_force_dict)
+        if not self.contact_constraint_only:
+            self._contact_dz += (self.friction_polytope_k) * self.num_contacts 
+        self._contact_dh_per_t = self._contact_dz
+
         self._contact_dh = self._contact_dz * T  # inequality
         # self._contact_dz = 0
 
@@ -1802,9 +1827,13 @@ class AllegroContactProblem(AllegroObjectProblem):
         reactional_torque_list = []
         for i, finger_name in enumerate(self.contact_fingers):
             # TODO: Assume that all the fingers are having an equlibrium, maybe we should change so that index finger is not considered
-            contact_jacobian = contact_jac_list[i]
             force_robot_frame = self.world_trans.inverse().transform_normals(force_list[i].unsqueeze(0)).squeeze(0)
+            # if not self.contact_constraint_only:
+            #     contact_jacobian = contact_jac_list[i]
+            #     reactional_torque_list.append(contact_jacobian.T @ -force_robot_frame)
+            contact_jacobian = contact_jac_list[i]
             reactional_torque_list.append(contact_jacobian.T @ -force_robot_frame)
+
             # pseudo inverse form
             contact_point_r_valve = contact_point_list[i] - obj_robot_frame[0]
             torque = torch.linalg.cross(contact_point_r_valve, force_robot_frame)
@@ -1832,11 +1861,18 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         torque_list = torch.stack(torque_list, dim=0)
         torque_list = torch.sum(torque_list, dim=0)
+        
         reactional_torque_list = torch.stack(reactional_torque_list, dim=0)
         sum_reactional_torque = torch.sum(reactional_torque_list, dim=0)
         g_force_torque_balance = (sum_reactional_torque + 3.0 * delta_q)
-        # print(g_force_torque_balance.max(), torque_list.max())
         g = torch.cat((torque_list, g_force_torque_balance.reshape(-1)), dim=-1)
+        # if not self.contact_constraint_only:
+        #     reactional_torque_list = torch.stack(reactional_torque_list, dim=0)
+        #     sum_reactional_torque = torch.sum(reactional_torque_list, dim=0)
+        #     g_force_torque_balance = (sum_reactional_torque + 3.0 * delta_q)
+        #     g = torch.cat((torque_list, g_force_torque_balance.reshape(-1)), dim=-1)
+        # else:
+        #     g = torque_list
         # residual_list = torch.stack(residual_list, dim=0) * 100
         # g = torch.cat((torque_list, residual_list), dim=-1)
         return g
@@ -1966,7 +2002,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         else:
             return g.reshape(N, -1), grad_g.reshape(N, -1, T * self.d), None, t_mask.reshape(N, -1)
 
-    @torch.compile(mode='max-autotune')
+    # @torch.compile(mode='max-autotune')
     def _kinematics_constr(self, current_q,
                            next_q,
                            current_theta,
@@ -2369,8 +2405,8 @@ class AllegroContactProblem(AllegroObjectProblem):
         return h, grad_h, None, t_mask
 
     def _con_ineq(self, xu, compute_grads=True, compute_hess=False, verbose=False, projected_diffusion=False):
-        if self.contact_constraint_only:
-            return None, None, None, None
+        # if self.contact_constraint_only:
+        #     return None, None, None, None
         N = xu.shape[0]
         T = xu.shape[1]
         q = xu[:, :, :self.num_fingers * 4]
@@ -2383,25 +2419,42 @@ class AllegroContactProblem(AllegroObjectProblem):
         if self.optimize_force:
             force = torch.zeros(N, T, 12, device=self.device)
             force[:, :, self._contact_force_indices] = xu[:, :, -self.num_contacts * 3:]
-            h, grad_h, hess_h, t_mask = self._friction_constraint(
-                q=q, delta_q=delta_q, force=None,
-                compute_grads=compute_grads,
-                compute_hess=compute_hess,
-                projected_diffusion=projected_diffusion)
+            hs = []
+            grad_hs = []
+            hess_hs = []
+            t_masks = []
+            
+            if not self.contact_constraint_only:
+                h, grad_h, hess_h, t_mask = self._friction_constraint(
+                    q=q, delta_q=delta_q, force=None,
+                    compute_grads=compute_grads,
+                    compute_hess=compute_hess,
+                    projected_diffusion=projected_diffusion)
+                hs.append(h)
+                grad_hs.append(grad_h)
+                hess_hs.append(hess_h)
+                t_masks.append(t_mask)
 
             if self.min_force_dict is not None:
                 h_min, grad_h_min, hess_h_min, t_mask_min = self._min_force_constraints(
                     q, force, compute_grads=compute_grads, compute_hess=compute_hess,
                     projected_diffusion=projected_diffusion)
-                h = torch.cat((h, h_min), dim=1)
-                t_mask = torch.cat((t_mask, t_mask_min), dim=1)
-                if grad_h is not None and grad_h_min is not None:
-                    grad_h = torch.cat((grad_h, grad_h_min), dim=1)
-            # if grad_h is not None:
-            #     grad_h = torch.cat((grad_h, grad_h2, grad_h_min), dim=1)
-            # if hess_h is not None:
-            #     hess_h = torch.cat((hess_h, hess_h2, hess_h_min), dim=1)
-        # print("friction", h.max())
+                hs.append(h_min)
+                grad_hs.append(grad_h_min)
+                hess_hs.append(hess_h_min)
+                t_masks.append(t_mask_min)
+
+            h = torch.cat(hs, dim=1)
+            if None not in grad_hs:
+                grad_h = torch.cat(grad_hs, dim=1)
+            else:
+                grad_h = None
+            if None not in hess_hs:
+                hess_h = torch.cat(hess_hs, dim=1)
+            else:
+                hess_h = None
+            t_mask = torch.cat(t_masks, dim=1)
+
         else:
             h, grad_h, hess_h, t_mask = self._friction_constraint(
                 q=q, delta_q=delta_q, force=None,
@@ -2447,28 +2500,37 @@ class AllegroContactProblem(AllegroObjectProblem):
                                                                                       compute_grads=compute_grads,
                                                                                       compute_hess=compute_hess, 
                                                                                       projected_diffusion=projected_diffusion)
+        
+        if self.optimize_force:
+            if self.env_force:
+                force = torch.zeros(N, T, 12 + 3, device=self.device) # assume one env contact
+                force[:, :, self._contact_force_indices] = xu[:, :, -(self.num_contacts + 1) * 3: -3]
+                force[:, :, -3:] = xu[:, :, -3:]
+            else:
+                force = torch.zeros(N, T, 12, device=self.device)
+                force[:, :, self._contact_force_indices] = xu[:, :, -self.num_contacts * 3:]
+
+            g_equil, grad_g_equil, hess_g_equil, t_mask_equil = self._force_equlibrium_constraints_w_force(
+                xu=xu,
+                compute_grads=compute_grads,
+                compute_hess=compute_hess,
+                projected_diffusion=projected_diffusion)
+        else:
+            g_equil, grad_g_equil, hess_g_equil, t_mask_equil = self._force_equlibrium_constraints(
+                q=q, delta_q=delta_q,
+                compute_grads=compute_grads,
+                compute_hess=compute_hess,
+                projected_diffusion=projected_diffusion)
+        g_contact = torch.cat((g_contact, g_equil), dim=1)
+        t_mask = torch.cat((t_mask, t_mask_equil), dim=1)
+        if grad_g_contact is not None:
+            grad_g_contact = torch.cat((grad_g_contact, grad_g_equil), dim=1)
+        if hess_g_contact is not None:
+            hess_g_contact = torch.cat((hess_g_contact, hess_g_equil), dim=1)
+
         if not self.contact_constraint_only:
             force = None
-            if self.optimize_force:
-                if self.env_force:
-                    force = torch.zeros(N, T, 12 + 3, device=self.device) # assume one env contact
-                    force[:, :, self._contact_force_indices] = xu[:, :, -(self.num_contacts + 1) * 3: -3]
-                    force[:, :, -3:] = xu[:, :, -3:]
-                else:
-                    force = torch.zeros(N, T, 12, device=self.device)
-                    force[:, :, self._contact_force_indices] = xu[:, :, -self.num_contacts * 3:]
 
-                g_equil, grad_g_equil, hess_g_equil, t_mask_equil = self._force_equlibrium_constraints_w_force(
-                    xu=xu,
-                    compute_grads=compute_grads,
-                    compute_hess=compute_hess,
-                    projected_diffusion=projected_diffusion)
-            else:
-                g_equil, grad_g_equil, hess_g_equil, t_mask_equil = self._force_equlibrium_constraints(
-                    q=q, delta_q=delta_q,
-                    compute_grads=compute_grads,
-                    compute_hess=compute_hess,
-                    projected_diffusion=projected_diffusion)
 
             g_valve, grad_g_valve, hess_g_valve, t_mask_valve = self._kinematics_constraints(
                 q=q, delta_q=delta_q, theta=theta,
@@ -2481,15 +2543,13 @@ class AllegroContactProblem(AllegroObjectProblem):
 
             g_contact = torch.cat((g_contact,
                                 #    g_dynamics,
-                                g_equil,
                                 g_valve,
                                 ), dim=1)
-            t_mask = torch.cat((t_mask, t_mask_equil, t_mask_valve), dim=1)
+            t_mask = torch.cat((t_mask, t_mask_valve), dim=1)
 
             if grad_g_contact is not None:
                 grad_g_contact = torch.cat((grad_g_contact,
                                             # grad_g_dynamics,
-                                            grad_g_equil,
                                             grad_g_valve,
                                             ), dim=1)
                 if torch.any(torch.isinf(grad_g_contact)) or torch.any(torch.isnan(grad_g_contact)):
@@ -2497,7 +2557,6 @@ class AllegroContactProblem(AllegroObjectProblem):
             if hess_g_contact is not None:
                 hess_g_contact = torch.cat((hess_g_contact,
                                             # hess_g_dynamics,
-                                            hess_g_equil,
                                             hess_g_valve,
                                             ), dim=1)
 

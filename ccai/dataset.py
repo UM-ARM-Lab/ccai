@@ -245,6 +245,8 @@ class AllegroScrewDriverDataset(Dataset):
             traj_data_all = list(path.rglob('*traj_data.p'))
             trajectory_all = list(path.rglob('*trajectory.pkl'))
             for p, traj_p in zip(traj_data_all, trajectory_all):
+                if str(traj_p).split('/')[-2] == 'trial_8259':
+                    print('here')
                 with open(p, 'rb') as f, open(traj_p, 'rb') as f_traj:
                     # data = CPU_Unpickler(f).load()
                     try:
@@ -263,7 +265,10 @@ class AllegroScrewDriverDataset(Dataset):
                         fl = data['final_likelihoods']
                         
                         # Masks out turns that are exited due to OOD without anything being executed
-                        executed_mode_bool = [i[0] is not None for i in fl]
+                        try:
+                            executed_mode_bool = [i[0] is not None for i in fl]
+                        except:
+                            continue
                         executed_modes = [data['executed_contacts'][i] for i in range(len(data['executed_contacts'])) if executed_mode_bool[i]]
                         fl = [l for l in fl if None not in l and len(l)>0]
                         
@@ -350,14 +355,14 @@ class AllegroScrewDriverDataset(Dataset):
                             data[t]['contact_state'] = data[t]['contact_state'][fl_improvement_bool[:-1]]
                             
                         try:
-                            data[t]['starts'] = data[t]['starts'][fl_improvement_bool]
+                            data[t]['starts'] = data[t]['starts'][fl_improvement_bool][:len(data[t]['contact_state'])]
                         except:
-                            data[t]['starts'] = data[t]['starts'][fl_improvement_bool[:-1]]
+                            data[t]['starts'] = data[t]['starts'][fl_improvement_bool[:-1]][:len(data[t]['contact_state'])]
                             
                         try:
-                            data[t]['plans'] = data[t]['plans'][fl_improvement_bool]
+                            data[t]['plans'] = data[t]['plans'][fl_improvement_bool][:len(data[t]['contact_state'])]
                         except:
-                            data[t]['plans'] = data[t]['plans'][fl_improvement_bool[:-1]]
+                            data[t]['plans'] = data[t]['plans'][fl_improvement_bool[:-1]][:len(data[t]['contact_state'])]
                         # if dropped_recovery:
                         #     data[t]['starts'] = data[t]['starts'][:-1]
                         #     data[t]['plans'] = data[t]['plans'][:-1]
