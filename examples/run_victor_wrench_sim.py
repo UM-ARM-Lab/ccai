@@ -10,7 +10,7 @@ import torch
 import time
 import yaml
 import pathlib
-import pytorch_kinematics as pk
+import allegro_optimized_wrapper as pk
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 from isaac_victor_envs.utils import get_assets_dir
 

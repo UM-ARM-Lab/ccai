@@ -309,12 +309,12 @@ class TrajectoryExecutor:
                 
             best_traj, plans = planner.step(state)
             
-            # if self.params['contact_constraint_only']:
-            #     u_hat = planner.problem.solve_for_u_hat(best_traj.unsqueeze(0), planner.solver.best_idx).squeeze(0)
+            if self.params['contact_constraint_only']:
+                u_hat = planner.problem.solve_for_u_hat(best_traj.unsqueeze(0), planner.solver.best_idx).squeeze(0)
                 
-            #     num_contact_fingers = len(planner.problem.contact_fingers)
+                num_contact_fingers = len(planner.problem.contact_fingers)
                 
-            #     best_traj = torch.cat((best_traj[:, :planner.problem.dx], u_hat, best_traj[:, -num_contact_fingers*3:]), dim=-1)
+                best_traj = torch.cat((best_traj[:, :planner.problem.dx], u_hat, best_traj[:, -num_contact_fingers*3:]), dim=-1)
                 
             csvto_time = time.perf_counter() - s
             data['csvto_times'][-1].append(csvto_time)

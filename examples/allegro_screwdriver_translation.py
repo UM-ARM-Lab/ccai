@@ -15,8 +15,8 @@ from functools import partial
 
 import time
 import pytorch_volumetric as pv
-import pytorch_kinematics as pk
-# import pytorch_kinematics.transforms as tf
+import allegro_optimized_wrapper as pk
+# from allegro_optimized_wrapper import transforms as tf
 from torch.func import vmap, jacrev, hessian, jacfwd
 import pytorch3d.transforms as tf
 

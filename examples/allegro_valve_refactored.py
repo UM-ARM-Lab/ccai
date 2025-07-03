@@ -11,7 +11,8 @@ import numpy as np
 import pickle as pkl
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-import pytorch_kinematics as pk
+import allegro_optimized_wrapper as pk
+
 import pytorch_volumetric as pv
 from functools import partial, wraps
 from torch.func import vmap, jacrev, hessian, jacfwd

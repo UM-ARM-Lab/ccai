@@ -10,8 +10,9 @@ import yaml
 import pathlib
 import time
 import pytorch_volumetric as pv
-import pytorch_kinematics as pk
-import pytorch_kinematics.transforms as tf
+import allegro_optimized_wrapper as pk
+
+from allegro_optimized_wrapper import transforms as tf
 
 import matplotlib.pyplot as plt
 import pickle as pkl

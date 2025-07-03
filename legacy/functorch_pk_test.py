@@ -1,4 +1,4 @@
-import pytorch_kinematics as pk
+import allegro_optimized_wrapper as pk
 import torch
 import functorch
 

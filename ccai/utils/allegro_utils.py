@@ -4,7 +4,7 @@ import open3d as o3d
 import numpy as np
 import matplotlib.pyplot as plt
 import pathlib
-import pytorch_kinematics.transforms as tf
+from allegro_optimized_wrapper import transforms as tf
 import time
 import pickle
 

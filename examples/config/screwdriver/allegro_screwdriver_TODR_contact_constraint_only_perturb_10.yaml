@@ -8,7 +8,8 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 30
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_model_contact_mf_fb_no_solve_for_u_hat_10_iters_perturb'
+# experiment_name: 'allegro_screwdriver_recovery_model_contact_mf_fb_no_solve_for_u_hat_10_iters_new_jac_perturb'
+experiment_name: 'allegro_screwdriver_recovery_model_contact_only_solve_for_u_hat_10_iters_new_jac_perturb'
 # experiment_name: 'allegro_screwdriver_recovery_model_diff_only'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']

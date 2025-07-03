@@ -19,8 +19,8 @@ from ccai.mpc.mppi import MPPI
 from ccai.mpc.svgd import SVMPC
 from ccai.mpc.ipopt import IpoptMPC
 import time
-import pytorch_kinematics as pk
-from pytorch_kinematics import SerialChain
+import allegro_optimized_wrapper as pk
+from allegro_optimized_wrapper import SerialChain
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 asset = '/home/fanyang/github/isaacgym-arm-envs/isaac_victor_envs/assets/victor/victor_allegro.urdf'
