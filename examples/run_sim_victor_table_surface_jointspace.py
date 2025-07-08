@@ -8,7 +8,7 @@ import yaml
 import pathlib
 from isaacgym.torch_utils import quat_apply
 
-import allegro_optimized_wrapper as pk
+import pytorch_kinematics as pk
 from isaac_victor_envs.utils import get_assets_dir
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]

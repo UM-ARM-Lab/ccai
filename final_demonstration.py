@@ -7,7 +7,7 @@ This script demonstrates the final state of the integration:
 """
 
 import torch
-import allegro_optimized_wrapper as pk
+import pytorch_kinematics as pk
 
 import numpy as np
 

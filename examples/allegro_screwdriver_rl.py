@@ -1,7 +1,7 @@
 from isaac_victor_envs.utils import get_assets_dir
 from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
 from ccai.utils.allegro_utils import state2ee_pos, partial_to_full_state
-import allegro_optimized_wrapper as pk
+import pytorch_kinematics as pk
 
 
 import os

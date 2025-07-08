@@ -23,8 +23,8 @@ from ccai.mpc.csvgd import Constrained_SVGD_MPC
 
 import time
 import pytorch_volumetric as pv
-import allegro_optimized_wrapper as pk
-from allegro_optimized_wrapper import transforms as tf
+import pytorch_kinematics as pk
+from pytorch_kinematics import transforms as tf
 # import pytorch3d.transforms as tf
 
 import matplotlib.pyplot as plt

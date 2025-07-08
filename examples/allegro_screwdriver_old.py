@@ -29,8 +29,8 @@ sys.path.append('..')
 # sys.stdout = open('./examples/logs/alelgro_screwdriver_data_genpi_2.log', 'w', buffering=1)
 
 import pytorch_volumetric as pv
-import allegro_optimized_wrapper as pk
-from allegro_optimized_wrapper import transforms as tf
+import pytorch_kinematics as pk
+from pytorch_kinematics import transforms as tf
 from torch.func import vmap, jacrev, hessian, jacfwd
 # import pytorch3d.transforms as tf
 

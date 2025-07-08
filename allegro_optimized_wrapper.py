@@ -11,7 +11,7 @@ Usage:
     # chain = pk.build_chain_from_urdf(urdf_data)
     
     # With this:
-    import allegro_optimized_wrapper as pk
+    import pytorch_kinematics as pk
     chain = pk.build_chain_from_urdf(urdf_data)
     
     # Everything else works exactly the same!

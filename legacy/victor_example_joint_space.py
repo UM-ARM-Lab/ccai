@@ -6,7 +6,7 @@ from isaac_victor_envs.tasks.victor import VictorEnv, orientation_error, quat_ch
 from isaacgym.torch_utils import quat_apply
 import torch
 import time
-import allegro_optimized_wrapper as pk
+import pytorch_kinematics as pk
 
 BOX_CENTRE = torch.tensor([0.75, 0.4, 0.803])
 BOX_HALFWIDTH = 0.04

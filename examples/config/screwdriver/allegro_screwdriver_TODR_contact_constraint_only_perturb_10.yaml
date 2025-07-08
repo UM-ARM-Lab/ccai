@@ -6,10 +6,10 @@ num_steps: 8
 num_turns: 1
 max_recovery_stages: 4
 num_trials: 10
-num_episodes: 30
+num_episodes: 5
 visualize: True
 # experiment_name: 'allegro_screwdriver_recovery_model_contact_mf_fb_no_solve_for_u_hat_10_iters_new_jac_perturb'
-experiment_name: 'allegro_screwdriver_recovery_model_contact_only_solve_for_u_hat_10_iters_new_jac_perturb'
+experiment_name: 'allegro_screwdriver_recovery_model_contact_only_scheduler_solve_for_u_hat_5_5_iters_1e-2_new_task_model_perturb_reuse_profile'
 # experiment_name: 'allegro_screwdriver_recovery_model_diff_only'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
@@ -61,8 +61,8 @@ OOD_metric: 'likelihood'
 recovery_controller: 'csvgd'
 recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_256_steps_diffusion'
 model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_256_steps_diffusion/allegro_screwdriver_diffusion.pt'
-model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion'
-task_model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion/allegro_screwdriver_diffusion.pt'
+model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_task_model_pi_2_fixed_data_filtering_diffusion'
+task_model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_task_model_pi_2_fixed_data_filtering_diffusion/allegro_screwdriver_diffusion.pt'
 likelihood_threshold: -170.0
 # likelihood_threshold: -1.0
 drop_threshold: -1250
@@ -75,7 +75,7 @@ sac_batch_size: 64
 N_contact_plan: 32
 likelihood_num_samples: 8
 start_ind: 0
-end_ind: 30
+end_ind: 5
 controllers:
   csvgd:
     # N: 16
@@ -84,9 +84,11 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:0'
-    online_iters: 10
-    warmup_iters: 10
+    device: 'cuda:1'
+    contact_only_warmup_iters: 5
+    contact_only_online_iters: 5
+    online_iters: 5
+    warmup_iters: 5
     resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1

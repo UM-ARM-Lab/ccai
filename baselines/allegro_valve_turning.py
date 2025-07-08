@@ -3,7 +3,7 @@ import torch
 from ccai.utils.allegro_utils import get_screwdriver_top_in_world, convert_sine_cosine_to_yaw, convert_yaw_to_sine_cosine, get_model_input_state
 from ccai.recovery_rl.recovery_rl.model import QNetworkConstraint
 
-from allegro_optimized_wrapper import transforms as tf
+from pytorch_kinematics import transforms as tf
 # import pytorch3d.transforms as tf
 
 class ValidityCheck:

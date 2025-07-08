@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from allegro_optimized_wrapper import transforms as tf
+from pytorch_kinematics import transforms as tf
 # import pytorch3d.transforms as tf
 
 class ValidityCheck:

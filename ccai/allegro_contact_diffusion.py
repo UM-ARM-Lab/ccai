@@ -19,12 +19,12 @@ from ccai.problem import ConstrainedSVGDProblem
 
 import time
 import pytorch_volumetric as pv
-import allegro_optimized_wrapper as pk
+import pytorch_kinematics as pk
 # import pytorch3d.transforms as tf
 
 import matplotlib.pyplot as plt
 from ccai.utils.allegro_utils import *
-from allegro_optimized_wrapper import transforms as tf
+from pytorch_kinematics import transforms as tf
 
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]

@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 30
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_model_N_16_no_obj'
+experiment_name: 'allegro_screwdriver_TODR_original_constraints'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -54,8 +54,8 @@ obj_gravity: True
 type: 'diffusion'
 OOD_metric: 'likelihood'
 recovery_controller: 'csvgd'
-recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_256_steps_diffusion'
-model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_256_steps_diffusion/allegro_screwdriver_diffusion.pt'
+recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_low_damping_diffusion'
+model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_low_damping_diffusion/allegro_screwdriver_diffusion.pt'
 model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion'
 task_model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion/allegro_screwdriver_diffusion.pt'
 likelihood_threshold: -170.0
@@ -68,6 +68,7 @@ sac_batch_size: 64
 # project_threshold: -90
 # parity: 654
 contact_constraint_only: False
+solve_for_u_hat: False
 N_contact_plan: 32
 likelihood_num_samples: 8
 controllers:
@@ -78,7 +79,7 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:1'
+    device: 'cuda:0'
     online_iters: 25
     warmup_iters: 25
     resample_steps: 16

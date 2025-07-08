@@ -11,7 +11,7 @@ import torch
 import yaml
 from tf.transformations import euler_from_quaternion
 import tf
-import allegro_optimized_wrapper as pk
+import pytorch_kinematics as pk
 from typing import Tuple, Optional
 
 urdf_path = "/home/roboguest/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/victor_allegro_stalk.urdf"

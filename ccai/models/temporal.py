@@ -277,8 +277,7 @@ class TemporalUnet(nn.Module):
         x = x[:, :H]
         return x, latent
 
-    @torch.compile(mode='max-autotune')
-    # @torch.compile(mode='reduce-overhead')
+    # @torch.compile(mode='max-autotune')
     def compiled_conditional_test(self, t, x, context):
         if self.use_mixed_precision:
             with torch.autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):
@@ -286,8 +285,7 @@ class TemporalUnet(nn.Module):
         else:
             return self(t, x, context, dropout=False)
 
-    @torch.compile(mode='max-autotune')
-    # @torch.compile(mode='reduce-overhead')
+    # @torch.compile(mode='max-autotune')
     def compiled_unconditional_test(self, t, x):
         if self.use_mixed_precision:
             with torch.autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):
@@ -995,7 +993,7 @@ class TemporalUNetContext(nn.Module):
         e_c = self.context_net(h)
         return e_x, e_c
     
-    # @torch.compile(mode='reduce-overhead')
+    @torch.compile(mode='max-autotune')
     def model_pred_for_sample(self, t, x, context):
         #Alt 2
         B, H, d, t = self.preprocess_t(t, x, context)

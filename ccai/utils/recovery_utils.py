@@ -14,7 +14,6 @@ from ccai.allegro_contact import AllegroManipulationProblem, PositionControlCons
 from ccai.utils.allegro_utils import visualize_trajectory
 
 
-
 def create_experiment_paths(fpath, fname, mode=None, create_goal_subdir=True):
     """Create directory structure for experiment data."""
     mode_fpath = pathlib.Path(fpath) / fname
@@ -156,14 +155,63 @@ def create_allegro_screwdriver_problem(problem_type, start, goal, params, env, d
     
     return AllegroScrewdriver(**final_params)
 
+class ConstraintScheduledSVGDMPC(PositionControlConstrainedSVGDMPC):
+    def __init__(self, problem, params):
+        super().__init__(problem, params)
+        self.contact_only_warmup_iters = params.get('contact_only_warmup_iters', 0)
+        self.contact_only_online_iters = params.get('contact_only_online_iters', 0)
+
+    def step(self, state, skip_optim=False, **kwargs):
+        if self.fix_T:
+            new_T = None
+        else:
+            if self.warmed_up:
+                new_T = self.problem.T - 1
+            else:
+                new_T = self.problem.T
+
+        # Contact only
+        self.problem.update(state, T=new_T, contact_constraint_only=True, **kwargs)
+        if (self.warmed_up and self.contact_only_online_iters > 0) or (not self.warmed_up and self.contact_only_warmup_iters > 0):
+            if self.warmed_up:
+                self.solver.iters = self.contact_only_online_iters
+                resample = True if (self.iter + 1) % self.resample_steps == 0 else False
+            else:
+                self.solver.iters = self.contact_only_warmup_iters
+                if self.online_iters == 0 and self.warmup_iters == 0:
+                    self.warmed_up = True
+                resample = False
+
+            path = self.solver.solve(self.x, resample, skip_optim=skip_optim)
+        
+        if (self.warmed_up and self.online_iters > 0) or (not self.warmed_up and self.warmup_iters > 0):
+            # Standard
+            self.problem.update(state, T=new_T, contact_constraint_only=False, **kwargs)
+            if self.warmed_up:
+                self.solver.iters = self.online_iters
+                resample = True if (self.iter + 1) % self.resample_steps == 0 else False
+            else:
+                self.solver.iters = self.warmup_iters
+                self.warmed_up = True
+                resample = False
+            path = self.solver.solve(self.x, resample, skip_optim=skip_optim)
+
+        self.x = path[-1]
+        self.path = path
+        self.iter += 1
+        best_trajectory = self.x[0].clone()
+        all_trajectories = self.x.clone()
+        self.shift()
+        # self.x = self.problem.get_initial_xu(self.N)
+        return best_trajectory, all_trajectories
 
 def create_planner(problem, params, planner_type='default'):
     """Create a planner for the given problem."""
     if planner_type == 'recovery':
         recovery_params = deepcopy(params)
-        return PositionControlConstrainedSVGDMPC(problem, recovery_params)
+        return ConstraintScheduledSVGDMPC(problem, recovery_params)
     else:
-        return PositionControlConstrainedSVGDMPC(problem, params)
+        return ConstraintScheduledSVGDMPC(problem, params)
 
 
 def initialize_data_structure(params):

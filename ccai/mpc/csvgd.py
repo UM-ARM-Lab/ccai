@@ -20,7 +20,7 @@ class Constrained_SVGD_MPC:
         self.iter = 0
         self.path = []
 
-    def step(self, state, skip_optim=False, **kwargs):
+    def step(self, state, skip_optim=False, shift=True, **kwargs):
         if self.fix_T:
             new_T = None
         else:
@@ -45,7 +45,8 @@ class Constrained_SVGD_MPC:
         self.iter += 1
         best_trajectory = self.x[0].clone()
         all_trajectories = self.x.clone()
-        self.shift()
+        if shift:
+            self.shift()
         # self.x = self.problem.get_initial_xu(self.N)
         return best_trajectory, all_trajectories
 

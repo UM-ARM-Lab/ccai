@@ -1113,7 +1113,7 @@ def main() -> None:
     Returns:
         None
     """
-    import allegro_optimized_wrapper as pk
+    import pytorch_kinematics as pk
     import os
     import re
     from pathlib import Path

@@ -11,9 +11,9 @@ import pathlib
 
 import time
 import pytorch_volumetric as pv
-import allegro_optimized_wrapper as pk
+import pytorch_kinematics as pk
 
-from allegro_optimized_wrapper import transforms as tf
+from pytorch_kinematics import transforms as tf
 
 from ccai.utils.allegro_utils import *
 from ccai.allegro_contact import AllegroManipulationProblem, PositionControlConstrainedSVGDMPC

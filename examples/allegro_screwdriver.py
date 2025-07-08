@@ -21,7 +21,7 @@ import sys
 
 sys.path.append('..')
 
-import allegro_optimized_wrapper as pk
+import pytorch_kinematics as pk
 
 
 
@@ -204,6 +204,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     goal_pregrasp = params['valve_goal']
     pregrasp_params = copy.deepcopy(params)
     pregrasp_params['warmup_iters'] = 80
+    pregrasp_params['contact_only_warmup_iters'] = 0
+    pregrasp_params['contact_only_online_iters'] = 0
 
     start[-4:] = 0
     pregrasp_problem = create_allegro_screwdriver_problem(
@@ -799,8 +801,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 if __name__ == "__main__":
     # get config. First option is to get the config from the command line.
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_TODR_contact_constraint_only_perturb_10.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_TODR_N_16.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_TODR_contact_constraint_only_perturb_10.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_TODR_N_16.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/touchlegro_screwdriver_csvto_recovery_hardware_hri.yaml').read_text())
     # Write to log file in the experiment's directory
     experiment_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}')

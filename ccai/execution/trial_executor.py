@@ -309,7 +309,7 @@ class TrajectoryExecutor:
                 
             best_traj, plans = planner.step(state)
             
-            if self.params['contact_constraint_only']:
+            if self.params['contact_constraint_only'] or self.params['solve_for_u_hat']:
                 u_hat = planner.problem.solve_for_u_hat(best_traj.unsqueeze(0), planner.solver.best_idx).squeeze(0)
                 
                 num_contact_fingers = len(planner.problem.contact_fingers)

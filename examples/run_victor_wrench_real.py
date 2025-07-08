@@ -10,7 +10,7 @@ from ccai.mpc.mppi import MPPI
 import torch
 import yaml
 
-import allegro_optimized_wrapper as pk
+import pytorch_kinematics as pk
 import pathlib
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]

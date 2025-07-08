@@ -17,7 +17,7 @@ from ccai.problem import ConstrainedSVGDProblem, UnconstrainedPenaltyProblem, Ip
 from ccai.mpc import Constrained_SVGD_MPC, MPPI, SVMPC, IpoptMPC
 
 import time
-import allegro_optimized_wrapper as pk
+import pytorch_kinematics as pk
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 asset_dir = get_assets_dir()

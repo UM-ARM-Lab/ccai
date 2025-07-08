@@ -8,12 +8,12 @@ import torch
 import pathlib
 import numpy as np
 import open3d as o3d
-import allegro_optimized_wrapper as pk
+import pytorch_kinematics as pk
 
 import pytorch_volumetric as pv
 import matplotlib.pyplot as plt
 from ccai.models.training import EMA
-from allegro_optimized_wrapper import transforms as tf
+from pytorch_kinematics import transforms as tf
 from ccai.dataset import AllegroScrewDriverDataset
 from isaac_victor_envs.utils import get_assets_dir
 from torch.utils.data import DataLoader, RandomSampler

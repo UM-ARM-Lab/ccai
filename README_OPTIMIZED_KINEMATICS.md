@@ -25,7 +25,7 @@ Your existing code works unchanged:
 
 ```python
 # Your existing code continues to work exactly the same:
-import allegro_optimized_wrapper as pk  # Was: import pytorch_kinematics as pk
+import pytorch_kinematics as pk  # Was: import pytorch_kinematics as pk
 from allegro_optimized_wrapper import transforms as tf
 
 # All existing function calls work identically:

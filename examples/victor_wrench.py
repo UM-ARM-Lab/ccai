@@ -3,7 +3,7 @@ from pytorch3d.transforms import euler_angles_to_matrix, matrix_to_quaternion, q
 import torch
 from functools import partial
 from functorch import vmap, jacrev, hessian, jacfwd
-import allegro_optimized_wrapper as pk
+import pytorch_kinematics as pk
 from ccai.kernels import rbf_kernel
 from ccai.problem import ConstrainedSVGDProblem, IpoptProblem, UnconstrainedPenaltyProblem
 from isaac_victor_envs.utils import get_assets_dir

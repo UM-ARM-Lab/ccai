@@ -11,7 +11,7 @@ import torch
 import yaml
 from lightweight_vicon_bridge.msg import MocapState
 from tf.transformations import euler_from_quaternion
-import allegro_optimized_wrapper as pk
+import pytorch_kinematics as pk
 
 urdf_path = "/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/victor_allegro_stalk.urdf"
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]

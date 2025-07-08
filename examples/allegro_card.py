@@ -15,9 +15,9 @@ from functools import partial
 import sys
 
 import pytorch_volumetric as pv
-import allegro_optimized_wrapper as pk
+import pytorch_kinematics as pk
 
-from allegro_optimized_wrapper import transforms as tf
+from pytorch_kinematics import transforms as tf
 from torch.func import vmap, jacrev, hessian, jacfwd
 # import pytorch3d.transforms as tf
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))

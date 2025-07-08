@@ -544,8 +544,8 @@ class TrajectorySampler(nn.Module):
         """
         start = state[:4 * 3 + obj_dof]
         start_sine_cosine = self.convert_yaw_to_sine_cosine(start,yaw_idx=yaw_idx)
-        
         # Use mixed precision for inference
+        start_time = time.perf_counter()
         with torch.no_grad():
             if self.use_mixed_precision:
                 with torch.autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):
@@ -554,10 +554,12 @@ class TrajectorySampler(nn.Module):
             else:
                 samples, _, likelihood = self.sample(N=N, H=self.T, start=start_sine_cosine.reshape(1, -1),
                         constraints=torch.ones(N, 3).to(device=state.device))
-        
+
         likelihood = likelihood.reshape(N).mean()
         likelihood = likelihood.item()
+        print(f'Time taken to sample: {time.perf_counter() - start_time}')
         print('Likelihood:', likelihood)
+        
 
         if threshold is None:
             threshold = -175  # Default threshold

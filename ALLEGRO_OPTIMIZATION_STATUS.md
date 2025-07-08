@@ -74,7 +74,7 @@ Best Speedup: 1.73x
 ### 5. ✅ Perfect Interface Compatibility
 - **Status**: ✅ Fully compatible and tested
 - All existing code using `pytorch_kinematics` works unchanged
-- Simply replace `import pytorch_kinematics as pk` with `import allegro_optimized_wrapper as pk`
+- Simply replace `import pytorch_kinematics as pk` with `import pytorch_kinematics as pk`
 - Supports both `Chain` and `SerialChain` interfaces
 - Handles partial joint inputs for finger-specific chains
 
@@ -134,7 +134,7 @@ import pytorch_kinematics as pk
 chain = pk.build_chain_from_urdf(urdf_data)
 
 # With this:  
-import allegro_optimized_wrapper as pk  # Drop-in replacement
+import pytorch_kinematics as pk  # Drop-in replacement
 chain = pk.build_chain_from_urdf(urdf_data)  # Auto-detects Allegro hand
 
 # Everything else works exactly the same!
