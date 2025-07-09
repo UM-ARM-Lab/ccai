@@ -5,7 +5,13 @@ import pathlib
 import numpy as np
 from torch.utils.data import Dataset
 
+import io
 
+class CPU_Unpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        if module == 'torch.storage' and name == '_load_from_bytes':
+            return lambda b: torch.load(io.BytesIO(b), map_location='cpu')
+        else: return super().find_class(module, name)
 class AllegroValveDataset(Dataset):
 
     def __init__(self, folders, turn=True, regrasp=True, cosine_sine=True, states_only=False):
@@ -208,11 +214,12 @@ class AllegroValveDataset(Dataset):
 
     def get_norm_constants(self):
         return self.mean, self.std
-
 class AllegroScrewDriverDataset(Dataset):
 
-    def __init__(self, folders, max_T, cosine_sine=False, states_only=False, 
-                 skip_pregrasp=False, type='diffusion', exec_only=False):
+    def __init__(self, folders, max_T, dx, cosine_sine=False, states_only=False, 
+                 skip_pregrasp=False, type_='diffusion', exec_only=False,
+                 best_traj_only=False, q_learning_constraint_violation=False,
+                 recovery=False):
         super().__init__()
         self.cosine_sine = cosine_sine
         self.skip_pregrasp = skip_pregrasp
@@ -223,33 +230,147 @@ class AllegroScrewDriverDataset(Dataset):
         masks = []
 
         min_t = 1
-
+        # if self.cosine_sine:
+        #     dx += 1
+        self.dx = dx
         use_actual_traj = True
+        self.screwdriver = 'screwdriver' in str(folders[0])
+        print(f'Screwdriver: {self.screwdriver}')
+        
+        total_num_removed = 0
         for fpath in folders:
             path = pathlib.Path(fpath)
             plans = []
-            traj_data = list(path.rglob('*traj_data.p'))
-            trajectory = list(path.rglob('*trajectory.pkl'))
-            for p, traj_p in zip(traj_data, trajectory):
+            traj_data_all = list(path.rglob('*traj_data.p'))
+            trajectory_all = list(path.rglob('*trajectory.pkl'))
+            for p, traj_p in zip(traj_data_all, trajectory_all):
+                if str(traj_p).split('/')[-2] == 'trial_8259':
+                    print('here')
                 with open(p, 'rb') as f, open(traj_p, 'rb') as f_traj:
+                    # data = CPU_Unpickler(f).load()
                     try:
-                        data = pickle.load(f)
-                        traj_data = pickle.load(f_traj)
+                        data = CPU_Unpickler(f).load()
+                        traj_data = CPU_Unpickler(f_traj).load()
                     except:
                         print('Fail')
                         continue
                     actual_traj = []
 
                     need_to_continue = False
+                
+                    # intiialize fl_improvement_bool as all True
+                    if recovery:
+
+                        fl = data['final_likelihoods']
+                        
+                        # Masks out turns that are exited due to OOD without anything being executed
+                        try:
+                            executed_mode_bool = [i[0] is not None for i in fl]
+                        except:
+                            continue
+                        executed_modes = [data['executed_contacts'][i] for i in range(len(data['executed_contacts'])) if executed_mode_bool[i]]
+                        fl = [l for l in fl if None not in l and len(l)>0]
+                        
+                        # Legacy code to handle the case where final likelihoods were not properly stored
+                        pre_action_likelihoods = data['pre_action_likelihoods']
+                        for k in range(len(fl)):
+                            if len(fl[k]) == 0 and len(pre_action_likelihoods[k]) > 0:
+                                fl[k].append(pre_action_likelihoods[k][-1])
+                        
+                        fl = np.array(fl).flatten()
+                        
+                        fl_delta = []
+                        for i in range(len(executed_modes)):
+                            if executed_modes[i] != 'turn':
+                                pre_mode_likelihood = fl[i-1]
+                                post_mode_likelihood = fl[i]
+                                likelihood_delta = post_mode_likelihood - pre_mode_likelihood
+                                fl_delta.append(likelihood_delta)
+                        fl_improvement_bool = np.array(fl_delta) > 0
+                        if data['dropped_recovery'] and fl_improvement_bool[-1]:
+                            fl_improvement_bool[-1] = False
+                            print('Overrode last recovery mode')
+                        num_removed = np.sum(~fl_improvement_bool)
+                        if num_removed > 0:
+                            total_num_removed += num_removed
+                            print(f'Num removed: {num_removed}, Total removed: {total_num_removed}')
+                    
+
                     for t in range(max_T, min_t - 1, -1):
+                        if not recovery:
+                            fl_improvement_bool = np.ones(len(data[t]['contact_state']), dtype=bool)
+                        new_cs = []
+                        cs_bool = []
+                        for c in data[t]['contact_state']:
+                            # new_cs.append(c.sum() != 3)
+                            if c.sum() != 3 or not recovery:
+                                # if isinstance(c, np.ndarray):
+                                #     c = torch.from_numpy(c).float()
+                                if torch.is_tensor(c):
+                                    c = c.cpu().numpy()
+                                new_cs.append(c)
+                                cs_bool.append(True)
+                            else:
+                                cs_bool.append(False)
+                        # Filter out any trajectories with contact_state [1, 1, 1]
+                        new_starts = []
+                        for idx, s in enumerate(data[t]['starts']):
+                            # if cs_bool[idx]:
+                            # if s.shape[-1] != 36:
+                            if (s.sum(0) == 0).any() or not recovery:
+                                new_starts.append(s)
+                        new_plans = []
+                        for idx, p in enumerate(data[t]['plans']):
+                            # if p.shape[-1] != 36:
+                            #     new_plans.append(p)
+                            # if cs_bool[idx]:
+                            if (p.sum(0) == 0).any() or not recovery:
+                                new_plans.append(p)
+
+
+                        if len(new_starts) == 0:
+                            print('No starts')
+                            need_to_continue = True
+                            break
+                        if type(new_starts) == list:
+                            if torch.is_tensor(new_starts[0]):
+                                new_starts = [s.cpu().numpy() for s in new_starts]
+                            if torch.is_tensor(new_plans[0]):
+                                new_plans = [p.cpu().numpy() for p in new_plans]
+                            if torch.is_tensor(new_cs[0]):
+                                new_cs = [c.cpu().numpy() for c in new_cs]
+                            data[t]['starts'] = np.stack(new_starts, axis=0)
+                            data[t]['plans'] = np.stack(new_plans, axis=0)
+                            data[t]['contact_state'] = np.stack(new_cs, axis=0)
+                        elif torch.is_tensor(new_starts):
+                            data[t]['starts'] = new_starts.cpu().numpy()
+                            data[t]['plans'] = new_plans.cpu().numpy()
+                            data[t]['contact_state'] = new_cs.cpu().numpy()
+
+                        try:
+                            data[t]['contact_state'] = data[t]['contact_state'][fl_improvement_bool]
+
+                        except:
+                            data[t]['contact_state'] = data[t]['contact_state'][fl_improvement_bool[:-1]]
+                            
+                        try:
+                            data[t]['starts'] = data[t]['starts'][fl_improvement_bool][:len(data[t]['contact_state'])]
+                        except:
+                            data[t]['starts'] = data[t]['starts'][fl_improvement_bool[:-1]][:len(data[t]['contact_state'])]
+                            
+                        try:
+                            data[t]['plans'] = data[t]['plans'][fl_improvement_bool][:len(data[t]['contact_state'])]
+                        except:
+                            data[t]['plans'] = data[t]['plans'][fl_improvement_bool[:-1]][:len(data[t]['contact_state'])]
+                        # if dropped_recovery:
+                        #     data[t]['starts'] = data[t]['starts'][:-1]
+                        #     data[t]['plans'] = data[t]['plans'][:-1]
+                        #     data[t]['contact_state'] = data[t]['contact_state'][:-1]
                         if len(data[t]['starts']) == 0:
                             print('No starts')
                             need_to_continue = True
                             break
-                        # if len(data['final_likelihoods']) == 1 and data['final_likelihoods'][0] < -45:
-                        #     print('No Data')
-                        #     need_to_continue = True
-                        #     break
+
                     if need_to_continue:
                         continue
                     for t in range(max_T, min_t - 1, -1):
@@ -264,10 +385,15 @@ class AllegroScrewDriverDataset(Dataset):
                                 end_states.append(np.concatenate((traj_data[i], zero_pad)))
                         # print(traj.shape)
                         if not exec_only or (exec_only and t == min_t):
-                            classes.append(data[t]['contact_state'][:, None, :])#.repeat(traj.shape[1], axis=1)
+                            to_append = data[t]['contact_state'][:, None, :]
+                            if not best_traj_only:
+                                to_append = to_append.repeat(traj.shape[1], axis=1)
+                            classes.append(to_append)
                             # combine traj and starts
                             if use_actual_traj:
-                                traj = np.concatenate(actual_traj + [traj], axis=2)[..., :1 , :,:]
+                                traj = np.concatenate(actual_traj + [traj], axis=2)
+                                if best_traj_only:
+                                    traj = traj[..., :1 , :,:]
                                 masks.append(np.ones((traj.shape[0], traj.shape[1], traj.shape[2])))
                             else:
                                 zeros = [np.zeros_like(actual_traj[0])] * (len(actual_traj) - 1)
@@ -276,39 +402,13 @@ class AllegroScrewDriverDataset(Dataset):
                                 mask[:, :, :t + 1] = 1
                                 masks.append(mask)
 
-                            if type == 'diffusion':
+                            if type_ == 'diffusion':
                                 # duplicated first control, rearrange so that it is (x_0, u_0, x_1, u_1, ..., x_{T-1}, u_{T-1}, x_T, 0)
-                                traj[:, :, :-1, 15:] = traj[:, :, 1:, 15:]
-                                traj[:, :, -1, 15:] = 0
-                            elif type == 'cnf':
-                                traj[:, :, 0, 15:] = 0
+                                traj[:, :, :-1, self.dx:] = traj[:, :, 1:, self.dx:]
+                                traj[:, :, -1, self.dx:] = 0
+                            elif type_ == 'cnf':
+                                traj[:, :, 0, self.dx:] = 0
                             trajectories.append(traj)
-
-                    # if exec_only:
-                    #     classes.append(data[t]['contact_state'][:, None, :])#.repeat(traj.shape[1], axis=1)
-                    #     end_states = np.stack(end_states, axis=0)
-                    #     end_states = end_states.reshape(end_states.shape[0], 1, 1, -1)
-                    #     end_states = end_states.repeat(traj.shape[1], axis=1)
-                    #     end_states = end_states[:traj.shape[0]]
-                    #     traj = np.concatenate([traj, end_states], axis=2)
-                    #     # combine traj and starts
-                    #     if use_actual_traj:
-                    #         traj = np.concatenate(actual_traj + [traj], axis=2)[..., :1 , :,:]
-                    #         masks.append(np.ones((traj.shape[0], traj.shape[1], traj.shape[2]))[..., :1, :])
-                    #     else:
-                    #         zeros = [np.zeros_like(actual_traj[0])] * (len(actual_traj) - 1)
-                    #         traj = np.concatenate([actual_traj[-1]] + [traj] + zeros, axis=2)
-                    #         mask = np.zeros((traj.shape[0], traj.shape[1], traj.shape[2]))
-                    #         mask[:, :, :t + 1] = 1
-                    #         masks.append(mask)
-
-                    #     if type == 'diffusion':
-                    #         # duplicated first control, rearrange so that it is (x_0, u_0, x_1, u_1, ..., x_{T-1}, u_{T-1}, x_T, 0)
-                    #         traj[:, :, :-1, 15:] = traj[:, :, 1:, 15:]
-                    #         traj[:, :, -1, 15:] = 0
-                    #     elif type == 'cnf':
-                    #         traj[:, :, 0, 15:] = 0
-                    #     trajectories.append(traj)
 
         self.trajectories = np.concatenate(trajectories, axis=0)
         self.masks = np.concatenate(masks, axis=0)
@@ -317,34 +417,195 @@ class AllegroScrewDriverDataset(Dataset):
         self.trajectories = self.trajectories.reshape(-1, self.trajectories.shape[-2], self.trajectories.shape[-1])
         self.masks = self.masks.reshape(-1, self.masks.shape[-1])
         self.trajectories = torch.from_numpy(self.trajectories).float()
-        self.trajectories[:, :, 14] = self.trajectories[:, :, 14] - self.trajectories[:, :1, 14].expand(-1, max_T+1)
         self.masks = torch.from_numpy(self.masks).float()
         if states_only:
-            self.trajectories = self.trajectories[:, :, :15]
+            self.trajectories = self.trajectories[:, :, :self.dx]
         self.trajectory_type = torch.from_numpy(self.trajectory_type)
         self.trajectory_type = 2 * (self.trajectory_type - 0.5)  # scale to be [-1, 1]
 
         print(self.trajectories.shape)
         # TODO consider alternative SO3 representation that is better for learning
-        if self.cosine_sine:
-            dx = self.trajectories.shape[-1] + 1
-        else:
-            dx = self.trajectories.shape[-1]
 
-        self.masks = self.masks[:, :, None].repeat(1, 1, dx)
+
+        self.masks = self.masks[:, :, None].repeat(1, 1, self.trajectories.shape[-1] + int(self.cosine_sine))  # for states
         self.mean = 0
         self.std = 1
 
-        # Filter out all non-turn modes 
-        turn_mask = self.trajectory_type.sum(1) == 3
-        self.trajectories = self.trajectories[turn_mask]
-        self.trajectory_type = self.trajectory_type[turn_mask]
-        self.masks = self.masks[turn_mask]
+        # if self.screwdriver and not recovery:
+        #     pre_shape = self.trajectories.shape
+        #     final_roll = self.trajectories[:, -1, 12].abs()
+        #     final_pitch = self.trajectories[:, -1, 13].abs()
+        #     dropped = (final_roll > .25) | (final_pitch > .25)
+        #     self.trajectories = self.trajectories[~dropped]
+        #     self.masks = self.masks[~dropped]
+        #     self.trajectory_type = self.trajectory_type[~dropped]
 
+        #     post_shape = self.trajectories.shape
+
+        #     print(f'# Trajectories: {pre_shape[0]} -> {post_shape[0]}')
+
+        #     final_yaw = self.trajectories[:, -1, 14]
+        #     initial_yaw = self.trajectories[:, 0, 14]
+        #     yaw_change = final_yaw - initial_yaw
+        #     print(yaw_change.mean())
+
+        #     bad_turn = yaw_change > -.5
+        #     self.trajectories = self.trajectories[~bad_turn]
+        #     self.masks = self.masks[~bad_turn]
+        #     self.trajectory_type = self.trajectory_type[~bad_turn]
+        #     post_bad_turn_shape = self.trajectories.shape
+
+        #     print(f'# Trajectories: {post_shape[0]} -> {post_bad_turn_shape[0]}')
+        #     final_yaw = self.trajectories[:, -1, 14]
+        #     initial_yaw = self.trajectories[:, 0, 14]
+        #     yaw_change = final_yaw - initial_yaw
+        #     print(yaw_change.mean())
+            
+        # elif 'recovery' not in str(folders[0]):
+        #     pre_shape = self.trajectories.shape
+        #     final_yaw = self.trajectories[:, -1, 12]
+        #     initial_yaw = self.trajectories[:, 0, 12]
+        #     yaw_change = final_yaw - initial_yaw
+            
+        #     bad_turn = yaw_change > -np.pi/8
+        #     self.trajectories = self.trajectories[~bad_turn]
+        #     self.masks = self.masks[~bad_turn]
+        #     self.trajectory_type = self.trajectory_type[~bad_turn]
+        #     post_shape = self.trajectories.shape
+        #     print(f'# Trajectories: {pre_shape[0]} -> {post_shape[0]}')
+        #     final_yaw = self.trajectories[:, -1, 12]
+        #     initial_yaw = self.trajectories[:, 0, 12]
+        #     yaw_change = final_yaw - initial_yaw
+        #     print('Average yaw change:', yaw_change.mean())     
+        #     yaw_for_plot = initial_yaw.cpu().numpy()
+        #     plt.hist(yaw_for_plot, bins=100)
+        #     plt.title('Yaw Change')
+        #     plt.xlabel('Yaw')
+        #     plt.ylabel('Count')
+        #     plt.show()
+        
         self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.75)
         self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=0.5)
         self.states_only = states_only
 
+    def get_replay_buffer_warm_start(self, device):
+        # Convert trajectories to (x, u, x_next)
+        # x is the state, u is the control, x_next is the next state
+        x = self.trajectories[:, :-1, :15]
+        x_next = self.trajectories[:, 1:, :15]
+        u = self.trajectories[:, :-1, 27:]
+        
+        done = torch.zeros((x.shape[0], x.shape[1]))
+        done[:, -1] = 1
+        
+        yaw_t = x[:, :, 14]
+        yaw_t_next = x_next[:, :, 14]
+        
+        yaw_delta = yaw_t_next - yaw_t
+        
+        reward = -yaw_delta
+        
+        x = x.flatten(0, 1).to(device)
+        u = u.flatten(0, 1).to(device)
+        x_next = x_next.flatten(0, 1).to(device)
+        reward = reward.flatten(0, 1).to(device)
+        done = done.flatten(0, 1).to(device)
+        
+        return x, u, x_next, reward, done
+
+    def update_masks(self, p1, p2):
+        self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=p2)
+        self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=p1)
+
+    def __len__(self):
+        return self.trajectories.shape[0]
+
+    def __getitem__(self, idx):
+        traj = self.trajectories[idx]
+
+        # TODO: figure out how to do data augmentation on screwdriver angle
+        # a little more complex due to rotation representation
+        dx = self.dx
+        if self.screwdriver:
+            ## randomly perturb angle of screwdriver
+            traj[:, dx-1] += 2 * np.pi * (np.random.rand() - 0.5)
+        # else:
+        #     # Randomly add a multiple of pi/2 to the yaw angle to account for the valve symmetry
+        #     traj[:, 12] += (np.random.randint(-3, 4) * np.pi / 2)
+            
+        #     # modulo to make sure between [-pi and pi]. Original range was arbitrary
+        #     traj[:, 12] = (traj[:, 12] + np.pi) % (2.0 * np.pi) - np.pi  # subtract to make [-pi, pi]
+
+        if self.cosine_sine:
+                traj_q = traj[:, :(dx-1)]
+                traj_theta = traj[:, (dx-1)][:, None]
+                traj_u = traj[:, dx:]
+                dx = dx + 1
+                traj = torch.cat((traj_q, torch.cos(traj_theta), torch.sin(traj_theta), traj_u), dim=1)
+
+        # randomly mask the initial state and the final state
+        # need to find the final state - last part of mask that is 1
+        final_idx = self.masks[idx, :, 0].nonzero().max().item()
+        mask = self.masks[idx].clone()
+
+        # sample mask for initial state
+        mask[0, :dx] = self.initial_state_mask_dist.sample((1,)).to(device=traj.device)
+
+        # sample mask for final state
+        mask[final_idx, :dx] = self.initial_state_mask_dist.sample((1,)).to(device=traj.device)
+
+        # also mask out the rest with small probability
+        mask = mask * self.mask_dist.sample((mask.shape[0],)).to(device=traj.device).reshape(-1, 1)
+
+        ## we can't mask out everything
+        if mask.sum() == 0:
+            # randomly choose an index to un-mask
+            mask[np.random.randint(0, final_idx)] = 1
+        # print(mask)
+        return self.masks[idx] * (traj - self.mean) / self.std, self.trajectory_type[idx], mask
+        # return self.masks[idx] * (traj), self.trajectory_type[idx], mask
+
+    def compute_norm_constants(self):
+        # compute norm constants not including the zero padding
+        x = self.trajectories.clone()
+        # x[:, :, 8] += 2 * np.pi * (torch.rand(x.shape[0], 1) - 0.5)
+        x = x.reshape(-1, x.shape[-1])
+
+        mask = self.masks[:, :, 0].reshape(-1)
+        mean = x.sum(dim=0) / mask.sum()
+        std = np.sqrt(np.average((x - mean) ** 2, weights=mask, axis=0))
+
+        if self.states_only:
+            dim = self.dx
+        else:
+            dim =self.dx + 12 + 9
+
+        dxm1 = self.dx-1
+        dxp1 = self.dx+1
+
+        # for angle we force to be between [-1, 1]
+        if self.cosine_sine:
+            self.mean = torch.zeros(dim + 1)
+            self.std = torch.ones(dim + 1)
+            self.mean[:dxm1] = mean[:dxm1]
+            self.std[:dxm1] = torch.from_numpy(std[:dxm1]).float()
+            self.mean[dxp1:] = mean[self.dx:]
+            self.std[dxp1:] = torch.from_numpy(std[self.dx:]).float()
+        else:
+            # mean[12:15] = 0
+            # std[12:15] = np.pi
+            # mean[14] = 0
+            # std[14] = np.pi
+            self.mean = mean
+            self.std = torch.from_numpy(std).float()
+
+    def set_norm_constants(self, mean, std):
+        self.mean = mean
+        self.std = std
+
+    def get_norm_constants(self):
+        return self.mean, self.std   
+    
     def update_masks(self, p1, p2):
         self.mask_dist = torch.distributions.bernoulli.Bernoulli(probs=p2)
         self.initial_state_mask_dist = torch.distributions.bernoulli.Bernoulli(probs=p1)

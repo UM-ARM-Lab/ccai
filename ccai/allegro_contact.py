@@ -195,7 +195,11 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             'ring': [8, 9, 10, 11],
             'thumb': [12, 13, 14, 15]
         }
-
+        # Joint index for only fingers in self.fingers
+        self.joint_index_used_fingers = {}
+        for i, finger in enumerate(self.fingers):
+            self.joint_index_used_fingers[finger] = list(range(4*i, 4*i+4))
+            
         self.all_joint_index = sum([self.joint_index[finger] for finger in self.fingers], [])
         self.obj_pos_index = [16 + idx for idx in range(self.obj_dof)]
         self.control_index = [16 + obj_dof + idx for idx in self.all_joint_index]
@@ -309,13 +313,15 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                                             collision_check_links=collision_check_links,
                                             softmin_temp=1.0e3,
                                             points_per_link=750,
-                                            links_per_finger=len(self.collision_link_names['index'])
+                                            links_per_finger=len(self.collision_link_names['index']),
+                                            obj_link_name=self.obj_link_name,
                                             )
         self.contact_scenes_for_viz = pv.RobotScene(robot_sdf, object_sdf_for_viz, scene_trans,
                                             collision_check_links=collision_check_links,
                                             softmin_temp=1.0e3,
                                             points_per_link=750,
-                                            links_per_finger=len(self.collision_link_names['index'])
+                                            links_per_finger=len(self.collision_link_names['index']),
+                                            obj_link_name=self.obj_link_name,
                                             )
         self.ee_link_idx = {finger: chain.frame_to_idx[ee_name] for finger, ee_name in self.ee_names.items()}
         self.frame_indices = torch.tensor([self.ee_link_idx[finger] for finger in self.fingers])
@@ -472,45 +478,64 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         ret_scene = self.contact_scenes.scene_collision_check(full_q, theta_b,
                                                               compute_gradient=True,
                                                               compute_hessian=False,
+                                                              contact_constraint_only=True
                                                               )
         for i, finger in enumerate(self.fingers):
             self.data[finger] = {}
-            self.data[finger]['sdf'] = ret_scene['sdf'][:, i].reshape(N, self.T + T_offset)
+            self.data[finger]['sdf'] = ret_scene['sdf'][:, i].reshape(N, T + T_offset)
             # reshape and throw away data for unused fingers
             grad_g_q = ret_scene.get('grad_sdf', None)
-            self.data[finger]['grad_sdf'] = grad_g_q[:, i].reshape(N, self.T + T_offset, 16)
+            self.data[finger]['grad_sdf'] = grad_g_q[:, i].reshape(N, T + T_offset, 16)
 
             # contact jacobian
             contact_jacobian = ret_scene.get('contact_jacobian', None)
-            self.data[finger]['contact_jacobian'] = contact_jacobian[:, i].reshape(N, self.T + T_offset, 3, 16)
-
-            # contact hessian
-            contact_hessian = ret_scene.get('contact_hessian', None)
-            contact_hessian = contact_hessian[:, i].reshape(N, self.T + T_offset, 3, 16, 16)  # [:, :, :, self.all_joint_index]
-            # contact_hessian = contact_hessian[:, :, :, :, self.all_joint_index]  # shape (N, T+1, 3, 8, 8)
-
-            # gradient of contact point
-            d_contact_loc_dq = ret_scene.get('closest_pt_q_grad', None)
-            d_contact_loc_dq = d_contact_loc_dq[:, i].reshape(N, self.T + T_offset, 3, 16)  # [:, :, :, self.all_joint_index]
-            self.data[finger]['closest_pt_q_grad'] = d_contact_loc_dq
-            self.data[finger]['contact_hessian'] = contact_hessian
-            self.data[finger]['closest_pt_world'] = ret_scene['closest_pt_world'][:, i]
+            self.data[finger]['contact_jacobian'] = contact_jacobian[:, i].reshape(N, T + T_offset, 3, 16)
+            self.data[finger]['grad_env_sdf'] = ret_scene['grad_env_sdf'][:, i, :obj_dof]
             self.data[finger]['contact_normal'] = ret_scene['contact_normal'][:, i]
 
-            d_contact_loc_denv_q = ret_scene.get('closest_pt_env_q_grad', None)
-            d_contact_loc_denv_q = d_contact_loc_denv_q[:, i, :, :obj_dof].reshape(N, self.T + T_offset, 3, obj_dof)
-            self.data[finger]['closest_pt_env_q_grad'] = d_contact_loc_denv_q
+            if not True:
+                # contact hessian
+                contact_hessian = ret_scene.get('contact_hessian', None)
+                contact_hessian = contact_hessian[:, i].reshape(N, T + T_offset, 3, 16, 16)  # [:, :, :, self.all_joint_index]
+                # contact_hessian = contact_hessian[:, :, :, :, self.all_joint_index]  # shape (N, T+T_offset, 3, 8, 8)
 
-            # gradient of contact normal
-            self.data[finger]['dnormal_dq'] = ret_scene['dnormal_dq'][:, i].reshape(N, self.T + T_offset, 3, 16)  # [:, :, :,
-            # self.all_joint_index]
+                # gradient of contact point
+                d_contact_loc_dq = ret_scene.get('closest_pt_q_grad', None)
+                d_contact_loc_dq = d_contact_loc_dq[:, i].reshape(N, T + T_offset, 3, 16)  # [:, :, :, self.all_joint_index]
+                self.data[finger]['closest_pt_q_grad'] = d_contact_loc_dq
+                self.data[finger]['contact_hessian'] = contact_hessian
+                self.data[finger]['closest_pt_world'] = ret_scene['closest_pt_world'][:, i]
+                self.data[finger]['contact_normal'] = ret_scene['contact_normal'][:, i]
 
-            self.data[finger]['dnormal_denv_q'] = ret_scene['dnormal_denv_q'][:, i, :, :obj_dof]
-            self.data[finger]['grad_env_sdf'] = ret_scene['grad_env_sdf'][:, i, :obj_dof]
-            dJ_dq = contact_hessian
-            self.data[finger]['dJ_dq'] = dJ_dq  # Jacobian of the contact point
-            
-            self.data[finger]['closest_rob_pt_scene_frame'] = ret_scene['closest_rob_pt_scene_frame'][:, i]
+                d_contact_loc_denv_q = ret_scene.get('closest_pt_env_q_grad', None)
+                d_contact_loc_denv_q = d_contact_loc_denv_q[:, i, :, :obj_dof].reshape(N, T + T_offset, 3, obj_dof)
+                self.data[finger]['closest_pt_env_q_grad'] = d_contact_loc_denv_q
+
+                d_contact_loc_dq_scene = ret_scene.get('closest_pt_q_grad_object', None)
+                if d_contact_loc_dq_scene is not None:
+                    d_contact_loc_dq_scene = d_contact_loc_dq_scene[:, i].reshape(N, T + T_offset, 3, 16)
+                    self.data[finger]['closest_pt_q_grad_object'] = d_contact_loc_dq_scene
+                d_contact_loc_denv_q_scene = ret_scene.get('closest_pt_env_q_grad_object', None)
+                if d_contact_loc_denv_q_scene is not None:
+                    d_contact_loc_denv_q_scene = d_contact_loc_denv_q_scene[:, i, :, :obj_dof].reshape(N, T + T_offset, 3, obj_dof)
+                    self.data[finger]['closest_pt_env_q_grad_object'] = d_contact_loc_denv_q_scene
+
+                d_contact_loc_dq_link = ret_scene.get('closest_pt_q_grad_link', None)
+                if d_contact_loc_dq_link is not None:
+                    d_contact_loc_dq_link = d_contact_loc_dq_link[:, i].reshape(N, T + T_offset, 3, 16)
+                    self.data[finger]['closest_pt_q_grad_link'] = d_contact_loc_dq_link
+                d_contact_loc_denv_q_link = ret_scene.get('closest_pt_env_q_grad_link', None)
+                if d_contact_loc_denv_q_link is not None:
+                    d_contact_loc_denv_q_link = d_contact_loc_denv_q_link[:, i, :, :obj_dof].reshape(N, T + T_offset, 3, obj_dof)
+                    self.data[finger]['closest_pt_env_q_grad_link'] = d_contact_loc_denv_q_link
+
+                # gradient of contact normal
+                self.data[finger]['dnormal_dq'] = ret_scene['dnormal_dq'][:, i].reshape(N, T + T_offset, 3, 16)  # [:, :, :,
+                # self.all_joint_index]
+
+                self.data[finger]['dnormal_denv_q'] = ret_scene['dnormal_denv_q'][:, i, :, :obj_dof]
+                dJ_dq = contact_hessian
+                self.data[finger]['dJ_dq'] = dJ_dq  # Jacobian of the contact point
             
 
     def _cost(self, xu, start, goal):
@@ -962,13 +987,6 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         else:
             self.default_ee_locs = None
             self.default_ee_locs_constraint = False
-        if self.obj_dof == 3:
-            object_link_name = 'screwdriver_body'
-        elif self.obj_dof == 1:
-            object_link_name = 'valve'
-        elif self.obj_dof == 6:
-            object_link_name = 'card'
-        self.obj_link_name = object_link_name
 
     def randomize_regrasp_points(self):
         self.default_ee_locs = self.default_ee_locs + 0.01 * torch.randn_like(self.default_ee_locs)
@@ -1708,7 +1726,7 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         T_offset = 1
         q = xu[:, :, :self.num_fingers * 4]
-        u_orig = xu[:, :, self.num_fingers * 4 + self.obj_dof:self.num_fingers * 8 + self.obj_dof]
+        u_orig = torch.zeros_like(q)
         q = partial_to_full_state(q, fingers=self.fingers)
         N, T = q.shape[:2]
         force = torch.zeros(N, T, 12, device=self.device)
@@ -1722,22 +1740,19 @@ class AllegroContactProblem(AllegroObjectProblem):
         q = q[:, :-1]
         force_list = force[:, :, self._contact_force_indices].reshape(force.shape[0], force.shape[1], self.num_contacts,
                                                                       3)
-        mult = 1
-        if 'delta_f' in self.data:
-            # force_list += self.data['delta_f'].reshape(N, T, self.num_contacts, 3)
-            mult = 2
+
         if self.env_force:
             env_force = force[:, :, -3:]
             force_list = torch.cat((force_list, env_force.unsqueeze(2)), dim=2)
             num_forces = self.num_contacts + 1
         else:
             num_forces = self.num_contacts
-        force_list = force_list[0]
+        force_list = force_list[:, 0]
         # retrieve contact jacobians and points
         contact_jac_list = []
         for finger in self.contact_fingers:
-            jac = self.data[finger]['contact_jacobian'][best_idx].reshape(T + T_offset, 3, -1)[T_offset:, :, self.contact_state_indices]
-            contact_jac_list.append(jac.reshape(T, 3, -1))
+            jac = self.data[finger]['contact_jacobian'].reshape(N,T + T_offset, 3, -1)[:, T_offset:, :, self.contact_state_indices]
+            contact_jac_list.append(jac.reshape(N*T, 3, -1))
 
         contact_jac_list = torch.stack(contact_jac_list, dim=1).to(device=device)
 
@@ -1761,8 +1776,8 @@ class AllegroContactProblem(AllegroObjectProblem):
         for i, finger_name in enumerate(self.contact_fingers):
             contact_indices.extend(self.joint_index[finger_name])
             contact_indices_used.extend(self.joint_index_used_fingers[finger_name])
-        u_hat[0, :, contact_indices] -= sum_reactional_torque / 3.0
-        u_orig[0, :, contact_indices_used] = u_hat[0, :, contact_indices]
+        u_hat[:, :, contact_indices] -= sum_reactional_torque.unsqueeze(1) / 3.0
+        u_orig[:, :, contact_indices_used] = u_hat[:, :, contact_indices]
         
             
         for i, finger_name in enumerate(self.regrasp_fingers):
@@ -1770,7 +1785,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         # u_hat = u_hat.reshape(N, T, -1)
         
 
-        return u_orig
+        return u_orig.squeeze(1)
 
     def update_grad_g(self, num_forces, gshape2, device, grad_g, N, T, d_offset, dg_dq, dg_du, dg_dnext_q, dg_dforce):
         T_range = torch.arange(T, device=device)
@@ -2417,73 +2432,73 @@ class AllegroContactProblem(AllegroObjectProblem):
                                                                                       compute_grads=compute_grads,
                                                                                       compute_hess=compute_hess, 
                                                                                       projected_diffusion=projected_diffusion)
-        force = None
-        if self.optimize_force:
-            if self.env_force:
-                force = torch.zeros(N, T, 12 + 3, device=self.device) # assume one env contact
-                force[:, :, self._contact_force_indices] = xu[:, :, -(self.num_contacts + 1) * 3: -3]
-                force[:, :, -3:] = xu[:, :, -3:]
-            else:
-                force = torch.zeros(N, T, 12, device=self.device)
-                force[:, :, self._contact_force_indices] = xu[:, :, -self.num_contacts * 3:]
+        # force = None
+        # if self.optimize_force:
+        #     if self.env_force:
+        #         force = torch.zeros(N, T, 12 + 3, device=self.device) # assume one env contact
+        #         force[:, :, self._contact_force_indices] = xu[:, :, -(self.num_contacts + 1) * 3: -3]
+        #         force[:, :, -3:] = xu[:, :, -3:]
+        #     else:
+        #         force = torch.zeros(N, T, 12, device=self.device)
+        #         force[:, :, self._contact_force_indices] = xu[:, :, -self.num_contacts * 3:]
 
-            g_equil, grad_g_equil, hess_g_equil = self._force_equlibrium_constraints_w_force(
-                q=q,
-                delta_q=delta_q,
-                force=force,
-                compute_grads=compute_grads,
-                compute_hess=compute_hess,
-                projected_diffusion=projected_diffusion)
-        else:
-            g_equil, grad_g_equil, hess_g_equil = self._force_equlibrium_constraints(
-                q=q, delta_q=delta_q,
-                compute_grads=compute_grads,
-                compute_hess=compute_hess,
-                projected_diffusion=projected_diffusion)
+        #     g_equil, grad_g_equil, hess_g_equil = self._force_equlibrium_constraints_w_force(
+        #         q=q,
+        #         delta_q=delta_q,
+        #         force=force,
+        #         compute_grads=compute_grads,
+        #         compute_hess=compute_hess,
+        #         projected_diffusion=projected_diffusion)
+        # else:
+        #     g_equil, grad_g_equil, hess_g_equil = self._force_equlibrium_constraints(
+        #         q=q, delta_q=delta_q,
+        #         compute_grads=compute_grads,
+        #         compute_hess=compute_hess,
+        #         projected_diffusion=projected_diffusion)
 
-        g_valve, grad_g_valve, hess_g_valve = self._kinematics_constraints(
-            q=q, delta_q=delta_q, theta=theta,
-            compute_grads=compute_grads,
-            compute_hess=compute_hess,
-            projected_diffusion=projected_diffusion)
-        # print("contact", g_contact.max())
-        # print("equil", g_equil.max())
-        # print("kinematics", g_valve.max())
+        # g_valve, grad_g_valve, hess_g_valve = self._kinematics_constraints(
+        #     q=q, delta_q=delta_q, theta=theta,
+        #     compute_grads=compute_grads,
+        #     compute_hess=compute_hess,
+        #     projected_diffusion=projected_diffusion)
+        # # print("contact", g_contact.max())
+        # # print("equil", g_equil.max())
+        # # print("kinematics", g_valve.max())
 
-        g_contact = torch.cat((
-            g_contact,
-                               g_equil,
-                               g_valve,
-                               ), dim=1)
+        # g_contact = torch.cat((
+        #     g_contact,
+        #                        g_equil,
+        #                        g_valve,
+        #                        ), dim=1)
 
-        if grad_g_contact is not None:
-            max_dim = max(
-                          grad_g_contact.shape[-1], 
-                          grad_g_equil.shape[-1], grad_g_valve.shape[-1])
+        # if grad_g_contact is not None:
+        #     max_dim = max(
+        #                   grad_g_contact.shape[-1], 
+        #                   grad_g_equil.shape[-1], grad_g_valve.shape[-1])
 
-            # pad the gradients to max_dim
-            if grad_g_contact.shape[-1] < max_dim:
-                grad_g_contact = torch.cat((grad_g_contact, torch.zeros(N, grad_g_contact.shape[1], max_dim - grad_g_contact.shape[-1],
-                                                                       device=self.device)), dim=-1)
-            if grad_g_equil.shape[-1] < max_dim:
-                grad_g_equil = torch.cat((grad_g_equil, torch.zeros(N, grad_g_equil.shape[1], max_dim - grad_g_equil.shape[-1],
-                                                                   device=self.device)), dim=-1)
-            if grad_g_valve.shape[-1] < max_dim:
-                grad_g_valve = torch.cat((grad_g_valve, torch.zeros(N, grad_g_valve.shape[1], max_dim - grad_g_valve.shape[-1],
-                                                                   device=self.device)), dim=-1)
-            grad_g_contact = torch.cat((
-                                        grad_g_contact,
-                                        grad_g_equil,
-                                        grad_g_valve,
-                                        ), dim=1)
-            if torch.any(torch.isinf(grad_g_contact)) or torch.any(torch.isnan(grad_g_contact)):
-                print('hello')
-        if hess_g_contact is not None:
-            hess_g_contact = torch.cat((
-                                        hess_g_contact,
-                                        hess_g_equil,
-                                        hess_g_valve,
-                                        ), dim=1)
+        #     # pad the gradients to max_dim
+        #     if grad_g_contact.shape[-1] < max_dim:
+        #         grad_g_contact = torch.cat((grad_g_contact, torch.zeros(N, grad_g_contact.shape[1], max_dim - grad_g_contact.shape[-1],
+        #                                                                device=self.device)), dim=-1)
+        #     if grad_g_equil.shape[-1] < max_dim:
+        #         grad_g_equil = torch.cat((grad_g_equil, torch.zeros(N, grad_g_equil.shape[1], max_dim - grad_g_equil.shape[-1],
+        #                                                            device=self.device)), dim=-1)
+        #     if grad_g_valve.shape[-1] < max_dim:
+        #         grad_g_valve = torch.cat((grad_g_valve, torch.zeros(N, grad_g_valve.shape[1], max_dim - grad_g_valve.shape[-1],
+        #                                                            device=self.device)), dim=-1)
+        #     grad_g_contact = torch.cat((
+        #                                 grad_g_contact,
+        #                                 grad_g_equil,
+        #                                 grad_g_valve,
+        #                                 ), dim=1)
+        #     if torch.any(torch.isinf(grad_g_contact)) or torch.any(torch.isnan(grad_g_contact)):
+        #         print('hello')
+        # if hess_g_contact is not None:
+        #     hess_g_contact = torch.cat((
+        #                                 hess_g_contact,
+        #                                 hess_g_equil,
+        #                                 hess_g_valve,
+        #                                 ), dim=1)
 
         return g_contact, grad_g_contact, hess_g_contact
 
@@ -2551,6 +2566,7 @@ class AllegroContactWithEnvProblem(AllegroContactProblem):
                 self.data[finger]['dnormal_denv_q'] = torch.cat((dnormal_denv_q[:, :, :2], dnormal_denv_q[:, :, -1:]), dim=2)
                 grad_env_sdf = self.data[finger]['grad_env_sdf']
                 self.data[finger]['grad_env_sdf'] = torch.cat((grad_env_sdf[:, :2], grad_env_sdf[:, -1:]), dim=-1)
+                
         # theta_b = theta.reshape(-1, 6)
         # ret_scene_obj_env = self.obj_table_scenes.scene_collision_check(theta_b, None,
         #                                                         compute_gradient=True,

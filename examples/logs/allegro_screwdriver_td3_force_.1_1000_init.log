@@ -1,0 +1,1213 @@
+wandb logging initialized
+Simulation running on: cpu
+TD3 training running on: cuda:0
+[Open3D DEBUG] Read geometry::TriangleMesh: 2272 triangles and 3504 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 2229 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 12858 triangles and 22952 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 16547 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 2746 triangles and 5035 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3288 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 4394 triangles and 7242 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 4383 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 360 triangles and 540 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 346 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 1478 triangles and 4100 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3363 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 12858 triangles and 22952 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 16547 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 2746 triangles and 5035 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3288 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 4394 triangles and 7242 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 4383 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 360 triangles and 540 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 346 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 1478 triangles and 4100 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3363 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 12858 triangles and 22952 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 16547 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 2746 triangles and 5035 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3288 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 4394 triangles and 7242 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 4383 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 360 triangles and 540 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 346 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 1478 triangles and 4100 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3363 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 1964 triangles and 3328 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 2196 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 447 triangles and 678 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 447 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 4951 triangles and 8210 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 4902 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 4255 triangles and 7080 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 4112 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 1478 triangles and 4100 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3363 vertices have been removed.
+object to robot tensor([[[-7.6604e-01,  4.1318e-01,  4.9240e-01,  9.2768e-01],
+         [ 1.1921e-07, -7.6604e-01,  6.4279e-01, -9.5000e-02],
+         [ 6.4279e-01,  4.9240e-01,  5.8682e-01,  1.0828e+00],
+         [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  1.0000e+00]]])
+[Open3D DEBUG] Read geometry::TriangleMesh: 2272 triangles and 3504 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 2229 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 12858 triangles and 22952 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 16547 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 2746 triangles and 5035 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3288 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 4394 triangles and 7242 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 4383 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 360 triangles and 540 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 346 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 1478 triangles and 4100 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3363 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 12858 triangles and 22952 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 16547 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 2746 triangles and 5035 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3288 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 4394 triangles and 7242 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 4383 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 360 triangles and 540 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 346 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 1478 triangles and 4100 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3363 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 12858 triangles and 22952 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 16547 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 2746 triangles and 5035 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3288 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 4394 triangles and 7242 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 4383 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 360 triangles and 540 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 346 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 1478 triangles and 4100 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3363 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 1964 triangles and 3328 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 2196 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 447 triangles and 678 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 447 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 4951 triangles and 8210 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 4902 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 4255 triangles and 7080 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 4112 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 1478 triangles and 4100 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3363 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 2272 triangles and 3504 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 2229 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 12858 triangles and 22952 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 16547 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 2746 triangles and 5035 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3288 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 4394 triangles and 7242 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 4383 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 360 triangles and 540 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 346 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 1478 triangles and 4100 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3363 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 12858 triangles and 22952 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 16547 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 2746 triangles and 5035 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3288 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 4394 triangles and 7242 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 4383 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 360 triangles and 540 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 346 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 1478 triangles and 4100 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3363 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 12858 triangles and 22952 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 16547 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 2746 triangles and 5035 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3288 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 4394 triangles and 7242 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 4383 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 360 triangles and 540 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 346 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 1478 triangles and 4100 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3363 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 1964 triangles and 3328 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 2196 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 447 triangles and 678 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 447 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 4951 triangles and 8210 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 4902 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 4255 triangles and 7080 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 4112 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 1478 triangles and 4100 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3363 vertices have been removed.
+object to robot tensor([[[-7.6604e-01,  4.1318e-01,  4.9240e-01,  9.2768e-01],
+         [ 1.1921e-07, -7.6604e-01,  6.4279e-01, -9.5000e-02],
+         [ 6.4279e-01,  4.9240e-01,  5.8682e-01,  1.0828e+00],
+         [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  1.0000e+00]]])
+[Open3D DEBUG] Read geometry::TriangleMesh: 2272 triangles and 3504 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 2229 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 12858 triangles and 22952 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 16547 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 2746 triangles and 5035 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3288 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 4394 triangles and 7242 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 4383 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 360 triangles and 540 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 346 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 1478 triangles and 4100 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3363 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 12858 triangles and 22952 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 16547 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 2746 triangles and 5035 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3288 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 4394 triangles and 7242 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 4383 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 360 triangles and 540 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 346 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 1478 triangles and 4100 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3363 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 12858 triangles and 22952 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 16547 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 2746 triangles and 5035 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3288 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 4394 triangles and 7242 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 4383 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 360 triangles and 540 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 346 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 1478 triangles and 4100 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3363 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 1964 triangles and 3328 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 2196 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 447 triangles and 678 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 447 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 4951 triangles and 8210 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 4902 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 4255 triangles and 7080 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 4112 vertices have been removed.
+[Open3D DEBUG] Read geometry::TriangleMesh: 1478 triangles and 4100 vertices.
+[Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
+[Open3D DEBUG] [RemoveDuplicatedVertices] 3363 vertices have been removed.
+Episode reset - starting new episode
+Starting training for 1000000 timesteps
+Episode terminated: dropped screwdriver (roll=0.204, pitch=0.162), final reward: -0.367, step: 10
+Episode 0: 10 steps, reward=-2.95
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.056, pitch=0.220), final reward: -0.299, step: 3
+Episode 1: 3 steps, reward=-0.85
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.062, pitch=0.200), final reward: -0.267, step: 4
+Episode 2: 4 steps, reward=-1.13
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.226, pitch=0.128), final reward: -0.333, step: 13
+Episode 3: 13 steps, reward=-3.88
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.063, pitch=0.200), final reward: -0.368, step: 4
+Episode 4: 4 steps, reward=-1.33
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.062, pitch=0.200), final reward: -0.258, step: 7
+Episode 5: 7 steps, reward=-2.02
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.061, pitch=0.209), final reward: -0.348, step: 5
+Episode 6: 5 steps, reward=-1.41
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.204, pitch=0.132), final reward: -0.339, step: 7
+Episode 7: 7 steps, reward=-2.04
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.238, pitch=0.112), final reward: -0.331, step: 9
+Episode 8: 9 steps, reward=-2.62
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.357, pitch=-0.184), final reward: -0.340, step: 4
+Episode 9: 4 steps, reward=-1.40
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.305, pitch=-0.302), final reward: -0.331, step: 5
+Episode 10: 5 steps, reward=-1.43
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.061, pitch=0.203), final reward: -0.271, step: 6
+Episode 11: 6 steps, reward=-1.62
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.215, pitch=0.142), final reward: -0.260, step: 14
+Episode 12: 14 steps, reward=-3.89
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.060, pitch=0.208), final reward: -0.373, step: 5
+Episode 13: 5 steps, reward=-1.36
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.349, pitch=0.277), final reward: -0.230, step: 5
+Episode 14: 5 steps, reward=-1.47
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.203, pitch=0.157), final reward: -0.267, step: 13
+Episode 15: 13 steps, reward=-3.97
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.049, pitch=-0.283), final reward: -0.240, step: 2
+Episode 16: 2 steps, reward=-0.52
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.063, pitch=0.203), final reward: -0.297, step: 6
+Episode 17: 6 steps, reward=-1.77
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.065, pitch=0.203), final reward: -0.370, step: 5
+Episode 18: 5 steps, reward=-1.55
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.211, pitch=0.099), final reward: -0.298, step: 17
+Episode 19: 17 steps, reward=-4.94
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.055, pitch=0.214), final reward: -0.228, step: 3
+Episode 20: 3 steps, reward=-0.85
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.226, pitch=0.152), final reward: -0.313, step: 13
+Episode 21: 13 steps, reward=-3.40
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.049, pitch=0.204), final reward: -0.248, step: 4
+Episode 22: 4 steps, reward=-1.10
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.050, pitch=0.204), final reward: -0.243, step: 4
+Episode 23: 4 steps, reward=-1.03
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.204, pitch=0.154), final reward: -0.294, step: 15
+Episode 24: 15 steps, reward=-4.36
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.207, pitch=0.160), final reward: -0.340, step: 19
+Episode 25: 19 steps, reward=-5.39
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.049, pitch=0.205), final reward: -0.273, step: 4
+Episode 26: 4 steps, reward=-1.19
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.288, pitch=0.120), final reward: -0.272, step: 14
+Episode 27: 14 steps, reward=-3.86
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.063, pitch=0.200), final reward: -0.292, step: 4
+Episode 28: 4 steps, reward=-1.29
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.066, pitch=0.225), final reward: -0.162, step: 3
+Episode 29: 3 steps, reward=-0.75
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.051, pitch=0.206), final reward: -0.166, step: 3
+Episode 30: 3 steps, reward=-0.78
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.016, pitch=0.210), final reward: -0.196, step: 7
+Episode 31: 7 steps, reward=-1.87
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.283, pitch=0.259), final reward: -0.293, step: 5
+Episode 32: 5 steps, reward=-1.52
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.013, pitch=0.205), final reward: -0.349, step: 3
+Episode 33: 3 steps, reward=-0.98
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.201, pitch=0.149), final reward: -0.397, step: 13
+Episode 34: 13 steps, reward=-3.88
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.053, pitch=0.203), final reward: -0.360, step: 4
+Episode 35: 4 steps, reward=-1.15
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.050, pitch=0.204), final reward: -0.336, step: 4
+Episode 36: 4 steps, reward=-1.24
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.062, pitch=0.200), final reward: -0.200, step: 4
+Episode 37: 4 steps, reward=-1.16
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.013, pitch=0.205), final reward: -0.300, step: 3
+Episode 38: 3 steps, reward=-0.90
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.305, pitch=0.108), final reward: -0.381, step: 13
+Episode 39: 13 steps, reward=-3.89
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.063, pitch=0.200), final reward: -0.265, step: 4
+Episode 40: 4 steps, reward=-1.23
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.062, pitch=0.200), final reward: -0.244, step: 4
+Episode 41: 4 steps, reward=-1.15
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.059, pitch=0.208), final reward: -0.364, step: 5
+Episode 42: 5 steps, reward=-1.73
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.079, pitch=0.228), final reward: -0.294, step: 3
+Episode 43: 3 steps, reward=-0.91
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.215, pitch=0.133), final reward: -0.255, step: 9
+Episode 44: 9 steps, reward=-2.60
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.058, pitch=0.206), final reward: -0.275, step: 6
+Episode 45: 6 steps, reward=-1.92
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.346, pitch=0.092), final reward: -0.284, step: 17
+Episode 46: 17 steps, reward=-5.09
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.059, pitch=0.208), final reward: -0.285, step: 5
+Episode 47: 5 steps, reward=-1.40
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.063, pitch=0.200), final reward: -0.320, step: 4
+Episode 48: 4 steps, reward=-1.08
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.050, pitch=0.204), final reward: -0.336, step: 4
+Episode 49: 4 steps, reward=-1.09
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.220, pitch=0.127), final reward: -0.281, step: 9
+Episode 50: 9 steps, reward=-2.67
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.236, pitch=0.125), final reward: -0.271, step: 16
+Episode 51: 16 steps, reward=-4.66
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.061, pitch=0.206), final reward: -0.258, step: 5
+Episode 52: 5 steps, reward=-1.57
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.080, pitch=0.200), final reward: -0.230, step: 5
+Episode 53: 5 steps, reward=-1.47
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.055, pitch=0.200), final reward: -0.187, step: 6
+Episode 54: 6 steps, reward=-1.54
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.048, pitch=0.203), final reward: -0.187, step: 7
+Episode 55: 7 steps, reward=-1.96
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.005, pitch=0.210), final reward: -0.228, step: 4
+Episode 56: 4 steps, reward=-1.05
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.086, pitch=0.237), final reward: -0.293, step: 3
+Episode 57: 3 steps, reward=-0.89
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.198, pitch=0.315), final reward: -0.371, step: 4
+Episode 58: 4 steps, reward=-1.08
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.204, pitch=0.123), final reward: -0.276, step: 8
+Episode 59: 8 steps, reward=-2.36
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.281, pitch=0.125), final reward: -0.230, step: 18
+Episode 60: 18 steps, reward=-5.33
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.069, pitch=0.225), final reward: -0.321, step: 3
+Episode 61: 3 steps, reward=-0.78
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.226, pitch=0.152), final reward: -0.302, step: 12
+Episode 62: 12 steps, reward=-3.45
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.295, pitch=0.116), final reward: -0.276, step: 17
+Episode 63: 17 steps, reward=-5.03
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.271, pitch=0.114), final reward: -0.221, step: 11
+Episode 64: 11 steps, reward=-3.18
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.074, pitch=0.227), final reward: -0.234, step: 4
+Episode 65: 4 steps, reward=-1.13
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.210, pitch=0.142), final reward: -0.207, step: 8
+Episode 66: 8 steps, reward=-2.41
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.061, pitch=0.203), final reward: -0.288, step: 5
+Episode 67: 5 steps, reward=-1.21
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.313, pitch=0.099), final reward: -0.327, step: 20
+Episode 68: 20 steps, reward=-5.61
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.204, pitch=0.157), final reward: -0.283, step: 13
+Episode 69: 13 steps, reward=-3.78
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.092, pitch=0.203), final reward: -0.338, step: 6
+Episode 70: 6 steps, reward=-1.82
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.033, pitch=0.207), final reward: -0.259, step: 3
+Episode 71: 3 steps, reward=-0.77
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.065, pitch=0.200), final reward: -0.183, step: 5
+Episode 72: 5 steps, reward=-1.44
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.286, pitch=0.123), final reward: -0.345, step: 12
+Episode 73: 12 steps, reward=-3.97
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.259, pitch=0.130), final reward: -0.304, step: 14
+Episode 74: 14 steps, reward=-4.22
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.049, pitch=0.203), final reward: -0.363, step: 4
+Episode 75: 4 steps, reward=-1.29
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.062, pitch=0.200), final reward: -0.283, step: 4
+Episode 76: 4 steps, reward=-1.10
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.063, pitch=0.200), final reward: -0.264, step: 4
+Episode 77: 4 steps, reward=-1.16
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.050, pitch=0.204), final reward: -0.376, step: 4
+Episode 78: 4 steps, reward=-1.22
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.050, pitch=0.204), final reward: -0.253, step: 4
+Episode 79: 4 steps, reward=-1.20
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.337, pitch=0.298), final reward: -0.314, step: 6
+Episode 80: 6 steps, reward=-2.17
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.201, pitch=0.165), final reward: -0.287, step: 20
+Episode 81: 20 steps, reward=-5.71
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.025, pitch=0.205), final reward: -0.295, step: 5
+Episode 82: 5 steps, reward=-1.41
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.078, pitch=0.233), final reward: -0.270, step: 3
+Episode 83: 3 steps, reward=-0.87
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.208, pitch=0.141), final reward: -0.320, step: 12
+Episode 84: 12 steps, reward=-3.21
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.203, pitch=0.137), final reward: -0.192, step: 14
+Episode 85: 14 steps, reward=-4.01
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.071, pitch=0.227), final reward: -0.189, step: 3
+Episode 86: 3 steps, reward=-0.67
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.051, pitch=0.204), final reward: -0.321, step: 7
+Episode 87: 7 steps, reward=-2.09
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.146, pitch=0.289), final reward: -0.344, step: 5
+Episode 88: 5 steps, reward=-1.53
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.063, pitch=0.200), final reward: -0.231, step: 4
+Episode 89: 4 steps, reward=-1.13
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.034, pitch=0.206), final reward: -0.299, step: 11
+Episode 90: 11 steps, reward=-3.53
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.063, pitch=0.200), final reward: -0.229, step: 5
+Episode 91: 5 steps, reward=-1.23
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.057, pitch=0.204), final reward: -0.399, step: 5
+Episode 92: 5 steps, reward=-1.50
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.310, pitch=0.109), final reward: -0.289, step: 15
+Episode 93: 15 steps, reward=-4.32
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.223, pitch=0.128), final reward: -0.307, step: 8
+Episode 94: 8 steps, reward=-2.23
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.063, pitch=0.201), final reward: -0.256, step: 5
+Episode 95: 5 steps, reward=-1.30
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.064, pitch=0.204), final reward: -0.276, step: 6
+Episode 96: 6 steps, reward=-1.71
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.340, pitch=-0.452), final reward: -0.255, step: 3
+Episode 97: 3 steps, reward=-0.90
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.050, pitch=0.204), final reward: -0.273, step: 4
+Episode 98: 4 steps, reward=-1.04
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.061, pitch=0.202), final reward: -0.276, step: 5
+Episode 99: 5 steps, reward=-1.26
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.087, pitch=0.237), final reward: -0.207, step: 3
+Episode 100: 3 steps, reward=-0.82
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.028, pitch=0.210), final reward: -0.204, step: 3
+Episode 101: 3 steps, reward=-0.75
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.027, pitch=0.223), final reward: -0.405, step: 4
+Episode 102: 4 steps, reward=-1.31
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.063, pitch=0.204), final reward: -0.271, step: 5
+Episode 103: 5 steps, reward=-1.41
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.063, pitch=0.206), final reward: -0.342, step: 5
+Episode 104: 5 steps, reward=-1.56
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.050, pitch=0.203), final reward: -0.392, step: 4
+Episode 105: 4 steps, reward=-1.33
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.215, pitch=-0.494), final reward: -0.348, step: 4
+Episode 106: 4 steps, reward=-1.29
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.053, pitch=0.217), final reward: -0.400, step: 3
+Episode 107: 3 steps, reward=-0.91
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.002, pitch=0.202), final reward: -0.273, step: 4
+Episode 108: 4 steps, reward=-1.08
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.202, pitch=0.146), final reward: -0.264, step: 21
+Episode 109: 21 steps, reward=-5.39
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.207, pitch=0.089), final reward: -0.233, step: 13
+Episode 110: 13 steps, reward=-3.51
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.139, pitch=0.283), final reward: -0.321, step: 4
+Episode 111: 4 steps, reward=-1.32
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.050, pitch=0.204), final reward: -0.272, step: 4
+Episode 112: 4 steps, reward=-1.13
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.207, pitch=0.149), final reward: -0.276, step: 19
+Episode 113: 19 steps, reward=-5.67
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.049, pitch=0.202), final reward: -0.345, step: 4
+Episode 114: 4 steps, reward=-1.32
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.073, pitch=0.228), final reward: -0.264, step: 3
+Episode 115: 3 steps, reward=-0.75
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.063, pitch=0.230), final reward: -0.298, step: 4
+Episode 116: 4 steps, reward=-1.23
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.350, pitch=0.104), final reward: -0.288, step: 8
+Episode 117: 8 steps, reward=-2.15
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.219, pitch=0.146), final reward: -0.292, step: 14
+Episode 118: 14 steps, reward=-4.06
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.066, pitch=0.226), final reward: -0.328, step: 3
+Episode 119: 3 steps, reward=-0.91
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.050, pitch=0.204), final reward: -0.313, step: 4
+Episode 120: 4 steps, reward=-1.30
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.062, pitch=0.206), final reward: -0.331, step: 5
+Episode 121: 5 steps, reward=-1.32
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.260, pitch=0.093), final reward: -0.345, step: 11
+Episode 122: 11 steps, reward=-3.10
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.065, pitch=0.201), final reward: -0.252, step: 5
+Episode 123: 5 steps, reward=-1.33
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.057, pitch=0.201), final reward: -0.276, step: 6
+Episode 124: 6 steps, reward=-1.78
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.050, pitch=0.204), final reward: -0.338, step: 4
+Episode 125: 4 steps, reward=-0.99
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.346, pitch=0.107), final reward: -0.242, step: 12
+Episode 126: 12 steps, reward=-3.35
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.089, pitch=0.275), final reward: -0.248, step: 4
+Episode 127: 4 steps, reward=-1.12
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.062, pitch=0.212), final reward: -0.222, step: 3
+Episode 128: 3 steps, reward=-0.69
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.045, pitch=0.206), final reward: -0.386, step: 4
+Episode 129: 4 steps, reward=-1.28
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.256, pitch=0.137), final reward: -0.263, step: 13
+Episode 130: 13 steps, reward=-3.66
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.176, pitch=0.307), final reward: -0.294, step: 4
+Episode 131: 4 steps, reward=-1.10
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.062, pitch=0.206), final reward: -0.300, step: 5
+Episode 132: 5 steps, reward=-1.42
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.210, pitch=0.151), final reward: -0.210, step: 17
+Episode 133: 17 steps, reward=-4.78
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.050, pitch=0.204), final reward: -0.276, step: 4
+Episode 134: 4 steps, reward=-1.10
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.243, pitch=0.384), final reward: -0.278, step: 4
+Episode 135: 4 steps, reward=-1.11
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.048, pitch=0.201), final reward: -0.270, step: 4
+Episode 136: 4 steps, reward=-1.05
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.204, pitch=0.073), final reward: -0.284, step: 4
+Episode 137: 4 steps, reward=-1.29
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.063, pitch=0.200), final reward: -0.330, step: 5
+Episode 138: 5 steps, reward=-1.25
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.044, pitch=0.207), final reward: -0.309, step: 3
+Episode 139: 3 steps, reward=-0.85
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.056, pitch=0.219), final reward: -0.133, step: 3
+Episode 140: 3 steps, reward=-0.53
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.061, pitch=0.209), final reward: -0.392, step: 5
+Episode 141: 5 steps, reward=-1.54
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.063, pitch=0.200), final reward: -0.268, step: 4
+Episode 142: 4 steps, reward=-1.22
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.357, pitch=0.118), final reward: -0.320, step: 19
+Episode 143: 19 steps, reward=-5.43
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.163, pitch=0.295), final reward: -0.289, step: 3
+Episode 144: 3 steps, reward=-0.80
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.041, pitch=0.215), final reward: -0.202, step: 3
+Episode 145: 3 steps, reward=-0.63
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.269, pitch=-0.164), final reward: -0.388, step: 13
+Episode 146: 13 steps, reward=-3.79
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.214, pitch=-0.126), final reward: -0.199, step: 15
+Episode 147: 15 steps, reward=-4.69
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.045, pitch=-0.205), final reward: -0.436, step: 3
+Episode 148: 3 steps, reward=-1.27
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.212, pitch=-0.119), final reward: -0.218, step: 15
+Episode 149: 15 steps, reward=-4.14
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.055, pitch=-0.206), final reward: -0.564, step: 3
+Episode 150: 3 steps, reward=-1.33
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.055, pitch=-0.206), final reward: -0.451, step: 3
+Episode 151: 3 steps, reward=-1.23
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.058, pitch=-0.200), final reward: -0.442, step: 3
+Episode 152: 3 steps, reward=-1.32
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.214, pitch=-0.114), final reward: -0.263, step: 11
+Episode 153: 11 steps, reward=-3.23
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.056, pitch=-0.205), final reward: -0.327, step: 3
+Episode 154: 3 steps, reward=-1.09
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.232, pitch=-0.117), final reward: -0.101, step: 10
+Episode 155: 10 steps, reward=-3.29
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.026, pitch=-0.331), final reward: -0.211, step: 3
+Episode 156: 3 steps, reward=-0.92
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.024, pitch=-0.239), final reward: -0.254, step: 3
+Episode 157: 3 steps, reward=-1.05
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.125, pitch=-0.370), final reward: -0.315, step: 3
+Episode 158: 3 steps, reward=-0.83
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.170, pitch=-0.282), final reward: -0.433, step: 6
+Episode 159: 6 steps, reward=-1.88
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.060, pitch=-0.340), final reward: -0.360, step: 5
+Episode 160: 5 steps, reward=-1.65
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.407, pitch=-0.241), final reward: -0.353, step: 4
+Episode 161: 4 steps, reward=-1.24
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.276, pitch=-0.307), final reward: -0.282, step: 3
+Episode 162: 3 steps, reward=-0.83
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.161, pitch=-0.265), final reward: -0.255, step: 3
+Episode 163: 3 steps, reward=-0.82
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.261, pitch=-0.305), final reward: -0.298, step: 3
+Episode 164: 3 steps, reward=-1.06
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.260, pitch=-0.303), final reward: -0.246, step: 3
+Episode 165: 3 steps, reward=-0.81
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.105, pitch=0.240), final reward: -0.284, step: 7
+Episode 166: 7 steps, reward=-2.09
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.247, pitch=-0.333), final reward: -0.255, step: 3
+Episode 167: 3 steps, reward=-0.77
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.015, pitch=0.207), final reward: -0.405, step: 7
+Episode 168: 7 steps, reward=-2.57
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.010, pitch=0.220), final reward: -0.387, step: 7
+Episode 169: 7 steps, reward=-2.17
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.070, pitch=0.230), final reward: -0.342, step: 8
+Episode 170: 8 steps, reward=-2.39
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.008, pitch=0.220), final reward: -0.404, step: 5
+Episode 171: 5 steps, reward=-1.62
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.044, pitch=0.218), final reward: -0.350, step: 4
+Episode 172: 4 steps, reward=-1.26
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.130, pitch=0.202), final reward: -0.279, step: 8
+Episode 173: 8 steps, reward=-2.30
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.013, pitch=0.216), final reward: -0.310, step: 5
+Episode 174: 5 steps, reward=-1.63
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.303, pitch=-0.323), final reward: -0.343, step: 3
+Episode 175: 3 steps, reward=-1.01
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.025, pitch=0.206), final reward: -0.404, step: 4
+Episode 176: 4 steps, reward=-1.53
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.114, pitch=-0.256), final reward: -0.312, step: 4
+Episode 177: 4 steps, reward=-1.37
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.062, pitch=0.200), final reward: -0.381, step: 19
+Episode 178: 19 steps, reward=-6.29
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.060, pitch=0.202), final reward: -0.345, step: 8
+Episode 179: 8 steps, reward=-2.66
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.073, pitch=0.204), final reward: -0.362, step: 10
+Episode 180: 10 steps, reward=-2.73
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.073, pitch=0.204), final reward: -0.320, step: 10
+Episode 181: 10 steps, reward=-3.38
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.061, pitch=0.201), final reward: -0.413, step: 8
+Episode 182: 8 steps, reward=-2.63
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.061, pitch=0.201), final reward: -0.301, step: 8
+Episode 183: 8 steps, reward=-2.49
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.060, pitch=0.202), final reward: -0.365, step: 8
+Episode 184: 8 steps, reward=-2.51
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.072, pitch=0.201), final reward: -0.402, step: 9
+Episode 185: 9 steps, reward=-2.97
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.061, pitch=0.201), final reward: -0.434, step: 8
+Episode 186: 8 steps, reward=-2.84
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.072, pitch=0.204), final reward: -0.289, step: 10
+Episode 187: 10 steps, reward=-3.56
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.060, pitch=0.202), final reward: -0.260, step: 8
+Episode 188: 8 steps, reward=-2.67
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.071, pitch=0.200), final reward: -0.330, step: 9
+Episode 189: 9 steps, reward=-3.18
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.073, pitch=0.204), final reward: -0.378, step: 10
+Episode 190: 10 steps, reward=-3.16
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.071, pitch=0.200), final reward: -0.370, step: 9
+Episode 191: 9 steps, reward=-2.99
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.065, pitch=0.204), final reward: -0.434, step: 9
+Episode 192: 9 steps, reward=-3.15
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.073, pitch=0.204), final reward: -0.421, step: 10
+Episode 193: 10 steps, reward=-3.56
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.073, pitch=0.204), final reward: -0.293, step: 10
+Episode 194: 10 steps, reward=-3.47
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.070, pitch=0.202), final reward: -0.375, step: 9
+Episode 195: 9 steps, reward=-3.19
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.070, pitch=0.201), final reward: -0.339, step: 9
+Episode 196: 9 steps, reward=-3.15
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.070, pitch=0.201), final reward: -0.429, step: 9
+Episode 197: 9 steps, reward=-3.03
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.065, pitch=0.204), final reward: -0.426, step: 9
+Episode 198: 9 steps, reward=-3.21
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.071, pitch=0.200), final reward: -0.409, step: 9
+Episode 199: 9 steps, reward=-3.08
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.061, pitch=0.201), final reward: -0.431, step: 8
+Episode 200: 8 steps, reward=-2.42
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.073, pitch=0.204), final reward: -0.385, step: 10
+Episode 201: 10 steps, reward=-3.16
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.073, pitch=0.204), final reward: -0.270, step: 10
+Episode 202: 10 steps, reward=-3.08
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.072, pitch=0.202), final reward: -0.423, step: 10
+Episode 203: 10 steps, reward=-3.47
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.074, pitch=0.201), final reward: -0.323, step: 10
+Episode 204: 10 steps, reward=-3.24
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.065, pitch=0.203), final reward: -0.391, step: 11
+Episode 205: 11 steps, reward=-3.56
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.036, pitch=0.203), final reward: -0.349, step: 7
+Episode 206: 7 steps, reward=-2.39
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.018, pitch=0.209), final reward: -0.375, step: 5
+Episode 207: 5 steps, reward=-1.85
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.009, pitch=0.214), final reward: -0.247, step: 4
+Episode 208: 4 steps, reward=-1.24
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.018, pitch=0.212), final reward: -0.278, step: 4
+Episode 209: 4 steps, reward=-1.36
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.014, pitch=0.212), final reward: -0.369, step: 4
+Episode 210: 4 steps, reward=-1.38
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.017, pitch=0.212), final reward: -0.389, step: 4
+Episode 211: 4 steps, reward=-1.33
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.027, pitch=0.215), final reward: -0.443, step: 5
+Episode 212: 5 steps, reward=-1.67
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.018, pitch=0.201), final reward: -0.325, step: 4
+Episode 213: 4 steps, reward=-1.51
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.030, pitch=0.207), final reward: -0.359, step: 4
+Episode 214: 4 steps, reward=-1.33
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.051, pitch=0.213), final reward: -0.400, step: 6
+Episode 215: 6 steps, reward=-1.96
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.098, pitch=0.220), final reward: -0.373, step: 9
+Episode 216: 9 steps, reward=-3.26
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.227, pitch=0.260), final reward: -0.291, step: 7
+Episode 217: 7 steps, reward=-2.22
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.029, pitch=0.207), final reward: -0.359, step: 4
+Episode 218: 4 steps, reward=-1.33
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.015, pitch=0.212), final reward: -0.330, step: 4
+Episode 219: 4 steps, reward=-1.30
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.023, pitch=0.206), final reward: -0.323, step: 4
+Episode 220: 4 steps, reward=-1.38
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.010, pitch=0.207), final reward: -0.312, step: 4
+Episode 221: 4 steps, reward=-1.14
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.016, pitch=0.205), final reward: -0.378, step: 4
+Episode 222: 4 steps, reward=-1.39
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.017, pitch=0.212), final reward: -0.348, step: 4
+Episode 223: 4 steps, reward=-1.50
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.039, pitch=0.205), final reward: -0.317, step: 7
+Episode 224: 7 steps, reward=-2.33
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.019, pitch=0.212), final reward: -0.378, step: 4
+Episode 225: 4 steps, reward=-1.46
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.016, pitch=0.212), final reward: -0.296, step: 4
+Episode 226: 4 steps, reward=-1.45
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.003, pitch=0.207), final reward: -0.247, step: 5
+Episode 227: 5 steps, reward=-1.57
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.001, pitch=0.201), final reward: -0.328, step: 4
+Episode 228: 4 steps, reward=-1.33
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.015, pitch=0.212), final reward: -0.375, step: 4
+Episode 229: 4 steps, reward=-1.22
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.003, pitch=0.211), final reward: -0.367, step: 5
+Episode 230: 5 steps, reward=-1.90
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.017, pitch=0.301), final reward: -0.368, step: 5
+Episode 231: 5 steps, reward=-1.60
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.009, pitch=0.214), final reward: -0.386, step: 4
+Episode 232: 4 steps, reward=-1.61
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.009, pitch=0.214), final reward: -0.395, step: 4
+Episode 233: 4 steps, reward=-1.36
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.016, pitch=0.212), final reward: -0.371, step: 4
+Episode 234: 4 steps, reward=-1.36
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.016, pitch=0.212), final reward: -0.380, step: 4
+Episode 235: 4 steps, reward=-1.62
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.019, pitch=0.212), final reward: -0.299, step: 4
+Episode 236: 4 steps, reward=-1.39
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.021, pitch=0.208), final reward: -0.424, step: 3
+Episode 237: 3 steps, reward=-1.00
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.019, pitch=0.212), final reward: -0.419, step: 4
+Episode 238: 4 steps, reward=-1.59
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.016, pitch=0.212), final reward: -0.464, step: 4
+Episode 239: 4 steps, reward=-1.39
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.017, pitch=0.301), final reward: -0.426, step: 5
+Episode 240: 5 steps, reward=-1.80
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.017, pitch=0.212), final reward: -0.251, step: 4
+Episode 241: 4 steps, reward=-1.39
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.013, pitch=0.212), final reward: -0.375, step: 4
+Episode 242: 4 steps, reward=-1.50
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.021, pitch=0.211), final reward: -0.360, step: 4
+Episode 243: 4 steps, reward=-1.34
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.016, pitch=0.212), final reward: -0.289, step: 4
+Episode 244: 4 steps, reward=-1.48
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.017, pitch=0.212), final reward: -0.283, step: 4
+Episode 245: 4 steps, reward=-1.48
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.006, pitch=0.293), final reward: -0.297, step: 5
+Episode 246: 5 steps, reward=-1.62
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.001, pitch=0.292), final reward: -0.327, step: 5
+Episode 247: 5 steps, reward=-1.69
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.009, pitch=0.214), final reward: -0.400, step: 4
+Episode 248: 4 steps, reward=-1.56
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.017, pitch=0.212), final reward: -0.306, step: 4
+Episode 249: 4 steps, reward=-1.38
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.009, pitch=0.213), final reward: -0.313, step: 5
+Episode 250: 5 steps, reward=-1.71
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.002, pitch=0.203), final reward: -0.379, step: 4
+Episode 251: 4 steps, reward=-1.36
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.019, pitch=0.212), final reward: -0.272, step: 4
+Episode 252: 4 steps, reward=-1.45
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.009, pitch=0.214), final reward: -0.416, step: 4
+Episode 253: 4 steps, reward=-1.55
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.019, pitch=0.212), final reward: -0.333, step: 4
+Episode 254: 4 steps, reward=-1.52
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.484, pitch=-0.023), final reward: -0.349, step: 5
+Episode 255: 5 steps, reward=-1.67
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.021, pitch=0.208), final reward: -0.264, step: 3
+Episode 256: 3 steps, reward=-0.90
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.009, pitch=0.214), final reward: -0.375, step: 4
+Episode 257: 4 steps, reward=-1.72
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.014, pitch=0.213), final reward: -0.333, step: 4
+Episode 258: 4 steps, reward=-1.41
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.014, pitch=0.213), final reward: -0.329, step: 4
+Episode 259: 4 steps, reward=-1.41
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.018, pitch=0.204), final reward: -0.394, step: 3
+Episode 260: 3 steps, reward=-1.10
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.016, pitch=0.212), final reward: -0.364, step: 4
+Episode 261: 4 steps, reward=-1.42
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.019, pitch=0.212), final reward: -0.398, step: 4
+Episode 262: 4 steps, reward=-1.69
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.005, pitch=0.207), final reward: -0.305, step: 5
+Episode 263: 5 steps, reward=-1.90
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.017, pitch=0.212), final reward: -0.241, step: 4
+Episode 264: 4 steps, reward=-1.34
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.019, pitch=0.212), final reward: -0.462, step: 4
+Episode 265: 4 steps, reward=-1.54
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.027, pitch=0.207), final reward: -0.321, step: 4
+Episode 266: 4 steps, reward=-1.37
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.014, pitch=0.213), final reward: -0.375, step: 4
+Episode 267: 4 steps, reward=-1.52
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.009, pitch=0.214), final reward: -0.352, step: 4
+Episode 268: 4 steps, reward=-1.50
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.019, pitch=0.212), final reward: -0.344, step: 4
+Episode 269: 4 steps, reward=-1.70
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.019, pitch=0.212), final reward: -0.254, step: 4
+Episode 270: 4 steps, reward=-1.41
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.014, pitch=0.213), final reward: -0.355, step: 4
+Episode 271: 4 steps, reward=-1.37
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.017, pitch=0.212), final reward: -0.342, step: 4
+Episode 272: 4 steps, reward=-1.48
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.021, pitch=0.208), final reward: -0.412, step: 3
+Episode 273: 3 steps, reward=-1.09
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.019, pitch=0.212), final reward: -0.423, step: 4
+Episode 274: 4 steps, reward=-1.53
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.015, pitch=0.212), final reward: -0.364, step: 4
+Episode 275: 4 steps, reward=-1.32
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.019, pitch=0.212), final reward: -0.411, step: 4
+Episode 276: 4 steps, reward=-1.37
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.298, pitch=-0.324), final reward: -0.277, step: 3
+Episode 277: 3 steps, reward=-0.97
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.019, pitch=0.212), final reward: -0.398, step: 4
+Episode 278: 4 steps, reward=-1.36
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=-0.029, pitch=0.309), final reward: -0.480, step: 5
+Episode 279: 5 steps, reward=-1.87
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.014, pitch=0.214), final reward: -0.283, step: 3
+Episode 280: 3 steps, reward=-0.93
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.009, pitch=0.214), final reward: -0.291, step: 4
+Episode 281: 4 steps, reward=-1.65
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.020, pitch=0.211), final reward: -0.377, step: 4
+Episode 282: 4 steps, reward=-1.11
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.009, pitch=0.214), final reward: -0.434, step: 4
+Episode 283: 4 steps, reward=-1.67
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.017, pitch=0.212), final reward: -0.396, step: 4
+Episode 284: 4 steps, reward=-1.47
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.024, pitch=0.211), final reward: -0.289, step: 3
+Episode 285: 3 steps, reward=-0.89
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.015, pitch=0.212), final reward: -0.360, step: 4
+Episode 286: 4 steps, reward=-1.36
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.019, pitch=0.212), final reward: -0.308, step: 4
+Episode 287: 4 steps, reward=-1.28
+Episode reset - starting new episode

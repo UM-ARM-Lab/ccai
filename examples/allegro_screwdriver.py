@@ -43,7 +43,7 @@ from ccai.allegro_contact import AllegroManipulationProblem, PositionControlCons
     add_trajectories_hardware
 from ccai.allegro_screwdriver_problem_diffusion import AllegroScrewdriverDiff
 # from ccai.mpc.diffusion_policy import Diffusion_Policy, DummyProblem
-from train_allegro_screwdriver import rollout_trajectory_in_sim
+# from train_allegro_screwdriver import rollout_trajectory_in_sim
 from scipy.spatial.transform import Rotation as R
 
 # from ccai.mpc.ipopt import IpoptMPC
@@ -123,81 +123,6 @@ def convert_sine_cosine_to_yaw(xu):
     xu_new = torch.cat([xu[..., :14], yaw.unsqueeze(-1), xu[..., 16:]], dim=-1)
     return xu_new
     
-class AllegroScrewdriver(AllegroManipulationProblem):
-    def __init__(self,
-                 start,
-                 goal,
-                 T,
-                 chain,
-                 object_location,
-                 object_type,
-                 world_trans,
-                 object_asset_pos,
-                 regrasp_fingers=[],
-                 contact_fingers=['index', 'middle', 'ring', 'thumb'],
-                 friction_coefficient=0.95,
-                #  friction_coefficient=0.5,
-                #  friction_coefficient=1000,
-                 obj_dof=1,
-                 obj_ori_rep='euler',
-                 obj_joint_dim=0,
-                 optimize_force=False,
-                 turn=False,
-                 obj_gravity=False,
-                 min_force_dict=None,
-                 device='cuda:0',
-                 proj_path=None,
-                 full_dof_goal=False, 
-                 project=False,
-                 test_recovery_trajectory=False, **kwargs):
-        self.obj_mass = 0.1
-        self.obj_dof_type = None
-        if obj_dof == 3:
-            object_link_name = 'screwdriver_body'
-        elif obj_dof == 1:
-            object_link_name = 'valve'
-        elif obj_dof == 6:
-            object_link_name = 'card'
-        self.obj_link_name = object_link_name
-
-
-        self.contact_points = None
-        contact_points_object = None
-        if proj_path is not None:
-            self.proj_path = proj_path.to(device=device)
-        else:
-            self.proj_path = None
-
-        super(AllegroScrewdriver, self).__init__(start=start, goal=goal, T=T, chain=chain,
-                                                 object_location=object_location,
-                                                 object_type=object_type, world_trans=world_trans,
-                                                 object_asset_pos=object_asset_pos,
-                                                 regrasp_fingers=regrasp_fingers,
-                                                 contact_fingers=contact_fingers,
-                                                 friction_coefficient=friction_coefficient,
-                                                 obj_dof=obj_dof,
-                                                 obj_ori_rep=obj_ori_rep, obj_joint_dim=1,
-                                                 optimize_force=optimize_force, device=device,
-                                                 turn=turn, obj_gravity=obj_gravity,
-                                                 min_force_dict=min_force_dict, 
-                                                 full_dof_goal=full_dof_goal,
-                                                  contact_points_object=contact_points_object,
-                                                  contact_points_dict = self.contact_points,
-                                                  project=project,
-                                                   **kwargs)
-        self.friction_coefficient = friction_coefficient
-
-    def _cost(self, xu, start, goal):
-        # TODO: check if the addtional term of the smoothness cost and running goal cost is necessary
-        state = xu[:, :self.dx]  # state dim = 9
-        state = torch.cat((start.reshape(1, self.dx), state), dim=0)  # combine the first time step into it
-
-        smoothness_cost = torch.sum((state[1:, -self.obj_dof:] - state[:-1, -self.obj_dof:]) ** 2)
-        upright_cost = 0
-        if not self.project:
-            upright_cost = 500 * torch.sum(
-                (state[:, -self.obj_dof:-1] + goal[-self.obj_dof:-1]) ** 2)  # the screwdriver should only rotate in z direction
-        return smoothness_cost + upright_cost + super()._cost(xu, start, goal)
 
 
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noise=None, noise_noise=None, sim=None, seed=None,

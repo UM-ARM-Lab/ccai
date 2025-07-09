@@ -5,7 +5,7 @@ num_steps: 12
 num_turns: 3
 num_trials: 10
 visualize: True
-experiment_name: 'allegro_screwdriver_csvto_only_shortcut_trajectory'
+experiment_name: 'allegro_screwdriver_constrained_rl_csvto_projection_warm_start_buffer'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
@@ -32,23 +32,43 @@ use_partial_constraint: True
 sine_cosine: False
 shortcut_trajectory: False
 use_constraints: True
-batch_size: 32
+batch_size: 256
+
+# RL Training Parameters
+total_timesteps: 1000000
+max_episode_steps: 20
+eval_freq: 5000
+checkpoint_freq: 10000
+start_timesteps: 1000
+buffer_size: 1000000
+warm_start_buffer: True
+lr_actor: .0003
+lr_critic: .001
+gamma: 0.99
+tau: 0.005
+policy_noise: 0.1
+noise_clip: 0.5
+policy_freq: 2
+randomize_obj_start: False
+randomize_rob_start: False
+evaluate: True
+eval_episodes: 10
+render_eval: False
+save_path: 'models/allegro_screwdriver_td3'
+
+data_directory: 'allegro_screwdriver_data_gen_pi_2_close_contact'
+
+# Prioritized Experience Replay
+use_per: True
+per_alpha: 0.6
+per_beta: 0.4
+per_beta_annealing: 0.0001
+
+# Wandb Configuration
+use_wandb: True
+wandb_project: 'allegro-screwdriver-td3'
+wandb_run_name: null  # Set to null for auto-generated names
+wandb_tags: ['allegro', 'td3', 'constrained-rl', 'manipulation']
 # model_path: 'data/training/allegro_screwdriver/allegro_better_model/allegro_screwdriver_diffusion_w_classifier.pt'
 # model_path: 'data/training/allegro_screwdriver/allegro_test_new_data_augment_angle_diffusion/allegro_screwdriver_diffusion.pt'
-controllers:
-  csvgd:
-    # N: 16
-    N: 16
-    alpha_J: 1.0e-2
-    alpha_C: 1
-    step_size: 0.1
-    momentum: 0.
-    device: 'cuda:0'
-    online_iters: 25
-    warmup_iters: 100
-    resample_steps: 16
-    resample_sigma: 0.01
-    resample_temperature: 0.1
-    penalty: 1000000
-    collision_checking: False
-    joint_friction: 0.0
+device: 'cuda:1'

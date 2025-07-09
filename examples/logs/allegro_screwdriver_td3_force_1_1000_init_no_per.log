@@ -1,6 +1,6 @@
 wandb logging initialized
 Simulation running on: cpu
-TD3 training running on: cuda:0
+TD3 training running on: cuda:1
 [Open3D DEBUG] Read geometry::TriangleMesh: 2272 triangles and 3504 vertices.
 [Open3D DEBUG] [RemoveDegenerateTriangles] 0 triangles have been removed.
 [Open3D DEBUG] [RemoveDuplicatedTriangles] 0 triangles have been removed.
@@ -347,685 +347,747 @@ object to robot tensor([[[-7.6604e-01,  4.1318e-01,  4.9240e-01,  9.2768e-01],
 [Open3D DEBUG] [RemoveDuplicatedVertices] 3363 vertices have been removed.
 Episode reset - starting new episode
 Starting training for 1000000 timesteps
-Episode terminated: dropped screwdriver (roll=-0.115, pitch=-0.358), final reward: -3.228, step: 3
-Episode 0: 3 steps, reward=-8.14
+Episode terminated: dropped screwdriver (roll=0.040, pitch=0.207), final reward: -2.947, step: 4
+Episode 0: 4 steps, reward=-11.18
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.156, pitch=-0.210), final reward: -3.253, step: 4
-Episode 1: 4 steps, reward=-11.99
+Episode terminated: dropped screwdriver (roll=0.045, pitch=0.206), final reward: -1.569, step: 4
+Episode 1: 4 steps, reward=-10.01
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.046, pitch=0.206), final reward: -3.381, step: 4
-Episode 2: 4 steps, reward=-11.27
+Episode terminated: dropped screwdriver (roll=0.061, pitch=0.200), final reward: -2.657, step: 4
+Episode 2: 4 steps, reward=-10.24
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.009, pitch=0.209), final reward: -4.064, step: 6
-Episode 3: 6 steps, reward=-21.30
+Episode terminated: dropped screwdriver (roll=0.059, pitch=0.201), final reward: -2.726, step: 4
+Episode 3: 4 steps, reward=-9.68
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.026, pitch=-0.271), final reward: -3.275, step: 2
-Episode 4: 2 steps, reward=-4.69
+Episode terminated: dropped screwdriver (roll=0.043, pitch=0.207), final reward: -2.400, step: 4
+Episode 4: 4 steps, reward=-11.14
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.239, pitch=-0.090), final reward: -1.131, step: 10
-Episode 5: 10 steps, reward=-26.79
+Episode terminated: dropped screwdriver (roll=0.025, pitch=0.210), final reward: -3.249, step: 4
+Episode 5: 4 steps, reward=-11.36
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.297, pitch=-0.337), final reward: -2.922, step: 3
-Episode 6: 3 steps, reward=-7.22
+Episode terminated: dropped screwdriver (roll=-0.225, pitch=-0.436), final reward: -3.621, step: 4
+Episode 6: 4 steps, reward=-12.53
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.365, pitch=-0.296), final reward: -2.615, step: 10
-Episode 7: 10 steps, reward=-27.82
+Episode terminated: dropped screwdriver (roll=0.269, pitch=0.099), final reward: -3.312, step: 10
+Episode 7: 10 steps, reward=-32.47
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.040, pitch=0.207), final reward: -4.176, step: 4
-Episode 8: 4 steps, reward=-11.93
+Episode terminated: dropped screwdriver (roll=0.028, pitch=0.210), final reward: -3.053, step: 4
+Episode 8: 4 steps, reward=-11.05
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.289, pitch=-0.323), final reward: -2.977, step: 3
-Episode 9: 3 steps, reward=-9.49
+Episode terminated: dropped screwdriver (roll=0.255, pitch=0.067), final reward: -2.795, step: 16
+Episode 9: 16 steps, reward=-44.51
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.032, pitch=-0.245), final reward: -2.570, step: 2
-Episode 10: 2 steps, reward=-4.97
+Episode terminated: dropped screwdriver (roll=0.041, pitch=0.200), final reward: -2.201, step: 4
+Episode 10: 4 steps, reward=-9.70
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.037, pitch=0.200), final reward: -2.190, step: 11
-Episode 11: 11 steps, reward=-32.22
+Episode terminated: dropped screwdriver (roll=0.027, pitch=0.204), final reward: -3.533, step: 4
+Episode 11: 4 steps, reward=-11.87
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.039, pitch=-0.242), final reward: -3.547, step: 2
-Episode 12: 2 steps, reward=-7.27
+Episode terminated: dropped screwdriver (roll=0.338, pitch=-0.187), final reward: -2.730, step: 12
+Episode 12: 12 steps, reward=-35.09
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.355, pitch=-0.022), final reward: -3.371, step: 8
-Episode 13: 8 steps, reward=-23.15
+Episode terminated: dropped screwdriver (roll=0.045, pitch=0.206), final reward: -2.921, step: 4
+Episode 13: 4 steps, reward=-12.35
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.030, pitch=-0.266), final reward: -2.511, step: 2
-Episode 14: 2 steps, reward=-5.09
+Episode terminated: dropped screwdriver (roll=0.346, pitch=-0.086), final reward: -2.464, step: 14
+Episode 14: 14 steps, reward=-43.48
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.037, pitch=0.208), final reward: -2.336, step: 4
-Episode 15: 4 steps, reward=-12.17
+Episode terminated: dropped screwdriver (roll=0.042, pitch=0.206), final reward: -1.759, step: 4
+Episode 15: 4 steps, reward=-9.47
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.043, pitch=0.207), final reward: -2.376, step: 4
-Episode 16: 4 steps, reward=-11.15
+Episode terminated: dropped screwdriver (roll=0.045, pitch=0.206), final reward: -2.656, step: 4
+Episode 16: 4 steps, reward=-10.62
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.285, pitch=0.143), final reward: -1.026, step: 9
-Episode 17: 9 steps, reward=-23.00
+Episode terminated: dropped screwdriver (roll=0.045, pitch=0.201), final reward: -3.901, step: 4
+Episode 17: 4 steps, reward=-14.45
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.025, pitch=0.200), final reward: -3.110, step: 4
-Episode 18: 4 steps, reward=-12.50
+Episode terminated: dropped screwdriver (roll=0.037, pitch=0.202), final reward: -2.462, step: 4
+Episode 18: 4 steps, reward=-9.60
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.051, pitch=-0.249), final reward: -3.397, step: 2
-Episode 19: 2 steps, reward=-6.25
+Episode terminated: dropped screwdriver (roll=-0.022, pitch=-0.256), final reward: -2.660, step: 2
+Episode 19: 2 steps, reward=-6.01
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.249, pitch=0.107), final reward: -3.024, step: 9
-Episode 20: 9 steps, reward=-25.79
+Episode terminated: dropped screwdriver (roll=0.044, pitch=0.207), final reward: -3.640, step: 4
+Episode 20: 4 steps, reward=-11.76
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.048, pitch=-0.240), final reward: -3.427, step: 2
-Episode 21: 2 steps, reward=-5.82
+Episode terminated: dropped screwdriver (roll=0.307, pitch=0.102), final reward: -1.941, step: 14
+Episode 21: 14 steps, reward=-37.10
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.011, pitch=0.212), final reward: -1.737, step: 7
-Episode 22: 7 steps, reward=-20.57
+Episode terminated: dropped screwdriver (roll=0.042, pitch=0.206), final reward: -3.499, step: 4
+Episode 22: 4 steps, reward=-10.06
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.003, pitch=-0.254), final reward: -2.578, step: 2
-Episode 23: 2 steps, reward=-5.20
+Episode terminated: dropped screwdriver (roll=0.044, pitch=0.207), final reward: -2.934, step: 4
+Episode 23: 4 steps, reward=-8.34
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.043, pitch=0.209), final reward: -2.351, step: 4
-Episode 24: 4 steps, reward=-9.68
+Episode terminated: dropped screwdriver (roll=0.242, pitch=0.126), final reward: -3.627, step: 11
+Episode 24: 11 steps, reward=-32.72
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.330, pitch=-0.284), final reward: -3.893, step: 9
-Episode 25: 9 steps, reward=-28.13
+Episode terminated: dropped screwdriver (roll=0.040, pitch=0.207), final reward: -4.227, step: 4
+Episode 25: 4 steps, reward=-13.80
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.083, pitch=-0.326), final reward: -3.086, step: 4
-Episode 26: 4 steps, reward=-12.44
+Episode terminated: dropped screwdriver (roll=0.025, pitch=0.205), final reward: -3.445, step: 4
+Episode 26: 4 steps, reward=-11.81
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.286, pitch=0.389), final reward: -2.441, step: 9
-Episode 27: 9 steps, reward=-23.28
+Episode terminated: dropped screwdriver (roll=0.299, pitch=0.035), final reward: -3.017, step: 17
+Episode 27: 17 steps, reward=-49.90
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.225, pitch=-0.157), final reward: -3.267, step: 4
-Episode 28: 4 steps, reward=-12.65
+Episode terminated: dropped screwdriver (roll=0.338, pitch=-0.040), final reward: -2.090, step: 16
+Episode 28: 16 steps, reward=-46.17
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.068, pitch=-0.356), final reward: -2.398, step: 3
-Episode 29: 3 steps, reward=-7.30
+Episode terminated: dropped screwdriver (roll=-0.202, pitch=0.247), final reward: -3.203, step: 10
+Episode 29: 10 steps, reward=-28.30
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.052, pitch=-0.256), final reward: -3.384, step: 3
-Episode 30: 3 steps, reward=-8.85
+Episode terminated: dropped screwdriver (roll=0.041, pitch=0.205), final reward: -3.613, step: 4
+Episode 30: 4 steps, reward=-10.39
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.140, pitch=-0.444), final reward: -3.636, step: 3
-Episode 31: 3 steps, reward=-9.27
+Episode terminated: dropped screwdriver (roll=0.044, pitch=0.206), final reward: -2.071, step: 4
+Episode 31: 4 steps, reward=-8.82
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.013, pitch=-0.305), final reward: -3.389, step: 3
-Episode 32: 3 steps, reward=-8.76
+Episode terminated: dropped screwdriver (roll=-0.174, pitch=-0.492), final reward: -2.583, step: 4
+Episode 32: 4 steps, reward=-11.76
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.028, pitch=-0.202), final reward: -2.210, step: 3
-Episode 33: 3 steps, reward=-8.20
+Episode terminated: dropped screwdriver (roll=0.044, pitch=0.206), final reward: -3.609, step: 4
+Episode 33: 4 steps, reward=-10.78
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.117, pitch=-0.437), final reward: -2.764, step: 3
-Episode 34: 3 steps, reward=-7.70
+Episode terminated: dropped screwdriver (roll=-0.315, pitch=-0.169), final reward: -1.942, step: 10
+Episode 34: 10 steps, reward=-25.99
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.041, pitch=-0.223), final reward: -1.642, step: 2
-Episode 35: 2 steps, reward=-5.70
+Episode terminated: dropped screwdriver (roll=0.091, pitch=-0.317), final reward: -2.673, step: 3
+Episode 35: 3 steps, reward=-8.87
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.029, pitch=-0.212), final reward: -2.239, step: 2
-Episode 36: 2 steps, reward=-4.36
+Episode terminated: dropped screwdriver (roll=0.060, pitch=0.200), final reward: -2.159, step: 4
+Episode 36: 4 steps, reward=-9.45
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.014, pitch=-0.242), final reward: -3.071, step: 3
-Episode 37: 3 steps, reward=-8.44
+Episode terminated: dropped screwdriver (roll=0.042, pitch=0.202), final reward: -3.225, step: 4
+Episode 37: 4 steps, reward=-12.43
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.051, pitch=-0.300), final reward: -2.306, step: 3
-Episode 38: 3 steps, reward=-8.37
+Episode terminated: dropped screwdriver (roll=0.202, pitch=0.129), final reward: -3.599, step: 24
+Episode 38: 24 steps, reward=-73.04
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.035, pitch=-0.334), final reward: -3.013, step: 3
-Episode 39: 3 steps, reward=-8.55
+Episode terminated: dropped screwdriver (roll=0.228, pitch=0.134), final reward: -2.473, step: 15
+Episode 39: 15 steps, reward=-41.18
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.105, pitch=-0.204), final reward: -3.613, step: 4
-Episode 40: 4 steps, reward=-12.46
+Episode terminated: dropped screwdriver (roll=0.043, pitch=0.201), final reward: -3.210, step: 4
+Episode 40: 4 steps, reward=-11.25
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.018, pitch=-0.222), final reward: -3.064, step: 13
-Episode 41: 13 steps, reward=-41.97
+Episode terminated: dropped screwdriver (roll=-0.163, pitch=0.237), final reward: -3.936, step: 11
+Episode 41: 11 steps, reward=-33.19
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.035, pitch=-0.204), final reward: -4.303, step: 24
-Episode 42: 24 steps, reward=-78.46
+Episode terminated: dropped screwdriver (roll=0.041, pitch=0.201), final reward: -3.522, step: 4
+Episode 42: 4 steps, reward=-13.05
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.243, pitch=0.060), final reward: -2.493, step: 5
-Episode 43: 5 steps, reward=-15.57
+Episode terminated: dropped screwdriver (roll=0.025, pitch=0.210), final reward: -2.787, step: 4
+Episode 43: 4 steps, reward=-9.92
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.211, pitch=0.034), final reward: -3.608, step: 6
-Episode 44: 6 steps, reward=-20.80
+Episode terminated: dropped screwdriver (roll=0.048, pitch=-0.286), final reward: -2.014, step: 2
+Episode 44: 2 steps, reward=-4.90
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.235, pitch=0.058), final reward: -3.029, step: 5
-Episode 45: 5 steps, reward=-19.01
+Episode terminated: dropped screwdriver (roll=0.042, pitch=0.206), final reward: -3.361, step: 4
+Episode 45: 4 steps, reward=-10.79
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.150, pitch=-0.209), final reward: -3.748, step: 9
-Episode 46: 9 steps, reward=-32.75
+Episode terminated: dropped screwdriver (roll=0.044, pitch=0.204), final reward: -2.922, step: 4
+Episode 46: 4 steps, reward=-10.91
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.212, pitch=0.056), final reward: -3.732, step: 5
-Episode 47: 5 steps, reward=-15.92
+Episode terminated: dropped screwdriver (roll=0.041, pitch=0.207), final reward: -3.028, step: 4
+Episode 47: 4 steps, reward=-10.63
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.234, pitch=0.051), final reward: -3.701, step: 6
-Episode 48: 6 steps, reward=-19.40
+Episode terminated: dropped screwdriver (roll=-0.439, pitch=-0.142), final reward: -2.510, step: 10
+Episode 48: 10 steps, reward=-29.87
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.205, pitch=0.047), final reward: -4.770, step: 6
-Episode 49: 6 steps, reward=-22.81
+Episode terminated: dropped screwdriver (roll=0.039, pitch=0.200), final reward: -3.294, step: 4
+Episode 49: 4 steps, reward=-11.45
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.200, pitch=0.139), final reward: -3.782, step: 4
-Episode 50: 4 steps, reward=-14.25
+Episode terminated: dropped screwdriver (roll=-0.069, pitch=-0.371), final reward: -2.621, step: 3
+Episode 50: 3 steps, reward=-8.65
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.114, pitch=-0.203), final reward: -4.089, step: 8
-Episode 51: 8 steps, reward=-24.48
+Episode terminated: dropped screwdriver (roll=-0.231, pitch=-0.081), final reward: -2.588, step: 6
+Episode 51: 6 steps, reward=-16.78
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.205, pitch=0.053), final reward: -3.872, step: 5
-Episode 52: 5 steps, reward=-17.06
+Episode terminated: dropped screwdriver (roll=0.247, pitch=-0.044), final reward: -3.682, step: 9
+Episode 52: 9 steps, reward=-26.84
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.042, pitch=-0.245), final reward: -3.574, step: 22
-Episode 53: 22 steps, reward=-77.81
+Episode terminated: dropped screwdriver (roll=0.039, pitch=0.202), final reward: -2.404, step: 4
+Episode 53: 4 steps, reward=-12.81
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.333), final reward: -4.450, step: 13
-Episode 54: 13 steps, reward=-48.34
+Episode terminated: dropped screwdriver (roll=0.043, pitch=0.207), final reward: -3.014, step: 4
+Episode 54: 4 steps, reward=-10.31
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.343, pitch=0.120), final reward: -4.585, step: 5
-Episode 55: 5 steps, reward=-20.63
+Episode terminated: dropped screwdriver (roll=0.218, pitch=0.123), final reward: -2.592, step: 14
+Episode 55: 14 steps, reward=-38.87
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.238, pitch=0.048), final reward: -4.380, step: 6
-Episode 56: 6 steps, reward=-21.87
+Episode terminated: dropped screwdriver (roll=0.039, pitch=0.203), final reward: -2.457, step: 4
+Episode 56: 4 steps, reward=-12.08
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.218, pitch=0.123), final reward: -2.731, step: 4
-Episode 57: 4 steps, reward=-11.32
+Episode terminated: dropped screwdriver (roll=0.230, pitch=-0.226), final reward: -2.694, step: 19
+Episode 57: 19 steps, reward=-52.03
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.362, pitch=-0.433), final reward: -4.094, step: 9
-Episode 58: 9 steps, reward=-32.84
+Episode terminated: dropped screwdriver (roll=0.037, pitch=0.208), final reward: -2.469, step: 4
+Episode 58: 4 steps, reward=-10.62
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.374, pitch=0.014), final reward: -3.542, step: 8
-Episode 59: 8 steps, reward=-27.41
+Episode terminated: dropped screwdriver (roll=0.355, pitch=-0.049), final reward: -2.002, step: 16
+Episode 59: 16 steps, reward=-45.18
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.244, pitch=0.136), final reward: -3.157, step: 5
-Episode 60: 5 steps, reward=-17.47
+Episode terminated: dropped screwdriver (roll=-0.365, pitch=0.238), final reward: -3.256, step: 12
+Episode 60: 12 steps, reward=-34.11
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.235, pitch=0.129), final reward: -4.544, step: 6
-Episode 61: 6 steps, reward=-20.89
+Episode terminated: dropped screwdriver (roll=0.033, pitch=0.209), final reward: -3.541, step: 4
+Episode 61: 4 steps, reward=-10.82
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.214, pitch=0.138), final reward: -2.916, step: 6
-Episode 62: 6 steps, reward=-19.77
+Episode terminated: dropped screwdriver (roll=0.042, pitch=0.203), final reward: -3.440, step: 4
+Episode 62: 4 steps, reward=-12.40
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.420, pitch=0.063), final reward: -3.691, step: 6
-Episode 63: 6 steps, reward=-17.93
+Episode terminated: dropped screwdriver (roll=0.045, pitch=0.206), final reward: -2.530, step: 4
+Episode 63: 4 steps, reward=-12.05
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.203, pitch=0.146), final reward: -2.811, step: 11
-Episode 64: 11 steps, reward=-37.27
+Episode terminated: dropped screwdriver (roll=0.043, pitch=0.207), final reward: -2.120, step: 4
+Episode 64: 4 steps, reward=-11.33
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.207, pitch=0.053), final reward: -4.898, step: 5
-Episode 65: 5 steps, reward=-17.92
+Episode terminated: dropped screwdriver (roll=0.042, pitch=0.200), final reward: -3.001, step: 4
+Episode 65: 4 steps, reward=-11.51
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.209, pitch=0.049), final reward: -3.776, step: 6
-Episode 66: 6 steps, reward=-23.30
+Episode terminated: dropped screwdriver (roll=0.031, pitch=0.209), final reward: -2.504, step: 4
+Episode 66: 4 steps, reward=-11.50
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.269, pitch=0.027), final reward: -3.534, step: 6
-Episode 67: 6 steps, reward=-16.64
+Episode terminated: dropped screwdriver (roll=-0.310, pitch=0.380), final reward: -2.343, step: 11
+Episode 67: 11 steps, reward=-30.56
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.057, pitch=-0.201), final reward: -2.734, step: 25
-Episode 68: 25 steps, reward=-69.03
+Episode terminated: dropped screwdriver (roll=0.028, pitch=0.209), final reward: -2.947, step: 4
+Episode 68: 4 steps, reward=-12.34
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.484, pitch=-0.038), final reward: -2.624, step: 10
-Episode 69: 10 steps, reward=-31.27
+Episode terminated: dropped screwdriver (roll=0.044, pitch=0.207), final reward: -3.517, step: 4
+Episode 69: 4 steps, reward=-13.82
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.202, pitch=-0.155), final reward: -3.319, step: 14
-Episode 70: 14 steps, reward=-39.46
+Episode terminated: dropped screwdriver (roll=0.260, pitch=0.104), final reward: -3.087, step: 15
+Episode 70: 15 steps, reward=-46.24
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=0.228, pitch=-0.178), final reward: -4.302, step: 12
-Episode 71: 12 steps, reward=-35.03
+Episode terminated: dropped screwdriver (roll=0.033, pitch=0.209), final reward: -2.478, step: 4
+Episode 71: 4 steps, reward=-10.54
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.049, pitch=-0.266), final reward: -2.821, step: 5
-Episode 72: 5 steps, reward=-14.77
+Episode terminated: dropped screwdriver (roll=0.043, pitch=0.202), final reward: -2.570, step: 4
+Episode 72: 4 steps, reward=-11.58
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.122, pitch=-0.312), final reward: -3.587, step: 4
-Episode 73: 4 steps, reward=-13.34
+Episode terminated: dropped screwdriver (roll=0.041, pitch=0.206), final reward: -3.052, step: 4
+Episode 73: 4 steps, reward=-11.76
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.136, pitch=-0.395), final reward: -2.307, step: 4
-Episode 74: 4 steps, reward=-10.10
+Episode terminated: dropped screwdriver (roll=0.226, pitch=0.131), final reward: -2.557, step: 11
+Episode 74: 11 steps, reward=-28.80
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.105, pitch=-0.462), final reward: -2.915, step: 4
-Episode 75: 4 steps, reward=-12.20
+Episode terminated: dropped screwdriver (roll=0.108, pitch=-0.319), final reward: -3.092, step: 2
+Episode 75: 2 steps, reward=-7.23
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.161, pitch=-0.306), final reward: -2.261, step: 4
-Episode 76: 4 steps, reward=-13.52
+Episode terminated: dropped screwdriver (roll=-0.194, pitch=0.238), final reward: -3.790, step: 6
+Episode 76: 6 steps, reward=-17.04
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.142, pitch=-0.268), final reward: -3.903, step: 4
-Episode 77: 4 steps, reward=-15.40
+Episode terminated: dropped screwdriver (roll=0.045, pitch=0.206), final reward: -3.231, step: 4
+Episode 77: 4 steps, reward=-9.97
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.298, pitch=-0.460), final reward: -3.151, step: 5
-Episode 78: 5 steps, reward=-14.94
+Episode terminated: dropped screwdriver (roll=0.040, pitch=0.207), final reward: -2.829, step: 4
+Episode 78: 4 steps, reward=-12.05
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.228, pitch=-0.301), final reward: -2.476, step: 4
-Episode 79: 4 steps, reward=-13.07
+Episode terminated: dropped screwdriver (roll=0.044, pitch=0.207), final reward: -2.922, step: 4
+Episode 79: 4 steps, reward=-12.29
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.460), final reward: -3.568, step: 4
-Episode 80: 4 steps, reward=-13.81
+Episode terminated: dropped screwdriver (roll=-0.207, pitch=0.365), final reward: -2.601, step: 13
+Episode 80: 13 steps, reward=-36.29
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.223, pitch=-0.345), final reward: -3.883, step: 4
-Episode 81: 4 steps, reward=-13.99
+Episode terminated: dropped screwdriver (roll=0.041, pitch=0.207), final reward: -3.174, step: 4
+Episode 81: 4 steps, reward=-11.13
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.251, pitch=-0.361), final reward: -3.142, step: 4
-Episode 82: 4 steps, reward=-13.04
+Episode terminated: dropped screwdriver (roll=0.024, pitch=0.211), final reward: -1.790, step: 4
+Episode 82: 4 steps, reward=-10.32
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.246, pitch=-0.364), final reward: -3.122, step: 4
-Episode 83: 4 steps, reward=-11.46
+Episode terminated: dropped screwdriver (roll=0.045, pitch=0.207), final reward: -3.275, step: 4
+Episode 83: 4 steps, reward=-12.56
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -4.440, step: 4
-Episode 84: 4 steps, reward=-15.74
+Episode terminated: dropped screwdriver (roll=-0.054, pitch=0.200), final reward: -2.918, step: 9
+Episode 84: 9 steps, reward=-24.00
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.168, pitch=-0.488), final reward: -4.301, step: 4
-Episode 85: 4 steps, reward=-16.54
+Episode terminated: dropped screwdriver (roll=-0.079, pitch=0.203), final reward: -2.919, step: 7
+Episode 85: 7 steps, reward=-22.11
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.195, pitch=-0.479), final reward: -4.267, step: 4
-Episode 86: 4 steps, reward=-16.27
+Episode terminated: dropped screwdriver (roll=-0.155, pitch=0.240), final reward: -2.553, step: 4
+Episode 86: 4 steps, reward=-11.36
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.223, pitch=-0.469), final reward: -5.180, step: 4
-Episode 87: 4 steps, reward=-15.26
+Episode terminated: dropped screwdriver (roll=-0.487, pitch=0.032), final reward: -3.535, step: 20
+Episode 87: 20 steps, reward=-56.34
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.220, pitch=-0.471), final reward: -2.647, step: 4
-Episode 88: 4 steps, reward=-14.31
+Episode terminated: dropped screwdriver (roll=0.202, pitch=0.119), final reward: -2.892, step: 12
+Episode 88: 12 steps, reward=-34.82
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -4.523, step: 4
-Episode 89: 4 steps, reward=-17.58
+Episode terminated: dropped screwdriver (roll=0.049, pitch=-0.325), final reward: -3.103, step: 3
+Episode 89: 3 steps, reward=-9.63
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -3.584, step: 4
-Episode 90: 4 steps, reward=-12.96
+Episode terminated: dropped screwdriver (roll=0.297, pitch=0.103), final reward: -2.724, step: 19
+Episode 90: 19 steps, reward=-55.63
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.224, pitch=-0.467), final reward: -3.861, step: 4
-Episode 91: 4 steps, reward=-15.36
+Episode terminated: dropped screwdriver (roll=0.037, pitch=0.208), final reward: -2.862, step: 4
+Episode 91: 4 steps, reward=-10.85
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -4.777, step: 4
-Episode 92: 4 steps, reward=-16.72
+Episode terminated: dropped screwdriver (roll=0.042, pitch=0.204), final reward: -2.335, step: 4
+Episode 92: 4 steps, reward=-11.33
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -5.286, step: 4
-Episode 93: 4 steps, reward=-17.54
+Episode terminated: dropped screwdriver (roll=0.042, pitch=0.205), final reward: -2.617, step: 4
+Episode 93: 4 steps, reward=-9.39
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.470), final reward: -3.693, step: 4
-Episode 94: 4 steps, reward=-17.16
+Episode terminated: dropped screwdriver (roll=0.041, pitch=0.203), final reward: -3.119, step: 4
+Episode 94: 4 steps, reward=-12.17
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.220, pitch=-0.471), final reward: -4.654, step: 4
-Episode 95: 4 steps, reward=-16.94
+Episode terminated: dropped screwdriver (roll=0.043, pitch=0.207), final reward: -2.844, step: 4
+Episode 95: 4 steps, reward=-14.05
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.470), final reward: -3.665, step: 4
-Episode 96: 4 steps, reward=-14.56
+Episode terminated: dropped screwdriver (roll=-0.215, pitch=-0.089), final reward: -2.956, step: 5
+Episode 96: 5 steps, reward=-15.31
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.240, pitch=-0.463), final reward: -4.500, step: 4
-Episode 97: 4 steps, reward=-17.11
+Episode terminated: dropped screwdriver (roll=-0.044, pitch=0.233), final reward: -2.604, step: 4
+Episode 97: 4 steps, reward=-10.99
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.470), final reward: -3.919, step: 4
-Episode 98: 4 steps, reward=-17.95
+Episode terminated: dropped screwdriver (roll=0.037, pitch=0.208), final reward: -2.925, step: 4
+Episode 98: 4 steps, reward=-12.35
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -4.072, step: 4
-Episode 99: 4 steps, reward=-13.19
+Episode terminated: dropped screwdriver (roll=0.247, pitch=-0.146), final reward: -3.069, step: 11
+Episode 99: 11 steps, reward=-33.40
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.220, pitch=-0.471), final reward: -3.641, step: 4
-Episode 100: 4 steps, reward=-15.29
+Episode terminated: dropped screwdriver (roll=-0.004, pitch=-0.240), final reward: -3.538, step: 2
+Episode 100: 2 steps, reward=-6.37
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -4.552, step: 4
-Episode 101: 4 steps, reward=-16.50
+Episode terminated: dropped screwdriver (roll=0.057, pitch=0.201), final reward: -3.149, step: 4
+Episode 101: 4 steps, reward=-11.08
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -4.327, step: 4
-Episode 102: 4 steps, reward=-16.24
+Episode terminated: dropped screwdriver (roll=-0.045, pitch=-0.371), final reward: -2.883, step: 3
+Episode 102: 3 steps, reward=-9.64
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.468), final reward: -3.879, step: 4
-Episode 103: 4 steps, reward=-14.12
+Episode terminated: dropped screwdriver (roll=0.262, pitch=-0.152), final reward: -2.782, step: 15
+Episode 103: 15 steps, reward=-41.51
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.220, pitch=-0.471), final reward: -3.889, step: 4
-Episode 104: 4 steps, reward=-15.75
+Episode terminated: dropped screwdriver (roll=-0.480, pitch=0.244), final reward: -3.555, step: 15
+Episode 104: 15 steps, reward=-41.05
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.470), final reward: -4.413, step: 4
-Episode 105: 4 steps, reward=-15.08
+Episode terminated: dropped screwdriver (roll=0.047, pitch=0.205), final reward: -2.410, step: 4
+Episode 105: 4 steps, reward=-11.03
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.470), final reward: -3.929, step: 4
-Episode 106: 4 steps, reward=-15.98
+Episode terminated: dropped screwdriver (roll=0.342, pitch=-0.124), final reward: -2.483, step: 19
+Episode 106: 19 steps, reward=-52.44
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.220, pitch=-0.471), final reward: -3.673, step: 4
-Episode 107: 4 steps, reward=-15.54
+Episode terminated: dropped screwdriver (roll=0.205, pitch=0.085), final reward: -3.047, step: 18
+Episode 107: 18 steps, reward=-53.83
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.470), final reward: -4.730, step: 4
-Episode 108: 4 steps, reward=-13.92
+Episode terminated: dropped screwdriver (roll=0.032, pitch=0.206), final reward: -3.565, step: 4
+Episode 108: 4 steps, reward=-12.21
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -2.138, step: 4
-Episode 109: 4 steps, reward=-13.66
+Episode terminated: dropped screwdriver (roll=-0.242, pitch=-0.441), final reward: -2.726, step: 3
+Episode 109: 3 steps, reward=-8.84
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -4.710, step: 4
-Episode 110: 4 steps, reward=-16.90
+Episode terminated: dropped screwdriver (roll=0.046, pitch=0.206), final reward: -2.676, step: 4
+Episode 110: 4 steps, reward=-10.49
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -4.609, step: 4
-Episode 111: 4 steps, reward=-17.76
+Episode terminated: dropped screwdriver (roll=0.027, pitch=0.210), final reward: -3.233, step: 4
+Episode 111: 4 steps, reward=-10.29
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.220, pitch=-0.471), final reward: -4.084, step: 4
-Episode 112: 4 steps, reward=-14.67
+Episode terminated: dropped screwdriver (roll=0.043, pitch=0.207), final reward: -2.954, step: 4
+Episode 112: 4 steps, reward=-11.32
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -4.276, step: 4
-Episode 113: 4 steps, reward=-17.26
+Episode terminated: dropped screwdriver (roll=0.028, pitch=0.204), final reward: -2.429, step: 4
+Episode 113: 4 steps, reward=-10.86
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.168, pitch=-0.488), final reward: -3.870, step: 4
-Episode 114: 4 steps, reward=-16.73
+Episode terminated: dropped screwdriver (roll=0.130, pitch=-0.355), final reward: -3.384, step: 5
+Episode 114: 5 steps, reward=-15.45
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.195, pitch=-0.479), final reward: -2.951, step: 4
-Episode 115: 4 steps, reward=-12.20
+Episode terminated: dropped screwdriver (roll=-0.030, pitch=-0.273), final reward: -3.292, step: 9
+Episode 115: 9 steps, reward=-26.82
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.260, pitch=-0.327), final reward: -2.482, step: 4
-Episode 116: 4 steps, reward=-13.66
+Episode terminated: dropped screwdriver (roll=0.042, pitch=0.207), final reward: -3.530, step: 4
+Episode 116: 4 steps, reward=-10.82
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.235, pitch=-0.327), final reward: -2.014, step: 4
-Episode 117: 4 steps, reward=-14.20
+Episode terminated: dropped screwdriver (roll=-0.243, pitch=-0.004), final reward: -2.733, step: 9
+Episode 117: 9 steps, reward=-25.08
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.345), final reward: -3.962, step: 4
-Episode 118: 4 steps, reward=-15.28
+Episode terminated: dropped screwdriver (roll=-0.234, pitch=0.008), final reward: -2.971, step: 14
+Episode 118: 14 steps, reward=-36.50
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.226, pitch=-0.436), final reward: -3.901, step: 4
-Episode 119: 4 steps, reward=-15.10
+Episode terminated: dropped screwdriver (roll=0.333, pitch=0.058), final reward: -2.082, step: 18
+Episode 119: 18 steps, reward=-51.40
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.229, pitch=-0.447), final reward: -4.021, step: 4
-Episode 120: 4 steps, reward=-14.82
+Episode terminated: dropped screwdriver (roll=0.026, pitch=0.210), final reward: -1.574, step: 4
+Episode 120: 4 steps, reward=-10.55
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -3.110, step: 4
-Episode 121: 4 steps, reward=-13.03
+Episode terminated: dropped screwdriver (roll=0.040, pitch=0.207), final reward: -3.348, step: 4
+Episode 121: 4 steps, reward=-12.19
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -3.587, step: 4
-Episode 122: 4 steps, reward=-13.69
+Episode terminated: dropped screwdriver (roll=-0.325, pitch=0.057), final reward: -2.394, step: 11
+Episode 122: 11 steps, reward=-30.93
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -3.898, step: 4
-Episode 123: 4 steps, reward=-12.73
+Episode terminated: dropped screwdriver (roll=-0.094, pitch=-0.260), final reward: -2.346, step: 3
+Episode 123: 3 steps, reward=-9.11
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.470), final reward: -3.821, step: 4
-Episode 124: 4 steps, reward=-12.60
+Episode terminated: dropped screwdriver (roll=0.045, pitch=0.206), final reward: -3.093, step: 4
+Episode 124: 4 steps, reward=-11.16
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -4.961, step: 4
-Episode 125: 4 steps, reward=-17.01
+Episode terminated: dropped screwdriver (roll=0.043, pitch=0.207), final reward: -2.869, step: 4
+Episode 125: 4 steps, reward=-9.83
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.240, pitch=-0.463), final reward: -4.293, step: 4
-Episode 126: 4 steps, reward=-17.04
+Episode terminated: dropped screwdriver (roll=0.375, pitch=0.015), final reward: -3.219, step: 20
+Episode 126: 20 steps, reward=-59.53
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.470), final reward: -3.600, step: 4
-Episode 127: 4 steps, reward=-17.01
+Episode terminated: dropped screwdriver (roll=0.027, pitch=0.206), final reward: -3.488, step: 4
+Episode 127: 4 steps, reward=-12.01
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.470), final reward: -3.453, step: 4
-Episode 128: 4 steps, reward=-15.77
+Episode terminated: dropped screwdriver (roll=0.027, pitch=0.202), final reward: -2.504, step: 4
+Episode 128: 4 steps, reward=-12.10
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -4.204, step: 4
-Episode 129: 4 steps, reward=-14.99
+Episode terminated: dropped screwdriver (roll=0.044, pitch=0.207), final reward: -2.912, step: 4
+Episode 129: 4 steps, reward=-12.22
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -3.009, step: 4
-Episode 130: 4 steps, reward=-14.88
+Episode terminated: dropped screwdriver (roll=-0.180, pitch=0.309), final reward: -2.789, step: 14
+Episode 130: 14 steps, reward=-41.54
 Episode reset - starting new episode
-Backend TkAgg is interactive backend. Turning interactive mode on.
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -2.410, step: 4
-Episode 131: 4 steps, reward=-15.18
+Episode terminated: dropped screwdriver (roll=-0.081, pitch=0.225), final reward: -3.490, step: 5
+Episode 131: 5 steps, reward=-15.89
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.223, pitch=-0.467), final reward: -3.746, step: 4
-Episode 132: 4 steps, reward=-15.10
+Episode terminated: dropped screwdriver (roll=-0.212, pitch=0.046), final reward: -3.862, step: 8
+Episode 132: 8 steps, reward=-23.88
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.470), final reward: -3.556, step: 4
-Episode 133: 4 steps, reward=-14.29
+Episode terminated: dropped screwdriver (roll=0.040, pitch=0.202), final reward: -3.849, step: 4
+Episode 133: 4 steps, reward=-10.50
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -4.332, step: 4
-Episode 134: 4 steps, reward=-15.35
+Episode terminated: dropped screwdriver (roll=0.214, pitch=0.127), final reward: -3.463, step: 18
+Episode 134: 18 steps, reward=-53.06
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -4.356, step: 4
-Episode 135: 4 steps, reward=-13.05
+Episode terminated: dropped screwdriver (roll=0.327, pitch=0.084), final reward: -2.618, step: 24
+Episode 135: 24 steps, reward=-66.57
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.470), final reward: -4.543, step: 4
-Episode 136: 4 steps, reward=-16.74
+Episode terminated: dropped screwdriver (roll=-0.100, pitch=-0.420), final reward: -1.461, step: 12
+Episode 136: 12 steps, reward=-35.22
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.470), final reward: -3.774, step: 4
-Episode 137: 4 steps, reward=-15.49
+Episode terminated: dropped screwdriver (roll=-0.258, pitch=0.309), final reward: -2.482, step: 12
+Episode 137: 12 steps, reward=-33.01
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.470), final reward: -4.307, step: 4
-Episode 138: 4 steps, reward=-13.74
+Episode terminated: dropped screwdriver (roll=0.042, pitch=0.207), final reward: -2.363, step: 4
+Episode 138: 4 steps, reward=-11.96
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.231, pitch=-0.383), final reward: -3.888, step: 4
-Episode 139: 4 steps, reward=-15.46
+Episode terminated: dropped screwdriver (roll=0.039, pitch=0.207), final reward: -2.313, step: 4
+Episode 139: 4 steps, reward=-11.62
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.460), final reward: -5.130, step: 4
-Episode 140: 4 steps, reward=-17.38
+Episode terminated: dropped screwdriver (roll=-0.343, pitch=0.256), final reward: -4.026, step: 12
+Episode 140: 12 steps, reward=-36.81
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.242, pitch=-0.336), final reward: -3.039, step: 4
-Episode 141: 4 steps, reward=-13.69
+Episode terminated: dropped screwdriver (roll=0.039, pitch=0.200), final reward: -3.693, step: 6
+Episode 141: 6 steps, reward=-17.53
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.224, pitch=-0.216), final reward: -1.916, step: 4
-Episode 142: 4 steps, reward=-14.13
+Episode terminated: dropped screwdriver (roll=-0.271, pitch=0.227), final reward: -4.571, step: 12
+Episode 142: 12 steps, reward=-35.32
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.225, pitch=-0.164), final reward: -4.741, step: 4
-Episode 143: 4 steps, reward=-15.73
+Episode terminated: dropped screwdriver (roll=-0.069, pitch=-0.296), final reward: -2.211, step: 13
+Episode 143: 13 steps, reward=-38.44
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.225, pitch=-0.164), final reward: -3.828, step: 4
-Episode 144: 4 steps, reward=-16.78
+Episode terminated: dropped screwdriver (roll=0.218, pitch=-0.168), final reward: -2.453, step: 14
+Episode 144: 14 steps, reward=-38.84
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.219, pitch=-0.166), final reward: -4.290, step: 4
-Episode 145: 4 steps, reward=-15.22
+Episode terminated: dropped screwdriver (roll=-0.333, pitch=-0.372), final reward: -2.920, step: 11
+Episode 145: 11 steps, reward=-36.80
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.225, pitch=-0.164), final reward: -4.139, step: 4
-Episode 146: 4 steps, reward=-14.14
+Episode terminated: dropped screwdriver (roll=-0.271, pitch=-0.330), final reward: -2.845, step: 7
+Episode 146: 7 steps, reward=-20.97
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.165), final reward: -4.743, step: 4
-Episode 147: 4 steps, reward=-16.57
+Episode terminated: dropped screwdriver (roll=0.359, pitch=0.245), final reward: -3.155, step: 8
+Episode 147: 8 steps, reward=-24.62
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.225, pitch=-0.218), final reward: -4.338, step: 4
-Episode 148: 4 steps, reward=-15.13
+Episode terminated: dropped screwdriver (roll=0.339, pitch=0.099), final reward: -3.677, step: 5
+Episode 148: 5 steps, reward=-13.64
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.248, pitch=-0.211), final reward: -2.541, step: 4
-Episode 149: 4 steps, reward=-14.83
+Episode terminated: reached max steps, final reward: -3.745, step: 100
+Episode 149: 100 steps, reward=-380.06
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -4.754, step: 4
-Episode 150: 4 steps, reward=-15.86
+Episode terminated: dropped screwdriver (roll=0.248, pitch=0.133), final reward: -4.496, step: 5
+Episode 150: 5 steps, reward=-20.49
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -5.183, step: 4
-Episode 151: 4 steps, reward=-17.08
+Episode terminated: dropped screwdriver (roll=0.202, pitch=0.152), final reward: -4.624, step: 14
+Episode 151: 14 steps, reward=-62.77
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -4.526, step: 4
-Episode 152: 4 steps, reward=-15.09
+Episode terminated: reached max steps, final reward: -5.282, step: 100
+Episode 152: 100 steps, reward=-486.49
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -3.743, step: 4
-Episode 153: 4 steps, reward=-17.27
+Episode terminated: dropped screwdriver (roll=0.107, pitch=0.202), final reward: -4.651, step: 6
+Episode 153: 6 steps, reward=-27.95
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -4.939, step: 4
-Episode 154: 4 steps, reward=-17.98
+Episode terminated: dropped screwdriver (roll=0.099, pitch=0.204), final reward: -5.333, step: 6
+Episode 154: 6 steps, reward=-29.35
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.470), final reward: -4.890, step: 4
-Episode 155: 4 steps, reward=-17.17
+Episode terminated: dropped screwdriver (roll=0.075, pitch=0.203), final reward: -5.187, step: 7
+Episode 155: 7 steps, reward=-33.84
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -3.898, step: 4
-Episode 156: 4 steps, reward=-14.19
+Episode terminated: dropped screwdriver (roll=0.086, pitch=0.201), final reward: -5.128, step: 8
+Episode 156: 8 steps, reward=-37.85
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -5.092, step: 4
-Episode 157: 4 steps, reward=-15.89
+Episode terminated: dropped screwdriver (roll=-0.316, pitch=0.277), final reward: -4.399, step: 36
+Episode 157: 36 steps, reward=-171.98
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -4.692, step: 4
-Episode 158: 4 steps, reward=-17.03
+Episode terminated: dropped screwdriver (roll=0.204, pitch=0.021), final reward: -4.668, step: 14
+Episode 158: 14 steps, reward=-62.54
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.470), final reward: -3.685, step: 4
-Episode 159: 4 steps, reward=-15.39
+Episode terminated: dropped screwdriver (roll=0.108, pitch=0.201), final reward: -3.337, step: 7
+Episode 159: 7 steps, reward=-27.55
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -3.251, step: 4
-Episode 160: 4 steps, reward=-14.83
+Episode terminated: dropped screwdriver (roll=0.112, pitch=0.201), final reward: -4.410, step: 7
+Episode 160: 7 steps, reward=-30.31
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -2.790, step: 4
-Episode 161: 4 steps, reward=-15.52
+Episode terminated: dropped screwdriver (roll=0.060, pitch=0.209), final reward: -4.026, step: 5
+Episode 161: 5 steps, reward=-20.02
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.223, pitch=-0.469), final reward: -3.777, step: 4
-Episode 162: 4 steps, reward=-15.06
+Episode terminated: dropped screwdriver (roll=0.062, pitch=0.200), final reward: -2.739, step: 4
+Episode 162: 4 steps, reward=-10.70
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -3.145, step: 4
-Episode 163: 4 steps, reward=-13.17
+Episode terminated: dropped screwdriver (roll=0.022, pitch=0.201), final reward: -2.725, step: 6
+Episode 163: 6 steps, reward=-21.67
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.168, pitch=-0.488), final reward: -4.162, step: 4
-Episode 164: 4 steps, reward=-15.46
+Episode terminated: dropped screwdriver (roll=-0.043, pitch=0.222), final reward: -3.020, step: 8
+Episode 164: 8 steps, reward=-31.80
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.223, pitch=-0.469), final reward: -3.123, step: 4
-Episode 165: 4 steps, reward=-12.50
+Episode terminated: dropped screwdriver (roll=0.018, pitch=0.215), final reward: -4.390, step: 7
+Episode 165: 7 steps, reward=-27.97
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -4.203, step: 4
-Episode 166: 4 steps, reward=-16.00
+Episode terminated: dropped screwdriver (roll=0.035, pitch=0.204), final reward: -4.331, step: 7
+Episode 166: 7 steps, reward=-29.95
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -4.781, step: 4
-Episode 167: 4 steps, reward=-14.77
+Episode terminated: dropped screwdriver (roll=0.056, pitch=0.202), final reward: -4.330, step: 6
+Episode 167: 6 steps, reward=-27.01
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.240, pitch=-0.463), final reward: -3.360, step: 4
-Episode 168: 4 steps, reward=-13.00
+Episode terminated: dropped screwdriver (roll=-0.054, pitch=0.203), final reward: -4.671, step: 11
+Episode 168: 11 steps, reward=-46.00
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -2.792, step: 4
-Episode 169: 4 steps, reward=-12.73
+Episode terminated: dropped screwdriver (roll=0.070, pitch=0.206), final reward: -4.521, step: 5
+Episode 169: 5 steps, reward=-21.84
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -3.993, step: 4
-Episode 170: 4 steps, reward=-13.65
+Episode terminated: dropped screwdriver (roll=0.045, pitch=0.205), final reward: -4.184, step: 6
+Episode 170: 6 steps, reward=-26.71
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -4.589, step: 4
-Episode 171: 4 steps, reward=-15.13
+Episode terminated: dropped screwdriver (roll=0.067, pitch=0.207), final reward: -4.400, step: 5
+Episode 171: 5 steps, reward=-23.25
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.470), final reward: -4.076, step: 4
-Episode 172: 4 steps, reward=-14.57
+Episode terminated: dropped screwdriver (roll=0.044, pitch=0.206), final reward: -4.004, step: 6
+Episode 172: 6 steps, reward=-27.28
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -4.505, step: 4
-Episode 173: 4 steps, reward=-12.68
+Episode terminated: dropped screwdriver (roll=0.047, pitch=0.203), final reward: -4.253, step: 6
+Episode 173: 6 steps, reward=-26.90
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -4.694, step: 4
-Episode 174: 4 steps, reward=-17.20
+Episode terminated: dropped screwdriver (roll=0.043, pitch=0.207), final reward: -4.443, step: 6
+Episode 174: 6 steps, reward=-25.00
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -3.258, step: 4
-Episode 175: 4 steps, reward=-11.61
+Episode terminated: dropped screwdriver (roll=0.049, pitch=0.200), final reward: -4.841, step: 4
+Episode 175: 4 steps, reward=-17.84
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.223, pitch=-0.467), final reward: -3.094, step: 4
-Episode 176: 4 steps, reward=-15.51
+Episode terminated: dropped screwdriver (roll=0.061, pitch=0.208), final reward: -4.779, step: 5
+Episode 176: 5 steps, reward=-24.58
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -3.438, step: 4
-Episode 177: 4 steps, reward=-15.08
+Episode terminated: dropped screwdriver (roll=0.070, pitch=0.206), final reward: -5.119, step: 5
+Episode 177: 5 steps, reward=-23.53
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -3.604, step: 4
-Episode 178: 4 steps, reward=-13.94
+Episode terminated: dropped screwdriver (roll=0.068, pitch=0.207), final reward: -4.512, step: 5
+Episode 178: 5 steps, reward=-22.52
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -3.409, step: 4
-Episode 179: 4 steps, reward=-14.66
+Episode terminated: dropped screwdriver (roll=0.062, pitch=0.208), final reward: -3.430, step: 5
+Episode 179: 5 steps, reward=-22.50
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -3.753, step: 4
-Episode 180: 4 steps, reward=-13.33
+Episode terminated: dropped screwdriver (roll=0.050, pitch=0.204), final reward: -5.025, step: 4
+Episode 180: 4 steps, reward=-17.89
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -3.472, step: 4
-Episode 181: 4 steps, reward=-13.64
+Episode terminated: dropped screwdriver (roll=0.044, pitch=0.200), final reward: -4.264, step: 4
+Episode 181: 4 steps, reward=-16.74
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.240, pitch=-0.463), final reward: -2.446, step: 4
-Episode 182: 4 steps, reward=-12.55
+Episode terminated: dropped screwdriver (roll=0.056, pitch=0.202), final reward: -5.307, step: 5
+Episode 182: 5 steps, reward=-24.72
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -4.205, step: 4
-Episode 183: 4 steps, reward=-13.51
+Episode terminated: dropped screwdriver (roll=0.044, pitch=0.200), final reward: -4.515, step: 4
+Episode 183: 4 steps, reward=-17.72
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -3.727, step: 4
-Episode 184: 4 steps, reward=-16.80
+Episode terminated: dropped screwdriver (roll=0.057, pitch=0.201), final reward: -4.886, step: 5
+Episode 184: 5 steps, reward=-22.03
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -3.143, step: 4
-Episode 185: 4 steps, reward=-15.11
+Episode terminated: dropped screwdriver (roll=0.067, pitch=0.207), final reward: -4.910, step: 5
+Episode 185: 5 steps, reward=-23.85
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.470), final reward: -3.790, step: 4
-Episode 186: 4 steps, reward=-14.53
+Episode terminated: dropped screwdriver (roll=0.063, pitch=0.207), final reward: -3.841, step: 5
+Episode 186: 5 steps, reward=-22.17
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -3.349, step: 4
-Episode 187: 4 steps, reward=-13.75
+Episode terminated: dropped screwdriver (roll=0.050, pitch=0.200), final reward: -4.007, step: 4
+Episode 187: 4 steps, reward=-19.07
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -4.529, step: 4
-Episode 188: 4 steps, reward=-14.86
+Episode terminated: dropped screwdriver (roll=0.060, pitch=0.201), final reward: -4.497, step: 5
+Episode 188: 5 steps, reward=-21.99
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -3.330, step: 4
-Episode 189: 4 steps, reward=-14.21
+Episode terminated: dropped screwdriver (roll=0.043, pitch=0.206), final reward: -4.383, step: 6
+Episode 189: 6 steps, reward=-27.83
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.223, pitch=-0.469), final reward: -4.023, step: 4
-Episode 190: 4 steps, reward=-13.26
+Episode terminated: dropped screwdriver (roll=0.044, pitch=0.206), final reward: -4.782, step: 6
+Episode 190: 6 steps, reward=-30.37
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -3.414, step: 4
-Episode 191: 4 steps, reward=-15.58
+Episode terminated: dropped screwdriver (roll=0.062, pitch=0.207), final reward: -5.328, step: 6
+Episode 191: 6 steps, reward=-27.60
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -3.544, step: 4
-Episode 192: 4 steps, reward=-14.95
+Episode terminated: dropped screwdriver (roll=0.029, pitch=0.209), final reward: -5.611, step: 6
+Episode 192: 6 steps, reward=-28.82
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.470), final reward: -4.107, step: 4
-Episode 193: 4 steps, reward=-14.25
+Episode terminated: dropped screwdriver (roll=0.049, pitch=0.207), final reward: -3.954, step: 5
+Episode 193: 5 steps, reward=-21.98
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -2.505, step: 4
-Episode 194: 4 steps, reward=-12.79
+Episode terminated: dropped screwdriver (roll=0.046, pitch=0.211), final reward: -4.933, step: 5
+Episode 194: 5 steps, reward=-24.56
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -3.291, step: 4
-Episode 195: 4 steps, reward=-13.84
+Episode terminated: dropped screwdriver (roll=0.054, pitch=0.210), final reward: -4.561, step: 5
+Episode 195: 5 steps, reward=-23.69
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.168, pitch=-0.488), final reward: -3.659, step: 4
-Episode 196: 4 steps, reward=-12.64
+Episode terminated: dropped screwdriver (roll=0.063, pitch=0.207), final reward: -3.953, step: 5
+Episode 196: 5 steps, reward=-20.75
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -3.407, step: 4
-Episode 197: 4 steps, reward=-13.14
+Episode terminated: dropped screwdriver (roll=0.028, pitch=0.205), final reward: -4.554, step: 7
+Episode 197: 7 steps, reward=-30.62
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -3.450, step: 4
-Episode 198: 4 steps, reward=-15.00
+Episode terminated: dropped screwdriver (roll=0.044, pitch=0.207), final reward: -5.397, step: 5
+Episode 198: 5 steps, reward=-22.92
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -4.030, step: 4
-Episode 199: 4 steps, reward=-16.27
+Episode terminated: dropped screwdriver (roll=-0.018, pitch=0.214), final reward: -4.852, step: 7
+Episode 199: 7 steps, reward=-31.71
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.470), final reward: -3.898, step: 4
-Episode 200: 4 steps, reward=-14.43
+Episode terminated: dropped screwdriver (roll=0.014, pitch=0.207), final reward: -4.118, step: 7
+Episode 200: 7 steps, reward=-30.38
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -4.648, step: 4
-Episode 201: 4 steps, reward=-15.73
+Episode terminated: dropped screwdriver (roll=0.024, pitch=0.201), final reward: -2.834, step: 7
+Episode 201: 7 steps, reward=-28.49
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.223, pitch=-0.469), final reward: -3.929, step: 4
-Episode 202: 4 steps, reward=-14.69
+Episode terminated: dropped screwdriver (roll=-0.020, pitch=0.207), final reward: -4.538, step: 7
+Episode 202: 7 steps, reward=-29.41
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -2.668, step: 4
-Episode 203: 4 steps, reward=-12.73
+Episode terminated: dropped screwdriver (roll=-0.042, pitch=0.206), final reward: -3.351, step: 9
+Episode 203: 9 steps, reward=-32.62
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.223, pitch=-0.469), final reward: -3.968, step: 4
-Episode 204: 4 steps, reward=-14.27
+Episode terminated: dropped screwdriver (roll=-0.265, pitch=-0.310), final reward: -3.022, step: 3
+Episode 204: 3 steps, reward=-11.78
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -4.407, step: 4
-Episode 205: 4 steps, reward=-17.24
+Episode terminated: dropped screwdriver (roll=-0.237, pitch=0.185), final reward: -3.540, step: 11
+Episode 205: 11 steps, reward=-34.66
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -4.452, step: 4
-Episode 206: 4 steps, reward=-16.86
+Episode terminated: dropped screwdriver (roll=-0.175, pitch=0.214), final reward: -3.361, step: 10
+Episode 206: 10 steps, reward=-35.20
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -3.889, step: 4
-Episode 207: 4 steps, reward=-12.87
+Episode terminated: dropped screwdriver (roll=-0.184, pitch=0.233), final reward: -3.616, step: 10
+Episode 207: 10 steps, reward=-30.01
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -4.078, step: 4
-Episode 208: 4 steps, reward=-12.40
+Episode terminated: dropped screwdriver (roll=-0.232, pitch=0.201), final reward: -3.902, step: 10
+Episode 208: 10 steps, reward=-34.47
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -3.493, step: 4
-Episode 209: 4 steps, reward=-13.50
+Episode terminated: dropped screwdriver (roll=0.068, pitch=0.201), final reward: -3.903, step: 6
+Episode 209: 6 steps, reward=-23.29
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.223, pitch=-0.467), final reward: -4.806, step: 4
-Episode 210: 4 steps, reward=-15.17
+Episode terminated: dropped screwdriver (roll=-0.068, pitch=0.224), final reward: -4.468, step: 7
+Episode 210: 7 steps, reward=-25.74
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -3.750, step: 4
-Episode 211: 4 steps, reward=-14.91
+Episode terminated: dropped screwdriver (roll=0.043, pitch=0.206), final reward: -3.672, step: 6
+Episode 211: 6 steps, reward=-21.18
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.168, pitch=-0.488), final reward: -3.679, step: 4
-Episode 212: 4 steps, reward=-13.11
+Episode terminated: dropped screwdriver (roll=-0.323, pitch=0.246), final reward: -3.403, step: 8
+Episode 212: 8 steps, reward=-28.27
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -2.666, step: 4
-Episode 213: 4 steps, reward=-13.09
+Episode terminated: dropped screwdriver (roll=0.069, pitch=0.206), final reward: -4.087, step: 5
+Episode 213: 5 steps, reward=-21.04
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.223, pitch=-0.467), final reward: -3.752, step: 4
-Episode 214: 4 steps, reward=-16.17
+Episode terminated: dropped screwdriver (roll=0.046, pitch=0.205), final reward: -4.130, step: 6
+Episode 214: 6 steps, reward=-21.89
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -3.524, step: 4
-Episode 215: 4 steps, reward=-13.22
+Episode terminated: dropped screwdriver (roll=0.055, pitch=0.202), final reward: -4.025, step: 5
+Episode 215: 5 steps, reward=-16.97
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.223, pitch=-0.469), final reward: -1.952, step: 4
-Episode 216: 4 steps, reward=-13.49
+Episode terminated: dropped screwdriver (roll=0.060, pitch=0.209), final reward: -1.432, step: 5
+Episode 216: 5 steps, reward=-17.48
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -4.828, step: 4
-Episode 217: 4 steps, reward=-15.12
+Episode terminated: dropped screwdriver (roll=0.032, pitch=0.208), final reward: -4.705, step: 4
+Episode 217: 4 steps, reward=-16.21
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -4.061, step: 4
-Episode 218: 4 steps, reward=-15.17
+Episode terminated: dropped screwdriver (roll=0.062, pitch=0.206), final reward: -3.869, step: 5
+Episode 218: 5 steps, reward=-19.42
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.223, pitch=-0.469), final reward: -4.050, step: 4
-Episode 219: 4 steps, reward=-15.67
+Episode terminated: dropped screwdriver (roll=0.061, pitch=0.208), final reward: -3.013, step: 5
+Episode 219: 5 steps, reward=-20.48
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -4.249, step: 4
-Episode 220: 4 steps, reward=-13.78
+Episode terminated: dropped screwdriver (roll=0.063, pitch=0.200), final reward: -4.028, step: 4
+Episode 220: 4 steps, reward=-18.61
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -3.148, step: 4
-Episode 221: 4 steps, reward=-12.83
+Episode terminated: dropped screwdriver (roll=0.025, pitch=0.208), final reward: -4.624, step: 4
+Episode 221: 4 steps, reward=-15.35
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -3.428, step: 4
-Episode 222: 4 steps, reward=-16.32
+Episode terminated: dropped screwdriver (roll=0.042, pitch=0.201), final reward: -4.203, step: 4
+Episode 222: 4 steps, reward=-14.70
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.221, pitch=-0.471), final reward: -4.473, step: 4
-Episode 223: 4 steps, reward=-13.17
+Episode terminated: dropped screwdriver (roll=0.009, pitch=0.214), final reward: -4.345, step: 4
+Episode 223: 4 steps, reward=-14.71
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.223, pitch=-0.469), final reward: -3.541, step: 4
-Episode 224: 4 steps, reward=-14.22
+Episode terminated: dropped screwdriver (roll=0.043, pitch=0.207), final reward: -3.834, step: 4
+Episode 224: 4 steps, reward=-16.04
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.222, pitch=-0.470), final reward: -3.922, step: 4
-Episode 225: 4 steps, reward=-16.04
+Episode terminated: dropped screwdriver (roll=0.042, pitch=0.205), final reward: -4.540, step: 4
+Episode 225: 4 steps, reward=-16.32
 Episode reset - starting new episode
-Episode terminated: dropped screwdriver (roll=-0.168, pitch=-0.488), final reward: -4.296, step: 4
-Episode 226: 4 steps, reward=-14.64
+Episode terminated: dropped screwdriver (roll=0.050, pitch=0.204), final reward: -3.361, step: 4
+Episode 226: 4 steps, reward=-16.52
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.059, pitch=0.209), final reward: -2.899, step: 5
+Episode 227: 5 steps, reward=-18.74
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.050, pitch=0.204), final reward: -2.967, step: 4
+Episode 228: 4 steps, reward=-15.32
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.060, pitch=0.209), final reward: -4.684, step: 5
+Episode 229: 5 steps, reward=-20.27
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.009, pitch=0.214), final reward: -4.535, step: 4
+Episode 230: 4 steps, reward=-19.15
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.063, pitch=0.200), final reward: -3.130, step: 4
+Episode 231: 4 steps, reward=-16.16
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.050, pitch=0.204), final reward: -3.481, step: 4
+Episode 232: 4 steps, reward=-16.16
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.063, pitch=0.200), final reward: -3.789, step: 4
+Episode 233: 4 steps, reward=-16.57
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.041, pitch=0.207), final reward: -4.139, step: 4
+Episode 234: 4 steps, reward=-16.21
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.026, pitch=0.210), final reward: -4.598, step: 4
+Episode 235: 4 steps, reward=-16.54
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.044, pitch=0.207), final reward: -4.049, step: 4
+Episode 236: 4 steps, reward=-18.20
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.061, pitch=0.209), final reward: -3.885, step: 5
+Episode 237: 5 steps, reward=-19.92
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.041, pitch=0.208), final reward: -5.238, step: 4
+Episode 238: 4 steps, reward=-16.90
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.044, pitch=0.207), final reward: -2.677, step: 4
+Episode 239: 4 steps, reward=-14.26
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.069, pitch=0.206), final reward: -4.756, step: 5
+Episode 240: 5 steps, reward=-18.14
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.017, pitch=0.212), final reward: -3.501, step: 4
+Episode 241: 4 steps, reward=-16.23
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.061, pitch=0.209), final reward: -4.597, step: 5
+Episode 242: 5 steps, reward=-17.91
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.009, pitch=0.214), final reward: -3.906, step: 4
+Episode 243: 4 steps, reward=-14.42
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.016, pitch=0.212), final reward: -4.877, step: 4
+Episode 244: 4 steps, reward=-17.07
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.061, pitch=0.209), final reward: -4.139, step: 5
+Episode 245: 5 steps, reward=-20.76
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.044, pitch=0.207), final reward: -4.019, step: 4
+Episode 246: 4 steps, reward=-17.69
+Episode reset - starting new episode
+Episode terminated: dropped screwdriver (roll=0.039, pitch=0.208), final reward: -4.513, step: 4
+Episode 247: 4 steps, reward=-18.92
 Episode reset - starting new episode
