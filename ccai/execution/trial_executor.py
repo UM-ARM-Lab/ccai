@@ -414,16 +414,16 @@ class TrajectoryExecutor:
         """Store contact distance and point information."""
         if planner.problem.data is not None and len(planner.problem.data) > 0:
             contact_distance[T] = torch.stack((
-                planner.problem.data['index']['sdf'][:, -T-1:].reshape(N, T + 1),
-                planner.problem.data['middle']['sdf'][:, -T-1:].reshape(N, T + 1),
-                planner.problem.data['thumb']['sdf'][:, -T-1:].reshape(N, T + 1)
+                planner.problem.data['index']['sdf'][:, -T-1:].reshape(16, T + 1),
+                planner.problem.data['middle']['sdf'][:, -T-1:].reshape(16, T + 1),
+                planner.problem.data['thumb']['sdf'][:, -T-1:].reshape(16, T + 1)
             ), dim=1).detach().cpu()
     
             if not planner.problem.contact_constraint_only:
                 contact_points[T] = torch.stack((
-                    planner.problem.data['index']['closest_pt_world'].reshape(N, -1, 3)[:, -T-1:],
-                    planner.problem.data['middle']['closest_pt_world'].reshape(N, -1, 3)[:, -T-1:],
-                    planner.problem.data['thumb']['closest_pt_world'].reshape(N, -1, 3)[:, -T-1:]
+                    planner.problem.data['index']['closest_pt_world'].reshape(16, -1, 3)[:, -T-1:],
+                    planner.problem.data['middle']['closest_pt_world'].reshape(16, -1, 3)[:, -T-1:],
+                    planner.problem.data['thumb']['closest_pt_world'].reshape(16, -1, 3)[:, -T-1:]
                 ), dim=2).detach().cpu()
 
     def _print_force_info(self, mode, best_traj):

@@ -149,9 +149,10 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                 (state[:, -self.obj_dof:-1] + goal[-self.obj_dof:-1]) ** 2)  # the screwdriver should only rotate in z direction
         return smoothness_cost + upright_cost + super()._cost(xu, rob_link_pts, nearest_robot_pts, start, goal, projected_diffusion=projected_diffusion)
 
+all_yaw_deltas = []
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noise=None, noise_noise=None, sim=None, seed=None,
              proj_path=None, perturb_this_trial=False, trajectory_sampler=None, trajectory_sampler_orig=None, config=None, classifier=None):
-    
+    global all_yaw_deltas
     episode_num_steps = 0
     max_episode_num_steps = 100
     num_fingers = len(params['fingers'])
@@ -450,6 +451,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             continue
         else:
             contact = contact_sequence.pop(0)
+            
+        initial_yaw = start[-1].item()
+            
         data['executed_contacts'].append(contact)
         print(stage, contact)
         torch.cuda.empty_cache()
@@ -794,6 +798,14 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         pickle.dump(data_save, open(f"{fpath}/traj_data.p", "wb"))
         del data_save
 
+    state = env.get_state()
+    state = extract_state_vector(state, num_fingers, params['device'], slice_end=15)
+    final_yaw = state[-1].item()
+    print('Final yaw:', final_yaw)
+    print('Initial yaw:', initial_yaw)
+    print('Difference:', final_yaw - initial_yaw)
+    all_yaw_deltas.append(final_yaw - initial_yaw)
+    print('All yaw deltas:', all_yaw_deltas)
     env.reset()
     return 0
 
@@ -802,8 +814,8 @@ if __name__ == "__main__":
     # get config. First option is to get the config from the command line.
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_TODR_contact_constraint_only_perturb_10.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_TODR_N_16.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/touchlegro_screwdriver_csvto_recovery_hardware_hri.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_TODR_N_16.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_diff.yaml').read_text())
     # Write to log file in the experiment's directory
     experiment_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}')
     pathlib.Path.mkdir(experiment_dir, parents=True, exist_ok=True)
@@ -887,8 +899,8 @@ if __name__ == "__main__":
                                            randomize_obj_start=config.get('randomize_obj_start', False),
                                            randomize_rob_start=config.get('randomize_rob_start', False),
                                            external_wrench_perturb=config.get('external_wrench_perturb', False),
-                                           random_force_magnitude=config.get('random_force_magnitude', 1.5),
-                                           default_dof_pos=default_dof_pos
+                                        #    random_force_magnitude=config.get('random_force_magnitude', 1.5),
+                                        #    default_dof_pos=default_dof_pos
                                            )
 
 
@@ -980,7 +992,11 @@ if __name__ == "__main__":
                                             config=config, classifier=classifier)
             succ = True
 
-        print(results)
+        print('All yaw deltas:', all_yaw_deltas)
+        print('Mean yaw delta:', np.mean(all_yaw_deltas))
+        print('Std yaw delta:', np.std(all_yaw_deltas))
+        print('Min yaw delta:', np.min(all_yaw_deltas))
+        print('Max yaw delta:', np.max(all_yaw_deltas))
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)

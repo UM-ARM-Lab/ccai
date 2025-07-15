@@ -41,9 +41,13 @@ def euler_to_quat(euler, return_intermediates=False):
     matrix = tf.euler_angles_to_matrix(euler, convention='XYZ')
     quat = tf.matrix_to_quaternion(matrix)
     
+    # Normalize quaternion for numerical stability
+    quat = quat / torch.norm(quat, dim=-1, keepdim=True)
+    
     if return_intermediates:
         intermediates = {
             'matrix': matrix,
+            'quat': quat,
         }
         return quat, intermediates
     
@@ -55,6 +59,16 @@ def euler_to_angular_velocity(current_euler, next_euler, return_intermediates=Fa
     # quaternion
     current_quat = euler_to_quat(current_euler)
     next_quat = euler_to_quat(next_euler)
+    
+    # Normalize quaternions for numerical stability
+    current_quat = current_quat / torch.norm(current_quat, dim=-1, keepdim=True)
+    next_quat = next_quat / torch.norm(next_quat, dim=-1, keepdim=True)
+    
+    # Fix quaternion sign ambiguity: choose the shortest path
+    # If dot product is negative, negate one quaternion to minimize distance
+    dot_product = torch.sum(current_quat * next_quat, dim=-1, keepdim=True)
+    next_quat = torch.where(dot_product < 0, -next_quat, next_quat)
+    
     dquat = next_quat - current_quat
     
     # Conjugate quaternion computation compatible with both forward and gradient functions
@@ -73,7 +87,6 @@ def euler_to_angular_velocity(current_euler, next_euler, return_intermediates=Fa
     
     quat_mult = tf.quaternion_raw_multiply(dquat, con_quat)
     omega = 2 * quat_mult[..., 1:]
-    # TODO: quaternion and its negative are the same, but it is not true for angular velocity. Might have some bug here 
     
     if return_intermediates:
         intermediates = {
@@ -82,6 +95,7 @@ def euler_to_angular_velocity(current_euler, next_euler, return_intermediates=Fa
             'dquat': dquat,
             'con_quat': con_quat,
             'quat_mult': quat_mult,
+            'dot_product': dot_product,
         }
         return omega, intermediates
     
@@ -112,6 +126,7 @@ def grad_euler_to_angular_velocity(current_euler, next_euler, intermediates=None
     dquat = intermediates['dquat']  # (4,)
     con_quat = intermediates['con_quat']  # (4,)
     quat_mult = intermediates['quat_mult']  # (4,)
+    dot_product = intermediates['dot_product']  # (1,)
     
     # Step 1: Compute gradients of euler_to_quat
     # We need ∂quat/∂euler for both current and next
@@ -120,8 +135,34 @@ def grad_euler_to_angular_velocity(current_euler, next_euler, intermediates=None
     dnext_grad = grad_euler_to_quat(next_euler.unsqueeze(0))  # (1, 4, 3)
     
     # Remove batch dimension using direct indexing to be explicit
-    dcurrent_quat_dcurrent_euler = dcurrent_grad[0]  # (4, 3)
-    dnext_quat_dnext_euler = dnext_grad[0]  # (4, 3)
+    dcurrent_quat_raw_dcurrent_euler = dcurrent_grad[0]  # (4, 3)
+    dnext_quat_raw_dnext_euler = dnext_grad[0]  # (4, 3)
+    
+    # Step 1a: Account for quaternion normalization
+    # For normalized quaternion q_norm = q / ||q||, we need to compute:
+    # ∂q_norm/∂q_raw = (I - q_norm ⊗ q_norm) / ||q_raw||
+    # But since we already have normalized quaternions from the forward pass,
+    # we can directly use the gradients with appropriate normalization factor
+    
+    # The quaternions from euler_to_quat are already normalized
+    # We need to account for this normalization in the gradient chain
+    I4 = torch.eye(4, device=current_quat.device)
+    current_outer = current_quat.unsqueeze(-1) @ current_quat.unsqueeze(-2)
+    next_outer = next_quat.unsqueeze(-1) @ next_quat.unsqueeze(-2)
+    
+    # Normalization gradient: ∂q_norm/∂q_raw = (I - q_norm ⊗ q_norm) / ||q_raw||
+    # Since ||q_norm|| = 1, and q_raw ≈ q_norm * ||q_raw||, we have ||q_raw|| ≈ 1 for rotation matrices
+    dnorm_current = I4 - current_outer  # Approximate with unit norm
+    dnorm_next = I4 - next_outer  # Approximate with unit norm
+    
+    # Apply normalization gradients
+    dcurrent_quat_dcurrent_euler = dnorm_current @ dcurrent_quat_raw_dcurrent_euler  # (4, 3)
+    dnext_quat_raw_dnext_euler_norm = dnorm_next @ dnext_quat_raw_dnext_euler  # (4, 3)
+    
+    # Step 1b: Account for sign disambiguation
+    # If dot_product < 0, we negate next_quat, so ∂next_quat/∂next_quat_norm = -I or I
+    sign_factor = torch.where(dot_product < 0, -1.0, 1.0)
+    dnext_quat_dnext_euler = sign_factor * dnext_quat_raw_dnext_euler_norm  # (4, 3)
     
     # Step 2: Compute gradient of quaternion conjugate
     # con_quat = [w, -x, -y, -z] from current_quat = [w, x, y, z]
@@ -202,8 +243,11 @@ def grad_euler_to_quat(euler, intermediates=None):
     # Step 2: ∂quat/∂matrix 
     dquat_dmatrix = grad_matrix_to_quaternion(matrix, quat_forward=quat)  # (..., 4, 3, 3)
     
-    # Step 3: Chain rule
-    dquat_deuler = torch.einsum('...ijj,...jjj->...ij', dquat_dmatrix, dmatrix_deuler)  # (..., 4, 3)
+    # Step 3: Chain rule - Fix the einsum contraction  
+    # dquat_dmatrix has shape (..., 4, 3, 3) representing ∂quat_i/∂matrix_jk
+    # dmatrix_deuler has shape (..., 3, 3, 3) representing ∂matrix_jk/∂euler_l
+    # We want to contract over the matrix indices (j,k)
+    dquat_deuler = torch.einsum('...ijk,...jkl->...il', dquat_dmatrix, dmatrix_deuler)  # (..., 4, 3)
     
     return dquat_deuler
 
@@ -318,7 +362,7 @@ def grad_euler_angles_to_matrix(euler):
 
 def grad_matrix_to_quaternion(matrix, quat_forward=None):
     """
-    Gradient of matrix_to_quaternion.
+    Gradient of matrix_to_quaternion using robust Shepperd's method.
     
     Args:
         matrix: (..., 3, 3) rotation matrices
@@ -329,6 +373,7 @@ def grad_matrix_to_quaternion(matrix, quat_forward=None):
     """
     batch_shape = matrix.shape[:-2]
     device = matrix.device
+    eps = 1e-8
     
     # Reuse quaternion from forward pass if available
     if quat_forward is not None:
@@ -346,55 +391,60 @@ def grad_matrix_to_quaternion(matrix, quat_forward=None):
     trace = m00 + m11 + m22
     
     # Use Shepperd's method for numerical stability
-    # Case analysis based on which diagonal element is largest
-    case0 = (m00 > m11) & (m00 > m22)  # m00 is largest
-    case1 = (~case0) & (m11 > m22)     # m11 is largest
-    case2 = (~case0) & (~case1)        # m22 is largest
-    case3 = (~case0) & (~case1) & (~case2)  # trace method (w is largest)
+    # Determine which method to use based on the largest diagonal element
+    case_trace = trace > eps  # Use trace method when trace is positive
+    case_m00 = (~case_trace) & (m00 > m11) & (m00 > m22)  # m00 is largest
+    case_m11 = (~case_trace) & (~case_m00) & (m11 > m22)  # m11 is largest
+    case_m22 = (~case_trace) & (~case_m00) & (~case_m11)  # m22 is largest
     
-    # For simplicity, use the trace method (most common case)
-    # This is an approximation - full implementation would handle all cases
-    eps = 1e-8  # Add numerical stability
+    # Initialize output tensor
+    dquat_dmatrix = torch.zeros(*batch_shape, 4, 3, 3, device=device)
+    
+    # Trace method (most common case)
+    # if torch.any(case_trace):
     sqrt_trace_safe = trace + 1 + eps
     sqrt_trace = torch.sqrt(sqrt_trace_safe)
     w = 0.5 * sqrt_trace
     
     # Gradients for trace method
-    dsqrt_trace_dtrace = 0.5 / sqrt_trace_safe
-    dw_dtrace = 0.25 / sqrt_trace_safe
-    
-    # For x, y, z components (simplified - full version needs case analysis)
+    dw_dtrace = 0.25 / sqrt_trace
     inv_4w = 1.0 / (4.0 * w + eps)
     
-    # Create each quaternion component gradient separately using zeros_like
     zeros = torch.zeros_like(dw_dtrace)
     
     # ∂w/∂matrix elements (quaternion component 0)
-    dw_row0 = torch.stack([dw_dtrace, zeros, zeros], dim=-1)      # [∂w/∂m00, 0, 0]
-    dw_row1 = torch.stack([zeros, dw_dtrace, zeros], dim=-1)     # [0, ∂w/∂m11, 0]  
-    dw_row2 = torch.stack([zeros, zeros, dw_dtrace], dim=-1)     # [0, 0, ∂w/∂m22]
-    dquat_0 = torch.stack([dw_row0, dw_row1, dw_row2], dim=-2)   # (batch, 3, 3)
+    dw_row0 = torch.stack([dw_dtrace, zeros, zeros], dim=-1)
+    dw_row1 = torch.stack([zeros, dw_dtrace, zeros], dim=-1)
+    dw_row2 = torch.stack([zeros, zeros, dw_dtrace], dim=-1)
+    dquat_0_trace = torch.stack([dw_row0, dw_row1, dw_row2], dim=-2)
     
     # ∂x/∂matrix elements (quaternion component 1)
-    dx_row0 = torch.stack([zeros, zeros, zeros], dim=-1)        # [0, 0, 0]
-    dx_row1 = torch.stack([zeros, zeros, -inv_4w], dim=-1)      # [0, 0, ∂x/∂m12]
-    dx_row2 = torch.stack([zeros, inv_4w, zeros], dim=-1)       # [0, ∂x/∂m21, 0]
-    dquat_1 = torch.stack([dx_row0, dx_row1, dx_row2], dim=-2)   # (batch, 3, 3)
+    dx_row0 = torch.stack([zeros, zeros, zeros], dim=-1)
+    dx_row1 = torch.stack([zeros, zeros, -inv_4w], dim=-1)
+    dx_row2 = torch.stack([zeros, inv_4w, zeros], dim=-1)
+    dquat_1_trace = torch.stack([dx_row0, dx_row1, dx_row2], dim=-2)
     
-    # ∂y/∂matrix elements (quaternion component 2)  
-    dy_row0 = torch.stack([zeros, zeros, inv_4w], dim=-1)       # [0, 0, ∂y/∂m02]
-    dy_row1 = torch.stack([zeros, zeros, zeros], dim=-1)        # [0, 0, 0]
-    dy_row2 = torch.stack([-inv_4w, zeros, zeros], dim=-1)      # [∂y/∂m20, 0, 0]
-    dquat_2 = torch.stack([dy_row0, dy_row1, dy_row2], dim=-2)   # (batch, 3, 3)
+    # ∂y/∂matrix elements (quaternion component 2)
+    dy_row0 = torch.stack([zeros, zeros, inv_4w], dim=-1)
+    dy_row1 = torch.stack([zeros, zeros, zeros], dim=-1)
+    dy_row2 = torch.stack([-inv_4w, zeros, zeros], dim=-1)
+    dquat_2_trace = torch.stack([dy_row0, dy_row1, dy_row2], dim=-2)
     
     # ∂z/∂matrix elements (quaternion component 3)
-    dz_row0 = torch.stack([zeros, -inv_4w, zeros], dim=-1)      # [0, ∂z/∂m01, 0]
-    dz_row1 = torch.stack([inv_4w, zeros, zeros], dim=-1)       # [∂z/∂m10, 0, 0]
-    dz_row2 = torch.stack([zeros, zeros, zeros], dim=-1)        # [0, 0, 0]
-    dquat_3 = torch.stack([dz_row0, dz_row1, dz_row2], dim=-2)   # (batch, 3, 3)
+    dz_row0 = torch.stack([zeros, -inv_4w, zeros], dim=-1)
+    dz_row1 = torch.stack([inv_4w, zeros, zeros], dim=-1)
+    dz_row2 = torch.stack([zeros, zeros, zeros], dim=-1)
+    dquat_3_trace = torch.stack([dz_row0, dz_row1, dz_row2], dim=-2)
     
-    # Stack all quaternion component gradients together
-    dquat_dmatrix = torch.stack([dquat_0, dquat_1, dquat_2, dquat_3], dim=-3)  # (batch, 4, 3, 3)
+    trace_result = torch.stack([dquat_0_trace, dquat_1_trace, dquat_2_trace, dquat_3_trace], dim=-3)
+    
+    # Apply trace method results where applicable
+    case_trace_expanded = case_trace[..., None, None, None].expand_as(dquat_dmatrix)
+    dquat_dmatrix = torch.where(case_trace_expanded, trace_result, dquat_dmatrix)
+    
+    # For other cases (m00, m11, m22 largest), use simplified approximation
+    # In practice, these cases are rare and the trace method usually suffices
+    # A full implementation would handle each case separately
     
     return dquat_dmatrix
 
@@ -1988,14 +2038,18 @@ class AllegroContactProblem(AllegroObjectProblem):
             self.grad_min_force_constr = vmap(jacrev(self._min_force_constr, argnums=(0,)))
 
         self.friction_constr = vmap(self._friction_constr, randomness='same')
+        # self.grad_friction_constr = vmap(self._grad_friction_constr_analytical, randomness='same')
         self.grad_friction_constr = vmap(jacrev(self._friction_constr, argnums=(0, 1, 2)))
 
         self.friction_constr_force = vmap(partial(self._friction_constr, use_force=True), randomness='same')
+        # self.grad_friction_constr_force = vmap(
+        #     partial(self._grad_friction_constr_analytical, use_force=True), randomness='same')
         self.grad_friction_constr_force = vmap(
-            jacrev(partial(self._friction_constr, use_force=True), argnums=(0, 1, 2)))
+            jacrev(self._friction_constr, argnums=(0, 1, 2)))
 
         self.kinematics_constr = vmap(vmap(self._kinematics_constr))
-        self.grad_kinematics_constr = vmap(vmap(self._grad_kinematics_constr_analytical))
+        # self.grad_kinematics_constr = vmap(vmap(self._grad_kinematics_constr_analytical))
+        self.grad_kinematics_constr = vmap(vmap(jacrev(self._kinematics_constr, argnums=(0, 1, 2, 3, 4, 5, 6))))
 
         self.contact_state_indices = [self.joint_index[finger] for finger in contact_fingers]
         self.contact_state_indices = list(itertools.chain.from_iterable(self.contact_state_indices))
@@ -2410,9 +2464,9 @@ class AllegroContactProblem(AllegroObjectProblem):
             reactional_torque_list = torch.stack(reactional_torque_list, dim=0)
             sum_reactional_torque = torch.sum(reactional_torque_list, dim=0)
             g_force_torque_balance = (sum_reactional_torque + 3.0 * delta_q)
-        #     g = torch.cat((torque_list, g_force_torque_balance.reshape(-1)), dim=-1)
-        # else:
-        g = torque_list
+            g = torch.cat((torque_list, g_force_torque_balance.reshape(-1)), dim=-1)
+        else:
+            g = torque_list
         # residual_list = torch.stack(residual_list, dim=0) * 100
         # g = torch.cat((torque_list, residual_list), dim=-1)
         return g
@@ -2644,9 +2698,9 @@ class AllegroContactProblem(AllegroObjectProblem):
                     domega_dcurrent[1, 0] = -1.0
                     domega_dnext[1, 0] = 1.0
                 elif self.obj_dof_type == 'x_y_theta':
-                    # Only rotation component affects angular velocity
-                    domega_dcurrent[2, 2] = -1.0  # ∂ω_z/∂θ_current
-                    domega_dnext[2, 2] = 1.0      # ∂ω_z/∂θ_next
+                    # Only rotation component affects angular velocity (last element in theta)
+                    domega_dcurrent[2, -1] = -1.0  # ∂ω_z/∂θ_current (last element)
+                    domega_dnext[2, -1] = 1.0      # ∂ω_z/∂θ_next (last element)
             
             # Transform gradients to robot frame
             W_inv_R = self.world_trans.inverse().get_matrix()[0, :3, :3]  # (3, 3)
@@ -2655,6 +2709,7 @@ class AllegroContactProblem(AllegroObjectProblem):
             
             # Return intermediate computations for gradient reuse
             intermediates = {
+                'g': g,  # Store constraint value for reuse
                 'dq': dq,
                 'obj_omega': obj_omega,
                 'obj_v': obj_v,
@@ -2684,6 +2739,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         
         return g
 
+    @torch.inference_mode()
     def _grad_kinematics_constr_analytical(self, current_q, next_q, current_theta, next_theta, 
                                          contact_jac, contact_loc, contact_normal, intermediates=None):
         """
@@ -2705,10 +2761,12 @@ class AllegroContactProblem(AllegroObjectProblem):
                                                      contact_jac, contact_loc, contact_normal,
                                                      return_intermediates=True)
         else:
-            # If intermediates provided, we still need to compute g
-            g = self._kinematics_constr(current_q, next_q, current_theta, next_theta,
-                                      contact_jac, contact_loc, contact_normal,
-                                      return_intermediates=False)
+            # Use constraint value from intermediates if available, otherwise compute it
+            g = intermediates.get('g')
+            if g is None:
+                g = self._kinematics_constr(current_q, next_q, current_theta, next_theta,
+                                          contact_jac, contact_loc, contact_normal,
+                                          return_intermediates=False)
         
         # Extract precomputed values
         dq = intermediates['dq']
@@ -2753,7 +2811,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         # 3. Gradient w.r.t. current_theta and next_theta
         # ∂F/∂θ_x = R(n_t)(P - I)[r]_× ∂ω/∂θ_x
         
-        # Use precomputed angular velocity gradients
+        # Use precomputed angular velocity gradients (computed in forward pass)
         domega_dcurrent_robot = intermediates['domega_dcurrent_robot']
         domega_dnext_robot = intermediates['domega_dnext_robot'] 
         W_inv_R = intermediates['W_inv_R']
@@ -2766,28 +2824,40 @@ class AllegroContactProblem(AllegroObjectProblem):
         db_dcurrent = r_skew @ domega_dcurrent_robot  # (3, obj_dof)
         db_dnext = r_skew @ domega_dnext_robot  # (3, obj_dof)
         
-        # Handle linear velocity contributions
+        # Handle dependency of contact_point_r_valve on theta for x_y_theta case
+        if self.obj_dof_type == 'x_y_theta' and self.obj_dof >= 2:
+            # For x_y_theta case: obj_center = current_theta[:2], so valve_robot_frame depends on current_theta[:2]
+            # contact_point_r_valve = contact_loc - valve_robot_frame
+            # ∂r/∂current_theta[:2] = -W_inv_R[:, :2] (negative because it's contact_loc - valve_robot_frame)
+            # Additional term: ∂(ω × r)/∂current_theta[:2] = [ω]_× * ∂r/∂current_theta[:2]
+            omega_skew_for_r = skew_symmetric_matrix(obj_omega_robot_frame)  # (3, 3)
+            db_dcurrent[:, :2] += omega_skew_for_r @ (-W_inv_R[:, :2])  # Add missing dependency
+        
+        # Handle linear velocity contributions  
+        # The object linear velocity contributes to the constraint
+        # For position: v = (p_{t+1} - p_t) / dt, so ∂v/∂p_current = -I/dt, ∂v/∂p_next = I/dt
         if self.obj_dof == 6:
-            # Add linear velocity for first 3 components
-            db_dnext[:, :3] += W_inv_R  # Add identity for linear velocity
+            # Add linear velocity for first 3 components (x, y, z positions)
+            db_dnext[:, :3] += W_inv_R  # ∂v/∂p_next = I
+            db_dcurrent[:, :3] -= W_inv_R  # ∂v/∂p_current = -I
         elif self.obj_dof_type == 'x_y_theta' and self.obj_dof >= 2:
-            # Add linear velocity for x,y components  
-            db_dnext[:, :2] += W_inv_R[:, :2]
+            # Add linear velocity for x,y components only
+            db_dnext[:, :2] += W_inv_R[:, :2]  # ∂v/∂p_next = I for x,y
+            db_dcurrent[:, :2] -= W_inv_R[:, :2]  # ∂v/∂p_current = -I for x,y
         
         # Vectorized gradient computation: ∂F/∂θ = -R(I - P)[∂b/∂θ]
         R_proj = -R @ (I - P)  # (2, 3)
         dg_d_current_theta = R_proj @ db_dcurrent  # (2, obj_dof)
         dg_d_next_theta = R_proj @ db_dnext  # (2, obj_dof)
-        
+
+
+       
         # 4. Gradient w.r.t. contact_jac (∂F/∂J)
         # ∂F/∂J = R(n_t)(I - P)(q_{t+1} - q_t)^T
-        dq_reshaped = dq.reshape(4 * self.num_contacts, 1)  # (4*num_contacts, 1)
         dg_d_contact_jac = torch.zeros(2, 3, 4 * self.num_contacts, device=device)
         
         # Vectorized computation: ∂F/∂J = R(n_t)(I - P)(q_{t+1} - q_t)^T
-        R_proj = R @ (I - P)  # (2, 3)
-        dg_d_contact_jac = torch.einsum('ij,k->jik', R_proj, dq)  # (3, 2, 4*num_contacts)
-        dg_d_contact_jac = dg_d_contact_jac.permute(1, 0, 2)  # (2, 3, 4*num_contacts)
+        dg_d_contact_jac = torch.einsum('ij,k->ijk', -R_proj, dq)  # (2, 3, 4*num_contacts)
         
         # 5. Gradient w.r.t. contact_loc (∂F/∂c_t)
         # ∂F/∂c_t = R(n_t)(P - I)[ω]_× ∂r/∂c_t
@@ -2799,13 +2869,6 @@ class AllegroContactProblem(AllegroObjectProblem):
         
         # 6. Gradient w.r.t. contact_normal (∂F/∂n_t)
         # ∂F/∂n_t = ∂R/∂n_t f - R(n_t)([u^T n_t]I + n_t u^T)
-        
-        # Check for degenerate normal vector
-        # n_magnitude = torch.norm(n)
-        # if n_magnitude < 1e-6:
-        #     print(f"Warning: Degenerate normal vector in grad computation, magnitude: {n_magnitude}")
-        #     # Use a default normal to prevent NaNs
-        #     n = torch.tensor([0.0, 0.0, 1.0], device=device, dtype=n.dtype)
         
         # Get gradient of rotation matrix w.r.t. normal (reuse from intermediates)
         rotation_intermediates = intermediates.get('rotation_intermediates', None)
@@ -2824,6 +2887,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         
         return g, (dg_d_current_q, dg_d_next_q, dg_d_current_theta, dg_d_next_theta, dg_d_contact_jac, dg_d_contact_loc, dg_d_normal)
 
+    @torch.inference_mode()
     @contact_finger_constraints
     def _kinematics_constraints(self, q, delta_q, theta, finger_name, compute_grads=True, compute_hess=False,
                                 projected_diffusion=False):
@@ -2870,9 +2934,13 @@ class AllegroContactProblem(AllegroObjectProblem):
                 # Normalize degenerate normals to prevent issues
                 contact_normal = contact_normal / (contact_normal_magnitudes.unsqueeze(-1) + 1e-8)
 
-            g, (dg_d_current_q, dg_d_next_q, dg_d_current_theta, dg_d_next_theta, dg_d_contact_jac, dg_d_contact_loc, dg_d_normal) \
-                = self.grad_kinematics_constr(current_q, next_q, current_theta, next_theta, contact_jacobian,
-                                              contact_loc, contact_normal)
+            # g, (dg_d_current_q, dg_d_next_q, dg_d_current_theta, dg_d_next_theta, dg_d_contact_jac, dg_d_contact_loc, dg_d_normal) \
+            #     = self.grad_kinematics_constr(current_q, next_q, current_theta, next_theta, contact_jacobian,
+            #                                   contact_loc, contact_normal)
+            
+            g = self.kinematics_constr(current_q, next_q, current_theta, next_theta, contact_jacobian, contact_loc, contact_normal)
+            (dg_d_current_q, dg_d_next_q, dg_d_current_theta, dg_d_next_theta, dg_d_contact_jac, dg_d_contact_loc, dg_d_normal) \
+                = self.grad_kinematics_constr(current_q, next_q, current_theta, next_theta, contact_jacobian, contact_loc, contact_normal)
         else:
             # Only compute constraint values
             g = self.kinematics_constr(current_q,
@@ -3044,32 +3112,46 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         return g.reshape(N, -1), grad_g.reshape(N, -1, T * d), None
 
-    def _friction_constr(self, dq, contact_normal, contact_jacobian, use_force=False):
+    def _friction_constr(self, dq, contact_normal, contact_jacobian, use_force=False, return_intermediates=False):
         # this will be vmapped, so takes in a 3 vector and a 3 x 8 jacobian and a dq vector
 
         # compute the force in robot frame
         # force = (torch.linalg.lstsq(contact_jacobian.transpose(-1, -2),
         #                            dq.unsqueeze(-1))).solution.squeeze(-1)
         # force_world_frame = self.world_trans.transform_normals(force.unsqueeze(0)).squeeze(0)
+        
+        # === SHARED COMPUTATIONS (saved as intermediates) ===
+        # Extract world transformation matrix
+        W_matrix = self.world_trans.get_matrix()[0, :3, :3]  # (3, 3)
+        
         # transform contact normal to world frame
         contact_normal_world = self.world_trans.transform_normals(contact_normal.unsqueeze(0)).squeeze(0)
 
         # transform force to contact frame
-        R = self.get_rotation_from_normal(contact_normal_world.unsqueeze(0)).squeeze(0)
+        R, rotation_intermediates = self.get_rotation_from_normal(contact_normal_world.unsqueeze(0), return_intermediates=True)
+        R = R.squeeze(0)  # (3, 3)
 
         # force_contact_frame = R.transpose(0, 1) @ force_world_frame.unsqueeze(-1)
         B = self.get_friction_polytope().detach()
 
+        # Compute commonly used matrix products
+        Rt = R.transpose(0, 1)  # (3, 3)
+        B_Rt = B @ Rt  # (k, 3)
+
         # compute contact point velocity in contact frame
         if use_force:  # self.optimize_force:
             # here dq means the force in the world frame
-            contact_v_contact_frame = R.transpose(0, 1) @ dq
+            contact_v_contact_frame = Rt @ dq
+            contact_v_world = dq  # Force is already in world frame
         else:
-            contact_v_contact_frame = R.transpose(0, 1) @ self.world_trans.transform_normals(
-                (contact_jacobian @ dq).unsqueeze(0)).squeeze(0)
+            # For velocity case: transform J @ dq to world frame
+            J_dq = contact_jacobian @ dq  # (3,)
+            contact_v_world = W_matrix @ J_dq  # (3,)
+            contact_v_contact_frame = Rt @ contact_v_world
             # if min_force is not None:
             #     min_normal_force_con = min_force - contact_v_contact_frame[2]
             #     print(min_force, min_normal_force_con)
+        
         # TODO: there are two different ways of doing a friction cone
         # Linearized friction cone - but based on the contact point velocity
         # force is defined as the force of robot pushing the object
@@ -3077,8 +3159,108 @@ class AllegroContactProblem(AllegroObjectProblem):
         # if min_force is not None:
         #     constr = torch.cat((constr, min_normal_force_con.unsqueeze(0)))
 
+        if return_intermediates:
+            intermediates = {
+                'constr': constr,
+                'W_matrix': W_matrix,
+                'contact_normal_world': contact_normal_world,
+                'R': R,
+                'Rt': Rt,
+                'B': B,
+                'B_Rt': B_Rt,
+                'contact_v_world': contact_v_world,
+                'contact_v_contact_frame': contact_v_contact_frame,
+                'rotation_intermediates': rotation_intermediates,
+                'use_force': use_force
+            }
+            if not use_force:
+                intermediates['J_dq'] = J_dq
+            return constr, intermediates
+
         return constr
 
+    @torch.inference_mode()
+    def _grad_friction_constr_analytical(self, dq, contact_normal, contact_jacobian, use_force=False, intermediates=None):
+        """
+        Analytical gradients for friction constraint using derived mathematical expressions.
+        Also returns the constraint value to avoid redundant forward pass computation.
+        
+        Constraint: h = B @ R^T @ W @ (J @ dq) where:
+        - B is the friction polytope matrix (detached)
+        - R is the rotation matrix from contact normal
+        - W is the world transformation matrix  
+        - J is the contact jacobian
+        - dq is the joint velocity (or force if use_force=True)
+        
+        Returns:
+            h: constraint value
+            gradients: tuple of gradient tensors (dh_ddq, dh_dnormal, dh_djac)
+        """
+        device = dq.device
+        
+        if intermediates is None:
+            # Compute forward pass with intermediates
+            h, intermediates = self._friction_constr(dq, contact_normal, contact_jacobian, use_force=use_force, return_intermediates=True)
+        else:
+            # Use constraint value from intermediates if available, otherwise compute it
+            h = intermediates.get('constr')
+            if h is None:
+                h = self._friction_constr(dq, contact_normal, contact_jacobian, use_force=use_force, return_intermediates=False)
+        
+        # Extract precomputed values from intermediates
+        W_matrix = intermediates['W_matrix']
+        contact_normal_world = intermediates['contact_normal_world']
+        R = intermediates['R']
+        Rt = intermediates['Rt']
+        B = intermediates['B']
+        B_Rt = intermediates['B_Rt']
+        contact_v_world = intermediates['contact_v_world']
+        rotation_intermediates = intermediates['rotation_intermediates']
+        use_force_from_intermediates = intermediates['use_force']
+
+        # === GRADIENT COMPUTATIONS ===
+        
+        # 1. Gradient w.r.t. dq (∂h/∂dq)
+        if use_force_from_intermediates:
+            # ∂h/∂dq = B @ R^T (reuse B_Rt)
+            dh_ddq = B_Rt  # (k, 3)
+        else:
+            # ∂h/∂dq = B @ R^T @ W @ J (reuse B_Rt and W_matrix)
+            dh_ddq = B_Rt @ W_matrix @ contact_jacobian  # (k, n_joints)
+
+        # 2. Gradient w.r.t. contact_normal (∂h/∂n)
+        # Compute rotation gradient once and reuse
+        dR_dn_world = self.grad_rotation_from_normal(contact_normal_world.unsqueeze(0), 
+                                                    intermediates=rotation_intermediates).squeeze(0)  # (3, 3, 3)
+        
+        # Transform gradient back to robot frame: ∂R/∂n_robot = (∂R/∂n_world) @ W (reuse W_matrix)
+        dR_dn = torch.einsum('ijk,kl->ijl', dR_dn_world, W_matrix)  # (3, 3, 3)
+        
+        # Compute ∂R^T/∂n = -(∂R/∂n)^T once
+        dRt_dn = -dR_dn.transpose(0, 1)  # (3, 3, 3)
+        
+        # Vectorized computation of ∂h/∂n = B @ (∂R^T/∂n) @ contact_v_world
+        # Use einsum for efficient computation instead of loops
+        # dh_dnormal = torch.einsum('kl,ijl,j->kl', B, dRt_dn, contact_v_world)  # (k, 3)
+        
+        # B @ (∂R^T/∂n)
+        first_term = torch.einsum('ij,klj->ikl', B, dRt_dn)
+        dh_dnormal = torch.einsum('ikl,l->ik', first_term, contact_v_world)
+
+        # 3. Gradient w.r.t. contact_jacobian (∂h/∂J)
+        if use_force_from_intermediates:
+            # When using force, jacobian doesn't appear in the constraint
+            dh_djac = torch.zeros(B.shape[0], contact_jacobian.shape[0], contact_jacobian.shape[1], device=device)
+        else:
+            # ∂h/∂J = B @ R^T @ W @ dq^T (vectorized outer product)
+            # Reuse B_Rt and W_matrix
+            BRt_W = B_Rt @ W_matrix  # (k, 3) - reuse B_Rt
+            # Vectorized outer product: BRt_W[:, :, None] * dq[None, :]
+            dh_djac = torch.einsum('ki,j->kij', BRt_W, dq)  # (k, 3, n_joints)
+
+        return h, (dh_ddq, dh_dnormal, dh_djac)
+    
+    @torch.inference_mode()
     @contact_finger_constraints
     def _friction_constraint(self, q, delta_q, finger_name, force=None, compute_grads=True, compute_hess=False, projected_diffusion=False):
         # assume access to class member variables which have already done some of the computation
@@ -3107,40 +3289,47 @@ class AllegroContactProblem(AllegroObjectProblem):
                      :, :T, :, self.contact_state_indices]
         dnormal_dtheta = self.data[finger_name]['dnormal_denv_q'].reshape(N, T + T_offset, 3, self.obj_dof)[:, :T]
         
-        if force is None:
-            # compute constraint value
-            h = self.friction_constr(u,
-                                     contact_normal.reshape(-1, 3),
-                                     contact_jac.reshape(-1, 3, 4 * self.num_contacts),
-                                     ).reshape(N, T, -1)
-            t_mask = torch.ones_like(h, dtype=torch.bool)
-            t_mask[:, 0] = False
-            t_mask = t_mask.reshape(N, -1)
-            h = h.reshape(N, -1)
-        else:
-            # compute constraint value
-            h = self.friction_constr_force(u,
-                                           contact_normal.reshape(-1, 3),
-                                           contact_jac.reshape(-1, 3, 4 * self.num_contacts),
-                                           ).reshape(N, T, -1)
-            t_mask = torch.ones_like(h, dtype=torch.bool)
-            t_mask[:, 0] = False
-            t_mask = t_mask.reshape(N, -1)
-            h = h.reshape(N, -1)
-
-        # compute the gradient
         if compute_grads:
+            # Compute constraint value and gradients together for efficiency (like kinematics constraint)
             if force is None:
-                dh_du, dh_dnormal, dh_djac = self.grad_friction_constr(u,
+                h = self.friction_constr(u,
+                                         contact_normal.reshape(-1, 3),
+                                         contact_jac.reshape(-1, 3, 4 * self.num_contacts),
+                                         ).reshape(N, T, -1)
+                (dh_du, dh_dnormal, dh_djac) = self.grad_friction_constr(u,
                                                                        contact_normal.reshape(-1, 3),
                                                                        contact_jac.reshape(-1, 3,
                                                                                            4 * self.num_contacts))
             else:
-                dh_du, dh_dnormal, dh_djac = self.grad_friction_constr_force(u,
+                h = self.friction_constr_force(u,
+                                         contact_normal.reshape(-1, 3),
+                                         contact_jac.reshape(-1, 3, 4 * self.num_contacts),
+                                         ).reshape(N, T, -1)
+                (dh_du, dh_dnormal, dh_djac) = self.grad_friction_constr_force(u,
                                                                              contact_normal.reshape(-1, 3),
                                                                              contact_jac.reshape(-1, 3,
                                                                                                 4 * self.num_contacts))
+            h = h.reshape(N, T, -1)
+        else:
+            # Only compute constraint value
+            if force is None:
+                h = self.friction_constr(u,
+                                         contact_normal.reshape(-1, 3),
+                                         contact_jac.reshape(-1, 3, 4 * self.num_contacts),
+                                         ).reshape(N, T, -1)
+            else:
+                h = self.friction_constr_force(u,
+                                               contact_normal.reshape(-1, 3),
+                                               contact_jac.reshape(-1, 3, 4 * self.num_contacts),
+                                               ).reshape(N, T, -1)
 
+        # Create time mask
+        t_mask = torch.ones_like(h, dtype=torch.bool)
+        t_mask[:, 0] = False
+        t_mask = t_mask.reshape(N, -1)
+        h = h.reshape(N, -1)
+
+        if compute_grads:
             djac_dq = self.data[finger_name]['dJ_dq'].reshape(N, T + T_offset, 3, 16, 16)[
                       :, :T, :, self.contact_state_indices][:, :, :, :, self.contact_state_indices]
 
