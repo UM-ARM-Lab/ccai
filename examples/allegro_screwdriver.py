@@ -207,6 +207,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     pregrasp_params['warmup_iters'] = 80
     pregrasp_params['contact_only_warmup_iters'] = 0
     pregrasp_params['contact_only_online_iters'] = 0
+    pregrasp_params['tactile_controller'] = False
 
     start[-4:] = 0
     pregrasp_problem = create_allegro_screwdriver_problem(
@@ -248,12 +249,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     state = env.get_state()
     start = extract_state_vector(state, num_fingers, params['device'])
 
-    actual_trajectory = []
+    actual_trajectory = [start]
 
     # Initialize executors and managers
     trajectory_executor = TrajectoryExecutor(params, env, sim_viz_env)
     
-    def execute_traj(planner, mode, goal=None, fname=None, initial_samples=None, recover=False, 
+    def execute_traj(planner, mode, env, goal=None, fname=None, initial_samples=None, recover=False, 
                      start_timestep=0, max_timesteps=None, ctrl=None, mppi_warmup=False):
         """
         Execute a trajectory with the given planner and mode.
@@ -288,6 +289,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         actual_trajectory, planned_trajectories, initial_samples, sim_rollouts, optimizer_paths, contact_points, contact_distance, recover, episode_num_steps = trajectory_executor.execute_traj(
             planner=planner,
             mode=mode,
+            env=env,
             goal=goal,
             fname=fname,
             initial_samples=initial_samples,
@@ -555,7 +557,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             max_timesteps = None
                 
             result = execute_traj(
-                None, mode='turn', goal=_goal, fname=f'turn_{all_stage}', initial_samples=initial_samples, 
+                None, 'turn', env, goal=_goal, fname=f'turn_{all_stage}', initial_samples=initial_samples, 
                 recover=recover, start_timestep=start_timestep, max_timesteps=max_timesteps)
                 
             state = env.get_state()
@@ -815,7 +817,7 @@ if __name__ == "__main__":
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_TODR_contact_constraint_only_perturb_10.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_TODR_N_16.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_diff.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_diff_tactile_control.yaml').read_text())
     # Write to log file in the experiment's directory
     experiment_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}')
     pathlib.Path.mkdir(experiment_dir, parents=True, exist_ok=True)
@@ -899,6 +901,7 @@ if __name__ == "__main__":
                                            randomize_obj_start=config.get('randomize_obj_start', False),
                                            randomize_rob_start=config.get('randomize_rob_start', False),
                                            external_wrench_perturb=config.get('external_wrench_perturb', False),
+                                           force_sensors=config.get('tactile_controller', False)
                                         #    random_force_magnitude=config.get('random_force_magnitude', 1.5),
                                         #    default_dof_pos=default_dof_pos
                                            )

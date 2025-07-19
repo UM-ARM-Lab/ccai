@@ -10,7 +10,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 200
 visualize: True
-experiment_name: 'allegro_screwdriver_csvto_diff_debug_viz_no_inference_mode'
+experiment_name: 'allegro_screwdriver_csvto_diff_tactile_control'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -54,6 +54,7 @@ OOD_metric: 'likelihood'
 recovery_controller: 'csvgd'
 model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion'
 model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion/allegro_screwdriver_diffusion.pt'
+tactile_controller: True
 start_ind: 0
 end_ind: 30
 N_contact_plan: 16
@@ -68,7 +69,7 @@ controllers:
     step_size: 0.1
     momentum: 0.
     device: 'cuda:1'
-    online_iters: 25
+    online_iters: 0
     warmup_iters: 0
     resample_steps: 16
     resample_sigma: 0.01

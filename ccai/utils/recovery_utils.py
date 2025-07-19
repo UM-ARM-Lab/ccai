@@ -12,7 +12,7 @@ import numpy as np
 
 from ccai.allegro_contact import AllegroManipulationProblem, PositionControlConstrainedSVGDMPC
 from ccai.utils.allegro_utils import visualize_trajectory
-
+from ccai.controller.tactile_feedback_controller import TactileMPC, ControllerConfig, TactileFeedbackController
 
 def create_experiment_paths(fpath, fname, mode=None, create_goal_subdir=True):
     """Create directory structure for experiment data."""
@@ -160,6 +160,24 @@ class ConstraintScheduledSVGDMPC(PositionControlConstrainedSVGDMPC):
         super().__init__(problem, params)
         self.contact_only_warmup_iters = params.get('contact_only_warmup_iters', 0)
         self.contact_only_online_iters = params.get('contact_only_online_iters', 0)
+        
+        self.tactile_controller_bool = params.get('tactile_controller', False)
+        if self.tactile_controller_bool:
+            self.contact_only_online_iters = 0
+            self.contact_only_warmup_iters = 0
+            self.online_iters = 0
+            
+            self.controller_config = ControllerConfig(
+                K_e=params.get('K_e', 1000.0),
+                K_P=params.get('K_P', 3),
+                K_D=params.get('K_D', 1),
+                force_threshold=params.get('force_threshold', 0.5),
+                horizon_length=params.get('horizon_length', 10),
+                dt=params.get('dt', 1/12),
+            )
+            self.tactile_controller = TactileFeedbackController(problem, self.controller_config)
+            self.t = 0
+            self.dt = params.get('dt', 1/12)
 
     def step(self, state, skip_optim=False, **kwargs):
         if self.fix_T:
@@ -169,9 +187,15 @@ class ConstraintScheduledSVGDMPC(PositionControlConstrainedSVGDMPC):
                 new_T = self.problem.T - 1
             else:
                 new_T = self.problem.T
-
-        # Contact only
-        self.problem.update(state, T=new_T, contact_constraint_only=True, **kwargs)
+        if 'q_d_init' in kwargs:
+            q_d_init = kwargs['q_d_init']
+            del kwargs['q_d_init']
+        if 'f_ext_init' in kwargs:
+            f_ext_init = kwargs['f_ext_init']
+            del kwargs['f_ext_init']
+        if not self.tactile_controller_bool:
+            # Contact only
+            self.problem.update(state, T=new_T, contact_constraint_only=True, **kwargs)
         if (self.warmed_up and self.contact_only_online_iters > 0) or (not self.warmed_up and self.contact_only_warmup_iters > 0):
             if self.warmed_up:
                 self.solver.iters = self.contact_only_online_iters
@@ -195,16 +219,169 @@ class ConstraintScheduledSVGDMPC(PositionControlConstrainedSVGDMPC):
                 self.warmed_up = True
                 resample = False
             path = self.solver.solve(self.x, resample, skip_optim=skip_optim)
-
+        try:
+            path[0]
+        except:
+            path = [self.x]
         self.x = path[-1]
         self.path = path
         self.iter += 1
         best_trajectory = self.x[0].clone()
         all_trajectories = self.x.clone()
-        self.shift()
+        if not self.tactile_controller_bool:
+            self.shift()
+        else:
+            self.problem._preprocess(self.x, tactile_controller=self.tactile_controller_bool)
+            reference_trajectory_spline, avg_normal, segment_tangents = self.compute_reference_trajectory_spline(best_trajectory, self.t, self.t + self.controller_config.horizon_length)
+            self.tactile_controller.mpc_problem_definition.set_reference_trajectory(reference_trajectory_spline)
+            
+            controller_q_d_delta = self.tactile_controller.solve(self.t, state, q_d_init, f_ext_init, avg_normal, segment_tangents)
+            self.t += self.dt
+            controller_action = torch.tensor(controller_q_d_delta, device=state.device) + q_d_init
+            best_trajectory[0, self.controller_config.dq:2*self.controller_config.dq] = controller_action
+            
         # self.x = self.problem.get_initial_xu(self.N)
         return best_trajectory, all_trajectories
 
+    def process_contact_normals(self):
+        contact_normals = []
+        for finger in self.problem.contact_fingers:
+            contact_normals.append(self.problem.data[finger]["contact_n"])
+        return torch.stack(contact_normals, dim=1).cpu().numpy()
+    
+    def compute_reference_trajectory_spline(self, reference_trajectory, start_time, end_time):
+        """
+        Create a spline interpolation function for the reference trajectory.
+        
+        Args:
+            reference_trajectory: Tensor of shape (T, state_dim) representing trajectory from time 0 to 1
+            start_time: Start time in the reference trajectory (between 0 and 1)
+            end_time: End time in the reference trajectory (between 0 and 1)
+            
+        Returns:
+            spline_func: Function that takes time t in [0, end_time-start_time] and returns interpolated state as numpy array
+        """
+        from scipy.interpolate import interp1d
+        
+        # Convert to numpy for scipy interpolation
+        if isinstance(reference_trajectory, torch.Tensor):
+            traj_np = reference_trajectory.cpu().numpy()
+        else:
+            traj_np = reference_trajectory
+        
+        T, state_dim = traj_np.shape
+        
+        # Create time points for the full reference trajectory (0 to 1)
+        full_time_points = np.linspace(0, 1, T)
+        
+        # Clamp start_time and end_time to valid range
+        start_time = max(0, min(start_time, 1))
+        end_time = max(start_time, min(end_time, 1))
+        duration = end_time - start_time
+        
+        # Find indices that bracket start_time and end_time
+        start_idx = max(0, int(start_time * (T - 1)))
+        end_idx = min(T - 1, int(end_time * (T - 1)) + 1)
+        
+        # Ensure we have enough points for interpolation
+        if start_idx == end_idx:
+            end_idx = min(T - 1, start_idx + 1)
+        if start_idx > 0 and start_time < full_time_points[start_idx]:
+            start_idx -= 1
+        if end_idx < T - 1 and end_time > full_time_points[end_idx]:
+            end_idx += 1
+            
+        # Extract trajectory segment with sufficient points for interpolation
+        segment_traj = traj_np[start_idx:end_idx + 1]
+        segment_time_points = full_time_points[start_idx:end_idx + 1]
+        
+        # Index normals by time
+        all_normals = self.process_contact_normals()
+        segment_normals = all_normals[start_idx:end_idx + 1]
+        avg_normal = np.mean(segment_normals, axis=0)
+        avg_normal = avg_normal / np.linalg.norm(avg_normal, axis=1, keepdims=True)
+        
+        # Compute tangents
+        segment_tangents = np.cross(avg_normal, np.array([0, 0, 1]))
+        segment_tangents = segment_tangents / np.linalg.norm(segment_tangents, axis=1, keepdims=True)
+        
+        # Compute binormal
+        segment_binormal = np.cross(avg_normal, segment_tangents)
+        segment_binormal = segment_binormal / np.linalg.norm(segment_binormal, axis=1, keepdims=True)
+        
+        # Stack tangents and binormals
+        segment_tangents = np.stack((segment_tangents, segment_binormal), axis=2)
+        
+        # Handle edge case where duration is very small or zero
+        if duration < 1e-6:
+            # Return constant function at start_time
+            from scipy.interpolate import interp1d
+            master_interpolators = []
+            for dim in range(state_dim):
+                master_interpolators.append(interp1d(
+                    segment_time_points,
+                    segment_traj[:, dim],
+                    kind='cubic' if len(segment_traj) >= 4 else 'linear',
+                    bounds_error=False,
+                    fill_value=(segment_traj[0, dim], segment_traj[-1, dim])
+                ))
+            
+            constant_value = np.array([interpolator(start_time) for interpolator in master_interpolators])
+            
+            def spline_func(t):
+                if isinstance(t, (int, float)):
+                    return constant_value.copy()
+                else:
+                    batch_size = len(t) if hasattr(t, '__len__') else 1
+                    return np.tile(constant_value, (batch_size, 1))
+        else:
+            # Create master interpolators for the extracted segment
+            from scipy.interpolate import interp1d
+            master_interpolators = []
+            for dim in range(state_dim):
+                master_interpolators.append(interp1d(
+                    segment_time_points,
+                    segment_traj[:, dim],
+                    kind='cubic' if len(segment_traj) >= 4 else 'linear',
+                    bounds_error=False,
+                    fill_value=(segment_traj[0, dim], segment_traj[-1, dim])
+                ))
+            
+            def spline_func(t):
+                """
+                Interpolate trajectory at time t.
+                
+                Args:
+                    t: Time value(s) in [0, end_time - start_time]
+                    
+                Returns:
+                    Interpolated state(s) as numpy array
+                """
+                # Handle scalar and batch inputs
+                is_scalar = isinstance(t, (int, float))
+                if is_scalar:
+                    t_array = np.array([t])
+                else:
+                    t_array = np.asarray(t)
+                
+                # Clamp input time to valid range [0, duration]
+                t_clamped = np.clip(t_array, 0, duration)
+                
+                # Map from input time range [0, duration] to original time range [start_time, end_time]
+                t_mapped = start_time + t_clamped
+                
+                # Interpolate each dimension using the master interpolators
+                interpolated_values = np.zeros((len(t_mapped), state_dim))
+                for dim in range(state_dim):
+                    interpolated_values[:, dim] = master_interpolators[dim](t_mapped)
+                
+                # Return scalar result if input was scalar
+                if is_scalar:
+                    return interpolated_values[0]
+                return interpolated_values
+        
+        return spline_func, avg_normal, segment_tangents
+        
 def create_planner(problem, params, planner_type='default'):
     """Create a planner for the given problem."""
     if planner_type == 'recovery':

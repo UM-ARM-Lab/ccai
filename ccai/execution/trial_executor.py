@@ -27,7 +27,7 @@ class TrajectoryExecutor:
         self.env = env
         self.sim_viz_env = sim_viz_env
         
-    def execute_traj(self, planner, mode, goal=None, fname=None, initial_samples=None, 
+    def execute_traj(self, planner, mode, env, goal=None, fname=None, initial_samples=None, 
                     recover=False, start_timestep=0, max_timesteps=None, ctrl=None, 
                     mppi_warmup=False, fpath=None, baseline_controller=None, 
                     baseline_ood_detector=None, data=None, trajectory_sampler=None,
@@ -146,10 +146,15 @@ class TrajectoryExecutor:
             initial_samples = torch.zeros(self.params['N'], 12)
         elif initial_samples is None:
             initial_samples = planner.x.detach().clone()
+            
+        # Visualization
+        if ((self.params['visualize_plan'] and not recover) or 
+            (self.params['visualize_recovery_plan'] and recover)):
+            self._handle_visualization(initial_samples[0], planner, state, turn_problem, fpath, fname, -1, num_fingers)
         
         # Execute trajectory steps
         actual_trajectory, planned_trajectories, optimizer_paths, contact_points, contact_distance, recover, episode_num_steps = self._execute_trajectory_steps(
-            planner, mode, state, goal, initial_samples, start_timestep, max_timesteps,
+            planner, mode, env, state, goal, initial_samples, start_timestep, max_timesteps,
             num_fingers, obj_dof, episode_num_steps, max_episode_num_steps, fpath, fname,
             baseline_controller, baseline_ood_detector, data, trajectory_sampler,
             trajectory_sampler_orig, turn_problem, recover, planner_returns_action,
@@ -262,7 +267,7 @@ class TrajectoryExecutor:
             
         return initial_samples, new_T, sim_rollouts
 
-    def _execute_trajectory_steps(self, planner, mode, state, goal, initial_samples, start_timestep,
+    def _execute_trajectory_steps(self, planner, mode, env, state, goal, initial_samples, start_timestep,
                                 max_timesteps, num_fingers, obj_dof, episode_num_steps, 
                                 max_episode_num_steps, fpath, fname, baseline_controller,
                                 baseline_ood_detector, data, trajectory_sampler, trajectory_sampler_orig,
@@ -307,7 +312,15 @@ class TrajectoryExecutor:
                 self.sim_viz_env.set_pose(state_16.cpu())
                 self.sim_viz_env.zero_obj_velocity()
                 
-            best_traj, plans = planner.step(state)
+            kwargs = {}
+            if self.params.get('tactile_controller', False):
+                if best_traj is not None:
+                    kwargs['q_d_init'] = best_traj[0, :planner.problem.dx]
+                else:
+                    kwargs['q_d_init'] = state[:planner.problem.dx]
+                
+                kwargs['f_ext_init'] = env.get_force_sensor_data()[0]
+            best_traj, plans = planner.step(state, **kwargs)
             
             if self.params['contact_constraint_only'] or self.params['solve_for_u_hat']:
                 u_hat = planner.problem.solve_for_u_hat(best_traj.unsqueeze(0), planner.solver.best_idx).squeeze(0)

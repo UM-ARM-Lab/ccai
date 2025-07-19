@@ -65,9 +65,9 @@ class ConstrainedSteinTrajOpt:
 
         grad_J, hess_J, K, grad_K, C, dC, hess_C, t_mask = self.problem.eval(xuz.to(dtype=torch.float32))
         self.problem.data = {}
-        dC_mask = ~(dC == 0).all(dim=-1).all(dim=0)
-        dC = dC[dC_mask.unsqueeze(0).unsqueeze(-1).repeat(N, 1, dC.shape[-1])].reshape(N, -1, dC.shape[-1])
-        C = C[dC_mask.unsqueeze(0).repeat(N, 1)].reshape(N, -1)
+        # dC_mask = ~(dC == 0).all(dim=-1).all(dim=0)
+        # dC = dC[dC_mask.unsqueeze(0).unsqueeze(-1).repeat(N, 1, dC.shape[-1])].reshape(N, -1, dC.shape[-1])
+        # C = C[dC_mask.unsqueeze(0).repeat(N, 1)].reshape(N, -1)
         if hess_C is None and self.use_constraint_hessian:
             hess_C = torch.zeros(N, self.dh + self.dg, self.T * d + self.dh, self.T * d + self.dh, device=xuz.device)
 

@@ -183,8 +183,8 @@ class ConstrainedSVGDProblem(Problem):
 
         return c, grad_c, hess_c, t_mask
 
-    def get_initial_z(self, x, projected_diffusion=False):
-        self._preprocess(x, projected_diffusion)
+    def get_initial_z(self, x, projected_diffusion=False, tactile_controller=False):
+        self._preprocess(x, projected_diffusion, tactile_controller)
         T_offset = 1 if projected_diffusion else 0
         N = x.shape[0]
         h, _, _, _ = self._con_ineq(x, compute_grads=False, compute_hess=False, projected_diffusion=projected_diffusion)

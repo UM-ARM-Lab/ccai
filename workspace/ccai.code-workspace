@@ -4,7 +4,7 @@
 			"path": ".."
 		},
 		{
-			"path": "../../github/pytorch_kinematics"
+			"path": "../../github/isaacgym-arm-envs"
 		}
 	],
 	"settings": {}
