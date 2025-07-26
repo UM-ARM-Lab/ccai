@@ -900,6 +900,9 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         self.nearest_robot_pts = []
         for i, finger in enumerate(self.fingers):
             self.data[finger] = {}
+            if tactile_controller:
+                self.data[finger]['contact_n'] = ret_scene['contact_n'][:, i]
+                continue
             self.data[finger]['sdf'] = ret_scene['sdf'][:, i].reshape(N, T + 1)
             # reshape and throw away data for unused fingers
             grad_g_q = ret_scene.get('grad_sdf', None)
@@ -925,11 +928,6 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             if d_contact_loc_denv_q_scene is not None:
                 d_contact_loc_denv_q_scene = d_contact_loc_denv_q_scene[:, i, :, :obj_dof].reshape(N, T + 1, 3, obj_dof)
                 self.data[finger]['closest_pt_env_q_grad_object'] = d_contact_loc_denv_q_scene
-                
-            if tactile_controller:
-                self.data[finger]['contact_n'] = ret_scene['contact_n'][:, i]
-                self.data[finger]['contact_o'] = ret_scene['contact_o'][:, i]
-                self.data[finger]['contact_t'] = ret_scene['contact_t'][:, i]
 
             if not self.contact_constraint_only and not tactile_controller:
                 self.data[finger]['contact_normal'] = ret_scene['contact_normal'][:, i]             
@@ -976,7 +974,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         if tactile_controller:
             self.data['G_o'] = ret_scene['G_o']
             self.data['J_q'] = ret_scene['J_q']
-            self.data['H_q'] = ret_scene['H_q']
+            # self.data['H_q'] = ret_scene['H_q']
 
 
         

@@ -6,6 +6,7 @@ Contains trajectory sampler loading and configuration logic.
 import torch
 from torch import nn
 import pathlib
+import os
 
 from ccai.models.trajectory_samplers_sac import TrajectorySampler
 
@@ -87,6 +88,12 @@ class ModelManager:
         trajectory_sampler.model.diffusion_model.subsampled_t = '5_10_15' in self.config['experiment_name']
         trajectory_sampler.model.diffusion_model.classifier = None
         trajectory_sampler.model.diffusion_model.cutoff_timesteps = 128
+        
+        # Set up compilation cache directory for the diffusion model
+        cache_dir = os.path.join(self.ccai_path, 'compiled_models_cache')
+        if hasattr(trajectory_sampler.model.diffusion_model, 'set_compilation_cache_dir'):
+            trajectory_sampler.model.diffusion_model.set_compilation_cache_dir(cache_dir)
+            print(f"Set compilation cache directory to: {cache_dir}")
         
         return trajectory_sampler
     

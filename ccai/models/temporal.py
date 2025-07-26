@@ -3,6 +3,9 @@ import torch.nn as nn
 import einops
 from einops.layers.torch import Rearrange
 import numpy as np
+import os
+import pickle
+from pathlib import Path
 
 from torch.distributions import Bernoulli
 from ccai.models.helpers import (
@@ -17,6 +20,87 @@ from ccai.models.helpers import (
     pad_to_multiple,
     Mish
 )
+
+class CompilationMixin:
+    """Mixin to handle compiled model saving and loading."""
+    
+    def __init__(self):
+        self._compiled_methods = {}
+        self._compilation_cache_dir = None
+        
+    def set_compilation_cache_dir(self, cache_dir):
+        """Set the directory for caching compiled models."""
+        self._compilation_cache_dir = Path(cache_dir)
+        self._compilation_cache_dir.mkdir(parents=True, exist_ok=True)
+        
+    def _get_cache_path(self, method_name):
+        """Get the cache file path for a compiled method."""
+        if self._compilation_cache_dir is None:
+            return None
+        # Create a hash of the model state for cache invalidation
+        model_hash = hash(str(self.state_dict()))
+        cache_file = f"{self.__class__.__name__}_{method_name}_{abs(model_hash)}.pt"
+        return self._compilation_cache_dir / cache_file
+        
+    def _save_compiled_method(self, method_name, compiled_fn):
+        """Save a compiled method to cache."""
+        cache_path = self._get_cache_path(method_name)
+        if cache_path is not None:
+            try:
+                torch.save(compiled_fn, cache_path)
+                print(f"Saved compiled method {method_name} to {cache_path}")
+            except Exception as e:
+                print(f"Warning: Could not save compiled method {method_name}: {e}")
+                
+    def _load_compiled_method(self, method_name):
+        """Load a compiled method from cache."""
+        cache_path = self._get_cache_path(method_name)
+        if cache_path is not None and cache_path.exists():
+            try:
+                compiled_fn = torch.load(cache_path, map_location=self.device if hasattr(self, 'device') else 'cpu')
+                print(f"Loaded compiled method {method_name} from cache")
+                return compiled_fn
+            except Exception as e:
+                print(f"Warning: Could not load compiled method {method_name}: {e}")
+                # Remove corrupted cache file
+                try:
+                    cache_path.unlink()
+                except:
+                    pass
+        return None
+        
+    def _get_or_compile_method(self, method_name, original_method, compile_kwargs=None):
+        """Get compiled method from cache or compile it."""
+        if compile_kwargs is None:
+            compile_kwargs = {'mode': 'max-autotune'}
+            
+        # Check if already compiled and cached in memory
+        if method_name in self._compiled_methods:
+            return self._compiled_methods[method_name]
+            
+        # Try to load from disk cache
+        compiled_fn = self._load_compiled_method(method_name)
+        
+        if compiled_fn is None:
+            # Compile the method
+            print(f"Compiling method {method_name}...")
+            compiled_fn = torch.compile(original_method, **compile_kwargs)
+            # Save to cache
+            self._save_compiled_method(method_name, compiled_fn)
+            
+        # Cache in memory
+        self._compiled_methods[method_name] = compiled_fn
+        return compiled_fn
+
+    def clear_compilation_cache(self):
+        """Clear the compilation cache."""
+        self._compiled_methods.clear()
+        if self._compilation_cache_dir and self._compilation_cache_dir.exists():
+            for cache_file in self._compilation_cache_dir.glob(f"{self.__class__.__name__}_*.pt"):
+                try:
+                    cache_file.unlink()
+                except:
+                    pass
 
 
 class ResidualTemporalBlock(nn.Module):
@@ -86,7 +170,7 @@ class ResidualBlock(nn.Module):
         out = out + self.residual_conv(x)
         return out
 
-class TemporalUnet(nn.Module):
+class TemporalUnet(nn.Module, CompilationMixin):
 
     def __init__(
             self,
@@ -100,6 +184,7 @@ class TemporalUnet(nn.Module):
             trajectory_condition=False
     ):
         super().__init__()
+        CompilationMixin.__init__(self)
 
         dims = [transition_dim, *map(lambda m: dim * m, dim_mults)]
         in_out = list(zip(dims[:-1], dims[1:]))
@@ -277,28 +362,37 @@ class TemporalUnet(nn.Module):
         x = x[:, :H]
         return x, latent
 
-    # @torch.compile(mode='max-autotune')
     def compiled_conditional_test(self, t, x, context):
-        if self.use_mixed_precision:
-            with torch.autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):
+        def _compiled_conditional_test(t, x, context):
+            if self.use_mixed_precision:
+                with torch.autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):
+                    return self(t, x, context, dropout=False)
+            else:
                 return self(t, x, context, dropout=False)
-        else:
-            return self(t, x, context, dropout=False)
+        
+        compiled_fn = self._get_or_compile_method('compiled_conditional_test', _compiled_conditional_test)
+        return compiled_fn(t, x, context)
 
-    # @torch.compile(mode='max-autotune')
     def compiled_unconditional_test(self, t, x):
-        if self.use_mixed_precision:
-            with torch.autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):
+        def _compiled_unconditional_test(t, x):
+            if self.use_mixed_precision:
+                with torch.autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):
+                    return self(t, x, context=None, dropout=False)
+            else:
                 return self(t, x, context=None, dropout=False)
-        else:
-            return self(t, x, context=None, dropout=False)
+        
+        compiled_fn = self._get_or_compile_method('compiled_unconditional_test', _compiled_unconditional_test)
+        return compiled_fn(t, x)
 
-    @torch.compile(mode='max-autotune')
     def compiled_conditional_train(self, t, x, context):
-        return self(t, x, context, dropout=True)
+        def _compiled_conditional_train(t, x, context):
+            return self(t, x, context, dropout=True)
+        
+        compiled_fn = self._get_or_compile_method('compiled_conditional_train', _compiled_conditional_train)
+        return compiled_fn(t, x, context)
 
 
-class TemporalUnetDynamics(nn.Module):
+class TemporalUnetDynamics(nn.Module, CompilationMixin):
 
     def __init__(
             self,
@@ -311,6 +405,7 @@ class TemporalUnetDynamics(nn.Module):
             context_dropout_p=0.25
     ):
         super().__init__()
+        CompilationMixin.__init__(self)
 
         dims = [transition_dim, *map(lambda m: dim * m, dim_mults)]
         in_out = list(zip(dims[:-1], dims[1:]))
@@ -475,19 +570,28 @@ class TemporalUnetDynamics(nn.Module):
         # x = x[:, :H]
         return x, latent, u_hat
 
-    # @torch.compile(mode='max-autotune')
     def compiled_conditional_test(self, t, x, context):
-        return self(t, x, context, dropout=False)
+        def _compiled_conditional_test(t, x, context):
+            return self(t, x, context, dropout=False)
+        
+        compiled_fn = self._get_or_compile_method('compiled_conditional_test', _compiled_conditional_test)
+        return compiled_fn(t, x, context)
 
-    # @torch.compile(mode='max-autotune')
     def compiled_unconditional_test(self, t, x):
-        return self(t, x, context=None, dropout=False)
+        def _compiled_unconditional_test(t, x):
+            return self(t, x, context=None, dropout=False)
+        
+        compiled_fn = self._get_or_compile_method('compiled_unconditional_test', _compiled_unconditional_test)
+        return compiled_fn(t, x)
 
-    @torch.compile(mode='max-autotune')
     def compiled_conditional_train(self, t, x, context):
-        return self(t, x, context, dropout=True)
+        def _compiled_conditional_train(t, x, context):
+            return self(t, x, context, dropout=True)
+        
+        compiled_fn = self._get_or_compile_method('compiled_conditional_train', _compiled_conditional_train)
+        return compiled_fn(t, x, context)
 
-class TemporalUnetStateAction(nn.Module):
+class TemporalUnetStateAction(nn.Module, CompilationMixin):
 
     def __init__(
             self,
@@ -501,6 +605,7 @@ class TemporalUnetStateAction(nn.Module):
             problem_dict=None
     ):
         super().__init__()
+        CompilationMixin.__init__(self)
 
         dims = [transition_dim, *map(lambda m: dim * m, dim_mults)]
         in_out = list(zip(dims[:-1], dims[1:]))
@@ -746,32 +851,41 @@ class TemporalUnetStateAction(nn.Module):
 
         return x, x
 
-    @torch.compile(mode='max-autotune')
     def compiled_conditional_test_fwd(self, t, x, context):
-        x_orig, x = self(t, x, context, dropout=False)
-        return x_orig, x
+        def _compiled_conditional_test_fwd(t, x, context):
+            x_orig, x = self(t, x, context, dropout=False)
+            return x_orig, x
+        
+        compiled_fn = self._get_or_compile_method('compiled_conditional_test_fwd', _compiled_conditional_test_fwd)
+        return compiled_fn(t, x, context)
 
     def compiled_conditional_test(self, t, x, context):
         x_orig, x = self.compiled_conditional_test_fwd(t, x, context)
         x, x = self.project(x_orig, x, context)
         return x, x
 
-    @torch.compile(mode='max-autotune')
     def compiled_unconditional_test(self, t, x):
-        _, x = self(t, x, context=None, dropout=False)
-        return x, x
+        def _compiled_unconditional_test(t, x):
+            _, x = self(t, x, context=None, dropout=False)
+            return x, x
+        
+        compiled_fn = self._get_or_compile_method('compiled_unconditional_test', _compiled_unconditional_test)
+        return compiled_fn(t, x)
     
-    @torch.compile(mode='max-autotune')
     def compiled_conditional_train_fwd(self, t, x, context):
-        x_orig, x = self(t, x, context, dropout=True)
-        return x_orig, x
+        def _compiled_conditional_train_fwd(t, x, context):
+            x_orig, x = self(t, x, context, dropout=True)
+            return x_orig, x
+        
+        compiled_fn = self._get_or_compile_method('compiled_conditional_train_fwd', _compiled_conditional_train_fwd)
+        return compiled_fn(t, x, context)
     
     def compiled_conditional_train(self, t, x, context):
         x_orig, x = self.compiled_conditional_train_fwd(t, x, context)
         x, x = self.project(x_orig, x, context)
         return x, x
 
-class StateActionMLP(nn.Module):
+class StateActionMLP(nn.Module, CompilationMixin):
 
     def __init__(
             self,
@@ -784,6 +898,7 @@ class StateActionMLP(nn.Module):
             context_dropout_p=0.25
     ):
         super().__init__()
+        CompilationMixin.__init__(self)
 
         self.time_embedding = SinusoidalPosEmb(32)
         self.constraint_type_embed = nn.Sequential(
@@ -853,20 +968,29 @@ class StateActionMLP(nn.Module):
         x = self.residual_block(x, t)
         return x, x
 
-    @torch.compile(mode='max-autotune')
     def compiled_conditional_test(self, t, x, context):
-        return self(t, x, context, dropout=False)
+        def _compiled_conditional_test(t, x, context):
+            return self(t, x, context, dropout=False)
+        
+        compiled_fn = self._get_or_compile_method('compiled_conditional_test', _compiled_conditional_test)
+        return compiled_fn(t, x, context)
 
-    @torch.compile(mode='max-autotune')
     def compiled_unconditional_test(self, t, x):
-        return self(t, x, context=None, dropout=False)
+        def _compiled_unconditional_test(t, x):
+            return self(t, x, context=None, dropout=False)
+        
+        compiled_fn = self._get_or_compile_method('compiled_unconditional_test', _compiled_unconditional_test)
+        return compiled_fn(t, x)
 
-    @torch.compile(mode='max-autotune')
     def compiled_conditional_train(self, t, x, context):
-        return self(t, x, context, dropout=True)
+        def _compiled_conditional_train(t, x, context):
+            return self(t, x, context, dropout=True)
+        
+        compiled_fn = self._get_or_compile_method('compiled_conditional_train', _compiled_conditional_train)
+        return compiled_fn(t, x, context)
 
 
-class TemporalUNetContext(nn.Module):
+class TemporalUNetContext(nn.Module, CompilationMixin):
     """ does a temporal unet for a score function and also a score function for the context"""
 
     def __init__(
@@ -888,6 +1012,7 @@ class TemporalUNetContext(nn.Module):
         self.action_dim = action_dim
         self.transition_dim = transition_dim
         super().__init__()
+        CompilationMixin.__init__(self)
         self.trajectory_condition = trajectory_condition
         self.register_buffer('dropout_prob', torch.tensor([1.0 - dropout_p]))
         self.dropout_p = dropout_p
@@ -993,73 +1118,83 @@ class TemporalUNetContext(nn.Module):
         e_c = self.context_net(h)
         return e_x, e_c
     
-    @torch.compile(mode='max-autotune')
     def model_pred_for_sample(self, t, x, context):
-        #Alt 2
-        B, H, d, t = self.preprocess_t(t, x, context)
-        if self.trajectory_condition:
+        def _model_pred_for_sample(t, x, context):
+            #Alt 2
+            B, H, d, t = self.preprocess_t(t, x, context)
+            if self.trajectory_condition:
 
-            e_x, h = self.temporal_unet(t, x, dropout=False)
-            h = self.pooling(h).reshape(B, -1)
-            if self.true_s0:
-                initial_state_embed = self.initial_state_context_net(x[:, 0, :self.state_dim])
-                h = torch.cat((h, initial_state_embed), dim=-1)
-            t = self.time_embedding(t)
+                e_x, h = self.temporal_unet(t, x, dropout=False)
+                h = self.pooling(h).reshape(B, -1)
+                if self.true_s0:
+                    initial_state_embed = self.initial_state_context_net(x[:, 0, :self.state_dim])
+                    h = torch.cat((h, initial_state_embed), dim=-1)
+                t = self.time_embedding(t)
 
-            h_for_e_c = torch.cat((context, h, t), dim=-1)
-            uncond_h_for_e_c = torch.cat((context, torch.zeros_like(h), t), dim=-1)
-            unconditional_e_c = self.context_net(uncond_h_for_e_c)
-            conditional_e_c = self.context_net(h_for_e_c)
+                h_for_e_c = torch.cat((context, h, t), dim=-1)
+                uncond_h_for_e_c = torch.cat((context, torch.zeros_like(h), t), dim=-1)
+                unconditional_e_c = self.context_net(uncond_h_for_e_c)
+                conditional_e_c = self.context_net(h_for_e_c)
 
-            w_total = 1.2
+                w_total = 1.2
 
-            e_c = unconditional_e_c + w_total * (conditional_e_c - unconditional_e_c)
-            return e_x, e_c
-        #Alt 1
-        else:
-            t_embed = self.time_embedding(t)
-            initial_state = x[:, 0, :self.state_dim]
-            inital_state_embed = self.initial_state_context_net(initial_state)
-            h_for_e_c = torch.cat((context, inital_state_embed, t_embed), dim=-1)
-            uncond_h_for_e_c = torch.cat((context, torch.zeros_like(inital_state_embed), t_embed), dim=-1)
-            unconditional_e_c = self.context_net(uncond_h_for_e_c)
-            conditional_e_c = self.context_net(h_for_e_c)
+                e_c = unconditional_e_c + w_total * (conditional_e_c - unconditional_e_c)
+                return e_x, e_c
+            #Alt 1
+            else:
+                t_embed = self.time_embedding(t)
+                initial_state = x[:, 0, :self.state_dim]
+                inital_state_embed = self.initial_state_context_net(initial_state)
+                h_for_e_c = torch.cat((context, inital_state_embed, t_embed), dim=-1)
+                uncond_h_for_e_c = torch.cat((context, torch.zeros_like(inital_state_embed), t_embed), dim=-1)
+                unconditional_e_c = self.context_net(uncond_h_for_e_c)
+                conditional_e_c = self.context_net(h_for_e_c)
 
-            w_total = 1.2
-            e_c = unconditional_e_c + w_total * (conditional_e_c - unconditional_e_c)
+                w_total = 1.2
+                e_c = unconditional_e_c + w_total * (conditional_e_c - unconditional_e_c)
 
-            unconditional_e_x, _ = self.temporal_unet(t, x, context=None, dropout=False)
-            conditional_e_x, _ = self.temporal_unet(t, x, context=context, dropout=False)
+                unconditional_e_x, _ = self.temporal_unet(t, x, context=None, dropout=False)
+                conditional_e_x, _ = self.temporal_unet(t, x, context=context, dropout=False)
 
-            e_x = unconditional_e_x + w_total * (conditional_e_x - unconditional_e_x)
-            return e_x, e_c
+                e_x = unconditional_e_x + w_total * (conditional_e_x - unconditional_e_x)
+                return e_x, e_c
+        
+        compiled_fn = self._get_or_compile_method('model_pred_for_sample', _model_pred_for_sample)
+        return compiled_fn(t, x, context)
 
-    # @torch.compile(mode='reduce-overhead')
-    @torch.compile(mode='max-autotune')
     def compiled_conditional_test(self, t, x, context):
-        if self.use_mixed_precision:
-            with torch.autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):
+        def _compiled_conditional_test(t, x, context):
+            if self.use_mixed_precision:
+                with torch.autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):
+                    return self(t, x, context, dropout=False)
+            else:
                 return self(t, x, context, dropout=False)
-        else:
-            return self(t, x, context, dropout=False)
+        
+        compiled_fn = self._get_or_compile_method('compiled_conditional_test', _compiled_conditional_test)
+        return compiled_fn(t, x, context)
 
-    # @torch.compile(mode='reduce-overhead')
-    @torch.compile(mode='max-autotune')
     def compiled_unconditional_test(self, t, x, initial_state=None):
-        if self.use_mixed_precision:
-            with torch.autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):
+        def _compiled_unconditional_test(t, x, initial_state=None):
+            if self.use_mixed_precision:
+                with torch.autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):
+                    return self(t, x, context=None, dropout=False, initial_state=initial_state)
+            else:
                 return self(t, x, context=None, dropout=False, initial_state=initial_state)
-        else:
-            return self(t, x, context=None, dropout=False, initial_state=initial_state)
+        
+        compiled_fn = self._get_or_compile_method('compiled_unconditional_test', _compiled_unconditional_test)
+        return compiled_fn(t, x, initial_state)
 
-    @torch.compile(mode='max-autotune')
     def compiled_conditional_train(self, t, x, context, initial_state=None):
-        # Use mixed precision for training
-        if self.use_mixed_precision:
-            with torch.autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):
+        def _compiled_conditional_train(t, x, context, initial_state=None):
+            # Use mixed precision for training
+            if self.use_mixed_precision:
+                with torch.autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):
+                    return self(t, x, context, dropout=True, initial_state=initial_state)
+            else:
                 return self(t, x, context, dropout=True, initial_state=initial_state)
-        else:
-            return self(t, x, context, dropout=True, initial_state=initial_state)
+        
+        compiled_fn = self._get_or_compile_method('compiled_conditional_train', _compiled_conditional_train)
+        return compiled_fn(t, x, context, initial_state)
 
 class BinaryClassifier(nn.Module):
     def __init__(self, input_dim=1, hidden_size=64):

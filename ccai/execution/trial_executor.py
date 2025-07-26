@@ -315,11 +315,12 @@ class TrajectoryExecutor:
             kwargs = {}
             if self.params.get('tactile_controller', False):
                 if best_traj is not None:
-                    kwargs['q_d_init'] = best_traj[0, :planner.problem.dx]
+                    kwargs['q_d_init'] = best_traj[0, planner.problem.dx:planner.problem.dx+4*num_fingers] + planner.problem.start[:4*num_fingers]
+                    kwargs['q_d_init'] = kwargs['q_d_init'][:4*num_fingers]
                 else:
                     kwargs['q_d_init'] = state[:planner.problem.dx]
                 
-                kwargs['f_ext_init'] = env.get_force_sensor_data()[0]
+                kwargs['f_ext_init'] = env.get_force_sensor_data()
             best_traj, plans = planner.step(state, **kwargs)
             
             if self.params['contact_constraint_only'] or self.params['solve_for_u_hat']:
@@ -338,7 +339,7 @@ class TrajectoryExecutor:
             N, T, _ = plans.shape
 
             # Store contact information
-            self._store_contact_info(planner, contact_distance, contact_points, N, T)
+            # self._store_contact_info(planner, contact_distance, contact_points, N, T)
 
             # Get current state and print orientation
             state = self.env.get_state()
@@ -427,16 +428,16 @@ class TrajectoryExecutor:
         """Store contact distance and point information."""
         if planner.problem.data is not None and len(planner.problem.data) > 0:
             contact_distance[T] = torch.stack((
-                planner.problem.data['index']['sdf'][:, -T-1:].reshape(16, T + 1),
-                planner.problem.data['middle']['sdf'][:, -T-1:].reshape(16, T + 1),
-                planner.problem.data['thumb']['sdf'][:, -T-1:].reshape(16, T + 1)
+                planner.problem.data['index']['sdf'][:, -T-1:].reshape(1, T + 1),
+                planner.problem.data['middle']['sdf'][:, -T-1:].reshape(1, T + 1),
+                planner.problem.data['thumb']['sdf'][:, -T-1:].reshape(1, T + 1)
             ), dim=1).detach().cpu()
     
             if not planner.problem.contact_constraint_only:
                 contact_points[T] = torch.stack((
-                    planner.problem.data['index']['closest_pt_world'].reshape(16, -1, 3)[:, -T-1:],
-                    planner.problem.data['middle']['closest_pt_world'].reshape(16, -1, 3)[:, -T-1:],
-                    planner.problem.data['thumb']['closest_pt_world'].reshape(16, -1, 3)[:, -T-1:]
+                    planner.problem.data['index']['closest_pt_world'].reshape(1, -1, 3)[:, -T-1:],
+                    planner.problem.data['middle']['closest_pt_world'].reshape(1, -1, 3)[:, -T-1:],
+                    planner.problem.data['thumb']['closest_pt_world'].reshape(1, -1, 3)[:, -T-1:]
                 ), dim=2).detach().cpu()
 
     def _print_force_info(self, mode, best_traj):
@@ -510,6 +511,9 @@ class TrajectoryExecutor:
 
         action = action[:, :4 * num_fingers]
         action = action.to(device=self.env.device) + state.unsqueeze(0)[:, :4 * num_fingers].to(device=self.env.device)
+        
+        if self.params.get('perturb_action', False):
+            action[..., :4] += torch.randn_like(action[..., :4]) * 0.08
 
         # Visualization
         if ((self.params['visualize_plan'] and not recover) or 

@@ -12,7 +12,7 @@ import numpy as np
 
 from ccai.allegro_contact import AllegroManipulationProblem, PositionControlConstrainedSVGDMPC
 from ccai.utils.allegro_utils import visualize_trajectory
-from ccai.controller.tactile_feedback_controller import TactileMPC, ControllerConfig, TactileFeedbackController
+from ccai.controller.tactile_feedback_controller import TactileMPC, ControllerConfig, TactileFeedbackController, TactileFeedbackQPController
 
 def create_experiment_paths(fpath, fname, mode=None, create_goal_subdir=True):
     """Create directory structure for experiment data."""
@@ -168,14 +168,14 @@ class ConstraintScheduledSVGDMPC(PositionControlConstrainedSVGDMPC):
             self.online_iters = 0
             
             self.controller_config = ControllerConfig(
-                K_e=params.get('K_e', 1000.0),
+                K_e=params.get('K_e', 200.0),
                 K_P=params.get('K_P', 3),
                 K_D=params.get('K_D', 1),
-                force_threshold=params.get('force_threshold', 0.5),
-                horizon_length=params.get('horizon_length', 10),
+                force_threshold=params.get('force_threshold', 0.2),
                 dt=params.get('dt', 1/12),
+                horizon_length=params.get('horizon_length', 2),
             )
-            self.tactile_controller = TactileFeedbackController(problem, self.controller_config)
+            self.tactile_controller = TactileFeedbackQPController(problem, self.controller_config)
             self.t = 0
             self.dt = params.get('dt', 1/12)
 
@@ -227,21 +227,35 @@ class ConstraintScheduledSVGDMPC(PositionControlConstrainedSVGDMPC):
         self.path = path
         self.iter += 1
         best_trajectory = self.x[0].clone()
+        
         all_trajectories = self.x.clone()
         if not self.tactile_controller_bool:
             self.shift()
         else:
+            if not hasattr(self, 'best_trajectory_for_spline'):
+                # Need to create a version of best_trajectory with q_d instead of u
+                self.best_trajectory_for_spline = best_trajectory.clone()
+                self.best_trajectory_for_spline[1:, self.problem.dx:self.problem.dx+self.controller_config.dq] = best_trajectory[1:, self.problem.dx:self.problem.dx+self.controller_config.dq] + best_trajectory[:-1, :self.controller_config.dq]
+                self.best_trajectory_for_spline[0, self.problem.dx:self.problem.dx+self.controller_config.dq] = best_trajectory[0, self.problem.dx:self.problem.dx+self.controller_config.dq] + self.problem.start[:self.controller_config.dq]
+
             self.problem._preprocess(self.x, tactile_controller=self.tactile_controller_bool)
-            reference_trajectory_spline, avg_normal, segment_tangents = self.compute_reference_trajectory_spline(best_trajectory, self.t, self.t + self.controller_config.horizon_length)
-            self.tactile_controller.mpc_problem_definition.set_reference_trajectory(reference_trajectory_spline)
+            reference_trajectory_spline, avg_normal, segment_tangents = self.compute_reference_trajectory_spline(self.best_trajectory_for_spline, self.t, self.t + self.controller_config.horizon_length * self.dt)
+            if hasattr(self.tactile_controller, 'set_reference_trajectory'):
+                self.tactile_controller.set_reference_trajectory(reference_trajectory_spline)
+            else:
+                self.tactile_controller.mpc_problem_definition.set_reference_trajectory(reference_trajectory_spline)
             
-            controller_q_d_delta = self.tactile_controller.solve(self.t, state, q_d_init, f_ext_init, avg_normal, segment_tangents)
-            self.t += self.dt
-            controller_action = torch.tensor(controller_q_d_delta, device=state.device) + q_d_init
-            best_trajectory[0, self.controller_config.dq:2*self.controller_config.dq] = controller_action
+            controller_q_d_delta = self.tactile_controller.solve(self.t, state[:self.controller_config.dq], q_d_init, f_ext_init, avg_normal, segment_tangents, method='precomputed_jacobians')
+            best_trajectory[int(self.t/self.dt), self.problem.dx:self.problem.dx+self.controller_config.dq] += controller_q_d_delta
             
         # self.x = self.problem.get_initial_xu(self.N)
-        return best_trajectory, all_trajectories
+        if self.tactile_controller_bool:
+            ret =  best_trajectory[int(self.t/self.dt):], all_trajectories[:, int(self.t/self.dt):]
+            self.t += self.dt
+            return ret
+
+        else:
+            return best_trajectory, all_trajectories
 
     def process_contact_normals(self):
         contact_normals = []

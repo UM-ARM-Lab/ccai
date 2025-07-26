@@ -20,12 +20,15 @@ from typing import Dict, List, Tuple, Optional, Union
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 import logging
+import scipy.linalg
+from scipy.spatial.transform import Rotation
 
 from ccai.allegro_contact import AllegroManipulationProblem
 
 from pygrampc import Grampc, GrampcResults, ProblemDescription
 
 from ccai.controller.se3_dist import se3_distance_gradient, se3_distance
+from ccai.utils.allegro_utils import partial_to_full_state
 
 import pytorch_kinematics.transforms as tf
 import pytorch_kinematics as pk
@@ -183,55 +186,18 @@ class ModelPredictiveController:
     
     def compute_K_bar(self, J_s):
         K_r = self.compute_K_r(J_s)
-        return (torch.eye(J_s.shape[0]) + self.K_e @torch.linalg.inv(K_r)) @ self.K_e
+        K_bar = (np.eye(self.K_e.shape[0]) + self.K_e @np.linalg.inv(K_r + 1e-6 * np.eye(K_r.shape[0]))) @ self.K_e
+        return K_bar
     
     def compute_K_coup(self, G_o: torch.Tensor, J_s: torch.Tensor) -> torch.Tensor:
         """
         Compute K_coup using the coupling formula.
         """
         self.K_bar = self.compute_K_bar(J_s)
-        G_o_Kbar = self.K_bar @ G_o
-        K_coup = self.K_bar + (self.K_bar @ G_o.T) @ torch.inverse(G_o_Kbar @ G_o.T + 1e-6 * torch.eye(6, device=self.device)) @ G_o_Kbar
+        G_o_Kbar = G_o @ self.K_bar
+        K_coup = self.K_bar + (self.K_bar @ G_o.T) @ np.linalg.inv(G_o_Kbar @ G_o.T + 1e-6 * np.eye(6)) @ G_o_Kbar
         return K_coup
         
-    def system_dynamics(self, system_matrices: Dict[str, torch.Tensor]) -> torch.Tensor:
-        """
-        Implement system dynamics equation (24) EXACTLY as shown in the image:
-        
-        [q̇]     [u + K_D^(-1)(K_P(q_d - q) - J(q)^T λ_ext)]
-        [q̇_d] = [            u            ]
-        [λ̇_ext] [      K_coup J(q_d)u     ]
-        
-        Args:
-            x: Current state [q; q_d; λ_ext]
-            u: Control input [n_q]
-            system_matrices: System matrices 
-            references: Reference trajectories 
-            n_q: Number of joints
-            n_c: Number of contacts
-            
-        Returns:
-            x_dot: State derivative [q̇; q̇_d; λ̇_ext]
-        """
-        # Unpack current state
-        
-        # Extract system matrices
-        J_q = system_matrices['jacobian']  # Contact Jacobian J(q) [3*n_c, n_q]
-        J_q_d = system_matrices['jacobian_d']  # Contact Jacobian J(q_d) [3*n_c, n_q]
-        G_o = system_matrices['G_o']
-        
-        K_coup = self.compute_K_coup(G_o, J_q)
-
-        mat = torch.zeros((self.dq*2 + self.df, self.dq*3 + self.df))
-        mat[:self.dq, :self.dq] = torch.eye(self.dq) * -1 * self.K_D_inv * self.K_P
-        mat[:self.dq, self.dq:2*self.dq] = torch.eye(self.dq) * self.K_D_inv * self.K_P
-        mat[:self.dq, 2*self.dq:2*self.dq + self.df] = -J_q.T * self.K_D_inv
-        mat[:self.dq, 2*self.dq+self.df:] = 1
-        
-        mat[self.dq:2*self.dq, -self.df:] = 1
-        
-        mat[2*self.dq:, -self.dq:] = -J_q_d @ K_coup
-                  
 class TactileMPC(ProblemDescription, ModelPredictiveController):
     def __init__(self, problem: AllegroManipulationProblem, config: ControllerConfig):
         ProblemDescription.__init__(self)
@@ -248,6 +214,8 @@ class TactileMPC(ProblemDescription, ModelPredictiveController):
         self.last_q = None
         self.last_q_d = None
         
+        self.contact_indices = [0, 1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15]
+        
     def compute_system_matrices(self, x):
         q = x[:self.dq]
         q_d = x[self.dq:2*self.dq]
@@ -261,15 +229,15 @@ class TactileMPC(ProblemDescription, ModelPredictiveController):
         
         self.problem._preprocess_fingers(q_for_preprocess, theta_for_preprocess, T_override=1, tactile_controller=True)
         
-        Js = self.problem.data['J_q'].clone()
-        Hs = self.problem.data['H_q'].clone()
+        Js = self.problem.data['J_q'].clone().flatten(1, 2)
+        Hs = self.problem.data['H_q'].clone().flatten(1, 2)
         
-        self.J_q = Js[0].detach().cpu().numpy()
-        self.J_q_d = Js[1].detach().cpu().numpy()
-        self.H_q = Hs[0].detach().cpu().numpy()
-        self.H_q_d = Hs[1].detach().cpu().numpy()
+        
+        self.J_q = Js[0].detach().cpu().numpy()[:, self.contact_indices]
+        self.J_q_d = Js[1].detach().cpu().numpy()[:, self.contact_indices]
+        self.H_q = Hs[0, :, self.contact_indices][:, :, self.contact_indices].detach().cpu().numpy()
+        self.H_q_d = Hs[1, :, self.contact_indices][:, :, self.contact_indices].detach().cpu().numpy()
         self.G_o = self.problem.data['G_o'][0].detach().cpu().numpy()
-
         
         self.K_coup = self.compute_K_coup(self.G_o, self.J_q)
 
@@ -290,7 +258,7 @@ class TactileMPC(ProblemDescription, ModelPredictiveController):
         interpolated_state = self.spline_func(t)
         return {
             'q_ref': interpolated_state[:self.dq],
-            'lambda_ref': interpolated_state[2*self.dq:2*self.dq + self.df]
+            'f_ref': interpolated_state[2*self.dq:2*self.dq + self.df]
         }
             
     def ffct(self, out, t, x, u, p):
@@ -299,7 +267,7 @@ class TactileMPC(ProblemDescription, ModelPredictiveController):
         q_d = x[self.dq:2*self.dq]
         f = x[2*self.dq:2*self.dq + self.df]
         # q_dot
-        out[:self.dq] = u + self.K_D_inv*(self.K_P*(q_d - q) - self.J_q.T @ f)
+        out[:self.dq] = u + self.K_D_inv@(self.K_P@(q_d - q) - self.J_q.T @ f)
         #q_d_dot
         out[self.dq:2*self.dq] = u
         # f_dot
@@ -311,18 +279,23 @@ class TactileMPC(ProblemDescription, ModelPredictiveController):
         J = np.zeros((self.dq*2+self.df, self.dq*2+self.df))
         
         # dq_dot/dq
-        J[:self.dq, :self.dq] = np.eye(self.dq) * -self.K_P * self.K_D_inv
+        J[:self.dq, :self.dq] = -self.K_P @ self.K_D_inv
         
         # Jacobian chain rule
-        dq_dot_dJ = -self.K_D_inv * x[2*self.dq:2*self.dq + self.df]
-        J[:self.dq, :self.dq] += dq_dot_dJ @ self.H_q_d
+        f_ext = x[2*self.dq:2*self.dq + self.df]
+        dq_dot_dJ = -self.K_D_inv @ (self.H_q.transpose(1, 2, 0) @ f_ext)
+        J[:self.dq, :self.dq] += dq_dot_dJ
         
         # dq_dot/dq_d
-        J[:self.dq, self.dq:2*self.dq] = np.eye(self.dq) * self.K_D_inv * self.K_P
+        J[:self.dq, self.dq:2*self.dq] = self.K_D_inv @ self.K_P
         
-        # df/dq_dot
-        df_dot_dJ = self.K_coup @ u
-        J[2*self.dq:2*self.dq + self.df, self.dq:2*self.dq] = df_dot_dJ @ self.H_q_d
+        #dq_dot/df
+        J[:self.dq, 2*self.dq:2*self.dq + self.df] = self.K_D_inv @ -self.J_q.T
+        
+        
+        # df_dot/dq_d
+        K_c_h = np.einsum('ij, jkl->ikl', self.K_coup, self.H_q_d)
+        J[2*self.dq:2*self.dq + self.df, self.dq:2*self.dq] = K_c_h @ u
         
         return J.T @ vec
     
@@ -345,9 +318,11 @@ class TactileMPC(ProblemDescription, ModelPredictiveController):
         ref = self.get_reference_trajectory(t)
         q_ref = ref['q_ref']
         f_ref = ref['f_ref']
-        fk_q_ref = self.problem.robot_sdf.chain.forward_kinematics(torch.tensor(q_ref.reshape(1, -1), device=self.problem.device)).detach().cpu().numpy()
+        
         q = x[:self.dq]
-        fk_q = self.problem.robot_sdf.chain.forward_kinematics(torch.tensor(q.reshape(1, -1), device=self.problem.device)).detach().cpu().numpy()
+        
+        fk_q_ref = self.handle_fk(q_ref)
+        fk_q = self.handle_fk(q)
         
         dist, _, _ = se3_distance(fk_q, fk_q_ref, self.W_P)
         
@@ -361,6 +336,23 @@ class TactileMPC(ProblemDescription, ModelPredictiveController):
         
         return out
     
+    def handle_fk(self, q, jac=False):
+        q_for_fk = torch.tensor(q.reshape(1, -1), device=self.problem.device).float()
+        q_for_fk = partial_to_full_state(q_for_fk, fingers=self.problem.fingers)
+        ee_names = [self.problem.ee_names[f] for f in self.problem.fingers]
+        frame_indices = [self.problem.contact_scenes.robot_sdf.chain.frame_to_idx[ee_name] for ee_name in ee_names]
+        if jac:
+            q_for_fk = q_for_fk.repeat(len(frame_indices), 1)
+            fk_q = self.problem.contact_scenes.robot_sdf.chain.jacobian(q_for_fk, link_indices=torch.tensor(frame_indices, device=self.problem.device).long())[..., self.contact_indices].cpu().numpy()
+        else:
+            fk_q = self.problem.contact_scenes.robot_sdf.chain.forward_kinematics(q_for_fk)
+            pts = []
+            for ee_name in ee_names:
+                pts.append(fk_q[ee_name].get_matrix().cpu().numpy())
+            fk_q = np.concatenate(pts, axis=0)
+
+        return fk_q
+    
     def dldx(self, out, t, x, u, p, xdes, udes):
         ref = self.get_reference_trajectory(t)
         q_ref = ref['q_ref']
@@ -370,17 +362,15 @@ class TactileMPC(ProblemDescription, ModelPredictiveController):
         # joint position cost
         out[:self.dq] = 2 * (q_ref - q) * self.config.w_q
         
-        # Forward kinematics cost derivative
-        fk_q = self.problem.robot_sdf.chain.forward_kinematics(torch.tensor(q.reshape(1, -1), device=self.problem.device)).detach().cpu().numpy()[0]
-        fk_q_ref = self.problem.robot_sdf.chain.forward_kinematics(torch.tensor(q_ref.reshape(1, -1), device=self.problem.device)).detach().cpu().numpy()[0]
-        
-        jac_fk_q = self.problem.robot_sdf.chain.jacobian(torch.tensor(q.reshape(1, -1), device=self.problem.device)).detach().cpu().numpy()[0]
+        fk_q = self.handle_fk(q)
+        fk_q_ref = self.handle_fk(q_ref)
+        jac_fk_q = self.handle_fk(q, jac=True)
         dist, grad = se3_distance_gradient(fk_q, fk_q_ref, self.W_P)
         # Squared cost, so adjust grad
-        grad = grad * 2 * dist
-        grad_fk_q = grad @ jac_fk_q
+        grad = grad * 2 * dist.reshape(-1, 1)
+        grad_fk_q = np.einsum('bi,bij->bj', grad, jac_fk_q)
         #
-        out[:self.dq] += grad_fk_q * self.config.w_p
+        out[:self.dq] += grad_fk_q.sum(axis=0) * self.config.w_p
         
         # external force cost
         out[2*self.dq:2*self.dq + self.df] = 2 * (x[2*self.dq:2*self.dq + self.df] - f_ref) * self.config.w_f
@@ -410,7 +400,7 @@ class WeightingMatrixDeterminer:
         Returns:
             is_active: Boolean mask for active contacts [n_c]
         """
-        force_magnitudes = torch.norm(contact_forces, dim=1)
+        force_magnitudes = np.linalg.norm(contact_forces.reshape(-1, 3), axis=1)
         is_active = force_magnitudes >= self.force_threshold
         return is_active
     
@@ -426,7 +416,7 @@ class WeightingMatrixDeterminer:
             W_A: Force weighting matrix
             W_P: Position weighting matrix
         """
-        n_c = contact_forces.shape[0]
+        n_c = avg_normal.shape[0]
         is_active = self.classify_contacts(contact_forces)
         
         # Initialize weighting matrices
@@ -461,7 +451,7 @@ class WeightingMatrixDeterminer:
                 W_P[start_idx_6:end_idx_6, start_idx_6:end_idx_6] = T_i
             else:
                 # Inactive contact: position tracking only
-                W_A[start_idx:end_idx, start_idx:end_idx] = np.zeros(3, 3)
+                W_A[start_idx:end_idx, start_idx:end_idx] = np.zeros((3, 3))
                 W_P_nc = np.eye(6)
                 W_P_nc[3:, 3:] *= self.config.w_ori
                 W_P[start_idx_6:end_idx_6, start_idx_6:end_idx_6] = W_P_nc
@@ -490,9 +480,9 @@ class TactileFeedbackController:
             'Thor': self.config.dt * 2,
             'dt': self.config.dt,
         })
-        self.grampc.estim_penmin(True)
         self.grampc.print_opts()
         self.grampc.print_params()
+        self.min_pen_estimate = False
 
         # Controller state
         self.current_mode = "multi_contact"  # "single_contact" or "multi_contact"
@@ -523,17 +513,590 @@ class TactileFeedbackController:
         
         self.mpc_problem_definition.set_weighting_matrices(W_A *self.config.w_f, W_P * self.config.w_p)
                 
-        grampc_x0 = torch.cat((state, q_d_init, f_ext_init), dim=0).cpu().numpy()
+        grampc_x0 = torch.cat((state.cpu(), q_d_init.cpu(), f_ext_init), dim=0).numpy()
         self.grampc.set_param({"x0": grampc_x0,
                                "t0": t0})
         
+        if not self.min_pen_estimate:
+            self.grampc.estim_penmin(True)
+            self.min_pen_estimate = True
         runtime = self.grampc.run()
+        
+        print(f'Solved GRAMPC in {runtime} seconds.')
+
         
         u = self.grampc.sol.unext * self.config.dt
         
         return u
         
+class TactileFeedbackQPController:
+    def __init__(self, problem: AllegroManipulationProblem, config: ControllerConfig):
+        self.config = config
+        self.device = config.device
+        self.problem = problem  # AllegroManipulationProblem instance
         
+        # Initialize subcomponents
+        self.weighting_determiner = WeightingMatrixDeterminer(config)
+        self.mpc_problem_definition = TactileMPC(problem, config)
+        
+        # Initialize control attributes
+        self.dq = config.dq
+        self.df = config.df
+        self.horizon = config.horizon_length
+        self.dt = config.dt
+        
+        # Control gains
+        self.K_P = config.K_P * np.eye(self.dq)
+        self.K_D = config.K_D * np.eye(self.dq)
+        self.K_D_inv = (1.0 / config.K_D) * np.eye(self.dq)
+        self.K_P_inv = (1.0 / config.K_P) * np.eye(self.dq)
+        
+        # State and control dimensions
+        self.n_x = self.dq * 2 + self.df  # [q; q_d; λ_ext]
+        self.n_u = self.dq  # joint torques
+        
+        # Contact indices (same as in TactileMPC)
+        self.contact_indices = [0, 1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15]
+        
+        # Check if cvxpy is available
+        try:
+            import cvxpy as cp
+            self.cvxpy_available = True
+        except ImportError:
+            self.cvxpy_available = False
+            logger.warning("cvxpy not available, falling back to basic QP solver")
+        
+        logger.info(f"Initialized TactileFeedbackQPController with config: {config}")
+        
+    def set_reference_trajectory(self, spline_func):
+        """Set the reference trajectory spline function."""
+        self.reference_spline = spline_func
+        
+    def compute_system_matrices_at_state(self, x_ref: np.ndarray):
+        """
+        Compute system matrices (Jacobians, coupling, etc.) at a reference state.
+        
+        Args:
+            x_ref: Reference state [n_x] = [q; q_d; λ_ext]
+            
+        Returns:
+            Dictionary containing system matrices
+        """
+        q = x_ref[:self.dq]
+        q_d = x_ref[self.dq:2*self.dq]
+        
+        # Use the preprocessing from TactileMPC to get Jacobians
+        q_for_preprocess = torch.tensor(np.stack((q, q_d), axis=0), device=self.problem.device).unsqueeze(0).float()
+        theta_for_preprocess = torch.zeros((1, 2, self.problem.obj_dof), device=self.problem.device).float()
+        
+        self.problem._preprocess_fingers(q_for_preprocess, theta_for_preprocess, T_override=1, tactile_controller=True)
+        
+        Js = self.problem.data['J_q'].clone().flatten(1, 2)
+        # Hs = self.problem.data['H_q'].clone().flatten(1, 2)
+        
+        J_q = Js[0].detach().cpu().numpy()[:, self.contact_indices]
+        J_q_d = Js[1].detach().cpu().numpy()[:, self.contact_indices]
+        # H_q = Hs[0, :, self.contact_indices][:, :, self.contact_indices].detach().cpu().numpy()
+        # H_q_d = Hs[1, :, self.contact_indices][:, :, self.contact_indices].detach().cpu().numpy()
+        G_o = self.problem.data['G_o'][0].detach().cpu().numpy()
+        
+        # Compute coupling matrix
+        K_r = J_q @ self.K_P_inv @ J_q.T
+        K_bar = np.linalg.inv(np.eye(K_r.shape[0]) + self.config.K_e @ np.linalg.inv(K_r + 1e-6 * np.eye(K_r.shape[0]))) @ self.config.K_e
+        G_o_Kbar = G_o @ K_bar
+        K_coup = K_bar + (K_bar @ G_o.T) @ np.linalg.inv(G_o_Kbar @ G_o.T + 1e-6 * np.eye(6)) @ G_o_Kbar
+        
+        return {
+            'J_q': J_q,
+            'J_q_d': J_q_d, 
+            # 'H_q': H_q,
+            # 'H_q_d': H_q_d,
+            'G_o': G_o,
+            'K_coup': K_coup
+        }
+               
+    def compute_fk_poses(self, q_ref: np.ndarray):
+        """
+        Compute forward kinematics poses for reference joint configuration.
+        
+        Args:
+            q_ref: Reference joint configuration [dq]
+            
+        Returns:
+            fk_poses: Forward kinematics poses [6*n_contacts] (position + orientation)
+        """
+        # Convert to torch and expand to full joint state
+        q_for_fk = torch.tensor(q_ref.reshape(1, -1), device=self.problem.device).float()
+        q_for_fk = partial_to_full_state(q_for_fk, fingers=self.problem.fingers)
+        
+        # Get end-effector names
+        ee_names = [self.problem.ee_names[f] for f in self.problem.fingers]
+        
+        # Compute forward kinematics
+        fk_result = self.problem.contact_scenes.robot_sdf.chain.forward_kinematics(q_for_fk)
+        poses = []
+        for ee_name in ee_names:
+            pose_matrix = fk_result[ee_name].get_matrix().cpu().numpy()[0]  # [4, 4]
+            # Extract position and orientation
+            position = pose_matrix[:3, 3]
+            rotation = pose_matrix[:3, :3]
+            # Convert rotation matrix to axis-angle representation
+            axis_angle = Rotation.from_matrix(rotation).as_rotvec()
+            pose_6d = np.concatenate([position, axis_angle])
+            poses.append(pose_6d)
+        
+        fk_poses = np.concatenate(poses)  # [6*n_contacts]
+        return fk_poses
+        
+    def evaluate_dynamics(self, x: np.ndarray, u: np.ndarray, system_matrices: dict):
+        """
+        Evaluate nonlinear dynamics at given state and control.
+        
+        Args:
+            x: State [n_x]
+            u: Control [n_u]
+            system_matrices: Precomputed system matrices
+            
+        Returns:
+            x_dot: State derivative [n_x]
+        """
+        q = x[:self.dq]
+        q_d = x[self.dq:2*self.dq]
+        f_ext = x[2*self.dq:2*self.dq + self.df]
+        
+        J_q = system_matrices['J_q']
+        J_q_d = system_matrices['J_q_d']
+        K_coup = system_matrices['K_coup']
+        
+        x_dot = np.zeros(self.n_x)
+        
+        # q_dot = u + K_D^(-1)(K_P(q_d - q) - J^T f)
+        x_dot[:self.dq] = u + self.K_D_inv @ (self.K_P @ (q_d - q) - J_q.T @ f_ext)
+        
+        # q_d_dot = u
+        x_dot[self.dq:2*self.dq] = u
+        
+        # f_dot = K_coup J_q_d u
+        x_dot[2*self.dq:2*self.dq + self.df] = K_coup @ (J_q_d @ u)
+        
+        return x_dot
+        
+    def setup_qp_problem(self, x0: np.ndarray, reference_trajectory: callable, 
+                        W_A: np.ndarray, W_P: np.ndarray):
+        """
+        Set up the QP problem for MPC using linearized dynamics.
+        
+        minimize: sum_{t=0}^{T-1} [cost(x_t, u_t)] + cost_terminal(x_T)
+        subject to: x_{t+1} = A_t x_t + B_t u_t + c_t  (linearized dynamics)
+                   u_min <= u_t <= u_max                (control bounds)
+        
+        Args:
+            x0: Initial state [n_x]
+            reference_trajectory: Function t -> reference_state
+            W_A: Force weighting matrix
+            W_P: Position weighting matrix
+            
+        Returns:
+            QP problem (depends on available solver)
+        """
+        if not self.cvxpy_available:
+            return self.setup_basic_qp_problem(x0, reference_trajectory, W_A, W_P)
+            
+        import cvxpy as cp
+        
+        # Decision variables: [u_0, u_1, ..., u_{T-1}, x_1, x_2, ..., x_T]
+        u_vars = [cp.Variable(self.n_u) for _ in range(self.horizon)]
+        x_vars = [cp.Variable(self.n_x) for _ in range(self.horizon)]
+        
+        constraints = []
+        cost = 0
+        
+        # Linearize around reference trajectory
+        x_ref_traj = []
+        u_ref_traj = []
+        A_mats = []
+        B_mats = []
+        c_vecs = []
+        system_matrices_traj = []  # Cache system matrices to reuse in cost function
+        
+        # Cache FK computations to avoid redundant calculations [[memory:2647243]]
+        fk_cache = {}
+        
+        for t in range(self.horizon):
+            # Get reference trajectory at time t
+            ref_state = reference_trajectory(t * self.dt)
+            x_ref = ref_state[:self.n_x]  
+            u_ref = np.zeros(self.n_u)  # Assume zero reference control
+            
+            x_ref_traj.append(x_ref)
+            u_ref_traj.append(u_ref)
+            
+            # Linearize dynamics and cache system matrices
+            A, B, c, system_matrices_t = self.linearize_dynamics(x_ref, u_ref)
+            A_mats.append(A)
+            B_mats.append(B)
+            c_vecs.append(c)
+            
+            # Cache system matrices for reuse in cost function
+            system_matrices_traj.append(system_matrices_t)
+            
+            # Cache FK computation for this reference point to reuse in cost function
+            q_ref_t = x_ref[:self.dq]
+            q_key = tuple(q_ref_t.round(6))  # Round for floating point key
+            if q_key not in fk_cache:
+                try:
+                    fk_ref = self.compute_fk_poses(q_ref_t)
+                    fk_cache[q_key] = fk_ref
+                except Exception as e:
+                    logger.warning(f"FK computation failed at timestep {t}: {e}")
+                    fk_cache[q_key] = None
+        
+        # Add dynamics constraints
+        x_prev = x0
+        for t in range(self.horizon):
+            if t == 0:
+                constraints.append(x_vars[t] == A_mats[t] @ x_prev + B_mats[t] @ u_vars[t] + c_vecs[t])
+            else:
+                constraints.append(x_vars[t] == A_mats[t] @ x_vars[t-1] + B_mats[t] @ u_vars[t] + c_vecs[t])
+        
+        # Add cost function
+        for t in range(self.horizon):
+            ref_t = reference_trajectory(t * self.dt)
+            q_ref = ref_t[:self.dq]
+            f_ref = ref_t[2*self.dq:2*self.dq + self.df]
+            
+            # Extract state components
+            q_t = x_vars[t][:self.dq]
+            f_t = x_vars[t][2*self.dq:2*self.dq + self.df]
+            
+            # Joint position cost
+            cost += self.config.w_q * cp.sum_squares(q_t - q_ref)
+            
+            # Force cost (using weighting matrix W_A)
+            if W_A.shape[0] > 0:
+                W_A_sqrt = np.real(scipy.linalg.sqrtm(W_A + 1e-6 * np.eye(W_A.shape[0])))
+                cost += self.config.w_f * cp.sum_squares(W_A_sqrt @ (f_t - f_ref))
+            
+            # Control cost
+            cost += self.config.w_u * cp.sum_squares(u_vars[t])
+            
+            # Linearized forward kinematics pose cost using cached FK jacobian
+            # This makes the pose cost convex for the QP formulation
+            if W_P.shape[0] > 0:
+                # Use cached FK computation to avoid redundant calculations
+                q_ref_t = q_ref
+                q_key = tuple(q_ref_t.round(6))
+                
+                if q_key in fk_cache and fk_cache[q_key] is not None:
+                    fk_ref = fk_cache[q_key]
+                    
+                    # Get the contact jacobian J_q from the cached system matrices
+                    J_q = system_matrices_traj[t]['J_q']  # Contact jacobian [df, dq]
+                    
+                    # Linearized FK: pose_approx = fk_ref + J_q @ (q_t - q_ref)
+                    # Cost: ||W_P_sqrt @ (pose_approx - fk_ref)||^2 = ||W_P_sqrt @ J_q @ (q_t - q_ref)||^2
+                    W_P_sqrt = np.real(scipy.linalg.sqrtm(W_P + 1e-6 * np.eye(W_P.shape[0])))
+                    
+                    # Handle dimension mismatches between W_P and contact jacobian
+                    if W_P.shape[0] > J_q.shape[0]:
+                        # W_P might include extra dimensions, truncate to contact jacobian dimensions
+                        W_P_sqrt = W_P_sqrt[:J_q.shape[0], :J_q.shape[0]]
+                    elif W_P.shape[0] < J_q.shape[0]:
+                        # Contact jacobian might have more DOFs, truncate to W_P dimensions  
+                        J_q = J_q[:W_P.shape[0], :]
+                    
+                    # Weighted contact jacobian for linearized pose cost
+                    weighted_contact_jac = W_P_sqrt @ J_q
+                    
+                    # Add convex pose cost: ||weighted_contact_jac @ (q_t - q_ref)||^2
+                    cost += self.config.w_p * cp.sum_squares(weighted_contact_jac @ (q_t - q_ref))
+                else:
+                    # Fallback to joint-space cost if FK computation failed
+                    logger.warning(f"Using joint-space fallback for pose cost at timestep {t}")
+                    cost += self.config.w_p * cp.sum_squares(q_t - q_ref)
+        
+        
+        # Control bounds (optional)
+        u_max = 50.0  # Reasonable torque limits for Allegro hand
+        for t in range(self.horizon):
+            constraints.append(u_vars[t] >= -u_max)
+            constraints.append(u_vars[t] <= u_max)
+        
+        # Create and return problem
+        problem = cp.Problem(cp.Minimize(cost), constraints)
+        
+        return {
+            'problem': problem,
+            'u_vars': u_vars,
+            'x_vars': x_vars,
+            'reference_trajectory': reference_trajectory
+        }
+        
+    def setup_basic_qp_problem(self, x0: np.ndarray, reference_trajectory: callable,
+                              W_A: np.ndarray, W_P: np.ndarray):
+        """
+        Fallback QP setup using scipy for when cvxpy is not available.
+        """
+        logger.warning("Using basic QP solver - may be less robust than cvxpy")
+        
+        # Simplified QP formulation 
+        # For now, just return zero control as fallback
+        return {
+            'problem': None,
+            'fallback': True,
+            'reference_trajectory': reference_trajectory
+        }
+    
+    def get_x_ref_from_ref_state(self, ref_state: np.ndarray):
+        """
+        Get the state x_ref from the reference state.
+        """
+        x_ref = np.zeros(self.n_x)
+        x_ref[:self.dq] = ref_state[:self.dq]
+        x_ref[self.dq:2*self.dq] = ref_state[self.dq+self.problem.obj_dof:2*self.dq+self.problem.obj_dof]
+        x_ref[2*self.dq:2*self.dq + self.df] = ref_state[2*self.dq+self.problem.obj_dof:]
+        return x_ref
+        
+    def setup_qp_problem_precomputed_jacobians(self, t0: float, x0: np.ndarray, reference_trajectory: callable, 
+                                             W_A: np.ndarray, W_P: np.ndarray):
+        """
+        Alternative QP setup using original dynamics with pre-computed jacobians.
+        
+        Instead of linearizing the dynamics, we use the original dynamics structure:
+        q̇ = u + K_D^(-1)(K_P(q_d - q) - J_ref^T λ_ext)
+        q̇_d = u  
+        λ̇_ext = K_coup_ref J_ref_d u
+        
+        But with jacobians J_ref, J_ref_d, K_coup_ref pre-computed at reference points,
+        making the dynamics linear in state.
+        
+        Args:
+            x0: Initial state [n_x]
+            reference_trajectory: Function t -> reference_state
+            W_A: Force weighting matrix
+            W_P: Position weighting matrix
+            
+        Returns:
+            QP problem (depends on available solver)
+        """
+        if not self.cvxpy_available:
+            return self.setup_basic_qp_problem(x0, reference_trajectory, W_A, W_P)
+            
+        import cvxpy as cp
+        
+        # Decision variables: [u_0, u_1, ..., u_{T-1}, x_1, x_2, ..., x_T]
+        u_vars = [cp.Variable(self.n_u) for _ in range(self.horizon)]
+        x_vars = [cp.Variable(self.n_x) for _ in range(self.horizon)]
+        
+        constraints = []
+        cost = 0
+        
+        # Pre-compute jacobians at reference trajectory points
+        ref_jacobians = []
+        fk_cache = {}
+        
+        for t in range(self.horizon):
+            # Get reference trajectory at time t
+            ref_state = reference_trajectory(t0 + t * self.dt)
+            x_ref = self.get_x_ref_from_ref_state(ref_state)
+            
+            # Pre-compute system matrices at reference point
+            system_matrices = self.compute_system_matrices_at_state(x_ref)
+            ref_jacobians.append(system_matrices)
+            
+            # Cache FK poses for cost function
+            q_ref_t = x_ref[:self.dq]
+            q_key = tuple(q_ref_t.round(6))
+            if q_key not in fk_cache:
+                try:
+                    fk_ref = self.compute_fk_poses(q_ref_t)
+                    fk_cache[q_key] = fk_ref
+                except Exception as e:
+                    logger.warning(f"FK computation failed at timestep {t}: {e}")
+                    fk_cache[q_key] = None
+        
+        # Add linear dynamics constraints using pre-computed jacobians
+        x_prev = x0
+        for t in range(self.horizon):
+            # Get pre-computed jacobians for this timestep
+            J_q = ref_jacobians[t]['J_q']      # Contact jacobian [df, dq]
+            J_q_d = ref_jacobians[t]['J_q_d']  # Contact jacobian derivative [df, dq]
+            K_coup = ref_jacobians[t]['K_coup'] # Coupling matrix [df, df]
+            
+            # Extract state variables for current timestep
+            if t == 0:
+                q_prev = x_prev[:self.dq]
+                q_d_prev = x_prev[self.dq:2*self.dq]
+                f_prev = x_prev[2*self.dq:2*self.dq + self.df]
+            else:
+                q_prev = x_vars[t-1][:self.dq]
+                q_d_prev = x_vars[t-1][self.dq:2*self.dq]
+                f_prev = x_vars[t-1][2*self.dq:2*self.dq + self.df]
+            
+            # Current state variables
+            q_curr = x_vars[t][:self.dq]
+            q_d_curr = x_vars[t][self.dq:2*self.dq]
+            f_curr = x_vars[t][2*self.dq:2*self.dq + self.df]
+            
+            # Linear dynamics using pre-computed jacobians:
+            # q̇ = u + K_D^(-1)(K_P(q_d - q) - J_ref^T f)
+            q_dot = u_vars[t] + self.K_D_inv @ (self.K_P @ (q_d_prev - q_prev) - J_q.T @ f_prev)
+            
+            # q̇_d = u
+            q_d_dot = u_vars[t]
+            
+            # λ̇_ext = K_coup_ref J_ref_d u  
+            f_dot = K_coup @ (J_q_d @ u_vars[t])
+            
+            # Discrete-time integration: x_{t+1} = x_t + dt * x_dot
+            constraints.append(q_curr == q_prev + self.dt * q_dot)
+            constraints.append(q_d_curr == q_d_prev + self.dt * q_d_dot)
+            constraints.append(f_curr == f_prev + self.dt * f_dot)
+        
+        # Add cost function (same as before)
+        for t in range(self.horizon):
+            ref_t = reference_trajectory(t0 + t * self.dt)
+            ref_t = self.get_x_ref_from_ref_state(ref_t)
+            q_ref = ref_t[:self.dq]
+            f_ref = ref_t[2*self.dq:2*self.dq + self.df]
+            
+            # Extract state components
+            q_t = x_vars[t][:self.dq]
+            f_t = x_vars[t][2*self.dq:2*self.dq + self.df]
+            
+            # Joint position cost
+            cost += self.config.w_q * cp.sum_squares(q_t - q_ref)
+            
+            # Force cost (using weighting matrix W_A)
+            if W_A.shape[0] > 0:
+                W_A_sqrt = np.real(scipy.linalg.sqrtm(W_A + 1e-6 * np.eye(W_A.shape[0])))
+                cost += self.config.w_f * cp.sum_squares(W_A_sqrt @ (f_t - f_ref))
+            
+            # Control cost
+            cost += self.config.w_u * cp.sum_squares(u_vars[t])
+            
+            # Linearized forward kinematics pose cost using pre-computed jacobians
+            if W_P.shape[0] > 0:
+                q_ref_t = q_ref
+                q_key = tuple(q_ref_t.round(6))
+                
+                if q_key in fk_cache and fk_cache[q_key] is not None:
+                    fk_ref = fk_cache[q_key]
+                    
+                    # Use pre-computed contact jacobian
+                    J_q = ref_jacobians[t]['J_q']  # Contact jacobian [df, dq]
+                    
+                    # Linearized FK cost using pre-computed jacobian
+                    W_P_sqrt = np.real(scipy.linalg.sqrtm(W_P + 1e-6 * np.eye(W_P.shape[0])))
+                    
+                    # Handle dimension mismatches
+                    if W_P.shape[0] > J_q.shape[0]:
+                        W_P_sqrt = W_P_sqrt[:J_q.shape[0], :J_q.shape[0]]
+                    elif W_P.shape[0] < J_q.shape[0]:
+                        J_q = J_q[:W_P.shape[0], :]
+                    
+                    # Weighted contact jacobian for pose cost
+                    weighted_contact_jac = W_P_sqrt @ J_q
+                    
+                    # Add pose cost: ||weighted_contact_jac @ (q_t - q_ref)||^2
+                    cost += self.config.w_p * cp.sum_squares(weighted_contact_jac @ (q_t - q_ref))
+                else:
+                    # Fallback to joint-space cost if FK computation failed
+                    logger.warning(f"Using joint-space fallback for pose cost at timestep {t}")
+                    cost += self.config.w_p * cp.sum_squares(q_t - q_ref)
+        
+        # Control bounds
+        u_max = 50.0  # Reasonable torque limits for Allegro hand
+        for t in range(self.horizon):
+            constraints.append(u_vars[t] >= -u_max)
+            constraints.append(u_vars[t] <= u_max)
+        
+        # Create and return problem
+        problem = cp.Problem(cp.Minimize(cost), constraints)
+        
+        return {
+            'problem': problem,
+            'u_vars': u_vars,
+            'x_vars': x_vars,
+            'reference_trajectory': reference_trajectory,
+            'method': 'precomputed_jacobians'
+        }
+        
+    def solve(self, t0: float, state: torch.Tensor, q_d_init: torch.Tensor, 
+             f_ext_init: torch.Tensor, avg_normal: np.ndarray, 
+             segment_tangents: np.ndarray, method: str = 'linearized') -> torch.Tensor:
+        """
+        Solve the QP-based MPC problem.
+        
+        Args:
+            t0: Initial time
+            state: Current joint state [dq]
+            q_d_init: Initial commanded positions [dq]  
+            f_ext_init: Initial external forces [df]
+            avg_normal: Average contact normals
+            segment_tangents: Contact tangent directions
+            method: QP formulation method - 'linearized' or 'precomputed_jacobians'
+            
+        Returns:
+            u: Optimal control input [dq]
+        """
+        
+        # Compute weighting matrices
+        W_A, W_P = self.weighting_determiner.compute_weighting_matrices(
+            f_ext_init.cpu().numpy(), avg_normal, segment_tangents)
+        
+        # Update environment stiffness with weighting  
+        self.config.K_e = self.config.K_e * W_A
+        
+        # Pack initial state
+        x0 = np.concatenate([state.cpu().numpy(), q_d_init.cpu().numpy(), f_ext_init.cpu().numpy()])
+        
+        # Set up reference trajectory (use the spline function if available)
+        if hasattr(self, 'reference_spline') and self.reference_spline is not None:
+            reference_trajectory = self.reference_spline
+        elif hasattr(self.mpc_problem_definition, 'spline_func'):
+            reference_trajectory = self.mpc_problem_definition.spline_func
+        else:
+            # Fallback: constant reference
+            def reference_trajectory(t):
+                return x0.copy()
+        
+        # Choose QP formulation method
+        if method == 'precomputed_jacobians':
+            qp_data = self.setup_qp_problem_precomputed_jacobians(t0, x0, reference_trajectory, W_A, W_P)
+            logger.info("Using precomputed jacobians method for QP formulation")
+        else:  # default to 'linearized'
+            qp_data = self.setup_qp_problem(t0, x0, reference_trajectory, W_A, W_P)
+            logger.info("Using linearized dynamics method for QP formulation")
+        
+        if qp_data.get('fallback', False):
+            logger.warning("Using fallback zero control")
+            return torch.zeros_like(state)
+        
+        try:
+            # Solve the QP problem
+            problem = qp_data['problem']
+            problem.solve(solver='OSQP', verbose=False)
+            
+            if problem.status not in ['optimal', 'optimal_inaccurate']:
+                logger.warning(f"QP solver status: {problem.status}")
+                return torch.zeros_like(state)
+            
+            # Extract first control input
+            u_optimal = qp_data['u_vars'][0].value
+            
+            if u_optimal is None:
+                logger.warning("QP solver returned None")
+                return torch.zeros_like(state)
+            
+            # Scale by time step (similar to GRAMPC integration)
+            u_scaled = u_optimal * self.dt
+            
+            return torch.tensor(u_scaled, device=state.device, dtype=state.dtype)
+            
+        except Exception as e:
+            logger.error(f"QP solve failed: {e}")
+            return torch.zeros_like(state) 
         
 if __name__ == "__main__":
     # Example usage with AllegroManipulationProblem integration
@@ -557,127 +1120,39 @@ if __name__ == "__main__":
     print("Use controller.set_problem(problem) to set the manipulation problem")
     print("Then use controller.update(..., use_allegro_integration=True) for control")
     
-    # Example integration workflow:
-    print("\n=== Example Integration Workflow ===")
+    print("\n=== Two QP Formulation Methods ===")
+    print("1. 'linearized': Linearizes full dynamics around reference trajectory")
+    print("   - Computes A, B, c matrices via differentiation")
+    print("   - Handles all nonlinearities through linearization")
+    print("   - QP constraint: x_{t+1} = A_t x_t + B_t u_t + c_t")
+    
+    print("\n2. 'precomputed_jacobians': Uses original dynamics with fixed jacobians")
+    print("   - Pre-computes J_q, J_q_d, K_coup at reference points")
+    print("   - Dynamics become linear since jacobians are constants")
+    print("   - QP constraint: x_{t+1} = x_t + dt * [original dynamics with J_ref]")
+    
+    print("\n=== Key Differences ===")
+    print("Linearized approach:")
+    print("  ✓ Handles all nonlinearities via Taylor expansion")
+    print("  ✓ More general, captures higher-order effects")
+    print("  ✗ Computationally intensive (many derivatives)")
+    
+    print("\nPrecomputed jacobians approach:")
+    print("  ✓ Computationally efficient (no derivatives)")
+    print("  ✓ Preserves original dynamics structure")
+    print("  ✓ Intuitive - jacobians frozen at reference")
+    print("  ✗ May miss some coupling effects")
+    
+    print("\n=== Usage Example ===")
     print("""
-    # 1. Create AllegroManipulationProblem
-    from ccai.allegro_contact import AllegroManipulationProblem
+    # Create QP controller
+    qp_controller = TactileFeedbackQPController(problem, config)
     
-    problem = AllegroManipulationProblem(
-        start=start_state,
-        goal=goal_state,
-        T=horizon_length,
-        chain=kinematic_chain,
-        object_location=object_location,
-        object_type='screwdriver',  # or 'valve', etc.
-        world_trans=world_transform,
-        object_asset_pos=object_position,
-        contact_fingers=['index', 'middle', 'ring', 'thumb'],
-        regrasp_fingers=[],  # or subset of fingers
-        optimize_force=True,
-        device='cuda'
-    )
+    # Method 1: Linearized dynamics  
+    u1 = qp_controller.solve(t0, state, q_d, f_ext, normals, tangents, method='linearized')
     
-    # 2. Set up controller with problem
-    controller.set_problem(problem)
-    
-    # 3. Create state from current robot configuration
-    current_state = create_allegro_compatible_state(
-        problem, 
-        q_current=torch.tensor([...]),  # current joint positions
-        q_dot_current=torch.tensor([...])  # current joint velocities
-    )
-    
-    # 4. Define reference trajectory
-    reference_trajectory = {
-        'q_ref': torch.zeros((horizon_length, n_joints)),  # desired joint trajectory
-        'theta_ref': torch.zeros((horizon_length, obj_dof)),  # desired object trajectory
-    }
-    
-    # 5. Run controller with integrated preprocessing
-    control_output = controller.update(
-        state=current_state,
-        references={'trajectory': reference_trajectory},
-        use_allegro_integration=True
-    )
-    
-    # 6. Extract control commands
-    joint_torques = control_output['joint_torques']  # Apply to robot
-    optimal_sequence = control_output['optimal_control_sequence']  # Full horizon plan
-    system_matrices = control_output['system_matrices']  # Extracted matrices
-    contact_data = control_output['contact_data']  # Contact information
-    
-    # Key benefits of this integration:
-    # - Automatic extraction of contact Jacobians from preprocessing
-    # - Proper handling of contact forces and positions
-    # - Seamless integration with existing AllegroManipulationProblem
-    # - Support for different object types and contact configurations
-    # - Advanced MPC with multiple solver options
-    """)
-    
-    print("\n=== Available MPC Solvers ===")
-    print("- 'cvxpy': cvxpy QP solver (PRIMARY - uses linearized dynamics as QP constraints)")
-    print("  └─ Automatically uses OSQP, ECOS, or other backends")
-    print("  └─ Formulates exact QP with dynamics constraints")
-    print("  └─ Superior numerical properties and convergence")
-    print("- 'lbfgs': L-BFGS (fallback - direct nonlinear optimization)")
-    print("- 'osqp': OSQP quadratic programming (legacy - simple QP approximation)")
-    print("- 'scipy': SciPy SLSQP (fallback - robust for constrained problems)")
-    print("- 'augmented_lagrangian': Augmented Lagrangian (complex constraints)")
-    print("- 'adam': Adam optimizer (for comparison)")
-    
-    print("\n=== Configuration Options ===")
-    print("Key parameters to tune:")
-    print("- K_e, K_r: Environment and robot stiffness")
-    print("- K_P, K_D: Proportional and damping gains")
-    print("- force_threshold: Contact classification threshold")
-    print("- w_motion, w_contact, w_smooth: Cost function weights")
-    print("- horizon_length: MPC prediction horizon")
-    
-    print("\n=== Contact Modes ===")
-    print("- Single contact: Use update_single_contact() for single finger contact")
-    print("- Multi contact: Use update_multi_contact() for multiple finger contacts")
-    print("- MPC mode: Use update_with_allegro_integration() for full MPC with preprocessing")
-    
-    print("\n=== cvxpy QP Formulation Benefits ===")
-    print("The new cvxpy solver offers significant advantages:")
-    print("✓ Exact dynamics constraints via linearization")
-    print("✓ Automatic differentiation for constraint matrices")
-    print("✓ Multiple QP solver backends (OSQP, ECOS, CLARABEL)")
-    print("✓ Better numerical conditioning and convergence")
-    print("✓ Handles box constraints on controls naturally")
-    print("✓ Disciplined convex programming guarantees")
-    print("✓ Scales well with horizon length and state dimension")
-    
-    print("\n=== QP Formulation Details ===")
-    print("Problem structure: minimize 0.5 * z^T * H * z + f^T * z")
-    print("                   subject to: A_eq * z = b_eq (dynamics)")
-    print("                              G * z <= h (bounds)")
-    print("where z = [u_0; u_1; ...; u_{T-1}; x_1; x_2; ...; x_T]")
-    print("- Dynamics linearized around nominal trajectory")
-    print("- State: x = [q; q_d; λ_ext] from equation (24)")
-    print("- Controls: u = joint torques")
-    
-    print("\n=== Solver Comparison Example ===")
-    print("""
-    # cvxpy QP solver (recommended)
-    config_qp = ControllerConfig(mpc_solver='cvxpy')
-    controller_qp = TactileFeedbackController(config_qp)
-    
-    # Traditional nonlinear solver (fallback)
-    config_nl = ControllerConfig(mpc_solver='lbfgs')
-    controller_nl = TactileFeedbackController(config_nl)
-    
-    # Both use the same dynamics equation (24): ẍ = g(x, u)
-    # Key difference:
-    # - cvxpy: Linearizes dynamics → creates QP constraints → solves QP
-    # - lbfgs: Direct nonlinear optimization via automatic differentiation
-    
-    # Benefits of QP approach:
-    # ✓ Guaranteed convergence for convex problems
-    # ✓ Handles constraints more naturally
-    # ✓ Better numerical conditioning
-    # ✓ Multiple solver backends available
+    # Method 2: Precomputed jacobians
+    u2 = qp_controller.solve(t0, state, q_d, f_ext, normals, tangents, method='precomputed_jacobians')
     """)
     
     print("\nReady for integration with AllegroManipulationProblem!") 

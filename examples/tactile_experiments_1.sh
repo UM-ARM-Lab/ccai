@@ -1,0 +1,2 @@
+python allegro_screwdriver.py allegro_screwdriver_diff_only
+python allegro_screwdriver.py allegro_screwdriver_csvto_diff
