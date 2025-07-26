@@ -1,0 +1,96 @@
+---
+# Ray Tune Hyperparameter Tuning Configuration for Tactile Controller
+# This config defines the search spaces and tuning parameters
+
+# Base experiment configuration
+base_config: 'allegro_screwdriver_diff_tactile_control.yaml'
+experiment_name: 'tactile_controller_hyperparameter_tuning'
+
+# Ray Tune Configuration
+ray_tune:
+  # Number of hyperparameter combinations to try
+  num_samples: 30
+  
+  # Number of trials per hyperparameter configuration for robustness
+  num_eval_trials: 5
+  
+  # Scheduler configuration for early stopping
+  scheduler:
+    type: 'ASHAScheduler'  # Asynchronous Successive Halving Algorithm
+    metric: 'performance_score'
+    mode: 'max'
+    max_t: 5
+    grace_period: 1
+    reduction_factor: 2
+  
+  # Resource allocation
+  resources_per_trial:
+    cpu: 16
+    gpu: 1  # Share GPU between trials for efficiency
+
+# Hyperparameter search spaces
+# Using log-uniform distributions for parameters that can vary by orders of magnitude
+hyperparameters:
+  K_e:
+    type: 'loguniform'
+    lower: 50.0
+    upper: 1000.0
+    description: 'Environment stiffness parameter'
+    
+  w_q:
+    type: 'loguniform' 
+    lower: 1.0
+    upper: 100.0
+    description: 'Position tracking weight'
+    
+  w_p:
+    type: 'loguniform'
+    lower: 0.1
+    upper: 10.0
+    description: 'Velocity tracking weight'
+    
+  w_f:
+    type: 'loguniform'
+    lower: 0.1
+    upper: 10.0
+    description: 'Force tracking weight'
+    
+  w_u:
+    type: 'loguniform'
+    lower: 0.1
+    upper: 10.0
+    description: 'Control effort regularization weight'
+    
+  w_ori:
+    type: 'loguniform'
+    lower: 0.01
+    upper: 1.0
+    description: 'Orientation tracking weight'
+
+# Performance evaluation configuration
+evaluation:
+  # Number of steps per trial (reduced for faster tuning)
+  num_steps: 6
+  
+  # Success criteria
+  success_threshold: 0.05  # Orientation distance threshold for success
+  drop_threshold: 0.25     # Roll/pitch threshold for considering screwdriver dropped
+  
+  # Performance score weighting (how to combine metrics)
+  weights:
+    distance_penalty: 1.0    # Penalty for distance to goal
+    success_bonus: 2.0       # Bonus for successful completion
+    completion_bonus: 1.0    # Bonus for not dropping screwdriver
+
+# Output configuration
+output:
+  results_dir: './tuning_results'
+  ray_results_dir: './ray_results'
+  save_best_config: true
+  save_all_results: true
+  
+# Environment settings for tuning (overrides base config)
+tuning_overrides:
+  visualize: false
+  num_trials: 1  # Single trial per config evaluation during tuning
+  mode: 'simulation' 

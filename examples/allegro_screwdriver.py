@@ -808,8 +808,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     print('Difference:', final_yaw - initial_yaw)
     all_yaw_deltas.append(final_yaw - initial_yaw)
     print('All yaw deltas:', all_yaw_deltas)
+    roll_abs = np.abs(state[-3].item())
+    pitch_abs = np.abs(state[-2].item())
+    drop_cutoff = .35
+    dropped = (roll_abs > drop_cutoff) or (pitch_abs > drop_cutoff)
     env.reset()
-    return 0
+    return final_yaw - initial_yaw, dropped
 
 
 if __name__ == "__main__":

@@ -1,0 +1,50 @@
+allegro_available: true
+best_config:
+  K_e: 129.5517109677188
+  w_f: 0.49407077820857415
+  w_ori: 0.6061676062904402
+  w_p: 0.3126212215841642
+  w_q: 61.693069918337734
+  w_u: 2.611658843085258
+best_metrics:
+  completion_rate: !!python/object/apply:numpy.core.multiarray.scalar
+  - &id001 !!python/object/apply:numpy.dtype
+    args:
+    - f8
+    - false
+    - true
+    state: !!python/tuple
+    - 3
+    - <
+    - null
+    - null
+    - null
+    - -1
+    - -1
+    - 0
+  - !!binary |
+    AAAAAAAA8D8=
+  final_distance_to_goal: !!python/object/apply:numpy.core.multiarray.scalar
+  - *id001
+  - !!binary |
+    q6rqhOru9z8=
+  num_trials_completed: 3
+  performance_score: !!python/object/apply:numpy.core.multiarray.scalar
+  - *id001
+  - !!binary |
+    q6oq9ioi0D8=
+  success_rate: !!python/object/apply:numpy.core.multiarray.scalar
+  - *id001
+  - !!binary |
+    AAAAAAAAAAA=
+isaac_gym_available: true
+note: Environment created within each worker process
+search_space:
+  K_e: <ray.tune.search.sample.Float object at 0x7f7f784e0a00>
+  w_f: <ray.tune.search.sample.Float object at 0x7f7f784e0730>
+  w_ori: <ray.tune.search.sample.Float object at 0x7f7f784e0460>
+  w_p: <ray.tune.search.sample.Float object at 0x7f7f784e0bb0>
+  w_q: <ray.tune.search.sample.Float object at 0x7f7f784e0af0>
+  w_u: <ray.tune.search.sample.Float object at 0x7f7f784e0490>
+test_mode: false
+total_trials: 12

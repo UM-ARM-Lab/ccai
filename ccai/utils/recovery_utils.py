@@ -174,6 +174,11 @@ class ConstraintScheduledSVGDMPC(PositionControlConstrainedSVGDMPC):
                 force_threshold=params.get('force_threshold', 0.2),
                 dt=params.get('dt', 1/12),
                 horizon_length=params.get('horizon_length', 2),
+                w_q=params.get('w_q', 1.0),
+                w_p=params.get('w_p', 1.0),
+                w_f=params.get('w_f', 1.0),
+                w_u=params.get('w_u', 1.0),
+                w_ori=params.get('w_ori', 0.1),
             )
             self.tactile_controller = TactileFeedbackQPController(problem, self.controller_config)
             self.t = 0
