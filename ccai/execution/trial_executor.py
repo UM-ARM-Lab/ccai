@@ -320,7 +320,7 @@ class TrajectoryExecutor:
                 else:
                     kwargs['q_d_init'] = state[:planner.problem.dx]
                 
-                kwargs['f_ext_init'] = env.get_force_sensor_data()
+                kwargs['f_ext_init'] = env.get_force_sensor_data(planner.problem.contact_fingers)
             best_traj, plans = planner.step(state, **kwargs)
             
             if self.params['contact_constraint_only'] or self.params['solve_for_u_hat']:

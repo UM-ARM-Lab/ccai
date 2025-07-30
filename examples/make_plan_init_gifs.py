@@ -20,7 +20,7 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/{sys.argv[1]}.yaml').read_text())
 # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_recovery_model.yaml').read_text())
 # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_mppi_safe_rl_recovery.yaml').read_text())
-config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_diff_tactile_control.yaml').read_text())
+config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_diff_only.yaml').read_text())
 # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_model_alt_2_noised_s0_9000_bto_recovery_diff_traj_pi_2.yaml').read_text())
 
 
@@ -35,6 +35,89 @@ def add_text_to_imgs(imgs, labels):
         # Show image
         imgs_with_txt.append(np.asarray(img))
     return imgs_with_txt
+
+
+def concatenate_videos(experiment_dir, config):
+    """
+    Concatenate all generated videos into a single video.
+    
+    Args:
+        experiment_dir: Path to the experiment directory containing trial folders
+        config: Configuration dictionary containing experiment_name
+    """
+    print("Concatenating all videos...")
+    
+    # Find all trial directories
+    trial_dirs = [d for d in os.listdir(experiment_dir) if d.startswith('trial_')]
+    trial_dirs.sort(key=lambda x: int(x.split('_')[1]))  # Sort by trial number
+    
+    # Collect all video files
+    all_videos = []
+    
+    for trial_dir in trial_dirs:
+        trial_path = pathlib.Path(experiment_dir) / trial_dir
+        
+        # Main trial video
+        main_video = trial_path / f'{config["experiment_name"]}_{trial_dir.split("_")[1]}_hq.mp4'
+        if main_video.exists():
+            all_videos.append(str(main_video))
+    
+    if not all_videos:
+        print("No videos found to concatenate.")
+        return
+    
+    # Create concatenated video
+    output_path = pathlib.Path(experiment_dir) / f'{config["experiment_name"]}_concatenated.mp4'
+    
+    # Use ffmpeg to concatenate videos
+    # First, create a file list for ffmpeg
+    file_list_path = pathlib.Path(experiment_dir) / 'video_list.txt'
+    
+    with open(file_list_path, 'w') as f:
+        for video in all_videos:
+            f.write(f"file '{video}'\n")
+    
+    # Use ffmpeg to concatenate
+    import subprocess
+    
+    try:
+        cmd = [
+            'ffmpeg', '-f', 'concat', '-safe', '0', 
+            '-i', str(file_list_path),
+            '-c', 'copy',  # Copy streams without re-encoding for speed
+            str(output_path),
+            '-y'  # Overwrite output file if it exists
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            print(f"Successfully created concatenated video: {output_path}")
+        else:
+            print(f"Error creating concatenated video: {result.stderr}")
+            # Fallback: try with re-encoding
+            print("Trying with re-encoding...")
+            cmd = [
+                'ffmpeg', '-f', 'concat', '-safe', '0', 
+                '-i', str(file_list_path),
+                '-c:v', 'libx264', '-preset', 'slow', '-crf', '17',
+                str(output_path),
+                '-y'
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                print(f"Successfully created concatenated video (re-encoded): {output_path}")
+            else:
+                print(f"Error creating concatenated video: {result.stderr}")
+    
+    except FileNotFoundError:
+        print("ffmpeg not found. Please install ffmpeg to concatenate videos.")
+        print("You can install it with: sudo apt-get install ffmpeg")
+    
+    finally:
+        # Clean up the temporary file list
+        if file_list_path.exists():
+            file_list_path.unlink()
 
 dirpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}/csvgd')
 
@@ -277,3 +360,7 @@ for trial_num in range(1, 11):
                 imageio.mimsave(f'{fpath_cind}/plan_{sample}.gif', gif_imgs_plans, loop=0)
             if len(gif_imgs_planned_inits) > 0:
                 imageio.mimsave(f'{fpath_cind}/planned_init_{sample}.gif', gif_imgs_planned_inits, loop=0, fps=12)
+
+# Concatenate all videos after processing all trials
+print("All videos generated. Now concatenating...")
+concatenate_videos(dirpath, config)

@@ -10,3 +10,5 @@ examples/wandb/*
 wandb/*
 ccai/recovery_rl/wandb/*
 examples/videos/*
+examples/tuning_results/*
+examples/ray_results/*

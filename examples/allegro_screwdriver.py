@@ -454,6 +454,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         else:
             contact = contact_sequence.pop(0)
             
+        start = extract_state_vector(env.get_state(), num_fingers, params['device'], slice_end=15)
         initial_yaw = start[-1].item()
             
         data['executed_contacts'].append(contact)
@@ -810,7 +811,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     print('All yaw deltas:', all_yaw_deltas)
     roll_abs = np.abs(state[-3].item())
     pitch_abs = np.abs(state[-2].item())
-    drop_cutoff = .35
+    drop_cutoff = .25
     dropped = (roll_abs > drop_cutoff) or (pitch_abs > drop_cutoff)
     env.reset()
     return final_yaw - initial_yaw, dropped

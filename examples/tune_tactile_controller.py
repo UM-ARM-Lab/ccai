@@ -20,6 +20,7 @@ import ray
 from ray import tune
 from ray.tune import CLIReporter
 from ray.tune.schedulers import ASHAScheduler
+from ray.tune.search.hyperopt import HyperOptSearch
 
 # Add the ccai path to sys.path
 CCAI_PATH = pathlib.Path(__file__).parent.parent.absolute()
@@ -42,7 +43,7 @@ from ccai.models.management.model_manager import ModelManager
 ALLEGRO_AVAILABLE = True
 import torch
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 def setup_environment_and_models(config):
     """
@@ -172,7 +173,6 @@ def run_tactile_trial_with_environment(config_params: Dict[str, Any], env, traje
         
         # Performance score (to be maximized)
         performance_score = -yaw_change * float(completed)
-        print(f"Performance score: {performance_score}")
         
         return {
             'completion_rate': float(completed),
@@ -201,11 +201,10 @@ def run_tactile_experiment_with_environment(config_params: Dict[str, Any], env, 
     Returns:
         Dictionary with aggregated performance metrics
     """
-    num_trials = 10  # Run 3 trials per hyperparameter configuration
+    num_trials = 15  # Run 3 trials per hyperparameter configuration
     all_results = []
     
     for trial_idx in range(num_trials):
-        print(f"Running trial {trial_idx + 1}/{num_trials} with params: {config_params}")
         trial_result = run_tactile_trial_with_environment(
             config_params, env, trajectory_sampler, trajectory_sampler_orig, 
             classifier, chain, config, params
@@ -214,7 +213,6 @@ def run_tactile_experiment_with_environment(config_params: Dict[str, Any], env, 
         
         # Early stopping if trial failed catastrophically
         if trial_result['performance_score'] < -5.0:
-            print(f"Trial {trial_idx + 1} failed catastrophically, stopping early")
             break
     
     if not all_results:
@@ -234,37 +232,24 @@ def run_tactile_experiment_with_environment(config_params: Dict[str, Any], env, 
         'num_trials_completed': len(all_results)
     }
 
-
 def objective(config_params):
     """Objective function for Ray Tune optimization."""
     # Create environment and models within this worker process
     # Load base config
-    base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_diff_tactile_control.yaml'
+    base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_csvto_diff_tactile_control.yaml'
     if not base_config_path.exists():
         base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_diff_only.yaml'
     
-    try:
-        with open(base_config_path, 'r') as f:
-            config = yaml.safe_load(f)
-    except Exception as e:
-        print(f"Failed to load config: {e}")
-        # Return poor performance for failed experiments
-        from ray.air import session
-        session.report({
-            'performance_score': -10.0,
-            'final_distance_to_goal': 10.0,
-            'success_rate': 0.0,
-            'completion_rate': 0.0,
-            'num_trials_completed': 0
-        })
-        return
+    with open(base_config_path, 'r') as f:
+        config = yaml.safe_load(f)
+
     
     # Set tuning-specific overrides
     config['num_episodes'] = 1  # Only run 1 episode per trial
     config['visualize'] = False
     config['mode'] = 'simulation'
     config['tactile_controller'] = True  # Enable tactile controller
-    config['experiment_name'] = 'tune_tactile_controller'
+    config['experiment_name'] = 'tune_tactile_controller_csvto_16_diff'
     
     # Ensure required fields are set
     if 'recovery_controller' not in config:
@@ -277,51 +262,37 @@ def objective(config_params):
     # Update config with tuned parameters
     config.update(config_params)
     
-    try:
-        # Create environment and models within this worker
-        env, trajectory_sampler, trajectory_sampler_orig, classifier, chain = setup_environment_and_models(config)
+    # Create environment and models within this worker
+    env, trajectory_sampler, trajectory_sampler_orig, classifier, chain = setup_environment_and_models(config)
+    
+    # Prepare parameters for do_trial
+    params = config.copy()
+    params.pop('controllers', None)
+    if 'controllers' in config and 'csvgd' in config['controllers']:
+        params.update(config['controllers']['csvgd'])
         
-        # Prepare parameters for do_trial
-        params = config.copy()
-        params.pop('controllers', None)
-        if 'controllers' in config and 'csvgd' in config['controllers']:
-            params.update(config['controllers']['csvgd'])
-            
-        params['device'] = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        
-        # Add required fields
-        params['controller'] = 'csvgd'
-        params['valve_goal'] = torch.tensor([0, 0, float(config['goal'])]).to(device=params['device'])
-        params['chain'] = chain.to(device=params['device'])
-        params['object_location'] = torch.tensor([0, 0, 1.205]).to(params['device'])
-        params['obj_dof'] = 3
-        
-        # Run the actual experiment with real environment
-        results = run_tactile_experiment_with_environment(
-            config_params, env, trajectory_sampler, trajectory_sampler_orig,
-            classifier, chain, config, params
-        )
-        
-        # Report results to Ray Tune using the correct API
-        from ray.air import session
-        session.report({
-            'performance_score': results['performance_score'],
-            'completion_rate': results['completion_rate'],
-            'num_trials_completed': results['num_trials_completed']
-        })
-        
-    except Exception as e:
-        print(f"Experiment failed: {e}")
-        import traceback
-        traceback.print_exc()
-        # Report poor performance for failed experiments
-        from ray.air import session
-        session.report({
-            'performance_score': -10.0,
-            'completion_rate': 0.0,
-            'num_trials_completed': 0
-        })
-
+    params['device'] = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    # Add required fields
+    params['controller'] = 'csvgd'
+    params['valve_goal'] = torch.tensor([0, 0, float(config['goal'])]).to(device=params['device'])
+    params['chain'] = chain.to(device=params['device'])
+    params['object_location'] = torch.tensor([0, 0, 1.205]).to(params['device'])
+    params['obj_dof'] = 3
+    
+    # Run the actual experiment with real environment
+    results = run_tactile_experiment_with_environment(
+        config_params, env, trajectory_sampler, trajectory_sampler_orig,
+        classifier, chain, config, params
+    )
+    
+    # Report results to Ray Tune using the correct API
+    from ray.air import session
+    session.report({
+        'performance_score': results['performance_score'],
+        'completion_rate': results['completion_rate'],
+        'num_trials_completed': results['num_trials_completed']
+    })
 
 def main():
     """Main hyperparameter tuning function."""
@@ -341,12 +312,12 @@ def main():
     
     # Define search space for tactile controller hyperparameters
     search_space = {
-        'K_e': tune.loguniform(50.0, 1000.0),      # Environment stiffness
-        'w_q': tune.loguniform(.1, 10.0),        # Position weight  
-        'w_p': tune.loguniform(0.1, 10.0),         # Velocity weight
-        'w_f': tune.loguniform(0.1, 10.0),         # Force weight
-        'w_u': tune.loguniform(0.1, 10.0),         # Control effort weight
-        'w_ori': tune.loguniform(0.01, 1.0),       # Orientation weight
+        'K_e': tune.loguniform(100.0, 500.0),      # Environment stiffness
+        'w_q': tune.loguniform(1, 50.0),        # Position weight  
+        'w_p': tune.loguniform(1, 10.0),         # Velocity weight
+        'w_f': tune.loguniform(1, 50.0),         # Force weight
+        'w_u': tune.loguniform(1, 10.0),         # Control effort weight
+        'w_ori': tune.loguniform(0.1, 1.0),       # Orientation weight
     }
     
     # Configure ASHA scheduler for early stopping
@@ -365,25 +336,42 @@ def main():
     )
     
     # Run hyperparameter tuning
-    num_samples = 1000 if ALLEGRO_AVAILABLE and ISAAC_GYM_AVAILABLE else 3  # Fewer samples if in mock mode
+    num_samples = 500 if ALLEGRO_AVAILABLE and ISAAC_GYM_AVAILABLE else 3  # Fewer samples if in mock mode
     print(f"\nRunning {num_samples} hyperparameter configuration(s)")
-    print("Note: Only 1 configuration will be tested at a time")
-    print("Note: Environment created within each worker process")
+    print("Note: Environment and models instantiated once before tuning")
     
     # Create absolute path for storage
     storage_path = pathlib.Path("./ray_results").resolve()
     
+    search_alg = HyperOptSearch(
+        space=search_space,
+        metric="performance_score",
+        mode="max",
+        random_state_seed=42
+    )
+    
+    # search_alg.restore_from_dir(
+    #     pathlib.Path("./ray_results/tactile_controller_tuning/")
+    # )
+    
+    # # Create a wrapper function that passes the pre-instantiated objects
+    # def objective_wrapper(config_params):
+    #     return objective(config_params, env, trajectory_sampler, trajectory_sampler_orig, 
+    #                    classifier, chain, base_config, base_params)
+    
     analysis = tune.run(
         objective,
-        config=search_space,
+        # config=search_space,
         num_samples=num_samples,
         # scheduler=scheduler,
         progress_reporter=reporter,
-        name="tactile_controller_tuning",
+        name="tactile_controller_tuning_csvto_16_diff",
         storage_path=str(storage_path),  # Use absolute path as string
-        resources_per_trial={"cpu": 8, "gpu": .5},  # CPU only for stability
+        resources_per_trial={"cpu": 8, "gpu": 1},  # CPU only for stability
         max_failures=5,  # Allow more failures since we're doing complex trials
         raise_on_failed_trial=False,  # Don't crash on individual trial failures
+        search_alg=search_alg,
+        resume=True,
         # max_concurrent_trials=4  # Ensure only 1 configuration is tested at a time
     )
     
@@ -423,7 +411,7 @@ def main():
         'allegro_available': ALLEGRO_AVAILABLE,
         'isaac_gym_available': ISAAC_GYM_AVAILABLE,
         'test_mode': False,
-        'note': 'Environment created within each worker process'
+        'note': 'Environment and models instantiated once before tuning'
     }
     
     results_path = output_dir / "tuning_results_summary.yaml"
