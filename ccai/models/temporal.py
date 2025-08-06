@@ -22,85 +22,63 @@ from ccai.models.helpers import (
 )
 
 class CompilationMixin:
-    """Mixin to handle compiled model saving and loading."""
+    """Mixin to handle compiled model caching in memory only."""
     
     def __init__(self):
         self._compiled_methods = {}
         self._compilation_cache_dir = None
+        self._cache_enabled = True
         
     def set_compilation_cache_dir(self, cache_dir):
-        """Set the directory for caching compiled models."""
+        """Set the directory for caching compiled models (for monitoring only)."""
         self._compilation_cache_dir = Path(cache_dir)
         self._compilation_cache_dir.mkdir(parents=True, exist_ok=True)
+        print(f"Compilation cache directory set to: {cache_dir}")
         
-    def _get_cache_path(self, method_name):
-        """Get the cache file path for a compiled method."""
-        if self._compilation_cache_dir is None:
-            return None
-        # Create a hash of the model state for cache invalidation
-        model_hash = hash(str(self.state_dict()))
-        cache_file = f"{self.__class__.__name__}_{method_name}_{abs(model_hash)}.pt"
-        return self._compilation_cache_dir / cache_file
-        
-    def _save_compiled_method(self, method_name, compiled_fn):
-        """Save a compiled method to cache."""
-        cache_path = self._get_cache_path(method_name)
-        if cache_path is not None:
-            try:
-                torch.save(compiled_fn, cache_path)
-                print(f"Saved compiled method {method_name} to {cache_path}")
-            except Exception as e:
-                print(f"Warning: Could not save compiled method {method_name}: {e}")
-                
-    def _load_compiled_method(self, method_name):
-        """Load a compiled method from cache."""
-        cache_path = self._get_cache_path(method_name)
-        if cache_path is not None and cache_path.exists():
-            try:
-                compiled_fn = torch.load(cache_path, map_location=self.device if hasattr(self, 'device') else 'cpu')
-                print(f"Loaded compiled method {method_name} from cache")
-                return compiled_fn
-            except Exception as e:
-                print(f"Warning: Could not load compiled method {method_name}: {e}")
-                # Remove corrupted cache file
-                try:
-                    cache_path.unlink()
-                except:
-                    pass
-        return None
+    def enable_compilation_cache(self, enabled=True):
+        """Enable or disable compilation caching."""
+        self._cache_enabled = enabled
+        if not enabled:
+            self._compiled_methods.clear()
         
     def _get_or_compile_method(self, method_name, original_method, compile_kwargs=None):
+        
+        # return original_method
         """Get compiled method from cache or compile it."""
+        if not self._cache_enabled:
+            # Direct compilation without caching
+            return torch.compile(original_method, **(compile_kwargs or {'mode': 'max-autotune'}))
+            
         if compile_kwargs is None:
+            # Use max-autotune for best performance
             compile_kwargs = {'mode': 'max-autotune'}
             
         # Check if already compiled and cached in memory
         if method_name in self._compiled_methods:
             return self._compiled_methods[method_name]
             
-        # Try to load from disk cache
-        compiled_fn = self._load_compiled_method(method_name)
+        # Compile the method
+        print(f"Compiling method {method_name}...")
+        compiled_fn = torch.compile(original_method, **compile_kwargs)
         
-        if compiled_fn is None:
-            # Compile the method
-            print(f"Compiling method {method_name}...")
-            compiled_fn = torch.compile(original_method, **compile_kwargs)
-            # Save to cache
-            self._save_compiled_method(method_name, compiled_fn)
-            
-        # Cache in memory
+        # Cache in memory only (PyTorch compiled functions can't be pickled)
         self._compiled_methods[method_name] = compiled_fn
+        print(f"Cached compiled method {method_name} in memory")
+        
         return compiled_fn
 
     def clear_compilation_cache(self):
         """Clear the compilation cache."""
         self._compiled_methods.clear()
-        if self._compilation_cache_dir and self._compilation_cache_dir.exists():
-            for cache_file in self._compilation_cache_dir.glob(f"{self.__class__.__name__}_*.pt"):
-                try:
-                    cache_file.unlink()
-                except:
-                    pass
+        print("Cleared compilation cache")
+        
+    def get_cache_stats(self):
+        """Get statistics about the compilation cache."""
+        return {
+            'cached_methods': list(self._compiled_methods.keys()),
+            'cache_size': len(self._compiled_methods),
+            'cache_enabled': self._cache_enabled
+        }
 
 
 class ResidualTemporalBlock(nn.Module):
@@ -312,7 +290,7 @@ class TemporalUnet(nn.Module, CompilationMixin):
             t = t.repeat(B)
         t = self.time_embedding(t)
         # x = einops.rearrange(x, 'b h t -> b t h')
-        x = x.permute(0, 2, 1)
+        x = x.permute(0, 2, 1).contiguous()  # Add .contiguous() to avoid CUDA graph issues
         x = pad_to_multiple(x, m=2 ** len(self.downs))
 
         if context is not None and not self.trajectory_condition:
@@ -357,7 +335,7 @@ class TemporalUnet(nn.Module, CompilationMixin):
         x = self.final_conv(x)
 
         # x = einops.rearrange(x, 'b t h -> b h t')
-        x = x.permute(0, 2, 1)
+        x = x.permute(0, 2, 1).contiguous()  # Add .contiguous() to avoid CUDA graph issues
         # get rid of padding
         x = x[:, :H]
         return x, latent

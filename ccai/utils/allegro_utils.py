@@ -163,11 +163,10 @@ def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headl
         vis.clear_geometries()
         q = trajectory[t, : 4 * num_fingers]
         theta = trajectory[t, 4 * num_fingers: 4 * num_fingers + obj_dof]
-        # scene.visualize_robot(partial_to_full_state(q.unsqueeze(0), fingers).to(device=scene.device),
-        #                      theta.unsqueeze(0).to(device=scene.device))
+
         rob_mesh, meshes = scene.get_visualization_meshes(partial_to_full_state(q.unsqueeze(0), fingers).to(device=scene.device),
                                                 theta.unsqueeze(0).to(device=scene.device), pcd=pcd)
-        # o3d.visualization.draw_geometries(meshes, mesh_show_wireframe=True, width=800, height=600)
+
         meshes += rob_mesh
         for mesh in meshes:
             vis.add_geometry(mesh)
@@ -197,7 +196,7 @@ def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headl
             cwd = os.getcwd()
 
             parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-10-02-14-35-33.json")
-            # parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-08-07-10-49-00.json")
+            # parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2025-08-04-08-19-16.json")
         elif task == 'card':
             parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_card.json")
         ctr.convert_from_pinhole_camera_parameters(parameters, allow_arbitrary=True)

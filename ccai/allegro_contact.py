@@ -676,28 +676,32 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         self.collision_link_names = {
             'index':
             ['allegro_hand_hitosashi_finger_finger_0_aftc_base_link',
-             'allegro_hand_hitosashi_finger_finger_link_3',
-             'allegro_hand_hitosashi_finger_finger_link_2',
-             'allegro_hand_hitosashi_finger_finger_link_1',
-             'allegro_hand_hitosashi_finger_finger_link_0'],
+            #  'allegro_hand_hitosashi_finger_finger_link_3',
+            #  'allegro_hand_hitosashi_finger_finger_link_2',
+            #  'allegro_hand_hitosashi_finger_finger_link_1',
+            #  'allegro_hand_hitosashi_finger_finger_link_0'
+             ],
              'middle':
             ['allegro_hand_naka_finger_finger_1_aftc_base_link',
-             'allegro_hand_naka_finger_finger_link_7',
-             'allegro_hand_naka_finger_finger_link_6',
-             'allegro_hand_naka_finger_finger_link_5',
-             'allegro_hand_naka_finger_finger_link_4'],
+            #  'allegro_hand_naka_finger_finger_link_7',
+            #  'allegro_hand_naka_finger_finger_link_6',
+            #  'allegro_hand_naka_finger_finger_link_5',
+            #  'allegro_hand_naka_finger_finger_link_4'
+             ],
                 'ring':
             ['allegro_hand_kusuri_finger_finger_2_aftc_base_link',
-                'allegro_hand_kusuri_finger_finger_link_11',
-                'allegro_hand_kusuri_finger_finger_link_10',
-                'allegro_hand_kusuri_finger_finger_link_9',
-                'allegro_hand_kusuri_finger_finger_link_8'],
+                # 'allegro_hand_kusuri_finger_finger_link_11',
+                # 'allegro_hand_kusuri_finger_finger_link_10',
+                # 'allegro_hand_kusuri_finger_finger_link_9',
+                # 'allegro_hand_kusuri_finger_finger_link_8'
+                ],
                 'thumb':
             ['allegro_hand_oya_finger_3_aftc_base_link',
-            'allegro_hand_oya_finger_link_15',
-            'allegro_hand_oya_finger_link_14',
-            'allegro_hand_oya_finger_link_13',
-            'allegro_hand_oya_finger_link_12'],
+            # 'allegro_hand_oya_finger_link_15',
+            # 'allegro_hand_oya_finger_link_14',
+            # 'allegro_hand_oya_finger_link_13',
+            # 'allegro_hand_oya_finger_link_12'
+            ],
         }
 
         self.ee_link_idx = {finger: chain.frame_to_idx[ee_name] for finger, ee_name in self.ee_names.items()}
@@ -856,6 +860,8 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                             compute_closest_obj_point=False,
                             tactile_controller=False,
                             T_override=None):
+        
+        tactile_controller = self.tactile_controller
         N, _, _ = q.shape
         obj_dof = theta.shape[-1]
 
@@ -879,22 +885,25 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                                                                 compute_hessian=False,
                                                                 compute_closest_obj_point=compute_closest_obj_point,
                                                                 contact_constraint_only=self.contact_constraint_only,
-                                                                tactile_controller=tactile_controller)
-        elif self.full_dof_goal and len(self.regrasp_fingers) > 0:
+                                                                tactile_controller=tactile_controller,
+                                                                skip_csvto=self.skip_csvto)
+        elif self.full_dof_goal and len(self.regrasp_fingers) > 0 and not self.skip_csvto:
             ret_scene = self.contact_scenes.scene_collision_check(full_q, theta_b,
                                                                 compute_gradient=True,
                                                                 compute_hessian=False,
                                                                 compute_closest_obj_point=compute_closest_obj_point,
                                                                 rob_link_idx=None if self.contact_constraint_only else self.rob_link_idx,
                                                                 contact_constraint_only=self.contact_constraint_only,
-                                                                tactile_controller=tactile_controller)
+                                                                tactile_controller=tactile_controller,
+                                                                skip_csvto=self.skip_csvto)
         else:
             ret_scene = self.contact_scenes.scene_collision_check(full_q, theta_b,
                                                                 compute_gradient=True,
                                                                 compute_hessian=False,
                                                                 compute_closest_obj_point=compute_closest_obj_point,
                                                                 contact_constraint_only=self.contact_constraint_only,
-                                                                tactile_controller=tactile_controller)
+                                                                tactile_controller=tactile_controller,
+                                                                skip_csvto=self.skip_csvto)
         self.rob_link_pts = []
         rob_link_idx = []
         self.nearest_robot_pts = []
@@ -902,7 +911,8 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.data[finger] = {}
             if tactile_controller:
                 self.data[finger]['contact_n'] = ret_scene['contact_n'][:, i]
-                continue
+                if self.skip_csvto:
+                    continue
             self.data[finger]['sdf'] = ret_scene['sdf'][:, i].reshape(N, T + 1)
             # reshape and throw away data for unused fingers
             grad_g_q = ret_scene.get('grad_sdf', None)
@@ -913,12 +923,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.data[finger]['contact_jacobian'] = contact_jacobian[:, i].reshape(N, T + 1, 3, 16)
             self.data[finger]['grad_env_sdf'] = ret_scene['grad_env_sdf'][:, i, :obj_dof]
 
-            if compute_closest_obj_point:
-                self.data[finger]['closest_obj_pt_object'] = ret_scene['closest_obj_pt_object'][:, i]
-            
-            if finger in self.regrasp_fingers and self.full_dof_goal:
-                self.nearest_robot_pts.append(self.data[finger]['closest_rob_pt_object'].reshape(q.shape[0], T+1, 3))
-
+           
             d_contact_loc_dq_scene = ret_scene.get('closest_pt_q_grad_object', None)
             if d_contact_loc_dq_scene is not None:
                 d_contact_loc_dq_scene = d_contact_loc_dq_scene[:, i].reshape(N, T + 1, 3, 16)
@@ -929,7 +934,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                 d_contact_loc_denv_q_scene = d_contact_loc_denv_q_scene[:, i, :, :obj_dof].reshape(N, T + 1, 3, obj_dof)
                 self.data[finger]['closest_pt_env_q_grad_object'] = d_contact_loc_denv_q_scene
 
-            if not self.contact_constraint_only and not tactile_controller:
+            if not self.contact_constraint_only and not self.skip_csvto:
                 self.data[finger]['contact_normal'] = ret_scene['contact_normal'][:, i]             
 
                 self.data[finger]['closest_pt_world'] = ret_scene['closest_pt_world'][:, i]
@@ -956,9 +961,13 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                     d_contact_loc_denv_q_link = d_contact_loc_denv_q_link[:, i, :, :obj_dof].reshape(N, T + 1, 3, obj_dof)
                     self.data[finger]['closest_pt_env_q_grad_link'] = d_contact_loc_denv_q_link
 
+                if compute_closest_obj_point:
+                    self.data[finger]['closest_obj_pt_object'] = ret_scene['closest_obj_pt_object'][:, i]
+                self.data[finger]['closest_rob_pt_object'] = ret_scene['closest_rob_pt_object'][:, i]
                 if finger in self.regrasp_fingers and self.full_dof_goal:
                     self.data[finger]['closest_rob_pt_link'] = ret_scene['closest_rob_pt_link'][:, i].reshape(q.shape[0], T+1, 3)
                     self.rob_link_pts.append(self.data[finger]['closest_rob_pt_link'])
+                    self.nearest_robot_pts.append(self.data[finger]['closest_rob_pt_object'].reshape(q.shape[0], T+1, 3))
                 if self.full_dof_goal and compute_closest_obj_point and len(self.regrasp_fingers) > 0:
                     rob_link_idx.append(ret_scene['closest_pt_closest_link'][:, i])
 
@@ -978,7 +987,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
 
         
-        if len(self.regrasp_fingers) > 0 and self.full_dof_goal and not self.contact_constraint_only:
+        if len(self.regrasp_fingers) > 0 and self.full_dof_goal and not self.contact_constraint_only and not self.skip_csvto:
             self.rob_link_pts = torch.stack(self.rob_link_pts, dim=1)  # N x num_fingers x T x 3
             if compute_closest_obj_point:
                 self.rob_link_idx = torch.stack(rob_link_idx).flatten()  # N x num_fingers x T
@@ -1448,7 +1457,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             self.dg = self.dg_per_t * T + self.dg_constant  # terminal contact points, terminal sdf=0, and dynamics
             
             
-        if self.full_dof_goal and len(self.regrasp_fingers) > 0:
+        if self.full_dof_goal and len(self.regrasp_fingers) > 0 and not self.skip_csvto:
             if self.goal is not None:
                 self.default_dof_pos = self.goal[: self.num_fingers * 4]
                 # Pad to length 16
@@ -1482,7 +1491,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
             self.do_contact_patch_constraint = True# self.object_type != 'valve'  
 
-        if self.num_regrasps > 0:
+        if self.num_regrasps > 0 and not self.skip_csvto:
             if self.full_dof_goal and contact_points_object is not None:
                 self.default_ee_locs = self._ee_locations_in_screwdriver(self.default_dof_pos,
                                                                     self.goal_theta).detach()
@@ -1619,7 +1628,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             self.default_dof_pos = default_dof_pos.to(self.device)
 
         self.do_contact_patch_constraint = False
-        if self.full_dof_goal and len(self.regrasp_fingers) > 0:# and self.obj_link_name != 'valve':
+        if self.full_dof_goal and len(self.regrasp_fingers) > 0 and not self.skip_csvto:# and self.obj_link_name != 'valve':
             if self.goal is not None:
                 self.default_dof_pos = self.goal[: self.num_fingers * 4]
                 # Pad to length 16
@@ -1842,8 +1851,11 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         # eps[:, :-1] = 5e-3
         if self.object_type == 'valve':
             eps[:, :-1] = 1.25e-2
+        elif len(self.regrasp_fingers) == len(self.fingers):
+            eps[:, :-1] = 1e-2
         else:
             eps[:, :-1] = 1.5e-2
+            
             # eps[:, :-1] = .5e-2
         h = -h + eps
         if grad_h is not None:

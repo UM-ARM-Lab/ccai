@@ -43,7 +43,7 @@ from ccai.models.management.model_manager import ModelManager
 ALLEGRO_AVAILABLE = True
 import torch
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 def setup_environment_and_models(config):
     """
@@ -57,14 +57,6 @@ def setup_environment_and_models(config):
     """
     if not ISAAC_GYM_AVAILABLE:
         raise ImportError("Isaac Gym environment required for real controller testing")
-    
-    # Set up environment exactly like in allegro_screwdriver.py
-    default_dof_pos = torch.cat((
-        torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
-        torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float(),
-        torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
-        torch.tensor([[1.2, 0.3, 0.3, 1.2]]).float()),
-        dim=1)
     
     # Force simulation mode for tuning
     config['mode'] = 'simulation'
@@ -236,7 +228,7 @@ def objective(config_params):
     """Objective function for Ray Tune optimization."""
     # Create environment and models within this worker process
     # Load base config
-    base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_csvto_diff_tactile_control.yaml'
+    base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_diff_tactile_control.yaml'
     if not base_config_path.exists():
         base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_diff_only.yaml'
     
@@ -249,7 +241,7 @@ def objective(config_params):
     config['visualize'] = False
     config['mode'] = 'simulation'
     config['tactile_controller'] = True  # Enable tactile controller
-    config['experiment_name'] = 'tune_tactile_controller_csvto_16_diff'
+    config['experiment_name'] = 'tune_tactile_controller_csvto_diff'
     
     # Ensure required fields are set
     if 'recovery_controller' not in config:
@@ -336,7 +328,7 @@ def main():
     )
     
     # Run hyperparameter tuning
-    num_samples = 500 if ALLEGRO_AVAILABLE and ISAAC_GYM_AVAILABLE else 3  # Fewer samples if in mock mode
+    num_samples = 680 if ALLEGRO_AVAILABLE and ISAAC_GYM_AVAILABLE else 3  # Fewer samples if in mock mode
     print(f"\nRunning {num_samples} hyperparameter configuration(s)")
     print("Note: Environment and models instantiated once before tuning")
     
@@ -347,12 +339,22 @@ def main():
         space=search_space,
         metric="performance_score",
         mode="max",
-        random_state_seed=42
+        random_state_seed=42,
+        # points_to_evaluate=[
+        #     {
+        #         'K_e': 113.058390,
+        #         'w_q': 49.967775,
+        #         'w_p': 2.994464,
+        #         'w_f': 5.410153,
+        #         'w_u': 4.369370,
+        #         'w_ori': 0.263349
+        #     }
+        # ]
     )
     
-    # search_alg.restore_from_dir(
-    #     pathlib.Path("./ray_results/tactile_controller_tuning/")
-    # )
+    search_alg.restore_from_dir(
+        pathlib.Path("./ray_results/tactile_controller_tuning_diff_partial_patch/")
+    )
     
     # # Create a wrapper function that passes the pre-instantiated objects
     # def objective_wrapper(config_params):
@@ -365,13 +367,13 @@ def main():
         num_samples=num_samples,
         # scheduler=scheduler,
         progress_reporter=reporter,
-        name="tactile_controller_tuning_csvto_16_diff",
+        name="tactile_controller_tuning_diff_partial_patch",
         storage_path=str(storage_path),  # Use absolute path as string
-        resources_per_trial={"cpu": 8, "gpu": 1},  # CPU only for stability
+        resources_per_trial={"cpu": 8, "gpu": .5},  # CPU only for stability
         max_failures=5,  # Allow more failures since we're doing complex trials
         raise_on_failed_trial=False,  # Don't crash on individual trial failures
         search_alg=search_alg,
-        resume=True,
+        resume=False,
         # max_concurrent_trials=4  # Ensure only 1 configuration is tested at a time
     )
     
@@ -393,8 +395,15 @@ def main():
     output_dir = pathlib.Path("./tuning_results")
     output_dir.mkdir(exist_ok=True)
     
+    base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_diff_tactile_control.yaml'
+    if not base_config_path.exists():
+        base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_diff_only.yaml'
+    
+    with open(base_config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    
     # Save best config as YAML
-    best_config_path = output_dir / "best_tactile_controller_config.yaml"
+    best_config_path = output_dir / f"best_tactile_controller_config_{config['experiment_name']}.yaml"
     with open(best_config_path, 'w') as f:
         yaml.dump(best_config, f, default_flow_style=False)
     
@@ -414,7 +423,7 @@ def main():
         'note': 'Environment and models instantiated once before tuning'
     }
     
-    results_path = output_dir / "tuning_results_summary.yaml"
+    results_path = output_dir / f"tuning_results_summary_{config['experiment_name']}.yaml"
     with open(results_path, 'w') as f:
         yaml.dump(results_summary, f, default_flow_style=False)
     
@@ -431,3 +440,28 @@ def main():
 
 if __name__ == "__main__":
     main() 
+    # import json
+    # def get_max(path):
+    #     exp = json.loads(open(f'{path}', 'r').read())
+    #     all_results = []
+    #     for i in range(len(exp['trial_data'])):
+    #         exp['trial_data'][i][1] = json.loads(exp['trial_data'][i][1])
+    #         if 'performance_score' in exp['trial_data'][i][1]['last_result'].keys():
+    #             all_results.append((exp['trial_data'][i][1]['last_result']['performance_score'], exp['trial_data'][i][1]['last_result']['config']))
+    #     if len(all_results) > 0:
+    #         try:
+    #             print(max(all_results))
+    #         except:
+    #             print('No performance score found')
+    #     else:
+    #         print('No performance score found')
+        
+    # dir_ = './examples/ray_results/tactile_controller_tuning_csvto_diff'
+    
+    # # Iterate through dir, run get_max for every experiment_state*.json file
+    # for file in os.listdir(dir_):
+    #     if file.endswith('.json') and 'experiment_state' in file:
+    #         print(file)
+    #         get_max(os.path.join(dir_, file))
+    #         print('-'*100)
+

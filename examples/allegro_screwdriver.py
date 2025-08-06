@@ -89,7 +89,11 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                  project=False,
                  default_dof_pos=None,
                  contact_constraint_only=False,
+                 tactile_controller=False,
+                 skip_csvto=False,
                  **kwargs):
+        self.tactile_controller = tactile_controller
+        self.skip_csvto = skip_csvto
         # Mass of the object. Hardcoded for now.
         self.obj_mass = 0.0851
         self.obj_dof_type = None
@@ -197,17 +201,18 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         }
     else:
         min_force_dict = {
-            'thumb': .5,
-            'middle': .5,
-            'index': .5,
+            'thumb': 1.0,
+            'middle': 1.0,
+            'index': 1.0,
         }
 
     goal_pregrasp = params['valve_goal']
     pregrasp_params = copy.deepcopy(params)
-    pregrasp_params['warmup_iters'] = 80
+    pregrasp_params['warmup_iters'] = 100
     pregrasp_params['contact_only_warmup_iters'] = 0
     pregrasp_params['contact_only_online_iters'] = 0
     pregrasp_params['tactile_controller'] = False
+    pregrasp_params['skip_csvto'] = False
 
     start[-4:] = 0
     pregrasp_problem = create_allegro_screwdriver_problem(
@@ -222,7 +227,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         obj_dof=obj_dof,
         AllegroScrewdriver=AllegroScrewdriver
     )
-    pregrasp_planner = create_planner(pregrasp_problem, pregrasp_params)
+    pregrasp_planner = create_planner(pregrasp_problem, 'pregrasp', pregrasp_params)
 
     turn_problem = create_allegro_screwdriver_problem(
         'turn',
@@ -311,7 +316,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             max_episode_num_steps=max_episode_num_steps,
             min_force_dict=min_force_dict,
             proj_path=proj_path,
-            AllegroScrewdriver=AllegroScrewdriver
+            AllegroScrewdriver=AllegroScrewdriver,
+            tactile_controller=params.get('tactile_controller', False),
+            skip_csvto=params.get('skip_csvto', False)
         )
                
         return actual_trajectory, planned_trajectories, initial_samples, sim_rollouts, optimizer_paths, contact_points, contact_distance, recover
@@ -488,7 +495,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             max_timesteps = None
             # Execute trajectory
             result = execute_traj(
-                index_regrasp_planner, mode='index', goal=_goal, 
+                index_regrasp_planner, 'index', env, goal=_goal, 
                 fname=f'index_regrasp_{all_stage}', initial_samples=initial_samples, 
                 recover=recover, start_timestep=start_timestep, max_timesteps=max_timesteps)
             state = env.get_state()
@@ -515,7 +522,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             start_timestep = 0
             max_timesteps = None
             result = execute_traj(
-                thumb_and_middle_regrasp_planner, mode='thumb_middle',
+                thumb_and_middle_regrasp_planner, 'thumb_middle',
+                env,
                 goal=_goal, fname=f'thumb_middle_regrasp_{all_stage}', initial_samples=initial_samples, 
                 recover=recover, start_timestep=start_timestep, max_timesteps=max_timesteps)
             state = env.get_state()
@@ -819,10 +827,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config. First option is to get the config from the command line.
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_TODR_contact_constraint_only_perturb_10.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_TODR_recovery_data_gen_tactile.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_TODR_N_16.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_diff_tactile_control.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_diff_tactile_control_eval.yaml').read_text())
     # Write to log file in the experiment's directory
     experiment_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}')
     pathlib.Path.mkdir(experiment_dir, parents=True, exist_ok=True)
@@ -840,9 +848,9 @@ if __name__ == "__main__":
     num_envs = get_num_envs_for_baseline(config)
     
     default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
-                                torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float(),
-                                torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
-                                torch.tensor([[1.2, 0.3, 0.3, 1.2]]).float()),
+                                torch.tensor([[-0.0533, 0.9370, 0.3040, 1.0172]]).float(),
+                                torch.tensor([[-.1253, 0.9571, 0.3136, 0.7901]]).float(),
+                                torch.tensor([[1.0655, 0.4575, 0.5301, .8653]]).float()),
                                 dim=1)
     if config['mode'] == 'hardware':
         # roslaunch allegro_hand allegro_hand_modified.launch
@@ -963,6 +971,7 @@ if __name__ == "__main__":
     num_episodes = config['num_episodes']
     if 'end_ind' in config:
         num_episodes = config['end_ind']
+    seed = 0
     for i in tqdm(range(start_ind, num_episodes, step_size)):
         print(f'\nTrial {i+1}')
 
@@ -994,17 +1003,22 @@ if __name__ == "__main__":
 
             if not perturb_this_trial:
                 print('No action perturbation this trial')
-            final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node,
-                                            seed=i, proj_path=None, perturb_this_trial=perturb_this_trial,
-                                            trajectory_sampler=trajectory_sampler, trajectory_sampler_orig=trajectory_sampler_orig,
-                                            config=config, classifier=classifier)
-            succ = True
+            try:
+                final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node,
+                                                seed=seed, proj_path=None, perturb_this_trial=perturb_this_trial,
+                                                trajectory_sampler=trajectory_sampler, trajectory_sampler_orig=trajectory_sampler_orig,
+                                                config=config, classifier=classifier)
+                succ = True
+            except Exception as e:
+                print(f'Error: {e}')
+            seed += 1
 
         print('All yaw deltas:', all_yaw_deltas)
         print('Mean yaw delta:', np.mean(all_yaw_deltas))
         print('Std yaw delta:', np.std(all_yaw_deltas))
         print('Min yaw delta:', np.min(all_yaw_deltas))
         print('Max yaw delta:', np.max(all_yaw_deltas))
+        
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)

@@ -33,7 +33,7 @@ class TrajectoryExecutor:
                     baseline_ood_detector=None, data=None, trajectory_sampler=None,
                     trajectory_sampler_orig=None, turn_problem=None, num_fingers=None,
                     obj_dof=None, episode_num_steps=None, max_episode_num_steps=None,
-                    min_force_dict=None, proj_path=None, AllegroScrewdriver=None):
+                    min_force_dict=None, proj_path=None, AllegroScrewdriver=None, tactile_controller=False, skip_csvto=False):
         """Execute a trajectory with the given planner and mode."""
         
         rand_pct = self.params.get('rand_pct', 1/3)
@@ -102,7 +102,7 @@ class TrajectoryExecutor:
             return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, not id_check, episode_num_steps
 
         # generate context from mode
-        contact = -torch.ones(self.params['N_contact_plan'], 3).to(device=self.params['device'])
+        contact = -torch.ones(self.params.get('N_contact_plan', 16), 3).to(device=self.params['device'])
         if mode == 'thumb_middle':
             contact[:, 0] = 1
         elif mode == 'index':
@@ -129,7 +129,7 @@ class TrajectoryExecutor:
         else:
             planner = self._create_mode_planner(mode, planner, state, goal, num_fingers, obj_dof, 
                                               recovery_params, min_force_dict, proj_path, 
-                                              max_timesteps, AllegroScrewdriver, recover)
+                                              max_timesteps, AllegroScrewdriver, recover, tactile_controller, skip_csvto)
             
         # Handle initial sampling and diffusion
         initial_samples, new_T, sim_rollouts = self._handle_initial_sampling(
@@ -171,38 +171,40 @@ class TrajectoryExecutor:
 
     def _create_mode_planner(self, mode, planner, state, goal, num_fingers, obj_dof, 
                            recovery_params, min_force_dict, proj_path, max_timesteps, 
-                           AllegroScrewdriver, recover):
+                           AllegroScrewdriver, recover, tactile_controller, skip_csvto):
         """Create planner for specific mode."""
         from ccai.utils.recovery_utils import create_allegro_screwdriver_problem, create_planner
-        
+        # recovery_params['warmup_iters'] = 15
+        # recovery_params['skip_csvto'] = False
+
         if mode == 'index' and planner is None:
             problem = create_allegro_screwdriver_problem(
                 'index_regrasp', state[:4 * num_fingers + obj_dof], goal, self.params, 
                 self.env, self.params['device'], min_force_dict=min_force_dict,
-                AllegroScrewdriver=AllegroScrewdriver)
-            planner = create_planner(problem, recovery_params, 'recovery')
+                AllegroScrewdriver=AllegroScrewdriver, tactile_controller=tactile_controller, skip_csvto=recovery_params['skip_csvto'])
+            planner = create_planner(problem, mode, recovery_params, 'recovery')
             
         elif mode == 'thumb_middle' and planner is None:
             problem = create_allegro_screwdriver_problem(
                 'thumb_middle_regrasp', state[:4 * num_fingers + obj_dof], goal, self.params,
                 self.env, self.params['device'], min_force_dict=min_force_dict,
-                AllegroScrewdriver=AllegroScrewdriver)
-            planner = create_planner(problem, recovery_params, 'recovery')
+                AllegroScrewdriver=AllegroScrewdriver, tactile_controller=tactile_controller, skip_csvto=recovery_params['skip_csvto'])
+            planner = create_planner(problem, mode, recovery_params, 'recovery')
             
         elif mode == 'all' and planner is None:
             problem = create_allegro_screwdriver_problem(
                 'all_regrasp', state[:4 * num_fingers + obj_dof], goal, self.params,
                 self.env, self.params['device'], min_force_dict=min_force_dict, obj_dof=obj_dof,
-                AllegroScrewdriver=AllegroScrewdriver)
-            planner = create_planner(problem, recovery_params, 'recovery')
+                AllegroScrewdriver=AllegroScrewdriver, tactile_controller=tactile_controller, skip_csvto=recovery_params['skip_csvto'])
+            planner = create_planner(problem, mode, recovery_params, 'recovery')
             
         elif mode == 'turn' and planner is None:
             problem = create_allegro_screwdriver_problem(
                 'turn', state[:4 * num_fingers + obj_dof], goal, self.params, self.env,
                 self.params['device'], min_force_dict=min_force_dict, proj_path=proj_path,
                 T_override=self.params['T_orig'] if max_timesteps is None else max_timesteps,
-                AllegroScrewdriver=AllegroScrewdriver)
-            planner = create_planner(problem, self.params)
+                AllegroScrewdriver=AllegroScrewdriver, tactile_controller=tactile_controller, skip_csvto=skip_csvto)
+            planner = create_planner(problem, mode, self.params)
         
         if recover:
             planner.problem.goal[-1] = state[-1]
@@ -320,10 +322,11 @@ class TrajectoryExecutor:
                 else:
                     kwargs['q_d_init'] = state[:planner.problem.dx]
                 
-                kwargs['f_ext_init'] = env.get_force_sensor_data(planner.problem.contact_fingers)
+                # kwargs['f_ext_init'] = env.get_force_sensor_data(planner.problem.contact_fingers)
+                kwargs['f_ext_init'] = env.get_force_sensor_data()
             best_traj, plans = planner.step(state, **kwargs)
             
-            if self.params['contact_constraint_only'] or self.params['solve_for_u_hat']:
+            if self.params.get('contact_constraint_only', False) or self.params.get('solve_for_u_hat', False):
                 u_hat = planner.problem.solve_for_u_hat(best_traj.unsqueeze(0), planner.solver.best_idx).squeeze(0)
                 
                 num_contact_fingers = len(planner.problem.contact_fingers)

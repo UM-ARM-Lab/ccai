@@ -151,7 +151,6 @@ class ContactPlanner:
                     if self.params['visualize_contact_plan']:
                         self._visualize_goal(fpath, all_stage, goal, state)
 
-            
             # Visualize all planning samples if requested
             if self.params.get('visualize_recovery_planning_samples', False):
                 viz_fpath = pathlib.Path(fpath) / f"recovery_stage_{all_stage}" / "planning_samples"
@@ -173,7 +172,11 @@ class ContactPlanner:
                     visualize_trajectory(traj_for_viz, self.turn_problem.contact_scenes_for_viz, sample_fpath,
                                       self.turn_problem.fingers, self.turn_problem.obj_dof + 1)
             
-            initial_samples = initial_samples[:self.params['N']]
+            if self.params['N'] > 1:
+                initial_samples = initial_samples[:self.params['N']]
+            else:
+                # Use highest likelihood trajectory of highst sum likelihood mode
+                initial_samples = initial_samples[best_traj_idx:best_traj_idx+1]
             
             return [contact_mode_str_max], goal_config, initial_samples, likelihood, plan_time
         # If we don't have a recovery model, use the task model to plan contacts

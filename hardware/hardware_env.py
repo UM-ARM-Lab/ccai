@@ -1,16 +1,16 @@
 import numpy as np
 from scipy.spatial.transform import Rotation as R
-import rospy
+# import rospy
 import pathlib
 from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
-if __name__ == "__main__":
-    from allegro_ros import RosNode
-else:
-    from .allegro_ros import RosNode
+# if __name__ == "__main__":
+#     from allegro_ros import RosNode
+# else:
+#     from .allegro_ros import RosNode
 import torch
 import yaml
-from lightweight_vicon_bridge.msg import MocapState
-from tf.transformations import euler_from_quaternion
+# from lightweight_vicon_bridge.msg import MocapState
+# from tf.transformations import euler_from_quaternion
 import pytorch_kinematics as pk
 
 urdf_path = "/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/victor_allegro_stalk.urdf"
@@ -200,13 +200,13 @@ if __name__ == "__main__":
     """
     Calculate the arm config that aligns the hand with the object in hardware, matching alignment in simulation
     """
-    rospy.init_node('object_pose_reader')
+    # rospy.init_node('object_pose_reader')
 
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_only.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/2.5_damping_low_eps/allegro_screwdriver_csvto_only.yaml').read_text())
     default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
-                                torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float(),
-                                torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
-                                torch.tensor([[1.2, 0.3, 0.3, 1.2]]).float()),
+                                torch.tensor([[-0.0536, 0.8922, 0.3233, 1.0361]]).float(),
+                                torch.tensor([[-.1253, 0.9571, 0.3136, 0.7901]]).float(),
+                                torch.tensor([[1.0655, 0.4575, 0.5301, .8653]]).float()),
                                 dim=1)
     sim_env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
                                     use_cartesian_controller=False,
@@ -222,51 +222,52 @@ if __name__ == "__main__":
                                     gravity=True, # For data generation only
                                     randomize_obj_start=config.get('randomize_obj_start', False),
                                     )
-    obj_reader = ObjectPoseReader(obj='blue_screwdriver', mode='relative')
+    # obj_reader = ObjectPoseReader(obj='blue_screwdriver', mode='relative')
     # # rospy.spin()
     import time
     time.sleep(.1)
     device = 'cuda:0'
-    chain = pk.build_serial_chain_from_urdf(open(urdf_path, mode='rb').read(), 'allegro_hand_base_link', root_link_name='victor_right_arm_link_1')
-    chain = chain.to(device=device)
-    lim = torch.tensor(chain.get_joint_limits(serial=True), device=device)
-    ik = pk.PseudoInverseIK(chain, max_iterations=100, num_retries=20,
-                            joint_limits=lim.T,
-                            early_stopping_any_converged=True,
-                            early_stopping_no_improvement="any",
-                            debug=False,
-                            config_sampling_method=regularized_ik,
-                            # init_for_non_serial_chain=
-                            lr=0.2)
+    # chain = pk.build_serial_chain_from_urdf(open(urdf_path, mode='rb').read(), 'allegro_hand_base_link', root_link_name='victor_right_arm_link_1')
+    # chain = chain.to(device=device)
+    # lim = torch.tensor(chain.get_joint_limits(serial=True), device=device)
+    # ik = pk.PseudoInverseIK(chain, max_iterations=100, num_retries=20,
+    #                         joint_limits=lim.T,
+    #                         early_stopping_any_converged=True,
+    #                         early_stopping_no_improvement="any",
+    #                         debug=False,
+    #                         config_sampling_method=regularized_ik,
+    #                         # init_for_non_serial_chain=
+    #                         lr=0.2)
     while True:
-        root_coor, root_ori = obj_reader.get_state_world_frame_pos()
-        print(root_ori)
-        # time.sleep(.1)
-        # continue
-
-        # num goals x num retries x DOF tensor of joint angles; if not converged, best solution found so far
-        # print(sol.solutions)
-        # num goals x num retries can check for the convergence of each run
-        # print(sol.converged)
-        # num goals x num retries can look at errors directly
+        # sim_env.step(None)
+        # root_coor, root_ori = obj_reader.get_state_world_frame_pos()
         # print(root_ori)
-        # if np.abs(root_ori[0]) < .01 and np.abs(root_ori[1]) < .01:
-        #     print(root_ori)
-        #     # Get converged solutions
-        #     tgt_ik_pose = obj_reader.get_target_IK_pose()
-        #     sol = ik.solve(tgt_ik_pose.to(chain.device))
-        #     converged_sol = sol.solutions[sol.converged]
+        # # time.sleep(.1)
+        # # continue
+
+        # # num goals x num retries x DOF tensor of joint angles; if not converged, best solution found so far
+        # # print(sol.solutions)
+        # # num goals x num retries can check for the convergence of each run
+        # # print(sol.converged)
+        # # num goals x num retries can look at errors directly
+        # # print(root_ori)
+        # # if np.abs(root_ori[0]) < .01 and np.abs(root_ori[1]) < .01:
+        # #     print(root_ori)
+        # #     # Get converged solutions
+        # #     tgt_ik_pose = obj_reader.get_target_IK_pose()
+        # #     sol = ik.solve(tgt_ik_pose.to(chain.device))
+        # #     converged_sol = sol.solutions[sol.converged]
             
-        #     if converged_sol.shape[0] > 0:
-        #         converged_sol = converged_sol[0]
+        # #     if converged_sol.shape[0] > 0:
+        # #         converged_sol = converged_sol[0]
        
-        #         print(converged_sol / np.pi * 180)
-        #         print(sol.err_pos[sol.converged][0])
-        #         print(sol.err_rot[sol.converged][0])
+        # #         print(converged_sol / np.pi * 180)
+        # #         print(sol.err_pos[sol.converged][0])
+        # #         print(sol.err_rot[sol.converged][0])
 
         cur_pose = sim_env.get_state()['q'].reshape(-1)
         
-        cur_pose[-4:-1] = torch.tensor(root_ori, dtype=cur_pose.dtype)
+        # cur_pose[-4:-1] = torch.tensor(root_ori, dtype=cur_pose.dtype)
         
         sim_env.set_pose(cur_pose.reshape(1,-1))
 

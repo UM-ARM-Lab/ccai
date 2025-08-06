@@ -10,7 +10,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 200
 visualize: True
-experiment_name: 'allegro_screwdriver_csvto_diff_tactile_control'
+experiment_name: 'allegro_screwdriver_diff_tactile_control_qp_partial_patch'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -24,7 +24,7 @@ goal: -1.5
 prior: 1
 multi_particle_search: True
 replan: False
-visualize_plan: False
+visualize_plan: True
 visualize_recovery_plan: False
 visualize_contact_plan: False
 optimize_force: True
@@ -54,24 +54,15 @@ obj_gravity: True
 type: 'diffusion'
 OOD_metric: 'likelihood'
 recovery_controller: 'csvgd'
-model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion'
-model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion/allegro_screwdriver_diffusion.pt'
+model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_task_model_pi_2_partial_patch_diffusion'
+model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_task_model_pi_2_partial_patch_diffusion/allegro_screwdriver_diffusion.pt'
 tactile_controller: True
-skip_csvto: False
 force_threshold: 0
 start_ind: 0
 end_ind: 30
 N_contact_plan: 16
 contact_constraint_only: False
 solve_for_u_hat: False
-
-# K_e: 316.882000
-# w_f: 28.102708
-# w_ori: 0.875883
-# w_p: 3.470648
-# w_q: 13.775718
-# w_u: 1.198594
-
 controllers:
   csvgd:
     # N: 16
@@ -82,7 +73,7 @@ controllers:
     momentum: 0.
     device: 'cuda:0'
     online_iters: 0
-    warmup_iters: 25
+    warmup_iters: 0
     resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1

@@ -118,7 +118,7 @@ class ModelPredictiveController:
         self.device = config.device
         
         self.dq = config.dq
-        self.df = config.df
+        self.df = 3 * problem.num_fingers
         
         self.K_e = config.K_e
         self.K_P = config.K_P * np.eye(self.dq)
@@ -541,7 +541,7 @@ class TactileFeedbackQPController:
         
         # Initialize control attributes
         self.dq = config.dq
-        self.df = config.df
+        self.df = 3 * problem.num_fingers
         self.horizon = config.horizon_length
         self.dt = config.dt
         

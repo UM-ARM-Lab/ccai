@@ -6,9 +6,9 @@ num_steps: 8
 num_turns: 1
 max_recovery_stages: 4
 num_trials: 10
-num_episodes: 1
+num_episodes: 200
 visualize: True
-experiment_name: 'allegro_screwdriver_recovery_model_profile'
+experiment_name: 'allegro_screwdriver_TODR_data_gen_tactile'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -18,12 +18,12 @@ friction_coefficient: 1.0
 kp: 3.0
 heuristic: 1000
 max_depth: 11
-goal: -.5
+goal: -1.5
 prior: 1
 multi_particle_search: True
 replan: False
-visualize_plan: True
-visualize_recovery_plan: True
+visualize_plan: False
+visualize_recovery_plan: False
 visualize_contact_plan: True
 optimize_force: True
 exclude_index: False
@@ -40,26 +40,19 @@ rl_adjustment: False
 test_recovery_trajectory: False
 perturb_action: False
 randomize_obj_start: True
-external_wrench_perturb: False
+external_wrench_perturb: True
 viz_states: False
 diff_init: True
 live_recovery: True
 new_projection: True
-trajectory_condition: True
-generate_context: True
-true_s0: False
-task_diffuse_goal: False
-recovery_diff_traj: True
+task_diffuse_goal: True
 obj_gravity: True
 type: 'diffusion'
 OOD_metric: 'likelihood'
 recovery_controller: 'csvgd'
-recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_256_steps_diffusion'
-model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_256_steps_diffusion/allegro_screwdriver_diffusion.pt'
-model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion'
-task_model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion/allegro_screwdriver_diffusion.pt'
+model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_task_model_pi_2_partial_patch_diffusion'
+model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_task_model_pi_2_partial_patch_diffusion/allegro_screwdriver_diffusion.pt'
 likelihood_threshold: -170.0
-# likelihood_threshold: -1.0
 drop_threshold: -1250
 project_threshold: -105.
 sac_batch_size: 64
@@ -67,8 +60,8 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
-N_contact_plan: 32
-likelihood_num_samples: 8
+start_ind: 50
+end_ind: 450
 controllers:
   csvgd:
     # N: 16

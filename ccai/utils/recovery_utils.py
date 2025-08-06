@@ -93,6 +93,8 @@ def create_allegro_screwdriver_problem(problem_type, start, goal, params, env, d
         'default_dof_pos': env.default_dof_pos[:, :16],
         'obj_gravity': params.get('obj_gravity', False),
         'contact_constraint_only': params.get('contact_constraint_only', False),
+        'tactile_controller': kwargs.get('tactile_controller', False),
+        'skip_csvto': kwargs.get('skip_csvto', False),
     }
     
     # Problem-specific configurations
@@ -156,7 +158,7 @@ def create_allegro_screwdriver_problem(problem_type, start, goal, params, env, d
     return AllegroScrewdriver(**final_params)
 
 class ConstraintScheduledSVGDMPC(PositionControlConstrainedSVGDMPC):
-    def __init__(self, problem, params):
+    def __init__(self, problem, params, mode):
         super().__init__(problem, params)
         self.contact_only_warmup_iters = params.get('contact_only_warmup_iters', 0)
         self.contact_only_online_iters = params.get('contact_only_online_iters', 0)
@@ -183,6 +185,8 @@ class ConstraintScheduledSVGDMPC(PositionControlConstrainedSVGDMPC):
             self.tactile_controller = TactileFeedbackQPController(problem, self.controller_config)
             self.t = 0
             self.dt = params.get('dt', 1/12)
+        self.mode = mode
+        self.default_skip_csvto = self.problem.skip_csvto
 
     def step(self, state, skip_optim=False, **kwargs):
         if self.fix_T:
@@ -198,20 +202,22 @@ class ConstraintScheduledSVGDMPC(PositionControlConstrainedSVGDMPC):
         if 'f_ext_init' in kwargs:
             f_ext_init = kwargs['f_ext_init']
             del kwargs['f_ext_init']
-        if not self.tactile_controller_bool:
-            # Contact only
-            self.problem.update(state, T=new_T, contact_constraint_only=True, **kwargs)
-        if (self.warmed_up and self.contact_only_online_iters > 0) or (not self.warmed_up and self.contact_only_warmup_iters > 0):
-            if self.warmed_up:
-                self.solver.iters = self.contact_only_online_iters
-                resample = True if (self.iter + 1) % self.resample_steps == 0 else False
-            else:
-                self.solver.iters = self.contact_only_warmup_iters
-                if self.online_iters == 0 and self.warmup_iters == 0:
-                    self.warmed_up = True
-                resample = False
+        if self.default_skip_csvto != self.problem.skip_csvto and not self.warmed_up:
+            self.problem.skip_csvto = self.default_skip_csvto
+        # if not self.tactile_controller_bool:
+        #     # Contact only
+        #     self.problem.update(state, T=new_T, contact_constraint_only=True, **kwargs)
+        # if (self.warmed_up and self.contact_only_online_iters > 0) or (not self.warmed_up and self.contact_only_warmup_iters > 0):
+        #     if self.warmed_up:
+        #         self.solver.iters = self.contact_only_online_iters
+        #         resample = True if (self.iter + 1) % self.resample_steps == 0 else False
+        #     else:
+        #         self.solver.iters = self.contact_only_warmup_iters
+        #         if self.online_iters == 0 and self.warmup_iters == 0:
+        #             self.warmed_up = True
+        #         resample = False
 
-            path = self.solver.solve(self.x, resample, skip_optim=skip_optim)
+        #     path = self.solver.solve(self.x, resample, skip_optim=skip_optim)
         
         if (self.warmed_up and self.online_iters > 0) or (not self.warmed_up and self.warmup_iters > 0):
             # Standard
@@ -224,6 +230,8 @@ class ConstraintScheduledSVGDMPC(PositionControlConstrainedSVGDMPC):
                 self.warmed_up = True
                 resample = False
             path = self.solver.solve(self.x, resample, skip_optim=skip_optim)
+        if self.online_iters == 0:
+            self.problem.skip_csvto = True
         try:
             path[0]
         except:
@@ -237,12 +245,12 @@ class ConstraintScheduledSVGDMPC(PositionControlConstrainedSVGDMPC):
         if not self.tactile_controller_bool:
             self.shift()
         else:
-            if not hasattr(self, 'best_trajectory_for_spline'):
-                # Need to create a version of best_trajectory with q_d instead of u
-                self.best_trajectory_for_spline = best_trajectory.clone()
-                self.best_trajectory_for_spline[1:, self.problem.dx:self.problem.dx+self.controller_config.dq] = best_trajectory[1:, self.problem.dx:self.problem.dx+self.controller_config.dq] + best_trajectory[:-1, :self.controller_config.dq]
-                self.best_trajectory_for_spline[0, self.problem.dx:self.problem.dx+self.controller_config.dq] = best_trajectory[0, self.problem.dx:self.problem.dx+self.controller_config.dq] + self.problem.start[:self.controller_config.dq]
+            # Need to create a version of best_trajectory with q_d instead of u
+            self.best_trajectory_for_spline = best_trajectory.clone()
+            self.best_trajectory_for_spline[1:, self.problem.dx:self.problem.dx+self.controller_config.dq] = best_trajectory[1:, self.problem.dx:self.problem.dx+self.controller_config.dq] + best_trajectory[:-1, :self.controller_config.dq]
+            self.best_trajectory_for_spline[0, self.problem.dx:self.problem.dx+self.controller_config.dq] = best_trajectory[0, self.problem.dx:self.problem.dx+self.controller_config.dq] + self.problem.start[:self.controller_config.dq]
 
+            self.best_trajectory_for_spline = partial_to_full_trajectory(self.best_trajectory_for_spline, self.mode, self.problem.device)
             self.problem._preprocess(self.x, tactile_controller=self.tactile_controller_bool)
             reference_trajectory_spline, avg_normal, segment_tangents = self.compute_reference_trajectory_spline(self.best_trajectory_for_spline, self.t, self.t + self.controller_config.horizon_length * self.dt)
             if hasattr(self.tactile_controller, 'set_reference_trajectory'):
@@ -264,7 +272,7 @@ class ConstraintScheduledSVGDMPC(PositionControlConstrainedSVGDMPC):
 
     def process_contact_normals(self):
         contact_normals = []
-        for finger in self.problem.contact_fingers:
+        for finger in self.problem.fingers:
             contact_normals.append(self.problem.data[finger]["contact_n"])
         return torch.stack(contact_normals, dim=1).cpu().numpy()
     
@@ -401,13 +409,13 @@ class ConstraintScheduledSVGDMPC(PositionControlConstrainedSVGDMPC):
         
         return spline_func, avg_normal, segment_tangents
         
-def create_planner(problem, params, planner_type='default'):
+def create_planner(problem, mode, params, planner_type='default'):
     """Create a planner for the given problem."""
     if planner_type == 'recovery':
         recovery_params = deepcopy(params)
-        return ConstraintScheduledSVGDMPC(problem, recovery_params)
+        return ConstraintScheduledSVGDMPC(problem, recovery_params, mode)
     else:
-        return ConstraintScheduledSVGDMPC(problem, params)
+        return ConstraintScheduledSVGDMPC(problem, params, mode)
 
 
 def initialize_data_structure(params):
@@ -588,8 +596,8 @@ def create_mode_planner_dict(env, params, device, min_force_dict, goal, AllegroS
     )
     
     # Create planners
-    mode_planner_dict['index'] = create_planner(index_problem, params, 'recovery')
-    mode_planner_dict['thumb_middle'] = create_planner(thumb_middle_problem, params, 'recovery')
-    mode_planner_dict['all'] = create_planner(all_problem, params, 'recovery')
+    mode_planner_dict['index'] = create_planner(index_problem, 'index', params, 'recovery')
+    mode_planner_dict['thumb_middle'] = create_planner(thumb_middle_problem, 'thumb_middle', params, 'recovery')
+    mode_planner_dict['all'] = create_planner(all_problem, 'all', params, 'recovery')
     
     return mode_planner_dict 
