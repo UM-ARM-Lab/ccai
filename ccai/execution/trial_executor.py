@@ -123,13 +123,16 @@ class TrajectoryExecutor:
         planner_returns_action = False
         
         # Create baseline planner if needed
+        created_planner = False
         if baseline_controller is not None and baseline_controller.is_mppi_controller() and recover:
             planner = baseline_controller.create_mppi_planner(ctrl, warmup=mppi_warmup)
             planner_returns_action = True
-        else:
+            created_planner = True
+        elif planner is None:
             planner = self._create_mode_planner(mode, planner, state, goal, num_fingers, obj_dof, 
                                               recovery_params, min_force_dict, proj_path, 
                                               max_timesteps, AllegroScrewdriver, recover, tactile_controller, skip_csvto)
+            created_planner = True
             
         # Handle initial sampling and diffusion
         initial_samples, new_T, sim_rollouts = self._handle_initial_sampling(
@@ -141,7 +144,12 @@ class TrajectoryExecutor:
         state = state['q'].reshape(-1, 4 * num_fingers + planner.problem.obj_dof + planner.problem.obj_joint_dim)[0, :4 * num_fingers + planner.problem.obj_dof].to(device=self.params['device'])
         state = state[:planner.problem.dx]
 
-        planner.reset(state, T=new_T, goal=goal, initial_x=initial_samples, proj_path=proj_path)
+        if created_planner:
+            planner.reset(state, T=new_T, goal=goal, initial_x=initial_samples, proj_path=proj_path)
+        else:
+            planner.problem.goal[-1] = state[-1]
+            planner.warmed_up = False
+
         if initial_samples is None and skip_diff_init:
             initial_samples = torch.zeros(self.params['N'], 16)
         elif initial_samples is None:
@@ -181,7 +189,7 @@ class TrajectoryExecutor:
             problem = create_allegro_screwdriver_problem(
                 'index_regrasp', state[:4 * num_fingers + obj_dof], goal, self.params, 
                 self.env, self.params['device'], min_force_dict=min_force_dict,
-                AllegroScrewdriver=AllegroScrewdriver, tactile_controller=tactile_controller, skip_csvto=recovery_params['skip_csvto'])
+                AllegroScrewdriver=AllegroScrewdriver, tactile_controller=tactile_controller, skip_csvto=recovery_params['recovery_skip_csvto'])
             planner = create_planner(problem, mode, recovery_params, 'recovery')
 
         elif mode == 'middle' and planner is None:
@@ -202,14 +210,14 @@ class TrajectoryExecutor:
             problem = create_allegro_screwdriver_problem(
                 'thumb_middle_regrasp', state[:4 * num_fingers + obj_dof], goal, self.params,
                 self.env, self.params['device'], min_force_dict=min_force_dict,
-                AllegroScrewdriver=AllegroScrewdriver, tactile_controller=tactile_controller, skip_csvto=recovery_params['skip_csvto'])
+                AllegroScrewdriver=AllegroScrewdriver, tactile_controller=tactile_controller, skip_csvto=recovery_params['recovery_skip_csvto'])
             planner = create_planner(problem, mode, recovery_params, 'recovery')
             
         elif mode == 'all' and planner is None:
             problem = create_allegro_screwdriver_problem(
                 'all_regrasp', state[:4 * num_fingers + obj_dof], goal, self.params,
                 self.env, self.params['device'], min_force_dict=min_force_dict, obj_dof=obj_dof,
-                AllegroScrewdriver=AllegroScrewdriver, tactile_controller=tactile_controller, skip_csvto=recovery_params['skip_csvto'])
+                AllegroScrewdriver=AllegroScrewdriver, tactile_controller=tactile_controller, skip_csvto=recovery_params['recovery_skip_csvto'])
             planner = create_planner(problem, mode, recovery_params, 'recovery')
             
         elif mode == 'turn' and planner is None:
@@ -328,7 +336,7 @@ class TrajectoryExecutor:
                 self.sim_viz_env.zero_obj_velocity()
                 
             kwargs = {}
-            if self.params.get('tactile_controller', False):
+            if (self.params.get('tactile_controller', False) and not recover) or (self.params.get('recovery_tactile_controller', False) and recover):
                 if best_traj is not None:
                     kwargs['q_d_init'] = best_traj[0, planner.problem.dx:planner.problem.dx+4*num_fingers] + planner.problem.start[:4*num_fingers]
                     kwargs['q_d_init'] = kwargs['q_d_init'][:4*num_fingers]

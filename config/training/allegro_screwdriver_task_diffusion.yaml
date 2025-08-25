@@ -1,5 +1,5 @@
 ---
-model_name: 'allegro_screwdriver_task_model_pi_2_partial_patch'
+model_name: 'allegro_screwdriver_data_gen_pi_2_partial_patch_new_init'
 T: 13
 dx: 15
 du: 21
@@ -18,7 +18,7 @@ lr: 1.0e-4
 model_type: 'diffusion'
 discriminator_guidance: True
 inverse_dynamics: False
-data_directory: 'allegro_screwdriver_data_gen_pi_2_partial_patch'
+data_directory: 'allegro_screwdriver_data_gen_pi_2_partial_patch_new_init'
 best_traj_only: True
 recovery: False
 device: 'cuda:0'

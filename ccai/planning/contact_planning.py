@@ -134,8 +134,8 @@ class ContactPlanner:
                 contact_mode_str_max = max(likelihood_sum, key=likelihood_sum.get)
                 print('Contact mode with highest likelihood sum:', contact_mode_str_max)
 
-                # contact_mode_str_max = contact_mode_str_sort[0]
-                # print('Contact mode with highest likelihood trajectory:', contact_mode_str_max)
+                contact_mode_str_max = contact_mode_str_sort[0]
+                print('Contact mode with highest likelihood trajectory:', contact_mode_str_max)
 
                 best_traj_idx = inds_grouped[contact_mode_str_max][0]
                 goal_config = initial_samples[best_traj_idx, -1, :15]
@@ -238,10 +238,10 @@ class ContactPlanner:
             begin_mode_loop = time.perf_counter()
             planner = self.mode_planner_dict[mode]
             planner.reset(state, T=self.params['T'], goal=goal)
-            planner.warmup_iters = self.params['warmup_iters']
+            planner.warmup_iters = self.params['recovery_warmup_iters']
 
             # Run CSVTO to plan trajectory
-            xu, plans = planner.step(state)
+            xu, plans = planner.step(state, shift=False)
             planner.problem.data = {}
             planner.warmup_iters = 0
             initial_samples.append(plans)

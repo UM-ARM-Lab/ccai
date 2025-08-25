@@ -1,5 +1,5 @@
 ---
-model_name: 'allegro_screwdriver_recovery_pi_2_256_steps'
+model_name: 'allegro_screwdriver_TODR_recovery_data_gen_partial_patch_new_110'
 T: 4
 dx: 15
 du: 21
@@ -10,7 +10,7 @@ train_classifier: False
 eval_classifier: False
 plot: False
 vis_dataset: False
-epochs: 15000
+epochs: 25000
 balance: 'none'
 classifier_epochs: 100
 batch_size: 256
@@ -18,8 +18,8 @@ lr: 1.0e-4
 model_type: 'diffusion'
 discriminator_guidance: True
 inverse_dynamics: False
-data_directory: 'allegro_screwdriver_recovery_data_rand_pct_.33_1.5_N_pi_2_9000_170_thresh_low_budget_perturb_during_recovery_damping_.1'
-device: 'cuda:1'
+data_directory: 'allegro_screwdriver_TODR_recovery_data_gen_partial_patch_new_130'
+device: 'cuda:0'
 test_every: 9999999999
 save_every: 500
 normalize_data: True

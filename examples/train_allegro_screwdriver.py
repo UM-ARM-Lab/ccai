@@ -46,7 +46,7 @@ fingers = ['index', 'middle', 'thumb']
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='allegro_valve_recovery_diffusion.yaml')
+    parser.add_argument('--config', type=str, default='TODR_256_steps.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_id_ood_states.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_project_ood_states.yaml')
     # parser.add_argument('--config', type=str, default='allegro_screwdriver_diffusion_id_ood_states.yaml')
@@ -75,7 +75,7 @@ def visualize_trajectories(trajectories, scene, fpath, headless=False):
 def train_model(trajectory_sampler, train_loader, val_loader, config):
     fpath = f'{CCAI_PATH}/data/training/allegro_screwdriver/{config["model_name"]}_{config["model_type"]}'
     pathlib.Path.mkdir(pathlib.Path(fpath), parents=True, exist_ok=True)
-    run = wandb.init(project='ccai-screwdriver', entity='abhinavk99', config=config)
+    run = wandb.init(project='ccai-screwdriver', entity='abhinavk99', config=config, name=config['model_name'])
 
     if config['use_ema']:
         ema = EMA(beta=config['ema_decay'])
@@ -109,6 +109,10 @@ def train_model(trajectory_sampler, train_loader, val_loader, config):
 
     epochs = config['epochs']
     pbar = tqdm.tqdm(range(epochs))
+    best_val_mse = float('inf')
+    
+    dset_mean_cuda = train_dataset.dataset.mean.to(device=config['device'])
+    dset_std_cuda = train_dataset.dataset.std.to(device=config['device'])
     for epoch in pbar:
         train_loss = 0.0
         train_loss_tau = 0.0
@@ -162,69 +166,94 @@ def train_model(trajectory_sampler, train_loader, val_loader, config):
         train_loss_tau /= len(train_loader)
         train_loss_c /= len(train_loader)
         
-        # Validation step
-        val_loss = 0.0
-        val_mse = 0.0
-        trajectory_sampler.eval()
-        with torch.no_grad():
-            for trajectories, traj_class, masks in val_loader:
-                trajectories = trajectories.to(device=config['device'], non_blocking=True)
-                masks = masks.to(device=config['device'], non_blocking=True)
-                
-                if config['use_class']:
-                    traj_class = traj_class.to(device=config['device'], non_blocking=True).float()
-                else:
-                    traj_class = None
-                
-                with torch.amp.autocast(device_type='cuda', dtype=torch.float16, enabled=config['use_mixed_precision']):
-                    sampler_losses = trajectory_sampler.loss(trajectories, mask=masks, constraints=traj_class)
-                    loss = sampler_losses['loss']
-                
-                val_loss += loss.item()
-                
-                # Calculate MSE for validation
-                # For diffusion models, we can calculate MSE between the model's output and the target
-                # This is a simplified MSE calculation - you may need to adjust based on your model's specific output format
-                try:
-                    # Try to get model predictions if available
-                    if hasattr(trajectory_sampler, 'get_predictions'):
-                        predictions = trajectory_sampler.get_predictions(trajectories, mask=masks, constraints=traj_class)
-                        targets = trajectories
-                        mse = torch.nn.functional.mse_loss(predictions, targets, reduction='mean')
-                        val_mse += mse.item()
+        if epoch % 100 == 0:
+            # Validation step
+            val_loss = 0.0
+            val_loss_tau = 0.0
+            val_loss_c = 0.0
+            val_mse = 0.0
+            trajectory_sampler.eval()
+            with torch.no_grad():
+                for trajectories, traj_class, masks in val_loader:
+                    trajectories = trajectories.to(device=config['device'], non_blocking=True)
+                    masks = masks.to(device=config['device'], non_blocking=True)
+                    
+                    if config['use_class']:
+                        traj_class = traj_class.to(device=config['device'], non_blocking=True).float()
                     else:
-                        # For diffusion models, the loss itself can be a good proxy for MSE
-                        # Alternatively, we can calculate MSE on the denoised predictions
-                        val_mse += loss.item()
-                except Exception as e:
-                    # Fallback: use loss as proxy for MSE
-                    print(f"Warning: Could not calculate MSE, using loss as proxy: {e}")
-                    val_mse += loss.item()
-        
-        val_loss /= len(val_loader)
-        val_mse /= len(val_loader)
-        
+                        traj_class = None
+                    
+                    with torch.amp.autocast(device_type='cuda', dtype=torch.float16, enabled=config['use_mixed_precision']):
+                        sampler_losses = trajectory_sampler.loss(trajectories, mask=masks, constraints=traj_class)
+                        loss = sampler_losses['loss']
+                    
+                    val_loss += loss.item()
+                    if config['diffuse_class']:
+                        val_loss_tau += sampler_losses['loss_tau']
+                        val_loss_c += sampler_losses['loss_c']
+                    # Calculate MSE for validation
+                    # For diffusion models, we can calculate MSE between the model's output and the target
+                    # This is a simplified MSE calculation - you may need to adjust based on your model's specific output format
+                    # try:
+                    # Try to get model predictions if available
+                    
+                    trajectories_unnormalized = trajectories * dset_std_cuda + dset_mean_cuda
+                    if config['diffuse_class']:
+                        predictions, contact, _ = trajectory_sampler.sample(
+                            N=trajectories.shape[0],
+                            H=config['T'],
+                            start=trajectories_unnormalized[:, 0, :config['dx']],
+                            constraints=None
+                        )
+                        predictions_normalized = (predictions - dset_mean_cuda) / dset_std_cuda
+                        
+                        mse = torch.nn.functional.mse_loss(predictions_normalized, trajectories, reduction='mean') + torch.nn.functional.mse_loss(contact, traj_class, reduction='mean')
+                    else:
+                        predictions, _, _ = trajectory_sampler.sample(
+                            N=trajectories.shape[0],
+                            H=config['T'],
+                            start=trajectories_unnormalized[:, 0, :config['dx']],
+                            constraints=traj_class
+                        )
+                        predictions_normalized = (predictions - dset_mean_cuda) / dset_std_cuda
+                        mse = torch.nn.functional.mse_loss(predictions_normalized, trajectories, reduction='mean')
+                    val_mse += mse.item()
+
+                    # except Exception as e:
+                    #     # Fallback: use loss as proxy for MSE
+                    #     print(f"Warning: Could not calculate MSE, using loss as proxy: {e}")
+                    #     val_mse += loss.item()
+            
+            val_loss /= len(val_loader)
+            val_mse /= len(val_loader)
+            val_loss_tau /= len(val_loader)
+            val_loss_c /= len(val_loader)
+            if val_mse < best_val_mse:
+                best_val_mse = val_mse
+                torch.save(trajectory_sampler.state_dict(), f'{fpath}/allegro_screwdriver_{config["model_type"]}_best.pt')
         pbar.set_description(
             f'Train loss {train_loss:.3f}, Val loss {val_loss:.3f}, Val MSE {val_mse:.3f}')
-        try:
-            wandb.log({
+        
+        metrics = {
                 'train_loss_epoch': train_loss,
                 'train_loss_diffusion_epoch': train_loss_tau,
                 'train_loss_c_mode_epoch': train_loss_c,
                 'val_loss_epoch': val_loss,
+                'val_loss_tau_epoch': val_loss_tau,
+                'val_loss_c_epoch': val_loss_c,
                 'val_mse_epoch': val_mse,
                 'time': time.time()
-                })
+                }
+        if epoch % 100 != 0:
+            del metrics['val_loss_epoch']
+            del metrics['val_loss_tau_epoch']
+            del metrics['val_loss_c_epoch']
+            del metrics['val_mse_epoch']
+        try:
+            wandb.log(metrics, step=epoch)
         except:
             print('Could not log to wandb')
-            print({
-                'train_loss_epoch': train_loss,
-                'train_loss_diffusion_epoch': train_loss_tau,
-                'train_loss_c_mode_epoch': train_loss_c,
-                'val_loss_epoch': val_loss,
-                'val_mse_epoch': val_mse,
-                'time': time.time()
-                })
+            print(metrics)
         # generate samples and plot them
         if (epoch + 1) % config['test_every'] == 0:
 
@@ -504,7 +533,9 @@ if __name__ == "__main__":
     if config['recovery']:
         # Access trajectory_type from the underlying dataset
         classes = train_dataset.dataset.trajectory_type
-        print(torch.unique(classes, dim=0, return_counts=True))
+        unique, counts = (torch.unique(classes, dim=0, return_counts=True))
+        pct = counts / counts.sum()
+        print(unique, counts, pct)
         if config['balance'] == 'weighted_random':
             weights = [1/(classes.sum(1)).tolist().count(classes[i].sum().item()) for i in range(classes.shape[0])]
             train_sampler = WeightedRandomSampler(weights, len(train_dataset), replacement=True)
@@ -532,8 +563,15 @@ if __name__ == "__main__":
             # Convert to tensor and shuffle
             balanced_indices = torch.tensor(balanced_indices)[torch.randperm(len(balanced_indices))]
             
+            subset = train_dataset.dataset.trajectories[balanced_indices].reshape(-1, train_dataset.dataset.trajectories.shape[-1])
+            dset_mean_cuda = subset.mean(dim=0)
+            dset_std_cuda = subset.std(dim=0)
+            
             # Create subset dataset
             train_dataset = Subset(train_dataset, balanced_indices)
+            
+            train_dataset.dataset.mean = dset_mean_cuda
+            train_dataset.dataset.std = dset_std_cuda
             
             print(f"Balanced dataset size: {len(train_dataset)}")
             print(f"Samples per class: {min_count}")
@@ -557,7 +595,7 @@ if __name__ == "__main__":
                             sampler=train_sampler, num_workers=4, pin_memory=True, drop_last=True,
                             )
     
-    val_loader = DataLoader(val_dataset, batch_size=config['batch_size'],
+    val_loader = DataLoader(val_dataset, batch_size=2048,
                           sampler=val_sampler, num_workers=4, pin_memory=True, drop_last=False,
                           )
 
@@ -598,10 +636,9 @@ if __name__ == "__main__":
     config['scene'] = scene
     config['env'] = env
 
-
+    # model.warmup_model(warmup_batch_size=config['batch_size'], warmup_horizon=None)
     if config['train_diffusion']:
         train_model(model, train_loader, val_loader, config)
-
 
     if config['load_model']:
         # if config['discriminator_guidance']:

@@ -6,7 +6,7 @@ num_steps: 12
 num_turns: 1
 num_episodes: 180
 visualize: False
-experiment_name: 'allegro_screwdriver_data_gen_pi_2_partial_patch'
+experiment_name: 'allegro_screwdriver_data_gen_pi_2_partial_patch_new_init'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
@@ -38,7 +38,7 @@ perturb_action: False
 live_recovery: False
 obj_gravity: True
 external_wrench_perturb: False
-start_ind: 0
+start_ind: 65
 end_ind: 360
 diff_init: False
 # model_path: 'data/training/allegro_screwdriver/allegro_better_model/allegro_screwdriver_diffusion_w_classifier.pt'

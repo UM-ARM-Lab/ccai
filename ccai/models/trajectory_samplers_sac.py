@@ -593,8 +593,8 @@ class TrajectorySampler(nn.Module):
     # @torch.compile(mode='reduce-overhead')
     def _compiled_sample(self, N, H=10, start=None, goal=None, constraints=None, past=None, project=False, no_grad=True, skip_likelihood=False, context_for_likelihood=True):
         # Ensure warmup is completed before inference
-        if not self.warmup_completed and not project:  # Skip warmup for projection mode
-            print("Warning: Model not warmed up. Consider calling warmup_model() for optimal performance.")
+        # if not self.warmup_completed and not project:  # Skip warmup for projection mode
+        #     print("Warning: Model not warmed up. Consider calling warmup_model() for optimal performance.")
         norm_start = None
         norm_past = None
         if start is not None and self.type != 'latent_diffusion':

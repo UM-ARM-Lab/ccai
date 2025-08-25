@@ -42,7 +42,6 @@ class CompilationMixin:
             self._compiled_methods.clear()
         
     def _get_or_compile_method(self, method_name, original_method, compile_kwargs=None):
-        
         # return original_method
         """Get compiled method from cache or compile it."""
         if not self._cache_enabled:

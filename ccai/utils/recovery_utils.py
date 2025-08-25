@@ -208,7 +208,7 @@ class ConstraintScheduledSVGDMPC(PositionControlConstrainedSVGDMPC):
         self.mode = mode
         self.default_skip_csvto = self.problem.skip_csvto
 
-    def step(self, state, skip_optim=False, **kwargs):
+    def step(self, state, skip_optim=False, shift=True, **kwargs):
         if self.fix_T:
             new_T = None
         else:
@@ -250,6 +250,8 @@ class ConstraintScheduledSVGDMPC(PositionControlConstrainedSVGDMPC):
                 self.warmed_up = True
                 resample = False
             path = self.solver.solve(self.x, resample, skip_optim=skip_optim)
+        if not self.warmed_up and self.warmup_iters == 0:
+            self.warmed_up = True
         if self.online_iters == 0:
             self.problem.skip_csvto = True
         try:
@@ -262,9 +264,9 @@ class ConstraintScheduledSVGDMPC(PositionControlConstrainedSVGDMPC):
         best_trajectory = self.x[0].clone()
         
         all_trajectories = self.x.clone()
-        if not self.tactile_controller_bool:
+        if not self.tactile_controller_bool and shift:
             self.shift()
-        else:
+        elif self.tactile_controller_bool:
             # Need to create a version of best_trajectory with q_d instead of u
             self.best_trajectory_for_spline = best_trajectory.clone()
             self.best_trajectory_for_spline[1:, self.problem.dx:self.problem.dx+self.controller_config.dq] = best_trajectory[1:, self.problem.dx:self.problem.dx+self.controller_config.dq] + best_trajectory[:-1, :self.controller_config.dq]
@@ -433,6 +435,11 @@ def create_planner(problem, mode, params, planner_type='default'):
     """Create a planner for the given problem."""
     if planner_type == 'recovery':
         recovery_params = deepcopy(params)
+        recovery_params['N'] = recovery_params['recovery_N']
+        recovery_params['skip_csvto'] = recovery_params['recovery_skip_csvto']
+        recovery_params['online_iters'] = recovery_params['recovery_online_iters']
+        recovery_params['warmup_iters'] = recovery_params['recovery_warmup_iters']
+        recovery_params['tactile_controller'] = recovery_params['recovery_tactile_controller']
         return ConstraintScheduledSVGDMPC(problem, recovery_params, mode)
     else:
         return ConstraintScheduledSVGDMPC(problem, params, mode)

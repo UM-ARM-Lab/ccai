@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 200
 visualize: True
-experiment_name: 'allegro_screwdriver_TODR_data_gen_tactile'
+experiment_name: 'allegro_screwdriver_TODR_recovery_data_gen_partial_patch_new_90'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -23,7 +23,7 @@ prior: 1
 multi_particle_search: True
 replan: False
 visualize_plan: False
-visualize_recovery_plan: False
+visualize_recovery_plan: True
 visualize_contact_plan: True
 optimize_force: True
 exclude_index: False
@@ -50,29 +50,48 @@ obj_gravity: True
 type: 'diffusion'
 OOD_metric: 'likelihood'
 recovery_controller: 'csvgd'
-model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_task_model_pi_2_partial_patch_diffusion'
-model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_task_model_pi_2_partial_patch_diffusion/allegro_screwdriver_diffusion.pt'
-likelihood_threshold: -170.0
-drop_threshold: -1250
-project_threshold: -105.
-sac_batch_size: 64
-# likelihood_threshold: -16.0
-# likelihood_threshold: -136.6758056640625
-# project_threshold: -90
-# parity: 654
-start_ind: 50
-end_ind: 450
+model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_data_gen_pi_2_partial_patch_new_init_diffusion'
+model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_data_gen_pi_2_partial_patch_new_init_diffusion/allegro_screwdriver_diffusion.pt'
+likelihood_threshold: -90.0
+# likelihood_threshold: -40.0
+likelihood_num_samples: 8
+N_contact_plan: 16
+start_ind: 0
+end_ind: 287
+
+# Tactile parameters
+tactile_controller: True
+recovery_tactile_controller: False
+skip_csvto: False
+recovery_skip_csvto: False
+# K_e: 148.05791757219248
+# w_f: 31.329669033477174
+# w_ori: 0.6292958456695827
+# w_p: 6.263656484855001
+# w_q: 16.795050979647648
+# w_u: 1.2629144928914158
+
+K_e: 188.15992948309466
+w_f: 7.4031468776312925
+w_ori: 0.7112557653352068
+w_p: 4.270564741000932
+w_q: 8.88415815458119
+w_u: 1.6541967621723381
+
 controllers:
   csvgd:
     # N: 16
-    N: 16
+    N: 1
+    recovery_N: 16
     alpha_J: 1.0e-2
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
     device: 'cuda:0'
     online_iters: 0
-    warmup_iters: 0
+    warmup_iters: 15
+    recovery_warmup_iters: 25
+    recovery_online_iters: 15
     resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1

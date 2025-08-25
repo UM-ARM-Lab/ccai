@@ -6,7 +6,7 @@ num_steps: 12
 num_turns: 1
 num_episodes: 180
 visualize: False
-experiment_name: 'allegro_screwdriver_data_gen_pi_2_partial_patch_new_init'
+experiment_name: 'allegro_screwdriver_IDTO'
 # experiment_name: 'allegro_screwdriver_new_data_collection_5'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
@@ -33,13 +33,13 @@ sample_contact: False
 use_partial_constraint: True
 sine_cosine: False
 shortcut_trajectory: False
-randomize_obj_start: True
+randomize_obj_start: False
 perturb_action: False
 live_recovery: False
 obj_gravity: True
 external_wrench_perturb: False
-start_ind: 230
-end_ind: 360
+start_ind: 0
+end_ind: 50
 diff_init: False
 # model_path: 'data/training/allegro_screwdriver/allegro_better_model/allegro_screwdriver_diffusion_w_classifier.pt'
 # model_path: 'data/training/allegro_screwdriver/allegro_test_new_data_augment_angle_diffusion/allegro_screwdriver_diffusion.pt'
@@ -51,7 +51,7 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:1'
+    device: 'cuda:0'
     online_iters: 50
     warmup_iters: 175
     resample_steps: 16

@@ -247,11 +247,7 @@ def objective(config_params):
     """Objective function for Ray Tune optimization."""
     # Create environment and models within this worker process
     # Load base config
-    # base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_diff_tactile_control.yaml'
-    # if not base_config_path.exists():
-    #     base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_diff_only.yaml'
-
-    base_config_path = CCAI_PATH / 'examples/config/valve/allegro_valve_csvto_diff_tactile_control.yaml'
+    base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_csvto_diff_tactile_control.yaml'
     if not base_config_path.exists():
         base_config_path = CCAI_PATH / 'examples/config/valve/allegro_valve_csvto_diff_only.yaml'
     
@@ -264,7 +260,7 @@ def objective(config_params):
     config['visualize'] = False
     config['mode'] = 'simulation'
     config['tactile_controller'] = True  # Enable tactile controller
-    config['experiment_name'] = 'tune_tactile_controller_valve_csvto_diff'
+    config['experiment_name'] = 'tune_tactile_controller_csvto_diff_new_init'
     
     # Ensure required fields are set
     if 'recovery_controller' not in config:
@@ -377,6 +373,9 @@ def main():
     # search_alg.restore_from_dir(
     #     pathlib.Path("./ray_results/tactile_controller_tuning_diff_partial_patch/")
     # )
+    # search_alg.restore_from_dir(
+    #     pathlib.Path("./ray_results/tactile_controller_tuning_diff_partial_patch/")
+    # )
     
     # # Create a wrapper function that passes the pre-instantiated objects
     # def objective_wrapper(config_params):
@@ -389,7 +388,7 @@ def main():
         num_samples=num_samples,
         # scheduler=scheduler,
         progress_reporter=reporter,
-        name="tactile_controller_tuning_valve_csvto_diff_partial_patch",
+        name="tactile_controller_tuning_csvto_diff_partial_patch_new",
         storage_path=str(storage_path),  # Use absolute path as string
         resources_per_trial={"cpu": 8, "gpu": .5},  # CPU only for stability
         max_failures=5,  # Allow more failures since we're doing complex trials
@@ -417,11 +416,7 @@ def main():
     output_dir = pathlib.Path("./tuning_results")
     output_dir.mkdir(exist_ok=True)
     
-    # base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_diff_tactile_control.yaml'
-    # if not base_config_path.exists():
-    #     base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_diff_only.yaml'
-
-    base_config_path = CCAI_PATH / 'examples/config/valve/allegro_valve_csvto_diff_tactile_control.yaml'
+    base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_csvto_diff_tactile_control.yaml'
     if not base_config_path.exists():
         base_config_path = CCAI_PATH / 'examples/config/valve/allegro_valve_csvto_diff_only.yaml'
 
@@ -465,29 +460,30 @@ def main():
 
 
 if __name__ == "__main__":
-    main() 
-    # import json
-    # def get_max(path):
-    #     exp = json.loads(open(f'{path}', 'r').read())
-    #     all_results = []
-    #     for i in range(len(exp['trial_data'])):
-    #         exp['trial_data'][i][1] = json.loads(exp['trial_data'][i][1])
-    #         if 'performance_score' in exp['trial_data'][i][1]['last_result'].keys():
-    #             all_results.append((exp['trial_data'][i][1]['last_result']['performance_score'], exp['trial_data'][i][1]['last_result']['config']))
-    #     if len(all_results) > 0:
-    #         try:
-    #             print(max(all_results))
-    #         except:
-    #             print('No performance score found')
-    #     else:
-    #         print('No performance score found')
-        
-    # dir_ = './examples/ray_results/tactile_controller_tuning_csvto_diff'
+    # main() 
     
-    # # Iterate through dir, run get_max for every experiment_state*.json file
-    # for file in os.listdir(dir_):
-    #     if file.endswith('.json') and 'experiment_state' in file:
-    #         print(file)
-    #         get_max(os.path.join(dir_, file))
-    #         print('-'*100)
+    import json
+    def get_max(path):
+        exp = json.loads(open(f'{path}', 'r').read())
+        all_results = []
+        for i in range(len(exp['trial_data'])):
+            exp['trial_data'][i][1] = json.loads(exp['trial_data'][i][1])
+            if 'performance_score' in exp['trial_data'][i][1]['last_result'].keys():
+                all_results.append((exp['trial_data'][i][1]['last_result']['completion_rate'], exp['trial_data'][i][1]['last_result']['performance_score'], exp['trial_data'][i][1]['last_result']['config']))
+        if len(all_results) > 0:
+            try:
+                print(max(all_results))
+            except:
+                print('No performance score found')
+        else:
+            print('No performance score found')
+        
+    dir_ = './examples/ray_results/tactile_controller_tuning_csvto_diff_partial_patch_new'
+    
+    # Iterate through dir, run get_max for every experiment_state*.json file
+    for file in os.listdir(dir_):
+        if file.endswith('.json') and 'experiment_state' in file:
+            print(file)
+            get_max(os.path.join(dir_, file))
+            print('-'*100)
 

@@ -33,7 +33,7 @@ from ccai.utils.allegro_utils import (
 )
 from ccai.utils.recovery_utils import (
     create_allegro_screwdriver_problem, create_planner, add_to_dataset, partial_to_full_trajectory,
-    full_to_partial_trajectory,
+    full_to_partial_trajectory, create_mode_planner_dict
 )
 
 from ccai.allegro_contact import AllegroManipulationProblem, PositionControlConstrainedSVGDMPC
@@ -651,89 +651,95 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             goal[-1] = start[-1]
 
             params_for_recovery = deepcopy(params)
-            if index_regrasp_planner is None:
-                index_regrasp_problem = AllegroScrewdriver(
-                    start=start[:4 * num_fingers + obj_dof],
-                    goal=goal,
-                    T=params['T'],
-                    chain=params['chain'],
-                    device=params['device'],
-                    object_asset_pos=env.table_pose,
-                    object_location=params['object_location'],
-                    object_type=params['object_type'],
-                    world_trans=env.world_trans,
-                    regrasp_fingers=['index'],
-                    contact_fingers=['middle', 'thumb'],
-                    obj_dof=3,
-                    obj_joint_dim=1,
-                    optimize_force=params['optimize_force'],
-                    default_dof_pos=env.default_dof_pos[:, :16],
-                    obj_gravity=params.get('obj_gravity', False),
-                    min_force_dict=min_force_dict,
-                    full_dof_goal=True,
-                    proj_path=None,
-                    project=True,
-                )
-                index_regrasp_planner = PositionControlConstrainedSVGDMPC(index_regrasp_problem, params_for_recovery)
+            # if index_regrasp_planner is None:
+            #     index_regrasp_problem = AllegroScrewdriver(
+            #         start=start[:4 * num_fingers + obj_dof],
+            #         goal=goal,
+            #         T=params['T'],
+            #         chain=params['chain'],
+            #         device=params['device'],
+            #         object_asset_pos=env.table_pose,
+            #         object_location=params['object_location'],
+            #         object_type=params['object_type'],
+            #         world_trans=env.world_trans,
+            #         regrasp_fingers=['index'],
+            #         contact_fingers=['middle', 'thumb'],
+            #         obj_dof=3,
+            #         obj_joint_dim=1,
+            #         optimize_force=params['optimize_force'],
+            #         default_dof_pos=env.default_dof_pos[:, :16],
+            #         obj_gravity=params.get('obj_gravity', False),
+            #         min_force_dict=min_force_dict,
+            #         full_dof_goal=True,
+            #         proj_path=None,
+            #         project=True,
+            #     )
+            #     index_regrasp_planner = PositionControlConstrainedSVGDMPC(index_regrasp_problem, params_for_recovery)
 
-            if thumb_and_middle_regrasp_planner is None:
-                thumb_and_middle_regrasp_problem = AllegroScrewdriver(
-                    start=start[:4 * num_fingers + obj_dof],
-                    goal=goal,
-                    T=params['T'],
-                    chain=params['chain'],
-                    device=params['device'],
-                    object_asset_pos=env.table_pose,
-                    object_location=params['object_location'],
-                    object_type=params['object_type'],
-                    world_trans=env.world_trans,
-                    contact_fingers=['index'],
-                    regrasp_fingers=['middle', 'thumb'],
-                    obj_dof=3,
-                    obj_joint_dim=1,        
-                    optimize_force=params['optimize_force'],
-                    default_dof_pos=env.default_dof_pos[:, :16],
-                    obj_gravity=params.get('obj_gravity', False),
-                    min_force_dict=min_force_dict,
-                    full_dof_goal=True,
-                    proj_path=None,
-                    project=True,
-                )
-                thumb_and_middle_regrasp_planner = PositionControlConstrainedSVGDMPC(thumb_and_middle_regrasp_problem, params_for_recovery)
+            # if thumb_and_middle_regrasp_planner is None:
+            #     thumb_and_middle_regrasp_problem = AllegroScrewdriver(
+            #         start=start[:4 * num_fingers + obj_dof],
+            #         goal=goal,
+            #         T=params['T'],
+            #         chain=params['chain'],
+            #         device=params['device'],
+            #         object_asset_pos=env.table_pose,
+            #         object_location=params['object_location'],
+            #         object_type=params['object_type'],
+            #         world_trans=env.world_trans,
+            #         contact_fingers=['index'],
+            #         regrasp_fingers=['middle', 'thumb'],
+            #         obj_dof=3,
+            #         obj_joint_dim=1,        
+            #         optimize_force=params['optimize_force'],
+            #         default_dof_pos=env.default_dof_pos[:, :16],
+            #         obj_gravity=params.get('obj_gravity', False),
+            #         min_force_dict=min_force_dict,
+            #         full_dof_goal=True,
+            #         proj_path=None,
+            #         project=True,
+            #     )
+            #     thumb_and_middle_regrasp_planner = PositionControlConstrainedSVGDMPC(thumb_and_middle_regrasp_problem, params_for_recovery)
 
-            if all_regrasp_planner is None:
-                all_regrasp_problem = AllegroScrewdriver(
-                    start=state[:4 * num_fingers + obj_dof],
-                    goal=goal,
-                    T=params['T'],
-                    chain=params['chain'],
-                    device=params['device'],
-                    object_asset_pos=env.obj_pose,
-                    object_location=params['object_location'],
-                    object_type=params['object_type'],
-                    world_trans=env.world_trans,
-                    contact_fingers=[],
-                    regrasp_fingers=['index', 'middle', 'thumb'],
-                    obj_dof=obj_dof,
-                    obj_joint_dim=1,
-                    optimize_force=params['optimize_force'],
-                    default_dof_pos=env.default_dof_pos[:, :16],
-                    obj_gravity=params.get('obj_gravity', False),
-                    min_force_dict=min_force_dict,
-                    full_dof_goal=True,
-                    proj_path=None,
-                    project=True,
-                )
-                all_regrasp_planner = PositionControlConstrainedSVGDMPC(all_regrasp_problem, params_for_recovery)
+            # if all_regrasp_planner is None:
+            #     all_regrasp_problem = AllegroScrewdriver(
+            #         start=state[:4 * num_fingers + obj_dof],
+            #         goal=goal,
+            #         T=params['T'],
+            #         chain=params['chain'],
+            #         device=params['device'],
+            #         object_asset_pos=env.obj_pose,
+            #         object_location=params['object_location'],
+            #         object_type=params['object_type'],
+            #         world_trans=env.world_trans,
+            #         contact_fingers=[],
+            #         regrasp_fingers=['index', 'middle', 'thumb'],
+            #         obj_dof=obj_dof,
+            #         obj_joint_dim=1,
+            #         optimize_force=params['optimize_force'],
+            #         default_dof_pos=env.default_dof_pos[:, :16],
+            #         obj_gravity=params.get('obj_gravity', False),
+            #         min_force_dict=min_force_dict,
+            #         full_dof_goal=True,
+            #         proj_path=None,
+            #         project=True,
+            #     )
+            #     all_regrasp_planner = PositionControlConstrainedSVGDMPC(all_regrasp_problem, params_for_recovery)
 
-            mode_planner_dict = {
-                'all': all_regrasp_planner,
-                'index': index_regrasp_planner,
-                'thumb_middle': thumb_and_middle_regrasp_planner,
-            }
-            index_regrasp_planner.reset(start, goal=goal)
-            thumb_and_middle_regrasp_planner.reset(start, goal=goal)
-            all_regrasp_planner.reset(start, goal=goal)
+            # mode_planner_dict = {
+            #     'all': all_regrasp_planner,
+            #     'index': index_regrasp_planner,
+            #     'thumb_middle': thumb_and_middle_regrasp_planner,
+            # }
+            if index_regrasp_planner is None or thumb_and_middle_regrasp_planner is None or all_regrasp_planner is None:
+                mode_planner_dict = create_mode_planner_dict(env, params, params['device'], min_force_dict, goal, AllegroScrewdriver)
+                index_regrasp_planner = mode_planner_dict['index']
+                thumb_and_middle_regrasp_planner = mode_planner_dict['thumb_middle']
+                all_regrasp_planner = mode_planner_dict['all']
+                
+            mode_planner_dict['index'].reset(start, goal=goal)
+            mode_planner_dict['thumb_middle'].reset(start, goal=goal)
+            mode_planner_dict['all'].reset(start, goal=goal)
 
             if contact_planner is None:
                 contact_planner = ContactPlanner(params, env, trajectory_sampler, trajectory_sampler_orig, 
@@ -741,8 +747,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                                 mode_planner_dict)
             
             print('New goal:', goal)
-
-
 
             if torch.allclose(start, goal):
                 print('Goal is the same as current state')
@@ -827,8 +831,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config. First option is to get the config from the command line.
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_TODR_recovery_data_gen_tactile.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_TODR_recovery_data_gen_tactile_1.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_TODR_N_16.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_diff_tactile_control_eval.yaml').read_text())
     # Write to log file in the experiment's directory
@@ -848,10 +852,10 @@ if __name__ == "__main__":
     num_envs = get_num_envs_for_baseline(config)
     
     default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
-                                torch.tensor([[-0.0533, 0.9370, 0.3040, 1.0172]]).float(),
-                                torch.tensor([[-.1253, 0.9571, 0.3136, 0.7901]]).float(),
-                                torch.tensor([[1.0655, 0.4575, 0.5301, .8653]]).float()),
-                                dim=1)
+                               torch.tensor([[-0.0535, 0.7626, 0.4006, 1.2064]]).float(),
+                               torch.tensor([[0,0,0,0]]).float(),
+                               torch.tensor([[.9830, 0.6005, 0.5771, .8364]]).float()),
+                               dim=1)
     if config['mode'] == 'hardware':
         # roslaunch allegro_hand allegro_hand_modified.launch
         from hardware.hardware_env_hri import HardwareEnv
@@ -1003,14 +1007,14 @@ if __name__ == "__main__":
 
             if not perturb_this_trial:
                 print('No action perturbation this trial')
-            try:
-                final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node,
-                                                seed=seed, proj_path=None, perturb_this_trial=perturb_this_trial,
-                                                trajectory_sampler=trajectory_sampler, trajectory_sampler_orig=trajectory_sampler_orig,
-                                                config=config, classifier=classifier)
-                succ = True
-            except Exception as e:
-                print(f'Error: {e}')
+            # try:
+            final_distance_to_goal = do_trial(env, params, fpath, sim_env, ros_copy_node,
+                                            seed=seed, proj_path=None, perturb_this_trial=perturb_this_trial,
+                                            trajectory_sampler=trajectory_sampler, trajectory_sampler_orig=trajectory_sampler_orig,
+                                            config=config, classifier=classifier)
+            succ = True
+            # except Exception as e:
+            #     print(f'Error: {e}')
             seed += 1
 
         print('All yaw deltas:', all_yaw_deltas)

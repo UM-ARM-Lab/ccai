@@ -245,8 +245,8 @@ class AllegroScrewDriverDataset(Dataset):
             traj_data_all = list(path.rglob('*traj_data.p'))
             trajectory_all = list(path.rglob('*trajectory.pkl'))
             for p, traj_p in zip(traj_data_all, trajectory_all):
-                if str(traj_p).split('/')[-2] == 'trial_8259':
-                    print('here')
+                # if str(traj_p).split('/')[-2] == 'trial_8259':
+                #     print('here')
                 with open(p, 'rb') as f, open(traj_p, 'rb') as f_traj:
                     # data = CPU_Unpickler(f).load()
                     try:
@@ -287,15 +287,16 @@ class AllegroScrewDriverDataset(Dataset):
                                 post_mode_likelihood = fl[i]
                                 likelihood_delta = post_mode_likelihood - pre_mode_likelihood
                                 fl_delta.append(likelihood_delta)
-                        fl_improvement_bool = np.array(fl_delta) > 0
+                        fl_improvement_bool = np.array(fl_delta) > 0 
                         if data['dropped_recovery'] and fl_improvement_bool[-1]:
                             fl_improvement_bool[-1] = False
                             print('Overrode last recovery mode')
                         num_removed = np.sum(~fl_improvement_bool)
                         if num_removed > 0:
                             total_num_removed += num_removed
-                            print(f'Num removed: {num_removed}, Total removed: {total_num_removed}')
-                    
+                            # print(f'Num removed: {num_removed}, Total removed: {total_num_removed}')
+                        # if len(executed_modes) > 0 and executed_modes[-1] == 'index':
+                        #     print(p)
 
                     for t in range(max_T, min_t - 1, -1):
                         if not recovery:
