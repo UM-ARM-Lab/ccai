@@ -116,6 +116,26 @@ def create_allegro_screwdriver_problem(problem_type, start, goal, params, env, d
             'proj_path': None,
             'project': True,
         }
+    elif problem_type == 'middle_regrasp':
+        specific_params = {
+            'T': params['T'],
+            'regrasp_fingers': ['middle'],
+            'contact_fingers': ['index', 'thumb'],
+            'min_force_dict': min_force_dict,
+            'full_dof_goal': True,
+            'proj_path': None,
+            'project': True,
+        }
+    elif problem_type == 'thumb_regrasp':
+        specific_params = {
+            'T': params['T'],
+            'regrasp_fingers': ['thumb'],
+            'contact_fingers': ['index', 'middle'],
+            'min_force_dict': min_force_dict,
+            'full_dof_goal': True,
+            'proj_path': None,
+            'project': True,
+        }
     elif problem_type == 'thumb_middle_regrasp':
         specific_params = {
             'T': params['T'],

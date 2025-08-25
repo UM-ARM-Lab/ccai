@@ -44,7 +44,7 @@ class TrajectoryExecutor:
         
         # reset planner
         state = self.env.get_state()
-        state = state['q'].reshape(-1, 4 * num_fingers + 4)[0, :15].to(device=self.params['device'])
+        state = state['q'].reshape(-1, 4 * num_fingers + planner.problem.obj_dof + planner.problem.obj_joint_dim)[0, :4 * num_fingers + planner.problem.obj_dof].to(device=self.params['device'])
         planned_trajectories = []
         actual_trajectory = []
         optimizer_paths = []
@@ -138,12 +138,12 @@ class TrajectoryExecutor:
 
         # Reset planner with new parameters
         state = self.env.get_state()
-        state = state['q'].reshape(-1, 4 * num_fingers + 4)[0, :15].to(device=self.params['device'])
+        state = state['q'].reshape(-1, 4 * num_fingers + planner.problem.obj_dof + planner.problem.obj_joint_dim)[0, :4 * num_fingers + planner.problem.obj_dof].to(device=self.params['device'])
         state = state[:planner.problem.dx]
 
         planner.reset(state, T=new_T, goal=goal, initial_x=initial_samples, proj_path=proj_path)
         if initial_samples is None and skip_diff_init:
-            initial_samples = torch.zeros(self.params['N'], 12)
+            initial_samples = torch.zeros(self.params['N'], 16)
         elif initial_samples is None:
             initial_samples = planner.x.detach().clone()
             
@@ -183,7 +183,21 @@ class TrajectoryExecutor:
                 self.env, self.params['device'], min_force_dict=min_force_dict,
                 AllegroScrewdriver=AllegroScrewdriver, tactile_controller=tactile_controller, skip_csvto=recovery_params['skip_csvto'])
             planner = create_planner(problem, mode, recovery_params, 'recovery')
-            
+
+        elif mode == 'middle' and planner is None:
+            problem = create_allegro_screwdriver_problem(
+                'middle_regrasp', state[:4 * num_fingers + obj_dof], goal, self.params,
+                self.env, self.params['device'], min_force_dict=min_force_dict,
+                AllegroScrewdriver=AllegroScrewdriver, tactile_controller=tactile_controller, skip_csvto=recovery_params['skip_csvto'])
+            planner = create_planner(problem, mode, recovery_params, 'recovery')
+        
+        elif mode == 'thumb' and planner is None:
+            problem = create_allegro_screwdriver_problem(
+                'thumb_regrasp', state[:4 * num_fingers + obj_dof], goal, self.params,
+                self.env, self.params['device'], min_force_dict=min_force_dict,
+                AllegroScrewdriver=AllegroScrewdriver, tactile_controller=tactile_controller, skip_csvto=recovery_params['skip_csvto'])
+            planner = create_planner(problem, mode, recovery_params, 'recovery')
+
         elif mode == 'thumb_middle' and planner is None:
             problem = create_allegro_screwdriver_problem(
                 'thumb_middle_regrasp', state[:4 * num_fingers + obj_dof], goal, self.params,
@@ -216,7 +230,7 @@ class TrajectoryExecutor:
                                obj_dof, mode_fpath, planner):
         """Handle initial sampling with diffusion model."""
         initial_samples_0 = None
-        new_T = self.params['T'] if (mode in ['index', 'thumb_middle', 'all']) else self.params['T_orig']
+        new_T = self.params['T'] if recover else self.params['T_orig']
         
         if (self.params.get('diff_init', True) and not skip_diff_init and 
             (trajectory_sampler is not None or trajectory_sampler_orig is not None) and 
@@ -287,8 +301,8 @@ class TrajectoryExecutor:
         best_traj = None
         for k in range(start_timestep, total_steps):
             state = self.env.get_state()
-            state_16 = state['q'].reshape(-1, 4 * num_fingers + 4).to(device=self.params['device'])[0]
-            state = state_16[:15]
+            state_16 = state['q'].reshape(-1, 4 * num_fingers + obj_dof +planner.problem.obj_joint_dim).to(device=self.params['device'])[0]
+            state = state_16[:4 * num_fingers + obj_dof]
             print(state)
 
             if k > 0:
@@ -301,7 +315,6 @@ class TrajectoryExecutor:
                         actual_trajectory = torch.stack(actual_trajectory, dim=0).to(device=self.params['device'])
                     return actual_trajectory, planned_trajectories, optimizer_paths, contact_points, contact_distance, recover_, episode_num_steps
 
-            current_state = state[:4 * num_fingers + obj_dof].clone()
             state = state[:planner.problem.dx]
 
             # Do diffusion replanning if needed
@@ -346,8 +359,8 @@ class TrajectoryExecutor:
 
             # Get current state and print orientation
             state = self.env.get_state()
-            state = state['q'].reshape(-1, 4 * num_fingers + 4)[0, :15].to(device=self.params['device'])
-            ori = state[:15][-3:]
+            state = state['q'].reshape(-1, 4 * num_fingers + 4)[0, :4 * num_fingers + obj_dof].to(device=self.params['device'])
+            ori = state[:4 * num_fingers + obj_dof][-obj_dof:]
             print('Current ori:', ori)
             
             # Print force information
@@ -516,7 +529,7 @@ class TrajectoryExecutor:
         action = action.to(device=self.env.device) + state.unsqueeze(0)[:, :4 * num_fingers].to(device=self.env.device)
         
         if self.params.get('perturb_action', False):
-            action[..., :4] += torch.randn_like(action[..., :4]) * 0.08
+            action += torch.randn_like(action) * 0.03
 
         # Visualization
         if ((self.params['visualize_plan'] and not recover) or 
