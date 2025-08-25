@@ -28,7 +28,7 @@ sys.path.append(str(CCAI_PATH))
 
 # Import Isaac Gym modules first (before PyTorch)
 try:
-    from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
+    from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv, AllegroValveTurningEnv
     from isaac_victor_envs.utils import get_assets_dir
     import pytorch_kinematics as pk
     ISAAC_GYM_AVAILABLE = True
@@ -38,7 +38,8 @@ except ImportError as e:
     ISAAC_GYM_AVAILABLE = False
 
 # Import required modules with error handling
-from examples.allegro_screwdriver import do_trial, CCAI_PATH
+# from examples.allegro_screwdriver import do_trial, CCAI_PATH
+from examples.allegro_valve_turning import do_trial, CCAI_PATH
 from ccai.models.management.model_manager import ModelManager
 ALLEGRO_AVAILABLE = True
 import torch
@@ -65,24 +66,38 @@ def setup_environment_and_models(config):
     num_envs = 1
     
     # Create environment
-    env = AllegroScrewdriverTurningEnv(
-        num_envs, 
-        control_mode='joint_impedance',
-        use_cartesian_controller=False,
-        viewer=False,  # No visualization during tuning
-        steps_per_action=60,
-        friction_coefficient=2.5,
-        device=config['sim_device'],
-        video_save_path=None,
-        joint_stiffness=config['kp'],
-        fingers=config['fingers'],
-        gradual_control=False,
-        gravity=True, 
-        randomize_obj_start=config.get('randomize_obj_start', False),
-        randomize_rob_start=config.get('randomize_rob_start', False),
-        external_wrench_perturb=config.get('external_wrench_perturb', False),
-        force_sensors=config.get('tactile_controller', False)
-    )
+    # env = AllegroScrewdriverTurningEnv(
+    #     num_envs, 
+    #     control_mode='joint_impedance',
+    #     use_cartesian_controller=False,
+    #     viewer=False,  # No visualization during tuning
+    #     steps_per_action=60,
+    #     friction_coefficient=2.5,
+    #     device=config['sim_device'],
+    #     video_save_path=None,
+    #     joint_stiffness=config['kp'],
+    #     fingers=config['fingers'],
+    #     gradual_control=False,
+    #     gravity=True, 
+    #     randomize_obj_start=config.get('randomize_obj_start', False),
+    #     randomize_rob_start=config.get('randomize_rob_start', False),
+    #     external_wrench_perturb=config.get('external_wrench_perturb', False),
+    #     force_sensors=config.get('tactile_controller', False)
+    # )
+
+    env = AllegroValveTurningEnv(num_envs, control_mode='joint_impedance',
+                                        use_cartesian_controller=False,
+                                        viewer=config['visualize'],
+                                        steps_per_action=60,
+                                        friction_coefficient=config['friction_coefficient'] * 1.0,
+                                        device=config['sim_device'],
+                                        video_save_path=None,
+                                        joint_stiffness=config['kp'],
+                                        fingers=config['fingers'],
+                                        gravity=True, 
+                                        randomize_obj_start=config['randomize_obj_start'],
+                                        randomize_rob_start=config['randomize_rob_start']
+                                        )
     
     # Build kinematic chain
     asset = f'{get_assets_dir()}/xela_models/allegro_hand_right.urdf'
@@ -139,8 +154,12 @@ def run_tactile_trial_with_environment(config_params: Dict[str, Any], env, traje
         
         # Record initial state
         initial_state = env.get_state()
-        initial_ori = initial_state['screwdriver_ori'][0] if 'screwdriver_ori' in initial_state else torch.zeros(3)
-        initial_yaw = initial_ori[2].item() if len(initial_ori) > 2 else 0.0
+        # initial_ori = initial_state['screwdriver_ori'][0] if 'screwdriver_ori' in initial_state else torch.zeros(3)
+        # initial_yaw = initial_ori[2].item() if len(initial_ori) > 2 else 0.0
+
+
+        initial_ori = initial_state['valve'][0] if 'valve' in initial_state else torch.zeros(3)
+        initial_yaw = initial_ori[0].item()
         
         # Run the actual do_trial function
         yaw_change, dropped = do_trial(
@@ -228,9 +247,13 @@ def objective(config_params):
     """Objective function for Ray Tune optimization."""
     # Create environment and models within this worker process
     # Load base config
-    base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_diff_tactile_control.yaml'
+    # base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_diff_tactile_control.yaml'
+    # if not base_config_path.exists():
+    #     base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_diff_only.yaml'
+
+    base_config_path = CCAI_PATH / 'examples/config/valve/allegro_valve_csvto_diff_tactile_control.yaml'
     if not base_config_path.exists():
-        base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_diff_only.yaml'
+        base_config_path = CCAI_PATH / 'examples/config/valve/allegro_valve_csvto_diff_only.yaml'
     
     with open(base_config_path, 'r') as f:
         config = yaml.safe_load(f)
@@ -241,7 +264,7 @@ def objective(config_params):
     config['visualize'] = False
     config['mode'] = 'simulation'
     config['tactile_controller'] = True  # Enable tactile controller
-    config['experiment_name'] = 'tune_tactile_controller_csvto_diff'
+    config['experiment_name'] = 'tune_tactile_controller_valve_csvto_diff'
     
     # Ensure required fields are set
     if 'recovery_controller' not in config:
@@ -269,7 +292,6 @@ def objective(config_params):
     params['controller'] = 'csvgd'
     params['valve_goal'] = torch.tensor([0, 0, float(config['goal'])]).to(device=params['device'])
     params['chain'] = chain.to(device=params['device'])
-    params['object_location'] = torch.tensor([0, 0, 1.205]).to(params['device'])
     params['obj_dof'] = 3
     
     # Run the actual experiment with real environment
@@ -352,9 +374,9 @@ def main():
         # ]
     )
     
-    search_alg.restore_from_dir(
-        pathlib.Path("./ray_results/tactile_controller_tuning_diff_partial_patch/")
-    )
+    # search_alg.restore_from_dir(
+    #     pathlib.Path("./ray_results/tactile_controller_tuning_diff_partial_patch/")
+    # )
     
     # # Create a wrapper function that passes the pre-instantiated objects
     # def objective_wrapper(config_params):
@@ -367,7 +389,7 @@ def main():
         num_samples=num_samples,
         # scheduler=scheduler,
         progress_reporter=reporter,
-        name="tactile_controller_tuning_diff_partial_patch",
+        name="tactile_controller_tuning_valve_csvto_diff_partial_patch",
         storage_path=str(storage_path),  # Use absolute path as string
         resources_per_trial={"cpu": 8, "gpu": .5},  # CPU only for stability
         max_failures=5,  # Allow more failures since we're doing complex trials
@@ -395,10 +417,14 @@ def main():
     output_dir = pathlib.Path("./tuning_results")
     output_dir.mkdir(exist_ok=True)
     
-    base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_diff_tactile_control.yaml'
+    # base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_diff_tactile_control.yaml'
+    # if not base_config_path.exists():
+    #     base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_diff_only.yaml'
+
+    base_config_path = CCAI_PATH / 'examples/config/valve/allegro_valve_csvto_diff_tactile_control.yaml'
     if not base_config_path.exists():
-        base_config_path = CCAI_PATH / 'examples/config/screwdriver/allegro_screwdriver_diff_only.yaml'
-    
+        base_config_path = CCAI_PATH / 'examples/config/valve/allegro_valve_csvto_diff_only.yaml'
+
     with open(base_config_path, 'r') as f:
         config = yaml.safe_load(f)
     

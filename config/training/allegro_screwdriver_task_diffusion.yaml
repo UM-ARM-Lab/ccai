@@ -46,4 +46,3 @@ test_samples: False
 test_name: None
 
 use_mixed_precision: False
-recovery: False

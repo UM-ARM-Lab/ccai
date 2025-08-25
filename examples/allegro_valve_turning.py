@@ -136,6 +136,9 @@ class AllegroValve(AllegroManipulationProblem):
         self.obj_mass = 0.0851
         self.obj_dof_type = None
         self.object_type = 'valve'
+
+        self.skip_csvto = False
+        self.tactile_controller = False
         if obj_dof == 3:
             object_link_name = 'screwdriver_body'
             self.obj_translational_dim = 0
@@ -220,9 +223,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     min_force_dict = None
     if params['mode'] == 'hardware':
         min_force_dict = {
-            'thumb': .5,
-            'middle': .5,
-            'index': .5,
+            'thumb': 1,
+            'middle': 1,
+            'index': 1,
         }
     else:
         min_force_dict = {
@@ -282,18 +285,18 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         proj_path=proj_path,
         project=False,
     )
-    traj_fpath = fpath/'recovery_stage_6/goal/traj.pkl'
-    a = pickle.load(open(traj_fpath, 'rb'))
-    traj_for_viz = torch.tensor(a)
-    fname = 'recovery_stage_6'
-    k = 0    
-    viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/goal")
-    img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
-    gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
-    pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
-    pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-    visualize_trajectory(traj_for_viz, turn_problem.contact_scenes_for_viz, viz_fpath,
-                            turn_problem.fingers, turn_problem.obj_dof + 1)
+    # traj_fpath = fpath/'recovery_stage_6/goal/traj.pkl'
+    # a = pickle.load(open(traj_fpath, 'rb'))
+    # traj_for_viz = torch.tensor(a)
+    # fname = 'recovery_stage_6'
+    # k = 0    
+    # viz_fpath = pathlib.PurePath.joinpath(fpath, f"{fname}/goal")
+    # img_fpath = pathlib.PurePath.joinpath(viz_fpath, 'img')
+    # gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
+    # pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
+    # pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
+    # visualize_trajectory(traj_for_viz, turn_problem.contact_scenes_for_viz, viz_fpath,
+    #                         turn_problem.fingers, turn_problem.obj_dof + 1)
 
     all_regrasp_planner = None
     index_regrasp_planner = None
@@ -486,7 +489,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # recovery_params['warmup_iters'] = 100 #if not params.get('task_model_path', None) else 25
         # recovery_params['online_iters'] = 30 #if not params.get('task_model_path', None) else 0
 
-        skip_diff_init = False
+        skip_diff_init = not params.get('diff_init', False)
         planner_returns_action = False
         if 'mppi' in params['recovery_controller'] and recover:
             planner = MPPIPlanner(ctrl, 12, params['T'], warmup=mppi_warmup)
@@ -2017,8 +2020,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 if __name__ == "__main__":
     # get config
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/{sys.argv[1]}.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_only.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_recovery_data_gen.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_only.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_recovery_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_safe_rl_data_gen.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_mppi_likelihood_recovery.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_mppi_safe_rl_recovery.yaml').read_text())

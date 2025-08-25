@@ -462,7 +462,7 @@ class AllegroScrewDriverDataset(Dataset):
             yaw_change = final_yaw - initial_yaw
             print(yaw_change.mean())
             
-        elif 'recovery' not in str(folders[0]):
+        elif not recovery:
             pre_shape = self.trajectories.shape
             final_yaw = self.trajectories[:, -1, 12]
             initial_yaw = self.trajectories[:, 0, 12]

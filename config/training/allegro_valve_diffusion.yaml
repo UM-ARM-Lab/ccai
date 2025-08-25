@@ -1,5 +1,5 @@
 ---
-model_name: 'allegro_short_valve_task_len_.085_low_friction'
+model_name: 'allegro_valve_task_data_partial_patch'
 T: 7
 dx: 13
 du: 21
@@ -18,9 +18,10 @@ lr: 1.0e-4
 model_type: 'diffusion'
 discriminator_guidance: True
 inverse_dynamics: False
-data_directory: 'allegro_valve_task_data_len_.085_valve_friction_.025_friction_.1'
-best_traj_only: False
-device: 'cuda:1'
+data_directory: 'allegro_valve_task_data_partial_patch'
+best_traj_only: True
+recovery: False
+device: 'cuda:0'
 test_every: 9999999999
 save_every: 1000
 normalize_data: True
@@ -43,3 +44,5 @@ skip_pregrasp: True
 test_directory: 'quadrotor_compose'
 test_samples: False
 test_name: None
+
+use_mixed_precision: False
