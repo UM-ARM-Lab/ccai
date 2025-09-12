@@ -532,6 +532,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                  collision_checking=False,
                  geometry_grad=True,
                  arm_type='None',
+                 obj_id=None,
                  device='cuda:0'):
         # object_location is different from object_asset_pos. object_asset_pos is 
         # used for pytorch volumetric. The asset of valve might contain something else such as a wall, a table
@@ -567,7 +568,10 @@ class AllegroContactProblem(AllegroObjectProblem):
         elif object_type == 'cross_valve':
             asset_object = get_assets_dir() + '/valve/valve_cross.urdf'
         elif object_type == 'screwdriver':
-            asset_object = get_assets_dir() + '/screwdriver/screwdriver.urdf'
+            if obj_id == None:
+                asset_object = get_assets_dir() + '/screwdriver/screwdriver.urdf'
+            else:
+                asset_object = get_assets_dir() + f'/screwdriver/screwdriver_{obj_id}.urdf'
         elif object_type == 'screwdriver_6d':
             asset_object = get_assets_dir() + '/screwdriver/screwdriver_6d.urdf'
         elif object_type == 'screwdriver_translation':
@@ -814,6 +818,7 @@ class AllegroValveTurning(AllegroContactProblem):
                  contact_region=False,
                  arm_type='None',
                  geometry_grad=True,
+                 obj_id=None,
                  device='cuda:0', **kwargs):
         self.screwdriver_force_balance = screwdriver_force_balance
         self.optimize_force = optimize_force
@@ -848,7 +853,7 @@ class AllegroValveTurning(AllegroContactProblem):
                         object_asset_pos=object_asset_pos,
                          fingers=fingers, obj_dof_code=obj_dof_code, 
                          obj_joint_dim=obj_joint_dim, fixed_obj=False, 
-                         collision_checking=collision_checking, 
+                         collision_checking=collision_checking, obj_id=obj_id,
                          arm_type=arm_type, geometry_grad=geometry_grad, device=device)
         self.friction_coefficient = friction_coefficient
         self.dynamics_constr = vmap(self._dynamics_constr)
@@ -867,7 +872,7 @@ class AllegroValveTurning(AllegroContactProblem):
             min_f = torch.ones(3 * self.num_fingers) * -10
             self.x_max = torch.cat((self.x_max, max_f))
             self.x_min = torch.cat((self.x_min, min_f))
-            self.min_force_dict = {'index': 0.1, 'middle': 0.1, 'ring': 0.1, 'thumb': 0.1}
+            self.min_force_dict = {'index': 0.01, 'middle': 0.01, 'ring': 0.01, 'thumb': 0.01}
             self.grad_min_force_constr = vmap(jacrev(self._min_force_constr, argnums=(0,)))
         self.friction_constr = vmap(self._friction_constr, randomness='same')
         self.grad_friction_constr = vmap(jacrev(self._friction_constr, argnums=(0, 1, 2)))
