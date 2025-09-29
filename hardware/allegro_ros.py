@@ -15,8 +15,9 @@ class RosNode(object):
     '''
     def __init__(self, node_name='run_policy', num_repeat=1, gradual_control=False, kp=4, use_grav_comp=False):
         try:
-            rospy.init_node('allegro_hand_node')
+            rospy.init_node(node_name)
         except:
+            print('failed to initialize node')
             pass
         self.node_name = node_name
         self.num_repeat = num_repeat

@@ -8,8 +8,8 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 50
 visualize: True
-experiment_name: 'allegro_valve_recovery_model'
-mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
+experiment_name: 'allegro_valve_recovery_model_hardware_2_5_mm_z_up_valve'
+mode: 'hardware'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
 object_type: 'valve'
@@ -38,7 +38,7 @@ project_state: False
 compute_recovery_trajectory: False
 rl_adjustment: False
 test_recovery_trajectory: False
-perturb_action: True
+perturb_action: False
 randomize_obj_start: True
 randomize_rob_start: True
 external_wrench_perturb: False
@@ -58,7 +58,7 @@ recovery_controller: 'csvgd'
 recovery_model_dir: 'data/training/allegro_screwdriver/allegro_valve_recovery_best_traj_only_diffusion'
 model_path: 'data/training/allegro_screwdriver/allegro_valve_recovery_best_traj_only_diffusion/allegro_screwdriver_diffusion.pt'
 model_dir: 'data/training/allegro_screwdriver/allegro_short_valve_task_low_friction_diffusion'
-task_model_path: 'data/training/allegro_screwdriver/allegro_short_valve_task_low_friction_diffusion/allegro_screwdriver_diffusion.pt'
+model_path_orig: 'data/training/allegro_screwdriver/allegro_short_valve_task_low_friction_diffusion/allegro_screwdriver_diffusion.pt'
 likelihood_threshold: -70.0
 # likelihood_threshold: -1.0
 drop_threshold: -1250
@@ -68,8 +68,8 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
-start_ind: 10000
-end_ind: 10050
+start_ind: 12
+end_ind: 50
 controllers:
   csvgd:
     # N: 16
@@ -78,7 +78,7 @@ controllers:
     alpha_C: 1
     step_size: 0.1
     momentum: 0.
-    device: 'cuda:1'
+    device: 'cuda:0'
     online_iters: 25
     warmup_iters: 25
     resample_steps: 16

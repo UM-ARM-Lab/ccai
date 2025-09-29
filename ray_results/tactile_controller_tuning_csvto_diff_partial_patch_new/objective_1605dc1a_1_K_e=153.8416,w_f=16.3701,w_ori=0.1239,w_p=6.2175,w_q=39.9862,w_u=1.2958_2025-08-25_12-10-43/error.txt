@@ -1,0 +1,378 @@
+Failure # 1 (occurred at 2025-08-25_12-10-45)
+The actor died unexpectedly before finishing this task.
+	class_name: ImplicitFunc
+	actor_id: e3f744389e818aac1d04b12d01000000
+	pid: 33098
+	namespace: a690df49-5477-4d57-ba63-a16f5330f720
+	ip: 10.10.10.118
+The actor is dead because its worker process has died. Worker exit type: SYSTEM_ERROR Worker exit detail: Worker exits unexpectedly. Worker exits with an exit code None. Traceback (most recent call last):
+  File "python/ray/_raylet.pyx", line 1883, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1984, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1889, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1830, in ray._raylet.execute_task.function_executor
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 724, in actor_method_executor
+    return method(__ray_actor, *args, **kwargs)
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 636, in temporary_actor_method
+    raise RuntimeError(
+RuntimeError: The actor with name ImplicitFunc failed to import on the worker. This may be because needed library dependencies are not installed in the worker environment:
+
+Traceback (most recent call last):
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 675, in _load_actor_class_from_gcs
+    actor_class = pickle.loads(pickled_class)
+  File "/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/tasks/allegro.py", line 4, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/__init__.py", line 5, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymapi.py", line 21, in <module>
+    from . import gymdeps
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 63, in <module>
+    _import_deps()
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 21, in _import_deps
+    raise ImportError("PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.")
+ImportError: PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "python/ray/_raylet.pyx", line 2281, in ray._raylet.task_execution_handler
+  File "python/ray/_raylet.pyx", line 2177, in ray._raylet.execute_task_with_cancellation_handler
+  File "python/ray/_raylet.pyx", line 1832, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1833, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 2071, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1059, in ray._raylet.store_task_errors
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 636, in temporary_actor_method
+    raise RuntimeError(
+RuntimeError: The actor with name ImplicitFunc failed to import on the worker. This may be because needed library dependencies are not installed in the worker environment:
+
+Traceback (most recent call last):
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 675, in _load_actor_class_from_gcs
+    actor_class = pickle.loads(pickled_class)
+  File "/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/tasks/allegro.py", line 4, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/__init__.py", line 5, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymapi.py", line 21, in <module>
+    from . import gymdeps
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 63, in <module>
+    _import_deps()
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 21, in _import_deps
+    raise ImportError("PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.")
+ImportError: PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.
+
+An unexpected internal error occurred while the worker was executing a task.
+Failure # 2 (occurred at 2025-08-25_12-10-46)
+The actor died unexpectedly before finishing this task.
+	class_name: ImplicitFunc
+	actor_id: fdf2bb4253f02707c453b3bc01000000
+	pid: 33282
+	namespace: a690df49-5477-4d57-ba63-a16f5330f720
+	ip: 10.10.10.118
+The actor is dead because its worker process has died. Worker exit type: SYSTEM_ERROR Worker exit detail: Worker exits unexpectedly. Worker exits with an exit code None. Traceback (most recent call last):
+  File "python/ray/_raylet.pyx", line 1883, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1984, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1889, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1830, in ray._raylet.execute_task.function_executor
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 724, in actor_method_executor
+    return method(__ray_actor, *args, **kwargs)
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 636, in temporary_actor_method
+    raise RuntimeError(
+RuntimeError: The actor with name ImplicitFunc failed to import on the worker. This may be because needed library dependencies are not installed in the worker environment:
+
+Traceback (most recent call last):
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 675, in _load_actor_class_from_gcs
+    actor_class = pickle.loads(pickled_class)
+  File "/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/tasks/allegro.py", line 4, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/__init__.py", line 5, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymapi.py", line 21, in <module>
+    from . import gymdeps
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 63, in <module>
+    _import_deps()
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 21, in _import_deps
+    raise ImportError("PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.")
+ImportError: PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "python/ray/_raylet.pyx", line 2281, in ray._raylet.task_execution_handler
+  File "python/ray/_raylet.pyx", line 2177, in ray._raylet.execute_task_with_cancellation_handler
+  File "python/ray/_raylet.pyx", line 1832, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1833, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 2071, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1059, in ray._raylet.store_task_errors
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 636, in temporary_actor_method
+    raise RuntimeError(
+RuntimeError: The actor with name ImplicitFunc failed to import on the worker. This may be because needed library dependencies are not installed in the worker environment:
+
+Traceback (most recent call last):
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 675, in _load_actor_class_from_gcs
+    actor_class = pickle.loads(pickled_class)
+  File "/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/tasks/allegro.py", line 4, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/__init__.py", line 5, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymapi.py", line 21, in <module>
+    from . import gymdeps
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 63, in <module>
+    _import_deps()
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 21, in _import_deps
+    raise ImportError("PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.")
+ImportError: PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.
+
+An unexpected internal error occurred while the worker was executing a task.
+Failure # 3 (occurred at 2025-08-25_12-10-47)
+The actor died unexpectedly before finishing this task.
+	class_name: ImplicitFunc
+	actor_id: 2b4a310c4ce29d22d6bd4c3101000000
+	pid: 33345
+	namespace: a690df49-5477-4d57-ba63-a16f5330f720
+	ip: 10.10.10.118
+The actor is dead because its worker process has died. Worker exit type: SYSTEM_ERROR Worker exit detail: Worker exits unexpectedly. Worker exits with an exit code None. Traceback (most recent call last):
+  File "python/ray/_raylet.pyx", line 1883, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1984, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1889, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1830, in ray._raylet.execute_task.function_executor
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 724, in actor_method_executor
+    return method(__ray_actor, *args, **kwargs)
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 636, in temporary_actor_method
+    raise RuntimeError(
+RuntimeError: The actor with name ImplicitFunc failed to import on the worker. This may be because needed library dependencies are not installed in the worker environment:
+
+Traceback (most recent call last):
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 675, in _load_actor_class_from_gcs
+    actor_class = pickle.loads(pickled_class)
+  File "/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/tasks/allegro.py", line 4, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/__init__.py", line 5, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymapi.py", line 21, in <module>
+    from . import gymdeps
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 63, in <module>
+    _import_deps()
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 21, in _import_deps
+    raise ImportError("PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.")
+ImportError: PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "python/ray/_raylet.pyx", line 2281, in ray._raylet.task_execution_handler
+  File "python/ray/_raylet.pyx", line 2177, in ray._raylet.execute_task_with_cancellation_handler
+  File "python/ray/_raylet.pyx", line 1832, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1833, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 2071, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1059, in ray._raylet.store_task_errors
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 636, in temporary_actor_method
+    raise RuntimeError(
+RuntimeError: The actor with name ImplicitFunc failed to import on the worker. This may be because needed library dependencies are not installed in the worker environment:
+
+Traceback (most recent call last):
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 675, in _load_actor_class_from_gcs
+    actor_class = pickle.loads(pickled_class)
+  File "/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/tasks/allegro.py", line 4, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/__init__.py", line 5, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymapi.py", line 21, in <module>
+    from . import gymdeps
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 63, in <module>
+    _import_deps()
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 21, in _import_deps
+    raise ImportError("PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.")
+ImportError: PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.
+
+An unexpected internal error occurred while the worker was executing a task.
+Failure # 4 (occurred at 2025-08-25_12-10-49)
+The actor died unexpectedly before finishing this task.
+	class_name: ImplicitFunc
+	actor_id: cf8bf572b68d3e13fff1fc9a01000000
+	pid: 33407
+	namespace: a690df49-5477-4d57-ba63-a16f5330f720
+	ip: 10.10.10.118
+The actor is dead because its worker process has died. Worker exit type: SYSTEM_ERROR Worker exit detail: Worker exits unexpectedly. Worker exits with an exit code None. Traceback (most recent call last):
+  File "python/ray/_raylet.pyx", line 1883, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1984, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1889, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1830, in ray._raylet.execute_task.function_executor
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 724, in actor_method_executor
+    return method(__ray_actor, *args, **kwargs)
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 636, in temporary_actor_method
+    raise RuntimeError(
+RuntimeError: The actor with name ImplicitFunc failed to import on the worker. This may be because needed library dependencies are not installed in the worker environment:
+
+Traceback (most recent call last):
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 675, in _load_actor_class_from_gcs
+    actor_class = pickle.loads(pickled_class)
+  File "/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/tasks/allegro.py", line 4, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/__init__.py", line 5, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymapi.py", line 21, in <module>
+    from . import gymdeps
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 63, in <module>
+    _import_deps()
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 21, in _import_deps
+    raise ImportError("PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.")
+ImportError: PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "python/ray/_raylet.pyx", line 2281, in ray._raylet.task_execution_handler
+  File "python/ray/_raylet.pyx", line 2177, in ray._raylet.execute_task_with_cancellation_handler
+  File "python/ray/_raylet.pyx", line 1832, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1833, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 2071, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1059, in ray._raylet.store_task_errors
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 636, in temporary_actor_method
+    raise RuntimeError(
+RuntimeError: The actor with name ImplicitFunc failed to import on the worker. This may be because needed library dependencies are not installed in the worker environment:
+
+Traceback (most recent call last):
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 675, in _load_actor_class_from_gcs
+    actor_class = pickle.loads(pickled_class)
+  File "/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/tasks/allegro.py", line 4, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/__init__.py", line 5, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymapi.py", line 21, in <module>
+    from . import gymdeps
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 63, in <module>
+    _import_deps()
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 21, in _import_deps
+    raise ImportError("PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.")
+ImportError: PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.
+
+An unexpected internal error occurred while the worker was executing a task.
+Failure # 5 (occurred at 2025-08-25_12-10-50)
+The actor died unexpectedly before finishing this task.
+	class_name: ImplicitFunc
+	actor_id: 9d9e696d12fc98fedd6cb71501000000
+	pid: 33574
+	namespace: a690df49-5477-4d57-ba63-a16f5330f720
+	ip: 10.10.10.118
+The actor is dead because its worker process has died. Worker exit type: SYSTEM_ERROR Worker exit detail: Worker exits unexpectedly. Worker exits with an exit code None. Traceback (most recent call last):
+  File "python/ray/_raylet.pyx", line 1883, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1984, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1889, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1830, in ray._raylet.execute_task.function_executor
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 724, in actor_method_executor
+    return method(__ray_actor, *args, **kwargs)
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 636, in temporary_actor_method
+    raise RuntimeError(
+RuntimeError: The actor with name ImplicitFunc failed to import on the worker. This may be because needed library dependencies are not installed in the worker environment:
+
+Traceback (most recent call last):
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 675, in _load_actor_class_from_gcs
+    actor_class = pickle.loads(pickled_class)
+  File "/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/tasks/allegro.py", line 4, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/__init__.py", line 5, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymapi.py", line 21, in <module>
+    from . import gymdeps
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 63, in <module>
+    _import_deps()
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 21, in _import_deps
+    raise ImportError("PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.")
+ImportError: PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "python/ray/_raylet.pyx", line 2281, in ray._raylet.task_execution_handler
+  File "python/ray/_raylet.pyx", line 2177, in ray._raylet.execute_task_with_cancellation_handler
+  File "python/ray/_raylet.pyx", line 1832, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1833, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 2071, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1059, in ray._raylet.store_task_errors
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 636, in temporary_actor_method
+    raise RuntimeError(
+RuntimeError: The actor with name ImplicitFunc failed to import on the worker. This may be because needed library dependencies are not installed in the worker environment:
+
+Traceback (most recent call last):
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 675, in _load_actor_class_from_gcs
+    actor_class = pickle.loads(pickled_class)
+  File "/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/tasks/allegro.py", line 4, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/__init__.py", line 5, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymapi.py", line 21, in <module>
+    from . import gymdeps
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 63, in <module>
+    _import_deps()
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 21, in _import_deps
+    raise ImportError("PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.")
+ImportError: PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.
+
+An unexpected internal error occurred while the worker was executing a task.
+Failure # 6 (occurred at 2025-08-25_12-10-52)
+The actor died unexpectedly before finishing this task.
+	class_name: ImplicitFunc
+	actor_id: a91b1f9dc59f463d0622177e01000000
+	pid: 33650
+	namespace: a690df49-5477-4d57-ba63-a16f5330f720
+	ip: 10.10.10.118
+The actor is dead because its worker process has died. Worker exit type: SYSTEM_ERROR Worker exit detail: Worker exits unexpectedly. Worker exits with an exit code None. Traceback (most recent call last):
+  File "python/ray/_raylet.pyx", line 1883, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1984, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1889, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1830, in ray._raylet.execute_task.function_executor
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 724, in actor_method_executor
+    return method(__ray_actor, *args, **kwargs)
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 636, in temporary_actor_method
+    raise RuntimeError(
+RuntimeError: The actor with name ImplicitFunc failed to import on the worker. This may be because needed library dependencies are not installed in the worker environment:
+
+Traceback (most recent call last):
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 675, in _load_actor_class_from_gcs
+    actor_class = pickle.loads(pickled_class)
+  File "/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/tasks/allegro.py", line 4, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/__init__.py", line 5, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymapi.py", line 21, in <module>
+    from . import gymdeps
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 63, in <module>
+    _import_deps()
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 21, in _import_deps
+    raise ImportError("PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.")
+ImportError: PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "python/ray/_raylet.pyx", line 2281, in ray._raylet.task_execution_handler
+  File "python/ray/_raylet.pyx", line 2177, in ray._raylet.execute_task_with_cancellation_handler
+  File "python/ray/_raylet.pyx", line 1832, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1833, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 2071, in ray._raylet.execute_task
+  File "python/ray/_raylet.pyx", line 1059, in ray._raylet.store_task_errors
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 636, in temporary_actor_method
+    raise RuntimeError(
+RuntimeError: The actor with name ImplicitFunc failed to import on the worker. This may be because needed library dependencies are not installed in the worker environment:
+
+Traceback (most recent call last):
+  File "/home/abhinav/diffusion/lib/python3.8/site-packages/ray/_private/function_manager.py", line 675, in _load_actor_class_from_gcs
+    actor_class = pickle.loads(pickled_class)
+  File "/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/tasks/allegro.py", line 4, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/__init__.py", line 5, in <module>
+    from isaacgym import gymapi
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymapi.py", line 21, in <module>
+    from . import gymdeps
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 63, in <module>
+    _import_deps()
+  File "/home/abhinav/Downloads/IsaacGym_Preview_4_Package/isaacgym/python/isaacgym/gymdeps.py", line 21, in _import_deps
+    raise ImportError("PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.")
+ImportError: PyTorch was imported before isaacgym modules.  Please import torch after isaacgym modules.
+
+An unexpected internal error occurred while the worker was executing a task.

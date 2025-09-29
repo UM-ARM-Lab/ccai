@@ -38,7 +38,6 @@ except ImportError as e:
     ISAAC_GYM_AVAILABLE = False
 
 # Import required modules with error handling
-# from examples.allegro_screwdriver import do_trial, CCAI_PATH
 from examples.allegro_valve_turning import do_trial, CCAI_PATH
 from ccai.models.management.model_manager import ModelManager
 ALLEGRO_AVAILABLE = True
@@ -162,7 +161,7 @@ def run_tactile_trial_with_environment(config_params: Dict[str, Any], env, traje
         initial_yaw = initial_ori[0].item()
         
         # Run the actual do_trial function
-        yaw_change, dropped = do_trial(
+        yaw_change, distance, dropped = do_trial(
             env=env,
             params=trial_params,
             fpath=fpath,
@@ -180,7 +179,7 @@ def run_tactile_trial_with_environment(config_params: Dict[str, Any], env, traje
             classifier=classifier
         )
                 
-        completed = not dropped
+        completed = not dropped and distance < .002
         
         # Performance score (to be maximized)
         performance_score = -yaw_change * float(completed)
@@ -460,30 +459,30 @@ def main():
 
 
 if __name__ == "__main__":
-    # main() 
+    main() 
     
-    import json
-    def get_max(path):
-        exp = json.loads(open(f'{path}', 'r').read())
-        all_results = []
-        for i in range(len(exp['trial_data'])):
-            exp['trial_data'][i][1] = json.loads(exp['trial_data'][i][1])
-            if 'performance_score' in exp['trial_data'][i][1]['last_result'].keys():
-                all_results.append((exp['trial_data'][i][1]['last_result']['completion_rate'], exp['trial_data'][i][1]['last_result']['performance_score'], exp['trial_data'][i][1]['last_result']['config']))
-        if len(all_results) > 0:
-            try:
-                print(max(all_results))
-            except:
-                print('No performance score found')
-        else:
-            print('No performance score found')
+    # import json
+    # def get_max(path):
+    #     exp = json.loads(open(f'{path}', 'r').read())
+    #     all_results = []
+    #     for i in range(len(exp['trial_data'])):
+    #         exp['trial_data'][i][1] = json.loads(exp['trial_data'][i][1])
+    #         if 'performance_score' in exp['trial_data'][i][1]['last_result'].keys():
+    #             all_results.append((exp['trial_data'][i][1]['last_result']['completion_rate'], exp['trial_data'][i][1]['last_result']['performance_score'], exp['trial_data'][i][1]['last_result']['config']))
+    #     if len(all_results) > 0:
+    #         try:
+    #             print(max(all_results))
+    #         except:
+    #             print('No performance score found')
+    #     else:
+    #         print('No performance score found')
         
-    dir_ = './examples/ray_results/tactile_controller_tuning_csvto_diff_partial_patch_new'
+    # dir_ = './examples/ray_results/tactile_controller_tuning_csvto_diff_partial_patch_new'
     
-    # Iterate through dir, run get_max for every experiment_state*.json file
-    for file in os.listdir(dir_):
-        if file.endswith('.json') and 'experiment_state' in file:
-            print(file)
-            get_max(os.path.join(dir_, file))
-            print('-'*100)
+    # # Iterate through dir, run get_max for every experiment_state*.json file
+    # for file in os.listdir(dir_):
+    #     if file.endswith('.json') and 'experiment_state' in file:
+    #         print(file)
+    #         get_max(os.path.join(dir_, file))
+    #         print('-'*100)
 

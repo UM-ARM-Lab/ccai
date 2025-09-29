@@ -344,7 +344,7 @@ def extract_state_vector(state, num_fingers, device, obj_dof=3, slice_end=None, 
         if obj_dof == 3:
             dim = 4 * num_fingers + 4  # Most common case
         else:
-            dim = 4 * num_fingers + obj_dof + 1
+            dim = 4 * num_fingers + obj_dof
         state_tensor = state['q'].reshape(-1, dim)
     
     # Extract first element

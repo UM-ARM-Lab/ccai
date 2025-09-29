@@ -6,28 +6,22 @@ except:
     print('No ROS install found, continuing')
 
 import numpy as np
-import pickle as pkl
 import pickle
 from statsmodels.distributions.empirical_distribution import ECDF
 from copy import deepcopy
 
 import torch
-from torch import nn
 import time
 import datetime
 import copy
 import yaml
 import pathlib
 from functools import partial
-from pprint import pprint
 import sys
-import os
 sys.path.append('..')
 
-import pytorch_volumetric as pv
 import pytorch_kinematics as pk
 from pytorch_kinematics import transforms as tf
-from torch.func import vmap, jacrev, hessian, jacfwd
 
 import matplotlib.pyplot as plt
 from ccai.utils.allegro_utils import (
@@ -36,7 +30,7 @@ from ccai.utils.allegro_utils import (
     extract_state_vector, state2ee_pos
 )
 from ccai.utils.recovery_utils import (
-    create_allegro_valve_problem, create_planner, add_to_dataset, partial_to_full_trajectory,
+    create_allegro_screwdriver_problem, create_planner, add_to_dataset, partial_to_full_trajectory,
     full_to_partial_trajectory, create_mode_planner_dict
 )
 
@@ -54,13 +48,6 @@ from ccai.baselines.allegro_recovery_baselines import (
 from ccai.planning.contact_planning import ContactPlanner
 from ccai.execution.trial_executor import TrajectoryExecutor
 from ccai.models.management.model_manager import ModelManager
-
-from scipy.spatial.transform import Rotation as R
-from ccai.models.trajectory_samplers_sac import TrajectorySampler
-from ccai.models.contact_samplers import GraphSearch, Node
-from model import LatentDiffusionModel
-from diffusion_mcts import DiffusionMCTS
-from ccai.trajectory_shortcut import shortcut_trajectory
 
 from baselines.allegro_valve_turning import RunningCostSafeRL, TerminalCostDiffusionLikelihood
 from baselines.dynamics_model import DynamicsModel
@@ -133,6 +120,7 @@ class AllegroValve(AllegroManipulationProblem):
         # Mass of the object. Hardcoded for now.
         self.obj_mass = 0.0851
         self.obj_dof_type = None
+        object_type = 'valve'
         self.object_type = 'valve'
         
         if obj_dof == 3:
@@ -211,7 +199,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     else:
         env.frame_fpath = None
         env.frame_id = None
-    start = extract_state_vector(state, num_fingers, params['device'])
+    obj_dof = 1
+    start = extract_state_vector(state, num_fingers, params['device'], obj_dof=obj_dof)
     initial_angle = start[-1]
     goal_yaw = start[-1] - np.pi / 3
     
@@ -264,7 +253,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     pregrasp_params['skip_csvto'] = False
 
     start[-obj_dof:] = 0  # Reset object state for pregrasp
-    pregrasp_problem = create_allegro_valve_problem(
+    pregrasp_problem = create_allegro_screwdriver_problem(
         'pregrasp', 
         start[:4 * num_fingers + obj_dof], 
         goal_pregrasp, 
@@ -274,11 +263,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         regrasp_fingers=fingers,
         proj_path=proj_path,
         obj_dof=obj_dof,
-        AllegroValve=AllegroValve
+        AllegroScrewdriver=AllegroValve
     )
     pregrasp_planner = create_planner(pregrasp_problem, 'pregrasp', pregrasp_params)
 
-    turn_problem = create_allegro_valve_problem(
+    turn_problem = create_allegro_screwdriver_problem(
         'turn',
         start[:4 * num_fingers + obj_dof],
         params['valve_goal'],
@@ -287,7 +276,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         params['device'],
         min_force_dict=min_force_dict,
         proj_path=proj_path,
-        AllegroValve=AllegroValve
+        AllegroScrewdriver=AllegroValve
     )
     # Initialize regrasp planners as None
     all_regrasp_planner = None
@@ -304,7 +293,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         trajectory_sampler_orig.model.diffusion_model.classifier = None
 
     state = env.get_state()
-    start = extract_state_vector(state, num_fingers, params['device'])
+    start = extract_state_vector(state, num_fingers, params['device'], obj_dof=obj_dof)
 
     actual_trajectory = [start]
 
@@ -374,16 +363,14 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             turn_problem=turn_problem,
             num_fingers=num_fingers,
             obj_dof=obj_dof,
+            obj_joint_dim=0,
             episode_num_steps=episode_num_steps,
             max_episode_num_steps=max_episode_num_steps,
             min_force_dict=min_force_dict,
             proj_path=proj_path,
-            AllegroValve=AllegroValve,
+            AllegroScrewdriver=AllegroValve,
             tactile_controller=params.get('tactile_controller', False),
             skip_csvto=params.get('skip_csvto', False),
-            goal_yaw=goal_yaw,
-            num_fingers_to_plan=num_fingers_to_plan,
-            exclude_index=params.get('exclude_index', False)
         )
                
         return actual_trajectory, planned_trajectories, initial_samples, sim_rollouts, optimizer_paths, contact_points, contact_distance, recover
@@ -406,7 +393,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     data['executed_contacts'] = []
     # Sample initial trajectory with diffusion model to get contact sequence
     state = env.get_state()
-    state = extract_state_vector(state, num_fingers, params['device'])
+    state = extract_state_vector(state, num_fingers, params['device'], obj_dof=obj_dof)
 
     def _add_to_dataset(traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, contact_state):
         add_to_dataset(data, traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, contact_state)
@@ -449,8 +436,6 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             traj = torch.cat((traj[..., :-9], traj[..., -3:]), dim=-1)
         return traj
 
-
-
     def plan_recovery_contacts_w_model(state):
         return contact_planner.plan_recovery_contacts_w_model(state, contact_state_dict_flip, classifier)
 
@@ -458,11 +443,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         return contact_planner.plan_recovery_contacts(state, stage, fpath, all_stage, index_regrasp_planner, mode_planner_dict if 'mode_planner_dict' in locals() else None)
 
     state = env.get_state()
-    state = extract_state_vector(state, num_fingers, params['device'])
+    state = extract_state_vector(state, num_fingers, params['device'], obj_dof=obj_dof)
 
     contact = None
     state = env.get_state()
-    state = extract_state_vector(state, num_fingers, params['device'])
+    state = extract_state_vector(state, num_fingers, params['device'], obj_dof=obj_dof)
 
     executed_contacts = []
     recover = False
@@ -486,7 +471,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         sample_contact = params['sample_contact'] and not recover
         initial_samples = None
         state = env.get_state()
-        state = extract_state_vector(state, num_fingers, params['device'])
+        state = extract_state_vector(state, num_fingers, params['device'], obj_dof=obj_dof)
         planned = False
         if params.get('live_recovery', False) and recover:
             contact_sequence = get_baseline_contact_sequence(params, recover=True)
@@ -521,7 +506,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             print('Plan time:', plan_time)
             data['contact_plan_times'].append(plan_time)
         state = env.get_state()
-        state = extract_state_vector(state, num_fingers, params['device'])
+        state = extract_state_vector(state, num_fingers, params['device'], obj_dof=obj_dof)
         ori = state[:4 * num_fingers + obj_dof][-1:]
         yaw = ori[-1]
         print('Current yaw:', ori)
@@ -533,7 +518,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             else:
                 input('Ready to pregrasp. Press <ENTER> to continue.')
             contact = 'pregrasp'
-            start = extract_state_vector(env.get_state(), num_fingers, params['device'])
+            start = extract_state_vector(env.get_state(), num_fingers, params['device'], obj_dof=obj_dof)
             best_traj, _ = pregrasp_planner.step(start[:pregrasp_planner.problem.dx])
             if (params['visualize_plan'] and not recover) or (params['visualize_recovery_plan'] and recover):
                 traj_for_viz = best_traj[:, :13]
@@ -555,11 +540,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 env.step(action)
                 # After stepping, reset the valve to where it was initially
                 if params['mode'] != 'hardware':
-                    s = extract_state_vector(env.get_state(), num_fingers, params['device'])
+                    s = extract_state_vector(env.get_state(), num_fingers, params['device'], obj_dof=obj_dof)
                     s[-obj_dof:] = start[-obj_dof:]
                     env.set_pose(s.to(device=env.device))
 
-            post_pregrasp_state = extract_state_vector(env.get_state(), num_fingers, params['device'])
+            post_pregrasp_state = extract_state_vector(env.get_state(), num_fingers, params['device'], obj_dof=obj_dof)
             post_pregrasp_state_for_viz = post_pregrasp_state.clone()
             post_pregrasp_state = post_pregrasp_state[:4 * num_fingers + obj_dof]
             if params['mode'] == 'hardware':
@@ -599,7 +584,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         contact_state_dict_flip = dict([(tuple(v.numpy()),k) for k, v in contact_state_dict.items()])
         state = env.get_state()
-        state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof)
+        state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof, obj_dof=obj_dof)
 
         pre_recover = recover
         pre_mode_yaw = state[-1]
@@ -612,11 +597,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             max_timesteps = None
             # Execute trajectory
             result = execute_traj(
-                index_regrasp_planner, mode='index', goal=_goal, 
+                index_regrasp_planner, 'index', env, goal=_goal, 
                 fname=f'index_regrasp_{all_stage}', initial_samples=initial_samples, 
                 recover=recover, start_timestep=start_timestep, max_timesteps=max_timesteps)
             state = env.get_state()
-            state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof)
+            state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof, obj_dof=obj_dof)
 
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
 
@@ -636,11 +621,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             max_timesteps = None
             # Execute trajectory
             result = execute_traj(
-                thumb_regrasp_planner, mode='thumb', goal=_goal, 
+                thumb_regrasp_planner, 'thumb', env, goal=_goal, 
                 fname=f'thumb_regrasp_{all_stage}', initial_samples=initial_samples, 
                 recover=recover, start_timestep=start_timestep, max_timesteps=max_timesteps)
             state = env.get_state()
-            state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof)
+            state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof, obj_dof=obj_dof)
 
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
 
@@ -658,11 +643,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             max_timesteps = None
             # Execute trajectory
             result = execute_traj(
-                middle_regrasp_planner, mode='middle', goal=_goal, 
+                middle_regrasp_planner, 'middle', env, goal=_goal, 
                 fname=f'middle_regrasp_{all_stage}', initial_samples=initial_samples, 
                 recover=recover, start_timestep=start_timestep, max_timesteps=max_timesteps)
             state = env.get_state()
-            state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof)
+            state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof, obj_dof=obj_dof)
 
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
 
@@ -678,11 +663,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             if params.get('task_model_path', None):
                 _goal = goal_config
             result = execute_traj(
-                all_regrasp_planner, mode='all', goal=_goal, 
+                all_regrasp_planner, 'all', env, goal=_goal, 
                 fname=f'all_regrasp_{all_stage}', initial_samples=initial_samples, 
                 recover=recover, start_timestep=start_timestep, max_timesteps=max_timesteps)
             state = env.get_state()
-            state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof)
+            state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof, obj_dof=obj_dof)
 
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
 
@@ -698,11 +683,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             if params.get('task_model_path', None):
                 _goal = goal_config
             result = execute_traj(
-                index_thumb_regrasp_planner, mode='index_thumb', goal=_goal, 
+                index_thumb_regrasp_planner, 'index_thumb', env, goal=_goal, 
                 fname=f'index_thumb_regrasp_{all_stage}', initial_samples=initial_samples, 
                 recover=recover, start_timestep=start_timestep, max_timesteps=max_timesteps)
             state = env.get_state()
-            state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof)
+            state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof, obj_dof=obj_dof)
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
             plans = [torch.cat((plan[..., :-3],
                                 torch.zeros(*plan.shape[:-1], 3).to(device=params['device']),
@@ -715,11 +700,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             if params.get('task_model_path', None):
                 _goal = goal_config
             result = execute_traj(
-                index_middle_regrasp_planner, mode='index_middle', goal=_goal, 
+                index_middle_regrasp_planner, 'index_middle', env, goal=_goal, 
                 fname=f'index_middle_regrasp_{all_stage}', initial_samples=initial_samples, 
                 recover=recover, start_timestep=start_timestep, max_timesteps=max_timesteps)
             state = env.get_state()
-            state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof)
+            state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof, obj_dof=obj_dof)
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
             plans= [torch.cat((plan[..., :-3], 
                                 torch.zeros(*plan.shape[:-1], 6).to(device=params['device']),
@@ -733,11 +718,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             if params.get('task_model_path', None):
                 _goal = goal_config
             result = execute_traj(
-                no_regrasp_planner, mode='no', goal=_goal, 
+                no_regrasp_planner, 'no', env, goal=_goal, 
                 fname=f'no_regrasp_{all_stage}', initial_samples=initial_samples, 
                 recover=recover, start_timestep=start_timestep, max_timesteps=max_timesteps)
             state = env.get_state()
-            state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof)
+            state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof, obj_dof=obj_dof)
 
             # Backward compatibility with old return format
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
@@ -752,11 +737,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             max_timesteps = None
                 
             result = execute_traj(
-                None, mode='turn', goal=_goal, fname=f'turn_{all_stage}', initial_samples=initial_samples, 
+                None, 'turn', env, goal=_goal, fname=f'turn_{all_stage}', initial_samples=initial_samples, 
                 recover=recover, start_timestep=start_timestep, max_timesteps=max_timesteps)
                 
             state = env.get_state()
-            state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof)
+            state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof, obj_dof=obj_dof)
 
             # Backward compatibility with old return format
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
@@ -768,7 +753,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                             device=params['device'])
                 mppi_needs_warmup = True
             result = execute_traj(
-                None, mode='mppi', goal=None, fname=f'mppi_{all_stage}', initial_samples=initial_samples,
+                None, 'mppi', env, goal=None, fname=f'mppi_{all_stage}', initial_samples=initial_samples,
                 recover=recover, ctrl=mppi_ctrl, mppi_warmup=mppi_needs_warmup)
             mppi_needs_warmup = False
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
@@ -782,7 +767,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         # done = False
         add = not recover or params['live_recovery']
         state = env.get_state()
-        state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof)
+        state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof, obj_dof=obj_dof)
         
         start = state[:4 * num_fingers + obj_dof]
         if params.get('live_recovery', True):
@@ -841,7 +826,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         if recover and not done and params.get('task_diffuse_goal', False):
         # if recover and not done:
             state = env.get_state()
-            state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof)
+            state = extract_state_vector(state, num_fingers, params['device'], slice_end=4 * num_fingers + obj_dof, obj_dof=obj_dof)
             
             start = state[:4 * num_fingers + obj_dof]
             start_sine_cosine = convert_yaw_to_sine_cosine(start)
@@ -1049,12 +1034,27 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         del data_save
         
     env.reset()
-    return (state[-1] - initial_angle).item()
+    turn_amount = (state[-1] - initial_angle).item()
+
+    if turn_amount < -np.pi / 3:
+        turn_amount += (np.abs(turn_amount) - np.pi/3)
+
+    planner = mode_planner_dict['index']
+    num_fingers = 3
+    obj_dof = planner.problem.obj_dof
+    cur_q = state[:4 * num_fingers]
+    cur_theta = state[4 * num_fingers: 4 * num_fingers + obj_dof]
+    planner.problem._preprocess_fingers(cur_q[None, None], cur_theta[None, None], compute_closest_obj_point=True)
+    
+    print('Final finger distances:')
+    print(planner.problem.data['index']['sdf'], planner.problem.data['middle']['sdf'], planner.problem.data['thumb']['sdf'])
+    return turn_amount, max(planner.problem.data['index']['sdf'].item(), planner.problem.data['middle']['sdf'].item(), planner.problem.data['thumb']['sdf'].item()), False
 
 
 if __name__ == "__main__":
     # get config. First option is to get the config from the command line.
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/{sys.argv[1]}.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/{sys.argv[1]}.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/valve/allegro_valve_csvto_diff_tactile_control.yaml').read_text())
     # Write to log file in the experiment's directory
     experiment_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}')
     pathlib.Path.mkdir(experiment_dir, parents=True, exist_ok=True)
@@ -1083,7 +1083,7 @@ if __name__ == "__main__":
         env = HardwareEnv(default_dof_pos[:, :16], 
                           finger_list=config['fingers'], 
                           kp=config['kp'], 
-                          obj='screwdriver',
+                          obj='valve',
                           mode='relative',
                           gradual_control=True,
                           num_repeat=10)
@@ -1100,14 +1100,14 @@ if __name__ == "__main__":
                                  use_cartesian_controller=False,
                                  viewer=True,
                                  steps_per_action=60,
-                                 friction_coefficient=2.5,
+                                 friction_coefficient=.1,
                                  device=config['sim_device'],
                                  valve=config['object_type'],
                                  video_save_path=img_save_dir,
                                  joint_stiffness=config['kp'],
                                  fingers=config['fingers'],
-                                 table_pose=None, # Since I ran the IK before the sim, I shouldn't need to set the table pose. 
-                                 gravity=False
+                                 gravity=False,
+                                 valve='cross_valve'
                                  )
         
         sim, gym, viewer = sim_env.get_sim()
@@ -1196,7 +1196,7 @@ if __name__ == "__main__":
     
     # Load models using ModelManager
     model_manager = ModelManager(config, params, CCAI_PATH)
-    trajectory_sampler, trajectory_sampler_orig, classifier = model_manager.load_trajectory_samplers()
+    trajectory_sampler, trajectory_sampler_orig, classifier = model_manager.load_trajectory_samplers(obj_dof=obj_dof)
 
     # Special valve-specific model loading for MPPI baseline
     if config['recovery_controller'] == 'mppi':

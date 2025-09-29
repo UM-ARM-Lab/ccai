@@ -19,7 +19,7 @@ class ModelManager:
         self.params = params
         self.ccai_path = ccai_path
         
-    def load_trajectory_samplers(self):
+    def load_trajectory_samplers(self, obj_dof=3):
         """Load trajectory samplers based on configuration."""
         trajectory_sampler = None
         trajectory_sampler_orig = None
@@ -38,13 +38,13 @@ class ModelManager:
             if self.params['recovery_controller'] != 'mppi':
                 T_for_diff = self.config['T'] if loading_recovery_model else self.config['T_orig']
                 trajectory_sampler = self._load_sampler(
-                    model_path, dim_mults=(1,2,4), T=T_for_diff, recovery=loading_recovery_model)
-                trajectory_sampler.warmup_model(warmup_batch_size=16, warmup_horizon=None)
+                    model_path, dim_mults=(1,2,4), T=T_for_diff, recovery=loading_recovery_model, obj_dof=obj_dof)
+                # trajectory_sampler.warmup_model(warmup_batch_size=16, warmup_horizon=None)
 
             if task_model_path is not None:
                 trajectory_sampler_orig = self._load_sampler(
                     task_model_path, dim_mults=(1,2,4), T=self.config['T_orig'], recovery=False)
-                trajectory_sampler_orig.warmup_model(warmup_batch_size=16, warmup_horizon=None)
+                # trajectory_sampler_orig.warmup_model(warmup_batch_size=16, warmup_horizon=None)
                 
                 if not self.config.get('generate_context', False):
                     classifier = self._create_classifier()
@@ -54,12 +54,12 @@ class ModelManager:
                 
         return trajectory_sampler, trajectory_sampler_orig, classifier
     
-    def _load_sampler(self, path, dim_mults=(1,2), T=None, recovery=False):
+    def _load_sampler(self, path, dim_mults=(1,2), T=None, recovery=False, obj_dof=3):
         """Load a single trajectory sampler."""
         if T is None:
             T = self.config['T']
             
-        dx = 15 + (1 if self.config['sine_cosine'] else 0)
+        dx = 12 + obj_dof + (1 if self.config['sine_cosine'] else 0)
         
         trajectory_sampler = TrajectorySampler(
             T=T + 1, 

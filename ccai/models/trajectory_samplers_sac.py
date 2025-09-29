@@ -373,7 +373,7 @@ class TrajectorySampler(nn.Module):
         # Mixed precision and warmup settings
         self.set_mixed_precision(use_mixed_precision)   
         self.warmup_completed = False
-        self.warmup_samples = 3  # Number of warmup runs
+        self.warmup_samples = 10  # Number of warmup runs
         
         self.send_norm_constants_to_submodels()
 

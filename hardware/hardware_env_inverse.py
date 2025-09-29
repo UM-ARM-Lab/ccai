@@ -3,10 +3,7 @@ from scipy.spatial.transform import Rotation as R
 import rospy
 import pathlib
 from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv, AllegroValveTurningEnv
-try:
-    from isaac_victor_envs.tasks.allegro_ros import RosAllegroValveTurningEnv
-except:
-    print('No ROS install found, continuing')
+from isaac_victor_envs.tasks.allegro_ros import RosAllegroValveTurningEnv
 if __name__ == "__main__":
     from allegro_ros import RosNode
 else:
@@ -20,6 +17,114 @@ import pytorch_kinematics as pk
 urdf_path = "/home/abhinav/Documents/git_packages/isaacgym-arm-envs/isaac_victor_envs/assets/xela_models/victor_allegro_stalk.urdf"
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
+
+class InverseObjectPoseCalculator:
+    """
+    Inverse of ObjectPoseReader - takes arm configuration and outputs where the screwdriver 
+    should be in mocap world frame.
+    """
+    def __init__(self, obj='valve', device='cpu') -> None:
+        self.obj = obj
+        self.device = device
+
+        # Same transformation matrices as in ObjectPoseReader
+        self.object_to_hand_matrix = torch.tensor([[[ 5.9605e-08,  1.0000e+00,  0.0000e+00,  9.5000e-02],
+         [-7.6604e-01,  5.9605e-08,  6.4279e-01, -9.3431e-03],
+         [ 6.4279e-01,  0.0000e+00,  7.6604e-01, -1.1135e-02],
+         [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  1.0000e+00]]], device=device) #scene_trans
+        
+        self.arm_mocap_to_arm_victor_matrix = torch.tensor([[[ 0.99973467,  0.01829301,  0.0139986 , -0.01603915],
+                                                            [-0.01838437,  0.99981035,  0.00642524,  0.00957037],
+                                                            [-0.01387841, -0.00668089,  0.99988137,  0.03222477],
+                                                            [ 0.        ,  0.        ,  0.        ,  1.        ]]])
+                                                                        
+        self.object_to_hand_trans = pk.Transform3d(matrix=self.object_to_hand_matrix)
+        self.hand_to_object_trans = self.object_to_hand_trans.inverse()
+        self.arm_mocap_to_arm_victor_trans = pk.Transform3d(matrix=self.arm_mocap_to_arm_victor_matrix)
+
+        # Initialize kinematics chain
+        self.chain = pk.build_serial_chain_from_urdf(open(urdf_path, mode='rb').read(), 
+                                                   'allegro_hand_base_link', 
+                                                   root_link_name='victor_right_arm_link_1')
+        self.chain = self.chain.to(device=device)
+
+    def get_screwdriver_pose_from_arm_config(self, arm_config, arm_base_trans=None, arm_base_euler=None):
+        """
+        Given an arm configuration, calculate where the screwdriver should be in mocap world frame.
+        
+        Args:
+            arm_config: torch.Tensor of shape (7,) - arm joint angles in radians
+            arm_base_trans: np.array of shape (3,) - arm base translation in mocap world frame
+            arm_base_euler: np.array of shape (3,) - arm base rotation in mocap world frame
+        
+        Returns:
+            tuple: (screwdriver_trans, screwdriver_euler) in mocap world frame
+        """
+        # Ensure arm_config is the right shape and device
+        if len(arm_config.shape) == 1:
+            arm_config = arm_config.unsqueeze(0)  # Add batch dimension
+        arm_config = arm_config.to(self.device)
+        
+        # Ensure arm_base_trans and arm_base_euler are numpy arrays on CPU
+        if arm_base_trans is not None:
+            arm_base_trans = np.array(arm_base_trans, dtype=np.float32)
+        if arm_base_euler is not None:
+            arm_base_euler = np.array(arm_base_euler, dtype=np.float32)
+        
+        # Forward kinematics to get hand pose in arm victor frame
+        hand_pose_arm_victor = self.chain.forward_kinematics(arm_config)
+        
+        # Transform from arm victor frame to arm mocap frame
+        # hand_to_arm_mocap = arm_victor_to_arm_mocap * hand_to_arm_victor
+        hand_to_arm_mocap = self.arm_mocap_to_arm_victor_trans.inverse().compose(hand_pose_arm_victor)
+        
+        # If arm base pose is provided, transform to mocap world frame
+        if arm_base_trans is not None and arm_base_euler is not None:
+            # Create arm mocap to mocap world transformation
+            arm_mocap_to_mocap_world_trans = pk.Transform3d(
+                pos=torch.tensor(arm_base_trans, device=self.device, dtype=torch.float32), 
+                rot=torch.tensor(arm_base_euler, device=self.device, dtype=torch.float32)
+            )
+            
+            # Transform hand pose to mocap world frame
+            # hand_to_mocap_world = arm_mocap_to_mocap_world * hand_to_arm_mocap
+            hand_to_mocap_world_trans = arm_mocap_to_mocap_world_trans.compose(hand_to_arm_mocap)
+            
+            # Get screwdriver pose in mocap world frame
+            # screwdriver_to_mocap_world = hand_to_mocap_world * screwdriver_to_hand
+            screwdriver_to_hand_trans = self.object_to_hand_trans
+            screwdriver_to_mocap_world_trans = hand_to_mocap_world_trans.compose(screwdriver_to_hand_trans)
+            
+            # Extract position and orientation
+            screwdriver_matrix = screwdriver_to_mocap_world_trans.get_matrix()[0]
+            screwdriver_trans = screwdriver_matrix[:3, 3].cpu().numpy()
+            screwdriver_rot_matrix = screwdriver_matrix[:3, :3].cpu().numpy()
+            screwdriver_euler = R.from_matrix(screwdriver_rot_matrix).as_euler('xyz')
+            
+            return screwdriver_trans, screwdriver_euler
+        else:
+            # Return hand pose in arm mocap frame if no arm base pose provided
+            hand_matrix = hand_to_arm_mocap.get_matrix()[0]
+            hand_trans = hand_matrix[:3, 3].cpu().numpy()
+            hand_rot_matrix = hand_matrix[:3, :3].cpu().numpy()
+            hand_euler = R.from_matrix(hand_rot_matrix).as_euler('xyz')
+            
+            return hand_trans, hand_euler
+
+    def get_screwdriver_pose_with_mocap_subscriber(self, arm_config):
+        """
+        Get screwdriver pose using mocap data for arm base pose.
+        This requires ROS to be running and mocap data to be available.
+        
+        Args:
+            arm_config: torch.Tensor of shape (7,) - arm joint angles in radians
+            
+        Returns:
+            tuple: (screwdriver_trans, screwdriver_euler) in mocap world frame, or None if mocap data unavailable
+        """
+        # This would need to be called from a ROS node context
+        # For now, return None and let the caller handle mocap data
+        return None
 
 class ObjectPoseReader:
     def __init__(self, obj='valve', mode='relative', device='cpu') -> None:
@@ -62,8 +167,6 @@ class ObjectPoseReader:
             self.arm_base = None
         self.mocap_obj = [i for i in data.tracked_objects if i.name == self.obj][0]
         self.obj_euler_, self.obj_trans_ = self.euler_trans_from_segment(self.mocap_obj.segments[0])
-
-        # self.obj_euler_[0], self.obj_euler_[1] = -self.obj_euler_[1], self.obj_euler_[0]
         self.obj_trans_[2] += .02
         # self.obj_euler_[0] += .02
         
@@ -116,10 +219,6 @@ class ObjectPoseReader:
         return (hand_to_arm_victor)
 
 
-# tensor([[[ 7.9061e-01, -4.7014e-01,  3.9230e-01,  2.2960e-01],
-#          [-3.4561e-04,  6.4034e-01,  7.6809e-01, -1.9502e-01],
-#          [-6.1232e-01, -6.0740e-01,  5.0610e-01,  7.3183e-01],
-#          [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  1.0000e+00]]])  self.hand_to_object_trans <- GPT says this one
 class HardwareEnv:
     def __init__(self, default_pos, num_repeat=1, gradual_control=False, finger_list=['index', 'middle', 'ring', 'thumb'], kp=4, obj='valve', ori_only=True, mode='relative', device='cuda:0', node_name='allegro_hand_viz'):
         self.__all_finger_list = ['index', 'middle', 'ring', 'thumb']
@@ -135,11 +234,7 @@ class HardwareEnv:
     
     def get_state(self):
         # rospy.sleep(0.5)
-        try:
-            robot_state = self.__ros_node.allegro_joint_pos.float()
-        except:
-            print('No robot state received. Using default state.')
-            robot_state = self.default_dof_pos.clone().squeeze(0)
+        robot_state = self.__ros_node.allegro_joint_pos.float()
         robot_state = robot_state.to(self.device)
         index, mid, ring, thumb = torch.chunk(robot_state, chunks=4, dim=-1)
         state = {}
@@ -215,103 +310,30 @@ def regularized_ik(n_tgts):
 
 if __name__ == "__main__":
     """
-    Calculate the arm config that aligns the hand with the object in hardware, matching alignment in simulation
+    Example usage of the inverse functionality
     """
-    # rospy.init_node('object_pose_reader')
-
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/2.5_damping_low_eps/allegro_screwdriver_csvto_only.yaml').read_text())
-    default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
-                                torch.tensor([[-0.0536, 0.8922, 0.3233, 1.0361]]).float(),
-                                torch.tensor([[-.1253, 0.9571, 0.3136, 0.7901]]).float(),
-                                torch.tensor([[1.0655, 0.4575, 0.5301, .8653]]).float()),
-                                dim=1)
-    sim_env = AllegroScrewdriverTurningEnv(1, control_mode='joint_impedance',
-                                    use_cartesian_controller=False,
-                                    viewer=config['visualize'],
-                                    steps_per_action=60,
-                                    friction_coefficient=config['friction_coefficient'] * 2.5,
-                                    # friction_coefficient=1.0,  # DEBUG ONLY, set the friction very high
-                                    device=config['sim_device'],
-                                    video_save_path=img_save_dir,
-                                    joint_stiffness=config['kp'],
-                                    fingers=config['fingers'],
-                                    gradual_control=False,
-                                    gravity=True, # For data generation only
-                                    randomize_obj_start=config.get('randomize_obj_start', False),
-                                    )
-
-
-    default_dof_pos = torch.cat((torch.tensor([[0.2, 0.5, 0.65, 0.8]]).float(),
-                                        torch.tensor([[-0.1, 0.2, 0.9, 0.8]]).float(),
-                                        torch.tensor([[0.0, 0.0, 0.0, 0.0]]).float(),
-                                        torch.tensor([[1.2, 0.2, 0., 1.0]]).float()),
-                                        dim=1)
-    env = HardwareEnv(default_dof_pos[:, :16], 
-                        finger_list=config['fingers'], 
-                        kp=config['kp'], 
-                        obj='blue_screwdriver_catching',
-                        mode='relative',
-                        gradual_control=True,
-                        num_repeat=10,
-                        node_name='allegro_hand_viz_2')
-    # sim_env = RosAllegroValveTurningEnv(1, control_mode='joint_impedance',
-    #                             use_cartesian_controller=False,
-    #                             viewer=True,
-    #                             steps_per_action=60,
-    #                             friction_coefficient=.1,
-    #                             device=config['sim_device'],
-    #                             video_save_path=img_save_dir,
-    #                             joint_stiffness=config['kp'],
-    #                             fingers=config['fingers'],
-    #                             valve='cross_valve',
-    #                             node_name='allegro_hand_viz_3'
-    #                             )
-
-    rospy.sleep(1)
-    env.get_state()
-
-
-    # obj_reader = ObjectPoseReader(obj='valve', mode='relative')
-    # # rospy.spin()
-    import time
-    time.sleep(3)
     device = 'cuda:0'
-    chain = pk.build_serial_chain_from_urdf(open(urdf_path, mode='rb').read(), 'allegro_hand_base_link', root_link_name='victor_right_arm_link_1')
-    chain = chain.to(device=device)
-    lim = torch.tensor(chain.get_joint_limits(serial=True), device=device)
-    ik = pk.PseudoInverseIK(chain, max_iterations=100, num_retries=20,
-                            joint_limits=lim.T,
-                            early_stopping_any_converged=True,
-                            early_stopping_no_improvement="any",
-                            debug=False,
-                            config_sampling_method=regularized_ik,
-                            # init_for_non_serial_chain=
-                            lr=0.2)
-    while True:
-        # sim_env.step(None)
-        # state = env.get_state()
-        # time.sleep(.1)
-
-        root_coor, root_ori = env.obj_reader.get_state_world_frame_pos()
-
-        if np.abs(root_ori[0]) < .01 and np.abs(root_ori[1]) < .01:
-            print(root_ori)
-            # Get converged solutions
-            tgt_ik_pose = env.obj_reader.get_target_IK_pose()
-            sol = ik.solve(tgt_ik_pose.to(chain.device))
-            converged_sol = sol.solutions[sol.converged]
-            
-            if converged_sol.shape[0] > 0:
-                converged_sol = converged_sol[0]
-       
-                print(converged_sol / np.pi * 180)
-                print(sol.err_pos[sol.converged][0])
-                print(sol.err_rot[sol.converged][0])
-
-        cur_pose = env.get_state()['q'].reshape(-1).cpu()
-        
-        cur_pose[-4:-1] = torch.tensor(root_ori, dtype=cur_pose.dtype).cpu()
-        
-        # sim_env.set_pose(state['q'].reshape(1,-1).to(sim_env.device))
-        sim_env.set_pose(cur_pose.reshape(1,-1))
-
+    
+    # Initialize the inverse calculator
+    inverse_calc = InverseObjectPoseCalculator(obj='blue_screwdriver_catching', device=device)
+    
+    # Example arm configuration (7 joint angles in radians)
+    # This is the configuration from the original code
+    arm_config = torch.tensor([50.92, -73.15, 106.4, 64.1, 40.81, -119.07, -20.78], device=device) / 180 * np.pi
+    
+    # Example arm base pose in mocap world frame (you would get this from mocap data)
+    arm_base_trans = np.array([0.0, 0.0, 0.0])  # Replace with actual mocap data
+    arm_base_euler = np.array([0.0, 0.0, 0.0])  # Replace with actual mocap data
+    
+    # Calculate where the screwdriver should be
+    screwdriver_trans, screwdriver_euler = inverse_calc.get_screwdriver_pose_from_arm_config(
+        arm_config, arm_base_trans, arm_base_euler
+    )
+    
+    print(f"Screwdriver position in mocap world frame: {screwdriver_trans}")
+    print(f"Screwdriver orientation in mocap world frame: {screwdriver_euler}")
+    
+    # Test without arm base pose (returns hand pose in arm mocap frame)
+    hand_trans, hand_euler = inverse_calc.get_screwdriver_pose_from_arm_config(arm_config)
+    print(f"Hand position in arm mocap frame: {hand_trans}")
+    print(f"Hand orientation in arm mocap frame: {hand_euler}")

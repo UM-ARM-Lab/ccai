@@ -208,7 +208,7 @@ class ContactPlanner:
         
         # Filter contact modes based on which fingers are in contact with the object. Contact fingers for each mode must be less than dist_min away from the object.
         num_fingers = len(self.params['fingers'])
-        obj_dof = 3
+        obj_dof = self.turn_problem.obj_dof
         cur_q = state[:4 * num_fingers]
         cur_theta = state[4 * num_fingers: 4 * num_fingers + obj_dof]
         planner.problem._preprocess_fingers(cur_q[None, None], cur_theta[None, None], compute_closest_obj_point=True)

@@ -12,7 +12,7 @@ import numpy as np
 
 from ccai.allegro_contact import AllegroManipulationProblem, PositionControlConstrainedSVGDMPC
 from ccai.utils.allegro_utils import visualize_trajectory
-from ccai.controller.tactile_feedback_controller import TactileMPC, ControllerConfig, TactileFeedbackController, TactileFeedbackQPController
+from ccai.controller.tactile_feedback_controller import ControllerConfig, TactileFeedbackQPController
 
 def create_experiment_paths(fpath, fname, mode=None, create_goal_subdir=True):
     """Create directory structure for experiment data."""
@@ -83,12 +83,12 @@ def create_allegro_screwdriver_problem(problem_type, start, goal, params, env, d
         'goal': goal,
         'chain': params['chain'],
         'device': device,
-        'object_asset_pos': env.table_pose,
+        'object_asset_pos': env.table_pose if env.table_pose is not None else env.obj_pose,
         'object_location': params['object_location'],
         'object_type': params['object_type'],
         'world_trans': env.world_trans,
-        'obj_dof': 3,
-        'obj_joint_dim': 1,
+        'obj_dof': 3 if env.table_pose is not None else 1,
+        'obj_joint_dim': 1 if env.table_pose is not None else 9,
         'optimize_force': params['optimize_force'],
         'default_dof_pos': env.default_dof_pos[:, :16],
         'obj_gravity': params.get('obj_gravity', False),

@@ -32,7 +32,7 @@ class TrajectoryExecutor:
                     mppi_warmup=False, fpath=None, baseline_controller=None, 
                     baseline_ood_detector=None, data=None, trajectory_sampler=None,
                     trajectory_sampler_orig=None, turn_problem=None, num_fingers=None,
-                    obj_dof=None, episode_num_steps=None, max_episode_num_steps=None,
+                    obj_dof=None, obj_joint_dim=1, episode_num_steps=None, max_episode_num_steps=None,
                     min_force_dict=None, proj_path=None, AllegroScrewdriver=None, tactile_controller=False, skip_csvto=False):
         """Execute a trajectory with the given planner and mode."""
         
@@ -44,7 +44,7 @@ class TrajectoryExecutor:
         
         # reset planner
         state = self.env.get_state()
-        state = state['q'].reshape(-1, 4 * num_fingers + planner.problem.obj_dof + planner.problem.obj_joint_dim)[0, :4 * num_fingers + planner.problem.obj_dof].to(device=self.params['device'])
+        state = state['q'].reshape(-1, 4 * num_fingers + obj_dof + obj_joint_dim)[0, :4 * num_fingers + obj_dof].to(device=self.params['device'])
         planned_trajectories = []
         actual_trajectory = []
         optimizer_paths = []

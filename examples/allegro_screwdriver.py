@@ -367,6 +367,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     all_stage = 0
     done = False
     max_episode_num_steps = 100 if params['mode'] != 'hardware' else 50
+    
+    # Store initial yaw for tracking rotation progress
+    initial_yaw = state[-1].item()
     max_stages = 2  # Maximum number of stages for non-live recovery mode
 
     def should_continue_loop():
@@ -428,17 +431,18 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 env.set_external_wrench_perturb(False)
             else:
                 input('Ready to pregrasp. Press <ENTER> to continue.')
-            contact = 'pregrasp'
-            start = env.get_state()['q'].reshape(-1, 4 * num_fingers + 4).to(device=params['device'])[0]
-            best_traj, _ = pregrasp_planner.step(start[:pregrasp_planner.problem.dx])
-            for x in best_traj[:, :4 * num_fingers]:
-                action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
-                env.step(action)
-                # After stepping, reset the screwdriver to where it was initially
-                if params['mode'] != 'hardware':
-                    s = env.get_state()['q'].reshape(-1, 4 * num_fingers + 4).to(device=params['device'])[0]
-                    s[-4:] = start[-4:]
-                    env.set_pose(s.to(device=env.device))
+            if not params['skip_pregrasp']:
+                contact = 'pregrasp'
+                start = env.get_state()['q'].reshape(-1, 4 * num_fingers + 4).to(device=params['device'])[0]
+                best_traj, _ = pregrasp_planner.step(start[:pregrasp_planner.problem.dx])
+                for x in best_traj[:, :4 * num_fingers]:
+                    action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
+                    env.step(action)
+                    # After stepping, reset the screwdriver to where it was initially
+                    if params['mode'] != 'hardware':
+                        s = env.get_state()['q'].reshape(-1, 4 * num_fingers + 4).to(device=params['device'])[0]
+                        s[-4:] = start[-4:]
+                        env.set_pose(s.to(device=env.device))
 
             # for _ in range(50):
             #     env._step_sim()
@@ -462,8 +466,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             contact = contact_sequence.pop(0)
             
         start = extract_state_vector(env.get_state(), num_fingers, params['device'], slice_end=15)
-        initial_yaw = start[-1].item()
-            
+        if stage == 2:
+            initial_yaw = start[-1].item()
+
         data['executed_contacts'].append(contact)
         print(stage, contact)
         torch.cuda.empty_cache()
@@ -558,7 +563,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         elif contact == 'turn':
             mppi_ctrl = None
-            # Goal is to turn clockwise by 90 degrees
+            # Goal is to turn clockwise by 60 degrees
             _goal = torch.tensor([0, 0, state[-1] - np.pi / 2]).to(device=params['device'])
                 
             # If we're recovering and have a saved goal/timesteps, use them
@@ -612,6 +617,15 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         stage += 1
         all_stage += 1
+
+        # Check if screwdriver has turned 60 degrees (π/3 radians)
+        current_yaw = start[-1].item()
+        yaw_delta = current_yaw - initial_yaw
+        target_yaw_delta = -np.pi / 3  # -60 degrees (clockwise)
+        
+        if yaw_delta <= target_yaw_delta and 3:
+            print(f'Screwdriver turned 60 degrees! Yaw delta: {np.degrees(yaw_delta):.2f} degrees')
+            done = True
 
         roll_abs = np.abs(start[-3].item())
         pitch_abs = np.abs(start[-2].item())
@@ -831,12 +845,21 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
 if __name__ == "__main__":
     # get config. First option is to get the config from the command line.
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
-    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_TODR_recovery_data_gen_tactile_1.yaml').read_text())
+    # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_hardware.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_TODR_N_16.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_diff_tactile_control_eval.yaml').read_text())
     # Write to log file in the experiment's directory
-    experiment_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}')
+
+    # Get datetime
+    if config['mode'] == 'hardware':
+        import datetime
+        now = datetime.datetime.now().strftime("%m.%d.%y:%I:%M:%S")
+        now_ = '.' + now
+        now = now_
+    else:
+        now = ''
+    experiment_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}{now}')
     pathlib.Path.mkdir(experiment_dir, parents=True, exist_ok=True)
     log_file = experiment_dir / 'log.log'
     log_file.touch()
@@ -851,19 +874,24 @@ if __name__ == "__main__":
         config['recovery_controller'] = 'csvgd'
     num_envs = get_num_envs_for_baseline(config)
     
+    # default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
+    #                            torch.tensor([[-0.0535, 0.7626, 0.4006, 1.2064]]).float(),
+    #                            torch.tensor([[0,0,0,0]]).float(),
+    #                            torch.tensor([[.9830, 0.6005, 0.5771, .8364]]).float()),
+    #                            dim=1)
     default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
-                               torch.tensor([[-0.0535, 0.7626, 0.4006, 1.2064]]).float(),
-                               torch.tensor([[0,0,0,0]]).float(),
-                               torch.tensor([[.9830, 0.6005, 0.5771, .8364]]).float()),
-                               dim=1)
+                                torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float(),
+                                torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
+                                torch.tensor([[1.2, 0.3, .3, 1.2]]).float()),
+                                dim=1)
     if config['mode'] == 'hardware':
         # roslaunch allegro_hand allegro_hand_modified.launch
-        from hardware.hardware_env_hri import HardwareEnv
+        from hardware.hardware_env import HardwareEnv
 
         env = HardwareEnv(default_dof_pos[:, :16], 
                           finger_list=config['fingers'], 
                           kp=config['kp'], 
-                          obj='blue_screwdriver',
+                          obj='blue_screwdriver_catching',
                           mode='relative',
                           gradual_control=True,
                           num_repeat=10)
@@ -888,8 +916,8 @@ if __name__ == "__main__":
                                  fingers=config['fingers'],
                                  table_pose=None, # Since I ran the IK before the sim, I shouldn't need to set the table pose. 
                                  gravity=True,
-                                 random_force_magnitude=config.get('random_force_magnitude', 1.5),
-                                 default_dof_pos=default_dof_pos
+                                #  random_force_magnitude=config.get('random_force_magnitude', 1.5),
+                                #  default_dof_pos=default_dof_pos
                                  )
         
         sim, gym, viewer = sim_env.get_sim()
@@ -944,18 +972,18 @@ if __name__ == "__main__":
     partial_to_full_state = partial(partial_to_full_state, fingers=config['fingers'])
 
     # Get datetime
-    if config['mode'] == 'hardware':
-        import datetime
-        now = datetime.datetime.now().strftime("%m.%d.%y:%I:%M:%S")
-        now_ = '.' + now
-        now = now_
+    # if config['mode'] == 'hardware':
+    #     import datetime
+    #     now = datetime.datetime.now().strftime("%m.%d.%y:%I:%M:%S")
+    #     now_ = '.' + now
+    #     now = now_
 
-        print('Hardware mode')
-        print('Datetime:', now)
-        print('Config:', config)
+    #     print('Hardware mode')
+    #     print('Datetime:', now)
+    #     print('Config:', config)
 
-    else:
-        now = ''
+    # else:
+    #     now = ''
 
     trajectory_sampler = None
     model_path = config.get('model_path', None)
@@ -979,8 +1007,8 @@ if __name__ == "__main__":
     for i in tqdm(range(start_ind, num_episodes, step_size)):
         print(f'\nTrial {i+1}')
 
-
-        env.reset()
+        if not params['skip_pregrasp']:
+            env.reset()
         goal = torch.tensor([0, 0, float(config['goal'])]) # Ignore. Deprecated
         # goal = goal + 0.025 * torch.randn(1) + 0.2
 
