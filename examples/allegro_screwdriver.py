@@ -154,6 +154,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
         return smoothness_cost + upright_cost + super()._cost(xu, rob_link_pts, nearest_robot_pts, start, goal, projected_diffusion=projected_diffusion)
 
 all_yaw_deltas = []
+all_pregrasp_states = []
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noise=None, noise_noise=None, sim=None, seed=None,
              proj_path=None, perturb_this_trial=False, trajectory_sampler=None, trajectory_sampler_orig=None, config=None, classifier=None):
     global all_yaw_deltas
@@ -448,7 +449,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             #     env._step_sim()
             post_pregrasp_state = env.get_state()['q'].reshape(-1, 4 * num_fingers + 4).to(device=params['device'])[0]
             post_pregrasp_state_for_viz = post_pregrasp_state.clone()
-            post_pregrasp_state = post_pregrasp_state[:15]
+            print(post_pregrasp_state)
+            all_pregrasp_states.append(post_pregrasp_state)
+            break
             if params['mode'] == 'hardware':
                 # print(set_state.shape)
                 sim_viz_env.set_pose(post_pregrasp_state_for_viz.cpu())  
@@ -831,7 +834,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     state = extract_state_vector(state, num_fingers, params['device'], slice_end=15)
     final_yaw = state[-1].item()
     print('Final yaw:', final_yaw)
-    print('Initial yaw:', initial_yaw)
+    try:
+        print('Initial yaw:', initial_yaw)
+    except:
+        initial_yaw = final_yaw
     print('Difference:', final_yaw - initial_yaw)
     all_yaw_deltas.append(final_yaw - initial_yaw)
     print('All yaw deltas:', all_yaw_deltas)
@@ -846,7 +852,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 if __name__ == "__main__":
     # get config. First option is to get the config from the command line.
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_csvto_recovery_hardware.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_TODR.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_TODR_N_16.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_diff_tactile_control_eval.yaml').read_text())
     # Write to log file in the experiment's directory
@@ -1044,7 +1050,8 @@ if __name__ == "__main__":
             # except Exception as e:
             #     print(f'Error: {e}')
             seed += 1
-
+        with open(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}{now}/pregrasp_states.pkl', 'wb') as f:
+            pickle.dump(all_pregrasp_states, f)
         print('All yaw deltas:', all_yaw_deltas)
         print('Mean yaw delta:', np.mean(all_yaw_deltas))
         print('Std yaw delta:', np.std(all_yaw_deltas))

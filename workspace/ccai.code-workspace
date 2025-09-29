@@ -7,5 +7,7 @@
 			"path": "../../github/isaacgym-arm-envs"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"python.languageServer": "None"
+	}
 }

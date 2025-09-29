@@ -22,7 +22,7 @@ goal: -.5
 prior: 1
 multi_particle_search: True
 replan: False
-visualize_plan: False
+visualize_plan: True
 visualize_recovery_plan: True
 visualize_contact_plan: False
 optimize_force: True
@@ -58,14 +58,14 @@ recovery_controller: 'csvgd'
 # Fixed models
 recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_256_steps_diffusion'
 model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_256_steps_diffusion/allegro_screwdriver_diffusion.pt'
-# model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_task_model_pi_2_fixed_data_filtering_diffusion'
-# task_model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_task_model_pi_2_fixed_data_filtering_diffusion/allegro_screwdriver_diffusion.pt'
+model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_task_model_pi_2_fixed_data_filtering_diffusion'
+task_model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_task_model_pi_2_fixed_data_filtering_diffusion/allegro_screwdriver_diffusion.pt'
 
 # CoRL Submission Models
 # recovery_model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_low_damping_diffusion'
 # model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_recovery_pi_2_low_damping_diffusion/allegro_screwdriver_diffusion.pt'
 # model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion'
-task_model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion/allegro_screwdriver_diffusion.pt'
+# task_model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion/allegro_screwdriver_diffusion.pt'
 tactile_controller: False
 skip_csvto: False
 contact_constraint_only: False

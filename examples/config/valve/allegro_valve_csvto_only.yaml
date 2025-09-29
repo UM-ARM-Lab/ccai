@@ -7,7 +7,7 @@ num_turns: 1
 max_recovery_stages: 4
 num_trials: 10
 num_episodes: 720
-visualize: False
+visualize: True
 experiment_name: 'allegro_valve_task_data_partial_patch'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
@@ -57,8 +57,8 @@ sac_batch_size: 64
 # likelihood_threshold: -136.6758056640625
 # project_threshold: -90
 # parity: 654
-start_ind: 360
-end_ind: 720
+start_ind: 0
+end_ind: 50
 recovery_controller: 'csvgd'
 OOD_metric: 'likelihood'
 controllers:

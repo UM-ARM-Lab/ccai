@@ -10,7 +10,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 200
 visualize: True
-experiment_name: 'allegro_screwdriver_csvto_16_diff_perturb_.75_ray_tuned'
+experiment_name: 'allegro_screwdriver_pregrasp_gen'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -46,7 +46,7 @@ external_wrench_perturb: True
 rand_pct: 1
 random_force_magnitude: 0.75
 viz_states: False
-diff_init: True
+diff_init: False
 live_recovery: False
 new_projection: True
 task_diffuse_goal: True
@@ -54,10 +54,10 @@ obj_gravity: True
 type: 'diffusion'
 OOD_metric: 'likelihood'
 recovery_controller: 'csvgd'
-model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion'
-model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion/allegro_screwdriver_diffusion.pt'
+# model_dir: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion'
+# model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_pi_2_diffusion/allegro_screwdriver_diffusion.pt'
 start_ind: 0
-end_ind: 30
+end_ind: 50
 N_contact_plan: 16
 contact_constraint_only: False
 solve_for_u_hat: False

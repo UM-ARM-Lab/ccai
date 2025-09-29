@@ -42,7 +42,7 @@ class CompilationMixin:
             self._compiled_methods.clear()
         
     def _get_or_compile_method(self, method_name, original_method, compile_kwargs=None):
-        # return original_method
+        return original_method
         """Get compiled method from cache or compile it."""
         if not self._cache_enabled:
             # Direct compilation without caching
@@ -155,7 +155,7 @@ class TemporalUnet(nn.Module, CompilationMixin):
             transition_dim,
             cond_dim,
             dim=32,
-            dim_mults=(1, 2, 4),
+            dim_mults=(1, 2),
             attention=False,
             context_dropout_p=0.25,
             trajectory_condition=False
