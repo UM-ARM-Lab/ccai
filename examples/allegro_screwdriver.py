@@ -887,7 +887,7 @@ if __name__ == "__main__":
     #                            dim=1)
     default_dof_pos = torch.cat((torch.tensor([[0.1, 0.6, 0.6, 0.6]]).float(),
                                 torch.tensor([[-0.1, 0.5, 0.9, 0.9]]).float(),
-                                torch.tensor([[0., 0.5, 0.65, 0.65]]).float(),
+                                torch.tensor([[0., 0.0, 0.0, 0.0]]).float(),
                                 torch.tensor([[1.2, 0.3, .3, 1.2]]).float()),
                                 dim=1)
     if config['mode'] == 'hardware':

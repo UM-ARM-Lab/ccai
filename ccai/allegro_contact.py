@@ -834,8 +834,8 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         self.grad_singularity_constr = vmap(jacrev(self._singularity_constr))
         self.grad_euler_to_angular_velocity = grad_euler_to_angular_velocity
 
-
-        self.contact_points = kwargs['contact_points_dict']
+        if 'contact_points_dict' in kwargs:
+            self.contact_points = kwargs['contact_points_dict']
 
     def _preprocess(self, xu, projected_diffusion=False, tactile_controller=False):
         N = xu.shape[0]
@@ -1606,11 +1606,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         self._regrasp_dh_constant = 0
         self._regrasp_dh_per_t = self._regrasp_dz
         if self.object_type == 'screwdriver':
-            # self.default_dof_pos_backup = torch.cat((torch.tensor([[0.1,  0.6, 0.6, 0.6]]).float().to(device=self.device),
-            #                                 torch.tensor([[-0.1, 0.5, 0.65, 0.65]]).float().to(device=self.device),
-            #                                 torch.tensor([[0., 0.5, 0.9, 0.9]]).float().to(device=self.device),
-            #                                 torch.tensor([[1.2, 0.3, 0.3, 1.2]]).float().to(device=self.device)),
-            #                                 dim=1).to(self.device).reshape(-1)
+
             self.default_dof_pos_backup = self.default_dof_pos.clone().reshape(-1).to(self.device)
         elif self.object_type == 'valve':
             self.default_dof_pos_backup = torch.cat((torch.tensor([[0.3, 0.55, 0.7, 0.8]]).float(),
@@ -1852,7 +1848,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         if self.object_type == 'valve':
             eps[:, :-1] = 1.25e-2
         elif len(self.regrasp_fingers) == len(self.fingers):
-            eps[:, :-1] = 1e-2
+            eps[:, :-1] = .5e-2
         else:
             eps[:, :-1] = 1.5e-2
             
