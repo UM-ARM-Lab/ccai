@@ -37,6 +37,26 @@ CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
 
 
+def _compute_constant_yaw_friction_torque(yaw_axis_robot_frame, yaw_joint_friction, goal_yaw_delta, eps=1e-6):
+    yaw_axis_robot_frame = torch.as_tensor(yaw_axis_robot_frame)
+    yaw_joint_friction_tensor = torch.as_tensor(
+        yaw_joint_friction,
+        device=yaw_axis_robot_frame.device,
+        dtype=yaw_axis_robot_frame.dtype,
+    )
+    goal_yaw_delta_tensor = torch.as_tensor(
+        goal_yaw_delta,
+        device=yaw_axis_robot_frame.device,
+        dtype=yaw_axis_robot_frame.dtype,
+    )
+    turn_sign = torch.where(
+        torch.abs(goal_yaw_delta_tensor) < eps,
+        torch.zeros_like(goal_yaw_delta_tensor),
+        torch.sign(goal_yaw_delta_tensor),
+    )
+    return -turn_sign * yaw_joint_friction_tensor * yaw_axis_robot_frame
+
+
 def euler_to_quat(euler, return_intermediates=False):
     matrix = tf.euler_angles_to_matrix(euler, convention='XYZ')
     quat = tf.matrix_to_quaternion(matrix)
@@ -2003,6 +2023,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                  regrasp_fingers=[],
                  contact_fingers=['index', 'middle', 'ring', 'thumb'],
                  friction_coefficient=0.95,
+                 yaw_joint_friction=0.0,
                  obj_dof=1,
                  obj_ori_rep='euler',
                  obj_dof_type=None,
@@ -2043,6 +2064,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         self.min_force_dict = min_force_dict
 
         self.friction_coefficient = friction_coefficient
+        self.yaw_joint_friction = float(yaw_joint_friction)
         self.dynamics_constr = vmap(self._dynamics_constr)
         self.grad_dynamics_constr = vmap(jacrev(self._dynamics_constr, argnums=(0, 1, 2, 3, 4)))
         if not optimize_force:
@@ -2428,7 +2450,37 @@ class AllegroContactProblem(AllegroObjectProblem):
             hess_h = torch.zeros(N, h.shape[1], T * 3, T * 3, device=self.device)
             return h.reshape(N, -1), grad_h, hess_h, t_mask
         return h.reshape(N, -1), grad_h, None, t_mask
-                
+
+    def _get_screwdriver_body_pose_in_robot_frame(self, next_env_q):
+        if self.object_type != 'screwdriver':
+            raise ValueError("Screwdriver body pose is only defined for screwdriver problems")
+        screwdriver_q = next_env_q
+        if screwdriver_q.shape[-1] == self.obj_dof:
+            cap_joint = torch.zeros(1, device=next_env_q.device, dtype=next_env_q.dtype)
+            screwdriver_q = torch.cat((next_env_q, cap_joint), dim=-1)
+        body_tf = self.contact_scenes.scene_sdf.chain.forward_kinematics(screwdriver_q)['screwdriver_body']
+        body_matrix = body_tf.get_matrix()
+        if body_matrix.ndim == 3:
+            body_matrix = body_matrix[0]
+        return body_matrix[:3, -1], body_matrix[:3, :3]
+
+    def _get_screwdriver_gravity_torque(self, next_env_q):
+        body_com_pos, _ = self._get_screwdriver_body_pose_in_robot_frame(next_env_q)
+        gravity_force = self.obj_mass * torch.tensor([0, 0, -9.8], device=next_env_q.device, dtype=next_env_q.dtype)
+        return torch.linalg.cross(body_com_pos, gravity_force)
+
+    def _get_screwdriver_yaw_friction_torque(self, next_env_q):
+        if self.object_type != 'screwdriver' or self.yaw_joint_friction == 0.0:
+            return torch.zeros(3, device=next_env_q.device, dtype=next_env_q.dtype)
+        _, body_rotation = self._get_screwdriver_body_pose_in_robot_frame(next_env_q)
+        yaw_axis_robot_frame = body_rotation[:, 2]
+        goal_yaw_delta = self.goal[-1] - self.start[-1]
+        return _compute_constant_yaw_friction_torque(
+            yaw_axis_robot_frame=yaw_axis_robot_frame,
+            yaw_joint_friction=self.yaw_joint_friction,
+            goal_yaw_delta=goal_yaw_delta,
+        )
+
     def _force_equlibrium_constr_w_force(self, q, u, next_q, force_list, contact_jac_list, contact_point_list, next_env_q):
         # NOTE: the constriant is defined in the robot frame
         # the contact jac an contact points are all in the robot frame
@@ -2460,16 +2512,10 @@ class AllegroContactProblem(AllegroObjectProblem):
                 # force_list.append(g)
             if self.obj_rotational_dim > 0:
                 if self.object_type == 'screwdriver':
-                    # NOTE: only works for the screwdriver now
-                    g = self.obj_mass * torch.tensor([0, 0, -9.8], device=self.device, dtype=torch.float32)
-                    # add the additional dimension for the screwdriver cap
-                    tmp = torch.zeros_like(next_env_q)
-                    next_env_q = torch.cat((next_env_q, tmp[:1]), dim=-1)
+                    torque_list.append(self._get_screwdriver_gravity_torque(next_env_q))
 
-                    body_tf = self.contact_scenes.scene_sdf.chain.forward_kinematics(next_env_q)['screwdriver_body']
-                    body_com_pos = body_tf.get_matrix()[:, :3, -1]
-                    torque = torch.linalg.cross(body_com_pos[0], g)
-                    torque_list.append(torque)
+        if self.object_type == 'screwdriver' and self.obj_rotational_dim > 0:
+            torque_list.append(self._get_screwdriver_yaw_friction_torque(next_env_q))
 
         torque_list = torch.stack(torque_list, dim=0)
         torque_list = torch.sum(torque_list, dim=0)
@@ -3567,6 +3613,7 @@ class AllegroContactWithEnvProblem(AllegroContactProblem):
                  regrasp_fingers=[],
                  contact_fingers=['index', 'middle', 'ring', 'thumb'],
                  friction_coefficient=0.95,
+                 yaw_joint_friction=0.0,
                  obj_dof=1,
                  obj_ori_rep='euler',
                  obj_joint_dim=0,
@@ -3578,7 +3625,9 @@ class AllegroContactWithEnvProblem(AllegroContactProblem):
                                                            object_location=object_location, object_type=object_type,
                                                            world_trans=world_trans, object_asset_pos=object_asset_pos,
                                                            regrasp_fingers=regrasp_fingers, contact_fingers=contact_fingers,
-                                                           friction_coefficient=friction_coefficient, obj_dof=obj_dof,
+                                                           friction_coefficient=friction_coefficient,
+                                                           yaw_joint_friction=yaw_joint_friction,
+                                                           obj_dof=obj_dof,
                                                            obj_ori_rep=obj_ori_rep, obj_joint_dim=obj_joint_dim,
                                                            optimize_force=optimize_force, device=device, env_force=True, 
                                                            obj_dof_type=obj_dof_type, **kwargs)
@@ -3808,6 +3857,7 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                  regrasp_fingers=[],
                  contact_fingers=['index', 'middle', 'ring', 'thumb'],
                  friction_coefficient=0.95,
+                 yaw_joint_friction=0.0,
                  obj_dof=1,
                  obj_ori_rep='euler',
                  obj_joint_dim=0,
@@ -3836,7 +3886,9 @@ class AllegroManipulationProblem(AllegroContactProblem, AllegroRegraspProblem):
                                         world_trans=world_trans, object_asset_pos=object_asset_pos,
                                         regrasp_fingers=regrasp_fingers,
                                         contact_fingers=contact_fingers,
-                                        friction_coefficient=friction_coefficient, obj_dof=obj_dof,
+                                        friction_coefficient=friction_coefficient,
+                                        yaw_joint_friction=yaw_joint_friction,
+                                        obj_dof=obj_dof,
                                         obj_ori_rep=obj_ori_rep, obj_joint_dim=obj_joint_dim,
                                         optimize_force=optimize_force, device=device, 
                                         desired_ee_in_world_frame=desired_ee_in_world_frame,
@@ -4141,6 +4193,7 @@ class AllegroManipulationExternalContactProblem(AllegroContactWithEnvProblem, Al
                  regrasp_fingers=[],
                  contact_fingers=['index', 'middle', 'ring', 'thumb'],
                  friction_coefficient=0.95,
+                 yaw_joint_friction=0.0,
                  obj_dof=1,
                  obj_ori_rep='euler',
                  obj_joint_dim=0,
@@ -4155,7 +4208,9 @@ class AllegroManipulationExternalContactProblem(AllegroContactWithEnvProblem, Al
                                         table_asset_pos=table_asset_pos,
                                         regrasp_fingers=regrasp_fingers,
                                         contact_fingers=contact_fingers,
-                                        friction_coefficient=friction_coefficient, obj_dof=obj_dof,
+                                        friction_coefficient=friction_coefficient,
+                                        yaw_joint_friction=yaw_joint_friction,
+                                        obj_dof=obj_dof,
                                         obj_ori_rep=obj_ori_rep, obj_joint_dim=obj_joint_dim,
                                         optimize_force=optimize_force, device=device, 
                                         desired_ee_in_world_frame=desired_ee_in_world_frame,

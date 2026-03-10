@@ -14,6 +14,88 @@ from ccai.allegro_contact import AllegroManipulationProblem, PositionControlCons
 from ccai.utils.allegro_utils import visualize_trajectory
 from ccai.controller.tactile_feedback_controller import ControllerConfig, TactileFeedbackQPController
 
+def process_contact_normals_generic(problem):
+    """Get contact normals from an AllegroManipulationProblem."""
+    contact_normals = []
+    for finger in problem.fingers:
+        contact_normals.append(problem.data[finger]["contact_n"])
+    return torch.stack(contact_normals, dim=1).cpu().numpy()
+
+def compute_reference_trajectory_spline_generic(problem, reference_trajectory, reference_trajectory_length_s, start_time, end_time, dt, all_normals=None):
+    """
+    Create a spline interpolation function for the reference trajectory and compute contact info.
+    
+    Args:
+        problem: AllegroManipulationProblem instance
+        reference_trajectory: Tensor or array of shape (T, state_dim)
+        reference_trajectory_length_s: Length of the reference trajectory in seconds
+        start_time: Start time
+        end_time: End time
+        dt: Timestep
+        all_normals: Optional precomputed normals of shape (T, num_fingers, 3)
+        
+    Returns:
+        spline_func, avg_normal, segment_tangents
+    """
+    from scipy.interpolate import interp1d
+    
+    # Convert to numpy for scipy interpolation
+    if isinstance(reference_trajectory, torch.Tensor):
+        traj_np = reference_trajectory.cpu().numpy()
+    else:
+        traj_np = reference_trajectory
+    
+    T, state_dim = traj_np.shape
+    full_time_points = np.linspace(0, reference_trajectory_length_s, T)
+    
+    # Clamp times
+    start_time = max(0, min(start_time,reference_trajectory_length_s))
+    end_time = max(start_time, min(end_time, reference_trajectory_length_s))
+    duration = end_time - start_time
+    
+    start_idx = max(0, int(start_time / dt))
+    end_idx = min(T - 1, int(end_time / dt ))
+    
+    if start_idx == end_idx:
+        end_idx = min(T - 1, start_idx + 1)
+    if start_idx > 0 and start_time < full_time_points[start_idx]:
+        start_idx -= 1
+    if end_idx < T - 1 and end_time > full_time_points[end_idx]:
+        end_idx += 1
+        
+    segment_traj = traj_np[start_idx:end_idx + 1]
+    segment_time_points = full_time_points[start_idx:end_idx + 1]
+    
+    # Get normals
+    if all_normals is None:
+        all_normals = process_contact_normals_generic(problem)
+    
+    segment_normals = all_normals[start_idx:end_idx + 1]
+    avg_normal = np.mean(segment_normals, axis=0)
+    avg_normal = avg_normal / (np.linalg.norm(avg_normal, axis=1, keepdims=True) + 1e-6)
+    
+    # Compute tangents
+    z_axis = np.array([0, 0, 1])
+    segment_tangents = np.cross(avg_normal, z_axis)
+    segment_tangents = segment_tangents / (np.linalg.norm(segment_tangents, axis=1, keepdims=True) + 1e-6)
+    
+    # Compute binormal
+    segment_binormal = np.cross(avg_normal, segment_tangents)
+    segment_binormal = segment_binormal / (np.linalg.norm(segment_binormal, axis=1, keepdims=True) + 1e-6)
+    
+    segment_tangents = np.stack((segment_tangents, segment_binormal), axis=2)
+    
+    if duration < 1e-6:
+        def spline_func(t):
+            return traj_np[start_idx]
+    else:
+        # Create spline for the segment
+        # Adjusted time for spline to be relative to start_time
+        relative_time_points = segment_time_points - start_time
+        spline_func = interp1d(relative_time_points, segment_traj, axis=0, kind='linear', fill_value="extrapolate")
+        
+    return spline_func, avg_normal, segment_tangents
+
 def create_experiment_paths(fpath, fname, mode=None, create_goal_subdir=True):
     """Create directory structure for experiment data."""
     mode_fpath = pathlib.Path(fpath) / fname
@@ -274,7 +356,12 @@ class ConstraintScheduledSVGDMPC(PositionControlConstrainedSVGDMPC):
 
             self.best_trajectory_for_spline = partial_to_full_trajectory(self.best_trajectory_for_spline, self.mode, self.problem.device)
             self.problem._preprocess(self.x, tactile_controller=self.tactile_controller_bool)
-            reference_trajectory_spline, avg_normal, segment_tangents = self.compute_reference_trajectory_spline(self.best_trajectory_for_spline, self.t, self.t + self.controller_config.horizon_length * self.dt)
+            
+            reference_trajectory_spline, avg_normal, segment_tangents = compute_reference_trajectory_spline_generic(
+                self.problem, self.best_trajectory_for_spline, self.t, 
+                self.t + self.controller_config.horizon_length * self.dt, self.dt
+            )
+            
             if hasattr(self.tactile_controller, 'set_reference_trajectory'):
                 self.tactile_controller.set_reference_trajectory(reference_trajectory_spline)
             else:
@@ -292,144 +379,7 @@ class ConstraintScheduledSVGDMPC(PositionControlConstrainedSVGDMPC):
         else:
             return best_trajectory, all_trajectories
 
-    def process_contact_normals(self):
-        contact_normals = []
-        for finger in self.problem.fingers:
-            contact_normals.append(self.problem.data[finger]["contact_n"])
-        return torch.stack(contact_normals, dim=1).cpu().numpy()
     
-    def compute_reference_trajectory_spline(self, reference_trajectory, start_time, end_time):
-        """
-        Create a spline interpolation function for the reference trajectory.
-        
-        Args:
-            reference_trajectory: Tensor of shape (T, state_dim) representing trajectory from time 0 to 1
-            start_time: Start time in the reference trajectory (between 0 and 1)
-            end_time: End time in the reference trajectory (between 0 and 1)
-            
-        Returns:
-            spline_func: Function that takes time t in [0, end_time-start_time] and returns interpolated state as numpy array
-        """
-        from scipy.interpolate import interp1d
-        
-        # Convert to numpy for scipy interpolation
-        if isinstance(reference_trajectory, torch.Tensor):
-            traj_np = reference_trajectory.cpu().numpy()
-        else:
-            traj_np = reference_trajectory
-        
-        T, state_dim = traj_np.shape
-        
-        # Create time points for the full reference trajectory (0 to 1)
-        full_time_points = np.linspace(0, 1, T)
-        
-        # Clamp start_time and end_time to valid range
-        start_time = max(0, min(start_time, 1))
-        end_time = max(start_time, min(end_time, 1))
-        duration = end_time - start_time
-        
-        # Find indices that bracket start_time and end_time
-        start_idx = max(0, int(start_time * (T - 1)))
-        end_idx = min(T - 1, int(end_time * (T - 1)) + 1)
-        
-        # Ensure we have enough points for interpolation
-        if start_idx == end_idx:
-            end_idx = min(T - 1, start_idx + 1)
-        if start_idx > 0 and start_time < full_time_points[start_idx]:
-            start_idx -= 1
-        if end_idx < T - 1 and end_time > full_time_points[end_idx]:
-            end_idx += 1
-            
-        # Extract trajectory segment with sufficient points for interpolation
-        segment_traj = traj_np[start_idx:end_idx + 1]
-        segment_time_points = full_time_points[start_idx:end_idx + 1]
-        
-        # Index normals by time
-        all_normals = self.process_contact_normals()
-        segment_normals = all_normals[start_idx:end_idx + 1]
-        avg_normal = np.mean(segment_normals, axis=0)
-        avg_normal = avg_normal / np.linalg.norm(avg_normal, axis=1, keepdims=True)
-        
-        # Compute tangents
-        segment_tangents = np.cross(avg_normal, np.array([0, 0, 1]))
-        segment_tangents = segment_tangents / np.linalg.norm(segment_tangents, axis=1, keepdims=True)
-        
-        # Compute binormal
-        segment_binormal = np.cross(avg_normal, segment_tangents)
-        segment_binormal = segment_binormal / np.linalg.norm(segment_binormal, axis=1, keepdims=True)
-        
-        # Stack tangents and binormals
-        segment_tangents = np.stack((segment_tangents, segment_binormal), axis=2)
-        
-        # Handle edge case where duration is very small or zero
-        if duration < 1e-6:
-            # Return constant function at start_time
-            from scipy.interpolate import interp1d
-            master_interpolators = []
-            for dim in range(state_dim):
-                master_interpolators.append(interp1d(
-                    segment_time_points,
-                    segment_traj[:, dim],
-                    kind='cubic' if len(segment_traj) >= 4 else 'linear',
-                    bounds_error=False,
-                    fill_value=(segment_traj[0, dim], segment_traj[-1, dim])
-                ))
-            
-            constant_value = np.array([interpolator(start_time) for interpolator in master_interpolators])
-            
-            def spline_func(t):
-                if isinstance(t, (int, float)):
-                    return constant_value.copy()
-                else:
-                    batch_size = len(t) if hasattr(t, '__len__') else 1
-                    return np.tile(constant_value, (batch_size, 1))
-        else:
-            # Create master interpolators for the extracted segment
-            from scipy.interpolate import interp1d
-            master_interpolators = []
-            for dim in range(state_dim):
-                master_interpolators.append(interp1d(
-                    segment_time_points,
-                    segment_traj[:, dim],
-                    kind='cubic' if len(segment_traj) >= 4 else 'linear',
-                    bounds_error=False,
-                    fill_value=(segment_traj[0, dim], segment_traj[-1, dim])
-                ))
-            
-            def spline_func(t):
-                """
-                Interpolate trajectory at time t.
-                
-                Args:
-                    t: Time value(s) in [0, end_time - start_time]
-                    
-                Returns:
-                    Interpolated state(s) as numpy array
-                """
-                # Handle scalar and batch inputs
-                is_scalar = isinstance(t, (int, float))
-                if is_scalar:
-                    t_array = np.array([t])
-                else:
-                    t_array = np.asarray(t)
-                
-                # Clamp input time to valid range [0, duration]
-                t_clamped = np.clip(t_array, 0, duration)
-                
-                # Map from input time range [0, duration] to original time range [start_time, end_time]
-                t_mapped = start_time + t_clamped
-                
-                # Interpolate each dimension using the master interpolators
-                interpolated_values = np.zeros((len(t_mapped), state_dim))
-                for dim in range(state_dim):
-                    interpolated_values[:, dim] = master_interpolators[dim](t_mapped)
-                
-                # Return scalar result if input was scalar
-                if is_scalar:
-                    return interpolated_values[0]
-                return interpolated_values
-        
-        return spline_func, avg_normal, segment_tangents
         
 def create_planner(problem, mode, params, planner_type='default'):
     """Create a planner for the given problem."""

@@ -14,6 +14,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                  regrasp_fingers=[],
                  contact_fingers=['index', 'middle', 'ring', 'thumb'],
                  friction_coefficient=0.95,
+                 yaw_joint_friction=0.0,
                  obj_dof=1,
                  obj_ori_rep='euler',
                  obj_joint_dim=0,
@@ -66,6 +67,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                                                  regrasp_fingers=regrasp_fingers,
                                                  contact_fingers=contact_fingers,
                                                  friction_coefficient=friction_coefficient,
+                                                 yaw_joint_friction=yaw_joint_friction,
                                                  obj_dof=obj_dof,
                                                  obj_ori_rep=obj_ori_rep, obj_joint_dim=1,
                                                  optimize_force=optimize_force, device=device,
@@ -78,6 +80,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                                                   contact_constraint_only=contact_constraint_only,
                                                    **kwargs)
         self.friction_coefficient = friction_coefficient
+        self.yaw_joint_friction = float(yaw_joint_friction)
 
     def _cost(self, xu, rob_link_pts, nearest_robot_pts, start, goal, projected_diffusion=False):
         state = xu[:, :self.dx]  # state dim = 9

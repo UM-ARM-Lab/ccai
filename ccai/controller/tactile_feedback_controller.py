@@ -83,7 +83,8 @@ class ControllerConfig:
     force_threshold: float = 0.5  # Δ in the paper
     
     # MPC parameters
-    horizon_length: int = 10
+    horizon_length: int = 8
+    trajectory_length_s: float = 8
     dt: float = 0.01
     mpc_solver: str = "cvxpy"  # Options: 'cvxpy' (recommended), 'lbfgs', 'osqp', 'scipy', 'adam', 'augmented_lagrangian'
     
@@ -198,188 +199,187 @@ class ModelPredictiveController:
         K_coup = self.K_bar + (self.K_bar @ G_o.T) @ np.linalg.inv(G_o_Kbar @ G_o.T + 1e-6 * np.eye(6)) @ G_o_Kbar
         return K_coup
         
-# class TactileMPC(ProblemDescription, ModelPredictiveController):
-#     def __init__(self, problem: AllegroManipulationProblem, config: ControllerConfig):
-#         ProblemDescription.__init__(self)
-#         ModelPredictiveController.__init__(self, problem, config)
-#         self.Nx = config.dq*2 + config.df
-#         self.Nu = config.dq
-#         self.Np = 0
-#         self.Ng = 0
-#         self.Nh = 0
-#         self.NgT = 0
-#         self.NhT = 0
+class TactileMPC(ModelPredictiveController):
+    def __init__(self, problem: AllegroManipulationProblem, config: ControllerConfig):
+        ModelPredictiveController.__init__(self, problem, config)
+        self.Nx = config.dq*2 + config.df
+        self.Nu = config.dq
+        self.Np = 0
+        self.Ng = 0
+        self.Nh = 0
+        self.NgT = 0
+        self.NhT = 0
         
-#         self.last_t = None
-#         self.last_q = None
-#         self.last_q_d = None
+        self.last_t = None
+        self.last_q = None
+        self.last_q_d = None
         
-#         self.contact_indices = [0, 1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15]
+        self.contact_indices = [0, 1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15]
         
-#     def compute_system_matrices(self, x):
-#         q = x[:self.dq]
-#         q_d = x[self.dq:2*self.dq]
-#         if (self.last_q is not None and self.last_q_d is not None and np.allclose(q, self.last_q) and np.allclose(q_d, self.last_q_d)):
-#             return
-#         self.last_q = q
-#         self.last_q_d = q_d
+    def compute_system_matrices(self, x):
+        q = x[:self.dq]
+        q_d = x[self.dq:2*self.dq]
+        if (self.last_q is not None and self.last_q_d is not None and np.allclose(q, self.last_q) and np.allclose(q_d, self.last_q_d)):
+            return
+        self.last_q = q
+        self.last_q_d = q_d
         
-#         q_for_preprocess = torch.tensor(np.stack((q, q_d), axis=0), device=self.problem.device).unsqueeze(0).float()
-#         theta_for_preprocess = torch.zeros((1, 2, self.problem.obj_dof), device=self.problem.device).float()
+        q_for_preprocess = torch.tensor(np.stack((q, q_d), axis=0), device=self.problem.device).unsqueeze(0).float()
+        theta_for_preprocess = torch.zeros((1, 2, self.problem.obj_dof), device=self.problem.device).float()
         
-#         self.problem._preprocess_fingers(q_for_preprocess, theta_for_preprocess, T_override=1, tactile_controller=True)
+        self.problem._preprocess_fingers(q_for_preprocess, theta_for_preprocess, T_override=1, tactile_controller=True)
         
-#         Js = self.problem.data['J_q'].clone().flatten(1, 2)
-#         Hs = self.problem.data['H_q'].clone().flatten(1, 2)
+        Js = self.problem.data['J_q'].clone().flatten(1, 2)
+        Hs = self.problem.data['H_q'].clone().flatten(1, 2)
         
         
-#         self.J_q = Js[0].detach().cpu().numpy()[:, self.contact_indices]
-#         self.J_q_d = Js[1].detach().cpu().numpy()[:, self.contact_indices]
-#         self.H_q = Hs[0, :, self.contact_indices][:, :, self.contact_indices].detach().cpu().numpy()
-#         self.H_q_d = Hs[1, :, self.contact_indices][:, :, self.contact_indices].detach().cpu().numpy()
-#         self.G_o = self.problem.data['G_o'][0].detach().cpu().numpy()
+        self.J_q = Js[0].detach().cpu().numpy()[:, self.contact_indices]
+        self.J_q_d = Js[1].detach().cpu().numpy()[:, self.contact_indices]
+        self.H_q = Hs[0, :, self.contact_indices][:, :, self.contact_indices].detach().cpu().numpy()
+        self.H_q_d = Hs[1, :, self.contact_indices][:, :, self.contact_indices].detach().cpu().numpy()
+        self.G_o = self.problem.data['G_o'][0].detach().cpu().numpy()
         
-#         self.K_coup = self.compute_K_coup(self.G_o, self.J_q)
+        self.K_coup = self.compute_K_coup(self.G_o, self.J_q)
 
-#     def set_weighting_matrices(self, W_A, W_P):
-#         self.W_A = W_A
-#         self.W_P = W_P
-#         print('Setting weighting matrices')
-#         print(self.W_A)
-#         print(self.W_P)
-#         print()
+    def set_weighting_matrices(self, W_A, W_P):
+        self.W_A = W_A
+        self.W_P = W_P
+        print('Setting weighting matrices')
+        print(self.W_A)
+        print(self.W_P)
+        print()
 
-#     def set_reference_trajectory(self, spline_func):
-#         self.spline_func = spline_func
-#         print('Setting reference trajectory')
-#         print()
+    def set_reference_trajectory(self, spline_func):
+        self.spline_func = spline_func
+        print('Setting reference trajectory')
+        print()
         
-#     def get_reference_trajectory(self, t):
-#         interpolated_state = self.spline_func(t)
-#         return {
-#             'q_ref': interpolated_state[:self.dq],
-#             'f_ref': interpolated_state[2*self.dq:2*self.dq + self.df]
-#         }
+    def get_reference_trajectory(self, t):
+        interpolated_state = self.spline_func(t)
+        return {
+            'q_ref': interpolated_state[:self.dq],
+            'f_ref': interpolated_state[2*self.dq:2*self.dq + self.df]
+        }
             
-#     def ffct(self, out, t, x, u, p):
-#         self.compute_system_matrices(x)
-#         q = x[:self.dq]
-#         q_d = x[self.dq:2*self.dq]
-#         f = x[2*self.dq:2*self.dq + self.df]
-#         # q_dot
-#         out[:self.dq] = u + self.K_D_inv@(self.K_P@(q_d - q) - self.J_q.T @ f)
-#         #q_d_dot
-#         out[self.dq:2*self.dq] = u
-#         # f_dot
-#         out[2*self.dq:2*self.dq + self.df] = self.K_coup @ (self.J_q_d @ u)
-#         return out
+    def ffct(self, out, t, x, u, p):
+        self.compute_system_matrices(x)
+        q = x[:self.dq]
+        q_d = x[self.dq:2*self.dq]
+        f = x[2*self.dq:2*self.dq + self.df]
+        # q_dot
+        out[:self.dq] = u + self.K_D_inv@(self.K_P@(q_d - q) - self.J_q.T @ f)
+        #q_d_dot
+        out[self.dq:2*self.dq] = u
+        # f_dot
+        out[2*self.dq:2*self.dq + self.df] = self.K_coup @ (self.J_q_d @ u)
+        return out
     
-#     def dfdx_vec(self, out, t, x, vec, u, p):
-#         self.compute_system_matrices(x)
-#         J = np.zeros((self.dq*2+self.df, self.dq*2+self.df))
+    def dfdx_vec(self, out, t, x, vec, u, p):
+        self.compute_system_matrices(x)
+        J = np.zeros((self.dq*2+self.df, self.dq*2+self.df))
         
-#         # dq_dot/dq
-#         J[:self.dq, :self.dq] = -self.K_P @ self.K_D_inv
+        # dq_dot/dq
+        J[:self.dq, :self.dq] = -self.K_P @ self.K_D_inv
         
-#         # Jacobian chain rule
-#         f_ext = x[2*self.dq:2*self.dq + self.df]
-#         dq_dot_dJ = -self.K_D_inv @ (self.H_q.transpose(1, 2, 0) @ f_ext)
-#         J[:self.dq, :self.dq] += dq_dot_dJ
+        # Jacobian chain rule
+        f_ext = x[2*self.dq:2*self.dq + self.df]
+        dq_dot_dJ = -self.K_D_inv @ (self.H_q.transpose(1, 2, 0) @ f_ext)
+        J[:self.dq, :self.dq] += dq_dot_dJ
         
-#         # dq_dot/dq_d
-#         J[:self.dq, self.dq:2*self.dq] = self.K_D_inv @ self.K_P
+        # dq_dot/dq_d
+        J[:self.dq, self.dq:2*self.dq] = self.K_D_inv @ self.K_P
         
-#         #dq_dot/df
-#         J[:self.dq, 2*self.dq:2*self.dq + self.df] = self.K_D_inv @ -self.J_q.T
+        #dq_dot/df
+        J[:self.dq, 2*self.dq:2*self.dq + self.df] = self.K_D_inv @ -self.J_q.T
         
         
-#         # df_dot/dq_d
-#         K_c_h = np.einsum('ij, jkl->ikl', self.K_coup, self.H_q_d)
-#         J[2*self.dq:2*self.dq + self.df, self.dq:2*self.dq] = K_c_h @ u
+        # df_dot/dq_d
+        K_c_h = np.einsum('ij, jkl->ikl', self.K_coup, self.H_q_d)
+        J[2*self.dq:2*self.dq + self.df, self.dq:2*self.dq] = K_c_h @ u
         
-#         return J.T @ vec
+        return J.T @ vec
     
-#     def dfdu_vec(self, out, t, x, vec, u, p):
-#         self.compute_system_matrices(x)
-#         J = np.zeros((self.dq*2+self.df, self.dq))
+    def dfdu_vec(self, out, t, x, vec, u, p):
+        self.compute_system_matrices(x)
+        J = np.zeros((self.dq*2+self.df, self.dq))
         
-#         # dq_dot/du
-#         J[:self.dq, :self.dq] = np.eye(self.dq)
+        # dq_dot/du
+        J[:self.dq, :self.dq] = np.eye(self.dq)
         
-#         # dq_d_dot/du
-#         J[self.dq:2*self.dq, :self.dq] = np.eye(self.dq)        
+        # dq_d_dot/du
+        J[self.dq:2*self.dq, :self.dq] = np.eye(self.dq)        
         
-#         # df_dot/du
-#         J[2*self.dq:2*self.dq + self.df, :self.dq] = self.K_coup @ self.J_q_d
+        # df_dot/du
+        J[2*self.dq:2*self.dq + self.df, :self.dq] = self.K_coup @ self.J_q_d
         
-#         return J.T @ vec
+        return J.T @ vec
     
-#     def lfct(self, out, t, x, u, p, xdes, udes):
-#         ref = self.get_reference_trajectory(t)
-#         q_ref = ref['q_ref']
-#         f_ref = ref['f_ref']
+    def lfct(self, out, t, x, u, p, xdes, udes):
+        ref = self.get_reference_trajectory(t)
+        q_ref = ref['q_ref']
+        f_ref = ref['f_ref']
         
-#         q = x[:self.dq]
+        q = x[:self.dq]
         
-#         fk_q_ref = self.handle_fk(q_ref)
-#         fk_q = self.handle_fk(q)
+        fk_q_ref = self.handle_fk(q_ref)
+        fk_q = self.handle_fk(q)
         
-#         dist, _, _ = se3_distance(fk_q, fk_q_ref, self.W_P)
+        dist, _, _ = se3_distance(fk_q, fk_q_ref, self.W_P)
         
-#         p_cost = dist ** 2 * self.config.w_p
+        p_cost = dist ** 2 * self.config.w_p
         
-#         q_cost = np.sum((q_ref - q)**2) * self.config.w_q
-#         f_cost = np.sum((f_ref - x[2*self.dq:2*self.dq + self.df])**2) * self.config.w_f
-#         u_cost = np.sum(u**2) * self.config.w_u
+        q_cost = np.sum((q_ref - q)**2) * self.config.w_q
+        f_cost = np.sum((f_ref - x[2*self.dq:2*self.dq + self.df])**2) * self.config.w_f
+        u_cost = np.sum(u**2) * self.config.w_u
         
-#         out = q_cost + p_cost + f_cost + u_cost
+        out = q_cost + p_cost + f_cost + u_cost
         
-#         return out
+        return out
     
-#     def handle_fk(self, q, jac=False):
-#         q_for_fk = torch.tensor(q.reshape(1, -1), device=self.problem.device).float()
-#         q_for_fk = partial_to_full_state(q_for_fk, fingers=self.problem.fingers)
-#         ee_names = [self.problem.ee_names[f] for f in self.problem.fingers]
-#         frame_indices = [self.problem.contact_scenes.robot_sdf.chain.frame_to_idx[ee_name] for ee_name in ee_names]
-#         if jac:
-#             q_for_fk = q_for_fk.repeat(len(frame_indices), 1)
-#             fk_q = self.problem.contact_scenes.robot_sdf.chain.jacobian(q_for_fk, link_indices=torch.tensor(frame_indices, device=self.problem.device).long())[..., self.contact_indices].cpu().numpy()
-#         else:
-#             fk_q = self.problem.contact_scenes.robot_sdf.chain.forward_kinematics(q_for_fk)
-#             pts = []
-#             for ee_name in ee_names:
-#                 pts.append(fk_q[ee_name].get_matrix().cpu().numpy())
-#             fk_q = np.concatenate(pts, axis=0)
+    def handle_fk(self, q, jac=False):
+        q_for_fk = torch.tensor(q.reshape(1, -1), device=self.problem.device).float()
+        q_for_fk = partial_to_full_state(q_for_fk, fingers=self.problem.fingers)
+        ee_names = [self.problem.ee_names[f] for f in self.problem.fingers]
+        frame_indices = [self.problem.contact_scenes.robot_sdf.chain.frame_to_idx[ee_name] for ee_name in ee_names]
+        if jac:
+            q_for_fk = q_for_fk.repeat(len(frame_indices), 1)
+            fk_q = self.problem.contact_scenes.robot_sdf.chain.jacobian(q_for_fk, link_indices=torch.tensor(frame_indices, device=self.problem.device).long())[..., self.contact_indices].cpu().numpy()
+        else:
+            fk_q = self.problem.contact_scenes.robot_sdf.chain.forward_kinematics(q_for_fk)
+            pts = []
+            for ee_name in ee_names:
+                pts.append(fk_q[ee_name].get_matrix().cpu().numpy())
+            fk_q = np.concatenate(pts, axis=0)
 
-#         return fk_q
+        return fk_q
     
-#     def dldx(self, out, t, x, u, p, xdes, udes):
-#         ref = self.get_reference_trajectory(t)
-#         q_ref = ref['q_ref']
-#         f_ref = ref['f_ref']
-#         q = x[:self.dq]
+    def dldx(self, out, t, x, u, p, xdes, udes):
+        ref = self.get_reference_trajectory(t)
+        q_ref = ref['q_ref']
+        f_ref = ref['f_ref']
+        q = x[:self.dq]
         
-#         # joint position cost
-#         out[:self.dq] = 2 * (q_ref - q) * self.config.w_q
+        # joint position cost
+        out[:self.dq] = 2 * (q_ref - q) * self.config.w_q
         
-#         fk_q = self.handle_fk(q)
-#         fk_q_ref = self.handle_fk(q_ref)
-#         jac_fk_q = self.handle_fk(q, jac=True)
-#         dist, grad = se3_distance_gradient(fk_q, fk_q_ref, self.W_P)
-#         # Squared cost, so adjust grad
-#         grad = grad * 2 * dist.reshape(-1, 1)
-#         grad_fk_q = np.einsum('bi,bij->bj', grad, jac_fk_q)
-#         #
-#         out[:self.dq] += grad_fk_q.sum(axis=0) * self.config.w_p
+        fk_q = self.handle_fk(q)
+        fk_q_ref = self.handle_fk(q_ref)
+        jac_fk_q = self.handle_fk(q, jac=True)
+        dist, grad = se3_distance_gradient(fk_q, fk_q_ref, self.W_P)
+        # Squared cost, so adjust grad
+        grad = grad * 2 * dist.reshape(-1, 1)
+        grad_fk_q = np.einsum('bi,bij->bj', grad, jac_fk_q)
+        #
+        out[:self.dq] += grad_fk_q.sum(axis=0) * self.config.w_p
         
-#         # external force cost
-#         out[2*self.dq:2*self.dq + self.df] = 2 * (x[2*self.dq:2*self.dq + self.df] - f_ref) * self.config.w_f
+        # external force cost
+        out[2*self.dq:2*self.dq + self.df] = 2 * (x[2*self.dq:2*self.dq + self.df] - f_ref) * self.config.w_f
         
-#         return out
+        return out
     
-#     def dldu(self, out, t, x, u, p, xdes, udes):
-#         out = 2 * u * self.config.w_u
-#         return out
+    def dldu(self, out, t, x, u, p, xdes, udes):
+        out = 2 * u * self.config.w_u
+        return out
 
 class WeightingMatrixDeterminer:
     """
@@ -582,29 +582,40 @@ class TactileFeedbackQPController:
         Returns:
             Dictionary containing system matrices
         """
-        q = x_ref[:self.dq]
-        q_d = x_ref[self.dq:2*self.dq]
+        q = np.expand_dims(x_ref[:, :self.dq], 0)
+        theta = np.expand_dims(x_ref[:, self.dq:self.dq+self.problem.obj_dof], 0)
+        q_d = np.expand_dims(x_ref[:, self.dq+self.problem.obj_dof:2*self.dq+self.problem.obj_dof], 0)
         
         # Use the preprocessing from TactileMPC to get Jacobians
-        q_for_preprocess = torch.tensor(np.stack((q, q_d), axis=0), device=self.problem.device).unsqueeze(0).float()
-        theta_for_preprocess = torch.zeros((1, 2, self.problem.obj_dof), device=self.problem.device).float()
+        q_for_preprocess = torch.tensor(np.concatenate((q, q_d), axis=0), device=self.problem.device).float()
+        theta_for_preprocess = torch.tensor(theta, device=self.problem.device).float().repeat(2, 1, 1)
         
-        self.problem._preprocess_fingers(q_for_preprocess, theta_for_preprocess, T_override=1, tactile_controller=True)
+        self.problem._preprocess_fingers(q_for_preprocess, theta_for_preprocess, T_override=q_for_preprocess.shape[1], tactile_controller=True)
         
-        Js = self.problem.data['J_q'].clone().flatten(1, 2)
+        Js = self.problem.data['J_q'].clone().reshape(2, q.shape[1], self.problem.num_fingers, 3, -1).flatten(2, 3)
         # Hs = self.problem.data['H_q'].clone().flatten(1, 2)
         
-        J_q = Js[0].detach().cpu().numpy()[:, self.contact_indices]
-        J_q_d = Js[1].detach().cpu().numpy()[:, self.contact_indices]
+        J_q = Js[0].detach().cpu().numpy()[:, :, self.contact_indices]
+        J_q_d = Js[1].detach().cpu().numpy()[:, :, self.contact_indices]
         # H_q = Hs[0, :, self.contact_indices][:, :, self.contact_indices].detach().cpu().numpy()
         # H_q_d = Hs[1, :, self.contact_indices][:, :, self.contact_indices].detach().cpu().numpy()
-        G_o = self.problem.data['G_o'][0].detach().cpu().numpy()
+        G_o = self.problem.data['G_o'].reshape(q_for_preprocess.shape[0], q_for_preprocess.shape[1], 6, -1)[0].detach().cpu().numpy()
         
         # Compute coupling matrix
-        K_r = J_q @ self.K_P_inv @ J_q.T
-        K_bar = np.linalg.inv(np.eye(K_r.shape[0]) + self.config.K_e @ np.linalg.inv(K_r + 1e-6 * np.eye(K_r.shape[0]))) @ self.config.K_e
-        G_o_Kbar = G_o @ K_bar
-        K_coup = K_bar + (K_bar @ G_o.T) @ np.linalg.inv(G_o_Kbar @ G_o.T + 1e-6 * np.eye(6)) @ G_o_Kbar
+        K_r = np.matmul(np.matmul(J_q, np.repeat(np.expand_dims(self.K_P_inv, 0), q_for_preprocess.shape[1], axis=0)), J_q.transpose(0, 2, 1))
+        B = K_r.shape[0]
+
+        K_e_repeat = np.repeat(np.expand_dims(self.config.K_e, 0), q_for_preprocess.shape[1], axis=0)
+        K_e_K_r_inv = np.matmul(K_e_repeat, np.linalg.inv(K_r + 1e-6 * np.eye(K_r.shape[-1])))
+
+        eye = np.repeat(np.expand_dims(np.eye(K_r.shape[-1]), 0), q_for_preprocess.shape[1], axis=0)
+        
+        first_term = np.linalg.inv(eye + K_e_K_r_inv)
+
+        K_bar = np.matmul(first_term, K_e_repeat)
+
+        G_o_Kbar = np.matmul(G_o, K_bar)
+        K_coup = K_bar + (K_bar @ G_o.transpose(0, 2, 1)) @ np.linalg.inv(G_o_Kbar @ G_o.transpose(0, 2, 1) + 1e-6 * np.eye(6)) @ G_o_Kbar
         
         return {
             'J_q': J_q,
@@ -744,12 +755,8 @@ class TactileFeedbackQPController:
             q_ref_t = x_ref[:self.dq]
             q_key = tuple(q_ref_t.round(6))  # Round for floating point key
             if q_key not in fk_cache:
-                try:
-                    fk_ref = self.compute_fk_poses(q_ref_t)
-                    fk_cache[q_key] = fk_ref
-                except Exception as e:
-                    logger.warning(f"FK computation failed at timestep {t}: {e}")
-                    fk_cache[q_key] = None
+                fk_ref = self.compute_fk_poses(q_ref_t)
+                fk_cache[q_key] = fk_ref
         
         # Add dynamics constraints
         x_prev = x0
@@ -847,14 +854,14 @@ class TactileFeedbackQPController:
             'reference_trajectory': reference_trajectory
         }
     
-    def get_x_ref_from_ref_state(self, ref_state: np.ndarray):
+    def get_x_ref_from_ref_state(self, ref_states: np.ndarray):
         """
         Get the state x_ref from the reference state.
         """
-        x_ref = np.zeros(self.n_x)
-        x_ref[:self.dq] = ref_state[:self.dq]
-        x_ref[self.dq:2*self.dq] = ref_state[self.dq+self.problem.obj_dof:2*self.dq+self.problem.obj_dof]
-        x_ref[2*self.dq:2*self.dq + self.df] = ref_state[2*self.dq+self.problem.obj_dof:]
+        x_ref = np.zeros((ref_states.shape[0], self.n_x))
+        x_ref[:, :self.dq] = ref_states[:, :self.dq]
+        x_ref[:, self.dq:2*self.dq] = ref_states[:, self.dq+self.problem.obj_dof:2*self.dq+self.problem.obj_dof]
+        x_ref[:, 2*self.dq:2*self.dq + self.df] = ref_states[:, 2*self.dq+self.problem.obj_dof:]
         return x_ref
         
     def setup_qp_problem_precomputed_jacobians(self, t0: float, x0: np.ndarray, reference_trajectory: callable, 
@@ -895,33 +902,29 @@ class TactileFeedbackQPController:
         ref_jacobians = []
         fk_cache = {}
         
+        t = np.arange(self.horizon) * self.dt + t0
+        # Get reference trajectory at time t
+        x_ref = reference_trajectory(t)
+            
+        # Pre-compute system matrices at reference point
+        ref_jacobians = self.compute_system_matrices_at_state(x_ref)
+        
+        # Cache FK poses for cost function
+        q_ref = x_ref[:, :self.dq]
         for t in range(self.horizon):
-            # Get reference trajectory at time t
-            ref_state = reference_trajectory(t0 + t * self.dt)
-            x_ref = self.get_x_ref_from_ref_state(ref_state)
-            
-            # Pre-compute system matrices at reference point
-            system_matrices = self.compute_system_matrices_at_state(x_ref)
-            ref_jacobians.append(system_matrices)
-            
-            # Cache FK poses for cost function
-            q_ref_t = x_ref[:self.dq]
+            q_ref_t = q_ref[t]
             q_key = tuple(q_ref_t.round(6))
             if q_key not in fk_cache:
-                try:
-                    fk_ref = self.compute_fk_poses(q_ref_t)
-                    fk_cache[q_key] = fk_ref
-                except Exception as e:
-                    logger.warning(f"FK computation failed at timestep {t}: {e}")
-                    fk_cache[q_key] = None
+                fk_ref = self.compute_fk_poses(q_ref_t)
+                fk_cache[q_key] = fk_ref
         
         # Add linear dynamics constraints using pre-computed jacobians
         x_prev = x0
         for t in range(self.horizon):
             # Get pre-computed jacobians for this timestep
-            J_q = ref_jacobians[t]['J_q']      # Contact jacobian [df, dq]
-            J_q_d = ref_jacobians[t]['J_q_d']  # Contact jacobian derivative [df, dq]
-            K_coup = ref_jacobians[t]['K_coup'] # Coupling matrix [df, df]
+            J_q = ref_jacobians['J_q'][t]      # Contact jacobian [df, dq]
+            J_q_d = ref_jacobians['J_q_d'][t]  # Contact jacobian derivative [df, dq]
+            K_coup = ref_jacobians['K_coup'][t] # Coupling matrix [df, df]
             
             # Extract state variables for current timestep
             if t == 0:
@@ -956,7 +959,7 @@ class TactileFeedbackQPController:
         # Add cost function (same as before)
         for t in range(self.horizon):
             ref_t = reference_trajectory(t0 + t * self.dt)
-            ref_t = self.get_x_ref_from_ref_state(ref_t)
+            ref_t = self.get_x_ref_from_ref_state(ref_t.reshape(1, -1))[0]
             q_ref = ref_t[:self.dq]
             f_ref = ref_t[2*self.dq:2*self.dq + self.df]
             
@@ -984,7 +987,7 @@ class TactileFeedbackQPController:
                     fk_ref = fk_cache[q_key]
                     
                     # Use pre-computed contact jacobian
-                    J_q = ref_jacobians[t]['J_q']  # Contact jacobian [df, dq]
+                    J_q = ref_jacobians['J_q'][t]  # Contact jacobian [df, dq]
                     
                     # Linearized FK cost using pre-computed jacobian
                     W_P_sqrt = np.real(scipy.linalg.sqrtm(W_P + 1e-6 * np.eye(W_P.shape[0])))
@@ -1076,9 +1079,9 @@ class TactileFeedbackQPController:
         try:
             # Solve the QP problem
             problem = qp_data['problem']
-            problem.solve(solver='OSQP', verbose=False)
+            problem.solve(solver='CLARABEL', verbose=False)
             
-            if problem.status not in ['optimal', 'optimal_inaccurate']:
+            if problem.status not in ['optimal', 'optimal_inaccurate', 'feasible']:
                 logger.warning(f"QP solver status: {problem.status}")
                 return torch.zeros_like(state)
             
