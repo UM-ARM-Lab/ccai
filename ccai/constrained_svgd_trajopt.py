@@ -312,6 +312,13 @@ class ConstrainedSteinTrajOpt:
         path = [xuz.data.clone()]
         self.gamma = self.max_gamma
         T = 0 if skip_optim else T
+
+        def format_path(sort_idx=None):
+            formatted_path = torch.stack(path, dim=0).reshape(len(path), N, self.T, -1)[:, :, :, :self.dx + self.du]
+            if sort_idx is not None:
+                formatted_path = formatted_path[:, sort_idx]
+            return formatted_path.detach()
+
         for iter in range(T):
             # print(iter)
             # reset slack variables
@@ -328,7 +335,11 @@ class ConstrainedSteinTrajOpt:
 
             # if (iter + 1) % resample_period == 0 and (iter < T - 1):
             #    xuz.data = self.resample(xuz.data)
-            grad = self.compute_update(xuz)
+            try:
+                grad = self.compute_update(xuz)
+            except Exception as e:
+                print(f"SVGD update failed at iter {iter}: {e}")
+                break
 
             grad_norm = torch.linalg.norm(grad, keepdim=True, dim=-1)
             max_norm = 1
@@ -342,17 +353,26 @@ class ConstrainedSteinTrajOpt:
 
         # sort particles by penalty
         xuz = xuz.to(dtype=torch.float32)
-        self.problem.preprocess_from_aug(xuz)
-        J = self.problem.get_cost(xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du])
-        C, _, _, _ = self.problem.combined_constraints(xuz.reshape(N, self.T, -1), compute_grads=False, compute_hess=False)
-        penalty = J.reshape(N) + self.penalty * torch.sum(C.reshape(N, -1).abs(), dim=1)
-        idx = torch.argsort(penalty, descending=False)
-        self.idx = idx
-        self.best_idx = idx[0]
-        path = torch.stack(path, dim=0).reshape(len(path), N, self.T, -1)[:, :, :, :self.dx + self.du]
-        path = path[:, idx]
+        try:
+            self.problem.preprocess_from_aug(xuz)
+            J = self.problem.get_cost(xuz.reshape(N, self.T, -1)[:, :, :self.dx + self.du])
+            C, _, _, _ = self.problem.combined_constraints(
+                xuz.reshape(N, self.T, -1),
+                compute_grads=False,
+                compute_hess=False,
+            )
+            penalty = J.reshape(N) + self.penalty * torch.sum(C.reshape(N, -1).abs(), dim=1)
+            idx = torch.argsort(penalty, descending=False)
+            self.idx = idx
+            self.best_idx = idx[0]
+            path = format_path(sort_idx=idx)
+        except Exception as e:
+            print(f"SVGD final scoring failed, returning current path without resorting: {e}")
+            self.idx = torch.arange(N, device=xuz.device)
+            self.best_idx = 0
+            path = format_path()
         # self.dual = self.dual[idx]
         # idx_cpu_numpy = idx.cpu().numpy()
         # for i in range(len(self.dual_history)):
         #     self.dual_history[i] = self.dual_history[i][idx_cpu_numpy]
-        return path.detach()
+        return path
