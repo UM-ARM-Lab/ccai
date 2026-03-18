@@ -807,7 +807,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                                         use_collision_geometry=False)
             self.object_sdf = object_sdf
             robot_sdf = pv.RobotSDF(chain, path_prefix=get_assets_dir() + '/xela_models',
-                                    use_collision_geometry=False)
+                                    use_collision_geometry=True)
             contact_scenes = pv.RobotScene(robot_sdf, object_sdf, scene_trans,
                                                 collision_check_links=collision_check_links,
                                                 softmin_temp=1.0e3,
@@ -2065,6 +2065,7 @@ class AllegroContactProblem(AllegroObjectProblem):
                  env_force=False,
                  turn=False,
                  obj_gravity=False,
+                 force_cost_weight=1.0,
                  device='cuda:0',
                  min_force_dict=None,
                  contact_constraint_only=False,
@@ -2073,6 +2074,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         self.obj_gravity = obj_gravity
         self.optimize_force = optimize_force
         self.turn = turn
+        self.force_cost_weight = float(force_cost_weight)
         self.num_contacts = len(contact_fingers)
         self.contact_fingers = contact_fingers
         self.env_force = env_force
@@ -2190,10 +2192,8 @@ class AllegroContactProblem(AllegroObjectProblem):
                 idx = self.contact_force_indices_dict[finger]
                 std = .05 if not self.full_dof_goal else .15
                 std = .05 if self.turn else std
-                if (self.object_type != 'screwdriver') or (finger != 'index' and self.turn and not self.full_dof_goal):
-                    u[..., idx] = 1.5 * torch.randn(N, self.T, 3, device=self.device)
-                else:
-                    u[..., idx] = std * torch.randn(N, self.T, 3, device=self.device)
+                force_std = 1.5 if self.turn and self.object_type == 'screwdriver' else std
+                u[..., idx] = force_std * torch.randn(N, self.T, 3, device=self.device)
         if not self.full_dof_goal:
             x = [self.start.reshape(1, self.dx).repeat(N, 1)]
             for t in range(self.T):
@@ -2272,7 +2272,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         if self.optimize_force:
             force = xu[:, -self.num_contacts * 3:]
             sq = force ** 2
-            cost += torch.sum(sq) * 1#.001
+            cost += torch.sum(sq) * self.force_cost_weight
         
             # if not self.turn:
             #     cost += torch.sum(sq)
