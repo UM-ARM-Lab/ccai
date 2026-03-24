@@ -2109,6 +2109,8 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         self.friction_coefficient = friction_coefficient
         self.yaw_joint_friction = float(yaw_joint_friction)
+        self.hand_joint_stiffness = float(kwargs.get('hand_joint_stiffness', 30.0))
+        self.hand_joint_damping = float(kwargs.get('hand_joint_damping', 10.0))
         self.action_dt = float(kwargs.get('action_dt', 1.0))
         self.yaw_friction_velocity_scale = float(kwargs.get('yaw_friction_velocity_scale', 1e-2))
         self.screwdriver_tip_radius = SCREWDRIVER_STICK_RADIUS if self.object_type == 'screwdriver' else 0.0
@@ -2400,9 +2402,10 @@ class AllegroContactProblem(AllegroObjectProblem):
                              djac_dnext_q.reshape(N, T, -1, 4 * self.num_contacts)
 
                 d_contact_loc_dq = self.data[finger_name]['closest_pt_q_grad']
-                d_contact_loc_dq = d_contact_loc_dq.reshape(N, T + T_offset, 3, 16)[:, :-1, :, self.contact_state_indices]
+                d_contact_loc_dq = d_contact_loc_dq.reshape(N, T + T_offset, 3, 16)[:, T_offset:, :, self.contact_state_indices]
                 d_contact_loc_dq = self._world_point_grads_to_robot_frame(d_contact_loc_dq)
-                dg_dq = dg_dq + dg_dcontact[:, :, i].reshape(N, T, g.shape[2], 3) @ d_contact_loc_dq
+                dg_dnext_q = dg_dnext_q + dg_dcontact[:, :, i].reshape(N, T, g.shape[2], 3) @ d_contact_loc_dq
+
             mask_t = torch.zeros_like(grad_g).bool()
             mask_t[:, :, T_range, T_range] = True
             mask_t_p = torch.zeros_like(grad_g).bool()
@@ -2689,6 +2692,8 @@ class AllegroContactProblem(AllegroObjectProblem):
             grad_g = torch.zeros(N, g.shape[2], T, T, self.d, device=self.device)
             dg_dq = dg_dq.reshape(N, T, g.shape[2], 4 * self.num_contacts)
             dg_dnext_q = dg_dnext_q.reshape(N, T, g.shape[2], 4 * self.num_contacts)
+            dg_dcurrent_env_q = dg_dcurrent_env_q.reshape(N, T, g.shape[2], self.obj_dof)
+            dg_dnext_env_q = dg_dnext_env_q.reshape(N, T, g.shape[2], self.obj_dof)
 
             for i, finger_name in enumerate(self.contact_fingers):
                 # NOTE: assume fingers have joints independent of each other
@@ -2700,9 +2705,14 @@ class AllegroContactProblem(AllegroObjectProblem):
                              djac_dnext_q.reshape(N, T, -1, 4 * self.num_contacts)
 
                 d_contact_loc_dq = self.data[finger_name]['closest_pt_q_grad']
-                d_contact_loc_dq = d_contact_loc_dq.reshape(N, T + T_offset, 3, 16)[:, :-1, :, self.contact_state_indices]
+                d_contact_loc_dq = d_contact_loc_dq.reshape(N, T + T_offset, 3, 16)[:, T_offset:, :, self.contact_state_indices]
                 d_contact_loc_dq = self._world_point_grads_to_robot_frame(d_contact_loc_dq)
-                dg_dq = dg_dq + dg_dcontact[:, :, i].reshape(N, T, g.shape[2], 3) @ d_contact_loc_dq
+                dg_dnext_q = dg_dnext_q + dg_dcontact[:, :, i].reshape(N, T, g.shape[2], 3) @ d_contact_loc_dq
+
+                d_contact_loc_denv_q = self.data[finger_name]['closest_pt_env_q_grad']
+                d_contact_loc_denv_q = d_contact_loc_denv_q.reshape(N, T + T_offset, 3, self.obj_dof)[:, T_offset:]
+                d_contact_loc_denv_q = self._world_point_grads_to_robot_frame(d_contact_loc_denv_q)
+                dg_dnext_env_q = dg_dnext_env_q + dg_dcontact[:, :, i].reshape(N, T, g.shape[2], 3) @ d_contact_loc_denv_q
 
             mask_t = torch.zeros_like(grad_g).bool()
             mask_t[:, :, T_range, T_range] = True
