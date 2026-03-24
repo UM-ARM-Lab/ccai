@@ -49,6 +49,11 @@ def _sign_with_deadband(value, eps=1e-6):
     )
 
 
+def _smooth_coulomb_sign(value, scale):
+    value_tensor = torch.as_tensor(value)
+    return torch.tanh(value_tensor / scale)
+
+
 def euler_to_quat(euler, return_intermediates=False):
     matrix = tf.euler_angles_to_matrix(euler, convention='XYZ')
     quat = tf.matrix_to_quaternion(matrix)
@@ -738,6 +743,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
         self.ee_link_idx = {finger: chain.frame_to_idx[ee_name] for finger, ee_name in self.ee_names.items()}
         self.frame_indices = torch.tensor([self.ee_link_idx[finger] for finger in self.fingers])
+        self.fingertip_contact_only = bool(kwargs.get('fingertip_contact_only', False))
 
         ##### SDF for robot and environment ######
         self.world_trans = world_trans.to(device=device)
@@ -774,9 +780,12 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         # robot_minus_object = world_trans.to(device=device).compose(obj_to_world_trans.to(device=device).inverse())
         # print(robot_minus_object.get_matrix())
         # contact checking
-        # collision_check_links = [self.ee_names[finger] for finger in self.fingers]
-        collision_check_links = sum([self.collision_link_names[finger] for finger in self.fingers], [])
-        links_per_finger = len(self.collision_link_names['index'])
+        if self.fingertip_contact_only:
+            collision_check_links = [self.ee_names[finger] for finger in self.fingers]
+            links_per_finger = 1
+        else:
+            collision_check_links = sum([self.collision_link_names[finger] for finger in self.fingers], [])
+            links_per_finger = len(self.collision_link_names['index'])
         cache_key = _make_contact_scene_cache_key(
             object_type=object_type,
             object_asset_path=asset_object,
@@ -2100,6 +2109,8 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         self.friction_coefficient = friction_coefficient
         self.yaw_joint_friction = float(yaw_joint_friction)
+        self.action_dt = float(kwargs.get('action_dt', 1.0))
+        self.yaw_friction_velocity_scale = float(kwargs.get('yaw_friction_velocity_scale', 1e-2))
         self.screwdriver_tip_radius = SCREWDRIVER_STICK_RADIUS if self.object_type == 'screwdriver' else 0.0
         self.dynamics_constr = vmap(self._dynamics_constr)
         self.grad_dynamics_constr = vmap(jacrev(self._dynamics_constr, argnums=(0, 1, 2, 3, 4)))
@@ -2121,7 +2132,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         # self.grad_friction_constr_force = vmap(
         #     partial(self._grad_friction_constr_analytical, use_force=True), randomness='same')
         self.grad_friction_constr_force = vmap(
-            jacrev(self._friction_constr, argnums=(0, 1, 2)))
+            jacrev(partial(self._friction_constr, use_force=True), argnums=(0, 1, 2)))
 
         self.kinematics_constr = vmap(vmap(self._kinematics_constr))
         # self.grad_kinematics_constr = vmap(vmap(self._grad_kinematics_constr_analytical))
@@ -2350,7 +2361,8 @@ class AllegroContactProblem(AllegroObjectProblem):
         contact_point_list = []
         for finger in self.contact_fingers:
             jac = self.data[finger]['contact_jacobian'].reshape(N, T + T_offset, 3, -1)[:, T_offset:, :, self.contact_state_indices]
-            contact_points = self.data[finger]['closest_pt_world'].reshape(N, T + T_offset, 3)[:, T_offset:].reshape(-1, 3)
+            contact_points_world = self.data[finger]['closest_pt_world'].reshape(N, T + T_offset, 3)[:, T_offset:].reshape(-1, 3)
+            contact_points = self._world_points_to_robot_frame(contact_points_world)
             contact_jac_list.append(jac.reshape(N * (T + T_offset), 3, -1))
             contact_point_list.append(contact_points)
 
@@ -2389,6 +2401,7 @@ class AllegroContactProblem(AllegroObjectProblem):
 
                 d_contact_loc_dq = self.data[finger_name]['closest_pt_q_grad']
                 d_contact_loc_dq = d_contact_loc_dq.reshape(N, T + T_offset, 3, 16)[:, :-1, :, self.contact_state_indices]
+                d_contact_loc_dq = self._world_point_grads_to_robot_frame(d_contact_loc_dq)
                 dg_dq = dg_dq + dg_dcontact[:, :, i].reshape(N, T, g.shape[2], 3) @ d_contact_loc_dq
             mask_t = torch.zeros_like(grad_g).bool()
             mask_t[:, :, T_range, T_range] = True
@@ -2501,6 +2514,19 @@ class AllegroContactProblem(AllegroObjectProblem):
     def _world_vector_to_robot_frame(self, vector_world):
         return self.world_trans.inverse().transform_normals(vector_world.unsqueeze(0)).squeeze(0)
 
+    def _world_points_to_robot_frame(self, points_world):
+        original_shape = points_world.shape
+        points_world = points_world.reshape(-1, 3)
+        points_robot = self.world_trans.inverse().transform_points(points_world)
+        return points_robot.reshape(original_shape)
+
+    def _world_point_grads_to_robot_frame(self, point_grads_world):
+        world_to_robot = self.world_trans.inverse().get_matrix()[0, :3, :3].to(
+            device=point_grads_world.device,
+            dtype=point_grads_world.dtype,
+        )
+        return torch.einsum('ij,...jk->...ik', world_to_robot, point_grads_world)
+
     def _get_screwdriver_gravity_force_world(self, env_q):
         return self.obj_mass * torch.tensor([0, 0, -9.8], device=env_q.device, dtype=env_q.dtype)
 
@@ -2524,10 +2550,17 @@ class AllegroContactProblem(AllegroObjectProblem):
         _, body_rotation_world = self._get_screwdriver_body_pose_in_robot_frame(next_env_q)
         yaw_axis_robot_frame = self._world_vector_to_robot_frame(body_rotation_world[:, 2])
         yaw_delta = next_env_q[-1] - current_env_q[-1]
-        yaw_motion_sign = _sign_with_deadband(yaw_delta, eps=eps)
-        normal_force = self._get_screwdriver_tip_normal_force(finger_force_list, next_env_q)
-        friction_magnitude = self.yaw_joint_friction * normal_force * self.screwdriver_tip_radius
-        return -yaw_motion_sign * friction_magnitude * yaw_axis_robot_frame
+        yaw_velocity = yaw_delta / self.action_dt
+        friction_direction = _smooth_coulomb_sign(
+            yaw_velocity,
+            scale=max(self.yaw_friction_velocity_scale, eps),
+        )
+        friction_magnitude = torch.as_tensor(
+            self.yaw_joint_friction,
+            device=next_env_q.device,
+            dtype=next_env_q.dtype,
+        )
+        return -friction_direction * friction_magnitude * yaw_axis_robot_frame
 
     def _force_equlibrium_constr_w_force(self, q, u, next_q, force_list, contact_jac_list, contact_point_list,
                                          current_env_q, next_env_q):
@@ -2618,7 +2651,8 @@ class AllegroContactProblem(AllegroObjectProblem):
         contact_point_list = []
         for finger in self.contact_fingers:
             jac = self.data[finger]['contact_jacobian'].reshape(N, T + T_offset, 3, -1)[:, T_offset:, :, self.contact_state_indices]
-            contact_points = self.data[finger]['closest_pt_world'].reshape(N, T + T_offset , 3)[:, T_offset:].reshape(-1, 3)
+            contact_points_world = self.data[finger]['closest_pt_world'].reshape(N, T + T_offset , 3)[:, T_offset:].reshape(-1, 3)
+            contact_points = self._world_points_to_robot_frame(contact_points_world)
             contact_jac_list.append(jac.reshape(N * T, 3, -1))
             contact_point_list.append(contact_points)
 
@@ -2667,6 +2701,7 @@ class AllegroContactProblem(AllegroObjectProblem):
 
                 d_contact_loc_dq = self.data[finger_name]['closest_pt_q_grad']
                 d_contact_loc_dq = d_contact_loc_dq.reshape(N, T + T_offset, 3, 16)[:, :-1, :, self.contact_state_indices]
+                d_contact_loc_dq = self._world_point_grads_to_robot_frame(d_contact_loc_dq)
                 dg_dq = dg_dq + dg_dcontact[:, :, i].reshape(N, T, g.shape[2], 3) @ d_contact_loc_dq
 
             mask_t = torch.zeros_like(grad_g).bool()
@@ -3515,7 +3550,7 @@ class AllegroContactProblem(AllegroObjectProblem):
             
             if not self.contact_constraint_only:
                 h, grad_h, hess_h, t_mask = self._friction_constraint(
-                    q=q, delta_q=delta_q, force=None,
+                    q=q, delta_q=delta_q, force=force,
                     compute_grads=compute_grads,
                     compute_hess=compute_hess,
                     projected_diffusion=projected_diffusion)
