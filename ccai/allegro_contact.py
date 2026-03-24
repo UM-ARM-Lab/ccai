@@ -2111,6 +2111,8 @@ class AllegroContactProblem(AllegroObjectProblem):
         self.yaw_joint_friction = float(yaw_joint_friction)
         self.hand_joint_stiffness = float(kwargs.get('hand_joint_stiffness', 30.0))
         self.hand_joint_damping = float(kwargs.get('hand_joint_damping', 10.0))
+        self.hand_equilibrium_stiffness = float(kwargs.get('hand_equilibrium_stiffness', 3.0))
+        self.hand_equilibrium_damping = float(kwargs.get('hand_equilibrium_damping', 0.0))
         self.action_dt = float(kwargs.get('action_dt', 1.0))
         self.yaw_friction_velocity_scale = float(kwargs.get('yaw_friction_velocity_scale', 1e-2))
         self.screwdriver_tip_radius = SCREWDRIVER_STICK_RADIUS if self.object_type == 'screwdriver' else 0.0
@@ -2616,7 +2618,12 @@ class AllegroContactProblem(AllegroObjectProblem):
         if not self.contact_constraint_only:
             reactional_torque_list = torch.stack(reactional_torque_list, dim=0)
             sum_reactional_torque = torch.sum(reactional_torque_list, dim=0)
-            g_force_torque_balance = (sum_reactional_torque + 3.0 * delta_q)
+            hand_velocity = (next_q - q) / self.action_dt
+            hand_equilibrium_torque = (
+                self.hand_equilibrium_stiffness * delta_q
+                - self.hand_equilibrium_damping * hand_velocity
+            )
+            g_force_torque_balance = (sum_reactional_torque + hand_equilibrium_torque)
             g = torch.cat((torque_list, g_force_torque_balance.reshape(-1)), dim=-1)
         else:
             g = torque_list
@@ -3863,7 +3870,12 @@ class AllegroContactWithEnvProblem(AllegroContactProblem):
         # force_world_frame = self.world_trans.transform_normals(force.unsqueeze(0)).squeeze(0)
         reactional_torque_list = torch.stack(reactional_torque_list, dim=0)
         sum_reactional_torque = torch.sum(reactional_torque_list, dim=0)
-        g_force_torque_balance = (sum_reactional_torque + 3.0 * delta_q)
+        hand_velocity = (next_q - q) / self.action_dt
+        hand_equilibrium_torque = (
+            self.hand_equilibrium_stiffness * delta_q
+            - self.hand_equilibrium_damping * hand_velocity
+        )
+        g_force_torque_balance = (sum_reactional_torque + hand_equilibrium_torque)
         
         sum_force = torch.sum(force_list, dim=0)
         # print(g_force_torque_balance.max(), torque_list.max())
