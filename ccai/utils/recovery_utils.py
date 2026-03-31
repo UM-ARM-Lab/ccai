@@ -180,6 +180,11 @@ def create_allegro_screwdriver_problem(problem_type, start, goal, params, env, d
         'yaw_friction_model_type': params.get('yaw_friction_model_type', 'legacy_scalar'),
         'yaw_friction_model_params': params.get('yaw_friction_model_params'),
         'yaw_friction_model_path': params.get('yaw_friction_model_path'),
+        'yaw_inertia_model_type': params.get('yaw_inertia_model_type', 'none'),
+        'yaw_inertia_model_params': params.get('yaw_inertia_model_params'),
+        'yaw_inertia_model_path': params.get('yaw_inertia_model_path'),
+        'dt': params.get('dt', 1/12),
+        'start_yaw_velocity': params.get('start_yaw_velocity', 0.0),
     }
     
     # Problem-specific configurations

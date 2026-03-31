@@ -2077,6 +2077,10 @@ class AllegroContactProblem(AllegroObjectProblem):
                  yaw_friction_model_type='legacy_scalar',
                  yaw_friction_model_params=None,
                  yaw_friction_model_path=None,
+                 yaw_inertia_model_type='none',
+                 yaw_inertia_model_params=None,
+                 yaw_inertia_model_path=None,
+                 start_yaw_velocity=0.0,
                  **kwargs):
         self.obj_dof_type = obj_dof_type
         self.obj_gravity = obj_gravity
@@ -2117,6 +2121,16 @@ class AllegroContactProblem(AllegroObjectProblem):
         if yaw_friction_model_params is not None and self.yaw_friction_model_type == 'legacy_scalar':
             self.yaw_friction_model_type = str(yaw_friction_model_params.get('model_type', 'learned_global_v1'))
         self.yaw_friction_model_params = yaw_friction_model_params
+        if yaw_inertia_model_path is not None:
+            yaw_inertia_model_params = json.loads(pathlib.Path(yaw_inertia_model_path).read_text(encoding='utf-8'))
+        self.yaw_inertia_model_type = yaw_inertia_model_type
+        if yaw_inertia_model_params is not None and self.yaw_inertia_model_type == 'none':
+            self.yaw_inertia_model_type = str(yaw_inertia_model_params.get('model_type', 'constant_inertia_v1'))
+        self.yaw_inertia_model_params = yaw_inertia_model_params
+        self.yaw_dynamics_dt = float(kwargs.get('dt', self.dt))
+        self.start_yaw_velocity = float(start_yaw_velocity)
+        if self.yaw_inertia_model_params is not None and not optimize_force:
+            raise ValueError("Yaw inertia models currently require optimize_force=True in screwdriver problems.")
         self.dynamics_constr = vmap(self._dynamics_constr)
         self.grad_dynamics_constr = vmap(jacrev(self._dynamics_constr, argnums=(0, 1, 2, 3, 4)))
         if not optimize_force:
@@ -2125,7 +2139,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         else:
             self.force_equlibrium_constr = vmap(self._force_equlibrium_constr_w_force)
             self.grad_force_equlibrium_constr = vmap(
-                jacrev(self._force_equlibrium_constr_w_force, argnums=(0, 1, 2, 3, 4, 5, 6, 7)))
+                jacrev(self._force_equlibrium_constr_w_force, argnums=(0, 1, 2, 3, 4, 5, 6, 7, 8)))
             self.min_force_constr = vmap(self._min_force_constr, randomness='same')
             self.grad_min_force_constr = vmap(jacrev(self._min_force_constr, argnums=(0,)))
 
@@ -2624,8 +2638,63 @@ class AllegroContactProblem(AllegroObjectProblem):
         friction_magnitude = self.yaw_joint_friction * normal_force * self.screwdriver_tip_radius
         return -yaw_motion_sign * friction_magnitude * yaw_axis_robot_frame
 
+    def _get_screwdriver_yaw_inertia_scalar(
+        self,
+        prev_env_q,
+        current_env_q,
+        next_env_q,
+    ):
+        if self.object_type != 'screwdriver':
+            return torch.tensor(0.0, device=next_env_q.device, dtype=next_env_q.dtype)
+        if self.yaw_inertia_model_params is None or self.yaw_inertia_model_type == 'none':
+            return torch.tensor(0.0, device=next_env_q.device, dtype=next_env_q.dtype)
+        dt = torch.tensor(self.yaw_dynamics_dt, device=next_env_q.device, dtype=next_env_q.dtype)
+        if dt <= 0:
+            raise ValueError(f"yaw dynamics dt must be positive, got {self.yaw_dynamics_dt}")
+        yaw_prev = prev_env_q[-1]
+        yaw_current = current_env_q[-1]
+        yaw_next = next_env_q[-1]
+        yaw_acceleration = (yaw_next - 2.0 * yaw_current + yaw_prev) / (dt * dt)
+        yaw_velocity = (yaw_next - yaw_current) / dt
+
+        model_type = str(self.yaw_inertia_model_type)
+        model_params = self.yaw_inertia_model_params
+        if model_type == 'constant_inertia_v1':
+            return torch.tensor(
+                float(model_params['inertia_constant']),
+                device=next_env_q.device,
+                dtype=next_env_q.dtype,
+            ) * yaw_acceleration
+        if model_type == 'inertia_plus_damping_v1':
+            inertia_constant = torch.tensor(
+                float(model_params['inertia_constant']),
+                device=next_env_q.device,
+                dtype=next_env_q.dtype,
+            )
+            damping_constant = torch.tensor(
+                float(model_params['damping_constant']),
+                device=next_env_q.device,
+                dtype=next_env_q.dtype,
+            )
+            return inertia_constant * yaw_acceleration + damping_constant * yaw_velocity
+        raise ValueError(f"Unsupported yaw inertia model_type {model_type!r}")
+
+    def _get_screwdriver_yaw_inertial_torque(
+        self,
+        prev_env_q,
+        current_env_q,
+        next_env_q,
+    ):
+        yaw_axis_robot_frame = self._get_screwdriver_yaw_axis_robot_frame(next_env_q)
+        yaw_inertia_scalar = self._get_screwdriver_yaw_inertia_scalar(
+            prev_env_q=prev_env_q,
+            current_env_q=current_env_q,
+            next_env_q=next_env_q,
+        )
+        return yaw_inertia_scalar * yaw_axis_robot_frame
+
     def _force_equlibrium_constr_w_force(self, q, u, next_q, force_list, contact_jac_list, contact_point_list,
-                                         current_env_q, next_env_q):
+                                         prev_env_q, current_env_q, next_env_q):
         # NOTE: the constriant is defined in the robot frame
         # the contact jac an contact points are all in the robot frame
         # this will be vmapped, so takes in a 3 vector and a [num_finger x 3 x 8] jacobian and a dq vector
@@ -2670,6 +2739,11 @@ class AllegroContactProblem(AllegroObjectProblem):
                 finger_force_robot_frame_list=force_robot_frame_list,
                 contact_point_r_valve_list=contact_point_r_valve_list,
             ))
+            torque_list.append(self._get_screwdriver_yaw_inertial_torque(
+                prev_env_q=prev_env_q,
+                current_env_q=current_env_q,
+                next_env_q=next_env_q,
+            ))
 
         torque_list = torch.stack(torque_list, dim=0)
         torque_list = torch.sum(torque_list, dim=0)
@@ -2708,6 +2782,13 @@ class AllegroContactProblem(AllegroObjectProblem):
         u = xu[:, :, self.dx: self.dx + self.robot_dof]
         u = partial_to_full_state(u, self.fingers)
         u = u[:, :, self.contact_state_indices]
+        prev_env_q = torch.cat(
+            (
+                x[:, :1, self.robot_dof:self.robot_dof + self.obj_dof],
+                x[:, :-2, self.robot_dof:self.robot_dof + self.obj_dof],
+            ),
+            dim=1,
+        )
         current_env_q = x[:, :-1, self.robot_dof:self.robot_dof + self.obj_dof]
         next_env_q = x[:, 1:, self.robot_dof:self.robot_dof + self.obj_dof]
         
@@ -2732,19 +2813,31 @@ class AllegroContactProblem(AllegroObjectProblem):
                                          force_list.reshape(-1, num_forces, 3),
                                          contact_jac_list,
                                          contact_point_list,
+                                         prev_env_q.reshape(-1, self.obj_dof),
                                          current_env_q.reshape(-1, self.obj_dof),
                                          next_env_q.reshape(-1, self.obj_dof)).reshape(N, T, -1)
         t_mask = torch.ones_like(g, dtype=torch.bool)
         t_mask[:, 0] = False
 
         if compute_grads:
-            dg_dq, dg_du, dg_dnext_q, dg_dforce, dg_djac, dg_dcontact, dg_dcurrent_env_q, dg_dnext_env_q = self.grad_force_equlibrium_constr(
+            (
+                dg_dq,
+                dg_du,
+                dg_dnext_q,
+                dg_dforce,
+                dg_djac,
+                dg_dcontact,
+                dg_dprev_env_q,
+                dg_dcurrent_env_q,
+                dg_dnext_env_q,
+            ) = self.grad_force_equlibrium_constr(
                                                 q.reshape(-1, 4 * self.num_contacts), 
                                                 u.reshape(-1, 4 * self.num_contacts), 
                                                 next_q.reshape(-1, 4 * self.num_contacts), 
                                                 force_list.reshape(-1, num_forces, 3),
                                                 contact_jac_list,
                                                 contact_point_list,
+                                                prev_env_q.reshape(-1, self.obj_dof),
                                                 current_env_q.reshape(-1, self.obj_dof),
                                                 next_env_q.reshape(-1, self.obj_dof))
             dg_dforce = dg_dforce.reshape(dg_dforce.shape[0], dg_dforce.shape[1], num_forces* 3)
@@ -2752,6 +2845,8 @@ class AllegroContactProblem(AllegroObjectProblem):
             T_range = torch.arange(T, device=device)
             T_plus = torch.arange(1, T, device=device)
             T_minus = torch.arange(T - 1, device=device)
+            T_plus_plus = torch.arange(2, T, device=device)
+            T_minus_minus = torch.arange(T - 2, device=device)
 
             grad_g = torch.zeros(N, g.shape[2], T, T, self.d, device=self.device)
             dg_dq = dg_dq.reshape(N, T, g.shape[2], 4 * self.num_contacts)
@@ -2774,6 +2869,8 @@ class AllegroContactProblem(AllegroObjectProblem):
             mask_t[:, :, T_range, T_range] = True
             mask_t_p = torch.zeros_like(grad_g).bool()
             mask_t_p[:, :, T_plus, T_minus] = True
+            mask_t_pp = torch.zeros_like(grad_g).bool()
+            mask_t_pp[:, :, T_plus_plus, T_minus_minus] = True
             mask_state = torch.zeros_like(grad_g).bool()
             mask_state[:, :, :, :, self.contact_state_indices] = True
             mask_force = torch.zeros_like(grad_g).bool()
@@ -2790,6 +2887,9 @@ class AllegroContactProblem(AllegroObjectProblem):
             grad_g[torch.logical_and(mask_t_p, mask_env)] = dg_dcurrent_env_q.reshape(
                 N, T, g.shape[2], self.obj_dof
             )[:, 1:].transpose(1, 2).reshape(-1)
+            grad_g[torch.logical_and(mask_t_pp, mask_env)] = dg_dprev_env_q.reshape(
+                N, T, g.shape[2], self.obj_dof
+            )[:, 2:].transpose(1, 2).reshape(-1)
 
             grad_g[torch.logical_and(mask_t, mask_control)] = dg_du.reshape(N, T, -1,
                                                                             4 * self.num_contacts
