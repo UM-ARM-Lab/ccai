@@ -146,75 +146,134 @@ def state2ee_pos(state, finger_name, fingers, chain, frame_indices, world_trans)
 
 
 is_visible = False
-def visualize_trajectory(trajectory, scene, scene_fpath, fingers, obj_dof, headless=False, task='screwdriver', pcd=None):
-    
-    with open(f'{scene_fpath}/traj.pkl', 'wb') as f:
-        pickle.dump(trajectory.cpu().numpy(), f)
+CAMERA_PRESET_FILENAMES = {
+    "screwdriver": "ScreenCamera_2024-10-02-14-35-33.json",
+    "card": "ScreenCamera_card.json",
+}
+
+
+def _get_camera_parameters(task):
+    try:
+        preset_name = CAMERA_PRESET_FILENAMES[task]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported visualization task: {task}") from exc
+
+    camera_path = pathlib.Path(__file__).resolve().with_name(preset_name)
+    if not camera_path.exists():
+        raise FileNotFoundError(f"Missing camera preset for task '{task}': {camera_path}")
+    return o3d.io.read_pinhole_camera_parameters(str(camera_path))
+
+
+def _collect_visualization_geometry(trajectory_step, scene, fingers, obj_dof, pcd=None):
     num_fingers = len(fingers)
-    # for a single trajectory
-    T, dxu = trajectory.shape
-    # set up visualizer
+    q = trajectory_step[: 4 * num_fingers]
+    theta = trajectory_step[4 * num_fingers: 4 * num_fingers + obj_dof]
+    rob_mesh, meshes = scene.get_visualization_meshes(
+        partial_to_full_state(q.unsqueeze(0), fingers).to(device=scene.device),
+        theta.unsqueeze(0).to(device=scene.device),
+        pcd=pcd,
+    )
+    return meshes + rob_mesh
+
+
+def _make_offscreen_material(geometry):
+    material = o3d.visualization.rendering.MaterialRecord()
+    if isinstance(geometry, o3d.geometry.PointCloud):
+        material.shader = "defaultUnlit"
+        material.point_size = 5.0
+    else:
+        material.shader = "defaultLit"
+    return material
+
+
+def _visualize_trajectory_window(trajectory, scene, scene_path, fingers, obj_dof, headless=False, task='screwdriver', pcd=None):
+    parameters = _get_camera_parameters(task)
     vis = o3d.visualization.VisualizerWithKeyCallback()
-    vis.create_window(width=int(800), height=int(600), visible=not headless)
-    # update camera
+    vis.create_window(width=800, height=600, visible=not headless)
     vis.get_render_option().mesh_show_wireframe = True
     vis.get_render_option().point_show_normal = True
-    for t in range(T):
+
+    for t in range(trajectory.shape[0]):
         vis.clear_geometries()
-        q = trajectory[t, : 4 * num_fingers]
-        theta = trajectory[t, 4 * num_fingers: 4 * num_fingers + obj_dof]
-
-        rob_mesh, meshes = scene.get_visualization_meshes(partial_to_full_state(q.unsqueeze(0), fingers).to(device=scene.device),
-                                                theta.unsqueeze(0).to(device=scene.device), pcd=pcd)
-
-        meshes += rob_mesh
+        meshes = _collect_visualization_geometry(trajectory[t], scene, fingers, obj_dof, pcd=pcd)
         for mesh in meshes:
             vis.add_geometry(mesh)
-        # vis.add_geometry(rob_mesh)
-        
-        # def toggle_visibility(vis):
-        #     global is_visible
-        #     if is_visible:
-        #         for m in rob_mesh:
-        #             vis.remove_geometry(m, reset_bounding_box=False)
-        #     else:
-        #         for m in rob_mesh:
-        #             vis.add_geometry(m, reset_bounding_box=False)
-            
-        #     # Update visibility status
-        #     is_visible = not is_visible
-        #     vis.update_renderer()
-
-
-        # vis.register_key_callback(ord('T'), toggle_visibility)
-        # vis.run()
 
         ctr = vis.get_view_control()
-        if task == 'screwdriver':
-            import os
-            #Get current working directory
-            cwd = os.getcwd()
-
-            parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2024-10-02-14-35-33.json")
-            # parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_2025-08-04-08-19-16.json")
-        elif task == 'card':
-            parameters = o3d.io.read_pinhole_camera_parameters("ScreenCamera_card.json")
         ctr.convert_from_pinhole_camera_parameters(parameters, allow_arbitrary=True)
         vis.poll_events()
         vis.update_renderer()
         img = vis.capture_screen_float_buffer(False)
-        plt.imsave(f'{scene_fpath}/img/im_{t:04d}.png',
-                   np.asarray(img),
-                   dpi=1)
+        plt.imsave(scene_path / 'img' / f'im_{t:04d}.png', np.asarray(img), dpi=1)
 
     vis.destroy_window()
 
+
+def _visualize_trajectory_offscreen(trajectory, scene, scene_path, fingers, obj_dof, task='screwdriver', pcd=None):
+    parameters = _get_camera_parameters(task)
+    renderer = o3d.visualization.rendering.OffscreenRenderer(800, 600)
+    renderer.scene.set_background(np.array([1.0, 1.0, 1.0, 1.0], dtype=np.float32))
+
+    for t in range(trajectory.shape[0]):
+        renderer.scene.clear_geometry()
+        geometries = _collect_visualization_geometry(trajectory[t], scene, fingers, obj_dof, pcd=pcd)
+        for idx, geometry in enumerate(geometries):
+            renderer.scene.add_geometry(
+                f"geometry_{idx}",
+                geometry,
+                _make_offscreen_material(geometry),
+            )
+
+        renderer.setup_camera(parameters.intrinsic, parameters.extrinsic)
+        img = renderer.render_to_image()
+        o3d.io.write_image(str(scene_path / 'img' / f'im_{t:04d}.png'), img)
+
+
+def visualize_trajectory(
+    trajectory,
+    scene,
+    scene_fpath,
+    fingers,
+    obj_dof,
+    headless=False,
+    task='screwdriver',
+    pcd=None,
+    render_backend='window',
+):
+    scene_path = pathlib.Path(scene_fpath)
+    with open(scene_path / 'traj.pkl', 'wb') as f:
+        pickle.dump(trajectory.cpu().numpy(), f)
+
+    if render_backend == 'offscreen':
+        _visualize_trajectory_offscreen(
+            trajectory,
+            scene,
+            scene_path,
+            fingers,
+            obj_dof,
+            task=task,
+            pcd=pcd,
+        )
+    elif render_backend == 'window':
+        _visualize_trajectory_window(
+            trajectory,
+            scene,
+            scene_path,
+            fingers,
+            obj_dof,
+            headless=headless,
+            task=task,
+            pcd=pcd,
+        )
+    else:
+        raise ValueError(f"Unsupported render backend: {render_backend}")
+
     # convert to GIF
     import subprocess
-    output_dir = f'{scene_fpath}/gif/trajectory.gif'
-    cmd = f"ffmpeg -y -i {scene_fpath}/img/im_%4d.png -vf palettegen ~/palette.png"
+    output_dir = scene_path / 'gif' / 'trajectory.gif'
+    cmd = f"ffmpeg -y -i {scene_path}/img/im_%4d.png -vf palettegen ~/palette.png"
     subprocess.call(cmd, shell=True)
-    cmd = f"ffmpeg -y -framerate 2 -i {scene_fpath}/img/im_%4d.png -i ~/palette.png " \
+    cmd = f"ffmpeg -y -framerate 2 -i {scene_path}/img/im_%4d.png -i ~/palette.png " \
           f"-lavfi paletteuse {output_dir}"
     subprocess.call(cmd, shell=True)
 

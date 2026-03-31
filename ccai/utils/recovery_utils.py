@@ -177,6 +177,9 @@ def create_allegro_screwdriver_problem(problem_type, start, goal, params, env, d
         'contact_constraint_only': params.get('contact_constraint_only', False),
         'tactile_controller': kwargs.get('tactile_controller', False),
         'skip_csvto': kwargs.get('skip_csvto', False),
+        'yaw_friction_model_type': params.get('yaw_friction_model_type', 'legacy_scalar'),
+        'yaw_friction_model_params': params.get('yaw_friction_model_params'),
+        'yaw_friction_model_path': params.get('yaw_friction_model_path'),
     }
     
     # Problem-specific configurations

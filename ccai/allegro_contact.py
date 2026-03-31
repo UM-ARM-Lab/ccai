@@ -1,6 +1,7 @@
 from isaac_victor_envs.utils import get_assets_dir
 # from isaac_victor_envs.tasks.allegro import AllegroValveTurningEnv
 
+import json
 import numpy as np
 import pickle as pkl
 
@@ -47,11 +48,6 @@ def _sign_with_deadband(value, eps=1e-6):
         torch.zeros_like(value_tensor),
         torch.sign(value_tensor),
     )
-
-
-def _smooth_coulomb_sign(value, scale):
-    value_tensor = torch.as_tensor(value)
-    return torch.tanh(value_tensor / scale)
 
 
 def euler_to_quat(euler, return_intermediates=False):
@@ -2078,6 +2074,9 @@ class AllegroContactProblem(AllegroObjectProblem):
                  device='cuda:0',
                  min_force_dict=None,
                  contact_constraint_only=False,
+                 yaw_friction_model_type='legacy_scalar',
+                 yaw_friction_model_params=None,
+                 yaw_friction_model_path=None,
                  **kwargs):
         self.obj_dof_type = obj_dof_type
         self.obj_gravity = obj_gravity
@@ -2109,9 +2108,15 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         self.friction_coefficient = friction_coefficient
         self.yaw_joint_friction = float(yaw_joint_friction)
-        self.action_dt = float(kwargs.get('action_dt', 1.0))
-        self.yaw_friction_velocity_scale = float(kwargs.get('yaw_friction_velocity_scale', 1e-2))
         self.screwdriver_tip_radius = SCREWDRIVER_STICK_RADIUS if self.object_type == 'screwdriver' else 0.0
+        if yaw_friction_model_path is not None:
+            yaw_friction_model_params = json.loads(pathlib.Path(yaw_friction_model_path).read_text(encoding='utf-8'))
+        if yaw_friction_model_params is not None and 'selected_model_params' in yaw_friction_model_params:
+            yaw_friction_model_params = yaw_friction_model_params['selected_model_params']
+        self.yaw_friction_model_type = yaw_friction_model_type
+        if yaw_friction_model_params is not None and self.yaw_friction_model_type == 'legacy_scalar':
+            self.yaw_friction_model_type = str(yaw_friction_model_params.get('model_type', 'learned_global_v1'))
+        self.yaw_friction_model_params = yaw_friction_model_params
         self.dynamics_constr = vmap(self._dynamics_constr)
         self.grad_dynamics_constr = vmap(jacrev(self._dynamics_constr, argnums=(0, 1, 2, 3, 4)))
         if not optimize_force:
@@ -2132,7 +2137,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         # self.grad_friction_constr_force = vmap(
         #     partial(self._grad_friction_constr_analytical, use_force=True), randomness='same')
         self.grad_friction_constr_force = vmap(
-            jacrev(partial(self._friction_constr, use_force=True), argnums=(0, 1, 2)))
+            jacrev(self._friction_constr, argnums=(0, 1, 2)))
 
         self.kinematics_constr = vmap(vmap(self._kinematics_constr))
         # self.grad_kinematics_constr = vmap(vmap(self._grad_kinematics_constr_analytical))
@@ -2361,8 +2366,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         contact_point_list = []
         for finger in self.contact_fingers:
             jac = self.data[finger]['contact_jacobian'].reshape(N, T + T_offset, 3, -1)[:, T_offset:, :, self.contact_state_indices]
-            contact_points_world = self.data[finger]['closest_pt_world'].reshape(N, T + T_offset, 3)[:, T_offset:].reshape(-1, 3)
-            contact_points = self._world_points_to_robot_frame(contact_points_world)
+            contact_points = self.data[finger]['closest_pt_world'].reshape(N, T + T_offset, 3)[:, T_offset:].reshape(-1, 3)
             contact_jac_list.append(jac.reshape(N * (T + T_offset), 3, -1))
             contact_point_list.append(contact_points)
 
@@ -2401,7 +2405,6 @@ class AllegroContactProblem(AllegroObjectProblem):
 
                 d_contact_loc_dq = self.data[finger_name]['closest_pt_q_grad']
                 d_contact_loc_dq = d_contact_loc_dq.reshape(N, T + T_offset, 3, 16)[:, :-1, :, self.contact_state_indices]
-                d_contact_loc_dq = self._world_point_grads_to_robot_frame(d_contact_loc_dq)
                 dg_dq = dg_dq + dg_dcontact[:, :, i].reshape(N, T, g.shape[2], 3) @ d_contact_loc_dq
             mask_t = torch.zeros_like(grad_g).bool()
             mask_t[:, :, T_range, T_range] = True
@@ -2514,21 +2517,15 @@ class AllegroContactProblem(AllegroObjectProblem):
     def _world_vector_to_robot_frame(self, vector_world):
         return self.world_trans.inverse().transform_normals(vector_world.unsqueeze(0)).squeeze(0)
 
-    def _world_points_to_robot_frame(self, points_world):
-        original_shape = points_world.shape
-        points_world = points_world.reshape(-1, 3)
-        points_robot = self.world_trans.inverse().transform_points(points_world)
-        return points_robot.reshape(original_shape)
-
-    def _world_point_grads_to_robot_frame(self, point_grads_world):
-        world_to_robot = self.world_trans.inverse().get_matrix()[0, :3, :3].to(
-            device=point_grads_world.device,
-            dtype=point_grads_world.dtype,
-        )
-        return torch.einsum('ij,...jk->...ik', world_to_robot, point_grads_world)
+    def _get_screwdriver_yaw_axis_robot_frame(self, next_env_q):
+        _, body_rotation_world = self._get_screwdriver_body_pose_in_robot_frame(next_env_q)
+        return self._world_vector_to_robot_frame(body_rotation_world[:, 2])
 
     def _get_screwdriver_gravity_force_world(self, env_q):
         return self.obj_mass * torch.tensor([0, 0, -9.8], device=env_q.device, dtype=env_q.dtype)
+
+    def _get_screwdriver_gravity_force_robot(self, env_q):
+        return self._world_vector_to_robot_frame(self._get_screwdriver_gravity_force_world(env_q))
 
     def _get_screwdriver_gravity_torque(self, next_env_q):
         body_com_pos_world, _ = self._get_screwdriver_body_pose_in_robot_frame(next_env_q)
@@ -2544,23 +2541,88 @@ class AllegroContactProblem(AllegroObjectProblem):
         normal_force = -(total_force_world @ table_normal_world)
         return torch.clamp(normal_force, min=0.0)
 
-    def _get_screwdriver_yaw_friction_torque(self, current_env_q, next_env_q, finger_force_list, eps=1e-6):
-        if self.object_type != 'screwdriver' or self.yaw_joint_friction == 0.0:
+    def _get_screwdriver_yaw_friction_features(
+        self,
+        next_env_q,
+        finger_force_robot_frame_list,
+        contact_point_r_valve_list,
+    ):
+        yaw_axis_robot_frame = self._get_screwdriver_yaw_axis_robot_frame(next_env_q)
+        total_force_robot = torch.zeros(3, device=next_env_q.device, dtype=next_env_q.dtype)
+        total_torque_robot = torch.zeros(3, device=next_env_q.device, dtype=next_env_q.dtype)
+        for force_robot_frame, contact_point_r_valve in zip(finger_force_robot_frame_list, contact_point_r_valve_list):
+            total_force_robot = total_force_robot + force_robot_frame
+            total_torque_robot = total_torque_robot + torch.linalg.cross(contact_point_r_valve, force_robot_frame)
+        if self.obj_gravity:
+            total_force_robot = total_force_robot + self._get_screwdriver_gravity_force_robot(next_env_q)
+            total_torque_robot = total_torque_robot + self._get_screwdriver_gravity_torque(next_env_q)
+        axial_force = total_force_robot @ yaw_axis_robot_frame
+        radial_force = total_force_robot - axial_force * yaw_axis_robot_frame
+        radial_load = torch.linalg.norm(radial_force)
+        compressive_axial_load = torch.clamp(-axial_force, min=0.0)
+        applied_yaw_moment = torch.abs(total_torque_robot @ yaw_axis_robot_frame)
+        return yaw_axis_robot_frame, radial_load, compressive_axial_load, applied_yaw_moment
+
+    def _get_screwdriver_yaw_friction_torque(
+        self,
+        current_env_q,
+        next_env_q,
+        finger_force_list,
+        finger_force_robot_frame_list=None,
+        contact_point_r_valve_list=None,
+        eps=1e-6,
+    ):
+        if self.object_type != 'screwdriver':
             return torch.zeros(3, device=next_env_q.device, dtype=next_env_q.dtype)
-        _, body_rotation_world = self._get_screwdriver_body_pose_in_robot_frame(next_env_q)
-        yaw_axis_robot_frame = self._world_vector_to_robot_frame(body_rotation_world[:, 2])
+        if self.yaw_friction_model_type != 'legacy_scalar' and self.yaw_friction_model_params is not None:
+            yaw_axis_robot_frame = self._get_screwdriver_yaw_axis_robot_frame(next_env_q)
+            yaw_delta = next_env_q[-1] - current_env_q[-1]
+            model_params = self.yaw_friction_model_params
+            velocity_beta = float(model_params['velocity_beta'])
+            screwdriver_tip_radius = float(model_params.get('screwdriver_tip_radius', self.screwdriver_tip_radius))
+            yaw_motion_sign = torch.tanh(torch.tensor(velocity_beta, device=next_env_q.device, dtype=next_env_q.dtype) * yaw_delta)
+            if self.yaw_friction_model_type == 'constant_magnitude_v1':
+                magnitude = torch.tensor(
+                    float(model_params['magnitude_constant']),
+                    device=next_env_q.device,
+                    dtype=next_env_q.dtype,
+                )
+                if bool(model_params.get('use_yaw_joint_friction_scale', True)):
+                    magnitude = magnitude * self.yaw_joint_friction
+                return -yaw_motion_sign * screwdriver_tip_radius * magnitude * yaw_axis_robot_frame
+
+            yaw_axis_robot_frame, radial_load, compressive_axial_load, applied_yaw_moment = (
+                self._get_screwdriver_yaw_friction_features(
+                    next_env_q,
+                    finger_force_robot_frame_list=finger_force_robot_frame_list,
+                    contact_point_r_valve_list=contact_point_r_valve_list,
+                )
+            )
+            intercept = float(model_params['intercept'])
+            joint_radial_load_coefficient = float(model_params.get('joint_radial_load_coefficient', 0.0))
+            compressive_axial_load_coefficient = float(model_params.get('compressive_axial_load_coefficient', 0.0))
+            applied_yaw_moment_coefficient = float(model_params.get('applied_yaw_moment_coefficient', 0.0))
+            joint_radial_load_scale = float(model_params.get('joint_radial_load_scale', 1.0))
+            compressive_axial_load_scale = float(model_params.get('compressive_axial_load_scale', 1.0))
+            applied_yaw_moment_scale = float(model_params.get('applied_yaw_moment_scale', 1.0))
+            use_yaw_joint_friction_scale = bool(model_params.get('use_yaw_joint_friction_scale', True))
+            magnitude = torch.nn.functional.softplus(
+                torch.tensor(intercept, device=next_env_q.device, dtype=next_env_q.dtype)
+                + joint_radial_load_coefficient * radial_load / joint_radial_load_scale
+                + compressive_axial_load_coefficient * compressive_axial_load / compressive_axial_load_scale
+                + applied_yaw_moment_coefficient * applied_yaw_moment / applied_yaw_moment_scale
+            )
+            if use_yaw_joint_friction_scale:
+                magnitude = magnitude * self.yaw_joint_friction
+            return -yaw_motion_sign * screwdriver_tip_radius * magnitude * yaw_axis_robot_frame
+        if self.yaw_joint_friction == 0.0:
+            return torch.zeros(3, device=next_env_q.device, dtype=next_env_q.dtype)
+        yaw_axis_robot_frame = self._get_screwdriver_yaw_axis_robot_frame(next_env_q)
         yaw_delta = next_env_q[-1] - current_env_q[-1]
-        yaw_velocity = yaw_delta / self.action_dt
-        friction_direction = _smooth_coulomb_sign(
-            yaw_velocity,
-            scale=max(self.yaw_friction_velocity_scale, eps),
-        )
-        friction_magnitude = torch.as_tensor(
-            self.yaw_joint_friction,
-            device=next_env_q.device,
-            dtype=next_env_q.dtype,
-        )
-        return -friction_direction * friction_magnitude * yaw_axis_robot_frame
+        yaw_motion_sign = _sign_with_deadband(yaw_delta, eps=eps)
+        normal_force = self._get_screwdriver_tip_normal_force(finger_force_list, next_env_q)
+        friction_magnitude = self.yaw_joint_friction * normal_force * self.screwdriver_tip_radius
+        return -yaw_motion_sign * friction_magnitude * yaw_axis_robot_frame
 
     def _force_equlibrium_constr_w_force(self, q, u, next_q, force_list, contact_jac_list, contact_point_list,
                                          current_env_q, next_env_q):
@@ -2571,9 +2633,12 @@ class AllegroContactProblem(AllegroObjectProblem):
         delta_q = q + u - next_q
         torque_list = []
         reactional_torque_list = []
+        force_robot_frame_list = []
+        contact_point_r_valve_list = []
         for i, finger_name in enumerate(self.contact_fingers):
             # TODO: Assume that all the fingers are having an equlibrium, maybe we should change so that index finger is not considered
             force_robot_frame = self.world_trans.inverse().transform_normals(force_list[i].unsqueeze(0)).squeeze(0)
+            force_robot_frame_list.append(force_robot_frame)
             if not self.contact_constraint_only:
                 contact_jacobian = contact_jac_list[i]
                 reactional_torque_list.append(contact_jacobian.T @ -force_robot_frame)
@@ -2582,6 +2647,7 @@ class AllegroContactProblem(AllegroObjectProblem):
 
             # pseudo inverse form
             contact_point_r_valve = contact_point_list[i] - obj_robot_frame[0]
+            contact_point_r_valve_list.append(contact_point_r_valve)
             torque = torch.linalg.cross(contact_point_r_valve, force_robot_frame)
             torque_list.append(torque)
             # Force is in the robot frame instead of the world frame.
@@ -2601,6 +2667,8 @@ class AllegroContactProblem(AllegroObjectProblem):
                 current_env_q=current_env_q,
                 next_env_q=next_env_q,
                 finger_force_list=force_list[:self.num_contacts],
+                finger_force_robot_frame_list=force_robot_frame_list,
+                contact_point_r_valve_list=contact_point_r_valve_list,
             ))
 
         torque_list = torch.stack(torque_list, dim=0)
@@ -2651,8 +2719,7 @@ class AllegroContactProblem(AllegroObjectProblem):
         contact_point_list = []
         for finger in self.contact_fingers:
             jac = self.data[finger]['contact_jacobian'].reshape(N, T + T_offset, 3, -1)[:, T_offset:, :, self.contact_state_indices]
-            contact_points_world = self.data[finger]['closest_pt_world'].reshape(N, T + T_offset , 3)[:, T_offset:].reshape(-1, 3)
-            contact_points = self._world_points_to_robot_frame(contact_points_world)
+            contact_points = self.data[finger]['closest_pt_world'].reshape(N, T + T_offset , 3)[:, T_offset:].reshape(-1, 3)
             contact_jac_list.append(jac.reshape(N * T, 3, -1))
             contact_point_list.append(contact_points)
 
@@ -2701,7 +2768,6 @@ class AllegroContactProblem(AllegroObjectProblem):
 
                 d_contact_loc_dq = self.data[finger_name]['closest_pt_q_grad']
                 d_contact_loc_dq = d_contact_loc_dq.reshape(N, T + T_offset, 3, 16)[:, :-1, :, self.contact_state_indices]
-                d_contact_loc_dq = self._world_point_grads_to_robot_frame(d_contact_loc_dq)
                 dg_dq = dg_dq + dg_dcontact[:, :, i].reshape(N, T, g.shape[2], 3) @ d_contact_loc_dq
 
             mask_t = torch.zeros_like(grad_g).bool()
@@ -3550,7 +3616,7 @@ class AllegroContactProblem(AllegroObjectProblem):
             
             if not self.contact_constraint_only:
                 h, grad_h, hess_h, t_mask = self._friction_constraint(
-                    q=q, delta_q=delta_q, force=force,
+                    q=q, delta_q=delta_q, force=None,
                     compute_grads=compute_grads,
                     compute_hess=compute_hess,
                     projected_diffusion=projected_diffusion)
