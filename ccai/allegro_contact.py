@@ -642,6 +642,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         self.squared_slack = True
         self.compute_hess = False
         self.contact_constraint_only = contact_constraint_only
+        self.use_target_contact_link_cost = False
         default_motion_cost_weight = 3.0 if len(regrasp_fingers) > 0 else 10.0
         self.smoothness_cost_weight = float(
             kwargs.pop('smoothness_cost_weight', default_motion_cost_weight)
@@ -1029,12 +1030,26 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                 if compute_closest_obj_point:
                     self.data[finger]['closest_obj_pt_object'] = ret_scene['closest_obj_pt_object'][:, i]
                 self.data[finger]['closest_rob_pt_object'] = ret_scene['closest_rob_pt_object'][:, i]
-                if finger in self.regrasp_fingers and self.full_dof_goal:
-                    self.data[finger]['closest_rob_pt_link'] = ret_scene['closest_rob_pt_link'][:, i].reshape(q.shape[0], T+1, 3)
+                if finger in self.regrasp_fingers and (self.full_dof_goal or self.use_target_contact_link_cost):
+                    if 'closest_rob_pt_link' in ret_scene:
+                        closest_rob_pt_link = ret_scene['closest_rob_pt_link'][:, i].reshape(q.shape[0], T+1, 3)
+                    else:
+                        closest_rob_pt_link = self.data[finger]['closest_rob_pt_object'].reshape(q.shape[0], T+1, 3)
+                    self.data[finger]['closest_rob_pt_link'] = closest_rob_pt_link
                     self.rob_link_pts.append(self.data[finger]['closest_rob_pt_link'])
                     self.nearest_robot_pts.append(self.data[finger]['closest_rob_pt_object'].reshape(q.shape[0], T+1, 3))
-                if self.full_dof_goal and compute_closest_obj_point and len(self.regrasp_fingers) > 0:
-                    rob_link_idx.append(ret_scene['closest_pt_closest_link'][:, i])
+                if (self.full_dof_goal or self.use_target_contact_link_cost) and compute_closest_obj_point and len(self.regrasp_fingers) > 0:
+                    if 'closest_pt_closest_link' in ret_scene:
+                        rob_link_idx.append(ret_scene['closest_pt_closest_link'][:, i])
+                    else:
+                        rob_link_idx.append(
+                            torch.full(
+                                (q.shape[0],),
+                                int(self.ee_link_idx[finger]),
+                                dtype=torch.long,
+                                device=q.device,
+                            )
+                        )
 
                 d_contact_loc_denv_q = ret_scene.get('closest_pt_env_q_grad', None)
                 d_contact_loc_denv_q = d_contact_loc_denv_q[:, i, :, :obj_dof].reshape(N, T + 1, 3, obj_dof)
@@ -1052,7 +1067,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
 
         
-        if len(self.regrasp_fingers) > 0 and self.full_dof_goal and not self.contact_constraint_only and not self.skip_csvto:
+        if len(self.regrasp_fingers) > 0 and (self.full_dof_goal or self.use_target_contact_link_cost) and not self.contact_constraint_only and not self.skip_csvto:
             self.rob_link_pts = torch.stack(self.rob_link_pts, dim=1)  # N x num_fingers x T x 3
             if compute_closest_obj_point:
                 self.rob_link_idx = torch.stack(rob_link_idx).flatten()  # N x num_fingers x T
@@ -1666,6 +1681,13 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         # self._regrasp_dh += self.num_regrasps
         self._regrasp_dh_constant = 0
         self._regrasp_dh_per_t = self._regrasp_dz
+        target_contact_points_object = kwargs.pop('target_contact_points_object', None)
+        target_contact_points_rob_link = kwargs.pop('target_contact_points_rob_link', None)
+        target_default_ee_locs = kwargs.pop('target_default_ee_locs', None)
+        target_contact_patch_radius = float(
+            kwargs.pop('target_contact_patch_radius', 0.0025 if self.object_type == 'screwdriver' else 0.001)
+        )
+        self.use_target_contact_link_cost = target_contact_points_rob_link is not None
         if self.object_type == 'screwdriver':
 
             self.default_dof_pos_backup = self.default_dof_pos.clone().reshape(-1).to(self.device)
@@ -1684,6 +1706,9 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         else:
             self.default_dof_pos = default_dof_pos.to(self.device)
 
+        self.contact_points = None
+        self.contact_points_object = None
+        self.contact_points_rob_link = None
         self.do_contact_patch_constraint = False
         if self.full_dof_goal and len(self.regrasp_fingers) > 0 and not self.skip_csvto:# and self.obj_link_name != 'valve':
             if self.goal is not None:
@@ -1726,11 +1751,30 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             self.do_contact_patch_constraint = True
                        
 
+        if target_contact_points_object is not None:
+            target_contact_points_object = target_contact_points_object.to(self.device)
+            self.contact_points = {
+                finger: (target_contact_points_object[i], target_contact_patch_radius)
+                for i, finger in enumerate(self.regrasp_fingers)
+            }
+            self.contact_points_object = target_contact_points_object
+            self._regrasp_dz += self.num_regrasps
+            self._regrasp_dh = self._regrasp_dz * T
+            self._regrasp_dh_constant = 0
+            self._regrasp_dh_per_t = self._regrasp_dz
+            self.do_contact_patch_constraint = True
+
+        if target_contact_points_rob_link is not None:
+            self.contact_points_rob_link = target_contact_points_rob_link.to(self.device)
+
         self.desired_ee_in_world_frame = desired_ee_in_world_frame
         if self.num_regrasps > 0:
             if contact_points_object is not None and contact_points_robot is not None:
                 raise ValueError("Cannot specify contact points in both object and robot frame")
-            if contact_points_object is not None:
+            if target_default_ee_locs is not None:
+                self.default_ee_locs = target_default_ee_locs.to(self.device)
+                self.default_ee_locs_constraint = True
+            elif contact_points_object is not None:
                 self.default_ee_locs = self._ee_locations_in_screwdriver(self.default_dof_pos,
                                                                     self.goal_theta).detach()
                 self.default_ee_locs_constraint = True
@@ -1756,16 +1800,12 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         # return 0
         if self.num_regrasps == 0:
             return 0.0
-        if self.full_dof_goal:
-            T_offset = 0 if projected_diffusion else 1
-
+        rob_link_cost = 0.0
+        if self.contact_points_rob_link is not None:
             link_cost_weight = 100 if self.object_type == 'screwdriver' else 1000
-            rob_link_cost = torch.sum((rob_link_pts[:, -1:] - self.contact_points_rob_link) ** 2)* link_cost_weight
-
-            closest_obj_pt_to_finger_cost = 0
-            # unit_mult = 10
-            # closest_obj_pt_to_finger_cost = unit_mult ** 2 * torch.sum((nearest_robot_pts[:, -1:] - self.contact_points_object) ** 2) * 250
-            return rob_link_cost + closest_obj_pt_to_finger_cost
+            rob_link_cost = torch.sum((rob_link_pts[:, -1:] - self.contact_points_rob_link) ** 2) * link_cost_weight
+        if self.full_dof_goal:
+            return rob_link_cost
         
         # if self.full_dof_goal:
         #     return 0
@@ -1799,7 +1839,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         goal_cost = goal_cost.sum()
         goal_cost *= 1000
 
-        return goal_cost
+        return goal_cost + rob_link_cost
         # dof_pos = self.default_dof_pos[None, self.regrasp_idx]
         # return 10 * torch.sum((q - dof_pos) ** 2)
 
