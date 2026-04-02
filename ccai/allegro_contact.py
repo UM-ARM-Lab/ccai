@@ -642,6 +642,13 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         self.squared_slack = True
         self.compute_hess = False
         self.contact_constraint_only = contact_constraint_only
+        default_motion_cost_weight = 3.0 if len(regrasp_fingers) > 0 else 10.0
+        self.smoothness_cost_weight = float(
+            kwargs.pop('smoothness_cost_weight', default_motion_cost_weight)
+        )
+        self.action_cost_weight = float(
+            kwargs.pop('action_cost_weight', default_motion_cost_weight)
+        )
         # make sure fingers is the wright order
         all_fingers = ['index', 'middle', 'ring', 'thumb']
         self.fingers = [f for f in all_fingers if f in fingers]
@@ -1057,12 +1064,8 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         q = torch.cat((start_q, q), dim=0)
         delta_q = partial_to_full_state(xu[:, self.dx:self.dx + 4 * self.num_fingers], self.fingers)
 
-        cost_weight = 10
-        if len(self.regrasp_fingers) > 0:
-            cost_weight = 3
-
-        smoothness_cost = cost_weight * torch.sum((q[1:] - q[-1]) ** 2)
-        action_cost = cost_weight * torch.sum(delta_q ** 2)
+        smoothness_cost = self.smoothness_cost_weight * torch.sum((q[1:] - q[-1]) ** 2)
+        action_cost = self.action_cost_weight * torch.sum(delta_q ** 2)
         return smoothness_cost + action_cost
 
     def process_cost_grads(self, grad, grad_J, closest_pt_q_grad_name, closest_pt_env_q_grad_name, projected_diffusion=False):
@@ -2112,6 +2115,9 @@ class AllegroContactProblem(AllegroObjectProblem):
 
         self.friction_coefficient = friction_coefficient
         self.yaw_joint_friction = float(yaw_joint_friction)
+        self.turn_action_init_std = float(kwargs.pop('turn_action_init_std', 0.025))
+        self.turn_force_init_std = float(kwargs.pop('turn_force_init_std', 1.5))
+        self.turn_yaw_init_std = float(kwargs.pop('turn_yaw_init_std', 0.0))
         self.screwdriver_tip_radius = SCREWDRIVER_STICK_RADIUS if self.object_type == 'screwdriver' else 0.0
         if yaw_friction_model_path is not None:
             yaw_friction_model_params = json.loads(pathlib.Path(yaw_friction_model_path).read_text(encoding='utf-8'))
@@ -2216,13 +2222,16 @@ class AllegroContactProblem(AllegroObjectProblem):
         # u_from_proj_path = x[:, 1:] - x[:, :-1]
         # x = x[:, 1:]
         # u[:, :, :self.num_fingers * 4] = u_from_proj_path[:, :, :self.num_fingers * 4]
-        u = 0.025 * torch.randn(N, self.T, self.du, device=self.device)
+        default_action_init_std = 0.025
+        default_force_init_std = 1.5 if self.turn and self.object_type == 'screwdriver' else None
+        action_init_std = self.turn_action_init_std if self.turn else default_action_init_std
+        u = action_init_std * torch.randn(N, self.T, self.du, device=self.device)
         if self.optimize_force:
             for i, finger in enumerate(self.contact_fingers):
                 idx = self.contact_force_indices_dict[finger]
                 std = .05 if not self.full_dof_goal else .15
                 std = .05 if self.turn else std
-                force_std = 1.5 if self.turn and self.object_type == 'screwdriver' else std
+                force_std = self.turn_force_init_std if default_force_init_std is not None else std
                 u[..., idx] = force_std * torch.randn(N, self.T, 3, device=self.device)
         if not self.full_dof_goal:
             x = [self.start.reshape(1, self.dx).repeat(N, 1)]
@@ -2237,6 +2246,10 @@ class AllegroContactProblem(AllegroObjectProblem):
                 theta = np.linspace(self.start[-self.obj_dof:].cpu().numpy(), self.goal[-self.obj_dof:].cpu().numpy(), self.T + 1)[:-1]
                 theta = torch.tensor(theta, device=self.device, dtype=torch.float32)
                 theta = theta.unsqueeze(0).repeat((N, 1, 1))
+                if self.turn and self.turn_yaw_init_std > 0:
+                    yaw_jitter = self.turn_yaw_init_std * torch.randn(N, self.T, device=self.device)
+                    yaw_jitter[:, 0] = 0
+                    theta[..., -1] += yaw_jitter
                 # theta = self.start[-self.obj_dof:].unsqueeze(0).repeat((N, self.T, 1))
                 # theta = torch.ones((N, self.T, self.obj_dof)).to(self.device) * self.start[-self.obj_dof:]
                 x = torch.cat((x, theta), dim=-1)
@@ -2255,6 +2268,10 @@ class AllegroContactProblem(AllegroObjectProblem):
             jitter[:, 0] = 0
             x = x_all.repeat(N, 1, 1)
             x[:, :, :self.num_fingers * 4] += jitter
+            if self.turn and self.turn_yaw_init_std > 0:
+                yaw_jitter = self.turn_yaw_init_std * torch.randn(N, self.T + 1, device=self.device)
+                yaw_jitter[:, 0] = 0
+                x[:, :, self.num_fingers * 4 + self.obj_dof - 1] += yaw_jitter
             u_from_proj_path = x[:, 1:] - x[:, :-1]
             x = x[:, 1:]
             u[:, :, :self.num_fingers * 4] = u_from_proj_path[:, :, :self.num_fingers * 4]

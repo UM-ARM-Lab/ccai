@@ -81,16 +81,20 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                                                    **kwargs)
         self.friction_coefficient = friction_coefficient
         self.yaw_joint_friction = float(yaw_joint_friction)
+        self.object_smoothness_cost_weight = float(kwargs.pop('object_smoothness_cost_weight', 1.0))
+        self.upright_cost_weight = float(kwargs.pop('upright_cost_weight', 500.0))
 
     def _cost(self, xu, rob_link_pts, nearest_robot_pts, start, goal, projected_diffusion=False):
         state = xu[:, :self.dx]  # state dim = 9
         state = torch.cat((start.reshape(1, self.dx), state), dim=0)  # combine the first time step into it
 
         # Smoothness cost for object degrees of freedom
-        smoothness_cost = torch.sum((state[1:, -self.obj_dof:] - state[:-1, -self.obj_dof:]) ** 2)
+        smoothness_cost = self.object_smoothness_cost_weight * torch.sum(
+            (state[1:, -self.obj_dof:] - state[:-1, -self.obj_dof:]) ** 2
+        )
         
         upright_cost = 0
         if not self.project:
-            upright_cost = 500 * torch.sum(
+            upright_cost = self.upright_cost_weight * torch.sum(
                 (state[:, -self.obj_dof:-1] + goal[-self.obj_dof:-1]) ** 2)  # the screwdriver should only rotate in z direction
         return smoothness_cost + upright_cost + super()._cost(xu, rob_link_pts, nearest_robot_pts, start, goal, projected_diffusion=projected_diffusion)
