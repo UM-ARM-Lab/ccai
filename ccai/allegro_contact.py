@@ -1684,10 +1684,22 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         target_contact_points_object = kwargs.pop('target_contact_points_object', None)
         target_contact_points_rob_link = kwargs.pop('target_contact_points_rob_link', None)
         target_default_ee_locs = kwargs.pop('target_default_ee_locs', None)
+        use_default_ee_locs_cost = bool(kwargs.pop('use_default_ee_locs_cost', True))
+        target_contact_patch_mode = kwargs.pop('target_contact_patch_mode', 'cost')
+        target_contact_link_cost_weight = float(
+            kwargs.pop('target_contact_link_cost_weight', 100 if self.object_type == 'screwdriver' else 1000)
+        )
+        target_contact_patch_cost_weight = float(
+            kwargs.pop('target_contact_patch_cost_weight', 100 if self.object_type == 'screwdriver' else 1000)
+        )
         target_contact_patch_radius = float(
             kwargs.pop('target_contact_patch_radius', 0.0025 if self.object_type == 'screwdriver' else 0.001)
         )
         self.use_target_contact_link_cost = target_contact_points_rob_link is not None
+        self.use_target_contact_patch_cost = target_contact_points_object is not None and target_contact_patch_mode == 'cost'
+        self.use_target_contact_patch_constraint = target_contact_points_object is not None and target_contact_patch_mode == 'constraint'
+        self.target_contact_link_cost_weight = target_contact_link_cost_weight
+        self.target_contact_patch_cost_weight = target_contact_patch_cost_weight
         if self.object_type == 'screwdriver':
 
             self.default_dof_pos_backup = self.default_dof_pos.clone().reshape(-1).to(self.device)
@@ -1758,11 +1770,12 @@ class AllegroRegraspProblem(AllegroObjectProblem):
                 for i, finger in enumerate(self.regrasp_fingers)
             }
             self.contact_points_object = target_contact_points_object
-            self._regrasp_dz += self.num_regrasps
-            self._regrasp_dh = self._regrasp_dz * T
-            self._regrasp_dh_constant = 0
-            self._regrasp_dh_per_t = self._regrasp_dz
-            self.do_contact_patch_constraint = True
+            if self.use_target_contact_patch_constraint:
+                self._regrasp_dz += self.num_regrasps
+                self._regrasp_dh = self._regrasp_dz * T
+                self._regrasp_dh_constant = 0
+                self._regrasp_dh_per_t = self._regrasp_dz
+                self.do_contact_patch_constraint = True
 
         if target_contact_points_rob_link is not None:
             self.contact_points_rob_link = target_contact_points_rob_link.to(self.device)
@@ -1771,7 +1784,10 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         if self.num_regrasps > 0:
             if contact_points_object is not None and contact_points_robot is not None:
                 raise ValueError("Cannot specify contact points in both object and robot frame")
-            if target_default_ee_locs is not None:
+            if not use_default_ee_locs_cost:
+                self.default_ee_locs = None
+                self.default_ee_locs_constraint = False
+            elif target_default_ee_locs is not None:
                 self.default_ee_locs = target_default_ee_locs.to(self.device)
                 self.default_ee_locs_constraint = True
             elif contact_points_object is not None:
@@ -1794,23 +1810,34 @@ class AllegroRegraspProblem(AllegroObjectProblem):
             self.default_ee_locs_constraint = False
 
     def randomize_regrasp_points(self):
-        self.default_ee_locs = self.default_ee_locs + 0.01 * torch.randn_like(self.default_ee_locs)
+        if self.default_ee_locs is not None:
+            self.default_ee_locs = self.default_ee_locs + 0.01 * torch.randn_like(self.default_ee_locs)
 
     def _cost(self, xu, rob_link_pts, nearest_robot_pts, start, goal, projected_diffusion=False):
         # return 0
         if self.num_regrasps == 0:
             return 0.0
         rob_link_cost = 0.0
+        contact_patch_cost = 0.0
         if self.contact_points_rob_link is not None:
-            link_cost_weight = 100 if self.object_type == 'screwdriver' else 1000
-            rob_link_cost = torch.sum((rob_link_pts[:, -1:] - self.contact_points_rob_link) ** 2) * link_cost_weight
+            rob_link_cost = torch.sum((rob_link_pts[:, :, -1:] - self.contact_points_rob_link) ** 2) * self.target_contact_link_cost_weight
+        if self.use_target_contact_patch_cost and self.contact_points_object is not None:
+            target_contact_points_object = self.contact_points_object.reshape(1, self.num_regrasps, 3)
+            closest_obj_pts = []
+            for finger in self.regrasp_fingers:
+                closest_obj_pts.append(self.data[finger]['closest_rob_pt_object'][:, -1:])
+            closest_obj_pts = torch.cat(closest_obj_pts, dim=1)
+            contact_patch_cost = torch.sum((closest_obj_pts - target_contact_points_object) ** 2) * self.target_contact_patch_cost_weight
         if self.full_dof_goal:
-            return rob_link_cost
+            return rob_link_cost + contact_patch_cost
         
         # if self.full_dof_goal:
         #     return 0
         # if self.default_ee_locs_constraint:
         #     return 0
+
+        if self.default_ee_locs is None:
+            return rob_link_cost + contact_patch_cost
 
         q = partial_to_full_state(xu[-1:, :self.num_fingers * 4], self.fingers)  # [:, self.regrasp_idx]
         theta = xu[-1:, self.num_fingers * 4:self.num_fingers * 4 + self.obj_dof]
@@ -1839,7 +1866,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         goal_cost = goal_cost.sum()
         goal_cost *= 1000
 
-        return goal_cost + rob_link_cost
+        return goal_cost + rob_link_cost + contact_patch_cost
         # dof_pos = self.default_dof_pos[None, self.regrasp_idx]
         # return 10 * torch.sum((q - dof_pos) ** 2)
 
