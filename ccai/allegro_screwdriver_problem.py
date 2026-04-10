@@ -33,8 +33,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
                  **kwargs):
         self.tactile_controller = tactile_controller
         self.skip_csvto = skip_csvto
-        # Mass of the object. Hardcoded for now.
-        self.obj_mass = 0.0851
+        self.obj_mass = float(kwargs.pop('object_mass', 0.0851))
         self.obj_dof_type = None
         self.object_type = 'screwdriver'
         object_link_name = 'screwdriver_body'

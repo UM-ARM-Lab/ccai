@@ -751,6 +751,8 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
 
         ##### SDF for robot and environment ######
         self.world_trans = world_trans.to(device=device)
+        object_asset_path = kwargs.pop('object_asset_path', None)
+        object_path_prefix = kwargs.pop('object_path_prefix', None)
         if object_type == 'cuboid_valve':
             asset_object = get_assets_dir() + '/valve/valve_cuboid.urdf'
         elif object_type == 'cylinder_valve':
@@ -763,6 +765,10 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             asset_object = get_assets_dir() + '/card/card.urdf'
         elif object_type == "peg":
             asset_object = get_assets_dir() + '/peg/short_peg.urdf'
+        if object_asset_path is not None:
+            asset_object = str(pathlib.Path(object_asset_path).expanduser().resolve())
+        if object_path_prefix is None:
+            object_path_prefix = str(pathlib.Path(asset_object).resolve().parent)
         self.object_asset_pos = object_asset_pos
         self.moveable_object = moveable_object
         chain_object = pk.build_chain_from_urdf(open(asset_object).read())
@@ -806,9 +812,9 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                 object_sdf_for_viz = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/valve',
                                         use_collision_geometry=True) # Use collision geometry for visualization to check fidelity of contact mesh
             elif 'screwdriver' in object_type:
-                object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver',
+                object_sdf = pv.RobotSDF(chain_object, path_prefix=object_path_prefix,
                                         use_collision_geometry=True)
-                object_sdf_for_viz = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/screwdriver',
+                object_sdf_for_viz = pv.RobotSDF(chain_object, path_prefix=object_path_prefix,
                                         use_collision_geometry=False)
             elif 'card' in object_type:
                 object_sdf = pv.RobotSDF(chain_object, path_prefix=get_assets_dir() + '/card',
