@@ -1,6 +1,40 @@
 from ccai.allegro_contact import AllegroManipulationProblem, PositionControlConstrainedSVGDMPC, add_trajectories, \
     add_trajectories_hardware
 import torch
+
+
+PROTO5_FULL_JOINT_INDEX = {
+    'index': [2, 3, 4, 5],
+    'middle': [6, 7, 8, 9],
+    'ring': [10, 11, 12, 13],
+    'thumb': [14, 15, 16, 17],
+}
+PROTO5_EE_NAMES = {
+    'index': 'RHand_I6AF_LINK',
+    'middle': 'RHand_M6AF_LINK',
+    'ring': 'RHand_R6AF_LINK',
+    'thumb': 'RHand_T6AF_LINK',
+}
+PROTO5_COLLISION_LINK_NAMES = {
+    'index': ['RHand_I6AF_LINK', 'RHand_I3Y_LINK', 'RHand_I2Y_LINK', 'RHand_I1Y_LINK', 'RHand_I1Z_LINK'],
+    'middle': ['RHand_M6AF_LINK', 'RHand_M3Y_LINK', 'RHand_M2Y_LINK', 'RHand_M1Y_LINK', 'RHand_M1Z_LINK'],
+    'ring': ['RHand_R6AF_LINK', 'RHand_R3Y_LINK', 'RHand_R2Y_LINK', 'RHand_R1Y_LINK', 'RHand_R1Z_LINK'],
+    'thumb': ['RHand_T6AF_LINK', 'RHand_T3Y_LINK', 'RHand_T2Y_LINK', 'RHand_T1Y_LINK', 'RHand_T1Z_LINK'],
+}
+PROTO5_ACTIVE_JOINT_MIN = {
+    'index': torch.tensor([-0.34906585, 0.0, 0.0, -0.17453293], dtype=torch.float32),
+    'middle': torch.tensor([-0.34906585, 0.0, 0.0, -0.17453293], dtype=torch.float32),
+    'ring': torch.tensor([-0.34906585, 0.0, 0.0, -0.17453293], dtype=torch.float32),
+    'thumb': torch.tensor([-1.57079633, 0.0, 0.0, -0.17453293], dtype=torch.float32),
+}
+PROTO5_ACTIVE_JOINT_MAX = {
+    'index': torch.tensor([0.34906585, 1.57079633, 1.57079633, 1.57079633], dtype=torch.float32),
+    'middle': torch.tensor([0.34906585, 1.57079633, 1.57079633, 1.57079633], dtype=torch.float32),
+    'ring': torch.tensor([0.34906585, 1.57079633, 1.57079633, 1.57079633], dtype=torch.float32),
+    'thumb': torch.tensor([0.17453293, 1.22173048, 1.57079633, 1.57079633], dtype=torch.float32),
+}
+
+
 class AllegroScrewdriver(AllegroManipulationProblem):
     def __init__(self,
                  start,
@@ -97,3 +131,36 @@ class AllegroScrewdriver(AllegroManipulationProblem):
             upright_cost = self.upright_cost_weight * torch.sum(
                 (state[:, -self.obj_dof:-1] + goal[-self.obj_dof:-1]) ** 2)  # the screwdriver should only rotate in z direction
         return smoothness_cost + upright_cost + super()._cost(xu, rob_link_pts, nearest_robot_pts, start, goal, projected_diffusion=projected_diffusion)
+
+
+class Proto5Screwdriver(AllegroScrewdriver):
+    def __init__(
+        self,
+        *args,
+        full_dof_reference=None,
+        robot_sdf_path_prefix=None,
+        **kwargs,
+    ):
+        if full_dof_reference is None:
+            full_dof_reference = torch.zeros(18, dtype=torch.float32)
+        device = kwargs.get('device', 'cuda:0')
+        kwargs.setdefault(
+            'default_dof_pos',
+            torch.cat(
+                [
+                    torch.as_tensor(full_dof_reference[2:10], dtype=torch.float32, device=device),
+                    torch.as_tensor(full_dof_reference[14:18], dtype=torch.float32, device=device),
+                ],
+                dim=0,
+            ),
+        )
+        kwargs.setdefault('full_robot_dof', 18)
+        kwargs.setdefault('joint_index', PROTO5_FULL_JOINT_INDEX)
+        kwargs.setdefault('ee_names', PROTO5_EE_NAMES)
+        kwargs.setdefault('collision_link_names', PROTO5_COLLISION_LINK_NAMES)
+        kwargs.setdefault('joint_min', PROTO5_ACTIVE_JOINT_MIN)
+        kwargs.setdefault('joint_max', PROTO5_ACTIVE_JOINT_MAX)
+        kwargs.setdefault('full_dof_reference', full_dof_reference)
+        if robot_sdf_path_prefix is not None:
+            kwargs.setdefault('robot_sdf_path_prefix', robot_sdf_path_prefix)
+        super().__init__(*args, **kwargs)
