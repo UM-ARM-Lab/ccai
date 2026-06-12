@@ -347,7 +347,19 @@ class TrajectoryExecutor:
                 kwargs['f_ext_init'] = env.get_force_sensor_data()
             best_traj, plans = planner.step(state, **kwargs)
             
-            if self.params.get('contact_constraint_only', False) or self.params.get('solve_for_u_hat', False):
+            tactile_backend = str(self.params.get('tactile_controller_backend', 'grampc')).lower()
+            using_grampc_tactile = (
+                self.params.get('mode') == 'simulation'
+                and tactile_backend == 'grampc'
+                and (
+                    (self.params.get('tactile_controller', False) and not recover)
+                    or (self.params.get('recovery_tactile_controller', False) and recover)
+                )
+            )
+            if not using_grampc_tactile and (
+                self.params.get('contact_constraint_only', False)
+                or self.params.get('solve_for_u_hat', False)
+            ):
                 u_hat = planner.problem.solve_for_u_hat(best_traj.unsqueeze(0), planner.solver.best_idx).squeeze(0)
                 
                 num_contact_fingers = len(planner.problem.contact_fingers)
