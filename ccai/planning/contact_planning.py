@@ -8,10 +8,21 @@ import numpy as np
 import time
 import pathlib
 import pickle as pkl
+from dataclasses import dataclass
 from pprint import pprint
 
 from ccai.utils.allegro_utils import convert_yaw_to_sine_cosine, convert_sine_cosine_to_yaw, visualize_trajectory
-from ccai.utils.recovery_utils import create_visualization_paths, save_goal_info, save_recovery_info
+from ccai.utils.recovery_utils import create_visualization_paths, get_contact_state_mappings, save_goal_info, save_recovery_info
+
+
+@dataclass
+class ChainedRecoveryNode:
+    contact_sequence: list
+    terminal_states: torch.Tensor
+    trajectories: torch.Tensor = None
+    score: float = float("-inf")
+    terminal_likelihoods: torch.Tensor = None
+    recovery_likelihoods: torch.Tensor = None
 
 
 class ContactPlanner:
@@ -28,6 +39,9 @@ class ContactPlanner:
         
     def plan_recovery_contacts_w_model(self, state, contact_state_dict_flip, classifier):
         """Plan recovery contacts using a trained model."""
+        if self.params.get('chained_recovery_contact_search', False):
+            return self._plan_chained_joint_recovery_contacts(state, contact_state_dict_flip)
+
         start_plan_time = time.perf_counter()
         modes = ['thumb_middle', 'index'] 
         
@@ -61,6 +75,9 @@ class ContactPlanner:
 
     def plan_recovery_contacts(self, state, stage, fpath, all_stage, index_regrasp_planner):
         """Plan recovery contacts using recovery model."""
+        if self.params.get('chained_recovery_contact_search', False):
+            return self._plan_chained_joint_recovery_contacts(state)
+
         start_plan_time = time.perf_counter()
         
         # If we have a recovery model, use it to get contact mode
@@ -182,6 +199,199 @@ class ContactPlanner:
         # If we don't have a recovery model, use the task model to plan contacts
         else:
             return self.plan_recovery_contacts_offline(state, stage, fpath, all_stage)
+
+    @torch.no_grad()
+    def _plan_chained_joint_recovery_contacts(self, state, contact_state_dict_flip=None):
+        """Plan a contact-mode sequence by chaining joint recovery diffusion samples."""
+        if self.trajectory_sampler is None:
+            raise ValueError("chained_recovery_contact_search requires trajectory_sampler.")
+        if self.trajectory_sampler_orig is None:
+            raise ValueError("chained_recovery_contact_search requires trajectory_sampler_orig for terminal OOD scoring.")
+
+        start_plan_time = time.perf_counter()
+        state_dim = self._state_dim()
+        threshold = self.params.get('likelihood_threshold', -15)
+        max_depth = self.params.get('max_recovery_stages', 1)
+
+        root_state = state[:state_dim].reshape(1, -1)
+        current = ChainedRecoveryNode(contact_sequence=[], terminal_states=root_state)
+        best_node = None
+
+        for depth in range(max_depth):
+            children = self._expand_chained_recovery_node(
+                current,
+                contact_state_dict_flip=contact_state_dict_flip,
+            )
+            if not children:
+                break
+
+            best_child = max(children, key=lambda node: node.score)
+            if best_node is None or best_child.score > best_node.score:
+                best_node = best_child
+
+            terminating_children = [child for child in children if child.score > threshold]
+            if terminating_children:
+                selected = max(terminating_children, key=lambda node: node.score)
+                print('Chained recovery terminated at depth:', depth + 1)
+                print('Chained recovery contact sequence:', selected.contact_sequence)
+                print('Chained recovery terminal task likelihood:', selected.score)
+                return self._format_chained_recovery_result(
+                    selected,
+                    time.perf_counter() - start_plan_time,
+                )
+
+            print('Chained recovery continuing with contact mode:', best_child.contact_sequence[-1])
+            print('Chained recovery best terminal task likelihood:', best_child.score)
+            current = best_child
+
+        if best_node is None:
+            raise ValueError("Joint recovery model did not produce any valid contact modes for chained search.")
+
+        print('Chained recovery reached max depth; returning best visited sequence:', best_node.contact_sequence)
+        print('Chained recovery best terminal task likelihood:', best_node.score)
+        return self._format_chained_recovery_result(
+            best_node,
+            time.perf_counter() - start_plan_time,
+        )
+
+    def _expand_chained_recovery_node(self, node, contact_state_dict_flip=None):
+        state_dim = self._state_dim()
+        starts_for_diff = self._prepare_chained_start_batch(node.terminal_states)
+        sample_count = starts_for_diff.shape[0] if starts_for_diff.shape[0] > 1 else self.params['N_contact_plan']
+
+        trajectories, raw_contact_modes, recovery_likelihoods = self.trajectory_sampler.sample(
+            N=sample_count,
+            start=starts_for_diff,
+            H=self.trajectory_sampler.T,
+            constraints=None,
+            project=False,
+        )
+        if raw_contact_modes is None:
+            raise ValueError(
+                "chained_recovery_contact_search requires a joint recovery model that diffuses contact modes."
+            )
+        if recovery_likelihoods is None:
+            raise ValueError(
+                "chained_recovery_contact_search requires recovery-model likelihoods for resampling."
+            )
+
+        recovery_likelihoods = recovery_likelihoods.reshape(-1)
+        modes = self._decode_contact_modes(raw_contact_modes, contact_state_dict_flip)
+        if self.params.get('sine_cosine', False):
+            trajectories_for_scoring = convert_sine_cosine_to_yaw(trajectories)
+        else:
+            trajectories_for_scoring = trajectories
+
+        valid_indices = [i for i, mode in enumerate(modes) if mode is not None]
+        if len(valid_indices) == 0:
+            print('No valid contact modes were diffused for chained recovery expansion')
+            return []
+
+        valid_indices = torch.tensor(valid_indices, device=recovery_likelihoods.device, dtype=torch.long)
+        valid_likelihoods = recovery_likelihoods[valid_indices]
+        valid_trajectories = trajectories_for_scoring[valid_indices]
+        valid_modes = [modes[i] for i in valid_indices.cpu().tolist()]
+
+        resampled_local_indices = self._resample_indices_from_recovery_likelihoods(
+            valid_likelihoods,
+            num_samples=self.params['N_contact_plan'],
+        )
+        resampled_trajectories = valid_trajectories[resampled_local_indices]
+        resampled_likelihoods = valid_likelihoods[resampled_local_indices]
+        resampled_modes = [valid_modes[i] for i in resampled_local_indices.cpu().tolist()]
+
+        children = []
+        for mode in dict.fromkeys(resampled_modes):
+            mode_indices = torch.tensor(
+                [i for i, candidate_mode in enumerate(resampled_modes) if candidate_mode == mode],
+                device=resampled_trajectories.device,
+                dtype=torch.long,
+            )
+            mode_trajectories = resampled_trajectories[mode_indices]
+            terminal_states = mode_trajectories[:, -1, :state_dim]
+            terminal_likelihoods = self._terminal_task_likelihoods(terminal_states)
+            score = terminal_likelihoods.mean().item()
+            children.append(
+                ChainedRecoveryNode(
+                    contact_sequence=list(node.contact_sequence) + [mode],
+                    terminal_states=terminal_states,
+                    trajectories=mode_trajectories,
+                    score=score,
+                    terminal_likelihoods=terminal_likelihoods,
+                    recovery_likelihoods=resampled_likelihoods[mode_indices],
+                )
+            )
+
+        return children
+
+    def _prepare_chained_start_batch(self, terminal_states):
+        states = terminal_states
+        if states.ndim == 1:
+            states = states.reshape(1, -1)
+
+        if states.shape[0] > 1:
+            sample_count = self.params['N_contact_plan']
+            indices = torch.arange(sample_count, device=states.device) % states.shape[0]
+            states = states[indices]
+
+        if self.params.get('sine_cosine', False):
+            return convert_yaw_to_sine_cosine(states)
+        return states
+
+    def _decode_contact_modes(self, raw_contact_modes, contact_state_dict_flip=None):
+        if contact_state_dict_flip is None:
+            _, _, _, contact_state_dict_flip = get_contact_state_mappings()
+
+        raw_contact_modes = raw_contact_modes.reshape(raw_contact_modes.shape[0], -1, raw_contact_modes.shape[-1])
+        if raw_contact_modes.shape[1] > 1:
+            raw_contact_modes = raw_contact_modes[:, 0]
+        else:
+            raw_contact_modes = raw_contact_modes.squeeze(1)
+
+        contact_vec = torch.round((raw_contact_modes + 1) / 2)
+        modes = []
+        for i in range(contact_vec.shape[0]):
+            key = tuple(contact_vec[i].detach().cpu().numpy())
+            mode = contact_state_dict_flip.get(key)
+            if mode is None:
+                print('Warning: Contact mode not found for:', contact_vec[i].detach().cpu().numpy())
+            modes.append(mode)
+        return modes
+
+    def _resample_indices_from_recovery_likelihoods(self, recovery_likelihoods, num_samples):
+        weights = torch.exp(recovery_likelihoods)
+        weights = weights / weights.sum()
+        if not torch.isfinite(weights).all():
+            raise ValueError("Non-finite recovery likelihood weights in chained recovery search.")
+        return torch.multinomial(weights, num_samples=num_samples, replacement=True)
+
+    def _terminal_task_likelihoods(self, terminal_states):
+        likelihoods = []
+        for terminal_state in terminal_states:
+            likelihood = self.trajectory_sampler_orig.check_id(
+                terminal_state,
+                self.params['likelihood_num_samples'],
+                threshold=self.params.get('likelihood_threshold', -15),
+                likelihood_only=True,
+            )
+            if isinstance(likelihood, tuple):
+                likelihood = likelihood[0]
+            likelihoods.append(float(likelihood))
+        return torch.tensor(likelihoods, device=terminal_states.device, dtype=terminal_states.dtype)
+
+    def _format_chained_recovery_result(self, node, plan_time):
+        if node.terminal_likelihoods is None:
+            best_idx = 0
+            likelihoods = None
+        else:
+            best_idx = torch.argmax(node.terminal_likelihoods).item()
+            likelihoods = node.terminal_likelihoods
+        goal_config = node.terminal_states[best_idx].clone()
+        return node.contact_sequence, goal_config, node.trajectories, likelihoods, plan_time
+
+    def _state_dim(self):
+        obj_dof = self.turn_problem.obj_dof if self.turn_problem is not None else 3
+        return 4 * len(self.params['fingers']) + obj_dof
 
     def plan_recovery_contacts_offline(self, state, stage, fpath, all_stage):
         """Plan recovery contacts using CSVTO + likelihood estimation"""
