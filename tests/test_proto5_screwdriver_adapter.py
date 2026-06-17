@@ -38,6 +38,32 @@ def test_proto5_screwdriver_default_dof_pos_is_full_reference(monkeypatch):
     assert default_dof_pos.shape == (18,)
     torch.testing.assert_close(default_dof_pos, full_reference)
     assert captured_kwargs["full_robot_dof"] == 18
+    assert captured_kwargs["contact_patch_link_frame_z_max"] == -0.003
+
+
+def test_proto5_screwdriver_allows_contact_patch_z_max_override(monkeypatch):
+    captured_kwargs = {}
+
+    def fake_allegro_init(self, *args, **kwargs):
+        captured_kwargs.update(kwargs)
+        self.dx = 0
+        self.du = 0
+        self.dg = 0
+        self.dh = 0
+        self.dz = 0
+        self.x_min = None
+        self.x_max = None
+        self.squared_slack = True
+
+    monkeypatch.setattr(AllegroScrewdriver, "__init__", fake_allegro_init)
+
+    Proto5Screwdriver(
+        full_dof_reference=torch.zeros(18, dtype=torch.float32),
+        contact_patch_link_frame_z_max=-0.004,
+        device="cpu",
+    )
+
+    assert captured_kwargs["contact_patch_link_frame_z_max"] == -0.004
 
 
 def test_proto5_screwdriver_wrist_control_passes_14d_controlled_mapping(monkeypatch):

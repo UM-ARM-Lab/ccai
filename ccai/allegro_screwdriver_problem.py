@@ -175,6 +175,7 @@ class Proto5Screwdriver(AllegroScrewdriver):
         kwargs.setdefault('joint_min', PROTO5_ACTIVE_JOINT_MIN)
         kwargs.setdefault('joint_max', PROTO5_ACTIVE_JOINT_MAX)
         kwargs.setdefault('full_dof_reference', full_dof_reference)
+        kwargs.setdefault('contact_patch_link_frame_z_max', -0.003)
         if robot_sdf_path_prefix is not None:
             kwargs.setdefault('robot_sdf_path_prefix', robot_sdf_path_prefix)
         super().__init__(*args, **kwargs)

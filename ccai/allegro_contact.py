@@ -595,6 +595,7 @@ def _make_contact_scene_cache_key(
     obj_link_name,
     collision_check_links,
     links_per_finger,
+    contact_patch_link_frame_z_max,
     device,
 ):
     return (
@@ -603,6 +604,7 @@ def _make_contact_scene_cache_key(
         obj_link_name,
         tuple(collision_check_links),
         int(links_per_finger),
+        contact_patch_link_frame_z_max,
         str(device),
     )
 
@@ -775,6 +777,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         self.ee_link_idx = {finger: chain.frame_to_idx[ee_name] for finger, ee_name in self.ee_names.items()}
         self.frame_indices = torch.tensor([self.ee_link_idx[finger] for finger in self.fingers])
         self.fingertip_contact_only = bool(kwargs.get('fingertip_contact_only', False))
+        self.contact_patch_link_frame_z_max = kwargs.get('contact_patch_link_frame_z_max', None)
 
         ##### SDF for robot and environment ######
         self.world_trans = world_trans.to(device=device)
@@ -829,6 +832,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
             obj_link_name=self.obj_link_name,
             collision_check_links=collision_check_links,
             links_per_finger=links_per_finger,
+            contact_patch_link_frame_z_max=self.contact_patch_link_frame_z_max,
             device=device,
         )
         global contact_scenes, contact_scenes_for_viz, contact_scene_cache_key
@@ -860,14 +864,16 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                                                 softmin_temp=1.0e3,
                                                 points_per_link=750,
                                                 links_per_finger=links_per_finger,
-                                                obj_link_name=self.obj_link_name
+                                                obj_link_name=self.obj_link_name,
+                                                contact_patch_link_frame_z_max=self.contact_patch_link_frame_z_max,
                                                 )
             contact_scenes_for_viz = pv.RobotScene(robot_sdf, object_sdf_for_viz, scene_trans,
                                                 collision_check_links=collision_check_links,
                                                 softmin_temp=1.0e3,
                                                 points_per_link=750,
                                                 links_per_finger=links_per_finger,
-                                                obj_link_name=self.obj_link_name
+                                                obj_link_name=self.obj_link_name,
+                                                contact_patch_link_frame_z_max=self.contact_patch_link_frame_z_max,
                                                 )
             contact_scene_cache_key = cache_key
             self.contact_scenes = contact_scenes
