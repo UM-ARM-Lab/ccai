@@ -53,6 +53,26 @@ def partial_to_full_state(partial, fingers):
     return full
 
 
+def _partial_to_visualization_full_state(partial, fingers, full_dof_reference=None, joint_index=None):
+    if full_dof_reference is None and joint_index is None:
+        return partial_to_full_state(partial, fingers)
+    if full_dof_reference is None or joint_index is None:
+        raise ValueError("full_dof_reference and joint_index must be provided together.")
+
+    expected_dof = 4 * len(fingers)
+    if partial.shape[-1] != expected_dof:
+        raise ValueError(
+            f"Expected {expected_dof} partial finger DOFs for {fingers}, got {partial.shape[-1]}."
+        )
+
+    reference = torch.as_tensor(full_dof_reference, device=partial.device, dtype=partial.dtype).reshape(-1)
+    active_joint_index = sum([list(joint_index[finger]) for finger in fingers], [])
+    active_joint_index = torch.as_tensor(active_joint_index, device=partial.device, dtype=torch.long)
+    scatter_index = active_joint_index.expand(partial.shape[:-1] + (active_joint_index.numel(),))
+    full_shape = partial.shape[:-1] + (reference.numel(),)
+    return reference.expand(full_shape).scatter(dim=-1, index=scatter_index, src=partial)
+
+
 def full_to_partial_state(full, fingers):
     """
     :params partial: B x 8 joint configurations for index and thumb
@@ -152,24 +172,59 @@ CAMERA_PRESET_FILENAMES = {
 }
 
 
-def _get_camera_parameters(task):
-    try:
-        preset_name = CAMERA_PRESET_FILENAMES[task]
-    except KeyError as exc:
-        raise ValueError(f"Unsupported visualization task: {task}") from exc
-
-    camera_path = pathlib.Path(__file__).resolve().with_name(preset_name)
+def _get_camera_parameters(task, camera_parameters_path=None):
+    if camera_parameters_path is not None:
+        camera_path = pathlib.Path(camera_parameters_path).expanduser()
+    else:
+        try:
+            preset_name = CAMERA_PRESET_FILENAMES[task]
+        except KeyError as exc:
+            raise ValueError(f"Unsupported visualization task: {task}") from exc
+        camera_path = pathlib.Path(__file__).resolve().with_name(preset_name)
     if not camera_path.exists():
-        raise FileNotFoundError(f"Missing camera preset for task '{task}': {camera_path}")
+        raise FileNotFoundError(f"Missing camera parameters for task '{task}': {camera_path}")
     return o3d.io.read_pinhole_camera_parameters(str(camera_path))
 
 
-def _collect_visualization_geometry(trajectory_step, scene, fingers, obj_dof, pcd=None):
+def _write_window_camera_parameters(vis, camera_parameters_path):
+    camera_path = pathlib.Path(camera_parameters_path).expanduser()
+    camera_path.parent.mkdir(parents=True, exist_ok=True)
+    parameters = vis.get_view_control().convert_to_pinhole_camera_parameters()
+    o3d.io.write_pinhole_camera_parameters(str(camera_path), parameters)
+    print(f"Saved Open3D camera parameters to {camera_path}")
+    return False
+
+
+def _register_camera_save_callback(vis, save_camera_parameters_path):
+    if save_camera_parameters_path is None:
+        return
+
+    def save_callback(callback_vis):
+        return _write_window_camera_parameters(callback_vis, save_camera_parameters_path)
+
+    vis.register_key_callback(ord("S"), save_callback)
+
+
+def _collect_visualization_geometry(
+    trajectory_step,
+    scene,
+    fingers,
+    obj_dof,
+    pcd=None,
+    full_dof_reference=None,
+    joint_index=None,
+):
     num_fingers = len(fingers)
     q = trajectory_step[: 4 * num_fingers]
     theta = trajectory_step[4 * num_fingers: 4 * num_fingers + obj_dof]
+    full_q = _partial_to_visualization_full_state(
+        q.unsqueeze(0),
+        fingers,
+        full_dof_reference=full_dof_reference,
+        joint_index=joint_index,
+    )
     rob_mesh, meshes = scene.get_visualization_meshes(
-        partial_to_full_state(q.unsqueeze(0), fingers).to(device=scene.device),
+        full_q.to(device=scene.device),
         theta.unsqueeze(0).to(device=scene.device),
         pcd=pcd,
     )
@@ -186,37 +241,158 @@ def _make_offscreen_material(geometry):
     return material
 
 
-def _visualize_trajectory_window(trajectory, scene, scene_path, fingers, obj_dof, headless=False, task='screwdriver', pcd=None):
-    parameters = _get_camera_parameters(task)
+def _compute_auto_camera_from_geometries(geometries):
+    bounds = []
+    for geometry in geometries:
+        if not hasattr(geometry, "get_axis_aligned_bounding_box"):
+            continue
+        bbox = geometry.get_axis_aligned_bounding_box()
+        min_bound = np.asarray(bbox.get_min_bound(), dtype=np.float64)
+        max_bound = np.asarray(bbox.get_max_bound(), dtype=np.float64)
+        if min_bound.shape != (3,) or max_bound.shape != (3,):
+            continue
+        if not (np.isfinite(min_bound).all() and np.isfinite(max_bound).all()):
+            continue
+        bounds.append((min_bound, max_bound))
+
+    if not bounds:
+        return None
+
+    combined_min = np.min(np.stack([bound[0] for bound in bounds], axis=0), axis=0)
+    combined_max = np.max(np.stack([bound[1] for bound in bounds], axis=0), axis=0)
+    center = 0.5 * (combined_min + combined_max)
+    extent = np.maximum(combined_max - combined_min, 1e-3)
+    view_direction = np.array([0.65, -0.75, 0.45], dtype=np.float64)
+    view_direction = view_direction / np.linalg.norm(view_direction)
+    distance = max(float(np.max(extent)) * 2.75, 0.35)
+    eye = center + view_direction * distance
+    return {
+        "center": center,
+        "eye": eye,
+        "up": np.array([0.0, 0.0, 1.0], dtype=np.float64),
+        "extent": extent,
+    }
+
+
+def _apply_auto_window_camera(view_control, geometries):
+    camera = _compute_auto_camera_from_geometries(geometries)
+    if camera is None:
+        return False
+    view_control.set_lookat(camera["center"])
+    front = camera["center"] - camera["eye"]
+    front = front / np.linalg.norm(front)
+    view_control.set_front(front)
+    view_control.set_up(camera["up"])
+    view_control.set_zoom(0.65)
+    return True
+
+
+def _apply_auto_offscreen_camera(renderer, geometries):
+    camera = _compute_auto_camera_from_geometries(geometries)
+    if camera is None:
+        return False
+    renderer.setup_camera(
+        60.0,
+        camera["center"].astype(np.float32),
+        camera["eye"].astype(np.float32),
+        camera["up"].astype(np.float32),
+    )
+    return True
+
+
+def _visualize_trajectory_window(
+    trajectory,
+    scene,
+    scene_path,
+    fingers,
+    obj_dof,
+    headless=False,
+    task='screwdriver',
+    pcd=None,
+    full_dof_reference=None,
+    joint_index=None,
+    camera_mode="preset",
+    camera_parameters_path=None,
+    save_camera_parameters_path=None,
+    camera_setup_only=False,
+):
+    parameters = _get_camera_parameters(task, camera_parameters_path=camera_parameters_path)
     vis = o3d.visualization.VisualizerWithKeyCallback()
     vis.create_window(width=800, height=600, visible=not headless)
+    _register_camera_save_callback(vis, save_camera_parameters_path)
     vis.get_render_option().mesh_show_wireframe = True
     vis.get_render_option().point_show_normal = True
 
     for t in range(trajectory.shape[0]):
         vis.clear_geometries()
-        meshes = _collect_visualization_geometry(trajectory[t], scene, fingers, obj_dof, pcd=pcd)
+        meshes = _collect_visualization_geometry(
+            trajectory[t],
+            scene,
+            fingers,
+            obj_dof,
+            pcd=pcd,
+            full_dof_reference=full_dof_reference,
+            joint_index=joint_index,
+        )
         for mesh in meshes:
             vis.add_geometry(mesh)
 
         ctr = vis.get_view_control()
-        ctr.convert_from_pinhole_camera_parameters(parameters, allow_arbitrary=True)
+        if camera_mode == "auto":
+            if not _apply_auto_window_camera(ctr, meshes):
+                ctr.convert_from_pinhole_camera_parameters(parameters, allow_arbitrary=True)
+        elif camera_mode == "preset":
+            ctr.convert_from_pinhole_camera_parameters(parameters, allow_arbitrary=True)
+        else:
+            raise ValueError(f"Unsupported camera mode: {camera_mode}")
         vis.poll_events()
         vis.update_renderer()
+        if camera_setup_only:
+            if save_camera_parameters_path is not None:
+                print(
+                    "Adjust the Open3D view, press S to save the camera, "
+                    "then close the viewer."
+                )
+            else:
+                print("Adjust the Open3D view, then close the viewer.")
+            vis.run()
+            vis.destroy_window()
+            return False
         img = vis.capture_screen_float_buffer(False)
         plt.imsave(scene_path / 'img' / f'im_{t:04d}.png', np.asarray(img), dpi=1)
 
     vis.destroy_window()
+    return True
 
 
-def _visualize_trajectory_offscreen(trajectory, scene, scene_path, fingers, obj_dof, task='screwdriver', pcd=None):
-    parameters = _get_camera_parameters(task)
+def _visualize_trajectory_offscreen(
+    trajectory,
+    scene,
+    scene_path,
+    fingers,
+    obj_dof,
+    task='screwdriver',
+    pcd=None,
+    full_dof_reference=None,
+    joint_index=None,
+    camera_mode="preset",
+    camera_parameters_path=None,
+):
+    parameters = _get_camera_parameters(task, camera_parameters_path=camera_parameters_path)
     renderer = o3d.visualization.rendering.OffscreenRenderer(800, 600)
     renderer.scene.set_background(np.array([1.0, 1.0, 1.0, 1.0], dtype=np.float32))
 
     for t in range(trajectory.shape[0]):
         renderer.scene.clear_geometry()
-        geometries = _collect_visualization_geometry(trajectory[t], scene, fingers, obj_dof, pcd=pcd)
+        geometries = _collect_visualization_geometry(
+            trajectory[t],
+            scene,
+            fingers,
+            obj_dof,
+            pcd=pcd,
+            full_dof_reference=full_dof_reference,
+            joint_index=joint_index,
+        )
         for idx, geometry in enumerate(geometries):
             renderer.scene.add_geometry(
                 f"geometry_{idx}",
@@ -224,9 +400,16 @@ def _visualize_trajectory_offscreen(trajectory, scene, scene_path, fingers, obj_
                 _make_offscreen_material(geometry),
             )
 
-        renderer.setup_camera(parameters.intrinsic, parameters.extrinsic)
+        if camera_mode == "auto":
+            if not _apply_auto_offscreen_camera(renderer, geometries):
+                renderer.setup_camera(parameters.intrinsic, parameters.extrinsic)
+        elif camera_mode == "preset":
+            renderer.setup_camera(parameters.intrinsic, parameters.extrinsic)
+        else:
+            raise ValueError(f"Unsupported camera mode: {camera_mode}")
         img = renderer.render_to_image()
         o3d.io.write_image(str(scene_path / 'img' / f'im_{t:04d}.png'), img)
+    return True
 
 
 def visualize_trajectory(
@@ -239,13 +422,19 @@ def visualize_trajectory(
     task='screwdriver',
     pcd=None,
     render_backend='window',
+    full_dof_reference=None,
+    joint_index=None,
+    camera_mode="preset",
+    camera_parameters_path=None,
+    save_camera_parameters_path=None,
+    camera_setup_only=False,
 ):
     scene_path = pathlib.Path(scene_fpath)
     with open(scene_path / 'traj.pkl', 'wb') as f:
         pickle.dump(trajectory.cpu().numpy(), f)
 
     if render_backend == 'offscreen':
-        _visualize_trajectory_offscreen(
+        rendered_frames = _visualize_trajectory_offscreen(
             trajectory,
             scene,
             scene_path,
@@ -253,9 +442,13 @@ def visualize_trajectory(
             obj_dof,
             task=task,
             pcd=pcd,
+            full_dof_reference=full_dof_reference,
+            joint_index=joint_index,
+            camera_mode=camera_mode,
+            camera_parameters_path=camera_parameters_path,
         )
     elif render_backend == 'window':
-        _visualize_trajectory_window(
+        rendered_frames = _visualize_trajectory_window(
             trajectory,
             scene,
             scene_path,
@@ -264,9 +457,18 @@ def visualize_trajectory(
             headless=headless,
             task=task,
             pcd=pcd,
+            full_dof_reference=full_dof_reference,
+            joint_index=joint_index,
+            camera_mode=camera_mode,
+            camera_parameters_path=camera_parameters_path,
+            save_camera_parameters_path=save_camera_parameters_path,
+            camera_setup_only=camera_setup_only,
         )
     else:
         raise ValueError(f"Unsupported render backend: {render_backend}")
+
+    if not rendered_frames:
+        return
 
     # convert to GIF
     import subprocess
