@@ -422,6 +422,8 @@ class AllegroScrewDriverDataset(Dataset):
         self.masks = torch.from_numpy(self.masks).float()
         if states_only:
             self.trajectories = self.trajectories[:, :, :self.dx]
+        self.trajectory_dim = self.trajectories.shape[-1]
+        self.du = max(0, self.trajectory_dim - self.dx)
         self.trajectory_type = torch.from_numpy(self.trajectory_type)
         self.trajectory_type = 2 * (self.trajectory_type - 0.5)  # scale to be [-1, 1]
 
@@ -435,8 +437,11 @@ class AllegroScrewDriverDataset(Dataset):
 
         if self.screwdriver and not recovery:
             pre_shape = self.trajectories.shape
-            final_roll = self.trajectories[:, -1, 12].abs()
-            final_pitch = self.trajectories[:, -1, 13].abs()
+            roll_idx = self.dx - 3
+            pitch_idx = self.dx - 2
+            yaw_idx = self.dx - 1
+            final_roll = self.trajectories[:, -1, roll_idx].abs()
+            final_pitch = self.trajectories[:, -1, pitch_idx].abs()
             dropped = (final_roll > .25) | (final_pitch > .25)
             self.trajectories = self.trajectories[~dropped]
             self.masks = self.masks[~dropped]
@@ -446,8 +451,8 @@ class AllegroScrewDriverDataset(Dataset):
 
             print(f'# Trajectories: {pre_shape[0]} -> {post_shape[0]}')
 
-            final_yaw = self.trajectories[:, -1, 14]
-            initial_yaw = self.trajectories[:, 0, 14]
+            final_yaw = self.trajectories[:, -1, yaw_idx]
+            initial_yaw = self.trajectories[:, 0, yaw_idx]
             yaw_change = final_yaw - initial_yaw
             print(yaw_change.mean())
 
@@ -458,8 +463,8 @@ class AllegroScrewDriverDataset(Dataset):
             post_bad_turn_shape = self.trajectories.shape
 
             print(f'# Trajectories: {post_shape[0]} -> {post_bad_turn_shape[0]}')
-            final_yaw = self.trajectories[:, -1, 14]
-            initial_yaw = self.trajectories[:, 0, 14]
+            final_yaw = self.trajectories[:, -1, yaw_idx]
+            initial_yaw = self.trajectories[:, 0, yaw_idx]
             yaw_change = final_yaw - initial_yaw
             print(yaw_change.mean())
             
@@ -498,7 +503,7 @@ class AllegroScrewDriverDataset(Dataset):
         return self.trajectories.shape[0]
 
     def __getitem__(self, idx):
-        traj = self.trajectories[idx]
+        traj = self.trajectories[idx].clone()
 
         # TODO: figure out how to do data augmentation on screwdriver angle
         # a little more complex due to rotation representation
@@ -555,7 +560,7 @@ class AllegroScrewDriverDataset(Dataset):
         if self.states_only:
             dim = self.dx
         else:
-            dim =self.dx + 12 + 9
+            dim = self.trajectory_dim
 
         dxm1 = self.dx-1
         dxp1 = self.dx+1

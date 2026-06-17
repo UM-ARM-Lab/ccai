@@ -26,6 +26,7 @@ from ccai.allegro_screwdriver_problem_diffusion import AllegroScrewdriverDiff
 import pickle
 import sys
 from torch.utils.data import random_split
+import json
 
 from typing import Dict
 
@@ -466,6 +467,40 @@ def convert_sine_cosine_to_yaw(xu):
         xu_new = xu_new.numpy()
     return xu_new
 
+
+def resolve_task_diffusion_data_path_and_manifest(ccai_path, config):
+    data_path = pathlib.Path(f'{ccai_path}/data/experiments/{config["data_directory"]}')
+    manifest_candidates = [
+        data_path / 'manifest.json',
+        data_path / 'ccai_diffusion_dataset' / 'manifest.json',
+    ]
+    for manifest_path in manifest_candidates:
+        if not manifest_path.exists():
+            continue
+        manifest = json.loads(manifest_path.read_text())
+        manifest_data_path = manifest_path.parent
+        trial_root = manifest.get('trial_root')
+        if trial_root is not None and not (manifest_data_path / trial_root).exists():
+            raise ValueError(
+                f'CCAI diffusion manifest {manifest_path} references missing trial_root {trial_root}'
+            )
+        return manifest_data_path, manifest
+    return data_path, None
+
+
+def apply_task_diffusion_manifest_dimensions(config, manifest):
+    if manifest is None:
+        return
+    manifest_dx = int(manifest.get('state_dim', manifest.get('dx', config['dx'])))
+    manifest_du = int(manifest.get('du', config['du']))
+    if int(config['dx']) != manifest_dx:
+        print(f'Overriding config dx from {config["dx"]} to manifest state_dim {manifest_dx}')
+    if int(config['du']) != manifest_du:
+        print(f'Overriding config du from {config["du"]} to manifest du {manifest_du}')
+    config['dx'] = manifest_dx
+    config['du'] = manifest_du
+
+
 if __name__ == "__main__":
     CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
     print(CCAI_PATH)
@@ -474,6 +509,8 @@ if __name__ == "__main__":
     print(args.config)
     config = yaml.safe_load(
         pathlib.Path(f'{CCAI_PATH}/config/training/{args.config}').read_text())
+    data_path, collector_manifest = resolve_task_diffusion_data_path_and_manifest(CCAI_PATH, config)
+    apply_task_diffusion_manifest_dimensions(config, collector_manifest)
     dx_original = config['dx']
     if config['sine_cosine']:
         dx = config['dx'] + 1
@@ -499,8 +536,6 @@ if __name__ == "__main__":
                               true_s0=False ,
                               use_mixed_precision=config['use_mixed_precision']
                               )
-
-    data_path = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["data_directory"]}')
 
     # Create full dataset first
     full_dataset = AllegroScrewDriverDataset([p for p in data_path.glob('*csvgd*')],
@@ -669,4 +704,3 @@ if __name__ == "__main__":
                                    shuffle=False, num_workers=4, pin_memory=True, drop_last=False)
         train_classifier(model, train_classifier_loader, val_classifier_loader, config)
         # eval trained classifier on training data
-

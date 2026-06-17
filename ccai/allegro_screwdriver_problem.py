@@ -4,10 +4,14 @@ import torch
 
 
 PROTO5_FULL_JOINT_INDEX = {
+    'wrist': [0, 1],
     'index': [2, 3, 4, 5],
     'middle': [6, 7, 8, 9],
     'ring': [10, 11, 12, 13],
     'thumb': [14, 15, 16, 17],
+}
+PROTO5_FINGER_JOINT_INDEX = {
+    key: value for key, value in PROTO5_FULL_JOINT_INDEX.items() if key != 'wrist'
 }
 PROTO5_EE_NAMES = {
     'index': 'RHand_I6AF_LINK',
@@ -22,12 +26,14 @@ PROTO5_COLLISION_LINK_NAMES = {
     'thumb': ['RHand_T6AF_LINK', 'RHand_T3Y_LINK', 'RHand_T2Y_LINK', 'RHand_T1Y_LINK', 'RHand_T1Z_LINK'],
 }
 PROTO5_ACTIVE_JOINT_MIN = {
+    'wrist': torch.tensor([-0.78539816, -0.95993109], dtype=torch.float32),
     'index': torch.tensor([-0.34906585, 0.0, 0.0, -0.17453293], dtype=torch.float32),
     'middle': torch.tensor([-0.34906585, 0.0, 0.0, -0.17453293], dtype=torch.float32),
     'ring': torch.tensor([-0.34906585, 0.0, 0.0, -0.17453293], dtype=torch.float32),
     'thumb': torch.tensor([-1.57079633, 0.0, 0.0, -0.17453293], dtype=torch.float32),
 }
 PROTO5_ACTIVE_JOINT_MAX = {
+    'wrist': torch.tensor([0.43633231, 0.78539816], dtype=torch.float32),
     'index': torch.tensor([0.34906585, 1.57079633, 1.57079633, 1.57079633], dtype=torch.float32),
     'middle': torch.tensor([0.34906585, 1.57079633, 1.57079633, 1.57079633], dtype=torch.float32),
     'ring': torch.tensor([0.34906585, 1.57079633, 1.57079633, 1.57079633], dtype=torch.float32),
@@ -139,6 +145,7 @@ class Proto5Screwdriver(AllegroScrewdriver):
         *args,
         full_dof_reference=None,
         robot_sdf_path_prefix=None,
+        control_wrist=False,
         **kwargs,
     ):
         if full_dof_reference is None:
@@ -146,16 +153,23 @@ class Proto5Screwdriver(AllegroScrewdriver):
         device = kwargs.get('device', 'cuda:0')
         kwargs.setdefault(
             'default_dof_pos',
-            torch.cat(
-                [
-                    torch.as_tensor(full_dof_reference[2:10], dtype=torch.float32, device=device),
-                    torch.as_tensor(full_dof_reference[14:18], dtype=torch.float32, device=device),
-                ],
-                dim=0,
-            ),
+            torch.as_tensor(full_dof_reference, dtype=torch.float32, device=device).reshape(18),
         )
         kwargs.setdefault('full_robot_dof', 18)
         kwargs.setdefault('joint_index', PROTO5_FULL_JOINT_INDEX)
+        if control_wrist:
+            controlled_joint_groups = ('index', 'middle', 'thumb', 'wrist')
+            controlled_joint_index = sum([PROTO5_FULL_JOINT_INDEX[group] for group in controlled_joint_groups], [])
+            kwargs.setdefault('robot_dof', len(controlled_joint_index))
+            kwargs.setdefault('controlled_joint_index', controlled_joint_index)
+            kwargs.setdefault(
+                'controlled_joint_min',
+                torch.cat([PROTO5_ACTIVE_JOINT_MIN[group] for group in controlled_joint_groups], dim=0),
+            )
+            kwargs.setdefault(
+                'controlled_joint_max',
+                torch.cat([PROTO5_ACTIVE_JOINT_MAX[group] for group in controlled_joint_groups], dim=0),
+            )
         kwargs.setdefault('ee_names', PROTO5_EE_NAMES)
         kwargs.setdefault('collision_link_names', PROTO5_COLLISION_LINK_NAMES)
         kwargs.setdefault('joint_min', PROTO5_ACTIVE_JOINT_MIN)
