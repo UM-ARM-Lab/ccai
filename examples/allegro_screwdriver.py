@@ -58,6 +58,7 @@ print("CCAI_PATH", CCAI_PATH)
 
 # Degrees of freedom of the object
 obj_dof = 3
+RECOVERY_STATES_PATH = CCAI_PATH / 'data' / 'recovery_states_screwdriver.pkl'
 
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
@@ -155,6 +156,112 @@ class AllegroScrewdriver(AllegroManipulationProblem):
 
 all_yaw_deltas = []
 all_pregrasp_states = []
+
+
+def _state_to_numpy(state):
+    if torch.is_tensor(state):
+        return state.detach().cpu().numpy().copy()
+    return np.asarray(state).copy()
+
+
+def append_unique_recovery_state(state, path=RECOVERY_STATES_PATH):
+    state_np = _state_to_numpy(state).reshape(-1)
+    if path.exists():
+        with open(path, 'rb') as f:
+            recovery_states = pickle.load(f)
+    else:
+        recovery_states = []
+
+    for saved_state in recovery_states:
+        saved_np = _state_to_numpy(saved_state).reshape(-1)
+        if saved_np.shape == state_np.shape and np.allclose(saved_np, state_np):
+            print(f'Recovery state already logged in {path}')
+            return False
+
+    recovery_states.append(state_np)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + '.tmp')
+    with open(tmp_path, 'wb') as f:
+        pickle.dump(recovery_states, f)
+    tmp_path.replace(path)
+    print(f'Logged recovery state {len(recovery_states)} to {path}')
+    return True
+
+
+def resolve_pregrasp_states_path(config, experiment_dir):
+    configured_path = config.get('pregrasp_states_path', None)
+    if configured_path is not None:
+        configured_path = pathlib.Path(configured_path)
+        if not configured_path.is_absolute():
+            configured_path = CCAI_PATH / configured_path
+        return configured_path
+
+    default_path = experiment_dir / 'pregrasp_states.pkl'
+    if default_path.exists():
+        return default_path
+
+    legacy_screwdriver_path = CCAI_PATH / 'data/experiments/allegro_screwdriver_pregrasp_gen/pregrasp_states_screwdriver.pkl'
+    if config.get('object_type') == 'screwdriver' and legacy_screwdriver_path.exists():
+        return legacy_screwdriver_path
+
+    return default_path
+
+
+def load_pregrasp_states(config, experiment_dir):
+    pregrasp_states_path = resolve_pregrasp_states_path(config, experiment_dir)
+    if not pregrasp_states_path.exists():
+        raise FileNotFoundError(
+            f'skip_pregrasp=True requires saved pregrasp states at {pregrasp_states_path}'
+        )
+    with open(pregrasp_states_path, 'rb') as f:
+        pregrasp_states = pickle.load(f)
+    print(f'Loaded {len(pregrasp_states)} pregrasp states from {pregrasp_states_path}')
+    return pregrasp_states, pregrasp_states_path
+
+
+def select_pregrasp_state(pregrasp_states, trial_index, start_ind):
+    if isinstance(pregrasp_states, dict):
+        for key in (trial_index, trial_index + 1, str(trial_index), str(trial_index + 1)):
+            if key in pregrasp_states:
+                return pregrasp_states[key], key
+        raise IndexError(f'No pregrasp state for trial index {trial_index}')
+
+    if trial_index < len(pregrasp_states):
+        return pregrasp_states[trial_index], trial_index
+
+    local_index = trial_index - start_ind
+    if 0 <= local_index < len(pregrasp_states):
+        return pregrasp_states[local_index], local_index
+
+    raise IndexError(
+        f'No pregrasp state for trial index {trial_index}; loaded {len(pregrasp_states)} states'
+    )
+
+
+def apply_saved_pregrasp_state(env, sim_viz_env, pregrasp_states, trial_index, start_ind, params):
+    pregrasp_state, state_index = select_pregrasp_state(pregrasp_states, trial_index, start_ind)
+    pregrasp_state = torch.as_tensor(pregrasp_state).float().reshape(-1)
+    num_fingers = len(params['fingers'])
+    expected_dim = 4 * num_fingers + 4
+    if pregrasp_state.numel() != expected_dim:
+        raise ValueError(
+            f'Expected pregrasp state dim {expected_dim}, got {pregrasp_state.numel()} '
+            f'for state index {state_index}'
+        )
+
+    print(f'Applying saved pregrasp state index {state_index}: {pregrasp_state}')
+    if hasattr(env, 'set_pose'):
+        if params['mode'] != 'hardware':
+            env.reset()
+        env.set_pose(pregrasp_state.to(device=env.device))
+    else:
+        action = pregrasp_state[:4 * num_fingers].reshape(1, -1).to(device=env.device)
+        env.step(action)
+
+    if sim_viz_env is not None and hasattr(sim_viz_env, 'set_pose'):
+        sim_viz_env.set_pose(pregrasp_state.cpu())
+
+
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noise=None, noise_noise=None, sim=None, seed=None,
              proj_path=None, perturb_this_trial=False, trajectory_sampler=None, trajectory_sampler_orig=None, config=None, classifier=None):
     global all_yaw_deltas
@@ -289,6 +396,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             pre_recovery_likelihood: Likelihood before recovery
         """
         nonlocal episode_num_steps
+        was_recovering = recover
         
 
         # Execute trajectory using TrajectoryExecutor
@@ -321,6 +429,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             tactile_controller=params.get('tactile_controller', False),
             skip_csvto=params.get('skip_csvto', False)
         )
+
+        if params.get('live_recovery', False) and not was_recovering and recover:
+            recovery_state = extract_state_vector(
+                env.get_state(), num_fingers, params['device'], slice_end=15
+            )
+            append_unique_recovery_state(recovery_state)
                
         return actual_trajectory, planned_trajectories, initial_samples, sim_rollouts, optimizer_paths, contact_points, contact_distance, recover
 
@@ -450,8 +564,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             post_pregrasp_state = env.get_state()['q'].reshape(-1, 4 * num_fingers + 4).to(device=params['device'])[0]
             post_pregrasp_state_for_viz = post_pregrasp_state.clone()
             print(post_pregrasp_state)
-            all_pregrasp_states.append(post_pregrasp_state)
-            break
+            if not params['skip_pregrasp']:
+                all_pregrasp_states.append(post_pregrasp_state)
+                break
             if params['mode'] == 'hardware':
                 # print(set_state.shape)
                 sim_viz_env.set_pose(post_pregrasp_state_for_viz.cpu())  
@@ -812,7 +927,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         if done:
             break
-    if params.get('live_recovery', False) and len(data['final_likelihoods'][-1]) == 0 and params['OOD_metric'] != 'q_function':
+    if (params.get('live_recovery', False) and data['final_likelihoods'] and
+            len(data['final_likelihoods'][-1]) == 0 and params['OOD_metric'] != 'q_function'):
         id, likelihood = trajectory_sampler_orig.check_id(state, params['likelihood_num_samples'], threshold=params.get('likelihood_threshold', -15))
         data['final_likelihoods'][-1].append(likelihood)
         data_save = deepcopy(data)
@@ -852,7 +968,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 if __name__ == "__main__":
     # get config. First option is to get the config from the command line.
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/{sys.argv[1]}.yaml').read_text())
-    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_TODR.yaml').read_text())
+    config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_TODR_chained_recovery.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_TODR_N_16.yaml').read_text())
     # config = yaml.safe_load(pathlib.Path(f'{CCAI_PATH}/examples/config/screwdriver/allegro_screwdriver_diff_tactile_control_eval.yaml').read_text())
     # Write to log file in the experiment's directory
@@ -1005,6 +1121,9 @@ if __name__ == "__main__":
     trajectory_sampler, trajectory_sampler_orig, classifier = model_manager.load_trajectory_samplers()
 
     start_ind = config.get('start_ind', 0)
+    pregrasp_states = None
+    if params['skip_pregrasp']:
+        pregrasp_states, pregrasp_states_path = load_pregrasp_states(config, experiment_dir)
     step_size = 1
     num_episodes = config['num_episodes']
     if 'end_ind' in config:
@@ -1015,6 +1134,8 @@ if __name__ == "__main__":
 
         if not params['skip_pregrasp']:
             env.reset()
+        else:
+            apply_saved_pregrasp_state(env, sim_env, pregrasp_states, i, start_ind, params)
         goal = torch.tensor([0, 0, float(config['goal'])]) # Ignore. Deprecated
         # goal = goal + 0.025 * torch.randn(1) + 0.2
 
@@ -1050,8 +1171,9 @@ if __name__ == "__main__":
             # except Exception as e:
             #     print(f'Error: {e}')
             seed += 1
-        with open(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}{now}/pregrasp_states.pkl', 'wb') as f:
-            pickle.dump(all_pregrasp_states, f)
+        if not params['skip_pregrasp']:
+            with open(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}{now}/pregrasp_states.pkl', 'wb') as f:
+                pickle.dump(all_pregrasp_states, f)
         print('All yaw deltas:', all_yaw_deltas)
         print('Mean yaw delta:', np.mean(all_yaw_deltas))
         print('Std yaw delta:', np.std(all_yaw_deltas))
@@ -1061,4 +1183,3 @@ if __name__ == "__main__":
 
     gym.destroy_viewer(viewer)
     gym.destroy_sim(sim)
-

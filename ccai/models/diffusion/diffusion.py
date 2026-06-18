@@ -120,7 +120,8 @@ class GaussianDiffusion(nn.Module):
             context_dropout_p=.25,
             discriminator_guidance=False,
             new_projection=False,
-            trajectory_condition=False
+            trajectory_condition=False,
+            dim_mults=None
     ):
         super().__init__()
 
@@ -134,7 +135,10 @@ class GaussianDiffusion(nn.Module):
         self.dx = dx
         self.du = du
         self.hidden_dim = hidden_dim
+        if dim_mults is None:
+            dim_mults = (1, 2)
         self.model = TemporalUnet(self.horizon, self.xu_dim, cond_dim=context_dim, dim=hidden_dim,
+                                  dim_mults=tuple(dim_mults),
                                   context_dropout_p=context_dropout_p,
                                   trajectory_condition=trajectory_condition)
 
@@ -1102,7 +1106,8 @@ class JointDiffusion(GaussianDiffusion):
             guided=False,
             dropout_p=.25,
             trajectory_condition=True,
-            true_s0=False
+            true_s0=False,
+            dim_mults=None
     ):
         super().__init__(
             horizon,
@@ -1116,7 +1121,8 @@ class JointDiffusion(GaussianDiffusion):
             unconditional=unconditional,
             model_type=model_type,
             context_dropout_p=dropout_p,
-            trajectory_condition=True
+            trajectory_condition=True,
+            dim_mults=dim_mults
         )
         if model_type not in ['conv_unet', 'transformer']:
             raise ValueError('Invalid model type')
@@ -1127,7 +1133,11 @@ class JointDiffusion(GaussianDiffusion):
         self.trajectory_condition = trajectory_condition
 
         if model_type == 'conv_unet':
-            self.model = TemporalUNetContext(horizon, dx, du, context_dim, dim=hidden_dim, dropout_p=dropout_p, trajectory_condition=trajectory_condition, true_s0=true_s0)
+            if dim_mults is None:
+                dim_mults = (1, 2, 4)
+            self.model = TemporalUNetContext(horizon, dx, du, context_dim, dim=hidden_dim,
+                                             dim_mults=tuple(dim_mults), dropout_p=dropout_p,
+                                             trajectory_condition=trajectory_condition, true_s0=true_s0)
         else:
             self.model = TransformerContext(dx + du, dx + du, horizon, 1, cond_dim=context_dim, n_emb=hidden_dim)
 

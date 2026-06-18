@@ -65,6 +65,9 @@ class FakeJointRecoverySampler:
             }
         )
         trajectories, modes, likelihoods = self.expansions.pop(0)
+        assert trajectories.shape[0] == N
+        assert modes.shape[0] == N
+        assert likelihoods.shape[0] == N
         return trajectories.clone(), modes.clone(), likelihoods.clone()
 
 
@@ -168,10 +171,10 @@ def test_chained_search_returns_full_sequence_when_terminal_child_reaches_thresh
             _raw_mode("thumb_middle"),
         ]
     )
-    second_modes = torch.stack([_raw_mode("index")] * 4)
+    second_modes = torch.stack([_raw_mode("index")] * 8)
     expansions = [
         (_trajectories([-5, -5, -1, -1]), first_modes, torch.zeros(4)),
-        (_trajectories([1, 2, 1, 2]), second_modes, torch.zeros(4)),
+        (_trajectories([-5, -5, -5, -5, 1, 2, 1, 2]), second_modes, torch.zeros(8)),
     ]
     planner, _ = _planner(expansions)
 
@@ -189,7 +192,49 @@ def test_chained_search_returns_full_sequence_when_terminal_child_reaches_thresh
     assert initial_samples.shape[0] == 4
     assert likelihoods.tolist() == pytest.approx([1.0, 2.0, 1.0, 2.0])
     assert planner.trajectory_sampler.calls[0]["constraints"] is None
-    assert planner.trajectory_sampler.calls[1]["start_shape"] == (4, 15)
+    assert planner.trajectory_sampler.calls[1]["N"] == 8
+    assert planner.trajectory_sampler.calls[1]["start_shape"] == (8, 15)
+
+
+def test_chained_frontier_expands_all_nodes_in_one_sampler_call(monkeypatch):
+    first_parent = ChainedRecoveryNode(
+        contact_sequence=["index"],
+        terminal_states=torch.tensor([[1.0] + [0.0] * 14, [2.0] + [0.0] * 14]),
+    )
+    second_parent = ChainedRecoveryNode(
+        contact_sequence=["thumb_middle"],
+        terminal_states=torch.tensor([[3.0] + [0.0] * 14]),
+    )
+    modes = torch.stack(
+        [
+            _raw_mode("index"),
+            _raw_mode("index"),
+            _raw_mode("thumb_middle"),
+            _raw_mode("thumb_middle"),
+            _raw_mode("index"),
+            _raw_mode("index"),
+            _raw_mode("thumb_middle"),
+            _raw_mode("thumb_middle"),
+        ]
+    )
+    planner, _ = _planner([(_trajectories([1, 2, 3, 4, 5, 6, 7, 8]), modes, torch.zeros(8))])
+
+    def identity_multinomial(weights, num_samples, replacement):
+        return torch.arange(num_samples, device=weights.device)
+
+    monkeypatch.setattr(torch, "multinomial", identity_multinomial)
+
+    children = planner._expand_chained_recovery_frontier([first_parent, second_parent])
+
+    assert len(planner.trajectory_sampler.calls) == 1
+    assert planner.trajectory_sampler.calls[0]["N"] == 8
+    assert planner.trajectory_sampler.calls[0]["start_shape"] == (8, 15)
+    assert [child.contact_sequence for child in children] == [
+        ["index", "index"],
+        ["index", "thumb_middle"],
+        ["thumb_middle", "index"],
+        ["thumb_middle", "thumb_middle"],
+    ]
 
 
 def test_chained_search_returns_best_visited_node_at_max_depth(monkeypatch):

@@ -7,6 +7,7 @@ import torch
 from torch import nn
 import pathlib
 import os
+import re
 
 from ccai.models.trajectory_samplers_sac import TrajectorySampler
 
@@ -60,6 +61,18 @@ class ModelManager:
             T = self.config['T']
             
         dx = 12 + obj_dof + (1 if self.config['sine_cosine'] else 0)
+        checkpoint_path = f'{self.ccai_path}/{path}'
+        d = self._unwrap_state_dict(torch.load(checkpoint_path, map_location=torch.device('cpu')))
+        d = {k:v for k, v in d.items() if 'classifier' not in k}
+
+        role_prefix = 'model' if recovery else 'task_model'
+        hidden_dim = int(self.config.get(f'{role_prefix}_hidden_dim', self.config.get('hidden_dim', 128)))
+        inferred = self._infer_sampler_architecture(d)
+        if inferred.get('hidden_dim') is not None:
+            hidden_dim = inferred['hidden_dim']
+        dim_mults = self._normalize_dim_mults(self.config.get(f'{role_prefix}_dim_mults', dim_mults))
+        if inferred.get('dim_mults') is not None:
+            dim_mults = inferred['dim_mults']
         
         trajectory_sampler = TrajectorySampler(
             T=T + 1, 
@@ -67,7 +80,7 @@ class ModelManager:
             du=21, 
             type=self.config['type'],
             timesteps=256,#128 if recovery else 256, 
-            hidden_dim=128,
+            hidden_dim=hidden_dim,
             context_dim=3, 
             problem=None,
             guided=self.config.get('use_guidance', False),
@@ -76,12 +89,10 @@ class ModelManager:
             new_projection=True,
             generate_context=recovery,
             trajectory_condition=True,
+            dim_mults=dim_mults,
         )
         
-        d = torch.load(f'{self.ccai_path}/{path}', map_location=torch.device(self.params['device']))
-        
         trajectory_sampler.model.diffusion_model.classifier = None
-        d = {k:v for k, v in d.items() if 'classifier' not in k}
         trajectory_sampler.load_state_dict(d, strict=recovery)
         trajectory_sampler.to(device=self.params['device'])
         trajectory_sampler.send_norm_constants_to_submodels()
@@ -96,6 +107,49 @@ class ModelManager:
             print(f"Set compilation cache directory to: {cache_dir}")
         
         return trajectory_sampler
+
+    @staticmethod
+    def _unwrap_state_dict(checkpoint):
+        """Accept raw state_dict checkpoints and common wrapped checkpoint forms."""
+        if isinstance(checkpoint, dict):
+            for key in ('state_dict', 'model_state_dict'):
+                value = checkpoint.get(key)
+                if isinstance(value, dict):
+                    return value
+        return checkpoint
+
+    @staticmethod
+    def _normalize_dim_mults(dim_mults):
+        if dim_mults is None:
+            return None
+        if isinstance(dim_mults, str):
+            dim_mults = dim_mults.strip().strip('[]()')
+            if not dim_mults:
+                return None
+            return tuple(int(part.strip()) for part in dim_mults.split(',') if part.strip())
+        return tuple(int(part) for part in dim_mults)
+
+    @staticmethod
+    def _infer_sampler_architecture(state_dict):
+        pattern = re.compile(
+            r'^model\.diffusion_model\.model\.(?:temporal_unet\.)?'
+            r'downs\.(\d+)\.0\.blocks\.0\.block\.0\.weight$'
+        )
+        channels_by_level = {}
+        for key, tensor in state_dict.items():
+            match = pattern.match(key)
+            if match is None or not hasattr(tensor, 'shape') or len(tensor.shape) < 1:
+                continue
+            channels_by_level[int(match.group(1))] = int(tensor.shape[0])
+        if not channels_by_level:
+            return {}
+
+        channels = [channels_by_level[idx] for idx in sorted(channels_by_level)]
+        hidden_dim = channels[0]
+        if hidden_dim <= 0:
+            return {}
+        dim_mults = tuple(channel // hidden_dim for channel in channels)
+        return {'hidden_dim': hidden_dim, 'dim_mults': dim_mults}
     
     def _create_classifier(self):
         """Create and load the contact mode classifier."""
