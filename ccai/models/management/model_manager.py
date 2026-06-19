@@ -40,12 +40,12 @@ class ModelManager:
                 T_for_diff = self.config['T'] if loading_recovery_model else self.config['T_orig']
                 trajectory_sampler = self._load_sampler(
                     model_path, dim_mults=(1,2,4), T=T_for_diff, recovery=loading_recovery_model, obj_dof=obj_dof)
-                # trajectory_sampler.warmup_model(warmup_batch_size=16, warmup_horizon=None)
+                self._warmup_sampler(trajectory_sampler, role='recovery' if loading_recovery_model else 'task')
 
             if task_model_path is not None:
                 trajectory_sampler_orig = self._load_sampler(
                     task_model_path, dim_mults=(1,2,4), T=self.config['T_orig'], recovery=False)
-                # trajectory_sampler_orig.warmup_model(warmup_batch_size=16, warmup_horizon=None)
+                self._warmup_sampler(trajectory_sampler_orig, role='task')
                 
                 if not self.config.get('generate_context', False):
                     classifier = self._create_classifier()
@@ -99,6 +99,7 @@ class ModelManager:
         trajectory_sampler.model.diffusion_model.subsampled_t = '5_10_15' in self.config['experiment_name']
         trajectory_sampler.model.diffusion_model.classifier = None
         trajectory_sampler.model.diffusion_model.cutoff_timesteps = 128
+        self._configure_model_compilation(trajectory_sampler)
         
         # Set up compilation cache directory for the diffusion model
         cache_dir = os.path.join(self.ccai_path, 'compiled_models_cache')
@@ -107,6 +108,31 @@ class ModelManager:
             print(f"Set compilation cache directory to: {cache_dir}")
         
         return trajectory_sampler
+
+    def _configure_model_compilation(self, trajectory_sampler):
+        """Apply compile_models to sampler submodules that use CompilationMixin."""
+        enabled = self.config.get('compile_models', True)
+        diffusion_model = getattr(getattr(trajectory_sampler, 'model', None), 'diffusion_model', None)
+        compile_model = getattr(diffusion_model, 'model', None)
+        if hasattr(compile_model, 'set_compilation_enabled'):
+            compile_model.set_compilation_enabled(enabled)
+
+    def _warmup_sampler(self, trajectory_sampler, role):
+        """Run one sampler warmup so compiled model methods are used at runtime."""
+        if trajectory_sampler is None or not self.config.get('compile_models', True):
+            return
+        if not hasattr(trajectory_sampler, 'warmup_model'):
+            return
+
+        batch_size = int(self.config.get(f'{role}_compile_warmup_batch_size',
+                         self.config.get('compile_warmup_batch_size', 16)))
+        warmup_horizon = self.config.get(f'{role}_compile_warmup_horizon',
+                         self.config.get('compile_warmup_horizon', None))
+        print(f'Warming up {role} trajectory sampler to compile model methods...')
+        trajectory_sampler.warmup_model(
+            warmup_batch_size=batch_size,
+            warmup_horizon=warmup_horizon,
+        )
 
     @staticmethod
     def _unwrap_state_dict(checkpoint):

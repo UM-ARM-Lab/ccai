@@ -110,6 +110,47 @@ def _config(tmp_path):
     return config_path
 
 
+def test_parse_args_accepts_disable_model_compilation():
+    args = eval_states.parse_args(["--disable-model-compilation"])
+
+    assert args.disable_model_compilation is True
+
+
+def test_evaluate_states_sets_compile_models_false_when_requested(tmp_path, monkeypatch):
+    states_path = tmp_path / "states.pkl"
+    with open(states_path, "wb") as f:
+        pickle.dump([], f)
+
+    captured = {}
+
+    def fake_setup(config):
+        captured["compile_models"] = config.get("compile_models")
+        return eval_states.EvaluationContext(
+            config=config,
+            params={},
+            env=object(),
+            trajectory_sampler=object(),
+            trajectory_sampler_orig=object(),
+            contact_planner=object(),
+            trajectory_executor=object(),
+            turn_problem=object(),
+            mode_planner_dict={},
+            min_force_dict={},
+            allegro_screwdriver_cls=object,
+        )
+
+    monkeypatch.setattr(eval_states, "setup_context", fake_setup)
+
+    eval_states.evaluate_states(
+        config_path=_config(tmp_path),
+        states_path=states_path,
+        output_dir=tmp_path / "out",
+        disable_model_compilation=True,
+    )
+
+    assert captured["compile_models"] is False
+
+
 def test_evaluate_chained_recovery_state_preserves_sim_slot_and_writes_outputs(tmp_path, monkeypatch):
     saved_state = torch.arange(15, dtype=torch.float32) + 10
     states_path = tmp_path / "states.pkl"

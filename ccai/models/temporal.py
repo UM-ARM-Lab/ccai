@@ -27,6 +27,7 @@ class CompilationMixin:
     def __init__(self):
         self._compiled_methods = {}
         self._compilation_cache_dir = None
+        self._compilation_enabled = True
         self._cache_enabled = True
         
     def set_compilation_cache_dir(self, cache_dir):
@@ -40,10 +41,18 @@ class CompilationMixin:
         self._cache_enabled = enabled
         if not enabled:
             self._compiled_methods.clear()
+
+    def set_compilation_enabled(self, enabled=True):
+        """Enable or disable torch.compile for wrapped methods."""
+        self._compilation_enabled = enabled
+        if not enabled:
+            self._compiled_methods.clear()
         
     def _get_or_compile_method(self, method_name, original_method, compile_kwargs=None):
-        return original_method
         """Get compiled method from cache or compile it."""
+        if not self._compilation_enabled:
+            return original_method
+
         if not self._cache_enabled:
             # Direct compilation without caching
             return torch.compile(original_method, **(compile_kwargs or {'mode': 'max-autotune'}))
@@ -76,6 +85,7 @@ class CompilationMixin:
         return {
             'cached_methods': list(self._compiled_methods.keys()),
             'cache_size': len(self._compiled_methods),
+            'compilation_enabled': self._compilation_enabled,
             'cache_enabled': self._cache_enabled
         }
 

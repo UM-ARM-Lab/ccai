@@ -3,7 +3,7 @@ Evaluate chained recovery planning from saved Allegro screwdriver recovery state
 
 Dry smoke command:
 
-python examples/evaluate_chained_recovery_states.py --config examples/config/screwdriver/allegro_screwdriver_TODR_chained_recovery.yaml --states data/recovery_states_screwdriver.pkl --start-index 0 --end-index 1 --no-viewer
+python examples/evaluate_chained_recovery_states.py --config examples/config/screwdriver/allegro_screwdriver_TODR_chained_recovery.yaml --states data/recovery_states_screwdriver.pkl --start-index 52 --disable-model-compilation
 """
 
 from __future__ import annotations
@@ -84,6 +84,11 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
     parser.add_argument("--start-index", type=int, default=0)
     parser.add_argument("--end-index", type=int, default=None)
     parser.add_argument("--no-viewer", action="store_true")
+    parser.add_argument(
+        "--disable-model-compilation",
+        action="store_true",
+        help="Disable torch.compile for trajectory sampler models.",
+    )
     parser.add_argument("--seed", type=int, default=0)
     return parser.parse_args(argv)
 
@@ -549,9 +554,12 @@ def evaluate_states(
     start_index: int = 0,
     end_index: Optional[int] = None,
     no_viewer: bool = False,
+    disable_model_compilation: bool = False,
     seed: int = 0,
 ) -> Dict[str, Any]:
     config = load_config(config_path, no_viewer=no_viewer)
+    if disable_model_compilation:
+        config["compile_models"] = False
     validate_config(config)
 
     if output_dir is None:
@@ -587,6 +595,7 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
         start_index=args.start_index,
         end_index=args.end_index,
         no_viewer=args.no_viewer,
+        disable_model_compilation=args.disable_model_compilation,
         seed=args.seed,
     )
     print(f"Wrote {len(result['summary_rows'])} rows to {result['output_dir'] / 'summary.csv'}")

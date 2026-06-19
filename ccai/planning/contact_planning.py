@@ -20,6 +20,7 @@ class ChainedRecoveryNode:
     contact_sequence: list
     terminal_states: torch.Tensor
     trajectories: torch.Tensor = None
+    csvto_seed_trajectories: torch.Tensor = None
     score: float = float("-inf")
     terminal_likelihoods: torch.Tensor = None
     recovery_likelihoods: torch.Tensor = None
@@ -309,13 +310,15 @@ class ContactPlanner:
         else:
             trajectories_for_scoring = trajectories
 
-        children = []
+        child_specs = []
+        terminal_state_chunks = []
         for node_idx, node in enumerate(frontier):
             chunk_start = node_idx * samples_per_node
             chunk_end = chunk_start + samples_per_node
             chunk_modes = modes[chunk_start:chunk_end]
             chunk_likelihoods = recovery_likelihoods[chunk_start:chunk_end]
             chunk_trajectories = trajectories_for_scoring[chunk_start:chunk_end]
+            chunk_csvto_seed_trajectories = chunk_trajectories
 
             valid_indices = [i for i, mode in enumerate(chunk_modes) if mode is not None]
             if len(valid_indices) == 0:
@@ -335,28 +338,105 @@ class ContactPlanner:
             resampled_likelihoods = valid_likelihoods[resampled_local_indices]
             resampled_modes = [valid_modes[i] for i in resampled_local_indices.cpu().tolist()]
 
-            for mode in dict.fromkeys(resampled_modes):
+            for mode in dict.fromkeys(valid_modes):
+                mode_valid_indices = [
+                    i for i, candidate_mode in enumerate(valid_modes) if candidate_mode == mode
+                ]
+                resampled_mode_positions = [
+                    i for i, candidate_mode in enumerate(resampled_modes) if candidate_mode == mode
+                ]
+                if len(resampled_mode_positions) == 0:
+                    continue
+
                 mode_indices = torch.tensor(
-                    [i for i, candidate_mode in enumerate(resampled_modes) if candidate_mode == mode],
+                    resampled_mode_positions,
                     device=resampled_trajectories.device,
                     dtype=torch.long,
                 )
+                score_indices = torch.tensor(
+                    mode_valid_indices,
+                    device=valid_trajectories.device,
+                    dtype=torch.long,
+                )
+                source_position_by_valid_index = {
+                    valid_index: i for i, valid_index in enumerate(mode_valid_indices)
+                }
+                resampled_score_indices = torch.tensor(
+                    [
+                        source_position_by_valid_index[i]
+                        for i in resampled_local_indices[mode_indices].cpu().tolist()
+                    ],
+                    device=valid_trajectories.device,
+                    dtype=torch.long,
+                )
                 mode_trajectories = resampled_trajectories[mode_indices]
-                terminal_states = mode_trajectories[:, -1, :state_dim]
-                terminal_likelihoods = self._terminal_task_likelihoods(terminal_states)
-                score = terminal_likelihoods.mean().item()
-                children.append(
-                    ChainedRecoveryNode(
-                        contact_sequence=list(node.contact_sequence) + [mode],
-                        terminal_states=terminal_states,
-                        trajectories=mode_trajectories,
-                        score=score,
-                        terminal_likelihoods=terminal_likelihoods,
-                        recovery_likelihoods=resampled_likelihoods[mode_indices],
+                terminal_states_for_score = valid_trajectories[score_indices, -1, :state_dim]
+                child_specs.append(
+                    (
+                        node,
+                        mode,
+                        terminal_states_for_score,
+                        valid_likelihoods[score_indices],
+                        resampled_score_indices,
+                        mode_trajectories,
+                        resampled_likelihoods[mode_indices],
+                        chunk_csvto_seed_trajectories,
                     )
                 )
+                terminal_state_chunks.append(terminal_states_for_score)
+
+        if not child_specs:
+            return []
+
+        all_terminal_states = torch.cat(terminal_state_chunks, dim=0)
+        all_terminal_likelihoods = self._terminal_task_likelihoods(all_terminal_states)
+
+        children = []
+        likelihood_offset = 0
+        for (
+            node,
+            mode,
+            terminal_states_for_score,
+            recovery_likelihoods_for_score,
+            resampled_score_indices,
+            mode_trajectories,
+            mode_recovery_likelihoods,
+            csvto_seed_trajectories,
+        ) in child_specs:
+            likelihood_count = terminal_states_for_score.shape[0]
+            terminal_likelihoods_for_score = all_terminal_likelihoods[
+                likelihood_offset:likelihood_offset + likelihood_count
+            ]
+            likelihood_offset += likelihood_count
+            score = self._weighted_terminal_task_score(
+                recovery_likelihoods_for_score,
+                terminal_likelihoods_for_score,
+            ).item()
+            terminal_likelihoods = terminal_likelihoods_for_score[resampled_score_indices]
+            terminal_states = mode_trajectories[:, -1, :state_dim]
+            children.append(
+                ChainedRecoveryNode(
+                    contact_sequence=list(node.contact_sequence) + [mode],
+                    terminal_states=terminal_states,
+                    trajectories=mode_trajectories,
+                    csvto_seed_trajectories=csvto_seed_trajectories,
+                    score=score,
+                    terminal_likelihoods=terminal_likelihoods,
+                    recovery_likelihoods=mode_recovery_likelihoods,
+                )
+            )
 
         return children
+
+    def _weighted_terminal_task_score(self, recovery_likelihoods, terminal_likelihoods):
+        recovery_likelihoods = recovery_likelihoods.to(
+            device=terminal_likelihoods.device,
+            dtype=terminal_likelihoods.dtype,
+        )
+        return torch.logsumexp(
+            recovery_likelihoods + terminal_likelihoods,
+            dim=0,
+        ) - torch.logsumexp(recovery_likelihoods, dim=0)
 
     def _prepare_chained_expansion_starts(self, terminal_states):
         starts = self._prepare_chained_start_batch(terminal_states)
@@ -411,6 +491,52 @@ class ContactPlanner:
         return torch.multinomial(weights, num_samples=num_samples, replacement=True)
 
     def _terminal_task_likelihoods(self, terminal_states):
+        if terminal_states.numel() == 0:
+            return torch.empty(0, device=terminal_states.device, dtype=terminal_states.dtype)
+
+        flat_terminal_states = terminal_states.reshape(-1, terminal_states.shape[-1])
+        unique_states, inverse_indices = torch.unique(
+            flat_terminal_states,
+            dim=0,
+            return_inverse=True,
+        )
+
+        if hasattr(self.trajectory_sampler_orig, 'sample'):
+            unique_likelihoods = self._batched_terminal_task_likelihoods(unique_states)
+        else:
+            unique_likelihoods = self._serial_terminal_task_likelihoods(unique_states)
+
+        return unique_likelihoods[inverse_indices].reshape(terminal_states.shape[:-1])
+
+    def _batched_terminal_task_likelihoods(self, terminal_states):
+        num_states = terminal_states.shape[0]
+        num_likelihood_samples = self.params['likelihood_num_samples']
+        start = convert_yaw_to_sine_cosine(terminal_states)
+        batched_start = start.repeat_interleave(num_likelihood_samples, dim=0)
+        constraint_count = num_states * num_likelihood_samples
+        constraints = torch.ones(
+            constraint_count,
+            3,
+            device=terminal_states.device,
+            dtype=terminal_states.dtype,
+        )
+
+        with torch.no_grad():
+            _, _, likelihood = self.trajectory_sampler_orig.sample(
+                N=constraint_count,
+                H=self.trajectory_sampler_orig.T,
+                start=batched_start,
+                constraints=constraints,
+            )
+
+        likelihood = likelihood.reshape(num_states, num_likelihood_samples).mean(dim=1)
+        if getattr(self.trajectory_sampler_orig, 'rl_adjustment', False):
+            residual, _ = self.trajectory_sampler_orig.gp.gp_model.predict(start, fast_mode=True)
+            likelihood = likelihood + residual.reshape(-1).to(device=likelihood.device, dtype=likelihood.dtype)
+
+        return likelihood.to(device=terminal_states.device, dtype=terminal_states.dtype)
+
+    def _serial_terminal_task_likelihoods(self, terminal_states):
         likelihoods = []
         for terminal_state in terminal_states:
             likelihood = self.trajectory_sampler_orig.check_id(
@@ -432,7 +558,10 @@ class ContactPlanner:
             best_idx = torch.argmax(node.terminal_likelihoods).item()
             likelihoods = node.terminal_likelihoods
         goal_config = node.terminal_states[best_idx].clone()
-        return node.contact_sequence, goal_config, node.trajectories, likelihoods, plan_time
+        initial_samples = node.csvto_seed_trajectories
+        if initial_samples is None:
+            initial_samples = node.trajectories
+        return node.contact_sequence, goal_config, initial_samples, likelihoods, plan_time
 
     def _state_dim(self):
         obj_dof = self.turn_problem.obj_dof if self.turn_problem is not None else 3

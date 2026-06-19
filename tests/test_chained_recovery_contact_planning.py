@@ -87,6 +87,24 @@ class FakeTaskSampler:
         return state[0].item()
 
 
+class FakeBatchedTaskSampler:
+    T = 3
+
+    def __init__(self):
+        self.calls = []
+
+    def sample(self, N, H, start, constraints=None):
+        self.calls.append(
+            {
+                "N": N,
+                "H": H,
+                "start": start.detach().clone(),
+                "constraints": constraints.detach().clone(),
+            }
+        )
+        return torch.zeros(N, H, start.shape[-1]), None, start[:, 0].clone()
+
+
 def _params(**overrides):
     params = {
         "chained_recovery_contact_search": True,
@@ -107,6 +125,10 @@ def _raw_mode(name):
         "thumb_middle": torch.tensor([1.0, 0.0, 0.0]),
     }
     return 2 * vectors[name] - 1
+
+
+def _raw_contact_vector(vector):
+    return 2 * torch.tensor(vector) - 1
 
 
 def _trajectories(terminal_scores):
@@ -160,6 +182,21 @@ def test_chained_expansion_resamples_by_recovery_likelihood_before_grouping(monk
     child_counts = {tuple(child.contact_sequence): child.trajectories.shape[0] for child in children}
     assert child_counts[("thumb_middle",)] == 3
     assert child_counts[("index",)] == 1
+    for child in children:
+        assert child.csvto_seed_trajectories.shape == (4, 3, 36)
+        assert child.csvto_seed_trajectories[:, -1, 0].tolist() == pytest.approx([10, 20, 30, 40])
+
+    child_scores = {tuple(child.contact_sequence): child.score for child in children}
+    expected_index_score = torch.logsumexp(
+        recovery_likelihoods[:2] + torch.tensor([10.0, 20.0]),
+        dim=0,
+    ) - torch.logsumexp(recovery_likelihoods[:2], dim=0)
+    expected_thumb_middle_score = torch.logsumexp(
+        recovery_likelihoods[2:] + torch.tensor([30.0, 40.0]),
+        dim=0,
+    ) - torch.logsumexp(recovery_likelihoods[2:], dim=0)
+    assert child_scores[("index",)] == pytest.approx(expected_index_score.item())
+    assert child_scores[("thumb_middle",)] == pytest.approx(expected_thumb_middle_score.item())
 
 
 def test_chained_search_returns_full_sequence_when_terminal_child_reaches_threshold(monkeypatch):
@@ -194,6 +231,41 @@ def test_chained_search_returns_full_sequence_when_terminal_child_reaches_thresh
     assert planner.trajectory_sampler.calls[0]["constraints"] is None
     assert planner.trajectory_sampler.calls[1]["N"] == 8
     assert planner.trajectory_sampler.calls[1]["start_shape"] == (8, 15)
+
+
+def test_chained_search_returns_raw_outputs_as_csvto_seeds_even_if_filtered(monkeypatch):
+    recovery_likelihoods = torch.log(torch.tensor([1.0, 100.0, 3.0, 4.0]))
+    modes = torch.stack(
+        [
+            _raw_mode("index"),
+            _raw_contact_vector([0.0, 1.0, 0.0]),  # Undecodable mode; filtered for search only.
+            _raw_mode("thumb_middle"),
+            _raw_mode("thumb_middle"),
+        ]
+    )
+    planner, _ = _planner([(_trajectories([10, 99, 30, 40]), modes, recovery_likelihoods)])
+
+    captured = {}
+
+    def fake_multinomial(weights, num_samples, replacement):
+        captured["weights"] = weights.detach().clone()
+        assert num_samples == 4
+        assert replacement is True
+        return torch.tensor([1, 2, 2, 1], device=weights.device)
+
+    monkeypatch.setattr(torch, "multinomial", fake_multinomial)
+
+    contact_sequence, goal_config, initial_samples, likelihoods, _ = planner._plan_chained_joint_recovery_contacts(
+        torch.zeros(15)
+    )
+
+    expected_search_weights = torch.tensor([1.0, 3.0, 4.0]) / 8.0
+    assert torch.allclose(captured["weights"], expected_search_weights)
+    assert contact_sequence == ["thumb_middle"]
+    assert goal_config[0].item() == pytest.approx(40.0)
+    assert likelihoods.tolist() == pytest.approx([30.0, 40.0, 40.0, 30.0])
+    assert initial_samples.shape == (4, 3, 36)
+    assert initial_samples[:, -1, 0].tolist() == pytest.approx([10.0, 99.0, 30.0, 40.0])
 
 
 def test_chained_frontier_expands_all_nodes_in_one_sampler_call(monkeypatch):
@@ -235,6 +307,36 @@ def test_chained_frontier_expands_all_nodes_in_one_sampler_call(monkeypatch):
         ["thumb_middle", "index"],
         ["thumb_middle", "thumb_middle"],
     ]
+
+
+def test_chained_frontier_scores_unique_terminal_states_once_after_grouping(monkeypatch):
+    modes = torch.stack(
+        [
+            _raw_mode("index"),
+            _raw_mode("thumb_middle"),
+            _raw_mode("index"),
+            _raw_mode("thumb_middle"),
+        ]
+    )
+    planner, _ = _planner([(_trajectories([1, 1, 2, 3]), modes, torch.zeros(4))])
+    task_sampler = FakeBatchedTaskSampler()
+    planner.trajectory_sampler_orig = task_sampler
+
+    def identity_multinomial(weights, num_samples, replacement):
+        return torch.arange(num_samples, device=weights.device)
+
+    monkeypatch.setattr(torch, "multinomial", identity_multinomial)
+
+    root = ChainedRecoveryNode(contact_sequence=[], terminal_states=torch.zeros(1, 15))
+    children = planner._expand_chained_recovery_node(root)
+
+    assert len(task_sampler.calls) == 1
+    assert task_sampler.calls[0]["N"] == 6
+    assert task_sampler.calls[0]["start"].shape == (6, 16)
+    assert task_sampler.calls[0]["constraints"].shape == (6, 3)
+    assert [child.contact_sequence for child in children] == [["index"], ["thumb_middle"]]
+    assert children[0].terminal_likelihoods.tolist() == pytest.approx([1.0, 2.0])
+    assert children[1].terminal_likelihoods.tolist() == pytest.approx([1.0, 3.0])
 
 
 def test_chained_search_returns_best_visited_node_at_max_depth(monkeypatch):
