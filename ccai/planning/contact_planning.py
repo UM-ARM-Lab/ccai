@@ -211,7 +211,7 @@ class ContactPlanner:
 
         start_plan_time = time.perf_counter()
         state_dim = self._state_dim()
-        threshold = self.params.get('likelihood_threshold', -15)
+        threshold = self._chained_recovery_likelihood_threshold()
         max_depth = self.params.get('max_recovery_stages', 1)
 
         root_state = state[:state_dim].reshape(1, -1)
@@ -258,6 +258,12 @@ class ContactPlanner:
 
     def _expand_chained_recovery_node(self, node, contact_state_dict_flip=None):
         return self._expand_chained_recovery_frontier([node], contact_state_dict_flip=contact_state_dict_flip)
+
+    def _chained_recovery_likelihood_threshold(self):
+        return self.params.get(
+            'chained_recovery_likelihood_threshold',
+            self.params.get('likelihood_threshold', -15),
+        )
 
     def _expand_chained_recovery_frontier(self, frontier, contact_state_dict_flip=None):
         if not frontier:

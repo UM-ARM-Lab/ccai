@@ -233,6 +233,37 @@ def test_chained_search_returns_full_sequence_when_terminal_child_reaches_thresh
     assert planner.trajectory_sampler.calls[1]["start_shape"] == (8, 15)
 
 
+def test_chained_search_uses_chained_likelihood_threshold_for_termination(monkeypatch):
+    modes = torch.stack(
+        [
+            _raw_mode("index"),
+            _raw_mode("index"),
+            _raw_mode("thumb_middle"),
+            _raw_mode("thumb_middle"),
+        ]
+    )
+    planner, task_sampler = _planner(
+        [(_trajectories([-2, -2, 1, 1]), modes, torch.zeros(4))],
+        params=_params(
+            likelihood_threshold=10.0,
+            chained_recovery_likelihood_threshold=0.0,
+            max_recovery_stages=2,
+        ),
+    )
+
+    def identity_multinomial(weights, num_samples, replacement):
+        return torch.arange(num_samples, device=weights.device)
+
+    monkeypatch.setattr(torch, "multinomial", identity_multinomial)
+
+    contact_sequence, goal_config, _, likelihoods, _ = planner._plan_chained_joint_recovery_contacts(torch.zeros(15))
+
+    assert contact_sequence == ["thumb_middle"]
+    assert goal_config[0].item() == pytest.approx(1.0)
+    assert likelihoods.tolist() == pytest.approx([1.0, 1.0])
+    assert [call["threshold"] for call in task_sampler.calls] == [10.0, 10.0]
+
+
 def test_chained_search_returns_raw_outputs_as_csvto_seeds_even_if_filtered(monkeypatch):
     recovery_likelihoods = torch.log(torch.tensor([1.0, 100.0, 3.0, 4.0]))
     modes = torch.stack(
