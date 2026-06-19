@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 1
 visualize: True
-experiment_name: 'allegro_screwdriver_csvto_D_TOUR_chained_recovery_eval_compiled'
+experiment_name: 'allegro_screwdriver_csvto_D_TOUR_chained_recovery_eval_compiled_plan_thresh_100'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -82,6 +82,7 @@ end_ind: 50
 chained_recovery_contact_search: True
 N_contact_plan: 16  # Total joint (trajectory, contact mode) samples per expanded node.
 likelihood_num_samples: 8
+chained_recovery_likelihood_threshold: -100
 
 controllers:
   csvgd:
