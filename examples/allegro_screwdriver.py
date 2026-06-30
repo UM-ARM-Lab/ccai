@@ -37,7 +37,7 @@ from ccai.utils.allegro_utils import (
 )
 from ccai.utils.recovery_utils import (
     create_allegro_screwdriver_problem, create_planner, add_to_dataset, partial_to_full_trajectory,
-    full_to_partial_trajectory, create_mode_planner_dict
+    full_to_partial_trajectory, create_mode_planner_dict, build_pregrasp_reference_target_kwargs
 )
 
 from ccai.allegro_contact import AllegroManipulationProblem, PositionControlConstrainedSVGDMPC
@@ -334,6 +334,16 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     pregrasp_params['skip_csvto'] = False
 
     start[-4:] = 0
+    pregrasp_reference_target_kwargs = {}
+    if params.get('use_pregrasp_reference_targets', False):
+        if debug_progress:
+            print('debug_progress: building pregrasp reference targets', flush=True)
+        pregrasp_reference_target_kwargs = build_pregrasp_reference_target_kwargs(
+            pregrasp_params,
+            env,
+            pregrasp_params['device'],
+            AllegroScrewdriver,
+        )
     if debug_progress:
         print('debug_progress: creating pregrasp problem', flush=True)
     pregrasp_problem = create_allegro_screwdriver_problem(
@@ -346,7 +356,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         regrasp_fingers=fingers,
         proj_path=proj_path,
         obj_dof=obj_dof,
-        AllegroScrewdriver=AllegroScrewdriver
+        AllegroScrewdriver=AllegroScrewdriver,
+        **pregrasp_reference_target_kwargs,
     )
     if debug_progress:
         print('debug_progress: creating pregrasp planner', flush=True)
@@ -573,14 +584,21 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 best_traj, _ = pregrasp_planner.step(start[:pregrasp_planner.problem.dx])
                 for x in best_traj[:, :4 * num_fingers]:
                     action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
-                    if debug_progress:
-                        print('debug_progress: stepping pregrasp action', flush=True)
-                    env.step(action)
-                    # After stepping, reset the screwdriver to where it was initially
-                    if params['mode'] != 'hardware':
-                        s = env.get_state()['q'].reshape(-1, 4 * num_fingers + 4).to(device=params['device'])[0]
-                        s[-4:] = start[-4:]
+                    if getattr(env, 'hand', None) == 'proto5' and hasattr(env, 'set_pose'):
+                        if debug_progress:
+                            print('debug_progress: setting Proto5 pregrasp pose', flush=True)
+                        s = start.clone()
+                        s[:4 * num_fingers] = action.reshape(-1)
                         env.set_pose(s.to(device=env.device))
+                    else:
+                        if debug_progress:
+                            print('debug_progress: stepping pregrasp action', flush=True)
+                        env.step(action)
+                        # After stepping, reset the screwdriver to where it was initially
+                        if params['mode'] != 'hardware':
+                            s = env.get_state()['q'].reshape(-1, 4 * num_fingers + 4).to(device=params['device'])[0]
+                            s[-4:] = start[-4:]
+                            env.set_pose(s.to(device=env.device))
 
             # for _ in range(50):
             #     env._step_sim()

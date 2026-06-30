@@ -172,6 +172,8 @@ class Proto5Screwdriver(AllegroScrewdriver):
             )
         kwargs.setdefault('ee_names', PROTO5_EE_NAMES)
         kwargs.setdefault('collision_link_names', PROTO5_COLLISION_LINK_NAMES)
+        kwargs.setdefault('fingertip_contact_only', True)
+        kwargs.setdefault('filter_self_collision_query_points', False)
         kwargs.setdefault('joint_min', PROTO5_ACTIVE_JOINT_MIN)
         kwargs.setdefault('joint_max', PROTO5_ACTIVE_JOINT_MAX)
         kwargs.setdefault('full_dof_reference', full_dof_reference)

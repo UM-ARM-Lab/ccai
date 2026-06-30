@@ -471,6 +471,42 @@ class IsaacSimScrewdriverRecoveryEnv:
         self.frame_id = 0
         return self.env.reset()
 
+    def get_environment_parameters(self, env_id: int = 0) -> dict[str, float]:
+        """Read physical parameters currently sampled in the IsaacLab env."""
+        env_id = int(env_id)
+        if self.hand == SCREWDRIVER_HAND_PROTO5:
+            screwdriver_friction = 1.0
+            yaw_joint_friction = 0.0
+            if hasattr(self._unwrapped, "_proto5_contact_friction_tensor"):
+                screwdriver_friction = float(self._unwrapped._proto5_contact_friction_tensor[env_id].item())
+            if hasattr(self._unwrapped, "_screwdriver_joint_friction_tensor"):
+                yaw_joint_friction = float(self._unwrapped._screwdriver_joint_friction_tensor[env_id].item())
+            return {
+                "screwdriver_friction": screwdriver_friction,
+                "yaw_joint_friction": yaw_joint_friction,
+            }
+
+        screwdriver_friction = 1.0
+        if hasattr(self._unwrapped, "_screwdriver_friction_values"):
+            friction_info = self._unwrapped._screwdriver_friction_values.get(env_id, {})
+            screwdriver_friction = float(friction_info.get("static_friction", 1.0))
+
+        yaw_joint_friction = 0.0
+        try:
+            obj = self.scene["obj"]
+            yaw_joint_idx = obj.find_joints("table_screwdriver_joint_3")[0][0]
+            joint_frictions = obj.root_physx_view.get_dof_friction_properties()
+            yaw_joint_friction = float(joint_frictions[env_id, yaw_joint_idx, 0].item())
+        except (KeyError, IndexError, AttributeError):
+            if hasattr(self._unwrapped, "_yaw_joint_friction_values"):
+                friction_info = self._unwrapped._yaw_joint_friction_values.get(env_id, {})
+                yaw_joint_friction = float(friction_info.get("friction", 0.0))
+
+        return {
+            "screwdriver_friction": screwdriver_friction,
+            "yaw_joint_friction": yaw_joint_friction,
+        }
+
     def close(self):
         if hasattr(self.env, "close"):
             return self.env.close()

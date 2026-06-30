@@ -778,6 +778,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
         self.frame_indices = torch.tensor([self.ee_link_idx[finger] for finger in self.fingers])
         self.fingertip_contact_only = bool(kwargs.get('fingertip_contact_only', False))
         self.contact_patch_link_frame_z_max = kwargs.get('contact_patch_link_frame_z_max', None)
+        self.filter_self_collision_query_points = bool(kwargs.get('filter_self_collision_query_points', True))
 
         ##### SDF for robot and environment ######
         self.world_trans = world_trans.to(device=device)
@@ -866,6 +867,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                                                 links_per_finger=links_per_finger,
                                                 obj_link_name=self.obj_link_name,
                                                 contact_patch_link_frame_z_max=self.contact_patch_link_frame_z_max,
+                                                filter_self_collision_query_points=self.filter_self_collision_query_points,
                                                 )
             contact_scenes_for_viz = pv.RobotScene(robot_sdf, object_sdf_for_viz, scene_trans,
                                                 collision_check_links=collision_check_links,
@@ -874,6 +876,7 @@ class AllegroObjectProblem(ConstrainedSVGDProblem):
                                                 links_per_finger=links_per_finger,
                                                 obj_link_name=self.obj_link_name,
                                                 contact_patch_link_frame_z_max=self.contact_patch_link_frame_z_max,
+                                                filter_self_collision_query_points=self.filter_self_collision_query_points,
                                                 )
             contact_scene_cache_key = cache_key
             self.contact_scenes = contact_scenes

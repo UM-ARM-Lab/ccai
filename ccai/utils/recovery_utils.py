@@ -195,6 +195,54 @@ def _default_dof_reference_for_problem(env, AllegroScrewdriver, device):
     return default_dof_pos[:16].reshape(16)
 
 
+def _default_active_dof_reference_for_problem(env, AllegroScrewdriver, device):
+    full_reference = _default_dof_reference_for_problem(env, AllegroScrewdriver, device)
+    hand_spec = getattr(env, "hand_spec", None)
+    if hand_spec is not None:
+        active_joint_names = tuple(getattr(hand_spec, "active_joint_names", ()))
+        all_joint_names = tuple(getattr(hand_spec, "all_joint_names", ()))
+        if active_joint_names and all_joint_names:
+            active_ids = [all_joint_names.index(name) for name in active_joint_names]
+            return full_reference[active_ids].reshape(-1)
+
+    problem_name = getattr(AllegroScrewdriver, "__name__", "")
+    if problem_name == "Proto5Screwdriver":
+        return torch.cat((full_reference[2:10], full_reference[14:18]), dim=0)
+    return torch.cat((full_reference[:8], full_reference[12:16]), dim=0)
+
+
+def build_pregrasp_reference_target_kwargs(params, env, device, AllegroScrewdriver):
+    """Build target contact kwargs from a one-step default-pose reference problem."""
+    reference_finger_q = _default_active_dof_reference_for_problem(env, AllegroScrewdriver, device)
+    obj_dof = 3 if env.table_pose is not None else 1
+    reference_theta = torch.zeros(obj_dof, device=device, dtype=torch.float32)
+    reference_state = torch.cat((reference_finger_q, reference_theta), dim=0)
+    reference_params = deepcopy(params)
+    reference_params["T"] = 1
+    reference_problem = create_allegro_screwdriver_problem(
+        "pregrasp",
+        reference_state,
+        reference_state,
+        reference_params,
+        env,
+        device,
+        regrasp_fingers=params.get("fingers", ["index", "middle", "thumb"]),
+        AllegroScrewdriver=AllegroScrewdriver,
+        T=1,
+        full_dof_goal=True,
+        fingertip_contact_only=True,
+        use_default_ee_locs_cost=True,
+    )
+    return {
+        "target_contact_points_object": reference_problem.contact_points_object.detach().clone(),
+        "target_contact_points_rob_link": reference_problem.contact_points_rob_link.detach().clone(),
+        "use_default_ee_locs_cost": False,
+        "target_contact_patch_cost_weight": params.get("pregrasp_target_contact_patch_cost_weight", 100.0),
+        "target_contact_link_cost_weight": params.get("pregrasp_target_contact_link_cost_weight", 100.0),
+        "target_contact_patch_mode": params.get("pregrasp_target_contact_patch_mode", "cost"),
+    }
+
+
 def create_allegro_screwdriver_problem(problem_type, start, goal, params, env, device, 
                                      contact_fingers=None, regrasp_fingers=None, 
                                      min_force_dict=None, proj_path=None, AllegroScrewdriver=None, **kwargs):
@@ -215,6 +263,8 @@ def create_allegro_screwdriver_problem(problem_type, start, goal, params, env, d
         'obj_dof': 3 if env.table_pose is not None else 1,
         'obj_joint_dim': 1 if env.table_pose is not None else 9,
         'optimize_force': params['optimize_force'],
+        'friction_coefficient': params.get('friction_coefficient', 0.95),
+        'yaw_joint_friction': params.get('yaw_joint_friction', 0.0),
         'default_dof_pos': _default_dof_reference_for_problem(env, AllegroScrewdriver, device),
         'obj_gravity': params.get('obj_gravity', False),
         'contact_constraint_only': params.get('contact_constraint_only', False),
@@ -229,6 +279,18 @@ def create_allegro_screwdriver_problem(problem_type, start, goal, params, env, d
         'dt': params.get('dt', 1/12),
         'start_yaw_velocity': params.get('start_yaw_velocity', 0.0),
     }
+    for optional_key in (
+        'action_dt',
+        'hand_joint_stiffness',
+        'hand_joint_damping',
+        'fingertip_contact_only',
+        'object_asset_path',
+        'object_mass',
+        'contact_patch_link_frame_z_max',
+        'filter_self_collision_query_points',
+    ):
+        if params.get(optional_key) is not None:
+            common_params[optional_key] = params[optional_key]
     if getattr(AllegroScrewdriver, "__name__", "") == "Proto5Screwdriver":
         common_params.update({
             'full_dof_reference': common_params['default_dof_pos'],

@@ -11,8 +11,10 @@ import datetime
 import faulthandler
 import importlib
 import importlib.util
+import os
 import pathlib
 import pickle
+import shutil
 import sys
 
 import yaml
@@ -20,9 +22,26 @@ import yaml
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
 DOCUMENTS_PATH = CCAI_PATH.parent
+MODEL_MISMATCH_PATH = DOCUMENTS_PATH / "model_mismatch"
 ISAACSIM_HAND_ENVS_PATH = DOCUMENTS_PATH / "github" / "isaacsim-hand-envs"
 ISAACGYM_ARM_ENVS_PATH = DOCUMENTS_PATH / "github" / "isaacgym-arm-envs"
 DEFAULT_CONFIG_PATH = CCAI_PATH / "examples" / "config" / "proto5" / "proto_screwdriver_csvto_TODR_recovery_data_gen.yaml"
+DEFAULT_PLANNER_YAW_FRICTION_MODEL_PATH = (
+    MODEL_MISMATCH_PATH / "results" / "csvto_yaw_joint_fit" / "yaw_friction_model.json"
+)
+DEFAULT_PLANNER_YAW_INERTIA_MODEL_PATH = (
+    MODEL_MISMATCH_PATH / "results" / "csvto_yaw_inertia_fit_full" / "yaw_inertia_model.json"
+)
+PROTO5_POINT_CACHE_NAMES = (
+    "RHand_I6AF_LINK_points_cache.pkl",
+    "RHand_M6AF_LINK_points_cache.pkl",
+    "RHand_T6AF_LINK_points_cache.pkl",
+)
+PROTO5_POINT_CACHE_SOURCE_DIRS = (
+    DOCUMENTS_PATH / "model_mismatch",
+    DOCUMENTS_PATH / "model_mismatch" / "scripts",
+    DOCUMENTS_PATH / "model_mismatch" / "examples",
+)
 
 
 def _bool_from_cli(value):
@@ -40,8 +59,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=pathlib.Path, default=DEFAULT_CONFIG_PATH)
     parser.add_argument("--hand", choices=("allegro", "proto5"), default=None)
-    parser.add_argument("--headless", type=_bool_from_cli, default=None)
-    parser.add_argument("--no_video", type=_bool_from_cli, default=None)
+    parser.add_argument("--headless", type=_bool_from_cli, default=False)
+    parser.add_argument("--no_video", type=_bool_from_cli, default=False)
     parser.add_argument("--num_envs", type=int, default=1)
     parser.add_argument("--sim_device", type=str, default=None)
     parser.add_argument("--proto5_control_wrist", action="store_true", default=None)
@@ -51,6 +70,46 @@ def parse_args():
     parser.add_argument("--skip_pregrasp", type=_bool_from_cli, default=None)
     parser.add_argument("--experiment_name", type=str, default=None)
     parser.add_argument("--debug_progress", action="store_true")
+    parser.add_argument("--planner_yaw_joint_friction_override", type=float, default=None)
+    yaw_friction_group = parser.add_mutually_exclusive_group()
+    yaw_friction_group.add_argument(
+        "--planner_use_env_yaw_joint_friction",
+        dest="planner_use_env_yaw_joint_friction",
+        action="store_true",
+        default=None,
+    )
+    yaw_friction_group.add_argument(
+        "--disable_planner_use_env_yaw_joint_friction",
+        dest="planner_use_env_yaw_joint_friction",
+        action="store_false",
+    )
+    parser.add_argument("--planner_yaw_friction_model_path", type=str, default=None)
+    parser.add_argument("--disable_planner_yaw_friction_model", action="store_true", default=None)
+    parser.add_argument("--planner_yaw_inertia_model_path", type=str, default=None)
+    yaw_inertia_group = parser.add_mutually_exclusive_group()
+    yaw_inertia_group.add_argument(
+        "--enable_planner_yaw_inertia_model",
+        dest="planner_use_yaw_inertia_model",
+        action="store_true",
+        default=None,
+    )
+    yaw_inertia_group.add_argument(
+        "--disable_planner_yaw_inertia_model",
+        dest="planner_use_yaw_inertia_model",
+        action="store_false",
+    )
+    pregrasp_target_group = parser.add_mutually_exclusive_group()
+    pregrasp_target_group.add_argument(
+        "--enable_pregrasp_reference_targets",
+        dest="use_pregrasp_reference_targets",
+        action="store_true",
+        default=None,
+    )
+    pregrasp_target_group.add_argument(
+        "--disable_pregrasp_reference_targets",
+        dest="use_pregrasp_reference_targets",
+        action="store_false",
+    )
     return parser.parse_args()
 
 
@@ -75,6 +134,13 @@ def load_config(args) -> dict:
         "end_ind",
         "skip_pregrasp",
         "experiment_name",
+        "planner_yaw_joint_friction_override",
+        "planner_use_env_yaw_joint_friction",
+        "planner_yaw_friction_model_path",
+        "disable_planner_yaw_friction_model",
+        "planner_yaw_inertia_model_path",
+        "planner_use_yaw_inertia_model",
+        "use_pregrasp_reference_targets",
     ):
         value = getattr(args, key)
         if value is not None:
@@ -89,6 +155,13 @@ def load_config(args) -> dict:
     config.setdefault("sim_device", "cuda:0")
     config.setdefault("proto5_control_wrist", False)
     config.setdefault("steps_per_action", 60)
+    config.setdefault("planner_use_env_yaw_joint_friction", True)
+    config.setdefault("planner_yaw_joint_friction_override", 0.0)
+    config.setdefault("planner_yaw_friction_model_path", str(DEFAULT_PLANNER_YAW_FRICTION_MODEL_PATH))
+    config.setdefault("disable_planner_yaw_friction_model", False)
+    config.setdefault("planner_yaw_inertia_model_path", str(DEFAULT_PLANNER_YAW_INERTIA_MODEL_PATH))
+    config.setdefault("planner_use_yaw_inertia_model", False)
+    config.setdefault("use_pregrasp_reference_targets", False)
     if config["no_video"]:
         config["visualize"] = False
         config["visualize_plan"] = False
@@ -111,6 +184,69 @@ def launch_isaaclab(config):
         enable_cameras=not bool(config.get("no_video", True)),
     )
     return app_launcher.app
+
+
+def ensure_proto5_point_cache(config):
+    if str(config.get("hand", "allegro")).lower() != "proto5":
+        return
+    cache_dir = CCAI_PATH / "data" / "cache" / "proto5_points"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    os.environ["PYTORCH_VOLUMETRIC_POINTS_CACHE_DIR"] = str(cache_dir)
+    missing = []
+    for cache_name in PROTO5_POINT_CACHE_NAMES:
+        dest = cache_dir / cache_name
+        if dest.exists():
+            continue
+        source = next((src_dir / cache_name for src_dir in PROTO5_POINT_CACHE_SOURCE_DIRS if (src_dir / cache_name).exists()), None)
+        if source is None:
+            missing.append(cache_name)
+            continue
+        shutil.copy2(source, dest)
+    if missing:
+        raise FileNotFoundError(
+            "Missing Proto5 point caches required for headless recovery: "
+            + ", ".join(missing)
+            + f". Expected them in one of: {', '.join(str(path) for path in PROTO5_POINT_CACHE_SOURCE_DIRS)}"
+        )
+
+
+def resolve_planner_yaw_model_paths(config) -> tuple[str | None, str | None]:
+    yaw_friction_model_path = None if config.get("disable_planner_yaw_friction_model", False) else config.get(
+        "planner_yaw_friction_model_path",
+        str(DEFAULT_PLANNER_YAW_FRICTION_MODEL_PATH),
+    )
+    yaw_inertia_model_path = (
+        config.get("planner_yaw_inertia_model_path", str(DEFAULT_PLANNER_YAW_INERTIA_MODEL_PATH))
+        if config.get("planner_use_yaw_inertia_model", False)
+        else None
+    )
+    for label, path in (
+        ("Planner yaw friction model", yaw_friction_model_path),
+        ("Planner yaw inertia model", yaw_inertia_model_path),
+    ):
+        if path is not None and not pathlib.Path(path).expanduser().exists():
+            raise FileNotFoundError(f"{label} JSON not found: {path}")
+    return yaw_friction_model_path, yaw_inertia_model_path
+
+
+def get_recovery_planner_physical_kwargs(env, config) -> dict:
+    if str(MODEL_MISMATCH_PATH) not in sys.path:
+        sys.path.insert(0, str(MODEL_MISMATCH_PATH))
+    from model_mismatch.utils.screwdriver_csvto_planning import get_screwdriver_turn_problem_physical_kwargs
+
+    yaw_friction_model_path, yaw_inertia_model_path = resolve_planner_yaw_model_paths(config)
+    yaw_joint_friction_override = (
+        None
+        if config.get("planner_use_env_yaw_joint_friction", True)
+        else config.get("planner_yaw_joint_friction_override", 0.0)
+    )
+    env_params = env.get_environment_parameters(env_id=0)
+    return get_screwdriver_turn_problem_physical_kwargs(
+        env_params,
+        yaw_joint_friction_override=yaw_joint_friction_override,
+        yaw_friction_model_path=yaw_friction_model_path,
+        yaw_inertia_model_path=yaw_inertia_model_path,
+    )
 
 
 def _friction_range(config, prefix: str, fallback):
@@ -227,6 +363,7 @@ def main():
         sys.stderr.reconfigure(line_buffering=True)
     args = parse_args()
     config = load_config(args)
+    ensure_proto5_point_cache(config)
     simulation_app = launch_isaaclab(config)
 
     import numpy as np
@@ -293,6 +430,18 @@ def main():
                 if config.get("debug_progress", False):
                     print("debug_progress: applying saved pregrasp state", flush=True)
                 legacy.apply_saved_pregrasp_state(env, None, pregrasp_states, i, start_ind, params)
+            physical_kwargs = get_recovery_planner_physical_kwargs(env, config)
+            params.update(physical_kwargs)
+            if config.get("debug_progress", False):
+                print(
+                    "debug_progress: planner physical kwargs "
+                    f"friction_coefficient={physical_kwargs['friction_coefficient']} "
+                    f"yaw_joint_friction={physical_kwargs['yaw_joint_friction']} "
+                    f"yaw_friction_model_path={physical_kwargs['yaw_friction_model_path']} "
+                    f"yaw_inertia_model_path={physical_kwargs['yaw_inertia_model_path']} "
+                    f"cache_dir={os.environ.get('PYTORCH_VOLUMETRIC_POINTS_CACHE_DIR')}",
+                    flush=True,
+                )
 
             goal = torch.tensor([0, 0, float(config["goal"])])
             fpath = experiment_dir / "csvgd" / f"trial_{i + 1}"

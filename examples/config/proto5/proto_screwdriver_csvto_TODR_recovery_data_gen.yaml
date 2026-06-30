@@ -15,6 +15,16 @@ fingers: ['index', 'middle', 'thumb']
 object_type: 'screwdriver'
 sim_device: 'cpu'
 friction_coefficient: 1.0
+planner_use_env_yaw_joint_friction: True
+planner_yaw_joint_friction_override: 0.0
+planner_yaw_friction_model_path: '/home/abhinav/Documents/model_mismatch/results/csvto_yaw_joint_fit/yaw_friction_model.json'
+disable_planner_yaw_friction_model: False
+planner_yaw_inertia_model_path: '/home/abhinav/Documents/model_mismatch/results/csvto_yaw_inertia_fit_full/yaw_inertia_model.json'
+planner_use_yaw_inertia_model: False
+use_pregrasp_reference_targets: False
+pregrasp_target_contact_patch_cost_weight: 100.0
+pregrasp_target_contact_link_cost_weight: 100.0
+pregrasp_target_contact_patch_mode: 'cost'
 kp: 3.0
 heuristic: 1000
 max_depth: 11

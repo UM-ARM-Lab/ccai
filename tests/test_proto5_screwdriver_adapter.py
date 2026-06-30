@@ -39,6 +39,8 @@ def test_proto5_screwdriver_default_dof_pos_is_full_reference(monkeypatch):
     torch.testing.assert_close(default_dof_pos, full_reference)
     assert captured_kwargs["full_robot_dof"] == 18
     assert captured_kwargs["contact_patch_link_frame_z_max"] == -0.003
+    assert captured_kwargs["fingertip_contact_only"] is True
+    assert captured_kwargs["filter_self_collision_query_points"] is False
 
 
 def test_proto5_screwdriver_allows_contact_patch_z_max_override(monkeypatch):
