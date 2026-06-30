@@ -299,6 +299,8 @@ class AllegroScrewDriverDataset(Dataset):
                         #     print(p)
 
                     for t in range(max_T, min_t - 1, -1):
+                        if t not in data or len(data[t].get('starts', [])) == 0:
+                            continue
                         if not recovery:
                             fl_improvement_bool = np.ones(len(data[t]['contact_state']), dtype=bool)
                         new_cs = []
@@ -332,8 +334,10 @@ class AllegroScrewDriverDataset(Dataset):
 
                         if len(new_starts) == 0:
                             print('No starts')
-                            need_to_continue = True
-                            break
+                            if recovery:
+                                need_to_continue = True
+                                break
+                            continue
                         if type(new_starts) == list:
                             if torch.is_tensor(new_starts[0]):
                                 new_starts = [s.cpu().numpy() for s in new_starts]
@@ -370,12 +374,16 @@ class AllegroScrewDriverDataset(Dataset):
                         #     data[t]['contact_state'] = data[t]['contact_state'][:-1]
                         if len(data[t]['starts']) == 0:
                             print('No starts')
-                            need_to_continue = True
-                            break
+                            if recovery:
+                                need_to_continue = True
+                                break
+                            continue
 
                     if need_to_continue:
                         continue
                     for t in range(max_T, min_t - 1, -1):
+                        if t not in data or len(data[t].get('starts', [])) == 0:
+                            continue
                         actual_traj.append(data[t]['starts'][:, :, None, :])
                         traj = data[t]['plans']
                         end_states = []

@@ -172,6 +172,29 @@ def save_projection_results(mode_fpath, initial_samples, initial_samples_0, all_
         pickle.dump((initial_samples, initial_samples_0, all_losses, all_samples, all_likelihoods), f)
 
 
+def _default_dof_reference_for_problem(env, AllegroScrewdriver, device):
+    """Return the planner's full default joint reference without assuming Allegro's 16 DOFs."""
+    default_dof_pos = torch.as_tensor(env.default_dof_pos, dtype=torch.float32, device=device)
+    if default_dof_pos.ndim > 1:
+        default_dof_pos = default_dof_pos[0]
+
+    problem_name = getattr(AllegroScrewdriver, "__name__", "")
+    if problem_name == "Proto5Screwdriver":
+        if default_dof_pos.numel() != 18:
+            raise ValueError(
+                "Proto5Screwdriver requires an 18-DOF default_dof_pos/full_dof_reference, "
+                f"got {default_dof_pos.numel()} values."
+            )
+        return default_dof_pos.reshape(18)
+
+    if default_dof_pos.numel() < 16:
+        raise ValueError(
+            "AllegroScrewdriver requires at least 16 default DOF values, "
+            f"got {default_dof_pos.numel()}."
+        )
+    return default_dof_pos[:16].reshape(16)
+
+
 def create_allegro_screwdriver_problem(problem_type, start, goal, params, env, device, 
                                      contact_fingers=None, regrasp_fingers=None, 
                                      min_force_dict=None, proj_path=None, AllegroScrewdriver=None, **kwargs):
@@ -192,7 +215,7 @@ def create_allegro_screwdriver_problem(problem_type, start, goal, params, env, d
         'obj_dof': 3 if env.table_pose is not None else 1,
         'obj_joint_dim': 1 if env.table_pose is not None else 9,
         'optimize_force': params['optimize_force'],
-        'default_dof_pos': env.default_dof_pos[:, :16],
+        'default_dof_pos': _default_dof_reference_for_problem(env, AllegroScrewdriver, device),
         'obj_gravity': params.get('obj_gravity', False),
         'contact_constraint_only': params.get('contact_constraint_only', False),
         'tactile_controller': kwargs.get('tactile_controller', False),
@@ -206,6 +229,12 @@ def create_allegro_screwdriver_problem(problem_type, start, goal, params, env, d
         'dt': params.get('dt', 1/12),
         'start_yaw_velocity': params.get('start_yaw_velocity', 0.0),
     }
+    if getattr(AllegroScrewdriver, "__name__", "") == "Proto5Screwdriver":
+        common_params.update({
+            'full_dof_reference': common_params['default_dof_pos'],
+            'robot_sdf_path_prefix': params.get('robot_sdf_path_prefix'),
+            'control_wrist': params.get('proto5_control_wrist', False),
+        })
     
     # Problem-specific configurations
     if problem_type == 'pregrasp':

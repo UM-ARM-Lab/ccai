@@ -6,11 +6,6 @@ Contains MPPI controller and Q-function based OOD detection functionality.
 import torch
 import numpy as np
 from collections import defaultdict
-from pytorch_mppi import MPPI
-
-from baselines.allegro_screwdriver import RunningCostSafeRL, TerminalCostDiffusionLikelihood
-from baselines.dynamics_model import DynamicsModel
-from baselines.mppi_planner import MPPIPlanner
 
 
 class BaselineRecoveryController:
@@ -28,6 +23,9 @@ class BaselineRecoveryController:
         
     def _init_mppi(self):
         """Initialize MPPI controller and related components."""
+        from baselines.allegro_screwdriver import RunningCostSafeRL, TerminalCostDiffusionLikelihood
+        from baselines.dynamics_model import DynamicsModel
+
         env_for_mppi = self.env if self.config['mode'] != 'hardware' else self.env  # sim_env in original
         self.dynamics = DynamicsModel(env_for_mppi, num_fingers=len(self.config['fingers']), 
                                     include_velocity=True, obj_joint_dim=1)
@@ -55,6 +53,8 @@ class BaselineRecoveryController:
 
     def create_mppi_controller(self):
         """Create and return MPPI controller."""
+        from pytorch_mppi import MPPI
+
         if self.mppi_ctrl is None:
             self.mppi_ctrl = MPPI(
                 dynamics=self.dynamics, 
@@ -74,6 +74,8 @@ class BaselineRecoveryController:
 
     def create_mppi_planner(self, ctrl, warmup=False):
         """Create MPPI planner wrapper."""
+        from baselines.mppi_planner import MPPIPlanner
+
         return MPPIPlanner(ctrl, 12, self.params['T'], warmup=warmup)
 
     def check_ood_q_function(self, state, action, num_fingers_to_plan):

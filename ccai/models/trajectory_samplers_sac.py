@@ -29,7 +29,6 @@ from ccai.models.helpers import MLP
 
 # Diffusion
 from ccai.models.diffusion.diffusion import GaussianDiffusion, JointDiffusion
-from ccai.models.cnf.cnf import TrajectoryCNF
 
 from ccai.models.helpers import MLP
 # from ccai.models.likelihood_residual_gp import LikelihoodResidualGP
@@ -277,62 +276,68 @@ class TrajectoryDiffusionModel(nn.Module):
         return self.diffusion_model.approximate_likelihood(trajectories, context)
 
 
-class TrajectoryCNFModel(TrajectoryCNF):
+def make_trajectory_cnf_model(horizon, dx, du, context_dim, problem, hidden_dim=32,
+                              state_only=False, state_control_only=False):
+    from ccai.models.cnf.cnf import TrajectoryCNF
 
-    def __init__(self, horizon, dx, du, context_dim, problem, hidden_dim=32, state_only=False, state_control_only=False):
-        super().__init__(horizon, dx, du, context_dim, problem, hidden_dim=hidden_dim, state_only=state_only,
-                         state_control_only=state_control_only)
+    class TrajectoryCNFModel(TrajectoryCNF):
 
-    def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None, project=False):
-        # B, N, _ = constraints.shape
-        if constraints is not None:
-            constraints = constraints.reshape(constraints.shape[0], -1, constraints.shape[-1])
-            context = constraints
-        else:
-            context = None
-        condition = {}
-        time_index = 0
-        mask = torch.ones(N, self.horizon, self.dx + self.du, device=self._grad_mask.device)
-        if past is not None:
-            condition[0] = [0, past]
-            time_index = past.shape[1]
-            mask[:, :time_index] = torch.zeros_like(past)
-        if start is not None:
-            condition[time_index] = [0, start]
-            mask[:, time_index, :start.shape[1]] = torch.zeros_like(start)
-        if goal is not None:
-            condition[-1] = [8, goal]
-        if condition == {}:
-            condition = None
+        def __init__(self):
+            super().__init__(horizon, dx, du, context_dim, problem, hidden_dim=hidden_dim, state_only=state_only,
+                             state_control_only=state_control_only)
 
-        # TODO: in-painting for sample generation with CNF
-        # I guess just a case of intervening on the required gradient?
-        # initialize trajectory to right amount, set gradient of components to be zero
-        # trajectories, likelihood = self._sample(context=context, condition=condition, mask=mask, H=H)
-        # return (trajectories, context, likelihood), trajectories
+        def sample(self, N, H=None, start=None, goal=None, constraints=None, past=None, project=False):
+            # B, N, _ = constraints.shape
+            if constraints is not None:
+                constraints = constraints.reshape(constraints.shape[0], -1, constraints.shape[-1])
+                context = constraints
+            else:
+                context = None
+            condition = {}
+            time_index = 0
+            mask = torch.ones(N, self.horizon, self.dx + self.du, device=self._grad_mask.device)
+            if past is not None:
+                condition[0] = [0, past]
+                time_index = past.shape[1]
+                mask[:, :time_index] = torch.zeros_like(past)
+            if start is not None:
+                condition[time_index] = [0, start]
+                mask[:, time_index, :start.shape[1]] = torch.zeros_like(start)
+            if goal is not None:
+                condition[-1] = [8, goal]
+            if condition == {}:
+                condition = None
 
-        if project:
-            samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.project(H=H, context=context, condition=condition)
-        else:
-            samples = self._sample(H=H, context=context, condition=condition)  # .reshape(-1, H#,
-        #         self.dx + self.du)
-        return samples, samples_0, (all_losses, all_samples, all_likelihoods)
+            # TODO: in-painting for sample generation with CNF
+            # I guess just a case of intervening on the required gradient?
+            # initialize trajectory to right amount, set gradient of components to be zero
+            # trajectories, likelihood = self._sample(context=context, condition=condition, mask=mask, H=H)
+            # return (trajectories, context, likelihood), trajectories
+
+            if project:
+                samples, samples_0, (all_losses, all_samples, all_likelihoods) = self.project(H=H, context=context, condition=condition)
+            else:
+                samples = self._sample(H=H, context=context, condition=condition)  # .reshape(-1, H#,
+            #         self.dx + self.du)
+            return samples, samples_0, (all_losses, all_samples, all_likelihoods)
 
 
-    def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
-        B = trajectories.shape[0]
-        if start is not None:
-            context = torch.cat((start, goal, constraints), dim=1)
-        else:
-            context = constraints
-        return self.flow_matching_loss(trajectories, context=context, mask=mask)
+        def loss(self, trajectories, mask=None, start=None, goal=None, constraints=None):
+            B = trajectories.shape[0]
+            if start is not None:
+                context = torch.cat((start, goal, constraints), dim=1)
+            else:
+                context = constraints
+            return self.flow_matching_loss(trajectories, context=context, mask=mask)
 
-    def set_norm_constants(self, x_mu, x_std):
-        self.x_mean.data = x_mu.to(device=self.x_mean.device, dtype=self.x_mean.dtype)
-        self.x_std.data = x_std.to(device=self.x_std.device, dtype=self.x_std.dtype)
+        def set_norm_constants(self, x_mu, x_std):
+            self.x_mean.data = x_mu.to(device=self.x_mean.device, dtype=self.x_mean.dtype)
+            self.x_std.data = x_std.to(device=self.x_std.device, dtype=self.x_std.dtype)
 
-        self.model.x_mean = self.x_mean
-        self.model.x_std = self.x_std
+            self.model.x_mean = self.x_mean
+            self.model.x_std = self.x_std
+
+    return TrajectoryCNFModel()
 
 class TrajectorySampler(nn.Module):
 
@@ -353,8 +358,8 @@ class TrajectorySampler(nn.Module):
         if type == 'nf':
             self.model = TrajectoryFlowModel(T, dx, du, context_dim, dynamics)
         elif type == 'cnf':
-            self.model = TrajectoryCNFModel(T, dx, du, context_dim, problem, hidden_dim=hidden_dim, 
-                                            state_only=state_only, state_control_only=state_control_only)
+            self.model = make_trajectory_cnf_model(T, dx, du, context_dim, problem, hidden_dim=hidden_dim,
+                                                   state_only=state_only, state_control_only=state_control_only)
         elif type == 'latent_diffusion':
             self.model = TrajectoryDiffusionModel(T, dx, du, context_dim, problem, timesteps, hidden_dim, constrain,
                                                   unconditional, generate_context=generate_context, score_model=score_model,

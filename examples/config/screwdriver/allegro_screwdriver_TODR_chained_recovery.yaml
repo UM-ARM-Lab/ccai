@@ -41,6 +41,8 @@ test_recovery_trajectory: False
 perturb_action: False
 randomize_obj_start: True
 external_wrench_perturb: True
+rand_pct: 0.3333333333333333
+random_force_magnitude: 1.5
 viz_states: False
 diff_init: True
 live_recovery: True

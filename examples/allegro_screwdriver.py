@@ -1,8 +1,12 @@
 from isaac_victor_envs.utils import get_assets_dir
-from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
+try:
+    from isaac_victor_envs.tasks.allegro import AllegroScrewdriverTurningEnv
+except ImportError:
+    AllegroScrewdriverTurningEnv = None
 try:
     from isaac_victor_envs.tasks.allegro_ros import RosAllegroScrewdriverTurningEnv
-except:
+except ImportError:
+    RosAllegroScrewdriverTurningEnv = None
     print('No ROS install found, continuing')
 
 import numpy as np
@@ -265,9 +269,12 @@ def apply_saved_pregrasp_state(env, sim_viz_env, pregrasp_states, trial_index, s
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noise=None, noise_noise=None, sim=None, seed=None,
              proj_path=None, perturb_this_trial=False, trajectory_sampler=None, trajectory_sampler_orig=None, config=None, classifier=None):
     global all_yaw_deltas
+    debug_progress = bool(params.get('debug_progress', False))
     episode_num_steps = 0
     max_episode_num_steps = 100
     num_fingers = len(params['fingers'])
+    if debug_progress:
+        print('debug_progress: do_trial get_state start', flush=True)
     state = env.get_state()
     if params['visualize']:
         env.frame_fpath = fpath
@@ -278,6 +285,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     else:
         env.frame_fpath = None
         env.frame_id = None
+    if debug_progress:
+        print('debug_progress: extracting initial state', flush=True)
     start = extract_state_vector(state, num_fingers, params['device'])
 
     if params.get('external_wrench_perturb', False):
@@ -288,6 +297,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     baseline_controller = None
     baseline_ood_detector = None
     if 'recovery_controller' in params:
+        if debug_progress:
+            print('debug_progress: initializing baseline recovery helpers', flush=True)
         baseline_controller = BaselineRecoveryController(env, config, params, trajectory_sampler_orig)
         baseline_ood_detector = BaselineOODDetector(params, trajectory_sampler_orig, 
                                                    getattr(baseline_controller, 'running_cost', None))
@@ -323,6 +334,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     pregrasp_params['skip_csvto'] = False
 
     start[-4:] = 0
+    if debug_progress:
+        print('debug_progress: creating pregrasp problem', flush=True)
     pregrasp_problem = create_allegro_screwdriver_problem(
         'pregrasp', 
         start[:4 * num_fingers + obj_dof], 
@@ -335,8 +348,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         obj_dof=obj_dof,
         AllegroScrewdriver=AllegroScrewdriver
     )
+    if debug_progress:
+        print('debug_progress: creating pregrasp planner', flush=True)
     pregrasp_planner = create_planner(pregrasp_problem, 'pregrasp', pregrasp_params)
 
+    if debug_progress:
+        print('debug_progress: creating turn problem', flush=True)
     turn_problem = create_allegro_screwdriver_problem(
         'turn',
         start[:4 * num_fingers + obj_dof],
@@ -348,6 +365,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         proj_path=proj_path,
         AllegroScrewdriver=AllegroScrewdriver
     )
+    if debug_progress:
+        print('debug_progress: created turn problem', flush=True)
 
     # Initialize regrasp planners as None
     index_regrasp_planner = None
@@ -549,9 +568,13 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             if not params['skip_pregrasp']:
                 contact = 'pregrasp'
                 start = env.get_state()['q'].reshape(-1, 4 * num_fingers + 4).to(device=params['device'])[0]
+                if debug_progress:
+                    print('debug_progress: running pregrasp planner step', flush=True)
                 best_traj, _ = pregrasp_planner.step(start[:pregrasp_planner.problem.dx])
                 for x in best_traj[:, :4 * num_fingers]:
                     action = x.reshape(-1, 4 * num_fingers).to(device=env.device) # move the rest fingers
+                    if debug_progress:
+                        print('debug_progress: stepping pregrasp action', flush=True)
                     env.step(action)
                     # After stepping, reset the screwdriver to where it was initially
                     if params['mode'] != 'hardware':
@@ -1009,6 +1032,8 @@ if __name__ == "__main__":
     if config['mode'] == 'hardware':
         # roslaunch allegro_hand allegro_hand_modified.launch
         from hardware.hardware_env import HardwareEnv
+        if RosAllegroScrewdriverTurningEnv is None:
+            raise ImportError("RosAllegroScrewdriverTurningEnv requires the legacy IsaacGym/ROS environment.")
 
         env = HardwareEnv(default_dof_pos[:, :16], 
                           finger_list=config['fingers'], 
@@ -1054,6 +1079,8 @@ if __name__ == "__main__":
         if not config['visualize']:
             img_save_dir = None
 
+        if AllegroScrewdriverTurningEnv is None:
+            raise ImportError("AllegroScrewdriverTurningEnv requires the legacy IsaacGym environment.")
         env = AllegroScrewdriverTurningEnv(num_envs, control_mode='joint_impedance',
                                            use_cartesian_controller=False,
                                            viewer=config['visualize'],
