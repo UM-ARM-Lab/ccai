@@ -55,16 +55,6 @@ def _entrypoint_args(config_path, **overrides):
         "planner_yaw_inertia_model_path": None,
         "planner_use_yaw_inertia_model": None,
         "use_pregrasp_reference_targets": None,
-        "diffpf_checkpoint": None,
-        "diffpf_ema_decay": None,
-        "diffpf_compile_model": None,
-        "diffpf_sample_horizon": None,
-        "diffpf_execution_horizon": None,
-        "diffpf_num_trajectories": None,
-        "diffpf_trajectory_selection_mode": None,
-        "diffpf_likelihood_mask": None,
-        "diffpf_likelihood_temperature": None,
-        "diffpf_likelihood_reward_scope": None,
     }
     values.update(overrides)
     return types.SimpleNamespace(**values)

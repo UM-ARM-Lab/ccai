@@ -109,16 +109,6 @@ def parse_args():
     parser.add_argument("--planner_yaw_friction_model_path", type=str, default=None)
     parser.add_argument("--disable_planner_yaw_friction_model", action="store_true", default=None)
     parser.add_argument("--planner_yaw_inertia_model_path", type=str, default=None)
-    parser.add_argument("--diffpf_checkpoint", type=str, default=None)
-    parser.add_argument("--diffpf_ema_decay", type=float, default=None)
-    parser.add_argument("--diffpf_compile_model", action="store_true", default=None)
-    parser.add_argument("--diffpf_sample_horizon", type=int, default=None)
-    parser.add_argument("--diffpf_execution_horizon", type=int, default=None)
-    parser.add_argument("--diffpf_num_trajectories", type=int, default=None)
-    parser.add_argument("--diffpf_trajectory_selection_mode", type=str, default=None)
-    parser.add_argument("--diffpf_likelihood_mask", type=str, default=None)
-    parser.add_argument("--diffpf_likelihood_temperature", type=float, default=None)
-    parser.add_argument("--diffpf_likelihood_reward_scope", type=str, default=None)
     yaw_inertia_group = parser.add_mutually_exclusive_group()
     yaw_inertia_group.add_argument(
         "--enable_planner_yaw_inertia_model",
@@ -177,16 +167,6 @@ def load_config(args) -> dict:
         "planner_yaw_inertia_model_path",
         "planner_use_yaw_inertia_model",
         "use_pregrasp_reference_targets",
-        "diffpf_checkpoint",
-        "diffpf_ema_decay",
-        "diffpf_compile_model",
-        "diffpf_sample_horizon",
-        "diffpf_execution_horizon",
-        "diffpf_num_trajectories",
-        "diffpf_trajectory_selection_mode",
-        "diffpf_likelihood_mask",
-        "diffpf_likelihood_temperature",
-        "diffpf_likelihood_reward_scope",
     ):
         value = getattr(args, key)
         if value is not None:
@@ -547,7 +527,7 @@ def build_normal_action_policy(config, env, device):
     if checkpoint in (None, ""):
         return None
     if str(config.get("hand", "allegro")).lower() != "proto5":
-        raise ValueError("--diffpf_checkpoint normal execution is currently supported only with --hand proto5.")
+        raise ValueError("diffpf_checkpoint normal execution is currently supported only with hand: proto5.")
     checkpoint_path = pathlib.Path(str(checkpoint)).expanduser()
     if not checkpoint_path.exists():
         raise FileNotFoundError(f"DiffPF checkpoint not found: {checkpoint_path}")

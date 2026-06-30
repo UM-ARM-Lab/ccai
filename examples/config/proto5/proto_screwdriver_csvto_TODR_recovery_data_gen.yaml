@@ -68,6 +68,16 @@ OOD_metric: 'likelihood'
 recovery_controller: 'csvgd'
 model_dir: 'data/training/allegro_screwdriver/proto5_screwdriver_data_gen_pi_2_partial_patch_new_init_diffusion'
 model_path: 'data/training/allegro_screwdriver/proto5_screwdriver_data_gen_pi_2_partial_patch_new_init_diffusion/allegro_screwdriver_diffusion_best.pt'
+diffpf_checkpoint: null
+diffpf_ema_decay: null
+diffpf_compile_model: false
+diffpf_sample_horizon: 8
+diffpf_execution_horizon: 1
+diffpf_num_trajectories: 128
+diffpf_trajectory_selection_mode: "max_reward"
+diffpf_likelihood_mask: "inverse_dynamics"
+diffpf_likelihood_temperature: 10.0
+diffpf_likelihood_reward_scope: "per_step"
 likelihood_threshold: -90.0
 # likelihood_threshold: -40.0
 likelihood_num_samples: 8
