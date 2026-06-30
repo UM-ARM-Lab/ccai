@@ -1,6 +1,6 @@
 ---
 T: 3
-T_orig: 12
+T_orig: 6
 receding_horizon: False
 num_steps: 8
 num_turns: 1
@@ -50,6 +50,10 @@ rl_adjustment: False
 test_recovery_trajectory: False
 perturb_action: False
 randomize_obj_start: True
+obj_orientation_noise_std: 0.03
+obj_position_noise_range_x: [-0.0, 0.0]
+obj_position_noise_range_y: [-0.0, 0.0]
+obj_position_noise_range_z: [-0.0, 0.0]
 external_wrench_perturb: False
 rand_pct: .333
 random_force_magnitude: 1.

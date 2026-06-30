@@ -4,6 +4,7 @@ import pathlib
 import sys
 import types
 
+import numpy as np
 import pytest
 import torch
 
@@ -179,6 +180,48 @@ class _FakePhysxView:
         return self._friction_properties
 
 
+class _FakeRandomizationObj:
+    def __init__(self):
+        self.data = types.SimpleNamespace(
+            root_pos_w=torch.tensor([[1.0, 2.0, 3.0]], dtype=torch.float32),
+            root_quat_w=torch.tensor([[1.0, 0.0, 0.0, 0.0]], dtype=torch.float32),
+            root_lin_vel_w=torch.ones(1, 3),
+            root_ang_vel_w=torch.ones(1, 3),
+            joint_pos=torch.tensor([[0.1, 0.2, 0.3, 0.4]], dtype=torch.float32),
+            joint_vel=torch.ones(1, 4),
+        )
+        self.last_root_pose = None
+        self.last_root_velocity = None
+        self.last_joint_pos = None
+        self.last_joint_vel = None
+
+    def write_root_pose_to_sim(self, root_pose, env_ids):
+        self.last_root_pose = root_pose.clone()
+
+    def write_root_velocity_to_sim(self, root_velocity, env_ids):
+        self.last_root_velocity = root_velocity.clone()
+
+    def write_joint_state_to_sim(self, joint_pos, joint_vel, env_ids):
+        self.last_joint_pos = joint_pos.clone()
+        self.last_joint_vel = joint_vel.clone()
+
+
+class _FakeRandomizationEnv:
+    def __init__(self):
+        self.device = torch.device("cpu")
+        self.num_envs = 1
+        self.scene = {"obj": _FakeRandomizationObj()}
+        self.table_pose = torch.zeros(3)
+        self.obj_pose = torch.zeros(3)
+        self.synced = False
+
+    def _obj_orientation_joint_ids(self):
+        return [0, 1, 2]
+
+    def _sync_scene(self):
+        self.synced = True
+
+
 def test_wrapper_get_state_packs_allegro_ccai_order():
     robot_joint_names = ALLEGRO_ACTIVE_JOINT_NAMES[:8] + ALLEGRO_RING_JOINT_NAMES + ALLEGRO_ACTIVE_JOINT_NAMES[8:]
     robot = _FakeAsset(robot_joint_names, torch.arange(16, dtype=torch.float32).reshape(1, 16))
@@ -345,6 +388,53 @@ def test_recovery_physical_kwargs_respect_yaw_override_and_model_toggles(tmp_pat
     assert kwargs["yaw_joint_friction"] == pytest.approx(0.04)
     assert kwargs["yaw_friction_model_path"] == str(friction_model)
     assert kwargs["yaw_inertia_model_path"] == str(inertia_model)
+
+
+def test_randomize_isaacsim_object_start_matches_collector_fields():
+    env = _FakeRandomizationEnv()
+    config = {
+        "randomize_obj_start": True,
+        "obj_position_noise_range_x": [-0.01, 0.02],
+        "obj_position_noise_range_y": [0.03, 0.04],
+        "obj_position_noise_range_z": [-0.05, -0.02],
+        "obj_orientation_noise_std": 0.5,
+    }
+    rng = np.random.default_rng(17)
+    expected_rng = np.random.default_rng(17)
+    expected_offset = torch.tensor(
+        [
+            expected_rng.uniform(-0.01, 0.02),
+            expected_rng.uniform(0.03, 0.04),
+            expected_rng.uniform(-0.05, -0.02),
+        ],
+        dtype=torch.float32,
+    )
+    expected_roll_pitch = torch.tensor(
+        expected_rng.normal(0.0, 0.5 * 0.2, (2,)),
+        dtype=torch.float32,
+    )
+    expected_yaw = torch.tensor(
+        expected_rng.normal(0.0, 0.5),
+        dtype=torch.float32,
+    )
+
+    result = screwdriver_isaacsim_recovery.randomize_isaacsim_object_start(env, config, rng)
+
+    expected_pos = torch.tensor([1.0, 2.0, 3.0]) + expected_offset
+    torch.testing.assert_close(result["screwdriver_pos_offset_world"][0], expected_offset)
+    torch.testing.assert_close(result["screwdriver_pos_world"][0], expected_pos)
+    torch.testing.assert_close(env.scene["obj"].last_root_pose[0, :3], expected_pos)
+    torch.testing.assert_close(env.scene["obj"].last_root_velocity, torch.zeros(1, 6))
+    torch.testing.assert_close(env.table_pose, expected_pos)
+    torch.testing.assert_close(env.obj_pose, expected_pos)
+
+    expected_joint_pos = torch.tensor([[0.1, 0.2, 0.3, 0.4]], dtype=torch.float32)
+    expected_joint_pos[0, 0:2] += expected_roll_pitch
+    expected_joint_pos[0, 2] += expected_yaw
+    torch.testing.assert_close(result["obj_joint_pos"], expected_joint_pos)
+    torch.testing.assert_close(env.scene["obj"].last_joint_pos, expected_joint_pos)
+    torch.testing.assert_close(env.scene["obj"].last_joint_vel[:, :3], torch.zeros(1, 3))
+    assert env.synced
 
 
 def test_wrapper_step_handles_headless_none_frame_id():

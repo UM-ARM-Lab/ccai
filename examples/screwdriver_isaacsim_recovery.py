@@ -42,6 +42,8 @@ PROTO5_POINT_CACHE_SOURCE_DIRS = (
     DOCUMENTS_PATH / "model_mismatch" / "scripts",
     DOCUMENTS_PATH / "model_mismatch" / "examples",
 )
+DEFAULT_OBJ_ORIENTATION_NOISE_STD = 0.03
+DEFAULT_OBJ_POSITION_NOISE_RANGE = (-0.0075, 0.0075)
 
 
 def _bool_from_cli(value):
@@ -176,6 +178,10 @@ def load_config(args) -> dict:
     config.setdefault("planner_yaw_inertia_model_path", str(DEFAULT_PLANNER_YAW_INERTIA_MODEL_PATH))
     config.setdefault("planner_use_yaw_inertia_model", False)
     config.setdefault("use_pregrasp_reference_targets", False)
+    config.setdefault("obj_orientation_noise_std", DEFAULT_OBJ_ORIENTATION_NOISE_STD)
+    config.setdefault("obj_position_noise_range_x", DEFAULT_OBJ_POSITION_NOISE_RANGE)
+    config.setdefault("obj_position_noise_range_y", DEFAULT_OBJ_POSITION_NOISE_RANGE)
+    config.setdefault("obj_position_noise_range_z", DEFAULT_OBJ_POSITION_NOISE_RANGE)
     if config["no_video"]:
         config["visualize"] = False
         config["visualize_plan"] = False
@@ -275,6 +281,125 @@ def _friction_range(config, prefix: str, fallback):
         value = float(value)
         return (value, value)
     return fallback
+
+
+def _float_pair(value, *, key: str) -> tuple[float, float]:
+    if value is None:
+        raise ValueError(f"{key} must be a two-value range, got None.")
+    if isinstance(value, str):
+        value = value.strip().strip("[]()")
+        parts = [part.strip() for part in value.split(",") if part.strip()]
+    else:
+        parts = list(value)
+    if len(parts) != 2:
+        raise ValueError(f"{key} must be a two-value range, got {value!r}.")
+    return (float(parts[0]), float(parts[1]))
+
+
+def get_object_randomization_params(config: dict) -> dict:
+    return {
+        "obj_orientation_noise_std": float(
+            config.get("obj_orientation_noise_std", DEFAULT_OBJ_ORIENTATION_NOISE_STD)
+        ),
+        "obj_position_noise_range_x": _float_pair(
+            config.get("obj_position_noise_range_x", DEFAULT_OBJ_POSITION_NOISE_RANGE),
+            key="obj_position_noise_range_x",
+        ),
+        "obj_position_noise_range_y": _float_pair(
+            config.get("obj_position_noise_range_y", DEFAULT_OBJ_POSITION_NOISE_RANGE),
+            key="obj_position_noise_range_y",
+        ),
+        "obj_position_noise_range_z": _float_pair(
+            config.get("obj_position_noise_range_z", DEFAULT_OBJ_POSITION_NOISE_RANGE),
+            key="obj_position_noise_range_z",
+        ),
+    }
+
+
+def randomize_isaacsim_object_start(env, config: dict, rng):
+    """Match the collector's object-start randomization fields and sampling."""
+    if not bool(config.get("randomize_obj_start", False)):
+        return None
+
+    import numpy as np
+    import torch
+
+    params = get_object_randomization_params(config)
+    obj = env.scene["obj"]
+    env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.long)
+
+    if hasattr(obj.data, "root_pos_w"):
+        root_pos = obj.data.root_pos_w[env_ids].clone()
+    else:
+        root_pos = obj.data.root_link_pos_w[env_ids].clone()
+    if hasattr(obj.data, "root_quat_w"):
+        root_quat = obj.data.root_quat_w[env_ids].clone()
+    else:
+        root_quat = obj.data.root_link_quat_w[env_ids].clone()
+
+    position_offset_world = torch.as_tensor(
+        np.stack(
+            (
+                rng.uniform(*params["obj_position_noise_range_x"], size=env.num_envs),
+                rng.uniform(*params["obj_position_noise_range_y"], size=env.num_envs),
+                rng.uniform(*params["obj_position_noise_range_z"], size=env.num_envs),
+            ),
+            axis=-1,
+        ),
+        device=root_pos.device,
+        dtype=root_pos.dtype,
+    )
+    randomized_root_pos = root_pos + position_offset_world
+    root_pose = torch.cat((randomized_root_pos, root_quat), dim=-1)
+    root_velocity = torch.zeros((len(env_ids), 6), device=root_pose.device, dtype=root_pose.dtype)
+    if hasattr(obj, "write_root_pose_to_sim"):
+        obj.write_root_pose_to_sim(root_pose, env_ids=env_ids)
+        obj.write_root_velocity_to_sim(root_velocity, env_ids=env_ids)
+    else:
+        obj.write_root_link_pose_to_sim(root_pose, env_ids=env_ids)
+        obj.write_root_com_velocity_to_sim(root_velocity, env_ids=env_ids)
+    if hasattr(obj.data, "root_pos_w"):
+        obj.data.root_pos_w[env_ids] = randomized_root_pos
+    if hasattr(obj.data, "root_link_pos_w"):
+        obj.data.root_link_pos_w[env_ids] = randomized_root_pos
+    if hasattr(obj.data, "root_lin_vel_w"):
+        obj.data.root_lin_vel_w[env_ids] = 0.0
+    if hasattr(obj.data, "root_ang_vel_w"):
+        obj.data.root_ang_vel_w[env_ids] = 0.0
+
+    joint_ids = env._obj_orientation_joint_ids() if hasattr(env, "_obj_orientation_joint_ids") else [0, 1, 2]
+    if len(joint_ids) < 3:
+        raise ValueError(f"Expected at least three object orientation joints, got {joint_ids}.")
+    obj_joint_pos = obj.data.joint_pos[env_ids].clone()
+    joint_vel_source = getattr(obj.data, "joint_vel", torch.zeros_like(obj.data.joint_pos))
+    obj_joint_vel = joint_vel_source[env_ids].clone()
+    roll_pitch_noise = torch.as_tensor(
+        rng.normal(0.0, params["obj_orientation_noise_std"] * 0.2, (len(env_ids), 2)),
+        device=obj_joint_pos.device,
+        dtype=obj_joint_pos.dtype,
+    )
+    yaw_noise = torch.as_tensor(
+        rng.normal(0.0, params["obj_orientation_noise_std"], (len(env_ids), 1)),
+        device=obj_joint_pos.device,
+        dtype=obj_joint_pos.dtype,
+    )
+    obj_joint_pos[:, joint_ids[0:2]] += roll_pitch_noise
+    obj_joint_pos[:, joint_ids[2:3]] += yaw_noise
+    obj_joint_vel[:, joint_ids[0:3]] = 0.0
+    obj.write_joint_state_to_sim(obj_joint_pos, obj_joint_vel, env_ids=env_ids)
+    obj.data.joint_pos[env_ids] = obj_joint_pos
+    if hasattr(obj.data, "joint_vel"):
+        obj.data.joint_vel[env_ids] = obj_joint_vel
+
+    env.table_pose = randomized_root_pos[0].detach().clone().to(dtype=torch.float32)
+    env.obj_pose = env.table_pose
+    if hasattr(env, "_sync_scene"):
+        env._sync_scene()
+    return {
+        "screwdriver_pos_world": randomized_root_pos.detach().clone(),
+        "screwdriver_pos_offset_world": position_offset_world.detach().clone(),
+        "obj_joint_pos": obj_joint_pos.detach().clone(),
+    }
 
 
 def make_isaacsim_env(config):
@@ -434,6 +559,7 @@ def main():
         num_episodes = int(config["end_ind"])
 
     seed = 0
+    base_seed = 0 if config.get("seed", None) is None else int(config["seed"])
     try:
         for i in tqdm(range(start_ind, num_episodes)):
             print(f"\nTrial {i + 1}")
@@ -441,6 +567,18 @@ def main():
                 if config.get("debug_progress", False):
                     print("debug_progress: resetting IsaacSim env", flush=True)
                 env.reset()
+                object_randomization = randomize_isaacsim_object_start(
+                    env,
+                    config,
+                    np.random.default_rng(base_seed + i),
+                )
+                if object_randomization is not None and config.get("debug_progress", False):
+                    print(
+                        "debug_progress: randomized object start "
+                        f"offset_world={object_randomization['screwdriver_pos_offset_world'][0].tolist()} "
+                        f"pos_world={object_randomization['screwdriver_pos_world'][0].tolist()}",
+                        flush=True,
+                    )
             else:
                 if config.get("debug_progress", False):
                     print("debug_progress: applying saved pregrasp state", flush=True)
