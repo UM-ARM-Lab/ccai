@@ -33,7 +33,8 @@ class TrajectoryExecutor:
                     baseline_ood_detector=None, data=None, trajectory_sampler=None,
                     trajectory_sampler_orig=None, turn_problem=None, num_fingers=None,
                     obj_dof=None, obj_joint_dim=1, episode_num_steps=None, max_episode_num_steps=None,
-                    min_force_dict=None, proj_path=None, AllegroScrewdriver=None, tactile_controller=False, skip_csvto=False):
+                    min_force_dict=None, proj_path=None, AllegroScrewdriver=None, tactile_controller=False, skip_csvto=False,
+                    normal_action_policy=None):
         """Execute a trajectory with the given planner and mode."""
         
         rand_pct = self.params.get('rand_pct', 1/3)
@@ -117,6 +118,24 @@ class TrajectoryExecutor:
             contact[:, 0] = 1
             contact[:, 2] = 1
 
+        if mode == "turn" and not recover and normal_action_policy is not None:
+            actual_trajectory, planned_trajectories, recover, episode_num_steps = self._execute_normal_policy_steps(
+                normal_action_policy,
+                mode,
+                state,
+                start_timestep,
+                max_timesteps,
+                num_fingers,
+                obj_dof,
+                episode_num_steps,
+                max_episode_num_steps,
+                data,
+                trajectory_sampler_orig,
+                actual_trajectory,
+                planned_trajectories,
+            )
+            return actual_trajectory, planned_trajectories, initial_samples, None, optimizer_paths, contact_points, contact_distance, recover, episode_num_steps
+
         recovery_params = copy.deepcopy(self.params)
 
         skip_diff_init = should_skip_diff_init(self.params, recover)
@@ -176,6 +195,173 @@ class TrajectoryExecutor:
             self.env.set_external_wrench_perturb(orig_torque_perturb, rand_pct)
             
         return actual_trajectory, planned_trajectories, initial_samples, sim_rollouts, optimizer_paths, contact_points, contact_distance, recover, episode_num_steps
+
+    @staticmethod
+    def _contact_plan_vector(mode, *, device):
+        mapping = {
+            "all": (0.0, 0.0, 0.0),
+            "index": (0.0, 1.0, 1.0),
+            "thumb_middle": (1.0, 0.0, 0.0),
+            "turn": (1.0, 1.0, 1.0),
+            "thumb": (1.0, 1.0, 0.0),
+            "middle": (1.0, 0.0, 1.0),
+            "pregrasp": (0.0, 0.0, 0.0),
+        }
+        return torch.tensor(mapping.get(str(mode), (0.0, 0.0, 0.0)), device=device, dtype=torch.float32)
+
+    def _ensure_execution_timeseries(self, data):
+        if data is None:
+            return
+        for key in ("contact_state", "contact_plan", "contact_wrenches", "contact_forces", "contact_points"):
+            data.setdefault(key, [])
+        data.setdefault("normal_policy_times", [])
+        data.setdefault("normal_policy_likelihood_stats", [])
+
+    @staticmethod
+    def _as_cpu_float_tensor(value):
+        return torch.as_tensor(value, dtype=torch.float32).detach().cpu()
+
+    def _record_tactile_state(self, data):
+        if data is None:
+            return
+        self._ensure_execution_timeseries(data)
+        if hasattr(self.env, "get_tactile_observation"):
+            obs = self.env.get_tactile_observation()
+        else:
+            obs = {}
+        defaults = {
+            "contact_state": torch.zeros(3, dtype=torch.float32),
+            "contact_wrenches": torch.zeros(3, 6, dtype=torch.float32),
+            "contact_forces": torch.zeros(3, 3, dtype=torch.float32),
+            "contact_points": torch.zeros(3, 3, dtype=torch.float32),
+        }
+        for key, default in defaults.items():
+            value = obs.get(key, default)
+            tensor = self._as_cpu_float_tensor(value)
+            if tensor.ndim > default.ndim:
+                tensor = tensor[0]
+            data[key].append(tensor)
+
+    def _record_contact_plan(self, data, mode):
+        if data is None:
+            return
+        self._ensure_execution_timeseries(data)
+        data["contact_plan"].append(self._contact_plan_vector(mode, device="cpu"))
+
+    def _stack_actual_trajectory(self, actual_trajectory):
+        if len(actual_trajectory) == 0:
+            return actual_trajectory
+        return torch.stack(actual_trajectory, dim=0).to(device=self.params["device"])
+
+    def _policy_result_value(self, result, *names, default=None):
+        if isinstance(result, dict):
+            for name in names:
+                if name in result:
+                    return result[name]
+            return default
+        for name in names:
+            if hasattr(result, name):
+                return getattr(result, name)
+        return default
+
+    def _execute_normal_policy_steps(self, normal_action_policy, mode, state, start_timestep, max_timesteps,
+                                     num_fingers, obj_dof, episode_num_steps, max_episode_num_steps, data,
+                                     trajectory_sampler_orig, actual_trajectory, planned_trajectories):
+        self._ensure_execution_timeseries(data)
+        if data is not None and len(data["contact_state"]) == 0:
+            self._record_tactile_state(data)
+
+        total_steps = self.params.get("diffpf_execution_horizon", None)
+        if total_steps is None:
+            total_steps = self.params.get("T_orig", self.params.get("T", 1))
+        if max_timesteps is not None:
+            total_steps = min(int(total_steps), int(max_timesteps))
+        if max_episode_num_steps is not None and episode_num_steps is not None:
+            total_steps = min(int(total_steps), max(0, int(max_episode_num_steps) - int(episode_num_steps)))
+
+        for k in range(int(start_timestep), int(total_steps)):
+            state_dict = self.env.get_state()
+            state_16 = state_dict["q"].reshape(-1, 4 * num_fingers + obj_dof + 1).to(device=self.params["device"])[0]
+            state = state_16[:4 * num_fingers + obj_dof]
+
+            if k > int(start_timestep):
+                exit_, recover_ = self._check_exit_conditions(
+                    k,
+                    state,
+                    None,
+                    trajectory_sampler_orig,
+                    None,
+                    False,
+                    data,
+                    actual_trajectory,
+                    planned_trajectories,
+                    None,
+                )
+                if exit_:
+                    return self._stack_actual_trajectory(actual_trajectory), planned_trajectories, recover_, episode_num_steps
+
+            start_time = time.perf_counter()
+            result = normal_action_policy.plan_next(self.env, k)
+            elapsed = time.perf_counter() - start_time
+            if data is not None:
+                data["normal_policy_times"].append(elapsed)
+                stats = self._policy_result_value(result, "likelihood_stats", default=None)
+                data["normal_policy_likelihood_stats"].append(stats)
+            print(f"DiffPF planning time for step {k + 1} (global step {episode_num_steps})", elapsed)
+
+            delta = self._policy_result_value(result, "delta_action", "delta12", "action_delta", default=None)
+            target = self._policy_result_value(
+                result,
+                "absolute_action_target",
+                "target_action",
+                "target12",
+                "active_joint_target",
+                default=None,
+            )
+            if target is None and delta is None:
+                raise ValueError("normal_action_policy.plan_next(...) must return a delta action or absolute target.")
+            if delta is None:
+                target_t = torch.as_tensor(target, device=self.params["device"], dtype=torch.float32).reshape(-1)[:12]
+                delta_t = target_t - state[:12]
+            else:
+                delta_t = torch.as_tensor(delta, device=self.params["device"], dtype=torch.float32).reshape(-1)[:12]
+                target_t = (
+                    torch.as_tensor(target, device=self.params["device"], dtype=torch.float32).reshape(-1)[:12]
+                    if target is not None
+                    else state[:12] + delta_t
+                )
+
+            selected_plan_rows = self._policy_result_value(result, "selected_plan_rows", "planned_rows", default=None)
+            if selected_plan_rows is None:
+                planned_row = torch.cat((state[:15], delta_t, torch.zeros(9, device=self.params["device"])))
+                selected_plan_rows_t = planned_row.reshape(1, -1)
+            else:
+                selected_plan_rows_t = torch.as_tensor(
+                    selected_plan_rows,
+                    device=self.params["device"],
+                    dtype=torch.float32,
+                )
+                if selected_plan_rows_t.ndim == 1:
+                    selected_plan_rows_t = selected_plan_rows_t.reshape(1, -1)
+            if selected_plan_rows_t.ndim == 2:
+                selected_plan_rows_t = selected_plan_rows_t.reshape(1, selected_plan_rows_t.shape[0], -1)
+            planned_trajectories.append(selected_plan_rows_t.detach().cpu())
+
+            actual_trajectory.append(torch.cat((state[:15].detach().cpu(), delta_t.detach().cpu())))
+            self.env.step(target_t.reshape(1, -1).to(device=self.env.device))
+            if hasattr(normal_action_policy, "observe_transition"):
+                normal_action_policy.observe_transition(
+                    env=self.env,
+                    step_idx=k,
+                    state=state.detach(),
+                    delta_action=delta_t.detach(),
+                    target_action=target_t.detach(),
+                )
+            self._record_contact_plan(data, mode)
+            self._record_tactile_state(data)
+            episode_num_steps += 1
+
+        return self._stack_actual_trajectory(actual_trajectory), planned_trajectories, False, episode_num_steps
 
     def _create_mode_planner(self, mode, planner, state, goal, num_fingers, obj_dof, 
                            recovery_params, min_force_dict, proj_path, max_timesteps, 
@@ -300,6 +486,9 @@ class TrajectoryExecutor:
         """Execute the trajectory steps."""
         resample = self.params.get('diffusion_resample', False)
         plans = None
+        self._ensure_execution_timeseries(data)
+        if data is not None and len(data["contact_state"]) == 0:
+            self._record_tactile_state(data)
         
         # Get max steps to execute
         total_steps = planner.problem.T if max_timesteps is None else max_timesteps
@@ -397,6 +586,8 @@ class TrajectoryExecutor:
             self._handle_action_execution(best_traj, planner_returns_action, planner, state, 
                                         num_fingers, actual_trajectory, mode, k, turn_problem, 
                                         fpath, fname, state_16, recover)
+            self._record_contact_plan(data, mode)
+            self._record_tactile_state(data)
             
             # Increment episode_num_steps after successful step
             episode_num_steps += 1

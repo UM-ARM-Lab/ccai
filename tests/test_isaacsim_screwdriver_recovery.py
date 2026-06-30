@@ -30,6 +30,65 @@ screwdriver_isaacsim_recovery = importlib.util.module_from_spec(_ENTRYPOINT_SPEC
 _ENTRYPOINT_SPEC.loader.exec_module(screwdriver_isaacsim_recovery)
 
 
+def _entrypoint_args(config_path, **overrides):
+    values = {
+        "config": config_path,
+        "hand": "proto5",
+        "headless": False,
+        "no_video": False,
+        "num_envs": 1,
+        "sim_device": "cuda:0",
+        "proto5_control_wrist": None,
+        "steps_per_action": None,
+        "action_repeat": None,
+        "save_recovery_frames": None,
+        "start_ind": None,
+        "end_ind": None,
+        "skip_pregrasp": None,
+        "pregrasp_only": None,
+        "experiment_name": None,
+        "debug_progress": False,
+        "planner_yaw_joint_friction_override": None,
+        "planner_use_env_yaw_joint_friction": None,
+        "planner_yaw_friction_model_path": None,
+        "disable_planner_yaw_friction_model": None,
+        "planner_yaw_inertia_model_path": None,
+        "planner_use_yaw_inertia_model": None,
+        "use_pregrasp_reference_targets": None,
+        "diffpf_checkpoint": None,
+        "diffpf_ema_decay": None,
+        "diffpf_compile_model": None,
+        "diffpf_sample_horizon": None,
+        "diffpf_execution_horizon": None,
+        "diffpf_num_trajectories": None,
+        "diffpf_trajectory_selection_mode": None,
+        "diffpf_likelihood_mask": None,
+        "diffpf_likelihood_temperature": None,
+        "diffpf_likelihood_reward_scope": None,
+    }
+    values.update(overrides)
+    return types.SimpleNamespace(**values)
+
+
+def test_isaacsim_recovery_defaults_match_csvto_cadence(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("controllers:\n  csvgd: {}\nexternal_wrench_perturb: false\nrand_pct: 0.333\nrandom_force_magnitude: 1.0\n")
+
+    config = screwdriver_isaacsim_recovery.load_config(_entrypoint_args(config_path))
+
+    assert config["steps_per_action"] == 40
+    assert config["action_repeat"] == 3
+    assert config["save_recovery_frames"] is True
+
+
+def test_isaacsim_recovery_rejects_frame_saving_without_cameras(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("controllers:\n  csvgd: {}\n")
+
+    with pytest.raises(ValueError, match="save_recovery_frames=True requires cameras"):
+        screwdriver_isaacsim_recovery.load_config(_entrypoint_args(config_path, no_video=True))
+
+
 def test_screwdriver_body_poke_sampler_bounds_magnitude_and_seed():
     generator_a = torch.Generator(device="cpu").manual_seed(7)
     point_a, force_a = sample_screwdriver_body_poke(
@@ -143,14 +202,50 @@ class _FakeAsset:
 
 
 class _FakeScene(dict):
-    pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.write_count = 0
+        self.update_count = 0
+
+    def write_data_to_sim(self):
+        self.write_count += 1
+
+    def update(self, dt):
+        self.update_count += 1
+
+
+class _FakeSim:
+    def __init__(self, *, has_gui=False, has_rtx=False):
+        self._has_gui = bool(has_gui)
+        self._has_rtx = bool(has_rtx)
+        self.forward_count = 0
+        self.render_count = 0
+
+    def has_gui(self):
+        return self._has_gui
+
+    def has_rtx_sensors(self):
+        return self._has_rtx
+
+    def forward(self):
+        self.forward_count += 1
+
+    def render(self):
+        self.render_count += 1
+
+    def get_physics_dt(self):
+        return 1.0 / 120.0
 
 
 class _FakeUnwrapped:
-    def __init__(self, robot, obj):
+    def __init__(self, robot, obj, *, scene_extra=None, sim=None):
         self.device = torch.device("cpu")
         self.num_envs = 1
-        self.scene = _FakeScene(robot=robot, obj=obj)
+        scene_items = {"robot": robot, "obj": obj}
+        if scene_extra:
+            scene_items.update(scene_extra)
+        self.scene = _FakeScene(scene_items)
+        self.sim = sim if sim is not None else _FakeSim()
 
 
 class _FakeActionSpace:
@@ -159,17 +254,28 @@ class _FakeActionSpace:
 
 
 class _FakeEnv:
-    def __init__(self, robot, obj, action_shape=(16,)):
-        self.unwrapped = _FakeUnwrapped(robot, obj)
+    def __init__(self, robot, obj, action_shape=(16,), scene_extra=None, sim=None):
+        self.unwrapped = _FakeUnwrapped(robot, obj, scene_extra=scene_extra, sim=sim)
         self.action_space = _FakeActionSpace(action_shape)
         self.last_action = None
+        self.actions = []
 
     def step(self, action):
         self.last_action = action
-        return action
+        self.actions.append(action.detach().clone())
+        return {"step": len(self.actions), "action": action}
 
     def reset(self):
         return None
+
+
+class _FakeCamera:
+    def __init__(self):
+        rgb = torch.tensor(
+            [[[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], [[0.0, 0.0, 1.0], [1.0, 1.0, 1.0]]]],
+            dtype=torch.float32,
+        )
+        self.data = types.SimpleNamespace(output={"rgb": rgb})
 
 
 class _FakePhysxView:
@@ -454,6 +560,86 @@ def test_wrapper_step_handles_headless_none_frame_id():
     torch.testing.assert_close(env.last_action, torch.arange(12, dtype=torch.float32).reshape(1, 12))
 
 
+def test_wrapper_repeats_recovery_action_three_times():
+    robot_joint_names = ALLEGRO_ACTIVE_JOINT_NAMES[:8] + ALLEGRO_RING_JOINT_NAMES + ALLEGRO_ACTIVE_JOINT_NAMES[8:]
+    robot = _FakeAsset(robot_joint_names, torch.arange(16, dtype=torch.float32).reshape(1, 16))
+    obj = _FakeAsset(OBJ_ORIENTATION_JOINT_NAMES, torch.tensor([[0.1, 0.2, 0.3]]))
+    env = _FakeEnv(robot, obj, action_shape=(12,))
+    wrapper = IsaacSimScrewdriverRecoveryEnv(env, hand="allegro", action_repeat=3)
+    wrapper._clear_external_force_torque = lambda: None
+
+    result = wrapper.step(torch.arange(12, dtype=torch.float32))
+
+    assert result["step"] == 3
+    assert len(env.actions) == 3
+    assert wrapper._step_index == 3
+    for action in env.actions:
+        torch.testing.assert_close(action, torch.arange(12, dtype=torch.float32).reshape(1, 12))
+
+
+def test_wrapper_reset_and_set_pose_force_render():
+    robot_joint_names = ALLEGRO_ACTIVE_JOINT_NAMES[:8] + ALLEGRO_RING_JOINT_NAMES + ALLEGRO_ACTIVE_JOINT_NAMES[8:]
+    robot = _FakeAsset(robot_joint_names, torch.arange(16, dtype=torch.float32).reshape(1, 16))
+    obj = _FakeAsset(OBJ_ORIENTATION_JOINT_NAMES, torch.tensor([[0.1, 0.2, 0.3]]))
+    sim = _FakeSim(has_gui=True)
+    env = _FakeEnv(robot, obj, action_shape=(12,), sim=sim)
+    wrapper = IsaacSimScrewdriverRecoveryEnv(env, hand="allegro")
+
+    wrapper.reset()
+    reset_render_count = sim.render_count
+    assert reset_render_count >= 1
+
+    wrapper._write_robot_root_default = lambda env_ids: None
+    wrapper._write_obj_root_default = lambda env_ids: None
+    wrapper._write_robot_joint_state = lambda active_joint_pos, env_ids: None
+    wrapper._write_obj_joint_state = lambda obj_orientation, env_ids: None
+    wrapper.set_pose(torch.zeros(16, dtype=torch.float32))
+
+    assert sim.render_count > reset_render_count
+
+
+def test_wrapper_saves_initial_and_repeated_step_frames(tmp_path):
+    robot_joint_names = ALLEGRO_ACTIVE_JOINT_NAMES[:8] + ALLEGRO_RING_JOINT_NAMES + ALLEGRO_ACTIVE_JOINT_NAMES[8:]
+    robot = _FakeAsset(robot_joint_names, torch.arange(16, dtype=torch.float32).reshape(1, 16))
+    obj = _FakeAsset(OBJ_ORIENTATION_JOINT_NAMES, torch.tensor([[0.1, 0.2, 0.3]]))
+    env = _FakeEnv(
+        robot,
+        obj,
+        action_shape=(12,),
+        scene_extra={"tiled_camera": _FakeCamera()},
+        sim=_FakeSim(has_rtx=True),
+    )
+    wrapper = IsaacSimScrewdriverRecoveryEnv(env, hand="allegro", action_repeat=3, save_recovery_frames=True)
+    wrapper._clear_external_force_torque = lambda: None
+    wrapper.frame_fpath = tmp_path
+
+    wrapper.frame_id = 0
+    assert wrapper.frame_id == 1
+    assert (tmp_path / "frame_000000.png").exists()
+
+    wrapper.step(torch.arange(12, dtype=torch.float32))
+
+    assert wrapper.frame_id == 4
+    assert (tmp_path / "frame_000001.png").exists()
+    assert (tmp_path / "frame_000002.png").exists()
+    assert (tmp_path / "frame_000003.png").exists()
+
+
+def test_wrapper_frame_saving_requires_tiled_camera(tmp_path):
+    robot_joint_names = ALLEGRO_ACTIVE_JOINT_NAMES[:8] + ALLEGRO_RING_JOINT_NAMES + ALLEGRO_ACTIVE_JOINT_NAMES[8:]
+    robot = _FakeAsset(robot_joint_names, torch.arange(16, dtype=torch.float32).reshape(1, 16))
+    obj = _FakeAsset(OBJ_ORIENTATION_JOINT_NAMES, torch.tensor([[0.1, 0.2, 0.3]]))
+    wrapper = IsaacSimScrewdriverRecoveryEnv(
+        _FakeEnv(robot, obj, action_shape=(12,), sim=_FakeSim(has_rtx=True)),
+        hand="allegro",
+        save_recovery_frames=True,
+    )
+    wrapper.frame_fpath = tmp_path
+
+    with pytest.raises(RuntimeError, match="requires a tiled_camera sensor"):
+        wrapper.frame_id = 0
+
+
 def _load_legacy_recovery_module(monkeypatch, executed_modes):
     def extract_state_vector(state, num_fingers, device, obj_dof=None, slice_end=None, hardcoded_dim=None):
         q = state["q"].reshape(-1).to(device=device, dtype=torch.float32).clone()
@@ -509,6 +695,7 @@ def _load_legacy_recovery_module(monkeypatch, executed_modes):
     stubs["ccai.utils.recovery_utils"].full_to_partial_trajectory = lambda *args, **kwargs: None
     stubs["ccai.utils.recovery_utils"].create_mode_planner_dict = lambda *args, **kwargs: {}
     stubs["ccai.utils.recovery_utils"].build_pregrasp_reference_target_kwargs = lambda *args, **kwargs: {}
+    stubs["ccai.utils.recovery_utils"].stack_execution_timeseries_for_save = lambda *args, **kwargs: None
     stubs["ccai.allegro_contact"].AllegroManipulationProblem = type(
         "AllegroManipulationProblem",
         (),

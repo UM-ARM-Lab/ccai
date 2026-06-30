@@ -81,6 +81,26 @@ PROTO5_ALL_JOINT_NAMES = (
     + PROTO5_RING_JOINT_NAMES
     + PROTO5_THUMB_JOINT_NAMES
 )
+PROTO5_FINGERTIP_LINK_BODY_NAMES = (
+    "RHand_ITIP_LINK",
+    "RHand_MTIP_LINK",
+    "RHand_TTIP_LINK",
+)
+PROTO5_6AF_BODY_NAMES = (
+    "RHand_I6AF_LINK",
+    "RHand_M6AF_LINK",
+    "RHand_T6AF_LINK",
+)
+PROTO5_6AF_PARENT_BODY_NAMES = (
+    "RHand_I3Y_LINK",
+    "RHand_M3Y_LINK",
+    "RHand_T3Y_LINK",
+)
+PROTO5_CONTACT_SENSOR_NAMES = (
+    "index_screwdriver_contact",
+    "middle_screwdriver_contact",
+    "thumb_screwdriver_contact",
+)
 
 OBJ_ORIENTATION_JOINT_NAMES = (
     "table_screwdriver_joint_1",
@@ -294,6 +314,12 @@ def rotate_vectors_by_quat(vectors: torch.Tensor, quat_wxyz: torch.Tensor) -> to
     return torch.matmul(rot, vectors.unsqueeze(-1)).squeeze(-1)
 
 
+def rotate_vectors_by_inverse_quat(vectors: torch.Tensor, quat_wxyz: torch.Tensor) -> torch.Tensor:
+    quat_wxyz = torch.as_tensor(quat_wxyz, device=vectors.device, dtype=vectors.dtype)
+    inv_quat = torch.cat((quat_wxyz[..., :1], -quat_wxyz[..., 1:]), dim=-1)
+    return rotate_vectors_by_quat(vectors, inv_quat)
+
+
 def local_force_at_position_to_world(
     local_point: torch.Tensor,
     local_force: torch.Tensor,
@@ -420,6 +446,8 @@ class IsaacSimScrewdriverRecoveryEnv:
         external_wrench_perturb: bool = False,
         rand_pct: float | None = None,
         random_force_magnitude: float = 1.5,
+        action_repeat: int = 1,
+        save_recovery_frames: bool = False,
     ):
         self.env = env
         self._unwrapped = env.unwrapped if hasattr(env, "unwrapped") else env
@@ -440,11 +468,13 @@ class IsaacSimScrewdriverRecoveryEnv:
         self.external_wrench_perturb = bool(external_wrench_perturb)
         self.external_wrench_perturb_rand_pct = 1.0 / 3.0 if rand_pct is None else float(rand_pct)
         self.random_force_magnitude = float(random_force_magnitude)
+        self.action_repeat = max(1, int(action_repeat))
+        self.save_recovery_frames = bool(save_recovery_frames)
         self.wrench_perturb_inds = []
         self._step_index = 0
         self._frame_id = 0
-        self.frame_id = 0
         self.frame_fpath = None
+        self.frame_id = 0
         setattr(self._unwrapped, "_ccai_recovery_hand", self.hand)
         setattr(self._unwrapped, "_ccai_recovery_proto5_control_wrist", self.proto5_control_wrist)
         self.refresh_default_dof_pos()
@@ -458,6 +488,8 @@ class IsaacSimScrewdriverRecoveryEnv:
         self._frame_id = value
         if value is None or value == 0:
             self._step_index = 0
+        if value == 0 and self.save_recovery_frames and self.frame_fpath is not None:
+            self._record_frame(force_render=True, sync_joint_targets=False)
 
     @property
     def unwrapped(self):
@@ -469,9 +501,11 @@ class IsaacSimScrewdriverRecoveryEnv:
 
     def reset(self):
         self.wrench_perturb_inds = []
-        self.frame_id = 0
+        self._frame_id = 0
+        self._step_index = 0
         ret = self.env.reset()
         self.refresh_default_dof_pos()
+        self.force_render(sync_joint_targets=True)
         return ret
 
     def refresh_default_dof_pos(self) -> torch.Tensor:
@@ -555,6 +589,22 @@ class IsaacSimScrewdriverRecoveryEnv:
     def _all_joint_ids(self) -> list[int]:
         return self._find_joints(self.scene["robot"], self.hand_spec.all_joint_names)
 
+    @staticmethod
+    def _find_bodies(asset, body_names: Sequence[str]) -> list[int]:
+        body_ids, _ = asset.find_bodies(tuple(body_names), preserve_order=True)
+        return list(body_ids)
+
+    def _robot_body_ids(self, body_names: Sequence[str], cache_attr: str) -> list[int]:
+        cached = getattr(self, cache_attr, None)
+        if cached is not None:
+            return list(cached)
+        robot = self.scene["robot"]
+        body_ids = self._find_bodies(robot, body_names)
+        if len(body_ids) != len(body_names):
+            raise ValueError(f"Could not resolve robot bodies {tuple(body_names)}.")
+        setattr(self, cache_attr, tuple(int(idx) for idx in body_ids))
+        return body_ids
+
     def _obj_orientation_joint_ids(self) -> list[int]:
         obj = self.scene["obj"]
         try:
@@ -573,6 +623,114 @@ class IsaacSimScrewdriverRecoveryEnv:
             "screwdriver_ori_euler": obj_orientation,
             "screwdriver_ori": obj_orientation,
             "screwdriver_angle": obj_orientation[:, 2:3],
+        }
+
+    def get_contact_state(self, threshold: float = 1.0e-6) -> torch.Tensor:
+        """Return simulator contact flags per fingertip in index/middle/thumb order."""
+        flags = []
+        for sensor_name in PROTO5_CONTACT_SENSOR_NAMES:
+            try:
+                sensor = self.scene[sensor_name]
+                data = sensor.data
+                forces = getattr(data, "net_forces_w_history", None)
+                if forces is None:
+                    forces = getattr(data, "net_forces_w", None)
+                if forces is None:
+                    raise AttributeError(sensor_name)
+                forces = torch.as_tensor(forces, device=self.device, dtype=torch.float32)
+                if forces.ndim == 4:
+                    norm = torch.linalg.norm(forces, dim=-1).amax(dim=(1, 2))
+                elif forces.ndim == 3:
+                    norm = torch.linalg.norm(forces, dim=-1).amax(dim=1)
+                elif forces.ndim == 2:
+                    norm = torch.linalg.norm(forces, dim=-1)
+                else:
+                    raise ValueError(f"Unsupported contact force shape {tuple(forces.shape)} for {sensor_name}.")
+                flags.append((norm > float(threshold)).to(dtype=torch.float32))
+            except (AttributeError, KeyError, RuntimeError, ValueError):
+                flags.append(torch.zeros((self.num_envs,), device=self.device, dtype=torch.float32))
+        return torch.stack(flags, dim=-1)
+
+    def get_contact_points(self) -> torch.Tensor:
+        """Return fingertip/contact-point positions in the robot frame."""
+        robot = self.scene["robot"]
+        try:
+            body_ids = self._robot_body_ids(PROTO5_FINGERTIP_LINK_BODY_NAMES, "_proto5_tip_body_ids")
+            body_pos_w = robot.data.body_pos_w[:, body_ids].to(device=self.device, dtype=torch.float32)
+            root_pos_w = robot.data.root_pos_w.to(device=self.device, dtype=torch.float32)
+            root_quat_w = robot.data.root_quat_w.to(device=self.device, dtype=torch.float32)
+            root_quat_per_finger = root_quat_w[:, None, :].expand(-1, len(body_ids), -1)
+            return rotate_vectors_by_inverse_quat(
+                (body_pos_w - root_pos_w[:, None, :]).reshape(-1, 3),
+                root_quat_per_finger.reshape(-1, 4),
+            ).reshape(self.num_envs, len(body_ids), 3)
+        except (AttributeError, KeyError, RuntimeError, ValueError):
+            return torch.zeros((self.num_envs, 3, 3), device=self.device, dtype=torch.float32)
+
+    def get_contact_wrenches(self, *, strict: bool = False) -> torch.Tensor:
+        """Return Proto5 6AF incoming joint wrenches in the robot frame."""
+        if self.hand != SCREWDRIVER_HAND_PROTO5:
+            if strict:
+                raise RuntimeError("6D contact wrench telemetry is only implemented for Proto5.")
+            return torch.zeros((self.num_envs, 3, 6), device=self.device, dtype=torch.float32)
+
+        robot = self.scene["robot"]
+        try:
+            child_body_ids = self._robot_body_ids(PROTO5_6AF_BODY_NAMES, "_proto5_6af_body_ids")
+            parent_body_ids = self._robot_body_ids(PROTO5_6AF_PARENT_BODY_NAMES, "_proto5_6af_parent_body_ids")
+            wrench_source = getattr(robot.data, "body_incoming_joint_wrench_b", None)
+            if wrench_source is None:
+                physx_view = getattr(robot, "root_physx_view", None) or getattr(robot, "_root_physx_view", None)
+                if physx_view is None:
+                    raise AttributeError("body_incoming_joint_wrench_b")
+                wrench_source = physx_view.get_link_incoming_joint_force()
+
+            env_ids = self._env_ids()
+            child_ids_t = torch.as_tensor(child_body_ids, device=wrench_source.device, dtype=torch.long)
+            parent_ids_t = torch.as_tensor(parent_body_ids, device=robot.data.body_quat_w.device, dtype=torch.long)
+            wrench_joint_frame = wrench_source.index_select(0, env_ids.to(wrench_source.device)).index_select(
+                1, child_ids_t
+            ).to(device=self.device, dtype=torch.float32)
+            parent_quat_w = robot.data.body_quat_w.index_select(
+                0, env_ids.to(robot.data.body_quat_w.device)
+            ).index_select(1, parent_ids_t).to(device=self.device, dtype=torch.float32)
+            root_quat_w = robot.data.root_quat_w.index_select(
+                0, env_ids.to(robot.data.root_quat_w.device)
+            ).to(device=self.device, dtype=torch.float32)
+            root_quat_per_finger = root_quat_w[:, None, :].expand(-1, len(child_body_ids), -1)
+
+            force_world = rotate_vectors_by_quat(
+                wrench_joint_frame[..., :3].reshape(-1, 3),
+                parent_quat_w.reshape(-1, 4),
+            ).reshape(self.num_envs, len(child_body_ids), 3)
+            torque_world = rotate_vectors_by_quat(
+                wrench_joint_frame[..., 3:6].reshape(-1, 3),
+                parent_quat_w.reshape(-1, 4),
+            ).reshape(self.num_envs, len(child_body_ids), 3)
+            force_robot = rotate_vectors_by_inverse_quat(
+                force_world.reshape(-1, 3),
+                root_quat_per_finger.reshape(-1, 4),
+            ).reshape(self.num_envs, len(child_body_ids), 3)
+            torque_robot = rotate_vectors_by_inverse_quat(
+                torque_world.reshape(-1, 3),
+                root_quat_per_finger.reshape(-1, 4),
+            ).reshape(self.num_envs, len(child_body_ids), 3)
+            return torch.cat((force_robot, torque_robot), dim=-1).to(dtype=torch.float32)
+        except (AttributeError, KeyError, RuntimeError, ValueError) as exc:
+            if strict:
+                raise RuntimeError("Proto5 6D contact wrench telemetry is unavailable.") from exc
+            return torch.zeros((self.num_envs, 3, 6), device=self.device, dtype=torch.float32)
+
+    def get_contact_forces(self, *, strict: bool = False) -> torch.Tensor:
+        return self.get_contact_wrenches(strict=strict)[..., :3]
+
+    def get_tactile_observation(self, *, strict_wrenches: bool = False) -> dict[str, torch.Tensor]:
+        wrenches = self.get_contact_wrenches(strict=strict_wrenches)
+        return {
+            "contact_state": self.get_contact_state(),
+            "contact_points": self.get_contact_points(),
+            "contact_wrenches": wrenches,
+            "contact_forces": wrenches[..., :3],
         }
 
     def _write_robot_root_default(self, env_ids: torch.Tensor) -> None:
@@ -626,6 +784,83 @@ class IsaacSimScrewdriverRecoveryEnv:
             self._unwrapped.sim.forward()
         dt = self._unwrapped.sim.get_physics_dt()
         self.scene.update(dt)
+        self._render_if_available()
+
+    def _render_if_available(self) -> bool:
+        sim = getattr(self._unwrapped, "sim", None)
+        if sim is None:
+            return False
+        has_gui = bool(sim.has_gui()) if hasattr(sim, "has_gui") else False
+        has_rtx = bool(sim.has_rtx_sensors()) if hasattr(sim, "has_rtx_sensors") else False
+        if not (has_gui or has_rtx):
+            return False
+        sim.render()
+        return True
+
+    def force_render(self, *, sync_joint_targets: bool = False) -> None:
+        """Synchronize direct state writes to USD/Fabric and update camera/viewer pixels."""
+        sim = getattr(self._unwrapped, "sim", None)
+        scene = getattr(self._unwrapped, "scene", None)
+        if sim is None or scene is None:
+            return
+        if sync_joint_targets:
+            try:
+                robot = self.scene["robot"]
+                env_ids = self._env_ids()
+                robot.set_joint_position_target(robot.data.joint_pos[env_ids].clone(), env_ids=env_ids)
+            except (AttributeError, KeyError, RuntimeError, ValueError):
+                pass
+        if hasattr(scene, "write_data_to_sim"):
+            scene.write_data_to_sim()
+        if hasattr(sim, "forward"):
+            sim.forward()
+        if hasattr(scene, "update") and hasattr(sim, "get_physics_dt"):
+            scene.update(sim.get_physics_dt())
+        self._render_if_available()
+
+    def _frame_path(self) -> Path | None:
+        if self.frame_id is None or self.frame_fpath is None:
+            return None
+        frame_dir = Path(self.frame_fpath)
+        frame_dir.mkdir(parents=True, exist_ok=True)
+        return frame_dir / f"frame_{int(self.frame_id):06d}.png"
+
+    def _write_camera_frame(self, save_path: Path) -> None:
+        try:
+            camera = self.scene["tiled_camera"]
+        except KeyError as exc:
+            raise RuntimeError(
+                "save_recovery_frames=True requires a tiled_camera sensor. "
+                "Make sure cameras are enabled for the IsaacLab environment."
+            ) from exc
+        try:
+            rgb_data = camera.data.output["rgb"]
+        except (AttributeError, KeyError) as exc:
+            raise RuntimeError("tiled_camera does not expose RGB output for recovery frame capture.") from exc
+        if rgb_data.shape[0] < 1:
+            raise RuntimeError(f"tiled_camera RGB output has no env-0 frame: shape={tuple(rgb_data.shape)}")
+        img_np = rgb_data[0].detach().cpu().numpy()
+        if img_np.max() <= 1.0:
+            img_np = (img_np * 255).astype(np.uint8)
+        else:
+            img_np = img_np.astype(np.uint8)
+        from PIL import Image
+
+        img = Image.fromarray(img_np)
+        img = img.transpose(Image.FLIP_TOP_BOTTOM)
+        img = img.transpose(Image.FLIP_LEFT_RIGHT)
+        img.save(save_path)
+
+    def _record_frame(self, *, force_render: bool = False, sync_joint_targets: bool = False) -> None:
+        if self.frame_id is None:
+            return
+        if self.save_recovery_frames and self.frame_fpath is not None:
+            if force_render:
+                self.force_render(sync_joint_targets=sync_joint_targets)
+            frame_path = self._frame_path()
+            if frame_path is not None:
+                self._write_camera_frame(frame_path)
+        self._frame_id += 1
 
     def set_pose(self, state):
         state = _as_2d_tensor(state, device=self.device, dtype=torch.float32)
@@ -639,6 +874,7 @@ class IsaacSimScrewdriverRecoveryEnv:
         self._write_robot_joint_state(state[:, :12], env_ids)
         self._write_obj_joint_state(state[:, 12:15], env_ids)
         self._sync_scene()
+        self._record_frame(force_render=False)
 
     def zero_obj_velocity(self):
         obj = self.scene["obj"]
@@ -717,13 +953,15 @@ class IsaacSimScrewdriverRecoveryEnv:
             current_wrist_joints=self._current_wrist_joints() if self.proto5_control_wrist else None,
             allegro_action_dim=self.action_dim if self.hand == SCREWDRIVER_HAND_ALLEGRO else None,
         ).to(device=self.device)
-        self._maybe_apply_external_perturbation()
-        ret = self.env.step(env_action)
-        self._clear_external_force_torque()
-        if self.frame_id is not None:
-            self.frame_id += 1
-        self._step_index += 1
+        ret = None
+        for _ in range(self.action_repeat):
+            self._maybe_apply_external_perturbation()
+            ret = self.env.step(env_action)
+            self._clear_external_force_torque()
+            self.force_render(sync_joint_targets=False)
+            self._record_frame(force_render=False)
+            self._step_index += 1
         return ret
 
     def get_force_sensor_data(self, *args, **kwargs):
-        return torch.zeros((self.num_envs, 9), device=self.device, dtype=torch.float32)
+        return self.get_contact_forces().reshape(self.num_envs, 9)

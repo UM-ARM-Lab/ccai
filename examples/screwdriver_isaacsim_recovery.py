@@ -44,6 +44,13 @@ PROTO5_POINT_CACHE_SOURCE_DIRS = (
 )
 DEFAULT_OBJ_ORIENTATION_NOISE_STD = 0.03
 DEFAULT_OBJ_POSITION_NOISE_RANGE = (-0.0075, 0.0075)
+DEFAULT_DIFFPF_SAMPLE_HORIZON = 8
+DEFAULT_DIFFPF_EXECUTION_HORIZON = 1
+DEFAULT_DIFFPF_NUM_TRAJECTORIES = 128
+DEFAULT_DIFFPF_TRAJECTORY_SELECTION_MODE = "max_reward"
+DEFAULT_DIFFPF_LIKELIHOOD_MASK = "inverse_dynamics"
+DEFAULT_DIFFPF_LIKELIHOOD_TEMPERATURE = 10.0
+DEFAULT_DIFFPF_LIKELIHOOD_REWARD_SCOPE = "per_step"
 
 
 def _bool_from_cli(value):
@@ -67,6 +74,8 @@ def parse_args():
     parser.add_argument("--sim_device", type=str, default='cuda:0')
     parser.add_argument("--proto5_control_wrist", action="store_true", default=None)
     parser.add_argument("--steps_per_action", type=int, default=None)
+    parser.add_argument("--action_repeat", type=int, default=None)
+    parser.add_argument("--save_recovery_frames", type=_bool_from_cli, default=None)
     parser.add_argument("--start_ind", type=int, default=None)
     parser.add_argument("--end_ind", type=int, default=None)
     parser.add_argument("--skip_pregrasp", type=_bool_from_cli, default=None)
@@ -100,6 +109,16 @@ def parse_args():
     parser.add_argument("--planner_yaw_friction_model_path", type=str, default=None)
     parser.add_argument("--disable_planner_yaw_friction_model", action="store_true", default=None)
     parser.add_argument("--planner_yaw_inertia_model_path", type=str, default=None)
+    parser.add_argument("--diffpf_checkpoint", type=str, default=None)
+    parser.add_argument("--diffpf_ema_decay", type=float, default=None)
+    parser.add_argument("--diffpf_compile_model", action="store_true", default=None)
+    parser.add_argument("--diffpf_sample_horizon", type=int, default=None)
+    parser.add_argument("--diffpf_execution_horizon", type=int, default=None)
+    parser.add_argument("--diffpf_num_trajectories", type=int, default=None)
+    parser.add_argument("--diffpf_trajectory_selection_mode", type=str, default=None)
+    parser.add_argument("--diffpf_likelihood_mask", type=str, default=None)
+    parser.add_argument("--diffpf_likelihood_temperature", type=float, default=None)
+    parser.add_argument("--diffpf_likelihood_reward_scope", type=str, default=None)
     yaw_inertia_group = parser.add_mutually_exclusive_group()
     yaw_inertia_group.add_argument(
         "--enable_planner_yaw_inertia_model",
@@ -144,6 +163,8 @@ def load_config(args) -> dict:
         "num_envs",
         "sim_device",
         "steps_per_action",
+        "action_repeat",
+        "save_recovery_frames",
         "start_ind",
         "end_ind",
         "skip_pregrasp",
@@ -156,6 +177,16 @@ def load_config(args) -> dict:
         "planner_yaw_inertia_model_path",
         "planner_use_yaw_inertia_model",
         "use_pregrasp_reference_targets",
+        "diffpf_checkpoint",
+        "diffpf_ema_decay",
+        "diffpf_compile_model",
+        "diffpf_sample_horizon",
+        "diffpf_execution_horizon",
+        "diffpf_num_trajectories",
+        "diffpf_trajectory_selection_mode",
+        "diffpf_likelihood_mask",
+        "diffpf_likelihood_temperature",
+        "diffpf_likelihood_reward_scope",
     ):
         value = getattr(args, key)
         if value is not None:
@@ -169,7 +200,9 @@ def load_config(args) -> dict:
     config.setdefault("num_envs", 1)
     config.setdefault("sim_device", "cuda:0")
     config.setdefault("proto5_control_wrist", False)
-    config.setdefault("steps_per_action", 60)
+    config.setdefault("steps_per_action", 40)
+    config.setdefault("action_repeat", 3)
+    config.setdefault("save_recovery_frames", True)
     config.setdefault("pregrasp_only", False)
     config.setdefault("planner_use_env_yaw_joint_friction", True)
     config.setdefault("planner_yaw_joint_friction_override", 0.0)
@@ -182,6 +215,18 @@ def load_config(args) -> dict:
     config.setdefault("obj_position_noise_range_x", DEFAULT_OBJ_POSITION_NOISE_RANGE)
     config.setdefault("obj_position_noise_range_y", DEFAULT_OBJ_POSITION_NOISE_RANGE)
     config.setdefault("obj_position_noise_range_z", DEFAULT_OBJ_POSITION_NOISE_RANGE)
+    config.setdefault("diffpf_checkpoint", None)
+    config.setdefault("diffpf_ema_decay", None)
+    config.setdefault("diffpf_compile_model", False)
+    config.setdefault("diffpf_sample_horizon", DEFAULT_DIFFPF_SAMPLE_HORIZON)
+    config.setdefault("diffpf_execution_horizon", DEFAULT_DIFFPF_EXECUTION_HORIZON)
+    config.setdefault("diffpf_num_trajectories", DEFAULT_DIFFPF_NUM_TRAJECTORIES)
+    config.setdefault("diffpf_trajectory_selection_mode", DEFAULT_DIFFPF_TRAJECTORY_SELECTION_MODE)
+    config.setdefault("diffpf_likelihood_mask", DEFAULT_DIFFPF_LIKELIHOOD_MASK)
+    config.setdefault("diffpf_likelihood_temperature", DEFAULT_DIFFPF_LIKELIHOOD_TEMPERATURE)
+    config.setdefault("diffpf_likelihood_reward_scope", DEFAULT_DIFFPF_LIKELIHOOD_REWARD_SCOPE)
+    if bool(config["save_recovery_frames"]) and bool(config["no_video"]):
+        raise ValueError("save_recovery_frames=True requires cameras; run without --no_video true.")
     if config["no_video"]:
         config["visualize"] = False
         config["visualize_plan"] = False
@@ -417,6 +462,7 @@ def make_isaacsim_env(config):
     seed = config.get("seed", None)
     enable_camera = not bool(config.get("no_video", True))
     sim_device = str(config.get("sim_device", "cuda:0"))
+    save_recovery_frames = bool(config.get("save_recovery_frames", True))
 
     screwdriver_friction_range = _friction_range(
         config,
@@ -468,6 +514,8 @@ def make_isaacsim_env(config):
         external_wrench_perturb=bool(config["external_wrench_perturb"]),
         rand_pct=float(config["rand_pct"]),
         random_force_magnitude=float(config["random_force_magnitude"]),
+        action_repeat=int(config.get("action_repeat", 3)),
+        save_recovery_frames=save_recovery_frames,
     )
 
 
@@ -494,6 +542,28 @@ def prepare_legacy_module(config):
     return legacy
 
 
+def build_normal_action_policy(config, env, device):
+    checkpoint = config.get("diffpf_checkpoint")
+    if checkpoint in (None, ""):
+        return None
+    if str(config.get("hand", "allegro")).lower() != "proto5":
+        raise ValueError("--diffpf_checkpoint normal execution is currently supported only with --hand proto5.")
+    checkpoint_path = pathlib.Path(str(checkpoint)).expanduser()
+    if not checkpoint_path.exists():
+        raise FileNotFoundError(f"DiffPF checkpoint not found: {checkpoint_path}")
+    eval_path = MODEL_MISMATCH_PATH / "examples" / "evaluation"
+    if str(eval_path) not in sys.path:
+        sys.path.insert(0, str(eval_path))
+    try:
+        from screwdriver_diffpf_policy import DiffPFScrewdriverActionPolicy
+    except ImportError as exc:
+        raise ImportError(
+            "Could not import DiffPFScrewdriverActionPolicy. Expected "
+            f"{eval_path / 'screwdriver_diffpf_policy.py'} to exist and be import-safe."
+        ) from exc
+    return DiffPFScrewdriverActionPolicy.from_config(config, env, device)
+
+
 def main():
     faulthandler.enable(all_threads=True)
     if hasattr(sys.stdout, "reconfigure"):
@@ -516,6 +586,7 @@ def main():
     legacy = prepare_legacy_module(config)
     env = make_isaacsim_env(config)
     hand_spec = get_hand_spec(config["hand"])
+    normal_action_policy = build_normal_action_policy(config, env, config.get("sim_device", "cuda:0"))
 
     if "recovery_controller" not in config:
         config["recovery_controller"] = "csvgd"
@@ -583,6 +654,8 @@ def main():
                 if config.get("debug_progress", False):
                     print("debug_progress: applying saved pregrasp state", flush=True)
                 legacy.apply_saved_pregrasp_state(env, None, pregrasp_states, i, start_ind, params)
+            if normal_action_policy is not None and hasattr(normal_action_policy, "reset_from_env"):
+                normal_action_policy.reset_from_env(env)
             physical_kwargs = get_recovery_planner_physical_kwargs(env, config)
             params.update(physical_kwargs)
             if config.get("debug_progress", False):
@@ -621,6 +694,7 @@ def main():
                 trajectory_sampler_orig=trajectory_sampler_orig,
                 config=config,
                 classifier=classifier,
+                normal_action_policy=normal_action_policy,
             )
             print(f"Trial {i + 1} yaw delta: {final_distance_to_goal}; dropped={dropped}")
             seed += 1

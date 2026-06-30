@@ -610,7 +610,7 @@ def initialize_data_structure(params):
         data[t] = {
             'plans': [], 'starts': [], 'inits': [], 'init_sim_rollouts': [], 
             'optimizer_paths': [], 'contact_points': [], 'contact_distance': [], 
-            'contact_state': []
+            'contact_state': [], 'contact_plan': []
         }
     
     data.update({
@@ -621,7 +621,12 @@ def initialize_data_structure(params):
         'all_samples_': [],
         'all_likelihoods_': [],
         'contact_plan_times': [],
-        'executed_contacts': []
+        'executed_contacts': [],
+        'contact_plan': [],
+        'contact_wrenches': [],
+        'contact_forces': [],
+        'contact_points': [],
+        'contact_state': [],
     })
     
     return data
@@ -641,11 +646,21 @@ def add_to_dataset(data, traj, plans, inits, init_sim_rollouts, optimizer_paths,
             pass
         data[t]['starts'].append(traj[i].reshape(1, -1).repeat(plan.shape[0], 1))
         data[t]['contact_state'].append(contact_state)
+        data[t].setdefault('contact_plan', []).append(contact_state)
         try:
             data[t]['contact_points'].append(contact_points[t])
             data[t]['contact_distance'].append(contact_distance[t])
         except:
             pass
+
+
+def stack_execution_timeseries_for_save(data_save):
+    """Stack top-level execution contact/tactile timeseries when present."""
+    for key in ('contact_state', 'contact_plan', 'contact_wrenches', 'contact_forces', 'contact_points'):
+        values = data_save.get(key)
+        if isinstance(values, list) and len(values) > 0:
+            data_save[key] = torch.stack([torch.as_tensor(v).detach().cpu().float() for v in values]).cpu().numpy()
+    return data_save
 
 
 def partial_to_full_trajectory(traj, mode, device):
@@ -714,8 +729,11 @@ def save_experiment_data(fpath, data, env=None):
                 data_save[t]['contact_distance'] = torch.stack(data_save[t]['contact_distance']).cpu().numpy()
             if data_save.get(t, {}).get('contact_state'):
                 data_save[t]['contact_state'] = torch.stack(data_save[t]['contact_state']).cpu().numpy()
+            if data_save.get(t, {}).get('contact_plan'):
+                data_save[t]['contact_plan'] = torch.stack(data_save[t]['contact_plan']).cpu().numpy()
         except:
             pass
+    stack_execution_timeseries_for_save(data_save)
     
     # Save trajectory data
     pathlib.Path(fpath).mkdir(parents=True, exist_ok=True)

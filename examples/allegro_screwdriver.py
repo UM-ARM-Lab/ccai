@@ -37,7 +37,8 @@ from ccai.utils.allegro_utils import (
 )
 from ccai.utils.recovery_utils import (
     create_allegro_screwdriver_problem, create_planner, add_to_dataset, partial_to_full_trajectory,
-    full_to_partial_trajectory, create_mode_planner_dict, build_pregrasp_reference_target_kwargs
+    full_to_partial_trajectory, create_mode_planner_dict, build_pregrasp_reference_target_kwargs,
+    stack_execution_timeseries_for_save
 )
 
 from ccai.allegro_contact import AllegroManipulationProblem, PositionControlConstrainedSVGDMPC
@@ -267,7 +268,8 @@ def apply_saved_pregrasp_state(env, sim_viz_env, pregrasp_states, trial_index, s
 
 
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noise=None, noise_noise=None, sim=None, seed=None,
-             proj_path=None, perturb_this_trial=False, trajectory_sampler=None, trajectory_sampler_orig=None, config=None, classifier=None):
+             proj_path=None, perturb_this_trial=False, trajectory_sampler=None, trajectory_sampler_orig=None, config=None,
+             classifier=None, normal_action_policy=None):
     global all_yaw_deltas
     debug_progress = bool(params.get('debug_progress', False))
     episode_num_steps = 0
@@ -457,7 +459,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             proj_path=proj_path,
             AllegroScrewdriver=AllegroScrewdriver,
             tactile_controller=params.get('tactile_controller', False),
-            skip_csvto=params.get('skip_csvto', False)
+            skip_csvto=params.get('skip_csvto', False),
+            normal_action_policy=normal_action_policy
         )
 
         if params.get('live_recovery', False) and not was_recovering and recover:
@@ -473,7 +476,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     if 'T_orig' in params and params['T_orig'] > t_range:
         t_range = params['T_orig']
     for t in range(1, 1 + t_range):
-        data[t] = {'plans': [], 'starts': [], 'inits': [], 'init_sim_rollouts': [], 'optimizer_paths': [], 'contact_points': [], 'contact_distance': [], 'contact_state': []}
+        data[t] = {'plans': [], 'starts': [], 'inits': [], 'init_sim_rollouts': [], 'optimizer_paths': [], 'contact_points': [], 'contact_distance': [], 'contact_state': [], 'contact_plan': []}
     data['pre_action_likelihoods'] = []
     data['final_likelihoods'] = []
     data['csvto_times'] = []
@@ -482,6 +485,11 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     data['all_likelihoods_'] = []
     data['contact_plan_times'] = []
     data['executed_contacts'] = []
+    data['contact_state'] = []
+    data['contact_plan'] = []
+    data['contact_wrenches'] = []
+    data['contact_forces'] = []
+    data['contact_points'] = []
         # sample initial trajectory with diffusion model to get contact sequence
     state = env.get_state()
     state = extract_state_vector(state, num_fingers, params['device'])
@@ -948,8 +956,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 data_save[t]['contact_points'] = torch.stack(data_save[t]['contact_points']).cpu().numpy()
                 data_save[t]['contact_distance'] = torch.stack(data_save[t]['contact_distance']).cpu().numpy()
                 data_save[t]['contact_state'] = torch.stack(data_save[t]['contact_state']).cpu().numpy()
+                data_save[t]['contact_plan'] = torch.stack(data_save[t]['contact_plan']).cpu().numpy()
             except:
                 pass
+        stack_execution_timeseries_for_save(data_save)
         
         pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
         pickle.dump(data_save, open(f"{fpath}/traj_data.p", "wb"))
@@ -981,8 +991,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 data_save[t]['contact_points'] = torch.stack(data_save[t]['contact_points']).cpu().numpy()
                 data_save[t]['contact_distance'] = torch.stack(data_save[t]['contact_distance']).cpu().numpy()
                 data_save[t]['contact_state'] = torch.stack(data_save[t]['contact_state']).cpu().numpy()
+                data_save[t]['contact_plan'] = torch.stack(data_save[t]['contact_plan']).cpu().numpy()
             except:
                 pass
+        stack_execution_timeseries_for_save(data_save)
         
         pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
         pickle.dump(data_save, open(f"{fpath}/traj_data.p", "wb"))
