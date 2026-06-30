@@ -99,9 +99,9 @@ ALLEGRO_DEFAULT_FULL_JOINT_POS = (
     0.9,
     0.9,
     0.0,
-    0.5,
-    0.65,
-    0.65,
+    0.0,
+    0.0,
+    0.0,
     1.2,
     0.3,
     0.3,
@@ -447,6 +447,7 @@ class IsaacSimScrewdriverRecoveryEnv:
         self.frame_fpath = None
         setattr(self._unwrapped, "_ccai_recovery_hand", self.hand)
         setattr(self._unwrapped, "_ccai_recovery_proto5_control_wrist", self.proto5_control_wrist)
+        self.refresh_default_dof_pos()
 
     @property
     def frame_id(self):
@@ -469,7 +470,24 @@ class IsaacSimScrewdriverRecoveryEnv:
     def reset(self):
         self.wrench_perturb_inds = []
         self.frame_id = 0
-        return self.env.reset()
+        ret = self.env.reset()
+        self.refresh_default_dof_pos()
+        return ret
+
+    def refresh_default_dof_pos(self) -> torch.Tensor:
+        """Refresh ordered full-hand defaults from the wrapped robot when available."""
+        try:
+            robot = self.scene["robot"]
+            source = getattr(robot.data, "default_joint_pos", None)
+            if source is None:
+                source = getattr(robot.data, "joint_pos", None)
+            if source is None:
+                return self.default_dof_pos
+            joint_pos = _as_2d_tensor(source, device=self.device, dtype=torch.float32)
+            self.default_dof_pos = joint_pos[:, self._all_joint_ids()].clone()
+        except (AttributeError, KeyError, IndexError, RuntimeError, ValueError):
+            pass
+        return self.default_dof_pos
 
     def get_environment_parameters(self, env_id: int = 0) -> dict[str, float]:
         """Read physical parameters currently sampled in the IsaacLab env."""

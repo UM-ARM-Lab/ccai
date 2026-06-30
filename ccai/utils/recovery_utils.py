@@ -15,6 +15,26 @@ from ccai.utils.allegro_utils import visualize_trajectory
 from ccai.controller.tactile_feedback_controller import ControllerConfig, TactileFeedbackQPController
 from ccai.controller.grampc_motion_contact_controller import GRAMPCMotionContactTracker
 
+DEFAULT_PROTO5_PLAN_CAMERA_PATH = (
+    pathlib.Path(__file__).resolve().parents[3]
+    / "model_mismatch"
+    / "scripts"
+    / "proto5_plan_camera.json"
+)
+
+
+def get_screwdriver_plan_camera_path(turn_problem):
+    full_dof_reference = getattr(turn_problem, "full_dof_reference", None)
+    if full_dof_reference is None or torch.as_tensor(full_dof_reference).numel() != 18:
+        return None
+    if not DEFAULT_PROTO5_PLAN_CAMERA_PATH.exists():
+        raise FileNotFoundError(
+            "Missing Proto5 plan camera JSON used by the model_mismatch collector: "
+            f"{DEFAULT_PROTO5_PLAN_CAMERA_PATH}"
+        )
+    return DEFAULT_PROTO5_PLAN_CAMERA_PATH
+
+
 def process_contact_normals_generic(problem):
     """Get contact normals from an AllegroManipulationProblem."""
     contact_normals = []
@@ -144,10 +164,25 @@ def create_visualization_paths(base_path, subdir_name):
     return viz_fpath, img_fpath, gif_fpath
 
 
-def setup_and_visualize_trajectory(traj_for_viz, contact_scenes, base_path, subdir_name, fingers, obj_dof):
+def setup_and_visualize_trajectory(
+    traj_for_viz,
+    contact_scenes,
+    base_path,
+    subdir_name,
+    fingers,
+    obj_dof,
+    **visualization_kwargs,
+):
     """Set up visualization paths and visualize trajectory."""
     viz_fpath, _, _ = create_visualization_paths(base_path, subdir_name)
-    visualize_trajectory(traj_for_viz, contact_scenes, viz_fpath, fingers, obj_dof + 1)
+    visualize_trajectory(
+        traj_for_viz,
+        contact_scenes,
+        viz_fpath,
+        fingers,
+        obj_dof + 1,
+        **visualization_kwargs,
+    )
     return viz_fpath
 
 

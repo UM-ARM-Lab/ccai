@@ -58,16 +58,28 @@ def _bool_from_cli(value):
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=pathlib.Path, default=DEFAULT_CONFIG_PATH)
-    parser.add_argument("--hand", choices=("allegro", "proto5"), default=None)
+    parser.add_argument("--hand", choices=("allegro", "proto5"), default='proto5')
     parser.add_argument("--headless", type=_bool_from_cli, default=False)
     parser.add_argument("--no_video", type=_bool_from_cli, default=False)
     parser.add_argument("--num_envs", type=int, default=1)
-    parser.add_argument("--sim_device", type=str, default=None)
+    parser.add_argument("--sim_device", type=str, default='cuda:0')
     parser.add_argument("--proto5_control_wrist", action="store_true", default=None)
     parser.add_argument("--steps_per_action", type=int, default=None)
     parser.add_argument("--start_ind", type=int, default=None)
     parser.add_argument("--end_ind", type=int, default=None)
     parser.add_argument("--skip_pregrasp", type=_bool_from_cli, default=None)
+    pregrasp_only_group = parser.add_mutually_exclusive_group()
+    pregrasp_only_group.add_argument(
+        "--pregrasp_only",
+        dest="pregrasp_only",
+        action="store_true",
+        default=None,
+    )
+    pregrasp_only_group.add_argument(
+        "--no_pregrasp_only",
+        dest="pregrasp_only",
+        action="store_false",
+    )
     parser.add_argument("--experiment_name", type=str, default=None)
     parser.add_argument("--debug_progress", action="store_true")
     parser.add_argument("--planner_yaw_joint_friction_override", type=float, default=None)
@@ -133,6 +145,7 @@ def load_config(args) -> dict:
         "start_ind",
         "end_ind",
         "skip_pregrasp",
+        "pregrasp_only",
         "experiment_name",
         "planner_yaw_joint_friction_override",
         "planner_use_env_yaw_joint_friction",
@@ -155,6 +168,7 @@ def load_config(args) -> dict:
     config.setdefault("sim_device", "cuda:0")
     config.setdefault("proto5_control_wrist", False)
     config.setdefault("steps_per_action", 60)
+    config.setdefault("pregrasp_only", False)
     config.setdefault("planner_use_env_yaw_joint_friction", True)
     config.setdefault("planner_yaw_joint_friction_override", 0.0)
     config.setdefault("planner_yaw_friction_model_path", str(DEFAULT_PLANNER_YAW_FRICTION_MODEL_PATH))
@@ -401,6 +415,7 @@ def main():
     params["robot_sdf_path_prefix"] = str(hand_spec.planner_robot_sdf_path_prefix)
     params["controller"] = "csvgd"
     params.setdefault("skip_pregrasp", False)
+    params.setdefault("pregrasp_only", False)
 
     model_manager = ModelManager(config, params, CCAI_PATH)
     trajectory_sampler, trajectory_sampler_orig, classifier = model_manager.load_trajectory_samplers()

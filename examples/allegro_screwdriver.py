@@ -607,6 +607,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             print(post_pregrasp_state)
             if not params['skip_pregrasp']:
                 all_pregrasp_states.append(post_pregrasp_state)
+            if params.get('pregrasp_only', False):
                 break
             if params['mode'] == 'hardware':
                 # print(set_state.shape)

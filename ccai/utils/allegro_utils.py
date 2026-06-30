@@ -53,20 +53,28 @@ def partial_to_full_state(partial, fingers):
     return full
 
 
-def _partial_to_visualization_full_state(partial, fingers, full_dof_reference=None, joint_index=None):
+def _partial_to_visualization_full_state(
+    partial,
+    fingers,
+    full_dof_reference=None,
+    joint_index=None,
+    controlled_joint_index=None,
+):
     if full_dof_reference is None and joint_index is None:
         return partial_to_full_state(partial, fingers)
     if full_dof_reference is None or joint_index is None:
         raise ValueError("full_dof_reference and joint_index must be provided together.")
 
-    expected_dof = 4 * len(fingers)
+    active_joint_index = controlled_joint_index
+    if active_joint_index is None:
+        active_joint_index = sum([list(joint_index[finger]) for finger in fingers], [])
+    expected_dof = len(active_joint_index)
     if partial.shape[-1] != expected_dof:
         raise ValueError(
-            f"Expected {expected_dof} partial finger DOFs for {fingers}, got {partial.shape[-1]}."
+            f"Expected {expected_dof} controlled DOFs for visualization, got {partial.shape[-1]}."
         )
 
     reference = torch.as_tensor(full_dof_reference, device=partial.device, dtype=partial.dtype).reshape(-1)
-    active_joint_index = sum([list(joint_index[finger]) for finger in fingers], [])
     active_joint_index = torch.as_tensor(active_joint_index, device=partial.device, dtype=torch.long)
     scatter_index = active_joint_index.expand(partial.shape[:-1] + (active_joint_index.numel(),))
     full_shape = partial.shape[:-1] + (reference.numel(),)
@@ -213,15 +221,17 @@ def _collect_visualization_geometry(
     pcd=None,
     full_dof_reference=None,
     joint_index=None,
+    controlled_joint_index=None,
 ):
-    num_fingers = len(fingers)
-    q = trajectory_step[: 4 * num_fingers]
-    theta = trajectory_step[4 * num_fingers: 4 * num_fingers + obj_dof]
+    robot_dof = len(controlled_joint_index) if controlled_joint_index is not None else 4 * len(fingers)
+    q = trajectory_step[:robot_dof]
+    theta = trajectory_step[robot_dof: robot_dof + obj_dof]
     full_q = _partial_to_visualization_full_state(
         q.unsqueeze(0),
         fingers,
         full_dof_reference=full_dof_reference,
         joint_index=joint_index,
+        controlled_joint_index=controlled_joint_index,
     )
     rob_mesh, meshes = scene.get_visualization_meshes(
         full_q.to(device=scene.device),
@@ -311,6 +321,7 @@ def _visualize_trajectory_window(
     pcd=None,
     full_dof_reference=None,
     joint_index=None,
+    controlled_joint_index=None,
     camera_mode="preset",
     camera_parameters_path=None,
     save_camera_parameters_path=None,
@@ -322,6 +333,7 @@ def _visualize_trajectory_window(
     _register_camera_save_callback(vis, save_camera_parameters_path)
     vis.get_render_option().mesh_show_wireframe = True
     vis.get_render_option().point_show_normal = True
+    vis.get_render_option().background_color = np.ones(3)
 
     for t in range(trajectory.shape[0]):
         vis.clear_geometries()
@@ -333,6 +345,7 @@ def _visualize_trajectory_window(
             pcd=pcd,
             full_dof_reference=full_dof_reference,
             joint_index=joint_index,
+            controlled_joint_index=controlled_joint_index,
         )
         for mesh in meshes:
             vis.add_geometry(mesh)
@@ -375,6 +388,7 @@ def _visualize_trajectory_offscreen(
     pcd=None,
     full_dof_reference=None,
     joint_index=None,
+    controlled_joint_index=None,
     camera_mode="preset",
     camera_parameters_path=None,
 ):
@@ -392,6 +406,7 @@ def _visualize_trajectory_offscreen(
             pcd=pcd,
             full_dof_reference=full_dof_reference,
             joint_index=joint_index,
+            controlled_joint_index=controlled_joint_index,
         )
         for idx, geometry in enumerate(geometries):
             renderer.scene.add_geometry(
@@ -424,6 +439,7 @@ def visualize_trajectory(
     render_backend='window',
     full_dof_reference=None,
     joint_index=None,
+    controlled_joint_index=None,
     camera_mode="preset",
     camera_parameters_path=None,
     save_camera_parameters_path=None,
@@ -444,6 +460,7 @@ def visualize_trajectory(
             pcd=pcd,
             full_dof_reference=full_dof_reference,
             joint_index=joint_index,
+            controlled_joint_index=controlled_joint_index,
             camera_mode=camera_mode,
             camera_parameters_path=camera_parameters_path,
         )
@@ -459,6 +476,7 @@ def visualize_trajectory(
             pcd=pcd,
             full_dof_reference=full_dof_reference,
             joint_index=joint_index,
+            controlled_joint_index=controlled_joint_index,
             camera_mode=camera_mode,
             camera_parameters_path=camera_parameters_path,
             save_camera_parameters_path=save_camera_parameters_path,

@@ -1,12 +1,15 @@
 import importlib.util
 import os
 import pathlib
+import sys
+import types
 
 import pytest
 import torch
 
 from ccai.utils.isaacsim_screwdriver_recovery import (
     ALLEGRO_ACTIVE_JOINT_NAMES,
+    ALLEGRO_DEFAULT_FULL_JOINT_POS,
     ALLEGRO_RING_JOINT_NAMES,
     OBJ_ORIENTATION_JOINT_NAMES,
     PROTO5_ACTIVE_JOINT_NAMES,
@@ -119,14 +122,16 @@ def test_active12_to_env_action_hand_layouts():
 
 
 class _FakeData:
-    def __init__(self, joint_pos):
+    def __init__(self, joint_pos, default_joint_pos=None):
         self.joint_pos = joint_pos
+        if default_joint_pos is not None:
+            self.default_joint_pos = default_joint_pos
 
 
 class _FakeAsset:
-    def __init__(self, joint_names, joint_pos, root_physx_view=None):
+    def __init__(self, joint_names, joint_pos, root_physx_view=None, default_joint_pos=None):
         self._joint_name_to_id = {name: idx for idx, name in enumerate(joint_names)}
-        self.data = _FakeData(joint_pos)
+        self.data = _FakeData(joint_pos, default_joint_pos=default_joint_pos)
         if root_physx_view is not None:
             self.root_physx_view = root_physx_view
 
@@ -161,6 +166,9 @@ class _FakeEnv:
     def step(self, action):
         self.last_action = action
         return action
+
+    def reset(self):
+        return None
 
 
 class _FakePhysxView:
@@ -198,6 +206,62 @@ def test_wrapper_get_state_packs_proto5_active_joints():
     assert q.shape == (1, 16)
     torch.testing.assert_close(q[0, :12], expected_active)
     torch.testing.assert_close(q[0, 12:16], torch.tensor([0.4, 0.5, 0.6, 0.6]))
+
+
+def test_allegro_fallback_default_dof_pos_has_zero_ring_joints():
+    fallback = torch.tensor(ALLEGRO_DEFAULT_FULL_JOINT_POS, dtype=torch.float32)
+
+    torch.testing.assert_close(fallback[8:12], torch.zeros(4))
+
+
+@pytest.mark.parametrize(
+    ("hand", "joint_names"),
+    [
+        ("allegro", ALLEGRO_ACTIVE_JOINT_NAMES[:8] + ALLEGRO_RING_JOINT_NAMES + ALLEGRO_ACTIVE_JOINT_NAMES[8:]),
+        ("proto5", PROTO5_ALL_JOINT_NAMES),
+    ],
+)
+def test_wrapper_refreshes_ordered_default_dof_pos_from_wrapped_env(hand, joint_names):
+    robot_joint_names = tuple(reversed(joint_names))
+    default_joint_pos = torch.arange(len(robot_joint_names), dtype=torch.float32).reshape(1, -1)
+    robot = _FakeAsset(
+        robot_joint_names,
+        torch.zeros_like(default_joint_pos),
+        default_joint_pos=default_joint_pos,
+    )
+    obj = _FakeAsset(OBJ_ORIENTATION_JOINT_NAMES, torch.tensor([[0.1, 0.2, 0.3]]))
+    wrapper = IsaacSimScrewdriverRecoveryEnv(_FakeEnv(robot, obj), hand=hand)
+    expected = torch.tensor([robot_joint_names.index(name) for name in joint_names], dtype=torch.float32)
+
+    torch.testing.assert_close(wrapper.default_dof_pos[0], expected)
+
+    robot.data.default_joint_pos = default_joint_pos + 100.0
+    wrapper.reset()
+
+    torch.testing.assert_close(wrapper.default_dof_pos[0], expected + 100.0)
+
+
+def test_wrapper_step_uses_refreshed_allegro_default_ring_targets():
+    default_joint_pos = torch.tensor(
+        [[0.1, 0.6, 0.6, 0.6, -0.1, 0.5, 0.9, 0.9, 4.0, 5.0, 6.0, 7.0, 1.2, 0.3, 0.3, 1.2]],
+        dtype=torch.float32,
+    )
+    robot_joint_names = ALLEGRO_ACTIVE_JOINT_NAMES[:8] + ALLEGRO_RING_JOINT_NAMES + ALLEGRO_ACTIVE_JOINT_NAMES[8:]
+    robot = _FakeAsset(
+        robot_joint_names,
+        torch.zeros_like(default_joint_pos),
+        default_joint_pos=default_joint_pos,
+    )
+    obj = _FakeAsset(OBJ_ORIENTATION_JOINT_NAMES, torch.tensor([[0.1, 0.2, 0.3]]))
+    env = _FakeEnv(robot, obj, action_shape=(16,))
+    wrapper = IsaacSimScrewdriverRecoveryEnv(env, hand="allegro")
+    wrapper._clear_external_force_torque = lambda: None
+    active = torch.arange(12, dtype=torch.float32)
+
+    wrapper.step(active)
+
+    torch.testing.assert_close(env.last_action[:, :12], active.reshape(1, 12))
+    torch.testing.assert_close(env.last_action[:, 12:16], torch.tensor([[4.0, 5.0, 6.0, 7.0]]))
 
 
 def test_wrapper_physical_readback_returns_sampled_proto5_friction():
@@ -298,6 +362,155 @@ def test_wrapper_step_handles_headless_none_frame_id():
     assert wrapper.frame_id is None
     assert wrapper._step_index == 1
     torch.testing.assert_close(env.last_action, torch.arange(12, dtype=torch.float32).reshape(1, 12))
+
+
+def _load_legacy_recovery_module(monkeypatch, executed_modes):
+    def extract_state_vector(state, num_fingers, device, obj_dof=None, slice_end=None, hardcoded_dim=None):
+        q = state["q"].reshape(-1).to(device=device, dtype=torch.float32).clone()
+        if slice_end is not None:
+            q = q[:slice_end]
+        return q
+
+    class FakePlanner:
+        def __init__(self, problem):
+            self.problem = problem
+
+        def step(self, start):
+            return torch.stack((torch.ones(12), torch.ones(12) * 2.0)), None
+
+    class FakeTrajectoryExecutor:
+        def __init__(self, params, env, sim_viz_env):
+            self.env = env
+
+        def execute_traj(self, **kwargs):
+            mode = kwargs["mode"]
+            executed_modes.append(mode)
+            if mode == "turn":
+                self.env.state[-1] = -1.2
+            traj = self.env.state[:15].clone()
+            return traj, [], [], [], [], [], [], False, kwargs["episode_num_steps"] + 1
+
+    stubs = {
+        "isaac_victor_envs": types.ModuleType("isaac_victor_envs"),
+        "isaac_victor_envs.utils": types.ModuleType("isaac_victor_envs.utils"),
+        "pytorch_kinematics": types.ModuleType("pytorch_kinematics"),
+        "matplotlib": types.ModuleType("matplotlib"),
+        "matplotlib.pyplot": types.ModuleType("matplotlib.pyplot"),
+        "ccai.utils.allegro_utils": types.ModuleType("ccai.utils.allegro_utils"),
+        "ccai.utils.recovery_utils": types.ModuleType("ccai.utils.recovery_utils"),
+        "ccai.allegro_contact": types.ModuleType("ccai.allegro_contact"),
+        "ccai.baselines.allegro_recovery_baselines": types.ModuleType("ccai.baselines.allegro_recovery_baselines"),
+        "ccai.planning.contact_planning": types.ModuleType("ccai.planning.contact_planning"),
+        "ccai.execution.trial_executor": types.ModuleType("ccai.execution.trial_executor"),
+        "ccai.models.management.model_manager": types.ModuleType("ccai.models.management.model_manager"),
+    }
+    stubs["isaac_victor_envs.utils"].get_assets_dir = lambda: "/tmp"
+    stubs["ccai.utils.allegro_utils"].convert_yaw_to_sine_cosine = lambda x: x
+    stubs["ccai.utils.allegro_utils"].convert_sine_cosine_to_yaw = lambda x: x
+    stubs["ccai.utils.allegro_utils"].visualize_trajectory = lambda *args, **kwargs: None
+    stubs["ccai.utils.allegro_utils"].partial_to_full_state = lambda *args, **kwargs: None
+    stubs["ccai.utils.allegro_utils"].extract_state_vector = extract_state_vector
+    stubs["ccai.utils.recovery_utils"].create_allegro_screwdriver_problem = (
+        lambda *args, **kwargs: types.SimpleNamespace(dx=15)
+    )
+    stubs["ccai.utils.recovery_utils"].create_planner = lambda problem, mode, params: FakePlanner(problem)
+    stubs["ccai.utils.recovery_utils"].add_to_dataset = lambda *args, **kwargs: None
+    stubs["ccai.utils.recovery_utils"].partial_to_full_trajectory = lambda *args, **kwargs: None
+    stubs["ccai.utils.recovery_utils"].full_to_partial_trajectory = lambda *args, **kwargs: None
+    stubs["ccai.utils.recovery_utils"].create_mode_planner_dict = lambda *args, **kwargs: {}
+    stubs["ccai.utils.recovery_utils"].build_pregrasp_reference_target_kwargs = lambda *args, **kwargs: {}
+    stubs["ccai.allegro_contact"].AllegroManipulationProblem = type(
+        "AllegroManipulationProblem",
+        (),
+        {"__init__": lambda self, *args, **kwargs: None},
+    )
+    stubs["ccai.allegro_contact"].PositionControlConstrainedSVGDMPC = object
+    stubs["ccai.baselines.allegro_recovery_baselines"].BaselineRecoveryController = object
+    stubs["ccai.baselines.allegro_recovery_baselines"].BaselineOODDetector = object
+    stubs["ccai.baselines.allegro_recovery_baselines"].get_baseline_contact_sequence = lambda *args, **kwargs: ["turn"]
+    stubs["ccai.baselines.allegro_recovery_baselines"].get_num_envs_for_baseline = lambda *args, **kwargs: 1
+    stubs["ccai.baselines.allegro_recovery_baselines"].handle_baseline_trajectory_processing = (
+        lambda traj, plans, contact, device: (traj, plans)
+    )
+    stubs["ccai.planning.contact_planning"].ContactPlanner = object
+    stubs["ccai.execution.trial_executor"].TrajectoryExecutor = FakeTrajectoryExecutor
+    stubs["ccai.models.management.model_manager"].ModelManager = object
+
+    for name, module in stubs.items():
+        monkeypatch.setitem(sys.modules, name, module)
+
+    path = pathlib.Path(__file__).resolve().parents[1] / "examples" / "allegro_screwdriver.py"
+    spec = importlib.util.spec_from_file_location(f"legacy_recovery_flow_{id(executed_modes)}", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class _FakeTrialEnv:
+    def __init__(self):
+        self.device = torch.device("cpu")
+        self.state = torch.zeros(16, dtype=torch.float32)
+        self.table_pose = torch.tensor([0.0, 0.0, 1.205])
+        self.obj_pose = self.table_pose
+        self.world_trans = object()
+        self.default_dof_pos = torch.zeros(1, 16)
+        self.external_wrench_perturb = True
+        self.wrench_perturb_inds = []
+        self.actions = []
+        self.reset_count = 0
+
+    def get_state(self):
+        return {"q": self.state.reshape(1, -1).clone()}
+
+    def step(self, action):
+        self.actions.append(action.detach().clone())
+        self.state[:12] = action.reshape(-1)[:12].to(dtype=torch.float32)
+
+    def set_pose(self, state):
+        self.state = state.reshape(-1).detach().clone().to(dtype=torch.float32)
+
+    def set_external_wrench_perturb(self, enabled, rand_pct=None):
+        self.external_wrench_perturb = bool(enabled)
+
+    def reset(self):
+        self.reset_count += 1
+
+
+def _trial_params(pregrasp_only):
+    return {
+        "fingers": ["index", "middle", "thumb"],
+        "device": "cpu",
+        "visualize": False,
+        "mode": "simulation",
+        "external_wrench_perturb": False,
+        "valve_goal": torch.zeros(3),
+        "T": 1,
+        "live_recovery": False,
+        "skip_pregrasp": False,
+        "pregrasp_only": pregrasp_only,
+    }
+
+
+def test_do_trial_runs_pregrasp_then_turn_when_not_pregrasp_only(monkeypatch, tmp_path):
+    executed_modes = []
+    legacy = _load_legacy_recovery_module(monkeypatch, executed_modes)
+    legacy.all_pregrasp_states.clear()
+
+    legacy.do_trial(_FakeTrialEnv(), _trial_params(pregrasp_only=False), tmp_path)
+
+    assert executed_modes == ["turn"]
+    assert len(legacy.all_pregrasp_states) == 1
+
+
+def test_do_trial_preserves_pregrasp_only_short_circuit(monkeypatch, tmp_path):
+    executed_modes = []
+    legacy = _load_legacy_recovery_module(monkeypatch, executed_modes)
+    legacy.all_pregrasp_states.clear()
+
+    legacy.do_trial(_FakeTrialEnv(), _trial_params(pregrasp_only=True), tmp_path)
+
+    assert executed_modes == []
+    assert len(legacy.all_pregrasp_states) == 1
 
 
 def test_create_problem_passes_proto5_full_dof_metadata():

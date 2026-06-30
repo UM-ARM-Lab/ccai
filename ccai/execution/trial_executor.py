@@ -13,7 +13,7 @@ from ccai.utils.allegro_utils import convert_yaw_to_sine_cosine, convert_sine_co
 from ccai.utils.recovery_utils import (
     create_experiment_paths, save_goal_info, save_projection_results,
     partial_to_full_trajectory, full_to_partial_trajectory, 
-    setup_and_visualize_trajectory
+    setup_and_visualize_trajectory, get_screwdriver_plan_camera_path
 )
 from ccai.trajectory_shortcut import shortcut_trajectory
 from ccai.baselines.allegro_recovery_baselines import should_skip_diff_init
@@ -589,7 +589,11 @@ class TrajectoryExecutor:
             fpath, 
             f"{fname}/timestep_{k}",
             turn_problem.fingers, 
-            turn_problem.obj_dof
+            turn_problem.obj_dof,
+            full_dof_reference=turn_problem.full_dof_reference,
+            joint_index=turn_problem.joint_index,
+            controlled_joint_index=turn_problem.controlled_joint_index,
+            camera_parameters_path=get_screwdriver_plan_camera_path(turn_problem),
         )
 
     def _handle_diffusion_replanning(self, actual_trajectory, plans, mode, state, trajectory_sampler, planner, k):

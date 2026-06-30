@@ -33,6 +33,9 @@ from pytorch_kinematics import transforms as tf
 torch._dynamo.config.capture_scalar_outputs = True
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
+DEFAULT_PROTO5_PLAN_CAMERA_PATH = (
+    CCAI_PATH.parent / "model_mismatch" / "scripts" / "proto5_plan_camera.json"
+)
 
 # instantiate environment
 img_save_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/videos')
@@ -4947,8 +4950,21 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None):
             gif_fpath = pathlib.PurePath.joinpath(viz_fpath, 'gif')
             pathlib.Path.mkdir(img_fpath, parents=True, exist_ok=True)
             pathlib.Path.mkdir(gif_fpath, parents=True, exist_ok=True)
-            visualize_trajectory(traj_for_viz, turn_problem.contact_scenes, viz_fpath, turn_problem.fingers,
-                                 turn_problem.obj_dof + 1)
+            visualize_trajectory(
+                traj_for_viz,
+                turn_problem.contact_scenes_for_viz,
+                viz_fpath,
+                turn_problem.fingers,
+                turn_problem.obj_dof + 1,
+                full_dof_reference=turn_problem.full_dof_reference,
+                joint_index=turn_problem.joint_index,
+                controlled_joint_index=turn_problem.controlled_joint_index,
+                camera_parameters_path=(
+                    DEFAULT_PROTO5_PLAN_CAMERA_PATH
+                    if torch.as_tensor(turn_problem.full_dof_reference).numel() == 18
+                    else None
+                ),
+            )
 
         # process the action
         x = best_traj[0, :turn_problem.dx + turn_problem.du]

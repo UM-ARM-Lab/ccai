@@ -12,7 +12,13 @@ from dataclasses import dataclass
 from pprint import pprint
 
 from ccai.utils.allegro_utils import convert_yaw_to_sine_cosine, convert_sine_cosine_to_yaw, visualize_trajectory
-from ccai.utils.recovery_utils import create_visualization_paths, get_contact_state_mappings, save_goal_info, save_recovery_info
+from ccai.utils.recovery_utils import (
+    create_visualization_paths,
+    get_contact_state_mappings,
+    get_screwdriver_plan_camera_path,
+    save_goal_info,
+    save_recovery_info,
+)
 
 
 @dataclass
@@ -187,8 +193,17 @@ class ContactPlanner:
                     sample_fpath_img.mkdir(parents=True, exist_ok=True)
                     sample_fpath_gif = sample_fpath / "gif"
                     sample_fpath_gif.mkdir(parents=True, exist_ok=True)
-                    visualize_trajectory(traj_for_viz, self.turn_problem.contact_scenes_for_viz, sample_fpath,
-                                      self.turn_problem.fingers, self.turn_problem.obj_dof + 1)
+                    visualize_trajectory(
+                        traj_for_viz,
+                        self.turn_problem.contact_scenes_for_viz,
+                        sample_fpath,
+                        self.turn_problem.fingers,
+                        self.turn_problem.obj_dof + 1,
+                        full_dof_reference=self.turn_problem.full_dof_reference,
+                        joint_index=self.turn_problem.joint_index,
+                        controlled_joint_index=self.turn_problem.controlled_joint_index,
+                        camera_parameters_path=get_screwdriver_plan_camera_path(self.turn_problem),
+                    )
             
             if self.params['N'] > 1:
                 initial_samples = initial_samples[:self.params['N']]
@@ -678,8 +693,17 @@ class ContactPlanner:
         traj_for_viz = torch.cat((state.unsqueeze(0), goal.unsqueeze(0)), dim=0)
         traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
         
-        visualize_trajectory(traj_for_viz, self.turn_problem.contact_scenes_for_viz, viz_fpath,
-                            self.turn_problem.fingers, self.turn_problem.obj_dof + 1)
+        visualize_trajectory(
+            traj_for_viz,
+            self.turn_problem.contact_scenes_for_viz,
+            viz_fpath,
+            self.turn_problem.fingers,
+            self.turn_problem.obj_dof + 1,
+            full_dof_reference=self.turn_problem.full_dof_reference,
+            joint_index=self.turn_problem.joint_index,
+            controlled_joint_index=self.turn_problem.controlled_joint_index,
+            camera_parameters_path=get_screwdriver_plan_camera_path(self.turn_problem),
+        )
         
         save_goal_info(viz_fpath, goal, state)
 
@@ -696,5 +720,14 @@ class ContactPlanner:
         img_fpath.mkdir(parents=True, exist_ok=True)
         gif_fpath.mkdir(parents=True, exist_ok=True)
         
-        visualize_trajectory(traj_for_viz, self.turn_problem.contact_scenes_for_viz, viz_fpath,
-                            self.turn_problem.fingers, self.turn_problem.obj_dof + 1) 
+        visualize_trajectory(
+            traj_for_viz,
+            self.turn_problem.contact_scenes_for_viz,
+            viz_fpath,
+            self.turn_problem.fingers,
+            self.turn_problem.obj_dof + 1,
+            full_dof_reference=self.turn_problem.full_dof_reference,
+            joint_index=self.turn_problem.joint_index,
+            controlled_joint_index=self.turn_problem.controlled_joint_index,
+            camera_parameters_path=get_screwdriver_plan_camera_path(self.turn_problem),
+        ) 

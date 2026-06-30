@@ -285,12 +285,13 @@ def test_visualize_trajectory_expands_proto5_partial_q_to_full_dof(monkeypatch, 
         task="screwdriver",
         pcd=None,
         full_dof_reference=None,
-            joint_index=None,
-            camera_mode="preset",
-            camera_parameters_path=None,
-            save_camera_parameters_path=None,
-            camera_setup_only=False,
-        ):
+        joint_index=None,
+        controlled_joint_index=None,
+        camera_mode="preset",
+        camera_parameters_path=None,
+        save_camera_parameters_path=None,
+        camera_setup_only=False,
+    ):
         allegro_utils._collect_visualization_geometry(
             trajectory[0],
             scene,
@@ -299,6 +300,7 @@ def test_visualize_trajectory_expands_proto5_partial_q_to_full_dof(monkeypatch, 
             pcd=pcd,
             full_dof_reference=full_dof_reference,
             joint_index=joint_index,
+            controlled_joint_index=controlled_joint_index,
         )
 
     import subprocess
@@ -323,6 +325,81 @@ def test_visualize_trajectory_expands_proto5_partial_q_to_full_dof(monkeypatch, 
         render_backend="window",
         full_dof_reference=full_reference,
         joint_index=PROTO5_FULL_JOINT_INDEX,
+    )
+
+    torch.testing.assert_close(captured["q"], expected_q)
+    torch.testing.assert_close(captured["theta"], theta.reshape(1, 4))
+
+
+def test_proto5_visualization_maps_wrist_controlled_trajectory_state(tmp_path, monkeypatch):
+    captured = {}
+
+    class FakeScene:
+        device = "cpu"
+
+        def get_visualization_meshes(self, q, env_q, pcd=None):
+            captured["q"] = q.detach().clone()
+            captured["theta"] = env_q.detach().clone()
+            return [], []
+
+    def fake_visualize_window(
+        trajectory,
+        scene,
+        scene_path,
+        fingers,
+        obj_dof,
+        headless=False,
+        task="screwdriver",
+        pcd=None,
+        full_dof_reference=None,
+        joint_index=None,
+        controlled_joint_index=None,
+        camera_mode="preset",
+        camera_parameters_path=None,
+        save_camera_parameters_path=None,
+        camera_setup_only=False,
+    ):
+        allegro_utils._collect_visualization_geometry(
+            trajectory[0],
+            scene,
+            fingers,
+            obj_dof,
+            pcd=pcd,
+            full_dof_reference=full_dof_reference,
+            joint_index=joint_index,
+            controlled_joint_index=controlled_joint_index,
+        )
+
+    import subprocess
+
+    monkeypatch.setattr(allegro_utils, "_visualize_trajectory_window", fake_visualize_window)
+    monkeypatch.setattr(subprocess, "call", lambda *args, **kwargs: 0)
+
+    controlled_joint_index = (
+        PROTO5_FULL_JOINT_INDEX["index"]
+        + PROTO5_FULL_JOINT_INDEX["middle"]
+        + PROTO5_FULL_JOINT_INDEX["thumb"]
+        + PROTO5_FULL_JOINT_INDEX["wrist"]
+    )
+    partial_q = torch.arange(14, dtype=torch.float32) + 100.0
+    theta = torch.tensor([0.1, 0.2, 0.3, 0.0], dtype=torch.float32)
+    full_reference = torch.arange(18, dtype=torch.float32)
+    expected_q = full_reference.reshape(1, 18).clone()
+    expected_q[:, 2:6] = partial_q[0:4]
+    expected_q[:, 6:10] = partial_q[4:8]
+    expected_q[:, 14:18] = partial_q[8:12]
+    expected_q[:, 0:2] = partial_q[12:14]
+
+    allegro_utils.visualize_trajectory(
+        torch.cat((partial_q, theta)).reshape(1, -1),
+        FakeScene(),
+        tmp_path,
+        fingers=["index", "middle", "thumb"],
+        obj_dof=4,
+        render_backend="window",
+        full_dof_reference=full_reference,
+        joint_index=PROTO5_FULL_JOINT_INDEX,
+        controlled_joint_index=controlled_joint_index,
     )
 
     torch.testing.assert_close(captured["q"], expected_q)
