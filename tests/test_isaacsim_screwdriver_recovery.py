@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 import torch
 
+from ccai.utils import isaacsim_screwdriver_recovery as isaacsim_recovery_utils
 from ccai.utils.isaacsim_screwdriver_recovery import (
     ALLEGRO_ACTIVE_JOINT_NAMES,
     ALLEGRO_DEFAULT_FULL_JOINT_POS,
@@ -22,6 +23,24 @@ from ccai.utils.isaacsim_screwdriver_recovery import (
     sample_screwdriver_body_poke,
 )
 from ccai.utils.recovery_utils import build_pregrasp_reference_target_kwargs, create_allegro_screwdriver_problem
+
+
+def test_proto5_recovery_hand_spec_uses_shared_isaacsim_defaults():
+    spec = importlib.util.spec_from_file_location(
+        "proto5_defaults_for_test",
+        isaacsim_recovery_utils.PROTO5_DEFAULTS_PATH,
+    )
+    defaults = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(defaults)
+
+    hand_spec = isaacsim_recovery_utils.get_hand_spec("proto5")
+
+    assert hand_spec.robot_root_pos == tuple(defaults.PROTO5_SCREWDRIVER_ROOT_POS)
+    assert hand_spec.robot_root_rot_wxyz == tuple(defaults.PROTO5_SCREWDRIVER_ROOT_ROT)
+    assert hand_spec.all_joint_names == tuple(defaults.ALL_JOINT_NAMES)
+    assert hand_spec.active_joint_names == tuple(defaults.ACTIVE_FINGER_JOINT_NAMES)
+    assert hand_spec.default_full_joint_pos == tuple(defaults.DEFAULT_FULL_JOINT_POS)
 
 
 _ENTRYPOINT_PATH = pathlib.Path(__file__).resolve().parents[1] / "examples" / "screwdriver_isaacsim_recovery.py"

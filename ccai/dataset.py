@@ -464,7 +464,7 @@ class AllegroScrewDriverDataset(Dataset):
             yaw_change = final_yaw - initial_yaw
             print(yaw_change.mean())
 
-            bad_turn = yaw_change > -.5
+            bad_turn = (yaw_change > -.5) | (yaw_change < -1.8)
             self.trajectories = self.trajectories[~bad_turn]
             self.masks = self.masks[~bad_turn]
             self.trajectory_type = self.trajectory_type[~bad_turn]

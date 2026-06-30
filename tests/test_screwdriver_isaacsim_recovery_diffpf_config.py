@@ -35,7 +35,7 @@ def test_diffpf_defaults_match_model_mismatch_collector(monkeypatch, tmp_path):
     assert config["diffpf_sample_horizon"] == 8
     assert config["diffpf_execution_horizon"] == 1
     assert config["diffpf_num_trajectories"] == 128
-    assert config["diffpf_trajectory_selection_mode"] == "max_reward"
+    assert config["diffpf_trajectory_selection_mode"] == "max_reward_times_exp_likelihood"
     assert config["diffpf_likelihood_mask"] == "inverse_dynamics"
     assert config["diffpf_likelihood_temperature"] == 10.0
     assert config["diffpf_likelihood_reward_scope"] == "per_step"
@@ -86,6 +86,33 @@ def test_diffpf_values_are_loaded_from_yaml(monkeypatch, tmp_path):
     assert config["diffpf_likelihood_mask"] == "all"
     assert config["diffpf_likelihood_temperature"] == 2.5
     assert config["diffpf_likelihood_reward_scope"] == "trajectory"
+
+
+def test_model_compilation_is_yaml_configured(monkeypatch, tmp_path):
+    module = _load_recovery_module()
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "experiment_name: no_compile",
+                "compile_models: false",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "screwdriver_isaacsim_recovery.py",
+            "--config",
+            str(config_path),
+        ],
+    )
+
+    config = module.load_config(module.parse_args())
+
+    assert config["compile_models"] is False
 
 
 def test_diffpf_checkpoint_is_not_a_cli_flag(monkeypatch, tmp_path):

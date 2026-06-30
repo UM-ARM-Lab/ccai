@@ -7,6 +7,7 @@ pulling IsaacLab into import-time unit tests.
 
 from __future__ import annotations
 
+import importlib.util
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
@@ -22,6 +23,19 @@ SCREWDRIVER_HAND_CHOICES = (SCREWDRIVER_HAND_ALLEGRO, SCREWDRIVER_HAND_PROTO5)
 CCAI_ROOT = Path(__file__).resolve().parents[2]
 DOCUMENTS_ROOT = CCAI_ROOT.parent
 ISAACSIM_HAND_ENVS_PATH = DOCUMENTS_ROOT / "github" / "isaacsim-hand-envs"
+PROTO5_DEFAULTS_PATH = ISAACSIM_HAND_ENVS_PATH / "isaacsim_hand_envs" / "assets" / "robot" / "proto5_defaults.py"
+
+
+def _load_proto5_defaults():
+    spec = importlib.util.spec_from_file_location("_isaacsim_hand_envs_proto5_defaults", PROTO5_DEFAULTS_PATH)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Could not load Proto5 defaults from {PROTO5_DEFAULTS_PATH}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_PROTO5_DEFAULTS = _load_proto5_defaults()
 
 ALLEGRO_ACTIVE_JOINT_NAMES = (
     "allegro_hand_hitosashi_finger_finger_joint_0",
@@ -44,43 +58,14 @@ ALLEGRO_RING_JOINT_NAMES = (
     "allegro_hand_kusuri_finger_finger_joint_11",
 )
 
-PROTO5_WRIST_JOINT_NAMES = (
-    "RHand_WRZ_joint",
-    "RHand_WRY_joint",
-)
-PROTO5_INDEX_JOINT_NAMES = (
-    "RHand_I1Z_joint",
-    "RHand_I1Y_joint",
-    "RHand_I2Y_joint",
-    "RHand_I3Y_joint",
-)
-PROTO5_MIDDLE_JOINT_NAMES = (
-    "RHand_M1Z_joint",
-    "RHand_M1Y_joint",
-    "RHand_M2Y_joint",
-    "RHand_M3Y_joint",
-)
-PROTO5_RING_JOINT_NAMES = (
-    "RHand_R1Z_joint",
-    "RHand_R1Y_joint",
-    "RHand_R2Y_joint",
-    "RHand_R3Y_joint",
-)
-PROTO5_THUMB_JOINT_NAMES = (
-    "RHand_T1Z_joint",
-    "RHand_T1Y_joint",
-    "RHand_T2Y_joint",
-    "RHand_T3Y_joint",
-)
-PROTO5_ACTIVE_JOINT_NAMES = PROTO5_INDEX_JOINT_NAMES + PROTO5_MIDDLE_JOINT_NAMES + PROTO5_THUMB_JOINT_NAMES
-PROTO5_FROZEN_JOINT_NAMES = PROTO5_WRIST_JOINT_NAMES + PROTO5_RING_JOINT_NAMES
-PROTO5_ALL_JOINT_NAMES = (
-    PROTO5_WRIST_JOINT_NAMES
-    + PROTO5_INDEX_JOINT_NAMES
-    + PROTO5_MIDDLE_JOINT_NAMES
-    + PROTO5_RING_JOINT_NAMES
-    + PROTO5_THUMB_JOINT_NAMES
-)
+PROTO5_WRIST_JOINT_NAMES = tuple(_PROTO5_DEFAULTS.WRIST_JOINT_NAMES)
+PROTO5_INDEX_JOINT_NAMES = tuple(_PROTO5_DEFAULTS.INDEX_JOINT_NAMES)
+PROTO5_MIDDLE_JOINT_NAMES = tuple(_PROTO5_DEFAULTS.MIDDLE_JOINT_NAMES)
+PROTO5_RING_JOINT_NAMES = tuple(_PROTO5_DEFAULTS.RING_JOINT_NAMES)
+PROTO5_THUMB_JOINT_NAMES = tuple(_PROTO5_DEFAULTS.THUMB_JOINT_NAMES)
+PROTO5_ACTIVE_JOINT_NAMES = tuple(_PROTO5_DEFAULTS.ACTIVE_FINGER_JOINT_NAMES)
+PROTO5_FROZEN_JOINT_NAMES = tuple(_PROTO5_DEFAULTS.FROZEN_JOINT_NAMES)
+PROTO5_ALL_JOINT_NAMES = tuple(_PROTO5_DEFAULTS.ALL_JOINT_NAMES)
 PROTO5_FINGERTIP_LINK_BODY_NAMES = (
     "RHand_ITIP_LINK",
     "RHand_MTIP_LINK",
@@ -127,31 +112,12 @@ ALLEGRO_DEFAULT_FULL_JOINT_POS = (
     0.3,
     1.2,
 )
-PROTO5_DEFAULT_FULL_JOINT_POS = (
-    0.271,
-    -0.005,
-    0.132,
-    0.743,
-    0.202,
-    0.486,
-    -0.33,
-    1.03,
-    0.371,
-    0.203,
-    -0.349,
-    0.0,
-    0.0,
-    0.002,
-    -0.156,
-    0.165,
-    0.86,
-    0.439,
-)
+PROTO5_DEFAULT_FULL_JOINT_POS = tuple(_PROTO5_DEFAULTS.DEFAULT_FULL_JOINT_POS)
 
 ALLEGRO_ROBOT_ROOT_POS = (0.0, -0.095, 1.33)
 ALLEGRO_ROBOT_ROOT_ROT_WXYZ = (0.664463, 0.2418448, 0.2418448, 0.664463)
-PROTO5_ROBOT_ROOT_POS = (-0.36898, -0.15366, 1.07923)
-PROTO5_ROBOT_ROOT_ROT_WXYZ = (0.71151, 0.62842, -0.20813, 0.23565)
+PROTO5_ROBOT_ROOT_POS = tuple(_PROTO5_DEFAULTS.PROTO5_SCREWDRIVER_ROOT_POS)
+PROTO5_ROBOT_ROOT_ROT_WXYZ = tuple(_PROTO5_DEFAULTS.PROTO5_SCREWDRIVER_ROOT_ROT)
 DEFAULT_SCREWDRIVER_TABLE_POSE = (0.0, 0.0, 1.205)
 
 
@@ -955,9 +921,9 @@ class IsaacSimScrewdriverRecoveryEnv:
         ).to(device=self.device)
         ret = None
         for _ in range(self.action_repeat):
-            self._maybe_apply_external_perturbation()
+            # self._maybe_apply_external_perturbation()
             ret = self.env.step(env_action)
-            self._clear_external_force_torque()
+            # self._clear_external_force_torque()
             self.force_render(sync_joint_targets=False)
             self._record_frame(force_render=False)
             self._step_index += 1
