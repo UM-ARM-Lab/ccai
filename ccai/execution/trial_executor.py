@@ -42,7 +42,7 @@ class TrajectoryExecutor:
         data['final_likelihoods'].append([])
         data['csvto_times'].append([])
         orig_torque_perturb = self.env.external_wrench_perturb if self.params['mode'] != 'hardware' else False
-        executing_recovery = bool(recover)
+        executing_recovery = bool(recover) and mode != "turn"
 
         def reset_normal_policy_after_recovery():
             if (

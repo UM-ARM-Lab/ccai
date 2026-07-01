@@ -145,6 +145,7 @@ def test_proto5_normal_policy_branch_logs_contact_timeseries_and_rows():
 
     assert policy.plan_calls == 2
     assert policy.observe_calls == 2
+    assert policy.reset_after_recovery_calls == 0
     assert len(env.step_calls) == 2
     assert actual.shape == (2, 27)
     assert [tuple(plan.shape) for plan in planned] == [(1, 1, 36), (1, 1, 36)]
@@ -202,3 +203,43 @@ def test_recovery_branch_resets_normal_policy_without_observing_recovery_transit
     assert policy.plan_calls == 0
     assert policy.observe_calls == 0
     assert policy.reset_after_recovery_calls == 1
+
+
+def test_turn_recovery_segment_does_not_reset_normal_policy_belief():
+    env = _FakeEnv()
+    policy = _FakePolicy()
+    data = _data()
+    params = {
+        "device": "cpu",
+        "mode": "simulation",
+        "live_recovery": True,
+        "OOD_metric": "likelihood",
+        "likelihood_num_samples": 1,
+        "likelihood_threshold": -15,
+        "controller": "csvgd",
+        "recovery_controller": "csvgd",
+        "visualize_plan": False,
+        "visualize_recovery_plan": False,
+        "T": 0,
+        "T_orig": 0,
+    }
+
+    actual, planned, *_rest = TrajectoryExecutor(params, env).execute_traj(
+        planner=_FakePlanner(),
+        mode="turn",
+        env=env,
+        data=data,
+        trajectory_sampler_orig=None,
+        num_fingers=3,
+        obj_dof=3,
+        episode_num_steps=0,
+        max_episode_num_steps=10,
+        normal_action_policy=policy,
+        recover=True,
+    )
+
+    assert actual == []
+    assert planned == []
+    assert policy.plan_calls == 0
+    assert policy.observe_calls == 0
+    assert policy.reset_after_recovery_calls == 0

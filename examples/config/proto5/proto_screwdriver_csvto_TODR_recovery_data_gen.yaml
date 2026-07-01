@@ -8,13 +8,15 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 200
 visualize: True
-experiment_name: 'proto_screwdriver_D_TOUR_recovery_data_gen'
+experiment_name: 'proto_screwdriver_D_TOUR_recovery_data_gen_105'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
 object_type: 'screwdriver'
 sim_device: 'cpu'
-friction_coefficient: 1.0
+friction_coefficient: .9
+screwdriver_friction: 2.5
+yaw_joint_friction: 0.03
 planner_use_env_yaw_joint_friction: True
 planner_yaw_joint_friction_override: 0.0
 planner_yaw_friction_model_path: '/home/abhinav/Documents/model_mismatch/results/csvto_yaw_joint_fit/yaw_friction_model.json'
@@ -74,12 +76,12 @@ compile_models: false
 diffpf_compile_model: false
 diffpf_sample_horizon: 8
 diffpf_execution_horizon: 1
-diffpf_num_trajectories: 64
+diffpf_num_trajectories: 128
 diffpf_trajectory_selection_mode: "max_reward_times_exp_likelihood"
 diffpf_likelihood_mask: "inverse_dynamics"
 diffpf_likelihood_temperature: 10.0
 diffpf_likelihood_reward_scope: "per_step"
-likelihood_threshold: -110.0
+likelihood_threshold: -105.0
 # likelihood_threshold: -40.0
 likelihood_num_samples: 8
 N_contact_plan: 16
@@ -110,7 +112,7 @@ controllers:
     online_iters: 0
     warmup_iters: 15
     recovery_warmup_iters: 100
-    recovery_online_iters: 25
+    recovery_online_iters: 40
     resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1

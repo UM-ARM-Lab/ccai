@@ -466,14 +466,16 @@ def test_recovery_physical_kwargs_use_env_yaw_friction_by_default():
     kwargs = screwdriver_isaacsim_recovery.get_recovery_planner_physical_kwargs(
         Env(),
         {
+            "friction_coefficient": 0.9,
+            "yaw_joint_friction": 0.03,
             "planner_use_env_yaw_joint_friction": True,
             "disable_planner_yaw_friction_model": True,
             "planner_use_yaw_inertia_model": False,
         },
     )
 
-    assert kwargs["friction_coefficient"] == pytest.approx(2.0)
-    assert kwargs["yaw_joint_friction"] == pytest.approx(0.21)
+    assert kwargs["friction_coefficient"] == pytest.approx(0.9)
+    assert kwargs["yaw_joint_friction"] == pytest.approx(0.03)
     assert kwargs["yaw_friction_model_path"] is None
     assert kwargs["yaw_inertia_model_path"] is None
 

@@ -287,12 +287,17 @@ def get_recovery_planner_physical_kwargs(env, config) -> dict:
         else config.get("planner_yaw_joint_friction_override", 0.0)
     )
     env_params = env.get_environment_parameters(env_id=0)
-    return get_screwdriver_turn_problem_physical_kwargs(
+    physical_kwargs = get_screwdriver_turn_problem_physical_kwargs(
         env_params,
         yaw_joint_friction_override=yaw_joint_friction_override,
         yaw_friction_model_path=yaw_friction_model_path,
         yaw_inertia_model_path=yaw_inertia_model_path,
     )
+    if "friction_coefficient" in config:
+        physical_kwargs["friction_coefficient"] = float(config["friction_coefficient"])
+    if "yaw_joint_friction" in config:
+        physical_kwargs["yaw_joint_friction"] = float(config["yaw_joint_friction"])
+    return physical_kwargs
 
 
 def _friction_range(config, prefix: str, fallback):
