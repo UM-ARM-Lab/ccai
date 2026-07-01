@@ -136,3 +136,11 @@ def test_proto5_normal_policy_branch_logs_contact_timeseries_and_rows():
     assert len(data["contact_points"]) == 3
     assert len(data["contact_plan"]) == 2
     torch.testing.assert_close(data["contact_plan"][0], torch.ones(3))
+    assert len(data["hri_diffpf_records"]) == 2
+    first_record = data["hri_diffpf_records"][0]
+    assert first_record["actions"].shape == (1, 12)
+    assert first_record["contact_plan"].shape == (1, 3)
+    torch.testing.assert_close(torch.as_tensor(first_record["actions"][0]), torch.ones(12) * 0.01)
+    torch.testing.assert_close(torch.as_tensor(first_record["contact_plan"][0]), torch.ones(3))
+    torch.testing.assert_close(torch.as_tensor(first_record["states"][0, :12]), torch.zeros(12))
+    torch.testing.assert_close(torch.as_tensor(first_record["states"][1, :12]), torch.ones(12) * 0.01)

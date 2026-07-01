@@ -214,6 +214,7 @@ class TrajectoryExecutor:
             return
         for key in ("contact_state", "contact_plan", "contact_wrenches", "contact_forces", "contact_points"):
             data.setdefault(key, [])
+        data.setdefault("hri_diffpf_records", [])
         data.setdefault("normal_policy_times", [])
         data.setdefault("normal_policy_likelihood_stats", [])
 
@@ -221,10 +222,7 @@ class TrajectoryExecutor:
     def _as_cpu_float_tensor(value):
         return torch.as_tensor(value, dtype=torch.float32).detach().cpu()
 
-    def _record_tactile_state(self, data):
-        if data is None:
-            return
-        self._ensure_execution_timeseries(data)
+    def _read_tactile_state(self):
         if hasattr(self.env, "get_tactile_observation"):
             obs = self.env.get_tactile_observation()
         else:
@@ -235,18 +233,92 @@ class TrajectoryExecutor:
             "contact_forces": torch.zeros(3, 3, dtype=torch.float32),
             "contact_points": torch.zeros(3, 3, dtype=torch.float32),
         }
+        tactile = {}
         for key, default in defaults.items():
             value = obs.get(key, default)
             tensor = self._as_cpu_float_tensor(value)
             if tensor.ndim > default.ndim:
                 tensor = tensor[0]
-            data[key].append(tensor)
+            tactile[key] = tensor
+        return tactile
+
+    def _record_tactile_state(self, data, tactile=None):
+        if data is None:
+            return
+        self._ensure_execution_timeseries(data)
+        if tactile is None:
+            tactile = self._read_tactile_state()
+        for key in ("contact_state", "contact_wrenches", "contact_forces", "contact_points"):
+            data[key].append(tactile[key])
 
     def _record_contact_plan(self, data, mode):
         if data is None:
             return
         self._ensure_execution_timeseries(data)
         data["contact_plan"].append(self._contact_plan_vector(mode, device="cpu"))
+
+    def _state15_from_env(self, *, num_fingers, obj_dof):
+        del num_fingers, obj_dof
+        state = self.env.get_state()["q"]
+        state_t = torch.as_tensor(state, device=self.params["device"], dtype=torch.float32)
+        state_t = state_t.reshape(-1, state_t.shape[-1])[0]
+        return state_t[:15].detach().cpu()
+
+    def _append_hri_diffpf_record(
+        self,
+        data,
+        *,
+        pre_state15,
+        post_state15,
+        delta12,
+        contact_plan,
+        pre_tactile,
+        post_tactile,
+        mode,
+        recover,
+        episode_num_steps,
+    ):
+        if data is None:
+            return
+        self._ensure_execution_timeseries(data)
+        pre_state15 = self._as_cpu_float_tensor(pre_state15).reshape(-1)[:15]
+        post_state15 = self._as_cpu_float_tensor(post_state15).reshape(-1)[:15]
+        delta12 = self._as_cpu_float_tensor(delta12).reshape(-1)[:12]
+        contact_plan = self._as_cpu_float_tensor(contact_plan).reshape(1, 3)
+        record = {
+            "states": torch.stack((pre_state15, post_state15), dim=0).numpy(),
+            "actions": delta12.reshape(1, 12).numpy(),
+            "contact_plan": contact_plan.numpy(),
+            "contact_state": torch.stack(
+                (pre_tactile["contact_state"].reshape(3), post_tactile["contact_state"].reshape(3)),
+                dim=0,
+            ).numpy(),
+            "contact_wrenches": torch.stack(
+                (pre_tactile["contact_wrenches"].reshape(3, 6), post_tactile["contact_wrenches"].reshape(3, 6)),
+                dim=0,
+            ).numpy(),
+            "contact_forces": torch.stack(
+                (pre_tactile["contact_forces"].reshape(3, 3), post_tactile["contact_forces"].reshape(3, 3)),
+                dim=0,
+            ).numpy(),
+            "contact_points": torch.stack(
+                (pre_tactile["contact_points"].reshape(3, 3), post_tactile["contact_points"].reshape(3, 3)),
+                dim=0,
+            ).numpy(),
+            "contact_mode": str(mode),
+            "recover": bool(recover),
+            "episode_num_steps": int(episode_num_steps) if episode_num_steps is not None else -1,
+            "trial_index": int(self.params.get("trial_index", -1)),
+            "stage_index": int(self.params.get("current_stage", -1)),
+            "screwdriver_friction": float(self.params.get("friction_coefficient", 1.0)),
+            "yaw_joint_friction": float(
+                self.params.get(
+                    "yaw_joint_friction",
+                    self.params.get("planner_yaw_joint_friction_override", 0.0),
+                )
+            ),
+        }
+        data["hri_diffpf_records"].append(record)
 
     def _stack_actual_trajectory(self, actual_trajectory):
         if len(actual_trajectory) == 0:
@@ -347,7 +419,9 @@ class TrajectoryExecutor:
                 selected_plan_rows_t = selected_plan_rows_t.reshape(1, selected_plan_rows_t.shape[0], -1)
             planned_trajectories.append(selected_plan_rows_t.detach().cpu())
 
-            actual_trajectory.append(torch.cat((state[:15].detach().cpu(), delta_t.detach().cpu())))
+            pre_state15 = state[:15].detach().cpu()
+            pre_tactile = self._read_tactile_state()
+            actual_trajectory.append(torch.cat((pre_state15, delta_t.detach().cpu())))
             self.env.step(target_t.reshape(1, -1).to(device=self.env.device))
             if hasattr(normal_action_policy, "observe_transition"):
                 normal_action_policy.observe_transition(
@@ -357,8 +431,23 @@ class TrajectoryExecutor:
                     delta_action=delta_t.detach(),
                     target_action=target_t.detach(),
                 )
+            post_state15 = self._state15_from_env(num_fingers=num_fingers, obj_dof=obj_dof)
+            post_tactile = self._read_tactile_state()
+            contact_plan = self._contact_plan_vector(mode, device="cpu")
             self._record_contact_plan(data, mode)
-            self._record_tactile_state(data)
+            self._record_tactile_state(data, post_tactile)
+            self._append_hri_diffpf_record(
+                data,
+                pre_state15=pre_state15,
+                post_state15=post_state15,
+                delta12=delta_t,
+                contact_plan=contact_plan,
+                pre_tactile=pre_tactile,
+                post_tactile=post_tactile,
+                mode=mode,
+                recover=False,
+                episode_num_steps=episode_num_steps,
+            )
             episode_num_steps += 1
 
         return self._stack_actual_trajectory(actual_trajectory), planned_trajectories, False, episode_num_steps
@@ -585,9 +674,7 @@ class TrajectoryExecutor:
             # Handle action perturbation and execution
             self._handle_action_execution(best_traj, planner_returns_action, planner, state, 
                                         num_fingers, actual_trajectory, mode, k, turn_problem, 
-                                        fpath, fname, state_16, recover)
-            self._record_contact_plan(data, mode)
-            self._record_tactile_state(data)
+                                        fpath, fname, state_16, recover, data, episode_num_steps, obj_dof)
             
             # Increment episode_num_steps after successful step
             episode_num_steps += 1
@@ -715,7 +802,7 @@ class TrajectoryExecutor:
 
     def _handle_action_execution(self, best_traj, planner_returns_action, planner, state, 
                                num_fingers, actual_trajectory, mode, k, turn_problem, 
-                               fpath, fname, state_16, recover):
+                               fpath, fname, state_16, recover, data, episode_num_steps, obj_dof):
         """Handle action computation and execution."""
         # Handle action perturbation
         if self.params.get('perturb_action', False):
@@ -742,6 +829,13 @@ class TrajectoryExecutor:
         if self.params.get('perturb_action', False):
             action += torch.randn_like(action) * 0.03
 
+        pre_state15 = state[:4 * num_fingers + obj_dof].detach().cpu()
+        delta12 = (
+            action.reshape(1, -1)[0, :12].detach().cpu()
+            - pre_state15[:12]
+        )
+        pre_tactile = self._read_tactile_state()
+
         # Visualization
         if ((self.params['visualize_plan'] and not recover) or 
             (self.params['visualize_recovery_plan'] and recover)):
@@ -766,6 +860,23 @@ class TrajectoryExecutor:
             ros_copy_node.apply_action(partial_to_full_state(action[0], self.params['fingers']))
 
         self.env.step(action.to(device=self.env.device))
+        post_state15 = self._state15_from_env(num_fingers=num_fingers, obj_dof=obj_dof)
+        post_tactile = self._read_tactile_state()
+        contact_plan = self._contact_plan_vector(mode, device="cpu")
+        self._record_contact_plan(data, mode)
+        self._record_tactile_state(data, post_tactile)
+        self._append_hri_diffpf_record(
+            data,
+            pre_state15=pre_state15,
+            post_state15=post_state15,
+            delta12=delta12,
+            contact_plan=contact_plan,
+            pre_tactile=pre_tactile,
+            post_tactile=post_tactile,
+            mode=mode,
+            recover=recover,
+            episode_num_steps=episode_num_steps,
+        )
 
     def _handle_visualization(self, best_traj, planner, state, turn_problem, fpath, fname, k, num_fingers):
         """Handle trajectory visualization."""

@@ -74,7 +74,7 @@ compile_models: false
 diffpf_compile_model: false
 diffpf_sample_horizon: 8
 diffpf_execution_horizon: 1
-diffpf_num_trajectories: 128
+diffpf_num_trajectories: 16
 diffpf_trajectory_selection_mode: "max_reward_times_exp_likelihood"
 diffpf_likelihood_mask: "inverse_dynamics"
 diffpf_likelihood_temperature: 10.0

@@ -658,6 +658,7 @@ def main():
         params["object_location"] = torch.as_tensor(env.table_pose, device=params["device"], dtype=torch.float32)
         params["controller"] = "csvgd"
         params["perturb_action"] = bool(params.get("perturb_action", False))
+        params["trial_index"] = i
 
         if config.get("debug_progress", False):
             print("debug_progress: entering legacy do_trial", flush=True)

@@ -161,6 +161,7 @@ class AllegroScrewdriver(AllegroManipulationProblem):
 
 all_yaw_deltas = []
 all_pregrasp_states = []
+all_hri_diffpf_records = []
 
 
 def _state_to_numpy(state):
@@ -191,6 +192,32 @@ def append_unique_recovery_state(state, path=RECOVERY_STATES_PATH):
     tmp_path.replace(path)
     print(f'Logged recovery state {len(recovery_states)} to {path}')
     return True
+
+
+def write_hri_diffpf_records_for_experiment(data, trial_fpath):
+    records = data.get('hri_diffpf_records', [])
+    if not records:
+        return None
+    try:
+        from model_mismatch.utils.ccai_screwdriver_diffusion_export import write_hri_diffpf_training_hdf5
+    except ImportError as exc:
+        print(f'Skipping HRI DiffPF training HDF5 export; import failed: {exc}')
+        return None
+
+    exported_count = int(data.get('hri_diffpf_records_exported', 0))
+    new_records = records[exported_count:]
+    if new_records:
+        all_hri_diffpf_records.extend(new_records)
+        data['hri_diffpf_records_exported'] = len(records)
+    if not all_hri_diffpf_records:
+        return None
+
+    trial_fpath = pathlib.Path(trial_fpath)
+    experiment_dir = trial_fpath.parent.parent if trial_fpath.parent.name == 'csvgd' else trial_fpath.parent
+    output_path = experiment_dir / 'proto5_diffpf_training_data.h5'
+    written_path = write_hri_diffpf_training_hdf5(all_hri_diffpf_records, output_path)
+    print(f'Wrote HRI DiffPF training HDF5 with {len(all_hri_diffpf_records)} rows to {written_path}')
+    return written_path
 
 
 def resolve_pregrasp_states_path(config, experiment_dir):
@@ -535,6 +562,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         contact_sequence = ['turn'] * (max_stages - 1) # minus 1 because pregrasp will iterate the all_stage counter
 
     while should_continue_loop():
+        params['current_stage'] = all_stage
 
         initial_samples = None
         state = env.get_state()
@@ -1015,6 +1043,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     pitch_abs = np.abs(state[-2].item())
     drop_cutoff = .25
     dropped = (roll_abs > drop_cutoff) or (pitch_abs > drop_cutoff)
+    write_hri_diffpf_records_for_experiment(data, fpath)
     env.reset()
     return final_yaw - initial_yaw, dropped
 

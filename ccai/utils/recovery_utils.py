@@ -635,6 +635,8 @@ def initialize_data_structure(params):
 def add_to_dataset(data, traj, plans, inits, init_sim_rollouts, optimizer_paths, 
                   contact_points, contact_distance, contact_state):
     """Add trajectory data to the dataset."""
+    if plans is None or inits is None:
+        return
     for i, plan in enumerate(plans):
         t = plan.shape[1]
         data[t]['plans'].append(plan)
