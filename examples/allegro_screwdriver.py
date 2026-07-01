@@ -1004,6 +1004,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 actual_trajectory_save = [i for i in actual_trajectory_save if type(i) != list]
                 pickle.dump([i.cpu().numpy() for i in actual_trajectory_save], f)
         del actual_trajectory_save
+        write_hri_diffpf_records_for_experiment(data, fpath)
 
         if done:
             break

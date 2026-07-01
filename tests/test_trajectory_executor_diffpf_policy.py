@@ -67,6 +67,7 @@ class _FakePolicy:
     def __init__(self):
         self.plan_calls = 0
         self.observe_calls = 0
+        self.reset_after_recovery_calls = 0
 
     def plan_next(self, env, step_idx):
         self.plan_calls += 1
@@ -82,10 +83,27 @@ class _FakePolicy:
     def observe_transition(self, **kwargs):
         self.observe_calls += 1
 
+    def reset_after_recovery(self, env):
+        self.reset_after_recovery_calls += 1
+
 
 class _FakeSampler:
     def check_id(self, *args, **kwargs):
         return True, torch.tensor(0.0)
+
+
+class _FakePlanner:
+    def __init__(self):
+        self.problem = types.SimpleNamespace(
+            T=0,
+            obj_dof=3,
+            obj_joint_dim=1,
+            dx=15,
+            goal=torch.zeros(3),
+            data={},
+        )
+        self.warmed_up = True
+        self.x = torch.zeros(1, 16)
 
 
 def _data():
@@ -144,3 +162,43 @@ def test_proto5_normal_policy_branch_logs_contact_timeseries_and_rows():
     torch.testing.assert_close(torch.as_tensor(first_record["contact_plan"][0]), torch.ones(3))
     torch.testing.assert_close(torch.as_tensor(first_record["states"][0, :12]), torch.zeros(12))
     torch.testing.assert_close(torch.as_tensor(first_record["states"][1, :12]), torch.ones(12) * 0.01)
+
+
+def test_recovery_branch_resets_normal_policy_without_observing_recovery_transition():
+    env = _FakeEnv()
+    policy = _FakePolicy()
+    data = _data()
+    params = {
+        "device": "cpu",
+        "mode": "simulation",
+        "live_recovery": True,
+        "OOD_metric": "likelihood",
+        "likelihood_num_samples": 1,
+        "likelihood_threshold": -15,
+        "controller": "csvgd",
+        "recovery_controller": "csvgd",
+        "visualize_plan": False,
+        "visualize_recovery_plan": False,
+        "T": 0,
+        "T_orig": 0,
+    }
+
+    actual, planned, *_rest = TrajectoryExecutor(params, env).execute_traj(
+        planner=_FakePlanner(),
+        mode="index",
+        env=env,
+        data=data,
+        trajectory_sampler_orig=None,
+        num_fingers=3,
+        obj_dof=3,
+        episode_num_steps=0,
+        max_episode_num_steps=10,
+        normal_action_policy=policy,
+        recover=True,
+    )
+
+    assert actual == []
+    assert planned == []
+    assert policy.plan_calls == 0
+    assert policy.observe_calls == 0
+    assert policy.reset_after_recovery_calls == 1

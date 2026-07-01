@@ -42,6 +42,15 @@ class TrajectoryExecutor:
         data['final_likelihoods'].append([])
         data['csvto_times'].append([])
         orig_torque_perturb = self.env.external_wrench_perturb if self.params['mode'] != 'hardware' else False
+        executing_recovery = bool(recover)
+
+        def reset_normal_policy_after_recovery():
+            if (
+                executing_recovery
+                and normal_action_policy is not None
+                and hasattr(normal_action_policy, "reset_after_recovery")
+            ):
+                normal_action_policy.reset_after_recovery(self.env)
         
         # reset planner
         state = self.env.get_state()
@@ -99,7 +108,7 @@ class TrajectoryExecutor:
                 self.env.zero_obj_velocity()
             else:
                 self.sim_viz_env.zero_obj_velocity()
-            
+            reset_normal_policy_after_recovery()
             return actual_trajectory, planned_trajectories, initial_samples, None, None, None, None, not id_check, episode_num_steps
 
         # generate context from mode
@@ -134,6 +143,7 @@ class TrajectoryExecutor:
                 actual_trajectory,
                 planned_trajectories,
             )
+            reset_normal_policy_after_recovery()
             return actual_trajectory, planned_trajectories, initial_samples, None, optimizer_paths, contact_points, contact_distance, recover, episode_num_steps
 
         recovery_params = copy.deepcopy(self.params)
@@ -193,7 +203,7 @@ class TrajectoryExecutor:
         if self.params.get('external_wrench_perturb') and self.params['mode'] != 'hardware':
             rand_pct = self.params.get('rand_pct', 1/3)
             self.env.set_external_wrench_perturb(orig_torque_perturb, rand_pct)
-            
+        reset_normal_policy_after_recovery()
         return actual_trajectory, planned_trajectories, initial_samples, sim_rollouts, optimizer_paths, contact_points, contact_distance, recover, episode_num_steps
 
     @staticmethod
