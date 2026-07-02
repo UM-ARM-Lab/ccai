@@ -25,6 +25,7 @@ replan: False
 visualize_plan: False
 visualize_recovery_plan: True
 visualize_contact_plan: False
+visualize_recovery_per_node: True  # Render every particle at every search-tree node to disk (off-screen)
 optimize_force: True
 exclude_index: False
 projected: False

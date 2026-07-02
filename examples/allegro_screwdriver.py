@@ -1144,8 +1144,6 @@ if __name__ == "__main__":
             pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
         # set up params
 
-        if torch.cuda.device_count() == 1 and torch.cuda.current_device() == 1:
-            params['device'] = 'cuda:0'
         params['controller'] = 'csvgd'
         params['valve_goal'] = goal.to(device=params['device'])
         params['chain'] = chain.to(device=params['device'])
