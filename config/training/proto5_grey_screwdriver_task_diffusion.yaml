@@ -1,5 +1,5 @@
 ---
-model_name: 'proto5_screwdriver_fixed_task_dset_new_init'
+model_name: 'proto5_grey_screwdriver_task_diffusion'
 T: 19
 dx: 15
 du: 21
@@ -18,10 +18,10 @@ lr: 1.0e-4
 model_type: 'diffusion'
 discriminator_guidance: True
 inverse_dynamics: False
-data_directory: 'proto5_diffpf_ccai_from_replay_fixed_defaults'
+data_directory: 'proto5_variation_model_single_shape_task_dset_fixed_init_pose'
 best_traj_only: True
 recovery: False
-device: 'cuda:1'
+device: 'cuda:0'
 test_every: 9999999999
 save_every: 1000
 normalize_data: True

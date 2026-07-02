@@ -7,10 +7,12 @@ pulling IsaacLab into import-time unit tests.
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
+from typing import Sequence, TextIO
 
 import numpy as np
 import torch
@@ -24,6 +26,56 @@ CCAI_ROOT = Path(__file__).resolve().parents[2]
 DOCUMENTS_ROOT = CCAI_ROOT.parent
 ISAACSIM_HAND_ENVS_PATH = DOCUMENTS_ROOT / "github" / "isaacsim-hand-envs"
 PROTO5_DEFAULTS_PATH = ISAACSIM_HAND_ENVS_PATH / "isaacsim_hand_envs" / "assets" / "robot" / "proto5_defaults.py"
+
+
+class _StdoutTee:
+    def __init__(self, *streams: TextIO):
+        self._streams = streams
+
+    def write(self, data: str) -> int:
+        for stream in self._streams:
+            stream.write(data)
+        return len(data)
+
+    def writelines(self, lines) -> None:
+        for line in lines:
+            self.write(line)
+
+    def flush(self) -> None:
+        for stream in self._streams:
+            stream.flush()
+
+    def writable(self) -> bool:
+        return True
+
+    def isatty(self) -> bool:
+        return bool(self._streams and self._streams[0].isatty())
+
+    def __getattr__(self, name: str):
+        return getattr(self._streams[0], name)
+
+    @property
+    def encoding(self) -> str | None:
+        return self._streams[0].encoding if self._streams else None
+
+    @property
+    def errors(self) -> str | None:
+        return self._streams[0].errors if self._streams else None
+
+
+@contextlib.contextmanager
+def tee_stdout_to_file(log_path: str | Path):
+    log_path = Path(log_path)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    original_stdout = sys.stdout
+    with open(log_path, "w", encoding="utf-8", buffering=1) as log_file:
+        tee_stdout = _StdoutTee(original_stdout, log_file)
+        sys.stdout = tee_stdout
+        try:
+            yield log_path
+        finally:
+            sys.stdout = original_stdout
+            tee_stdout.flush()
 
 
 def _load_proto5_defaults():

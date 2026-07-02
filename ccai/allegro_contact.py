@@ -1774,7 +1774,7 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         target_contact_points_rob_link = kwargs.pop('target_contact_points_rob_link', None)
         target_default_ee_locs = kwargs.pop('target_default_ee_locs', None)
         use_default_ee_locs_cost = bool(kwargs.pop('use_default_ee_locs_cost', True))
-        target_contact_patch_mode = kwargs.pop('target_contact_patch_mode', 'cost')
+        target_contact_patch_mode = kwargs.pop('target_contact_patch_mode', 'constraint')
         target_contact_link_cost_weight = float(
             kwargs.pop('target_contact_link_cost_weight', 100 if self.object_type == 'screwdriver' else 1000)
         )

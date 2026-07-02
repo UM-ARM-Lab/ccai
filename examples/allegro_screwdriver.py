@@ -340,8 +340,10 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     
     fingers = params['fingers']
     # Minimum magnitude of contact forces for trajectory optimization
-    min_force_dict = None
-    if params['mode'] == 'hardware':
+    min_force_dict = params.get('min_force_dict')
+    if min_force_dict is not None:
+        min_force_dict = {finger: float(force) for finger, force in min_force_dict.items()}
+    elif params['mode'] == 'hardware':
         min_force_dict = {
             'thumb': 1.,
             'middle': 1.,

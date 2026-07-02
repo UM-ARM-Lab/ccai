@@ -21,6 +21,7 @@ from ccai.utils.isaacsim_screwdriver_recovery import (
     local_force_at_position_to_world,
     pack_ccai_state,
     sample_screwdriver_body_poke,
+    tee_stdout_to_file,
 )
 from ccai.utils.recovery_utils import build_pregrasp_reference_target_kwargs, create_allegro_screwdriver_problem
 
@@ -47,6 +48,16 @@ _ENTRYPOINT_PATH = pathlib.Path(__file__).resolve().parents[1] / "examples" / "s
 _ENTRYPOINT_SPEC = importlib.util.spec_from_file_location("screwdriver_isaacsim_recovery_entrypoint", _ENTRYPOINT_PATH)
 screwdriver_isaacsim_recovery = importlib.util.module_from_spec(_ENTRYPOINT_SPEC)
 _ENTRYPOINT_SPEC.loader.exec_module(screwdriver_isaacsim_recovery)
+
+
+def test_tee_stdout_to_file_copies_prints_to_trial_log(tmp_path, capsys):
+    log_path = tmp_path / "trial_1" / "stdout.log"
+
+    with tee_stdout_to_file(log_path):
+        print("trial log line")
+
+    assert "trial log line" in capsys.readouterr().out
+    assert log_path.read_text(encoding="utf-8") == "trial log line\n"
 
 
 def _entrypoint_args(config_path, **overrides):
@@ -88,6 +99,34 @@ def test_isaacsim_recovery_defaults_match_csvto_cadence(tmp_path):
     assert config["steps_per_action"] == 40
     assert config["action_repeat"] == 3
     assert config["save_recovery_frames"] is True
+
+
+def test_isaacsim_recovery_loads_per_finger_min_force(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "\n".join(
+            (
+                "controllers:",
+                "  csvgd: {}",
+                "external_wrench_perturb: false",
+                "rand_pct: 0.333",
+                "random_force_magnitude: 1.0",
+                "min_force:",
+                "  index: 0.25",
+                "  middle: 0.75",
+                "  thumb: 1.25",
+                "",
+            )
+        )
+    )
+
+    config = screwdriver_isaacsim_recovery.load_config(_entrypoint_args(config_path))
+
+    assert config["min_force_dict"] == {
+        "index": pytest.approx(0.25),
+        "middle": pytest.approx(0.75),
+        "thumb": pytest.approx(1.25),
+    }
 
 
 def test_isaacsim_recovery_rejects_frame_saving_without_cameras(tmp_path):
@@ -651,7 +690,7 @@ def test_wrapper_frame_saving_requires_tiled_camera(tmp_path):
         wrapper.frame_id = 0
 
 
-def _load_legacy_recovery_module(monkeypatch, executed_modes):
+def _load_legacy_recovery_module(monkeypatch, executed_modes, created_problems=None):
     def extract_state_vector(state, num_fingers, device, obj_dof=None, slice_end=None, hardcoded_dim=None):
         q = state["q"].reshape(-1).to(device=device, dtype=torch.float32).clone()
         if slice_end is not None:
@@ -697,9 +736,12 @@ def _load_legacy_recovery_module(monkeypatch, executed_modes):
     stubs["ccai.utils.allegro_utils"].visualize_trajectory = lambda *args, **kwargs: None
     stubs["ccai.utils.allegro_utils"].partial_to_full_state = lambda *args, **kwargs: None
     stubs["ccai.utils.allegro_utils"].extract_state_vector = extract_state_vector
-    stubs["ccai.utils.recovery_utils"].create_allegro_screwdriver_problem = (
-        lambda *args, **kwargs: types.SimpleNamespace(dx=15)
-    )
+    def create_problem(*args, **kwargs):
+        if created_problems is not None:
+            created_problems.append({"args": args, "kwargs": kwargs})
+        return types.SimpleNamespace(dx=15)
+
+    stubs["ccai.utils.recovery_utils"].create_allegro_screwdriver_problem = create_problem
     stubs["ccai.utils.recovery_utils"].create_planner = lambda problem, mode, params: FakePlanner(problem)
     stubs["ccai.utils.recovery_utils"].add_to_dataset = lambda *args, **kwargs: None
     stubs["ccai.utils.recovery_utils"].partial_to_full_trajectory = lambda *args, **kwargs: None
@@ -799,6 +841,24 @@ def test_do_trial_preserves_pregrasp_only_short_circuit(monkeypatch, tmp_path):
 
     assert executed_modes == []
     assert len(legacy.all_pregrasp_states) == 1
+
+
+def test_do_trial_uses_configured_min_force_dict(monkeypatch, tmp_path):
+    executed_modes = []
+    created_problems = []
+    legacy = _load_legacy_recovery_module(monkeypatch, executed_modes, created_problems)
+    legacy.all_pregrasp_states.clear()
+    params = _trial_params(pregrasp_only=False)
+    params["min_force_dict"] = {"index": 0.25, "middle": 0.75, "thumb": 1.25}
+
+    legacy.do_trial(_FakeTrialEnv(), params, tmp_path)
+
+    turn_problem = next(problem for problem in created_problems if problem["args"][0] == "turn")
+    assert turn_problem["kwargs"]["min_force_dict"] == {
+        "index": pytest.approx(0.25),
+        "middle": pytest.approx(0.75),
+        "thumb": pytest.approx(1.25),
+    }
 
 
 def test_create_problem_passes_proto5_full_dof_metadata():

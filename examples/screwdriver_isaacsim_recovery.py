@@ -51,6 +51,18 @@ DEFAULT_DIFFPF_TRAJECTORY_SELECTION_MODE = "max_reward_times_exp_likelihood"
 DEFAULT_DIFFPF_LIKELIHOOD_MASK = "inverse_dynamics"
 DEFAULT_DIFFPF_LIKELIHOOD_TEMPERATURE = 10.0
 DEFAULT_DIFFPF_LIKELIHOOD_REWARD_SCOPE = "per_step"
+DEFAULT_MIN_FORCE_BY_HAND = {
+    "allegro": {
+        "thumb": 1.0,
+        "middle": 1.0,
+        "index": 1.0,
+    },
+    "proto5": {
+        "thumb": 1.0,
+        "middle": 1.0,
+        "index": 1.0,
+    },
+}
 
 
 def _bool_from_cli(value):
@@ -136,6 +148,29 @@ def parse_args():
     return parser.parse_args()
 
 
+def _parse_min_force_config(config: dict) -> dict[str, float]:
+    hand = str(config.get("hand", "allegro")).lower()
+    fallback = DEFAULT_MIN_FORCE_BY_HAND.get(hand, DEFAULT_MIN_FORCE_BY_HAND["allegro"])
+    configured = config.get("min_force", config.get("min_force_dict", fallback))
+    if configured is None:
+        return dict(fallback)
+    if isinstance(configured, (int, float)):
+        return {finger: float(configured) for finger in fallback}
+    if not isinstance(configured, dict):
+        raise ValueError("min_force must be a scalar or a mapping from finger name to force.")
+
+    unknown_fingers = set(configured) - set(fallback)
+    if unknown_fingers:
+        raise ValueError(
+            "min_force contains unknown finger(s): "
+            + ", ".join(sorted(unknown_fingers))
+            + f". Expected any of: {', '.join(sorted(fallback))}."
+        )
+    min_force_dict = dict(fallback)
+    min_force_dict.update({finger: float(value) for finger, value in configured.items()})
+    return min_force_dict
+
+
 def load_config(args) -> dict:
     config_path = args.config
     if not config_path.is_absolute():
@@ -206,6 +241,7 @@ def load_config(args) -> dict:
     config.setdefault("diffpf_likelihood_mask", DEFAULT_DIFFPF_LIKELIHOOD_MASK)
     config.setdefault("diffpf_likelihood_temperature", DEFAULT_DIFFPF_LIKELIHOOD_TEMPERATURE)
     config.setdefault("diffpf_likelihood_reward_scope", DEFAULT_DIFFPF_LIKELIHOOD_REWARD_SCOPE)
+    config["min_force_dict"] = _parse_min_force_config(config)
     if bool(config["save_recovery_frames"]) and bool(config["no_video"]):
         raise ValueError("save_recovery_frames=True requires cameras; run without --no_video true.")
     if config["no_video"]:
@@ -567,7 +603,7 @@ def main():
     from tqdm import tqdm
 
     from ccai.models.management.model_manager import ModelManager
-    from ccai.utils.isaacsim_screwdriver_recovery import get_hand_spec
+    from ccai.utils.isaacsim_screwdriver_recovery import get_hand_spec, tee_stdout_to_file
 
     legacy = prepare_legacy_module(config)
     env = make_isaacsim_env(config)
@@ -618,71 +654,72 @@ def main():
     seed = 0
     base_seed = 0 if config.get("seed", None) is None else int(config["seed"])
     for i in tqdm(range(start_ind, num_episodes)):
-        print(f"\nTrial {i + 1}")
-        if not params["skip_pregrasp"]:
-            if config.get("debug_progress", False):
-                print("debug_progress: resetting IsaacSim env", flush=True)
-            env.reset()
-            object_randomization = randomize_isaacsim_object_start(
-                env,
-                config,
-                np.random.default_rng(base_seed + i),
-            )
-            if object_randomization is not None and config.get("debug_progress", False):
-                print(
-                    "debug_progress: randomized object start "
-                    f"offset_world={object_randomization['screwdriver_pos_offset_world'][0].tolist()} "
-                    f"pos_world={object_randomization['screwdriver_pos_world'][0].tolist()}",
-                    flush=True,
-                )
-        else:
-            if config.get("debug_progress", False):
-                print("debug_progress: applying saved pregrasp state", flush=True)
-            legacy.apply_saved_pregrasp_state(env, None, pregrasp_states, i, start_ind, params)
-        if normal_action_policy is not None and hasattr(normal_action_policy, "reset_from_env"):
-            normal_action_policy.reset_from_env(env)
-        physical_kwargs = get_recovery_planner_physical_kwargs(env, config)
-        params.update(physical_kwargs)
-        if config.get("debug_progress", False):
-            print(
-                "debug_progress: planner physical kwargs "
-                f"friction_coefficient={physical_kwargs['friction_coefficient']} "
-                f"yaw_joint_friction={physical_kwargs['yaw_joint_friction']} "
-                f"yaw_friction_model_path={physical_kwargs['yaw_friction_model_path']} "
-                f"yaw_inertia_model_path={physical_kwargs['yaw_inertia_model_path']} "
-                f"cache_dir={os.environ.get('PYTORCH_VOLUMETRIC_POINTS_CACHE_DIR')}",
-                flush=True,
-            )
-
-        goal = torch.tensor([0, 0, float(config["goal"])])
         fpath = experiment_dir / "csvgd" / f"trial_{i + 1}"
         fpath.mkdir(parents=True, exist_ok=True)
+        with tee_stdout_to_file(fpath / "stdout.log"):
+            print(f"\nTrial {i + 1}")
+            if not params["skip_pregrasp"]:
+                if config.get("debug_progress", False):
+                    print("debug_progress: resetting IsaacSim env", flush=True)
+                env.reset()
+                object_randomization = randomize_isaacsim_object_start(
+                    env,
+                    config,
+                    np.random.default_rng(base_seed + i),
+                )
+                if object_randomization is not None and config.get("debug_progress", False):
+                    print(
+                        "debug_progress: randomized object start "
+                        f"offset_world={object_randomization['screwdriver_pos_offset_world'][0].tolist()} "
+                        f"pos_world={object_randomization['screwdriver_pos_world'][0].tolist()}",
+                        flush=True,
+                    )
+            else:
+                if config.get("debug_progress", False):
+                    print("debug_progress: applying saved pregrasp state", flush=True)
+                legacy.apply_saved_pregrasp_state(env, None, pregrasp_states, i, start_ind, params)
+            if normal_action_policy is not None and hasattr(normal_action_policy, "reset_from_env"):
+                normal_action_policy.reset_from_env(env)
+            physical_kwargs = get_recovery_planner_physical_kwargs(env, config)
+            params.update(physical_kwargs)
+            if config.get("debug_progress", False):
+                print(
+                    "debug_progress: planner physical kwargs "
+                    f"friction_coefficient={physical_kwargs['friction_coefficient']} "
+                    f"yaw_joint_friction={physical_kwargs['yaw_joint_friction']} "
+                    f"yaw_friction_model_path={physical_kwargs['yaw_friction_model_path']} "
+                    f"yaw_inertia_model_path={physical_kwargs['yaw_inertia_model_path']} "
+                    f"cache_dir={os.environ.get('PYTORCH_VOLUMETRIC_POINTS_CACHE_DIR')}",
+                    flush=True,
+                )
 
-        params["valve_goal"] = goal.to(device=params["device"])
-        params["chain"] = chain.to(device=params["device"])
-        params["object_location"] = torch.as_tensor(env.table_pose, device=params["device"], dtype=torch.float32)
-        params["controller"] = "csvgd"
-        params["perturb_action"] = bool(params.get("perturb_action", False))
-        params["trial_index"] = i
+            goal = torch.tensor([0, 0, float(config["goal"])])
 
-        if config.get("debug_progress", False):
-            print("debug_progress: entering legacy do_trial", flush=True)
-        final_distance_to_goal, dropped = legacy.do_trial(
-            env,
-            params,
-            fpath,
-            sim_viz_env=None,
-            ros_copy_node=None,
-            seed=seed,
-            proj_path=None,
-            perturb_this_trial=params["perturb_action"],
-            trajectory_sampler=trajectory_sampler,
-            trajectory_sampler_orig=trajectory_sampler_orig,
-            config=config,
-            classifier=classifier,
-            normal_action_policy=normal_action_policy,
-        )
-        print(f"Trial {i + 1} yaw delta: {final_distance_to_goal}; dropped={dropped}")
+            params["valve_goal"] = goal.to(device=params["device"])
+            params["chain"] = chain.to(device=params["device"])
+            params["object_location"] = torch.as_tensor(env.table_pose, device=params["device"], dtype=torch.float32)
+            params["controller"] = "csvgd"
+            params["perturb_action"] = bool(params.get("perturb_action", False))
+            params["trial_index"] = i
+
+            if config.get("debug_progress", False):
+                print("debug_progress: entering legacy do_trial", flush=True)
+            final_distance_to_goal, dropped = legacy.do_trial(
+                env,
+                params,
+                fpath,
+                sim_viz_env=None,
+                ros_copy_node=None,
+                seed=seed,
+                proj_path=None,
+                perturb_this_trial=params["perturb_action"],
+                trajectory_sampler=trajectory_sampler,
+                trajectory_sampler_orig=trajectory_sampler_orig,
+                config=config,
+                classifier=classifier,
+                normal_action_policy=normal_action_policy,
+            )
+            print(f"Trial {i + 1} yaw delta: {final_distance_to_goal}; dropped={dropped}")
         seed += 1
 
         if not params["skip_pregrasp"]:
