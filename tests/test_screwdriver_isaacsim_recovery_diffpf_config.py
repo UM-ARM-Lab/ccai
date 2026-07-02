@@ -39,6 +39,7 @@ def test_diffpf_defaults_match_model_mismatch_collector(monkeypatch, tmp_path):
     assert config["diffpf_likelihood_mask"] == "inverse_dynamics"
     assert config["diffpf_likelihood_temperature"] == 10.0
     assert config["diffpf_likelihood_reward_scope"] == "per_step"
+    assert config["diffpf_reset_belief_after_recovery"] is True
 
 
 def test_diffpf_values_are_loaded_from_yaml(monkeypatch, tmp_path):
@@ -60,6 +61,7 @@ def test_diffpf_values_are_loaded_from_yaml(monkeypatch, tmp_path):
                 "diffpf_likelihood_mask: 'all'",
                 "diffpf_likelihood_temperature: 2.5",
                 "diffpf_likelihood_reward_scope: 'trajectory'",
+                "diffpf_reset_belief_after_recovery: false",
             ]
         ),
         encoding="utf-8",
@@ -86,6 +88,7 @@ def test_diffpf_values_are_loaded_from_yaml(monkeypatch, tmp_path):
     assert config["diffpf_likelihood_mask"] == "all"
     assert config["diffpf_likelihood_temperature"] == 2.5
     assert config["diffpf_likelihood_reward_scope"] == "trajectory"
+    assert config["diffpf_reset_belief_after_recovery"] is False
 
 
 def test_model_compilation_is_yaml_configured(monkeypatch, tmp_path):

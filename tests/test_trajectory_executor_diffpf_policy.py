@@ -31,6 +31,12 @@ baselines.should_skip_diff_init = lambda *args, **kwargs: False
 sys.modules["ccai.baselines.allegro_recovery_baselines"] = baselines
 
 from ccai.execution.trial_executor import TrajectoryExecutor
+from ccai.utils.screwdriver_yaw_wrap import (
+    reset_screwdriver_yaw_wrap,
+    unwrap_screwdriver_task_state_yaw,
+    update_screwdriver_yaw_wrap_after_recovery,
+    wrap_screwdriver_task_state_yaw,
+)
 
 
 class _FakeEnv:
@@ -68,6 +74,7 @@ class _FakePolicy:
         self.plan_calls = 0
         self.observe_calls = 0
         self.reset_after_recovery_calls = 0
+        self.reset_belief_args = []
 
     def plan_next(self, env, step_idx):
         self.plan_calls += 1
@@ -83,12 +90,23 @@ class _FakePolicy:
     def observe_transition(self, **kwargs):
         self.observe_calls += 1
 
-    def reset_after_recovery(self, env):
+    def reset_after_recovery(self, env, *, reset_belief=True):
+        self.reset_belief_args.append(reset_belief)
         self.reset_after_recovery_calls += 1
 
 
 class _FakeSampler:
     def check_id(self, *args, **kwargs):
+        return True, torch.tensor(0.0)
+
+
+class _RecordingSampler:
+    def __init__(self):
+        self.states = []
+
+    def check_id(self, state, *args, **kwargs):
+        del args, kwargs
+        self.states.append(torch.as_tensor(state).detach().clone())
         return True, torch.tensor(0.0)
 
 
@@ -106,12 +124,125 @@ class _FakePlanner:
         self.x = torch.zeros(1, 16)
 
 
+class _FakeTrajectorySampler:
+    T = 3
+
+    def __init__(self, yaw):
+        self.yaw = float(yaw)
+        self.starts = []
+
+    def sample(self, *, N, start, H, constraints):
+        del H, constraints
+        self.starts.append(torch.as_tensor(start).detach().clone())
+        samples = torch.zeros(N, 3, 27)
+        samples[..., 14] = self.yaw
+        return samples, None, torch.arange(N, dtype=torch.float32)
+
+
 def _data():
     return {
         "pre_action_likelihoods": [],
         "final_likelihoods": [],
         "csvto_times": [],
     }
+
+
+def test_screwdriver_yaw_wrap_advances_only_after_recovery_update():
+    params = {}
+    initial = torch.zeros(15)
+    initial[-1] = 1.0
+    reset_screwdriver_yaw_wrap(params, initial)
+
+    crossed = initial.clone()
+    crossed[-1] = 1.0 - torch.pi / 2.0 - 0.2
+    before_update = wrap_screwdriver_task_state_yaw(params, crossed)
+    torch.testing.assert_close(before_update[-1], crossed[-1])
+
+    update_screwdriver_yaw_wrap_after_recovery(params, crossed)
+    after_update = wrap_screwdriver_task_state_yaw(params, crossed)
+    torch.testing.assert_close(after_update[-1], torch.tensor(0.8))
+    unwrapped = unwrap_screwdriver_task_state_yaw(params, after_update)
+    torch.testing.assert_close(unwrapped[-1], crossed[-1])
+    torch.testing.assert_close(crossed[-1], torch.tensor(1.0 - torch.pi / 2.0 - 0.2))
+
+
+def test_likelihood_check_uses_wrapped_yaw_without_mutating_raw_state():
+    env = _FakeEnv()
+    sampler = _RecordingSampler()
+    data = _data()
+    data["pre_action_likelihoods"].append([])
+    params = {
+        "device": "cpu",
+        "mode": "simulation",
+        "live_recovery": True,
+        "OOD_metric": "likelihood",
+        "likelihood_num_samples": 1,
+        "likelihood_threshold": -15,
+    }
+    initial = torch.zeros(15)
+    initial[-1] = 1.0
+    reset_screwdriver_yaw_wrap(params, initial)
+    raw_state = initial.clone()
+    raw_state[-1] = 1.0 - torch.pi / 2.0 - 0.2
+    update_screwdriver_yaw_wrap_after_recovery(params, raw_state)
+
+    TrajectoryExecutor(params, env)._check_exit_conditions(
+        1,
+        raw_state,
+        None,
+        sampler,
+        None,
+        False,
+        data,
+        [],
+        [],
+        None,
+    )
+
+    assert len(sampler.states) == 1
+    torch.testing.assert_close(sampler.states[0][-1], torch.tensor(0.8))
+    torch.testing.assert_close(raw_state[-1], torch.tensor(1.0 - torch.pi / 2.0 - 0.2))
+
+
+def test_diffusion_initial_samples_unwrap_yaw_before_planner_use(tmp_path, monkeypatch):
+    import ccai.execution.trial_executor as trial_executor_module
+
+    monkeypatch.setattr(trial_executor_module, "convert_yaw_to_sine_cosine", lambda x: x)
+    monkeypatch.setattr(trial_executor_module, "convert_sine_cosine_to_yaw", lambda x: x)
+    params = {
+        "device": "cpu",
+        "diff_init": True,
+        "sine_cosine": True,
+        "N_contact_plan": 2,
+        "N": 1,
+        "T": 2,
+        "T_orig": 2,
+    }
+    initial = torch.zeros(15)
+    initial[-1] = 1.0
+    reset_screwdriver_yaw_wrap(params, initial)
+    raw_state = initial.clone()
+    raw_state[-1] = 1.0 - torch.pi / 2.0 - 0.2
+    update_screwdriver_yaw_wrap_after_recovery(params, raw_state)
+    sampler = _FakeTrajectorySampler(yaw=0.8)
+
+    initial_samples, _new_T, _sim_rollouts = TrajectoryExecutor(params, _FakeEnv())._handle_initial_sampling(
+        mode="turn",
+        trajectory_sampler=None,
+        trajectory_sampler_orig=sampler,
+        recover=False,
+        skip_diff_init=False,
+        initial_samples=None,
+        state=raw_state,
+        contact=torch.ones(2, 3),
+        num_fingers=3,
+        obj_dof=3,
+        mode_fpath=tmp_path,
+        planner=types.SimpleNamespace(problem=types.SimpleNamespace(dx=15, du=12)),
+    )
+
+    torch.testing.assert_close(sampler.starts[0].reshape(-1)[-1], torch.tensor(0.8))
+    torch.testing.assert_close(initial_samples[0, 0, 14], torch.tensor(1.0 - torch.pi / 2.0 - 0.2))
 
 
 def test_proto5_normal_policy_branch_logs_contact_timeseries_and_rows():
@@ -203,6 +334,45 @@ def test_recovery_branch_resets_normal_policy_without_observing_recovery_transit
     assert policy.plan_calls == 0
     assert policy.observe_calls == 0
     assert policy.reset_after_recovery_calls == 1
+    assert policy.reset_belief_args == [True]
+
+
+def test_recovery_branch_passes_no_reset_config_to_normal_policy():
+    env = _FakeEnv()
+    policy = _FakePolicy()
+    data = _data()
+    params = {
+        "device": "cpu",
+        "mode": "simulation",
+        "live_recovery": True,
+        "OOD_metric": "likelihood",
+        "likelihood_num_samples": 1,
+        "likelihood_threshold": -15,
+        "controller": "csvgd",
+        "recovery_controller": "csvgd",
+        "visualize_plan": False,
+        "visualize_recovery_plan": False,
+        "diffpf_reset_belief_after_recovery": False,
+        "T": 0,
+        "T_orig": 0,
+    }
+
+    TrajectoryExecutor(params, env).execute_traj(
+        planner=_FakePlanner(),
+        mode="index",
+        env=env,
+        data=data,
+        trajectory_sampler_orig=None,
+        num_fingers=3,
+        obj_dof=3,
+        episode_num_steps=0,
+        max_episode_num_steps=10,
+        normal_action_policy=policy,
+        recover=True,
+    )
+
+    assert policy.reset_after_recovery_calls == 1
+    assert policy.reset_belief_args == [False]
 
 
 def test_turn_recovery_segment_does_not_reset_normal_policy_belief():

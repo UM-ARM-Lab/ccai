@@ -40,6 +40,11 @@ from ccai.utils.recovery_utils import (
     full_to_partial_trajectory, create_mode_planner_dict, build_pregrasp_reference_target_kwargs,
     stack_execution_timeseries_for_save
 )
+from ccai.utils.screwdriver_yaw_wrap import (
+    reset_screwdriver_yaw_wrap,
+    update_screwdriver_yaw_wrap_after_recovery,
+    wrap_screwdriver_task_state_yaw,
+)
 
 from ccai.allegro_contact import AllegroManipulationProblem, PositionControlConstrainedSVGDMPC
 
@@ -552,6 +557,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     
     # Store initial yaw for tracking rotation progress
     initial_yaw = state[-1].item()
+    reset_screwdriver_yaw_wrap(params, state)
     max_stages = 2  # Maximum number of stages for non-live recovery mode
 
     def should_continue_loop():
@@ -813,17 +819,12 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             if all_stage > 1 and len(data['final_likelihoods'][-2]) == 0:
                 data['final_likelihoods'][-2].append(data['pre_action_likelihoods'][-1][0])
 
+        just_finished_recovery = bool(pre_recover) and not bool(recover)
+        if just_finished_recovery:
+            update_screwdriver_yaw_wrap_after_recovery(params, start)
+
         stage += 1
         all_stage += 1
-
-        # Check if screwdriver has turned 60 degrees (π/3 radians)
-        current_yaw = start[-1].item()
-        yaw_delta = current_yaw - initial_yaw
-        target_yaw_delta = -np.pi / 3  # -60 degrees (clockwise)
-        
-        if yaw_delta <= target_yaw_delta and 3:
-            print(f'Screwdriver turned 60 degrees! Yaw delta: {np.degrees(yaw_delta):.2f} degrees')
-            done = True
 
         roll_abs = np.abs(start[-3].item())
         pitch_abs = np.abs(start[-2].item())
@@ -842,7 +843,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             state = extract_state_vector(state, num_fingers, params['device'], slice_end=15)
             
             start = state[:4 * num_fingers + obj_dof]
-            start_sine_cosine = convert_yaw_to_sine_cosine(start)
+            task_start = wrap_screwdriver_task_state_yaw(params, start)
+            start_sine_cosine = convert_yaw_to_sine_cosine(task_start)
             
             # Project the state back into distribution if we are computing recovery trajectories
             pre_project_time = time.perf_counter()
@@ -1012,7 +1014,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             break
     if (params.get('live_recovery', False) and data['final_likelihoods'] and
             len(data['final_likelihoods'][-1]) == 0 and params['OOD_metric'] != 'q_function'):
-        id, likelihood = trajectory_sampler_orig.check_id(state, params['likelihood_num_samples'], threshold=params.get('likelihood_threshold', -15))
+        task_state = wrap_screwdriver_task_state_yaw(params, state)
+        id, likelihood = trajectory_sampler_orig.check_id(task_state, params['likelihood_num_samples'], threshold=params.get('likelihood_threshold', -15))
         data['final_likelihoods'][-1].append(likelihood)
         data_save = deepcopy(data)
         for t in range(1, 1 + params['T']):

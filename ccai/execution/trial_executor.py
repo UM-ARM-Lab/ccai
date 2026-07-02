@@ -15,6 +15,10 @@ from ccai.utils.recovery_utils import (
     partial_to_full_trajectory, full_to_partial_trajectory, 
     setup_and_visualize_trajectory, get_screwdriver_plan_camera_path
 )
+from ccai.utils.screwdriver_yaw_wrap import (
+    unwrap_screwdriver_task_state_yaw,
+    wrap_screwdriver_task_state_yaw,
+)
 from ccai.trajectory_shortcut import shortcut_trajectory
 from ccai.baselines.allegro_recovery_baselines import should_skip_diff_init
 
@@ -50,7 +54,11 @@ class TrajectoryExecutor:
                 and normal_action_policy is not None
                 and hasattr(normal_action_policy, "reset_after_recovery")
             ):
-                normal_action_policy.reset_after_recovery(self.env)
+                reset_belief = bool(self.params.get("diffpf_reset_belief_after_recovery", True))
+                try:
+                    normal_action_policy.reset_after_recovery(self.env, reset_belief=reset_belief)
+                except TypeError:
+                    normal_action_policy.reset_after_recovery(self.env)
         
         # reset planner
         state = self.env.get_state()
@@ -78,8 +86,9 @@ class TrajectoryExecutor:
                 id_check, final_likelihood = True, None
             else:
                 if self.params['OOD_metric'] == 'likelihood':
+                    task_state = wrap_screwdriver_task_state_yaw(self.params, state)
                     id_check, final_likelihood = trajectory_sampler_orig.check_id(
-                        state, self.params['likelihood_num_samples'], 
+                        task_state, self.params['likelihood_num_samples'],
                         threshold=self.params.get('likelihood_threshold', -15))
                 else:
                     id_check, final_likelihood = True, None
@@ -530,7 +539,7 @@ class TrajectoryExecutor:
             initial_samples is None):
 
             sampler = trajectory_sampler if recover else trajectory_sampler_orig
-            start = state.clone()
+            start = wrap_screwdriver_task_state_yaw(self.params, state)
 
             a = time.perf_counter()
             if self.params['sine_cosine']:
@@ -551,6 +560,13 @@ class TrajectoryExecutor:
                 initial_samples = convert_sine_cosine_to_yaw(initial_samples)
                 if initial_samples_0 is not None:
                     initial_samples_0 = convert_sine_cosine_to_yaw(initial_samples_0)
+            initial_samples = unwrap_screwdriver_task_state_yaw(self.params, initial_samples, yaw_idx=14)
+            if initial_samples_0 is not None:
+                initial_samples_0 = unwrap_screwdriver_task_state_yaw(
+                    self.params,
+                    initial_samples_0,
+                    yaw_idx=14,
+                )
         
         if initial_samples is not None:
             initial_samples = initial_samples.to(device=self.params['device'])
@@ -710,8 +726,9 @@ class TrajectoryExecutor:
                 id_check, final_likelihood = True, None
             else:
                 if self.params['OOD_metric'] == 'likelihood':
+                    task_state = wrap_screwdriver_task_state_yaw(self.params, state)
                     id_check, final_likelihood = trajectory_sampler_orig.check_id(
-                        state, self.params['likelihood_num_samples'], 
+                        task_state, self.params['likelihood_num_samples'],
                         threshold=self.params.get('likelihood_threshold', -15))
                 else:
                     id_check, final_likelihood = True, None

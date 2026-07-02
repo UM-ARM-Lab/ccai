@@ -7,6 +7,8 @@ import torch
 import numpy as np
 from collections import defaultdict
 
+from ccai.utils.screwdriver_yaw_wrap import wrap_screwdriver_task_state_yaw
+
 
 class BaselineRecoveryController:
     """Base class for baseline recovery controllers."""
@@ -136,9 +138,9 @@ class BaselineOODDetector:
         """Check OOD using likelihood from trajectory sampler."""
         if self.trajectory_sampler_orig is None:
             return True, None
-            
+        task_state = wrap_screwdriver_task_state_yaw(self.params, state)
         id_check, final_likelihood = self.trajectory_sampler_orig.check_id(
-            state, 
+            task_state,
             self.params['likelihood_num_samples'], 
             threshold=self.params.get('likelihood_threshold', -15)
         )
@@ -212,8 +214,9 @@ def get_baseline_final_likelihood(data, params, state, trajectory_sampler_orig):
         len(data['final_likelihoods'][-1]) == 0 and 
         params['OOD_metric'] != 'q_function'):
         
+        task_state = wrap_screwdriver_task_state_yaw(params, state)
         id_check, likelihood = trajectory_sampler_orig.check_id(
-            state, 
+            task_state,
             params['likelihood_num_samples'], 
             threshold=params.get('likelihood_threshold', -15)
         )

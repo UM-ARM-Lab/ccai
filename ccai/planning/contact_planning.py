@@ -19,6 +19,10 @@ from ccai.utils.recovery_utils import (
     save_goal_info,
     save_recovery_info,
 )
+from ccai.utils.screwdriver_yaw_wrap import (
+    unwrap_screwdriver_task_state_yaw,
+    wrap_screwdriver_task_state_yaw,
+)
 
 
 @dataclass
@@ -51,11 +55,12 @@ class ContactPlanner:
 
         start_plan_time = time.perf_counter()
         modes = ['thumb_middle', 'index'] 
+        task_state = wrap_screwdriver_task_state_yaw(self.params, state)
         
         if self.params['sine_cosine']:
-            start_for_diff = convert_yaw_to_sine_cosine(state)
+            start_for_diff = convert_yaw_to_sine_cosine(task_state)
         else:
-            start_for_diff = state
+            start_for_diff = task_state
             
         mean = self.trajectory_sampler.x_mean[:16]
         std = self.trajectory_sampler.x_std[:16]
@@ -73,6 +78,7 @@ class ContactPlanner:
         )
         
         best_mode_traj = convert_sine_cosine_to_yaw(best_mode_traj)
+        best_mode_traj = unwrap_screwdriver_task_state_yaw(self.params, best_mode_traj, yaw_idx=14)
         highest_likelihood_traj_idx = best_mode_likelihoods.argmax(0)
         num_fingers = len(self.params['fingers'])
         obj_dof = 3  # Assuming obj_dof is 3 for screwdriver
@@ -91,7 +97,8 @@ class ContactPlanner:
         if self.params.get('task_model_path', None):
             # Use recovery model to get contact mode
             state = state[:15]
-            start = convert_yaw_to_sine_cosine(state)
+            task_state = wrap_screwdriver_task_state_yaw(self.params, state)
+            start = convert_yaw_to_sine_cosine(task_state)
             start = start.unsqueeze(0)
             contact_mode_str_max = 'unknown'
             
@@ -124,6 +131,7 @@ class ContactPlanner:
 
                 initial_samples = initial_samples[indices]
                 initial_samples = convert_sine_cosine_to_yaw(initial_samples)
+                initial_samples = unwrap_screwdriver_task_state_yaw(self.params, initial_samples, yaw_idx=14)
                 plan_time = time.perf_counter() - start_plan_time
                 print('Likelihoods:', likelihood_sort)
                 print('Contact modes', contact_mode_str_sort)
@@ -330,6 +338,11 @@ class ContactPlanner:
             trajectories_for_scoring = convert_sine_cosine_to_yaw(trajectories)
         else:
             trajectories_for_scoring = trajectories
+        trajectories_for_scoring = unwrap_screwdriver_task_state_yaw(
+            self.params,
+            trajectories_for_scoring,
+            yaw_idx=14,
+        )
 
         child_specs = []
         terminal_state_chunks = []
@@ -471,7 +484,7 @@ class ContactPlanner:
         return starts.repeat(self.params['N_contact_plan'], 1)
 
     def _prepare_chained_start_batch(self, terminal_states):
-        states = terminal_states
+        states = wrap_screwdriver_task_state_yaw(self.params, terminal_states)
         if states.ndim == 1:
             states = states.reshape(1, -1)
 
@@ -530,6 +543,7 @@ class ContactPlanner:
         return unique_likelihoods[inverse_indices].reshape(terminal_states.shape[:-1])
 
     def _batched_terminal_task_likelihoods(self, terminal_states):
+        terminal_states = wrap_screwdriver_task_state_yaw(self.params, terminal_states)
         num_states = terminal_states.shape[0]
         num_likelihood_samples = self.params['likelihood_num_samples']
         start = convert_yaw_to_sine_cosine(terminal_states)
@@ -560,8 +574,9 @@ class ContactPlanner:
     def _serial_terminal_task_likelihoods(self, terminal_states):
         likelihoods = []
         for terminal_state in terminal_states:
+            task_terminal_state = wrap_screwdriver_task_state_yaw(self.params, terminal_state)
             likelihood = self.trajectory_sampler_orig.check_id(
-                terminal_state,
+                task_terminal_state,
                 self.params['likelihood_num_samples'],
                 threshold=self.params.get('likelihood_threshold', -15),
                 likelihood_only=True,
@@ -655,8 +670,9 @@ class ContactPlanner:
             end = x[-1]
             
             # Estimate likelihood of the end state
+            task_end = wrap_screwdriver_task_state_yaw(self.params, end)
             likelihood, samples = self.trajectory_sampler_orig.check_id(
-                end, self.params['likelihood_num_samples'], likelihood_only=True, 
+                task_end, self.params['likelihood_num_samples'], likelihood_only=True,
                 return_samples=True, threshold=self.params.get('likelihood_threshold', -15))
             distances.append(-likelihood)
             

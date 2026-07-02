@@ -241,6 +241,7 @@ def load_config(args) -> dict:
     config.setdefault("diffpf_likelihood_mask", DEFAULT_DIFFPF_LIKELIHOOD_MASK)
     config.setdefault("diffpf_likelihood_temperature", DEFAULT_DIFFPF_LIKELIHOOD_TEMPERATURE)
     config.setdefault("diffpf_likelihood_reward_scope", DEFAULT_DIFFPF_LIKELIHOOD_REWARD_SCOPE)
+    config.setdefault("diffpf_reset_belief_after_recovery", True)
     config["min_force_dict"] = _parse_min_force_config(config)
     if bool(config["save_recovery_frames"]) and bool(config["no_video"]):
         raise ValueError("save_recovery_frames=True requires cameras; run without --no_video true.")
