@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 10
 num_episodes: 200
 visualize: True
-experiment_name: 'proto_blue_screwdriver_D_TOUR_recovery_data_gen_95'
+experiment_name: 'proto_blue_screwdriver_D_TOUR_recovery_data_gen_mf_1_lt_10_105'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -39,9 +39,9 @@ visualize_recovery_plan: True
 visualize_contact_plan: True
 optimize_force: True
 min_force:
-  index: 1.5
-  middle: 1.5
-  thumb: 1.5
+  index: 0
+  middle: 1
+  thumb: 1
 exclude_index: False
 projected: False
 use_saved_plans: True
@@ -83,9 +83,9 @@ diffpf_execution_horizon: 1
 diffpf_num_trajectories: 128
 diffpf_trajectory_selection_mode: "max_reward_times_exp_likelihood"
 diffpf_likelihood_mask: "inverse_dynamics"
-diffpf_likelihood_temperature: 10.0
+diffpf_likelihood_temperature: 10
 diffpf_likelihood_reward_scope: "per_step"
-likelihood_threshold: -100.0
+likelihood_threshold: -105.0
 # likelihood_threshold: -40.0
 likelihood_num_samples: 8
 N_contact_plan: 16
@@ -108,7 +108,7 @@ controllers:
     # N: 16
     N: 1
     recovery_N: 16
-    alpha_J: 1.0e-3
+    alpha_J: 1.0e-2
     alpha_C: 1
     step_size: 0.1
     momentum: 0.

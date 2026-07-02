@@ -541,6 +541,21 @@ class IsaacSimScrewdriverRecoveryEnv:
             pass
         return self.default_dof_pos
 
+    def get_full_dof_reference(self, env_id: int = 0) -> torch.Tensor:
+        """Return the current full-hand joint state in the planner's semantic order."""
+        env_id = int(env_id)
+        try:
+            robot = self.scene["robot"]
+            source = getattr(robot.data, "joint_pos", None)
+            if source is None:
+                source = getattr(robot.data, "default_joint_pos", None)
+            if source is None:
+                raise AttributeError("joint_pos")
+            joint_pos = _as_2d_tensor(source, device=self.device, dtype=torch.float32)
+            return joint_pos[env_id, self._all_joint_ids()].clone()
+        except (AttributeError, KeyError, IndexError, RuntimeError, ValueError):
+            return self.default_dof_pos[env_id].detach().clone()
+
     def get_environment_parameters(self, env_id: int = 0) -> dict[str, float]:
         """Read physical parameters currently sampled in the IsaacLab env."""
         env_id = int(env_id)
@@ -782,7 +797,10 @@ class IsaacSimScrewdriverRecoveryEnv:
 
     def _write_robot_joint_state(self, active_joint_pos: torch.Tensor, env_ids: torch.Tensor) -> None:
         robot = self.scene["robot"]
-        joint_pos = robot.data.default_joint_pos[env_ids].clone()
+        if self.hand == SCREWDRIVER_HAND_PROTO5 and hasattr(robot.data, "joint_pos"):
+            joint_pos = robot.data.joint_pos[env_ids].clone()
+        else:
+            joint_pos = robot.data.default_joint_pos[env_ids].clone()
         joint_vel = torch.zeros_like(robot.data.default_joint_vel[env_ids])
         joint_pos[:, self._active_joint_ids()] = active_joint_pos
         self._set_proto5_frozen_targets(joint_pos, env_ids)

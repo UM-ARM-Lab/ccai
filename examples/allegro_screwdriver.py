@@ -827,7 +827,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
         roll_abs = np.abs(start[-3].item())
         pitch_abs = np.abs(start[-2].item())
-        drop_cutoff = .35
+        drop_cutoff = np.float32(0.15).item()
         dropped = (roll_abs > drop_cutoff) or (pitch_abs > drop_cutoff)
 
         if dropped:
@@ -1044,7 +1044,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     print('All yaw deltas:', all_yaw_deltas)
     roll_abs = np.abs(state[-3].item())
     pitch_abs = np.abs(state[-2].item())
-    drop_cutoff = .25
+    drop_cutoff = np.float32(0.15).item()
     dropped = (roll_abs > drop_cutoff) or (pitch_abs > drop_cutoff)
     write_hri_diffpf_records_for_experiment(data, fpath)
     env.reset()

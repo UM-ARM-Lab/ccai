@@ -158,7 +158,7 @@ class BaselineOODDetector:
         """Check if object has been dropped based on orientation."""
         roll_abs = np.abs(state[-3].item())
         pitch_abs = np.abs(state[-2].item())
-        drop_cutoff = .35
+        drop_cutoff = np.float32(0.15).item()
         dropped = (roll_abs > drop_cutoff) or (pitch_abs > drop_cutoff)
         
         # Only apply drop logic for MPPI

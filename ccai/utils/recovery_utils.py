@@ -215,6 +215,12 @@ def _default_dof_reference_for_problem(env, AllegroScrewdriver, device):
 
     problem_name = getattr(AllegroScrewdriver, "__name__", "")
     if problem_name == "Proto5Screwdriver":
+        if hasattr(env, "get_full_dof_reference"):
+            default_dof_pos = torch.as_tensor(
+                env.get_full_dof_reference(env_id=0),
+                dtype=torch.float32,
+                device=device,
+            )
         if default_dof_pos.numel() != 18:
             raise ValueError(
                 "Proto5Screwdriver requires an 18-DOF default_dof_pos/full_dof_reference, "
