@@ -220,7 +220,7 @@ class AllegroScrewDriverDataset(Dataset):
     def __init__(self, folders, max_T, dx, cosine_sine=False, states_only=False, 
                  skip_pregrasp=False, type_='diffusion', exec_only=False,
                  best_traj_only=False, q_learning_constraint_violation=False,
-                 recovery=False):
+                 recovery=False, filter_recovery_trajectories=True):
         super().__init__()
         self.cosine_sine = cosine_sine
         self.skip_pregrasp = skip_pregrasp
@@ -259,8 +259,9 @@ class AllegroScrewDriverDataset(Dataset):
 
                     need_to_continue = False
                 
-                    # intiialize fl_improvement_bool as all True
-                    if recovery:
+                    # Initialize as all True. Recovery datasets can optionally
+                    # narrow this to trajectories that increased likelihood.
+                    if recovery and filter_recovery_trajectories:
 
                         fl = data['final_likelihoods']
                         
@@ -301,7 +302,7 @@ class AllegroScrewDriverDataset(Dataset):
                     for t in range(max_T, min_t - 1, -1):
                         if t not in data or len(data[t].get('starts', [])) == 0:
                             continue
-                        if not recovery:
+                        if not recovery or not filter_recovery_trajectories:
                             fl_improvement_bool = np.ones(len(data[t]['contact_state']), dtype=bool)
                         new_cs = []
                         cs_bool = []

@@ -241,6 +241,34 @@ class TrajectoryExecutor:
     def _as_cpu_float_tensor(value):
         return torch.as_tensor(value, dtype=torch.float32).detach().cpu()
 
+    @staticmethod
+    def _to_optional_float(value):
+        if value is None:
+            return float("nan")
+        if isinstance(value, torch.Tensor):
+            if value.numel() == 0:
+                return float("nan")
+            value = value.detach().cpu().reshape(-1)[0].item()
+        if isinstance(value, np.ndarray):
+            if value.size == 0:
+                return float("nan")
+            value = value.reshape(-1)[0].item()
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return float("nan")
+
+    def _latest_pre_action_likelihood(self, data):
+        if data is None:
+            return float("nan")
+        likelihood_series = data.get("pre_action_likelihoods", [])
+        if not likelihood_series:
+            return float("nan")
+        current_stage = likelihood_series[-1]
+        if not current_stage:
+            return float("nan")
+        return self._to_optional_float(current_stage[-1])
+
     def _read_tactile_state(self):
         if hasattr(self.env, "get_tactile_observation"):
             obs = self.env.get_tactile_observation()
@@ -296,6 +324,7 @@ class TrajectoryExecutor:
         mode,
         recover,
         episode_num_steps,
+        ood_likelihood=None,
     ):
         if data is None:
             return
@@ -336,6 +365,7 @@ class TrajectoryExecutor:
                     self.params.get("planner_yaw_joint_friction_override", 0.0),
                 )
             ),
+            "likelihood": self._to_optional_float(ood_likelihood),
         }
         data["hri_diffpf_records"].append(record)
 
@@ -466,6 +496,7 @@ class TrajectoryExecutor:
                 mode=mode,
                 recover=False,
                 episode_num_steps=episode_num_steps,
+                ood_likelihood=self._latest_pre_action_likelihood(data),
             )
             episode_num_steps += 1
 
@@ -903,6 +934,7 @@ class TrajectoryExecutor:
             mode=mode,
             recover=recover,
             episode_num_steps=episode_num_steps,
+            ood_likelihood=self._latest_pre_action_likelihood(data),
         )
 
     def _handle_visualization(self, best_traj, planner, state, turn_problem, fpath, fname, k, num_fingers):

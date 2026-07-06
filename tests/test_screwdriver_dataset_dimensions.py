@@ -56,6 +56,52 @@ def _write_screwdriver_trial(root, *, state_dim, action_dim):
     return trial_dir.parent
 
 
+def _write_recovery_trial(root):
+    state_dim = 15
+    action_dim = 12
+    row_width = state_dim + action_dim + 9
+    trial_dir = root / "screwdriver_csvgd_csvto_closed_loop" / "trial_000000"
+    trial_dir.mkdir(parents=True)
+
+    starts = np.stack(
+        [
+            _make_row(state_dim, action_dim, yaw=0.0).reshape(1, row_width),
+            _make_row(state_dim, action_dim, yaw=-0.1).reshape(1, row_width),
+        ],
+        axis=0,
+    )
+    plans = np.stack(
+        [
+            _make_row(state_dim, action_dim, yaw=-1.0).reshape(1, 1, row_width),
+            _make_row(state_dim, action_dim, yaw=-1.1).reshape(1, 1, row_width),
+        ],
+        axis=0,
+    )
+    data = {
+        "pre_action_likelihoods": [[0.0], [1.0], [0.5]],
+        "final_likelihoods": [[0.0], [1.0], [0.5]],
+        "executed_contacts": ["turn", "index", "middle"],
+        "dropped": False,
+        "dropped_recovery": False,
+        1: {
+            "starts": starts,
+            "plans": plans,
+            "contact_state": np.array(
+                [
+                    [1.0, 0.0, 0.0],
+                    [0.0, 1.0, 0.0],
+                ],
+                dtype=np.float32,
+            ),
+        },
+    }
+    with open(trial_dir / "traj_data.p", "wb") as handle:
+        pickle.dump(data, handle)
+    with open(trial_dir / "trajectory.pkl", "wb") as handle:
+        pickle.dump([np.zeros(state_dim, dtype=np.float32)], handle)
+    return trial_dir.parent
+
+
 def _load_dataset(tmp_path, *, state_dim, action_dim, cosine_sine=False):
     dataset_root = _write_screwdriver_trial(tmp_path / f"proto5_screwdriver_{state_dim}_{action_dim}", state_dim=state_dim, action_dim=action_dim)
     return AllegroScrewDriverDataset(
@@ -115,3 +161,37 @@ def test_roll_pitch_yaw_filter_uses_last_three_state_dims(tmp_path):
     assert torch.all(wrist_columns == 2.0)
     final_roll_pitch = dataset.trajectories[:, -1, 14:16]
     assert torch.all(final_roll_pitch.abs() <= 0.25)
+
+
+def test_recovery_dataset_filters_to_likelihood_improving_trajectories_by_default(tmp_path):
+    dataset_root = _write_recovery_trial(tmp_path / "recovery_default_filter")
+
+    dataset = AllegroScrewDriverDataset(
+        [dataset_root],
+        max_T=1,
+        dx=15,
+        best_traj_only=True,
+        recovery=True,
+    )
+
+    assert len(dataset) == 1
+    assert dataset.trajectory_type.tolist() == [[1.0, -1.0, -1.0]]
+
+
+def test_recovery_dataset_can_keep_all_recovery_trajectories(tmp_path):
+    dataset_root = _write_recovery_trial(tmp_path / "recovery_all")
+
+    dataset = AllegroScrewDriverDataset(
+        [dataset_root],
+        max_T=1,
+        dx=15,
+        best_traj_only=True,
+        recovery=True,
+        filter_recovery_trajectories=False,
+    )
+
+    assert len(dataset) == 2
+    assert dataset.trajectory_type.tolist() == [
+        [1.0, -1.0, -1.0],
+        [-1.0, 1.0, -1.0],
+    ]

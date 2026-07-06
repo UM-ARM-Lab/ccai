@@ -547,7 +547,8 @@ if __name__ == "__main__":
                                             type_=config['model_type'],
                                             exec_only=config.get('train_classifier', False) or config.get('likelihood_ecdf_calc', False),
                                             best_traj_only=config['best_traj_only'],
-                                            recovery=config['recovery'])
+                                            recovery=config['recovery'],
+                                            filter_recovery_trajectories=config.get('filter_recovery_trajectories', True))
     
     # Split dataset into train and validation (90% train, 10% validation)
     train_size = int(0.9 * len(full_dataset))
