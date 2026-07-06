@@ -528,11 +528,65 @@ class TrajectorySampler(nn.Module):
         xu is shape (N, T, 36)
         Replace the yaw in xu with sine and cosine and return the new xu
         """
-        yaw = xu[yaw_idx]
+        if xu.dim() == 1:
+            yaw = xu[yaw_idx]
+            sine = torch.sin(yaw)
+            cosine = torch.cos(yaw)
+            return torch.cat([xu[:yaw_idx], cosine.unsqueeze(-1), sine.unsqueeze(-1), xu[(yaw_idx+1):]], dim=-1)
+
+        yaw = xu[..., yaw_idx]
         sine = torch.sin(yaw)
         cosine = torch.cos(yaw)
-        xu_new = torch.cat([xu[:yaw_idx], cosine.unsqueeze(-1), sine.unsqueeze(-1), xu[(yaw_idx+1):]], dim=-1)
-        return xu_new
+        return torch.cat([xu[..., :yaw_idx], cosine.unsqueeze(-1), sine.unsqueeze(-1), xu[..., (yaw_idx+1):]], dim=-1)
+
+    def check_id_batch(self, states, N, threshold=None, likelihood_only=False, yaw_idx=14, obj_dof=3):
+        if states.dim() == 1:
+            states = states.unsqueeze(0)
+        if states.shape[0] == 0:
+            likelihood = torch.empty(0, device=states.device, dtype=states.dtype)
+            if likelihood_only:
+                return likelihood
+            if threshold is None:
+                threshold = -175
+            return likelihood >= threshold, likelihood
+
+        start = states[..., :4 * 3 + obj_dof]
+        start_sine_cosine = self.convert_yaw_to_sine_cosine(start, yaw_idx=yaw_idx)
+        num_states = start_sine_cosine.shape[0]
+        num_samples = int(N)
+        constraint_count = num_states * num_samples
+        batched_start = start_sine_cosine.repeat_interleave(num_samples, dim=0)
+        constraints = torch.ones(
+            constraint_count,
+            3,
+            device=states.device,
+            dtype=start_sine_cosine.dtype,
+        )
+
+        with torch.no_grad():
+            if self.use_mixed_precision:
+                with torch.autocast(device_type='cuda' if torch.cuda.is_available() else 'cpu'):
+                    _, _, likelihood = self.sample(
+                        N=constraint_count,
+                        H=self.T,
+                        start=batched_start,
+                        constraints=constraints,
+                    )
+            else:
+                _, _, likelihood = self.sample(
+                    N=constraint_count,
+                    H=self.T,
+                    start=batched_start,
+                    constraints=constraints,
+                )
+
+        likelihood = likelihood.reshape(num_states, num_samples).mean(dim=1)
+        if likelihood_only:
+            return likelihood
+
+        if threshold is None:
+            threshold = -175
+        return likelihood >= threshold, likelihood
 
     def check_id(self, state, N, threshold=None, likelihood_only=False, return_samples=False, yaw_idx=14, obj_dof=3):
         """
@@ -549,6 +603,28 @@ class TrajectorySampler(nn.Module):
         Returns:
             Tuple of (is_in_distribution, likelihood, [samples if return_samples])
         """
+        if not return_samples:
+            start_time = time.perf_counter()
+            likelihood_tensor = self.check_id_batch(
+                state.unsqueeze(0),
+                N,
+                threshold=threshold,
+                likelihood_only=True,
+                yaw_idx=yaw_idx,
+                obj_dof=obj_dof,
+            )
+            likelihood = likelihood_tensor.reshape(-1)[0].item()
+            print(f'Time taken to sample: {time.perf_counter() - start_time}')
+            print('Likelihood:', likelihood)
+            if threshold is None:
+                threshold = -175
+            if likelihood_only:
+                return likelihood
+            if likelihood < threshold:
+                print('State is out of distribution')
+                return False, likelihood
+            return True, likelihood
+
         start = state[:4 * 3 + obj_dof]
         start_sine_cosine = self.convert_yaw_to_sine_cosine(start,yaw_idx=yaw_idx)
         # Use mixed precision for inference
