@@ -64,7 +64,7 @@ def _entrypoint_args(config_path, **overrides):
     values = {
         "config": config_path,
         "hand": "proto5",
-        "headless": False,
+        "headless": None,
         "no_video": False,
         "num_envs": 1,
         "sim_device": "cuda:0",
@@ -99,6 +99,26 @@ def test_isaacsim_recovery_defaults_match_csvto_cadence(tmp_path):
     assert config["steps_per_action"] == 40
     assert config["action_repeat"] == 3
     assert config["save_recovery_frames"] is True
+
+
+def test_isaacsim_recovery_visualize_false_defaults_to_headless(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("controllers:\n  csvgd: {}\nvisualize: false\n")
+
+    config = screwdriver_isaacsim_recovery.load_config(_entrypoint_args(config_path))
+
+    assert config["visualize"] is False
+    assert config["headless"] is True
+
+
+def test_isaacsim_recovery_visualize_true_defaults_to_visible(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("controllers:\n  csvgd: {}\nvisualize: true\n")
+
+    config = screwdriver_isaacsim_recovery.load_config(_entrypoint_args(config_path))
+
+    assert config["visualize"] is True
+    assert config["headless"] is False
 
 
 def test_isaacsim_recovery_loads_per_finger_min_force(tmp_path):

@@ -1,5 +1,5 @@
 ---
-model_name: 'proto5_blue_screwdriver_task_diffusion'
+model_name: 'proto5_blue_screwdriver_task_fixed_replay'
 T: 19
 dx: 15
 du: 21
@@ -18,7 +18,7 @@ lr: 1.0e-4
 model_type: 'diffusion'
 discriminator_guidance: True
 inverse_dynamics: False
-data_directory: 'proto5_blue_screwdriver_fixed_wrench'
+data_directory: 'proto5_blue_screwdriver_fixed_replay'
 best_traj_only: True
 recovery: False
 device: 'cuda:1'

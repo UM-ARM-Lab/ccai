@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 1000
 num_episodes: 2000
 visualize: False
-experiment_name: 'proto_blue_screwdriver_D_TOUR_recovery_data_gen_fixed_replay_90_1'
+experiment_name: 'proto_blue_screwdriver_D_TOUR_recovery_data_gen_fixed_replay_90_no_belief_reset'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -85,13 +85,13 @@ diffpf_trajectory_selection_mode: "max_reward_times_exp_likelihood"
 diffpf_likelihood_mask: "inverse_dynamics"
 diffpf_likelihood_temperature: 10
 diffpf_likelihood_reward_scope: "per_step"
-diffpf_reset_belief_after_recovery: true
+diffpf_reset_belief_after_recovery: false
 likelihood_threshold: -90.0
 # likelihood_threshold: -40.0
 likelihood_num_samples: 8
 N_contact_plan: 16
-start_ind: 5473
-end_ind: 10000
+start_ind: 20132
+end_ind: 25000
 
 # Tactile parameters
 tactile_controller: False

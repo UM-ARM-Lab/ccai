@@ -25,7 +25,7 @@ DOCUMENTS_PATH = CCAI_PATH.parent
 MODEL_MISMATCH_PATH = DOCUMENTS_PATH / "model_mismatch"
 ISAACSIM_HAND_ENVS_PATH = DOCUMENTS_PATH / "github" / "isaacsim-hand-envs"
 ISAACGYM_ARM_ENVS_PATH = DOCUMENTS_PATH / "github" / "isaacgym-arm-envs"
-DEFAULT_CONFIG_PATH = CCAI_PATH / "examples" / "config" / "proto5" / "proto_screwdriver_csvto_TODR_recovery_data_gen.yaml"
+DEFAULT_CONFIG_PATH = CCAI_PATH / "examples" / "config" / "proto5" / "proto_screwdriver_csvto_TODR_recovery_data_gen_no_belief_reset.yaml"
 DEFAULT_PLANNER_YAW_FRICTION_MODEL_PATH = (
     MODEL_MISMATCH_PATH / "results" / "csvto_yaw_joint_fit" / "yaw_friction_model.json"
 )
@@ -80,7 +80,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=pathlib.Path, default=DEFAULT_CONFIG_PATH)
     parser.add_argument("--hand", choices=("allegro", "proto5"), default='proto5')
-    parser.add_argument("--headless", type=_bool_from_cli, default=False)
+    parser.add_argument("--headless", type=_bool_from_cli, default=None)
     parser.add_argument("--no_video", type=_bool_from_cli, default=False)
     parser.add_argument("--num_envs", type=int, default=1)
     parser.add_argument("--sim_device", type=str, default='cuda:0')
@@ -177,6 +177,7 @@ def load_config(args) -> dict:
         config_path = CCAI_PATH / config_path
     with open(config_path, "r", encoding="utf-8") as handle:
         config = yaml.safe_load(handle)
+    headless_from_cli = getattr(args, "headless", None) is not None
     config["config_path"] = str(config_path)
     config["simulator"] = "isaacsim"
     config["mode"] = "simulation"
@@ -210,7 +211,10 @@ def load_config(args) -> dict:
         config["proto5_control_wrist"] = bool(args.proto5_control_wrist)
 
     config.setdefault("hand", "allegro")
-    config.setdefault("headless", True)
+    if not headless_from_cli and not bool(config.get("visualize", True)):
+        config["headless"] = True
+    elif "headless" not in config:
+        config["headless"] = not bool(config.get("visualize", False))
     config.setdefault("no_video", True)
     config.setdefault("num_envs", 1)
     config.setdefault("sim_device", "cuda:0")
