@@ -123,28 +123,6 @@ def previous_likelihood(pre_action_likelihoods: list[Any], final_likelihoods: li
     return float("nan")
 
 
-def recovery_contact_blocks(executed_contacts: list[str]) -> list[tuple[int, int]]:
-    blocks: list[tuple[int, int]] = []
-    contact_idx = 0
-    while contact_idx < len(executed_contacts):
-        if executed_contacts[contact_idx] == "turn":
-            contact_idx += 1
-            continue
-        start_idx = contact_idx
-        while contact_idx < len(executed_contacts) and executed_contacts[contact_idx] != "turn":
-            contact_idx += 1
-        blocks.append((start_idx, contact_idx - 1))
-    return blocks
-
-
-def block_terminal_reason(executed_contacts: list[str], end_contact_idx: int) -> str:
-    if end_contact_idx + 1 >= len(executed_contacts):
-        return "episode_end"
-    if executed_contacts[end_contact_idx + 1] == "turn":
-        return "switch_to_turn"
-    return "next_recovery_stage"
-
-
 def record_stage_index(record: dict[str, Any]) -> int:
     return int(record.get("stage_index", -1))
 
@@ -162,6 +140,47 @@ def recovery_records_for_block(records: list[dict[str, Any]], stage_indices: set
     return sorted(block_records, key=lambda record: (record_step(record), record_stage_index(record)))
 
 
+def recovery_sequence_blocks(
+    executed_contacts: list[str],
+    records: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    records_by_stage: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    for record in records:
+        records_by_stage[record_stage_index(record)].append(record)
+
+    blocks: list[dict[str, Any]] = []
+    active: dict[str, Any] | None = None
+
+    def close_active(reason: str) -> None:
+        nonlocal active
+        if active is not None:
+            active["terminal_reason"] = reason
+            blocks.append(active)
+            active = None
+
+    for stage_index, _contact in enumerate(executed_contacts, start=1):
+        stage_records = records_by_stage.get(stage_index, [])
+        has_recovery = any(bool(record.get("recover", False)) for record in stage_records)
+        has_non_recovery = any(not bool(record.get("recover", False)) for record in stage_records)
+
+        if has_recovery:
+            if active is None:
+                active = {
+                    "start_contact_index": stage_index - 1,
+                    "end_contact_index": stage_index - 1,
+                    "recovery_stage_indices": [],
+                }
+            active["end_contact_index"] = stage_index - 1
+            active["recovery_stage_indices"].append(stage_index)
+            continue
+
+        if active is not None and has_non_recovery:
+            close_active("return_to_id")
+
+    close_active("episode_end")
+    return blocks
+
+
 def stack_block_records(block_records: list[dict[str, Any]]) -> dict[str, np.ndarray]:
     first = block_records[0]
     states = [np.asarray(first["states"], dtype=np.float32)[0]]
@@ -176,7 +195,13 @@ def stack_block_records(block_records: list[dict[str, Any]]) -> dict[str, np.nda
     stage_indices = []
     recover = []
     record_likelihoods = []
+    terminal_state_indices = []
+    previous_stage_index = None
     for record in block_records:
+        stage_index = int(record.get("stage_index", -1))
+        if previous_stage_index is not None and stage_index != previous_stage_index:
+            terminal_state_indices.append(len(states) - 1)
+        previous_stage_index = stage_index
         states_arr = np.asarray(record["states"], dtype=np.float32)
         actions_arr = np.asarray(record["actions"], dtype=np.float32)
         contact_state_arr = np.asarray(record["contact_state"], dtype=np.float32)
@@ -208,6 +233,7 @@ def stack_block_records(block_records: list[dict[str, Any]]) -> dict[str, np.nda
         "stage_index": np.asarray(stage_indices, dtype=np.int64),
         "recover": np.asarray(recover, dtype=np.bool_),
         "record_likelihoods": np.asarray(record_likelihoods, dtype=np.float32),
+        "recovery_terminal_state_indices": np.asarray([*terminal_state_indices, len(states) - 1], dtype=np.int64),
     }
 
 
@@ -231,8 +257,10 @@ def read_blocks_from_trial(
             trial_initial_state = first_states.reshape(-1, first_states.shape[-1])[0, :15].copy()
     blocks: list[dict[str, Any]] = []
     stats = defaultdict(int)
-    for block_idx, (start_contact_idx, end_contact_idx) in enumerate(recovery_contact_blocks(executed_contacts)):
-        stage_indices = set(range(start_contact_idx + 1, end_contact_idx + 2))
+    for block_idx, sequence_block in enumerate(recovery_sequence_blocks(executed_contacts, records)):
+        start_contact_idx = int(sequence_block["start_contact_index"])
+        end_contact_idx = int(sequence_block["end_contact_index"])
+        stage_indices = set(int(stage_index) for stage_index in sequence_block["recovery_stage_indices"])
         block_records = recovery_records_for_block(records, stage_indices)
         if not block_records:
             stats["empty_blocks"] += 1
@@ -256,6 +284,9 @@ def read_blocks_from_trial(
             yaw_joint_friction = float("nan")
         start_likelihood = previous_likelihood(pre_action_likelihoods, final_likelihoods, start_contact_idx)
         final_likelihood = stage_value(final_likelihoods, end_contact_idx)
+        terminal_likelihoods = []
+        for stage_index in sorted(stage_indices):
+            terminal_likelihoods.append(stage_value(final_likelihoods, stage_index - 1))
         blocks.append(
             {
                 "arrays": arrays,
@@ -272,17 +303,19 @@ def read_blocks_from_trial(
                 "end_contact_index": end_contact_idx,
                 "start_stage_index": start_contact_idx + 1,
                 "end_stage_index": end_contact_idx + 1,
+                "recovery_stage_indices": sorted(stage_indices),
                 "start_episode_num_steps": start_step,
                 "end_episode_num_steps": end_step,
                 "initial_likelihood": start_likelihood,
                 "final_likelihood": final_likelihood,
+                "recovery_terminal_likelihoods": terminal_likelihoods,
                 "likelihood_delta": final_likelihood - start_likelihood,
                 "improved_likelihood": (
                     (not math.isnan(start_likelihood))
                     and (not math.isnan(final_likelihood))
                     and final_likelihood > start_likelihood
                 ),
-                "terminal_reason": block_terminal_reason(executed_contacts, end_contact_idx),
+                "terminal_reason": str(sequence_block["terminal_reason"]),
             }
         )
     return blocks, dict(stats)
@@ -481,9 +514,14 @@ def recompute_block_likelihoods(
         for block in trial_blocks:
             states = block["arrays"]["states"]
             original_mask = block["likelihood_originally_labeled_mask"]
+            terminal_state_indices = set(
+                int(idx) for idx in block["arrays"].get("recovery_terminal_state_indices", [])
+            )
+            if not terminal_state_indices and block["terminal_reason"] == "switch_to_turn":
+                terminal_state_indices.add(len(states) - 1)
             for state_idx, state in enumerate(states):
                 state_t = torch.as_tensor(state, device=params["device"], dtype=torch.float32)
-                if state_idx == len(states) - 1 and block["terminal_reason"] == "switch_to_turn":
+                if state_idx in terminal_state_indices:
                     update_screwdriver_yaw_wrap_after_recovery(wrap_params, state_t)
                 task_state = wrap_screwdriver_task_state_yaw(wrap_params, state_t)
                 if original_mask[state_idx]:
@@ -527,6 +565,13 @@ def attach_original_likelihoods(blocks: list[dict[str, Any]]) -> None:
             if record_likelihoods is not None:
                 limit = min(len(record_likelihoods), max(0, state_length - 1))
                 original[1 : 1 + limit] = record_likelihoods[:limit]
+            terminal_indices = arrays.get("recovery_terminal_state_indices")
+            terminal_likelihoods = block.get("recovery_terminal_likelihoods", [])
+            if terminal_indices is not None:
+                for state_idx, likelihood in zip(terminal_indices, terminal_likelihoods):
+                    state_idx = int(state_idx)
+                    if 0 <= state_idx < state_length:
+                        original[state_idx] = np.float32(likelihood)
         if state_length > 1:
             original[state_length - 1] = np.float32(block["final_likelihood"])
         block["original_likelihood"] = original

@@ -16,6 +16,8 @@ from ccai.utils.isaacsim_screwdriver_recovery import (
     OBJ_ORIENTATION_JOINT_NAMES,
     PROTO5_ACTIVE_JOINT_NAMES,
     PROTO5_ALL_JOINT_NAMES,
+    HardwareScrewdriverRecoveryEnv,
+    HardwareVisualizationShim,
     IsaacSimScrewdriverRecoveryEnv,
     active12_to_env_action,
     local_force_at_position_to_world,
@@ -149,6 +151,35 @@ def test_isaacsim_recovery_loads_per_finger_min_force(tmp_path):
     }
 
 
+def test_hardware_recovery_load_config_preserves_hardware_mode_and_disables_sim_noise(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "\n".join(
+            (
+                "controllers:",
+                "  csvgd: {}",
+                "mode: hardware",
+                "hand: proto5",
+                "external_wrench_perturb: true",
+                "randomize_obj_start: true",
+                "save_recovery_frames: true",
+                "hardware_execute: true",
+                "",
+            )
+        )
+    )
+
+    config = screwdriver_isaacsim_recovery.load_config(_entrypoint_args(config_path))
+
+    assert config["mode"] == "hardware"
+    assert config["simulator"] == "hardware"
+    assert config["external_wrench_perturb"] is False
+    assert config["randomize_obj_start"] is False
+    assert config["save_recovery_frames"] is False
+    assert config["hardware_execute"] is True
+    assert config["hardware_ros_config"] == str(screwdriver_isaacsim_recovery.DEFAULT_HARDWARE_ROS_CONFIG)
+
+
 def test_isaacsim_recovery_rejects_frame_saving_without_cameras(tmp_path):
     config_path = tmp_path / "config.yaml"
     config_path.write_text("controllers:\n  csvgd: {}\n")
@@ -247,6 +278,107 @@ def test_active12_to_env_action_hand_layouts():
     assert proto5_wrist_action.shape == (1, 14)
     torch.testing.assert_close(proto5_wrist_action[:, :12], active)
     torch.testing.assert_close(proto5_wrist_action[:, 12:14], torch.tensor([[0.25, -0.05]]))
+
+
+class _FakeHardwareRuntime:
+    def __init__(self):
+        self.state15 = torch.arange(15, dtype=torch.float32).reshape(1, 15)
+        self.state15[:, 12:15] = torch.tensor([[0.1, 0.2, 0.3]])
+        self.command_targets = []
+        self.reset_calls = 0
+        self.close_calls = 0
+        self.position = torch.tensor([[0.7, 0.8, 0.9]], dtype=torch.float32)
+        self.wrenches = torch.arange(18, dtype=torch.float32).reshape(1, 3, 6)
+        self.points = torch.arange(9, dtype=torch.float32).reshape(1, 3, 3) * 0.01
+
+    def get_current_state(self, device):
+        return self.state15.to(device=device)
+
+    def get_screwdriver_position_robot(self, device, dtype=torch.float32):
+        return self.position.to(device=device, dtype=dtype)
+
+    def step(self, action_target):
+        self.command_targets.append(torch.as_tensor(action_target, dtype=torch.float32).detach().clone())
+        self.state15[:, :12] = self.command_targets[-1].reshape(1, -1)[:, :12]
+        return self.state15
+
+    def reset(self):
+        self.reset_calls += 1
+        return self.state15, {}
+
+    def close(self):
+        self.close_calls += 1
+
+    def read_wrenches_robot(self, device, dtype=torch.float32):
+        return self.wrenches.to(device=device, dtype=dtype)
+
+    def read_contact_forces_robot(self, device, dtype=torch.float32):
+        return self.wrenches[..., :3].to(device=device, dtype=dtype)
+
+    def get_contact_points_robot(self, device, dtype=torch.float32):
+        return self.points.to(device=device, dtype=dtype)
+
+
+def test_hardware_recovery_env_packs_12_joint_plus_observed_pose_state():
+    runtime = _FakeHardwareRuntime()
+    env = HardwareScrewdriverRecoveryEnv(
+        {
+            "hand": "proto5",
+            "sim_device": "cpu",
+            "screwdriver_friction": 2.5,
+            "yaw_joint_friction": 0.03,
+        },
+        runtime=runtime,
+        device="cpu",
+    )
+
+    state = env.get_state()
+
+    assert state["q"].shape == (1, 16)
+    torch.testing.assert_close(state["q"][0, :12], torch.arange(12, dtype=torch.float32))
+    torch.testing.assert_close(state["q"][0, 12:16], torch.tensor([0.1, 0.2, 0.3, 0.3]))
+    torch.testing.assert_close(env.table_pose, torch.tensor([0.7, 0.8, 0.9]))
+    assert env.get_environment_parameters() == {
+        "screwdriver_friction": pytest.approx(2.5),
+        "yaw_joint_friction": pytest.approx(0.03),
+    }
+
+
+def test_hardware_recovery_env_step_and_set_pose_delegate_active_12d_targets():
+    runtime = _FakeHardwareRuntime()
+    env = HardwareScrewdriverRecoveryEnv({"hand": "proto5", "sim_device": "cpu"}, runtime=runtime, device="cpu")
+
+    env.step(torch.arange(16, dtype=torch.float32).reshape(1, 16))
+    env.set_pose(torch.arange(20, dtype=torch.float32))
+
+    assert len(runtime.command_targets) == 2
+    torch.testing.assert_close(runtime.command_targets[0], torch.arange(12, dtype=torch.float32).reshape(1, 12))
+    torch.testing.assert_close(runtime.command_targets[1], torch.arange(12, dtype=torch.float32).reshape(1, 12))
+
+
+def test_hardware_recovery_env_tactile_methods_return_runtime_signals_without_noise():
+    runtime = _FakeHardwareRuntime()
+    env = HardwareScrewdriverRecoveryEnv({"hand": "proto5", "sim_device": "cpu"}, runtime=runtime, device="cpu")
+
+    tactile = env.get_tactile_observation()
+
+    torch.testing.assert_close(tactile["contact_wrenches"], runtime.wrenches)
+    torch.testing.assert_close(tactile["contact_forces"], runtime.wrenches[..., :3])
+    torch.testing.assert_close(tactile["contact_points"], runtime.points)
+    torch.testing.assert_close(env.get_force_sensor_data(), runtime.wrenches[..., :3].reshape(1, 9))
+
+
+def test_hardware_visualization_shim_does_not_publish_commands():
+    runtime = _FakeHardwareRuntime()
+    env = HardwareScrewdriverRecoveryEnv({"hand": "proto5", "sim_device": "cpu"}, runtime=runtime, device="cpu")
+    shim = HardwareVisualizationShim(env)
+
+    shim.set_pose(torch.ones(16))
+    shim.zero_obj_velocity()
+    shim.write_image()
+
+    assert runtime.command_targets == []
+    torch.testing.assert_close(shim.get_state()["q"], env.get_state()["q"])
 
 
 class _FakeData:

@@ -167,6 +167,74 @@ def test_recompute_block_likelihoods_preserves_originals_and_batches_only_missin
     assert summary["likelihood_relabeling"]["likelihood_batches"] == 1
 
 
+def test_read_blocks_groups_recovery_attempts_until_id_return(tmp_path):
+    records = []
+
+    def add_record(stage_index, step, mode, recover):
+        state0 = np.full(15, float(step), dtype=np.float32)
+        state1 = np.full(15, float(step + 1), dtype=np.float32)
+        records.append(
+            {
+                "states": np.stack([state0, state1]),
+                "actions": np.full((1, 12), float(step), dtype=np.float32),
+                "contact_plan": np.ones((1, 3), dtype=np.float32),
+                "contact_state": np.zeros((2, 3), dtype=np.float32),
+                "contact_wrenches": np.zeros((2, 3, 6), dtype=np.float32),
+                "contact_forces": np.zeros((2, 3, 3), dtype=np.float32),
+                "contact_points": np.zeros((2, 3, 3), dtype=np.float32),
+                "contact_mode": mode,
+                "recover": recover,
+                "episode_num_steps": step,
+                "trial_index": 3,
+                "stage_index": stage_index,
+                "screwdriver_friction": 2.5,
+                "yaw_joint_friction": 0.03,
+                "likelihood": None,
+            }
+        )
+
+    add_record(1, 0, "turn", False)
+    for step in range(1, 4):
+        add_record(3, step, "thumb_middle", True)
+    for step in range(4, 7):
+        add_record(5, step, "index", True)
+    add_record(6, 7, "turn", False)
+    for step in range(8, 11):
+        add_record(8, step, "thumb_middle", True)
+
+    traj_data = {
+        "executed_contacts": ["turn", "turn", "thumb_middle", "turn", "index", "turn", "turn", "thumb_middle"],
+        "hri_diffpf_records": records,
+        "pre_action_likelihoods": [[-20.0], [-40.0], [], [-50.0], [], [-30.0], [-55.0], []],
+        "final_likelihoods": [[-40.0], [None], [-50.0], [None], [-30.0], [-55.0], [None], [-10.0]],
+    }
+    trial_dir = tmp_path / "trial_3"
+    trial_dir.mkdir()
+    traj_path = trial_dir / "traj_data.p"
+    import pickle
+
+    with open(traj_path, "wb") as handle:
+        pickle.dump(traj_data, handle)
+
+    blocks, stats = exporter.read_blocks_from_trial(
+        traj_path,
+        source_experiment="exp",
+        allow_empty_blocks=False,
+    )
+
+    assert stats == {}
+    assert [block["action_length"] for block in blocks] == [6, 3]
+    assert [block["state_length"] for block in blocks] == [7, 4]
+    assert blocks[0]["terminal_reason"] == "return_to_id"
+    assert blocks[1]["terminal_reason"] == "episode_end"
+    assert blocks[0]["recovery_stage_indices"] == [3, 5]
+    np.testing.assert_array_equal(blocks[0]["arrays"]["recovery_terminal_state_indices"], [3, 6])
+
+    exporter.attach_original_likelihoods(blocks)
+    np.testing.assert_allclose(blocks[0]["original_likelihood"][[0, 3, 6]], [-40.0, -50.0, -30.0])
+    np.testing.assert_allclose(blocks[1]["original_likelihood"][[0, 3]], [-55.0, -10.0])
+
+
 def test_write_blocks_h5_uses_block_rows_masks_and_action_aligned_metadata(tmp_path):
     states = [
         np.arange(15, dtype=np.float32),

@@ -12,6 +12,7 @@ import importlib.util
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Sequence, TextIO
 
 import numpy as np
@@ -1001,3 +1002,218 @@ class IsaacSimScrewdriverRecoveryEnv:
 
     def get_force_sensor_data(self, *args, **kwargs):
         return self.get_contact_forces().reshape(self.num_envs, 9)
+
+
+class HardwareVisualizationShim:
+    """No-op visualization surface for legacy hardware-mode branches."""
+
+    def __init__(self, env):
+        self.env = env
+        self.frame_fpath = None
+        self.frame_id = None
+
+    def set_pose(self, *args, **kwargs):
+        return None
+
+    def zero_obj_velocity(self):
+        return None
+
+    def write_image(self):
+        return None
+
+    def get_state(self):
+        return self.env.get_state()
+
+
+class HardwareScrewdriverRecoveryEnv:
+    """Expose the CCAI recovery contract on top of the model_mismatch hardware runtime."""
+
+    is_hardware = True
+
+    def __init__(self, config: dict, *, runtime=None, device: str | torch.device | None = None):
+        self.config = dict(config)
+        self.hand = get_hand_spec(str(self.config.get("hand", SCREWDRIVER_HAND_PROTO5))).name
+        if self.hand != SCREWDRIVER_HAND_PROTO5:
+            raise ValueError("HardwareScrewdriverRecoveryEnv currently supports hand: proto5.")
+        self.hand_spec = get_hand_spec(self.hand)
+        self.device = torch.device(device or self.config.get("sim_device", self.config.get("device", "cpu")))
+        self.num_envs = 1
+        self.action_dim = 12
+        self.proto5_control_wrist = bool(self.config.get("proto5_control_wrist", False))
+        self.default_dof_pos = torch.tensor(
+            self.hand_spec.default_full_joint_pos,
+            device=self.device,
+            dtype=torch.float32,
+        ).reshape(1, -1)
+        self.table_pose = torch.tensor(DEFAULT_SCREWDRIVER_TABLE_POSE, device=self.device, dtype=torch.float32)
+        self.obj_pose = self.table_pose
+        self.world_trans = create_world_transform(self.hand, self.device)
+        self.external_wrench_perturb = False
+        self.wrench_perturb_inds = []
+        self.frame_fpath = None
+        self.frame_id = None
+        self.runtime = runtime if runtime is not None else self._create_runtime()
+        self._update_object_pose()
+
+    @property
+    def unwrapped(self):
+        return self
+
+    def _create_runtime(self):
+        if str(DOCUMENTS_ROOT / "model_mismatch") not in sys.path:
+            sys.path.insert(0, str(DOCUMENTS_ROOT / "model_mismatch"))
+        from model_mismatch.utils.screwdriver_hardware_runtime import create_hardware_runtime
+
+        args = self._runtime_args_from_config()
+        return create_hardware_runtime(args, self.device)
+
+    def _runtime_args_from_config(self):
+        default_q = list(self.hand_spec.default_full_joint_pos)
+        values = {
+            "hand": self.hand,
+            "proto5_control_wrist": self.proto5_control_wrist,
+            "hardware_ros_config": self.config.get("hardware_ros_config"),
+            "hardware_profile": self.config.get("hardware_profile", self.hand),
+            "hardware_execute": bool(self.config.get("hardware_execute", False)),
+            "hardware_command_topic": self.config.get("hardware_command_topic"),
+            "hardware_joint_state_topic": self.config.get("hardware_joint_state_topic"),
+            "hardware_mocap_topic": self.config.get("hardware_mocap_topic"),
+            "hardware_proto5_wrench_topic": self.config.get("hardware_proto5_wrench_topic"),
+            "hardware_proto5_wrench_fixed_joint_names": self.config.get("hardware_proto5_wrench_fixed_joint_names"),
+            "hardware_num_repeat": int(self.config.get("hardware_num_repeat", 10)),
+            "hardware_command_mode": self.config.get("hardware_command_mode", "repeat"),
+            "hardware_command_duration_s": float(self.config.get("hardware_command_duration_s", 1.0 / 12.0)),
+            "hardware_allow_placeholder_wrenches": bool(
+                self.config.get("hardware_allow_placeholder_wrenches", False)
+            ),
+            "hardware_default_q16": self.config.get("hardware_default_q16", default_q),
+            "hardware_node_name": self.config.get("hardware_node_name", "screwdriver_recovery_hardware"),
+            "hardware_screwdriver_mocap_object": self.config.get(
+                "hardware_screwdriver_mocap_object",
+                "blue_screwdriver_catching",
+            ),
+        }
+        return SimpleNamespace(**values)
+
+    def _state15_from_runtime(self) -> torch.Tensor:
+        if hasattr(self.runtime, "get_current_state"):
+            state = self.runtime.get_current_state(self.device)
+        elif hasattr(self.runtime, "get_state"):
+            state = self.runtime.get_state()
+            if isinstance(state, dict):
+                state = state["q"]
+        else:
+            raise AttributeError("Hardware runtime must expose get_current_state(...) or get_state().")
+        state = torch.as_tensor(state, device=self.device, dtype=torch.float32).reshape(1, -1)
+        if state.shape[-1] < 15:
+            raise RuntimeError(f"Expected hardware state with at least 15 values, got {tuple(state.shape)}.")
+        return state[:, :15]
+
+    def _update_object_pose(self) -> None:
+        if hasattr(self.runtime, "get_screwdriver_position_robot"):
+            try:
+                position = self.runtime.get_screwdriver_position_robot(self.device, dtype=torch.float32)
+                self.table_pose = torch.as_tensor(position, device=self.device, dtype=torch.float32).reshape(1, 3)[0]
+                self.obj_pose = self.table_pose
+            except Exception:
+                pass
+
+    def reset(self):
+        self.wrench_perturb_inds = []
+        if hasattr(self.runtime, "reset"):
+            ret = self.runtime.reset()
+        else:
+            ret = self._state15_from_runtime(), {}
+        self._update_object_pose()
+        return ret
+
+    def close(self):
+        if hasattr(self.runtime, "close"):
+            return self.runtime.close()
+        return None
+
+    def get_state(self):
+        state15 = self._state15_from_runtime()
+        self._update_object_pose()
+        orientation = state15[:, 12:15]
+        q = pack_ccai_state(state15[:, :12], orientation)
+        return {
+            "q": q,
+            "screwdriver_ori_euler": orientation,
+            "screwdriver_ori": orientation,
+            "screwdriver_angle": orientation[:, 2:3],
+        }
+
+    def set_pose(self, state):
+        state = _as_2d_tensor(state, device=self.device, dtype=torch.float32)
+        if state.shape[-1] < 12:
+            raise ValueError(f"Expected state with at least 12 active joints, got shape {tuple(state.shape)}.")
+        return self.step(state[:, :12])
+
+    def step(self, action):
+        active_targets = _as_2d_tensor(action, device=self.device, dtype=torch.float32)
+        if active_targets.shape[-1] < 12:
+            raise ValueError(f"Expected action with at least 12 values, got shape {tuple(active_targets.shape)}.")
+        ret = self.runtime.step(active_targets[:, :12])
+        self._update_object_pose()
+        return ret
+
+    def zero_obj_velocity(self):
+        return None
+
+    def force_render(self, *args, **kwargs):
+        return None
+
+    def set_external_wrench_perturb(self, enabled, rand_pct=None):
+        del enabled, rand_pct
+        self.external_wrench_perturb = False
+
+    def get_contact_wrenches(self, *, strict: bool = False) -> torch.Tensor:
+        try:
+            return self.runtime.read_wrenches_robot(self.device, dtype=torch.float32)
+        except Exception:
+            if strict:
+                raise
+            return torch.zeros((1, 3, 6), device=self.device, dtype=torch.float32)
+
+    def get_contact_forces(self, *, strict: bool = False) -> torch.Tensor:
+        if hasattr(self.runtime, "read_contact_forces_robot"):
+            try:
+                return self.runtime.read_contact_forces_robot(self.device, dtype=torch.float32)
+            except Exception:
+                if strict:
+                    raise
+        return self.get_contact_wrenches(strict=strict)[..., :3]
+
+    def get_contact_points(self) -> torch.Tensor:
+        if hasattr(self.runtime, "get_contact_points_robot"):
+            try:
+                return self.runtime.get_contact_points_robot(self.device, dtype=torch.float32)
+            except Exception:
+                pass
+        return torch.zeros((1, 3, 3), device=self.device, dtype=torch.float32)
+
+    def get_contact_state(self, threshold: float = 1.0e-6) -> torch.Tensor:
+        forces = self.get_contact_forces()
+        return (torch.linalg.norm(forces, dim=-1) > float(threshold)).to(dtype=torch.float32)
+
+    def get_tactile_observation(self, *, strict_wrenches: bool = False) -> dict[str, torch.Tensor]:
+        wrenches = self.get_contact_wrenches(strict=strict_wrenches)
+        return {
+            "contact_state": (torch.linalg.norm(wrenches[..., :3], dim=-1) > 1.0e-6).to(dtype=torch.float32),
+            "contact_points": self.get_contact_points(),
+            "contact_wrenches": wrenches,
+            "contact_forces": wrenches[..., :3],
+        }
+
+    def get_force_sensor_data(self, *args, **kwargs):
+        return self.get_contact_forces().reshape(self.num_envs, 9)
+
+    def get_environment_parameters(self, env_id: int = 0) -> dict[str, float]:
+        del env_id
+        return {
+            "screwdriver_friction": float(
+                self.config.get("screwdriver_friction", self.config.get("friction_coefficient", 1.0))
+            ),
+            "yaw_joint_friction": float(self.config.get("yaw_joint_friction", 0.0)),
+        }

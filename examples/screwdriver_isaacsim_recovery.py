@@ -51,6 +51,9 @@ DEFAULT_DIFFPF_TRAJECTORY_SELECTION_MODE = "max_reward_times_exp_likelihood"
 DEFAULT_DIFFPF_LIKELIHOOD_MASK = "inverse_dynamics"
 DEFAULT_DIFFPF_LIKELIHOOD_TEMPERATURE = 10.0
 DEFAULT_DIFFPF_LIKELIHOOD_REWARD_SCOPE = "per_step"
+DEFAULT_HARDWARE_ROS_CONFIG = (
+    MODEL_MISMATCH_PATH / "examples" / "evaluation" / "config" / "screwdriver_hardware_ros_profiles.yaml"
+)
 DEFAULT_MIN_FORCE_BY_HAND = {
     "allegro": {
         "thumb": 1.0,
@@ -145,6 +148,18 @@ def parse_args():
         dest="use_pregrasp_reference_targets",
         action="store_false",
     )
+    parser.add_argument("--hardware_ros_config", type=str, default=None)
+    parser.add_argument("--hardware_profile", type=str, default=None)
+    parser.add_argument("--hardware_execute", type=_bool_from_cli, default=None)
+    parser.add_argument("--hardware_command_topic", type=str, default=None)
+    parser.add_argument("--hardware_joint_state_topic", type=str, default=None)
+    parser.add_argument("--hardware_mocap_topic", type=str, default=None)
+    parser.add_argument("--hardware_proto5_wrench_topic", type=str, default=None)
+    parser.add_argument("--hardware_proto5_wrench_fixed_joint_names", type=str, default=None)
+    parser.add_argument("--hardware_num_repeat", type=int, default=None)
+    parser.add_argument("--hardware_command_mode", type=str, default=None)
+    parser.add_argument("--hardware_command_duration_s", type=float, default=None)
+    parser.add_argument("--hardware_allow_placeholder_wrenches", type=_bool_from_cli, default=None)
     return parser.parse_args()
 
 
@@ -180,7 +195,7 @@ def load_config(args) -> dict:
     headless_from_cli = getattr(args, "headless", None) is not None
     config["config_path"] = str(config_path)
     config["simulator"] = "isaacsim"
-    config["mode"] = "simulation"
+    config.setdefault("mode", "simulation")
 
     for key in (
         "hand",
@@ -203,8 +218,20 @@ def load_config(args) -> dict:
         "planner_yaw_inertia_model_path",
         "planner_use_yaw_inertia_model",
         "use_pregrasp_reference_targets",
+        "hardware_ros_config",
+        "hardware_profile",
+        "hardware_execute",
+        "hardware_command_topic",
+        "hardware_joint_state_topic",
+        "hardware_mocap_topic",
+        "hardware_proto5_wrench_topic",
+        "hardware_proto5_wrench_fixed_joint_names",
+        "hardware_num_repeat",
+        "hardware_command_mode",
+        "hardware_command_duration_s",
+        "hardware_allow_placeholder_wrenches",
     ):
-        value = getattr(args, key)
+        value = getattr(args, key, None)
         if value is not None:
             config[key] = value
     if args.proto5_control_wrist is not None:
@@ -246,6 +273,21 @@ def load_config(args) -> dict:
     config.setdefault("diffpf_likelihood_temperature", DEFAULT_DIFFPF_LIKELIHOOD_TEMPERATURE)
     config.setdefault("diffpf_likelihood_reward_scope", DEFAULT_DIFFPF_LIKELIHOOD_REWARD_SCOPE)
     config.setdefault("diffpf_reset_belief_after_recovery", True)
+    config.setdefault("hardware_ros_config", str(DEFAULT_HARDWARE_ROS_CONFIG))
+    config.setdefault("hardware_profile", str(config.get("hand", "proto5")))
+    config.setdefault("hardware_execute", False)
+    config.setdefault("hardware_num_repeat", 10)
+    config.setdefault("hardware_command_mode", "repeat")
+    config.setdefault("hardware_command_duration_s", 1.0 / 12.0)
+    config.setdefault("hardware_allow_placeholder_wrenches", False)
+    config["mode"] = str(config.get("mode", "simulation")).lower()
+    if config["mode"] not in {"simulation", "hardware", "hardware_copy"}:
+        raise ValueError(f"Unsupported mode {config['mode']!r}; expected simulation, hardware, or hardware_copy.")
+    if config["mode"] == "hardware":
+        config["external_wrench_perturb"] = False
+        config["randomize_obj_start"] = False
+        config["save_recovery_frames"] = False
+        config["simulator"] = "hardware"
     config["min_force_dict"] = _parse_min_force_config(config)
     if bool(config["save_recovery_frames"]) and bool(config["no_video"]):
         raise ValueError("save_recovery_frames=True requires cameras; run without --no_video true.")
@@ -546,6 +588,12 @@ def make_isaacsim_env(config):
     )
 
 
+def make_hardware_env(config):
+    from ccai.utils.isaacsim_screwdriver_recovery import HardwareScrewdriverRecoveryEnv
+
+    return HardwareScrewdriverRecoveryEnv(config, device=config.get("sim_device", "cpu"))
+
+
 def prepare_legacy_module(config):
     if str(CCAI_PATH) not in sys.path:
         sys.path.insert(0, str(CCAI_PATH))
@@ -600,7 +648,8 @@ def main():
     args = parse_args()
     config = load_config(args)
     ensure_proto5_point_cache(config)
-    simulation_app = launch_isaaclab(config)
+    hardware_mode = config.get("mode") == "hardware"
+    simulation_app = None if hardware_mode else launch_isaaclab(config)
 
     import numpy as np
     import pytorch_kinematics as pk
@@ -608,10 +657,11 @@ def main():
     from tqdm import tqdm
 
     from ccai.models.management.model_manager import ModelManager
-    from ccai.utils.isaacsim_screwdriver_recovery import get_hand_spec, tee_stdout_to_file
+    from ccai.utils.isaacsim_screwdriver_recovery import HardwareVisualizationShim, get_hand_spec, tee_stdout_to_file
 
     legacy = prepare_legacy_module(config)
-    env = make_isaacsim_env(config)
+    env = make_hardware_env(config) if hardware_mode else make_isaacsim_env(config)
+    sim_viz_env = HardwareVisualizationShim(env) if hardware_mode else None
     hand_spec = get_hand_spec(config["hand"])
     normal_action_policy = build_normal_action_policy(config, env, config.get("sim_device", "cuda:0"))
 
@@ -631,8 +681,8 @@ def main():
     params = config.copy()
     params.pop("controllers")
     params.update(config["controllers"]["csvgd"])
-    params["simulator"] = "isaacsim"
-    params["mode"] = "simulation"
+    params["simulator"] = config.get("simulator", "isaacsim")
+    params["mode"] = config.get("mode", "simulation")
     params["hand"] = config["hand"]
     params["proto5_control_wrist"] = bool(config.get("proto5_control_wrist", False))
     params["robot_sdf_path_prefix"] = str(hand_spec.planner_robot_sdf_path_prefix)
@@ -665,13 +715,16 @@ def main():
             print(f"\nTrial {i + 1}")
             if not params["skip_pregrasp"]:
                 if config.get("debug_progress", False):
-                    print("debug_progress: resetting IsaacSim env", flush=True)
+                    backend_name = "hardware env" if hardware_mode else "IsaacSim env"
+                    print(f"debug_progress: resetting {backend_name}", flush=True)
                 env.reset()
-                object_randomization = randomize_isaacsim_object_start(
-                    env,
-                    config,
-                    np.random.default_rng(base_seed + i),
-                )
+                object_randomization = None
+                if not hardware_mode:
+                    object_randomization = randomize_isaacsim_object_start(
+                        env,
+                        config,
+                        np.random.default_rng(base_seed + i),
+                    )
                 if object_randomization is not None and config.get("debug_progress", False):
                     print(
                         "debug_progress: randomized object start "
@@ -713,7 +766,7 @@ def main():
                 env,
                 params,
                 fpath,
-                sim_viz_env=None,
+                sim_viz_env=sim_viz_env,
                 ros_copy_node=None,
                 seed=seed,
                 proj_path=None,
@@ -736,7 +789,8 @@ def main():
         print("Mean yaw delta:", np.mean(legacy.all_yaw_deltas))
         print("Std yaw delta:", np.std(legacy.all_yaw_deltas))
     env.close()
-    simulation_app.close()
+    if simulation_app is not None:
+        simulation_app.close()
 
 
 if __name__ == "__main__":
