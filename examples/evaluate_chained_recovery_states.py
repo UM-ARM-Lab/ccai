@@ -223,6 +223,82 @@ def tensor_to_cpu(value: Any) -> Any:
     return value
 
 
+def visualize_trajectory_for_eval(*args, **kwargs):
+    from ccai.utils.allegro_utils import visualize_trajectory
+
+    return visualize_trajectory(*args, **kwargs)
+
+
+def combined_actual_rollout_from_artifacts(
+    artifacts: List[Dict[str, Any]],
+    final_state: torch.Tensor,
+) -> Optional[torch.Tensor]:
+    torch = ensure_torch()
+    frames = []
+    for artifact in artifacts:
+        actual_trajectory = artifact.get("actual_trajectory")
+        if actual_trajectory is None:
+            continue
+        if torch.is_tensor(actual_trajectory):
+            actual_trajectory = actual_trajectory.detach().cpu().to(dtype=torch.float32)
+        else:
+            actual_trajectory = torch.as_tensor(actual_trajectory, dtype=torch.float32)
+        if actual_trajectory.numel() == 0:
+            continue
+        if actual_trajectory.ndim == 1:
+            actual_trajectory = actual_trajectory.reshape(1, -1)
+        frames.append(actual_trajectory[:, :15])
+
+    if torch.is_tensor(final_state):
+        final_state = final_state.detach().cpu().to(dtype=torch.float32)
+    else:
+        final_state = torch.as_tensor(final_state, dtype=torch.float32)
+    final_state = final_state.reshape(1, -1)[:, :15]
+    frames.append(final_state)
+    return torch.cat(frames, dim=0) if frames else final_state
+
+
+def save_executed_rollout_visualization(
+    trial_dir: pathlib.Path,
+    contact_sequence: List[str],
+    artifacts: List[Dict[str, Any]],
+    final_state: torch.Tensor,
+    turn_problem: Any,
+    selected_recovery: Optional[Dict[str, Any]] = None,
+) -> Optional[pathlib.Path]:
+    torch = ensure_torch()
+    rollout = combined_actual_rollout_from_artifacts(artifacts, final_state)
+    if rollout is None:
+        return None
+
+    viz_dir = pathlib.Path(trial_dir) / "executed_rollout"
+    img_dir = viz_dir / "img"
+    gif_dir = viz_dir / "gif"
+    img_dir.mkdir(parents=True, exist_ok=True)
+    gif_dir.mkdir(parents=True, exist_ok=True)
+
+    traj_for_viz = rollout.to(dtype=torch.float32)
+    tmp = torch.zeros((traj_for_viz.shape[0], 1), dtype=traj_for_viz.dtype)
+    traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
+
+    visualize_trajectory_for_eval(
+        traj_for_viz,
+        turn_problem.contact_scenes_for_viz,
+        viz_dir,
+        turn_problem.fingers,
+        turn_problem.obj_dof + 1,
+    )
+
+    metadata = {
+        "contact_sequence": list(contact_sequence),
+        "num_frames": int(traj_for_viz.shape[0]),
+        "selected_recovery": selected_recovery,
+    }
+    with open(viz_dir / "metadata.json", "w") as f:
+        json.dump(metadata, f, indent=2)
+    return viz_dir
+
+
 def init_executor_data(params: Dict[str, Any]) -> Dict[str, Any]:
     t_range = params.get("T_orig", params["T"])
     data = {
@@ -364,6 +440,15 @@ def evaluate_one_state(
     )
 
     final_state = current_planner_state(ctx.env).to(device=ctx.params["device"])
+    selected_recovery = getattr(ctx.contact_planner, "last_chained_recovery_selection", None)
+    executed_rollout_dir = save_executed_rollout_visualization(
+        trial_dir=trial_dir,
+        contact_sequence=contact_sequence,
+        artifacts=artifacts,
+        final_state=final_state,
+        turn_problem=ctx.turn_problem,
+        selected_recovery=selected_recovery,
+    )
     actual_likelihood_raw = ctx.trajectory_sampler_orig.check_id(
         final_state,
         ctx.params["likelihood_num_samples"],
@@ -402,6 +487,8 @@ def evaluate_one_state(
             "final_state": tensor_to_cpu(final_state),
             "executed_contacts": contact_sequence,
             "executor_artifacts": artifacts,
+            "selected_recovery": selected_recovery,
+            "executed_rollout_dir": str(executed_rollout_dir) if executed_rollout_dir is not None else None,
             "trial_dir": str(trial_dir),
         },
     }
@@ -570,7 +657,7 @@ def evaluate_states(
 
     ctx = setup_context(config)
     set_seed(seed)
-    states = load_recovery_states(states_path)
+    states = load_recovery_states(states_path)    ## where are these coming from? 
     rows = []
     records = []
     try:

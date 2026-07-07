@@ -11,6 +11,7 @@ except ImportError:
 
 import numpy as np
 import pickle
+import json
 from copy import deepcopy
 
 import torch
@@ -298,6 +299,123 @@ def apply_saved_pregrasp_state(env, sim_viz_env, pregrasp_states, trial_index, s
 
     if sim_viz_env is not None and hasattr(sim_viz_env, 'set_pose'):
         sim_viz_env.set_pose(pregrasp_state.cpu())
+
+
+def _flatten_actual_rollout_for_visualization(actual_trajectory, final_state, state_dim):
+    frames = []
+    for item in actual_trajectory:
+        if isinstance(item, list):
+            continue
+        if item is None:
+            continue
+        item = item.detach().cpu().float() if torch.is_tensor(item) else torch.as_tensor(item).float()
+        if item.numel() == 0:
+            continue
+        if item.ndim == 1:
+            item = item.reshape(1, -1)
+        else:
+            item = item.reshape(-1, item.shape[-1])
+        frames.append(item[:, :state_dim])
+
+    if final_state is not None:
+        final_state = final_state.detach().cpu().float() if torch.is_tensor(final_state) else torch.as_tensor(final_state).float()
+        frames.append(final_state.reshape(1, -1)[:, :state_dim])
+
+    if not frames:
+        return None
+    return torch.cat(frames, dim=0)
+
+
+def _sanitize_temperature_for_path(temperature):
+    temperature = 1.0 if temperature is None else float(temperature)
+    text = f"{temperature:g}"
+    if "e" not in text and "." not in text:
+        text = f"{text}.0"
+    return text.replace("-", "m").replace("+", "").replace(".", "p")
+
+
+def _recovery_log_run_name(temperature=None):
+    timestamp = time.strftime("%Y%m%d_%H%M")
+    return f"{timestamp}_temp{_sanitize_temperature_for_path(temperature)}"
+
+
+def _collision_safe_child_dir(parent, preferred_name):
+    parent = pathlib.Path(parent)
+    candidate = parent / preferred_name
+    if not candidate.exists():
+        return candidate
+    suffix = 2
+    while True:
+        candidate = parent / f"{preferred_name}_run{suffix:02d}"
+        if not candidate.exists():
+            return candidate
+        suffix += 1
+
+
+def _experiment_log_run_dir(controller_dir, temperature=None):
+    return _collision_safe_child_dir(
+        controller_dir,
+        _recovery_log_run_name(temperature),
+    )
+
+
+def _trial_log_run(trial_dir):
+    trial_dir = pathlib.Path(trial_dir)
+    return trial_dir.parent.name, trial_dir.parent
+
+
+def save_executed_rollout_visualization(
+    fpath,
+    actual_trajectory,
+    final_state,
+    executed_contacts,
+    turn_problem,
+    num_fingers,
+    obj_dof,
+    selected_recovery=None,
+    temperature=None,
+    all_stage=None,
+    log_run_name=None,
+):
+    state_dim = 4 * num_fingers + obj_dof
+    rollout = _flatten_actual_rollout_for_visualization(actual_trajectory, final_state, state_dim)
+    if rollout is None:
+        return None
+
+    viz_fpath = pathlib.Path(fpath) / "executed_rollout"
+    img_fpath, gif_fpath = viz_fpath / "img", viz_fpath / "gif"
+    img_fpath.mkdir(parents=True, exist_ok=True)
+    gif_fpath.mkdir(parents=True, exist_ok=True)
+
+    tmp = torch.zeros((rollout.shape[0], 1), dtype=rollout.dtype)
+    traj_for_viz = torch.cat((rollout, tmp), dim=1)
+    visualize_trajectory(
+        traj_for_viz,
+        turn_problem.contact_scenes_for_viz,
+        viz_fpath,
+        turn_problem.fingers,
+        obj_dof + 1,
+    )
+
+    run_name, run_dir = _trial_log_run(fpath)
+    effective_temperature = (
+        selected_recovery.get("recovery_likelihood_temperature")
+        if selected_recovery is not None and selected_recovery.get("recovery_likelihood_temperature") is not None
+        else (1.0 if temperature is None else temperature)
+    )
+    metadata = {
+        "executed_contacts": list(executed_contacts),
+        "num_frames": int(traj_for_viz.shape[0]),
+        "trial_dir": str(pathlib.Path(fpath)),
+        "log_run_name": log_run_name or (selected_recovery or {}).get("log_run_name") or run_name,
+        "log_run_dir": str(run_dir),
+        "all_stage": all_stage,
+        "recovery_likelihood_temperature": effective_temperature,
+        "selected_recovery": selected_recovery,
+    }
+    with open(viz_fpath / "metadata.json", "w") as f:
+        json.dump(metadata, f, indent=2)
+    return viz_fpath
 
 
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noise=None, noise_noise=None, sim=None, seed=None,
@@ -1044,6 +1162,19 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 # Filter empty lists from actual_trajectory_save
                 actual_trajectory_save = [i for i in actual_trajectory_save if type(i) != list]
                 pickle.dump([i.cpu().numpy() for i in actual_trajectory_save], f)
+            selected_recovery = getattr(contact_planner, 'last_chained_recovery_selection', None) if contact_planner is not None else None
+            save_executed_rollout_visualization(
+                fpath,
+                actual_trajectory,
+                state.clone()[:4 * num_fingers + obj_dof],
+                data.get('executed_contacts', []),
+                turn_problem,
+                num_fingers,
+                obj_dof,
+                selected_recovery=selected_recovery,
+                temperature=params.get("recovery_likelihood_temperature", 1.0),
+                all_stage=all_stage,
+            )
         del actual_trajectory_save
         write_hri_diffpf_records_for_experiment(data, fpath)
 
@@ -1073,6 +1204,19 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
 
     state = env.get_state()
     state = extract_state_vector(state, num_fingers, params['device'], slice_end=15)
+    selected_recovery = getattr(contact_planner, 'last_chained_recovery_selection', None) if contact_planner is not None else None
+    save_executed_rollout_visualization(
+        fpath,
+        actual_trajectory,
+        state.clone()[:4 * num_fingers + obj_dof],
+        data.get('executed_contacts', []),
+        turn_problem,
+        num_fingers,
+        obj_dof,
+        selected_recovery=selected_recovery,
+        temperature=params.get("recovery_likelihood_temperature", 1.0),
+        all_stage=all_stage,
+    )
     final_yaw = state[-1].item()
     print('Final yaw:', final_yaw)
     try:
@@ -1259,6 +1403,12 @@ if __name__ == "__main__":
     if 'end_ind' in config:
         num_episodes = config['end_ind']
     seed = 0
+    controller_dir = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}{now}/csvgd')
+    trial_run_dir = _experiment_log_run_dir(
+        controller_dir,
+        temperature=params.get("recovery_likelihood_temperature", 1.0),
+    )
+    pathlib.Path.mkdir(trial_run_dir, parents=True, exist_ok=True)
     for i in tqdm(range(start_ind, num_episodes, step_size)):
         print(f'\nTrial {i+1}')
 
@@ -1269,13 +1419,11 @@ if __name__ == "__main__":
         goal = torch.tensor([0, 0, float(config['goal'])]) # Ignore. Deprecated
         # goal = goal + 0.025 * torch.randn(1) + 0.2
 
-        fpath = pathlib.Path(f'{CCAI_PATH}/data/experiments/{config["experiment_name"]}{now}/csvgd/trial_{i + 1}')
+        fpath = trial_run_dir / f'trial_{i + 1}'
         if config['mode'] != 'hardware':
             pathlib.Path.mkdir(fpath, parents=True, exist_ok=True)
         # set up params
 
-        if torch.cuda.device_count() == 1 and torch.cuda.current_device() == 1:
-            params['device'] = 'cuda:0'
         params['controller'] = 'csvgd'
         params['valve_goal'] = goal.to(device=params['device'])
         params['chain'] = chain.to(device=params['device'])

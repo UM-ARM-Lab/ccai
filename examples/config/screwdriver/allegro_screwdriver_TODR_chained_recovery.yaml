@@ -4,7 +4,7 @@ T_orig: 12
 receding_horizon: False
 num_steps: 8
 num_turns: 1
-max_recovery_stages: 4
+max_recovery_stages: 2
 num_trials: 10
 num_episodes: 1
 visualize: True
@@ -25,6 +25,7 @@ replan: False
 visualize_plan: False
 visualize_recovery_plan: True
 visualize_contact_plan: False
+visualize_recovery_per_node: True  # Render every particle at every search-tree node to disk (off-screen)
 optimize_force: True
 exclude_index: False
 projected: False
@@ -84,6 +85,7 @@ end_ind: 50
 chained_recovery_contact_search: True
 N_contact_plan: 16  # Total joint (trajectory, contact mode) samples per expanded node.
 likelihood_num_samples: 8
+recovery_likelihood_temperature: 1.5
 chained_recovery_likelihood_threshold: -100
 
 controllers:
