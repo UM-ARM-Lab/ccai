@@ -311,6 +311,30 @@ class TrajectoryExecutor:
         state_t = state_t.reshape(-1, state_t.shape[-1])[0]
         return state_t[:15].detach().cpu()
 
+    def _full_dof_reference_from_env(self):
+        if not hasattr(self.env, "get_full_dof_reference"):
+            return None
+        try:
+            return self._as_cpu_float_tensor(self.env.get_full_dof_reference(env_id=0)).reshape(-1)
+        except Exception:
+            if bool(self.params.get("hardware_track_wrist_state", False)):
+                raise
+            return None
+
+    def _wrist_from_full_dof_reference(self, full_dof_reference):
+        if full_dof_reference is None:
+            return None
+        hand_spec = getattr(self.env, "hand_spec", None)
+        wrist_joint_names = tuple(getattr(hand_spec, "wrist_joint_names", ()))
+        all_joint_names = tuple(getattr(hand_spec, "all_joint_names", ()))
+        if not wrist_joint_names:
+            return None
+        if all_joint_names:
+            wrist_ids = [all_joint_names.index(name) for name in wrist_joint_names]
+        else:
+            wrist_ids = list(range(len(wrist_joint_names)))
+        return full_dof_reference[wrist_ids].reshape(-1)
+
     def _append_hri_diffpf_record(
         self,
         data,
@@ -321,6 +345,8 @@ class TrajectoryExecutor:
         contact_plan,
         pre_tactile,
         post_tactile,
+        pre_full_dof_reference=None,
+        post_full_dof_reference=None,
         mode,
         recover,
         episode_num_steps,
@@ -367,6 +393,20 @@ class TrajectoryExecutor:
             ),
             "likelihood": self._to_optional_float(ood_likelihood),
         }
+        if pre_full_dof_reference is not None and post_full_dof_reference is not None:
+            pre_full = self._as_cpu_float_tensor(pre_full_dof_reference).reshape(-1)
+            post_full = self._as_cpu_float_tensor(post_full_dof_reference).reshape(-1)
+            if pre_full.numel() == post_full.numel():
+                record["full_joint_pos"] = torch.stack((pre_full, post_full), dim=0).numpy()
+                hand_spec = getattr(self.env, "hand_spec", None)
+                full_joint_names = tuple(getattr(hand_spec, "all_joint_names", ()))
+                if full_joint_names:
+                    record["full_joint_names"] = full_joint_names
+                pre_wrist = self._wrist_from_full_dof_reference(pre_full)
+                post_wrist = self._wrist_from_full_dof_reference(post_full)
+                if pre_wrist is not None and post_wrist is not None:
+                    record["wrist_joint_pos"] = torch.stack((pre_wrist, post_wrist), dim=0).numpy()
+                    record["wrist_joint_names"] = tuple(getattr(hand_spec, "wrist_joint_names", ()))
         data["hri_diffpf_records"].append(record)
 
     def _stack_actual_trajectory(self, actual_trajectory):
@@ -470,6 +510,7 @@ class TrajectoryExecutor:
 
             pre_state15 = state[:15].detach().cpu()
             pre_tactile = self._read_tactile_state()
+            pre_full_dof_reference = self._full_dof_reference_from_env()
             actual_trajectory.append(torch.cat((pre_state15, delta_t.detach().cpu())))
             self.env.step(target_t.reshape(1, -1).to(device=self.env.device))
             if hasattr(normal_action_policy, "observe_transition"):
@@ -482,6 +523,7 @@ class TrajectoryExecutor:
                 )
             post_state15 = self._state15_from_env(num_fingers=num_fingers, obj_dof=obj_dof)
             post_tactile = self._read_tactile_state()
+            post_full_dof_reference = self._full_dof_reference_from_env()
             contact_plan = self._contact_plan_vector(mode, device="cpu")
             self._record_contact_plan(data, mode)
             self._record_tactile_state(data, post_tactile)
@@ -493,6 +535,8 @@ class TrajectoryExecutor:
                 contact_plan=contact_plan,
                 pre_tactile=pre_tactile,
                 post_tactile=post_tactile,
+                pre_full_dof_reference=pre_full_dof_reference,
+                post_full_dof_reference=post_full_dof_reference,
                 mode=mode,
                 recover=False,
                 episode_num_steps=episode_num_steps,
@@ -893,6 +937,7 @@ class TrajectoryExecutor:
             - pre_state15[:12]
         )
         pre_tactile = self._read_tactile_state()
+        pre_full_dof_reference = self._full_dof_reference_from_env()
 
         # Visualization
         if ((self.params['visualize_plan'] and not recover) or 
@@ -920,6 +965,7 @@ class TrajectoryExecutor:
         self.env.step(action.to(device=self.env.device))
         post_state15 = self._state15_from_env(num_fingers=num_fingers, obj_dof=obj_dof)
         post_tactile = self._read_tactile_state()
+        post_full_dof_reference = self._full_dof_reference_from_env()
         contact_plan = self._contact_plan_vector(mode, device="cpu")
         self._record_contact_plan(data, mode)
         self._record_tactile_state(data, post_tactile)
@@ -931,6 +977,8 @@ class TrajectoryExecutor:
             contact_plan=contact_plan,
             pre_tactile=pre_tactile,
             post_tactile=post_tactile,
+            pre_full_dof_reference=pre_full_dof_reference,
+            post_full_dof_reference=post_full_dof_reference,
             mode=mode,
             recover=recover,
             episode_num_steps=episode_num_steps,

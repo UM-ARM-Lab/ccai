@@ -16,6 +16,7 @@ from ccai.utils.isaacsim_screwdriver_recovery import (
     OBJ_ORIENTATION_JOINT_NAMES,
     PROTO5_ACTIVE_JOINT_NAMES,
     PROTO5_ALL_JOINT_NAMES,
+    PROTO5_WRIST_JOINT_NAMES,
     HardwareScrewdriverRecoveryEnv,
     HardwareVisualizationShim,
     IsaacSimScrewdriverRecoveryEnv,
@@ -177,6 +178,7 @@ def test_hardware_recovery_load_config_preserves_hardware_mode_and_disables_sim_
     assert config["randomize_obj_start"] is False
     assert config["save_recovery_frames"] is False
     assert config["hardware_execute"] is True
+    assert config["hardware_use_live_screwdriver_position"] is True
     assert config["hardware_ros_config"] == str(screwdriver_isaacsim_recovery.DEFAULT_HARDWARE_ROS_CONFIG)
 
 
@@ -463,6 +465,16 @@ class _FakeHardwareRuntime:
         return self.points.to(device=device, dtype=dtype)
 
 
+class _FakeNamedHardwareRuntime(_FakeHardwareRuntime):
+    def __init__(self, names, positions):
+        super().__init__()
+        self.measured_names = tuple(names)
+        self.measured_positions = torch.as_tensor(positions, dtype=torch.float32).reshape(1, -1)
+
+    def get_measured_joint_state(self, device, dtype=torch.float32):
+        return self.measured_names, self.measured_positions.to(device=device, dtype=dtype)
+
+
 def test_hardware_recovery_env_packs_12_joint_plus_observed_pose_state():
     runtime = _FakeHardwareRuntime()
     env = HardwareScrewdriverRecoveryEnv(
@@ -486,6 +498,64 @@ def test_hardware_recovery_env_packs_12_joint_plus_observed_pose_state():
         "screwdriver_friction": pytest.approx(2.5),
         "yaw_joint_friction": pytest.approx(0.03),
     }
+
+
+def test_hardware_recovery_env_can_keep_hardcoded_position_with_live_orientation():
+    runtime = _FakeHardwareRuntime()
+    runtime.position = torch.tensor([[0.7, 0.8, 0.9]], dtype=torch.float32)
+    env = HardwareScrewdriverRecoveryEnv(
+        {
+            "hand": "proto5",
+            "sim_device": "cpu",
+            "hardware_use_live_screwdriver_position": False,
+        },
+        runtime=runtime,
+        device="cpu",
+    )
+
+    state = env.get_state()
+
+    torch.testing.assert_close(
+        env.table_pose,
+        torch.tensor(isaacsim_recovery_utils.DEFAULT_SCREWDRIVER_TABLE_POSE, dtype=torch.float32),
+    )
+    torch.testing.assert_close(state["q"][0, 12:16], torch.tensor([0.1, 0.2, 0.3, 0.3]))
+
+
+def test_proto5_hardware_full_dof_reference_maps_named_live_wrist_and_fingers():
+    names = (
+        PROTO5_ACTIVE_JOINT_NAMES[:4]
+        + PROTO5_WRIST_JOINT_NAMES
+        + PROTO5_ACTIVE_JOINT_NAMES[4:]
+    )
+    positions_by_name = {name: 10.0 + idx for idx, name in enumerate(names)}
+    runtime = _FakeNamedHardwareRuntime(names, [positions_by_name[name] for name in names])
+    env = HardwareScrewdriverRecoveryEnv(
+        {"hand": "proto5", "sim_device": "cpu", "hardware_track_wrist_state": True},
+        runtime=runtime,
+        device="cpu",
+    )
+
+    full = env.get_full_dof_reference()
+
+    assert full.shape == (18,)
+    for joint_name in PROTO5_WRIST_JOINT_NAMES + PROTO5_ACTIVE_JOINT_NAMES:
+        expected = torch.tensor(positions_by_name[joint_name], dtype=torch.float32)
+        torch.testing.assert_close(full[PROTO5_ALL_JOINT_NAMES.index(joint_name)], expected)
+    state = env.get_state()
+    assert state["q"].shape == (1, 16)
+
+
+def test_proto5_hardware_full_dof_reference_requires_wrist_when_tracking_enabled():
+    runtime = _FakeNamedHardwareRuntime(PROTO5_ACTIVE_JOINT_NAMES, torch.arange(12, dtype=torch.float32))
+    env = HardwareScrewdriverRecoveryEnv(
+        {"hand": "proto5", "sim_device": "cpu", "hardware_track_wrist_state": True},
+        runtime=runtime,
+        device="cpu",
+    )
+
+    with pytest.raises(RuntimeError, match="wrist joints are unavailable"):
+        env.get_full_dof_reference()
 
 
 def test_hardware_recovery_env_uses_dataset_orientation_when_runtime_reports_zero():

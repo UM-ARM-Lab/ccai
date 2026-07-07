@@ -283,6 +283,7 @@ def load_config(args) -> dict:
     config.setdefault("hardware_command_mode", "repeat")
     config.setdefault("hardware_command_duration_s", 1.0 / 12.0)
     config.setdefault("hardware_allow_placeholder_wrenches", False)
+    config.setdefault("hardware_use_live_screwdriver_position", True)
     config["mode"] = str(config.get("mode", "simulation")).lower()
     if config["mode"] not in {"simulation", "hardware", "hardware_copy"}:
         raise ValueError(f"Unsupported mode {config['mode']!r}; expected simulation, hardware, or hardware_copy.")

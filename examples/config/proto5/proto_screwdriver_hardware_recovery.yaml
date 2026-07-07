@@ -8,7 +8,7 @@ max_recovery_stages: 4
 num_trials: 1000
 num_episodes: 1
 visualize: False
-no_video: True
+no_video: False
 save_recovery_frames: False
 experiment_name: 'proto5_screwdriver_hardware_recovery'
 mode: 'hardware'
@@ -33,10 +33,10 @@ goal: -1.5
 prior: 1
 multi_particle_search: True
 replan: False
-visualize_plan: False
-visualize_recovery_plan: False
-visualize_contact_plan: False
-visualize_recovery_planning_samples: False
+visualize_plan: True
+visualize_recovery_plan: True
+visualize_contact_plan: True
+visualize_recovery_planning_samples: True
 optimize_force: True
 min_force:
   index: 0
@@ -88,13 +88,15 @@ diffpf_reset_belief_after_recovery: false
 likelihood_threshold: -90.0
 likelihood_num_samples: 8
 N_contact_plan: 16
-seed: 0
-start_ind: 0
-end_ind: 1
+seed: 1
+start_ind: 1
+end_ind: 2
 dataset_path: '/home/proto5/Programs/UMich/model_mismatch/data/proto5_saved_action_contact_replay.h5'
 hardware_ros_config: '/home/proto5/Programs/UMich/model_mismatch/examples/evaluation/config/screwdriver_hardware_ros_profiles.yaml'
 hardware_profile: 'proto5'
 hardware_execute: true
+hardware_track_wrist_state: true
+hardware_use_live_screwdriver_position: false
 hardware_command_topic: null
 hardware_joint_state_topic: null
 hardware_mocap_topic: null

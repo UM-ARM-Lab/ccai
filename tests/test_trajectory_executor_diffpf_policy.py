@@ -297,6 +297,43 @@ def test_proto5_normal_policy_branch_logs_contact_timeseries_and_rows():
     torch.testing.assert_close(torch.as_tensor(first_record["states"][1, :12]), torch.ones(12) * 0.01)
 
 
+def test_hri_diffpf_record_saves_optional_full_joint_and_wrist_fields():
+    env = _FakeEnv()
+    env.hand_spec = types.SimpleNamespace(
+        all_joint_names=tuple(f"joint_{idx}" for idx in range(18)),
+        wrist_joint_names=("joint_0", "joint_1"),
+    )
+    executor = TrajectoryExecutor({"device": "cpu", "trial_index": 2, "current_stage": 3}, env)
+    tactile = {
+        "contact_state": torch.zeros(3),
+        "contact_wrenches": torch.zeros(3, 6),
+        "contact_forces": torch.zeros(3, 3),
+        "contact_points": torch.zeros(3, 3),
+    }
+    data = {}
+
+    executor._append_hri_diffpf_record(
+        data,
+        pre_state15=torch.zeros(15),
+        post_state15=torch.ones(15),
+        delta12=torch.ones(12) * 0.1,
+        contact_plan=torch.ones(3),
+        pre_tactile=tactile,
+        post_tactile=tactile,
+        pre_full_dof_reference=torch.arange(18, dtype=torch.float32),
+        post_full_dof_reference=torch.arange(18, dtype=torch.float32) + 100.0,
+        mode="turn",
+        recover=False,
+        episode_num_steps=0,
+    )
+
+    record = data["hri_diffpf_records"][0]
+    assert record["full_joint_pos"].shape == (2, 18)
+    assert record["wrist_joint_pos"].shape == (2, 2)
+    assert record["full_joint_names"] == env.hand_spec.all_joint_names
+    torch.testing.assert_close(torch.as_tensor(record["wrist_joint_pos"][1]), torch.tensor([100.0, 101.0]))
+
+
 def test_recovery_branch_resets_normal_policy_without_observing_recovery_transition():
     env = _FakeEnv()
     policy = _FakePolicy()

@@ -1040,6 +1040,10 @@ class HardwareScrewdriverRecoveryEnv:
         self.num_envs = 1
         self.action_dim = 12
         self.proto5_control_wrist = bool(self.config.get("proto5_control_wrist", False))
+        self.hardware_track_wrist_state = bool(self.config.get("hardware_track_wrist_state", True))
+        self.hardware_use_live_screwdriver_position = bool(
+            self.config.get("hardware_use_live_screwdriver_position", True)
+        )
         self.default_dof_pos = torch.tensor(
             self.hand_spec.default_full_joint_pos,
             device=self.device,
@@ -1073,6 +1077,7 @@ class HardwareScrewdriverRecoveryEnv:
         values = {
             "hand": self.hand,
             "proto5_control_wrist": self.proto5_control_wrist,
+            "hardware_track_wrist_state": self.hardware_track_wrist_state,
             "hardware_ros_config": self.config.get("hardware_ros_config"),
             "hardware_profile": self.config.get("hardware_profile", self.hand),
             "hardware_execute": bool(self.config.get("hardware_execute", False)),
@@ -1119,6 +1124,49 @@ class HardwareScrewdriverRecoveryEnv:
             )
         return state15
 
+    def get_measured_joint_state(self) -> tuple[tuple[str, ...], torch.Tensor]:
+        if hasattr(self.runtime, "get_measured_joint_state"):
+            names, positions = self.runtime.get_measured_joint_state(self.device, dtype=torch.float32)
+            return tuple(str(name) for name in names), _as_2d_tensor(positions, device=self.device, dtype=torch.float32)
+        if hasattr(self.runtime, "get_named_joint_positions"):
+            names, positions = self.runtime.get_named_joint_positions(self.device, dtype=torch.float32)
+            return tuple(str(name) for name in names), _as_2d_tensor(positions, device=self.device, dtype=torch.float32)
+        if hasattr(self.runtime, "get_full_joint_positions"):
+            positions = self.runtime.get_full_joint_positions(self.device, dtype=torch.float32)
+            names = tuple(getattr(self.runtime, "state_joint_names", ()))
+            if not names and hasattr(self.runtime, "profile"):
+                profile = self.runtime.profile
+                names = tuple(getattr(profile, "state_joint_names", ()) or getattr(profile, "command_joint_names", ()))
+            if names:
+                return tuple(str(name) for name in names), _as_2d_tensor(positions, device=self.device, dtype=torch.float32)
+        raise RuntimeError(
+            "hardware_track_wrist_state=True requires the hardware runtime to expose named measured joints."
+        )
+
+    def get_full_dof_reference(self, env_id: int = 0) -> torch.Tensor:
+        full = self.default_dof_pos[int(env_id)].detach().clone()
+        names, positions = self.get_measured_joint_state()
+        row = positions[int(env_id) if positions.shape[0] > int(env_id) else 0].reshape(-1)
+        if len(names) != int(row.numel()):
+            raise RuntimeError(
+                f"Hardware measured joint names/positions length mismatch: names={len(names)}, positions={int(row.numel())}."
+            )
+        by_name = {name: row[idx] for idx, name in enumerate(names)}
+        missing_wrist = [name for name in self.hand_spec.wrist_joint_names if name not in by_name]
+        if self.hardware_track_wrist_state and missing_wrist:
+            raise RuntimeError(
+                "hardware_track_wrist_state=True but wrist joints are unavailable from hardware state: "
+                f"{missing_wrist}."
+            )
+        for joint_idx, name in enumerate(self.hand_spec.all_joint_names):
+            if name in by_name:
+                full[joint_idx] = by_name[name].to(device=full.device, dtype=full.dtype)
+        return full
+
+    def get_wrist_joint_state(self, env_id: int = 0) -> torch.Tensor:
+        full = self.get_full_dof_reference(env_id=env_id)
+        return full[: len(self.hand_spec.wrist_joint_names)].detach().clone()
+
     def set_observed_object_orientation(self, orientation) -> None:
         orientation = torch.as_tensor(orientation, device=self.device, dtype=torch.float32).reshape(1, -1)
         if orientation.shape[-1] != 3:
@@ -1126,6 +1174,10 @@ class HardwareScrewdriverRecoveryEnv:
         self._observed_object_orientation_fallback = orientation
 
     def _update_object_pose(self) -> None:
+        if not self.hardware_use_live_screwdriver_position:
+            self.table_pose = torch.tensor(DEFAULT_SCREWDRIVER_TABLE_POSE, device=self.device, dtype=torch.float32)
+            self.obj_pose = self.table_pose
+            return
         if hasattr(self.runtime, "get_screwdriver_position_robot"):
             try:
                 position = self.runtime.get_screwdriver_position_robot(self.device, dtype=torch.float32)
