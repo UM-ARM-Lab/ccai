@@ -581,6 +581,25 @@ def test_hardware_recovery_env_prefers_nonzero_runtime_orientation_over_dataset_
     torch.testing.assert_close(state["q"][0, 12:16], torch.tensor([0.1, 0.2, 0.3, 0.3]))
 
 
+def test_hardware_recovery_env_can_freeze_dataset_orientation_over_live_runtime():
+    runtime = _FakeHardwareRuntime()
+    env = HardwareScrewdriverRecoveryEnv(
+        {
+            "hand": "proto5",
+            "sim_device": "cpu",
+            "hardware_use_live_screwdriver_orientation": False,
+        },
+        runtime=runtime,
+        device="cpu",
+    )
+
+    env.set_observed_object_orientation(torch.tensor([0.4, -0.2, 0.7]))
+
+    state = env.get_state()
+
+    torch.testing.assert_close(state["q"][0, 12:16], torch.tensor([0.4, -0.2, 0.7, 0.7]))
+
+
 def test_hardware_recovery_env_step_and_set_pose_delegate_active_12d_targets():
     runtime = _FakeHardwareRuntime()
     env = HardwareScrewdriverRecoveryEnv({"hand": "proto5", "sim_device": "cpu"}, runtime=runtime, device="cpu")

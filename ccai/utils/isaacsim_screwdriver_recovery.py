@@ -1044,6 +1044,12 @@ class HardwareScrewdriverRecoveryEnv:
         self.hardware_use_live_screwdriver_position = bool(
             self.config.get("hardware_use_live_screwdriver_position", True)
         )
+        self.hardware_use_live_screwdriver_orientation = bool(
+            self.config.get("hardware_use_live_screwdriver_orientation", True)
+        )
+        self.hardware_debug_mocap_orientation = bool(
+            self.config.get("hardware_debug_mocap_orientation", False)
+        )
         self.default_dof_pos = torch.tensor(
             self.hand_spec.default_full_joint_pos,
             device=self.device,
@@ -1101,7 +1107,7 @@ class HardwareScrewdriverRecoveryEnv:
         }
         return SimpleNamespace(**values)
 
-    def _state15_from_runtime(self) -> torch.Tensor:
+    def _raw_state15_from_runtime(self) -> torch.Tensor:
         if hasattr(self.runtime, "get_current_state"):
             state = self.runtime.get_current_state(self.device)
         elif hasattr(self.runtime, "get_state"):
@@ -1113,15 +1119,80 @@ class HardwareScrewdriverRecoveryEnv:
         state = torch.as_tensor(state, device=self.device, dtype=torch.float32).reshape(1, -1)
         if state.shape[-1] < 15:
             raise RuntimeError(f"Expected hardware state with at least 15 values, got {tuple(state.shape)}.")
-        state15 = state[:, :15].clone()
-        if (
+        return state[:, :15].clone()
+
+    def _apply_observed_object_orientation(self, state15: torch.Tensor) -> tuple[torch.Tensor, bool]:
+        state15 = state15.clone()
+        use_observed_orientation = (
             self._observed_object_orientation_fallback is not None
-            and torch.allclose(state15[:, 12:15], torch.zeros_like(state15[:, 12:15]))
-        ):
+            and (
+                not self.hardware_use_live_screwdriver_orientation
+                or torch.allclose(state15[:, 12:15], torch.zeros_like(state15[:, 12:15]))
+            )
+        )
+        if use_observed_orientation:
             state15[:, 12:15] = self._observed_object_orientation_fallback.to(
                 device=state15.device,
                 dtype=state15.dtype,
             )
+        return state15, bool(use_observed_orientation)
+
+    @staticmethod
+    def _diagnostic_value(value):
+        if value is None:
+            return None
+        try:
+            return torch.as_tensor(value).detach().cpu().reshape(-1).tolist()
+        except Exception:
+            return value
+
+    def print_mocap_orientation_diagnostic(self, *, context: str) -> None:
+        if not self.hardware_debug_mocap_orientation:
+            return
+        raw_state15 = self._raw_state15_from_runtime()
+        state15, used_observed_orientation = self._apply_observed_object_orientation(raw_state15)
+        snapshot = {}
+        snapshot_error = None
+        if hasattr(self.runtime, "read_hardware_snapshot"):
+            try:
+                snapshot = self.runtime.read_hardware_snapshot()
+            except Exception as exc:
+                snapshot_error = repr(exc)
+        profile = getattr(self.runtime, "profile", None)
+        observed = self._observed_object_orientation_fallback
+        print(
+            "Hardware mocap orientation diagnostic "
+            f"context={context} "
+            f"runtime_orientation={self._diagnostic_value(raw_state15[:, 12:15])} "
+            f"returned_orientation={self._diagnostic_value(state15[:, 12:15])} "
+            f"observed_fallback={self._diagnostic_value(observed)} "
+            f"used_observed_fallback={used_observed_orientation} "
+            f"live_orientation_enabled={self.hardware_use_live_screwdriver_orientation} "
+            f"snapshot_orientation={self._diagnostic_value(snapshot.get('mocap_orientation'))} "
+            f"snapshot_orientation_source={snapshot.get('mocap_orientation_source')} "
+            f"snapshot_base_configured={snapshot.get('mocap_debug_base_configured')} "
+            f"snapshot_base_msg_received={snapshot.get('mocap_debug_base_msg_received')} "
+            f"snapshot_object_stamp_s={snapshot.get('mocap_debug_object_stamp_s')} "
+            f"snapshot_base_stamp_s={snapshot.get('mocap_debug_base_stamp_s')} "
+            f"snapshot_stamp_delta_s={snapshot.get('mocap_debug_stamp_delta_s')} "
+            f"snapshot_object_receive_age_s={snapshot.get('mocap_debug_object_receive_age_s')} "
+            f"snapshot_base_receive_age_s={snapshot.get('mocap_debug_base_receive_age_s')} "
+            f"snapshot_receive_delta_s={snapshot.get('mocap_debug_receive_delta_s')} "
+            f"snapshot_object_position={self._diagnostic_value(snapshot.get('mocap_debug_object_position'))} "
+            f"snapshot_object_quat_xyzw={self._diagnostic_value(snapshot.get('mocap_debug_object_quat_xyzw'))} "
+            f"snapshot_object_euler_rxyz={self._diagnostic_value(snapshot.get('mocap_debug_object_euler_rxyz'))} "
+            f"snapshot_base_position={self._diagnostic_value(snapshot.get('mocap_debug_base_position'))} "
+            f"snapshot_base_quat_xyzw={self._diagnostic_value(snapshot.get('mocap_debug_base_quat_xyzw'))} "
+            f"snapshot_base_euler_rxyz={self._diagnostic_value(snapshot.get('mocap_debug_base_euler_rxyz'))} "
+            f"mocap_topic={getattr(profile, 'mocap_topic', None)} "
+            f"turning_base_topic={getattr(profile, 'screwdriver_turning_base_topic', None)} "
+            f"snapshot_error={snapshot_error}",
+            flush=True,
+        )
+
+    def _state15_from_runtime(self) -> torch.Tensor:
+        raw_state15 = self._raw_state15_from_runtime()
+        state15, _ = self._apply_observed_object_orientation(raw_state15)
         return state15
 
     def get_measured_joint_state(self) -> tuple[tuple[str, ...], torch.Tensor]:

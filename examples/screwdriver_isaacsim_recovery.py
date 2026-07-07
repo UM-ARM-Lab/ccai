@@ -163,6 +163,8 @@ def parse_args():
     parser.add_argument("--hardware_command_mode", type=str, default=None)
     parser.add_argument("--hardware_command_duration_s", type=float, default=None)
     parser.add_argument("--hardware_allow_placeholder_wrenches", type=_bool_from_cli, default=None)
+    parser.add_argument("--hardware_use_live_screwdriver_orientation", type=_bool_from_cli, default=None)
+    parser.add_argument("--hardware_debug_mocap_orientation", type=_bool_from_cli, default=None)
     return parser.parse_args()
 
 
@@ -233,6 +235,8 @@ def load_config(args) -> dict:
         "hardware_command_mode",
         "hardware_command_duration_s",
         "hardware_allow_placeholder_wrenches",
+        "hardware_use_live_screwdriver_orientation",
+        "hardware_debug_mocap_orientation",
     ):
         value = getattr(args, key, None)
         if value is not None:
@@ -284,6 +288,8 @@ def load_config(args) -> dict:
     config.setdefault("hardware_command_duration_s", 1.0 / 12.0)
     config.setdefault("hardware_allow_placeholder_wrenches", False)
     config.setdefault("hardware_use_live_screwdriver_position", True)
+    config.setdefault("hardware_use_live_screwdriver_orientation", True)
+    config.setdefault("hardware_debug_mocap_orientation", False)
     config["mode"] = str(config.get("mode", "simulation")).lower()
     if config["mode"] not in {"simulation", "hardware", "hardware_copy"}:
         raise ValueError(f"Unsupported mode {config['mode']!r}; expected simulation, hardware, or hardware_copy.")
@@ -508,6 +514,8 @@ def send_proto5_hardware_initial_pose_and_wait(env, initialization: dict, *, dev
         "Proto5 initial hand pose command sent. "
         "Confirm the hand is ready, then press Enter to start policy execution."
     )
+    if hasattr(env, "print_mocap_orientation_diagnostic"):
+        env.print_mocap_orientation_diagnostic(context="after_initial_pose_confirm")
 
 
 def _friction_range(config, prefix: str, fallback):

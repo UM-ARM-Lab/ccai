@@ -84,7 +84,7 @@ diffpf_trajectory_selection_mode: 'max_reward_times_exp_likelihood'
 diffpf_likelihood_mask: 'inverse_dynamics'
 diffpf_likelihood_temperature: 10
 diffpf_likelihood_reward_scope: 'per_step'
-diffpf_reset_belief_after_recovery: false
+diffpf_reset_belief_after_recovery: true
 likelihood_threshold: -90.0
 likelihood_num_samples: 8
 N_contact_plan: 16
@@ -97,6 +97,8 @@ hardware_profile: 'proto5'
 hardware_execute: true
 hardware_track_wrist_state: true
 hardware_use_live_screwdriver_position: false
+hardware_use_live_screwdriver_orientation: true
+hardware_debug_mocap_orientation: true
 hardware_command_topic: null
 hardware_joint_state_topic: null
 hardware_mocap_topic: null
