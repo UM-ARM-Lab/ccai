@@ -383,6 +383,112 @@ def get_recovery_planner_physical_kwargs(env, config) -> dict:
     return physical_kwargs
 
 
+def _is_proto5_hardware_dataset_initialization_mode(config: dict) -> bool:
+    return (
+        str(config.get("mode", "simulation")).lower() == "hardware"
+        and str(config.get("hand", "")).lower() == "proto5"
+    )
+
+
+def _resolve_proto5_validation_dataset_row(seed: int) -> int:
+    if str(MODEL_MISMATCH_PATH) not in sys.path:
+        sys.path.insert(0, str(MODEL_MISMATCH_PATH))
+    from scripts.proto5_screwdriver_val_indices import proto5_screwdriver_val_indices
+
+    ordinal = int(seed)
+    if ordinal < 0 or ordinal >= len(proto5_screwdriver_val_indices):
+        raise ValueError(
+            "Proto5 hardware seed selects an ordinal in "
+            "scripts/proto5_screwdriver_val_indices.py; "
+            f"got {ordinal}, expected 0 <= seed < {len(proto5_screwdriver_val_indices)}."
+        )
+    return int(proto5_screwdriver_val_indices[ordinal])
+
+
+def _load_proto5_hardware_initialization(config: dict) -> dict | None:
+    if not _is_proto5_hardware_dataset_initialization_mode(config):
+        return None
+    dataset_path = config.get("dataset_path")
+    if dataset_path in (None, ""):
+        raise ValueError(
+            "Proto5 hardware initialization requires dataset_path in the recovery YAML "
+            "so seed can select an initial pose from scripts/proto5_screwdriver_val_indices.py."
+        )
+
+    import numpy as np
+
+    if str(MODEL_MISMATCH_PATH) not in sys.path:
+        sys.path.insert(0, str(MODEL_MISMATCH_PATH))
+    from model_mismatch.utils.trajectory_dataset_io import open_trajectory_dataset, trajectory_dataset_keys
+
+    validation_ordinal = int(config.get("seed", 0))
+    trajectory_row = _resolve_proto5_validation_dataset_row(validation_ordinal)
+    with open_trajectory_dataset(str(dataset_path), allow_pickle=True) as data:
+        dataset_keys = set(trajectory_dataset_keys(data))
+        if "initial_joint_targets" in dataset_keys:
+            initial_target = np.asarray(
+                data["initial_joint_targets"][trajectory_row],
+                dtype=np.float32,
+            ).reshape(-1)
+            target_source = "initial_joint_targets"
+        elif "initial_state" in dataset_keys:
+            initial_state = np.asarray(data["initial_state"][trajectory_row], dtype=np.float32).reshape(-1)
+            initial_target = initial_state[:12].astype(np.float32, copy=True)
+            target_source = "initial_state[:12]"
+        elif "initial_states" in dataset_keys:
+            initial_state = np.asarray(data["initial_states"][trajectory_row], dtype=np.float32).reshape(-1)
+            initial_target = initial_state[:12].astype(np.float32, copy=True)
+            target_source = "initial_states[:12]"
+        elif "q" in dataset_keys:
+            q0 = np.asarray(data["q"][trajectory_row], dtype=np.float32)
+            initial_target = q0.reshape(q0.shape[0], -1)[0, :12].astype(np.float32, copy=True)
+            target_source = "q[0, :12]"
+        else:
+            raise ValueError(
+                "Proto5 hardware initialization dataset must contain one of "
+                "initial_joint_targets, initial_state, initial_states, or q."
+            )
+
+    expected_dim = 14 if bool(config.get("proto5_control_wrist", False)) else 12
+    if initial_target.shape != (expected_dim,):
+        raise ValueError(
+            "Proto5 hardware initial pose target has incompatible dimension: "
+            f"selected {target_source} from dataset row {trajectory_row} with shape "
+            f"{tuple(initial_target.shape)}, expected ({expected_dim},) for "
+            f"proto5_control_wrist={bool(config.get('proto5_control_wrist', False))}."
+        )
+
+    return {
+        "validation_ordinal": validation_ordinal,
+        "trajectory_row": trajectory_row,
+        "target_source": target_source,
+        "initial_target": initial_target,
+    }
+
+
+def send_proto5_hardware_initial_pose_and_wait(env, initialization: dict, *, device) -> None:
+    import torch
+
+    initial_target = torch.as_tensor(
+        initialization["initial_target"],
+        device=device,
+        dtype=torch.float32,
+    ).reshape(1, -1)
+    print(
+        "Proto5 hardware initial pose: "
+        f"validation ordinal {int(initialization['validation_ordinal'])} -> "
+        f"dataset row {int(initialization['trajectory_row'])}; "
+        f"target_dim={initial_target.shape[-1]} "
+        f"source={initialization['target_source']}.",
+        flush=True,
+    )
+    env.step(initial_target)
+    input(
+        "Proto5 initial hand pose command sent. "
+        "Confirm the hand is ready, then press Enter to start policy execution."
+    )
+
+
 def _friction_range(config, prefix: str, fallback):
     low_key = f"{prefix}_min"
     high_key = f"{prefix}_max"
@@ -708,6 +814,7 @@ def main():
 
     seed = 0
     base_seed = 0 if config.get("seed", None) is None else int(config["seed"])
+    proto5_hardware_initialization = _load_proto5_hardware_initialization(config)
     for i in tqdm(range(start_ind, num_episodes)):
         fpath = experiment_dir / "csvgd" / f"trial_{i + 1}"
         fpath.mkdir(parents=True, exist_ok=True)
@@ -718,6 +825,12 @@ def main():
                     backend_name = "hardware env" if hardware_mode else "IsaacSim env"
                     print(f"debug_progress: resetting {backend_name}", flush=True)
                 env.reset()
+                if proto5_hardware_initialization is not None:
+                    send_proto5_hardware_initial_pose_and_wait(
+                        env,
+                        proto5_hardware_initialization,
+                        device=params["device"],
+                    )
                 object_randomization = None
                 if not hardware_mode:
                     object_randomization = randomize_isaacsim_object_start(

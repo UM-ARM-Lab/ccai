@@ -69,7 +69,9 @@ obj_gravity: True
 type: 'diffusion'
 OOD_metric: 'likelihood'
 recovery_controller: 'csvgd'
-model_path: 'data/training/allegro_screwdriver/allegro_screwdriver_TODR_recovery_partial_patch_new_110_diffusion/allegro_screwdriver_diffusion.pt'
+recovery_model_dir: 'data/training/allegro_screwdriver/proto5_blue_screwdriver_filtered_diffusion'
+model_path: 'data/training/allegro_screwdriver/proto5_blue_screwdriver_filtered_diffusion/allegro_screwdriver_diffusion_best.pt'
+model_dir: 'data/training/allegro_screwdriver/proto5_blue_screwdriver_filtered_diffusion'
 task_model_path: 'data/training/allegro_screwdriver/proto5_blue_screwdriver_task_fixed_replay_diffusion/allegro_screwdriver_diffusion_best.pt'
 diffpf_checkpoint: '/home/abhinav/Documents/model_mismatch/runs/proto5_blue_screwdriver_fixed_replay_latest.pt'
 diffpf_ema_decay: .9999
@@ -86,11 +88,11 @@ diffpf_reset_belief_after_recovery: false
 likelihood_threshold: -90.0
 likelihood_num_samples: 8
 N_contact_plan: 16
-start_ind: 0
-end_ind: 1
+seed: 0
+dataset_path: '/home/proto5/Programs/UMich/model_mismatch/data/proto5_saved_action_contact_replay.h5'
 hardware_ros_config: '/home/abhinav/Documents/model_mismatch/examples/evaluation/config/screwdriver_hardware_ros_profiles.yaml'
 hardware_profile: 'proto5'
-hardware_execute: false
+hardware_execute: true
 hardware_command_topic: null
 hardware_joint_state_topic: null
 hardware_mocap_topic: null
@@ -104,6 +106,12 @@ tactile_controller: False
 recovery_tactile_controller: False
 skip_csvto: False
 recovery_skip_csvto: False
+
+chained_recovery_contact_search: False
+N_contact_plan: 16  # Total joint (trajectory, contact mode) samples per expanded node.
+likelihood_num_samples: 8
+chained_recovery_likelihood_threshold: -100
+
 controllers:
   csvgd:
     N: 1
@@ -115,8 +123,8 @@ controllers:
     device: 'cuda:0'
     online_iters: 0
     warmup_iters: 15
-    recovery_warmup_iters: 100
-    recovery_online_iters: 40
+    recovery_warmup_iters: 25
+    recovery_online_iters: 25
     resample_steps: 16
     resample_sigma: 0.01
     resample_temperature: 0.1

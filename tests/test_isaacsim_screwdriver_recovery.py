@@ -180,6 +180,122 @@ def test_hardware_recovery_load_config_preserves_hardware_mode_and_disables_sim_
     assert config["hardware_ros_config"] == str(screwdriver_isaacsim_recovery.DEFAULT_HARDWARE_ROS_CONFIG)
 
 
+def _write_hardware_initialization_h5(path, **datasets):
+    h5py = pytest.importorskip("h5py")
+    with h5py.File(path, "w") as h5_file:
+        for name, value in datasets.items():
+            h5_file.create_dataset(name, data=np.asarray(value, dtype=np.float32))
+
+
+def _proto5_hardware_init_config(dataset_path, **overrides):
+    config = {
+        "mode": "hardware",
+        "hand": "proto5",
+        "dataset_path": str(dataset_path),
+        "seed": 2,
+        "proto5_control_wrist": False,
+    }
+    config.update(overrides)
+    return config
+
+
+def test_proto5_hardware_initialization_uses_seed_selected_validation_row_and_joint_targets(monkeypatch, tmp_path):
+    dataset_path = tmp_path / "initialization.h5"
+    initial_joint_targets = np.arange(36, dtype=np.float32).reshape(3, 12)
+    _write_hardware_initialization_h5(dataset_path, initial_joint_targets=initial_joint_targets)
+    monkeypatch.setattr(
+        screwdriver_isaacsim_recovery,
+        "_resolve_proto5_validation_dataset_row",
+        lambda seed: seed - 1,
+    )
+
+    initialization = screwdriver_isaacsim_recovery._load_proto5_hardware_initialization(
+        _proto5_hardware_init_config(dataset_path)
+    )
+
+    assert initialization["validation_ordinal"] == 2
+    assert initialization["trajectory_row"] == 1
+    assert initialization["target_source"] == "initial_joint_targets"
+    np.testing.assert_allclose(initialization["initial_target"], initial_joint_targets[1])
+
+
+def test_proto5_hardware_initialization_falls_back_to_initial_state(monkeypatch, tmp_path):
+    dataset_path = tmp_path / "initialization.h5"
+    initial_state = np.arange(45, dtype=np.float32).reshape(3, 15)
+    _write_hardware_initialization_h5(dataset_path, initial_state=initial_state)
+    monkeypatch.setattr(
+        screwdriver_isaacsim_recovery,
+        "_resolve_proto5_validation_dataset_row",
+        lambda seed: 2,
+    )
+
+    initialization = screwdriver_isaacsim_recovery._load_proto5_hardware_initialization(
+        _proto5_hardware_init_config(dataset_path, seed=0)
+    )
+
+    assert initialization["trajectory_row"] == 2
+    assert initialization["target_source"] == "initial_state[:12]"
+    np.testing.assert_allclose(initialization["initial_target"], initial_state[2, :12])
+
+
+def test_proto5_hardware_initialization_requires_dataset_path():
+    with pytest.raises(ValueError, match="requires dataset_path"):
+        screwdriver_isaacsim_recovery._load_proto5_hardware_initialization(
+            {
+                "mode": "hardware",
+                "hand": "proto5",
+                "seed": 0,
+            }
+        )
+
+
+def test_proto5_hardware_initialization_rejects_wrong_target_dim(monkeypatch, tmp_path):
+    dataset_path = tmp_path / "initialization.h5"
+    _write_hardware_initialization_h5(
+        dataset_path,
+        initial_joint_targets=np.zeros((1, 13), dtype=np.float32),
+    )
+    monkeypatch.setattr(
+        screwdriver_isaacsim_recovery,
+        "_resolve_proto5_validation_dataset_row",
+        lambda seed: 0,
+    )
+
+    with pytest.raises(ValueError, match="incompatible dimension"):
+        screwdriver_isaacsim_recovery._load_proto5_hardware_initialization(
+            _proto5_hardware_init_config(dataset_path)
+        )
+
+
+def test_send_proto5_hardware_initial_pose_steps_before_confirmation(monkeypatch):
+    calls = []
+
+    class Env:
+        def step(self, action):
+            calls.append(("step", torch.as_tensor(action).detach().cpu().clone()))
+
+    def fake_input(prompt):
+        calls.append(("input", prompt))
+        return ""
+
+    monkeypatch.setattr("builtins.input", fake_input)
+
+    screwdriver_isaacsim_recovery.send_proto5_hardware_initial_pose_and_wait(
+        Env(),
+        {
+            "validation_ordinal": 2,
+            "trajectory_row": 7,
+            "target_source": "initial_joint_targets",
+            "initial_target": np.arange(12, dtype=np.float32),
+        },
+        device="cpu",
+    )
+
+    assert calls[0][0] == "step"
+    torch.testing.assert_close(calls[0][1], torch.arange(12, dtype=torch.float32).reshape(1, 12))
+    assert calls[1][0] == "input"
+
+
 def test_isaacsim_recovery_rejects_frame_saving_without_cameras(tmp_path):
     config_path = tmp_path / "config.yaml"
     config_path.write_text("controllers:\n  csvgd: {}\n")
