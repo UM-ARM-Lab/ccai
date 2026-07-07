@@ -370,7 +370,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     pregrasp_params['tactile_controller'] = False
     pregrasp_params['skip_csvto'] = False
 
-    start[-4:] = 0
+    skip_pregrasp_stage = bool(params.get('skip_pregrasp_stage', False))
+    if not skip_pregrasp_stage:
+        start[-4:] = 0
     pregrasp_reference_target_kwargs = {}
     if params.get('use_pregrasp_reference_targets', False):
         if debug_progress:
@@ -551,8 +553,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     executed_contacts = []
     recover = False
     pre_recover = False
-    stage = 0
-    all_stage = 0
+    stage = 1 if skip_pregrasp_stage else 0
+    all_stage = 1 if skip_pregrasp_stage else 0
     done = False
     max_episode_num_steps = 100 if params['mode'] != 'hardware' else 50
     
@@ -569,6 +571,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     contact_planner = None
     if not params.get('live_recovery', False):
         contact_sequence = ['turn'] * (max_stages - 1) # minus 1 because pregrasp will iterate the all_stage counter
+    if skip_pregrasp_stage:
+        post_pregrasp_state = state_16.clone()
 
     while should_continue_loop():
         params['current_stage'] = all_stage

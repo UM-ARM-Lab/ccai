@@ -1052,6 +1052,7 @@ class HardwareScrewdriverRecoveryEnv:
         self.wrench_perturb_inds = []
         self.frame_fpath = None
         self.frame_id = None
+        self._observed_object_orientation_fallback = None
         self.runtime = runtime if runtime is not None else self._create_runtime()
         self._update_object_pose()
 
@@ -1107,7 +1108,22 @@ class HardwareScrewdriverRecoveryEnv:
         state = torch.as_tensor(state, device=self.device, dtype=torch.float32).reshape(1, -1)
         if state.shape[-1] < 15:
             raise RuntimeError(f"Expected hardware state with at least 15 values, got {tuple(state.shape)}.")
-        return state[:, :15]
+        state15 = state[:, :15].clone()
+        if (
+            self._observed_object_orientation_fallback is not None
+            and torch.allclose(state15[:, 12:15], torch.zeros_like(state15[:, 12:15]))
+        ):
+            state15[:, 12:15] = self._observed_object_orientation_fallback.to(
+                device=state15.device,
+                dtype=state15.dtype,
+            )
+        return state15
+
+    def set_observed_object_orientation(self, orientation) -> None:
+        orientation = torch.as_tensor(orientation, device=self.device, dtype=torch.float32).reshape(1, -1)
+        if orientation.shape[-1] != 3:
+            raise ValueError(f"Expected 3 object orientation values, got shape {tuple(orientation.shape)}.")
+        self._observed_object_orientation_fallback = orientation
 
     def _update_object_pose(self) -> None:
         if hasattr(self.runtime, "get_screwdriver_position_robot"):

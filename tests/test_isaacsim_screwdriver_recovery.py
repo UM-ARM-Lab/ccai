@@ -236,6 +236,28 @@ def test_proto5_hardware_initialization_falls_back_to_initial_state(monkeypatch,
     assert initialization["trajectory_row"] == 2
     assert initialization["target_source"] == "initial_state[:12]"
     np.testing.assert_allclose(initialization["initial_target"], initial_state[2, :12])
+    np.testing.assert_allclose(initialization["initial_orientation"], initial_state[2, 12:15])
+
+
+def test_proto5_hardware_initialization_preserves_q_initial_orientation(monkeypatch, tmp_path):
+    dataset_path = tmp_path / "initialization.h5"
+    q = np.zeros((3, 2, 16), dtype=np.float32)
+    q[1, 0, :12] = np.arange(12, dtype=np.float32)
+    q[1, 0, 12:15] = np.array([0.11, -0.22, 0.33], dtype=np.float32)
+    _write_hardware_initialization_h5(dataset_path, q=q)
+    monkeypatch.setattr(
+        screwdriver_isaacsim_recovery,
+        "_resolve_proto5_validation_dataset_row",
+        lambda seed: 1,
+    )
+
+    initialization = screwdriver_isaacsim_recovery._load_proto5_hardware_initialization(
+        _proto5_hardware_init_config(dataset_path, seed=0)
+    )
+
+    assert initialization["target_source"] == "q[0, :12]"
+    np.testing.assert_allclose(initialization["initial_target"], np.arange(12, dtype=np.float32))
+    np.testing.assert_allclose(initialization["initial_orientation"], np.array([0.11, -0.22, 0.33], dtype=np.float32))
 
 
 def test_proto5_hardware_initialization_requires_dataset_path():
@@ -274,6 +296,9 @@ def test_send_proto5_hardware_initial_pose_steps_before_confirmation(monkeypatch
         def step(self, action):
             calls.append(("step", torch.as_tensor(action).detach().cpu().clone()))
 
+        def set_observed_object_orientation(self, orientation):
+            calls.append(("orientation", torch.as_tensor(orientation).detach().cpu().clone()))
+
     def fake_input(prompt):
         calls.append(("input", prompt))
         return ""
@@ -287,13 +312,16 @@ def test_send_proto5_hardware_initial_pose_steps_before_confirmation(monkeypatch
             "trajectory_row": 7,
             "target_source": "initial_joint_targets",
             "initial_target": np.arange(12, dtype=np.float32),
+            "initial_orientation": np.array([0.1, 0.2, 0.3], dtype=np.float32),
         },
         device="cpu",
     )
 
     assert calls[0][0] == "step"
     torch.testing.assert_close(calls[0][1], torch.arange(12, dtype=torch.float32).reshape(1, 12))
-    assert calls[1][0] == "input"
+    assert calls[1][0] == "orientation"
+    torch.testing.assert_close(calls[1][1], torch.tensor([0.1, 0.2, 0.3]))
+    assert calls[2][0] == "input"
 
 
 def test_isaacsim_recovery_rejects_frame_saving_without_cameras(tmp_path):
@@ -458,6 +486,29 @@ def test_hardware_recovery_env_packs_12_joint_plus_observed_pose_state():
         "screwdriver_friction": pytest.approx(2.5),
         "yaw_joint_friction": pytest.approx(0.03),
     }
+
+
+def test_hardware_recovery_env_uses_dataset_orientation_when_runtime_reports_zero():
+    runtime = _FakeHardwareRuntime()
+    runtime.state15[:, 12:15] = 0.0
+    env = HardwareScrewdriverRecoveryEnv({"hand": "proto5", "sim_device": "cpu"}, runtime=runtime, device="cpu")
+
+    env.set_observed_object_orientation(torch.tensor([0.4, -0.2, 0.7]))
+
+    state = env.get_state()
+
+    torch.testing.assert_close(state["q"][0, 12:16], torch.tensor([0.4, -0.2, 0.7, 0.7]))
+
+
+def test_hardware_recovery_env_prefers_nonzero_runtime_orientation_over_dataset_fallback():
+    runtime = _FakeHardwareRuntime()
+    env = HardwareScrewdriverRecoveryEnv({"hand": "proto5", "sim_device": "cpu"}, runtime=runtime, device="cpu")
+
+    env.set_observed_object_orientation(torch.tensor([0.4, -0.2, 0.7]))
+
+    state = env.get_state()
+
+    torch.testing.assert_close(state["q"][0, 12:16], torch.tensor([0.1, 0.2, 0.3, 0.3]))
 
 
 def test_hardware_recovery_env_step_and_set_pose_delegate_active_12d_targets():
@@ -1109,6 +1160,21 @@ def test_do_trial_preserves_pregrasp_only_short_circuit(monkeypatch, tmp_path):
 
     assert executed_modes == []
     assert len(legacy.all_pregrasp_states) == 1
+
+
+def test_do_trial_skip_pregrasp_stage_goes_directly_to_turn(monkeypatch, tmp_path):
+    executed_modes = []
+    legacy = _load_legacy_recovery_module(monkeypatch, executed_modes)
+    legacy.all_pregrasp_states.clear()
+    params = _trial_params(pregrasp_only=False)
+    params["skip_pregrasp_stage"] = True
+    env = _FakeTrialEnv()
+    env.state[12:15] = torch.tensor([0.1, 0.2, 0.9])
+
+    legacy.do_trial(env, params, tmp_path)
+
+    assert executed_modes == ["turn"]
+    assert len(legacy.all_pregrasp_states) == 0
 
 
 def test_do_trial_uses_configured_min_force_dict(monkeypatch, tmp_path):

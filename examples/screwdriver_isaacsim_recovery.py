@@ -16,6 +16,7 @@ import pathlib
 import pickle
 import shutil
 import sys
+import types
 
 import yaml
 
@@ -25,6 +26,8 @@ DOCUMENTS_PATH = CCAI_PATH.parent
 MODEL_MISMATCH_PATH = DOCUMENTS_PATH / "model_mismatch"
 ISAACSIM_HAND_ENVS_PATH = DOCUMENTS_PATH / "github" / "isaacsim-hand-envs"
 ISAACGYM_ARM_ENVS_PATH = DOCUMENTS_PATH / "github" / "isaacgym-arm-envs"
+TORCH_CG_PATH = DOCUMENTS_PATH / "torch_cg"
+ISAAC_VICTOR_COMPAT_ASSETS_DIR = ISAACSIM_HAND_ENVS_PATH / "isaacsim_hand_envs" / "assets" / "urdf"
 DEFAULT_CONFIG_PATH = CCAI_PATH / "examples" / "config" / "proto5" / "proto_screwdriver_csvto_TODR_recovery_data_gen_no_belief_reset.yaml"
 DEFAULT_PLANNER_YAW_FRICTION_MODEL_PATH = (
     MODEL_MISMATCH_PATH / "results" / "csvto_yaw_joint_fit" / "yaw_friction_model.json"
@@ -423,6 +426,7 @@ def _load_proto5_hardware_initialization(config: dict) -> dict | None:
 
     validation_ordinal = int(config.get("seed", 0))
     trajectory_row = _resolve_proto5_validation_dataset_row(validation_ordinal)
+    initial_orientation = None
     with open_trajectory_dataset(str(dataset_path), allow_pickle=True) as data:
         dataset_keys = set(trajectory_dataset_keys(data))
         if "initial_joint_targets" in dataset_keys:
@@ -434,14 +438,21 @@ def _load_proto5_hardware_initialization(config: dict) -> dict | None:
         elif "initial_state" in dataset_keys:
             initial_state = np.asarray(data["initial_state"][trajectory_row], dtype=np.float32).reshape(-1)
             initial_target = initial_state[:12].astype(np.float32, copy=True)
+            if initial_state.shape[0] >= 15:
+                initial_orientation = initial_state[12:15].astype(np.float32, copy=True)
             target_source = "initial_state[:12]"
         elif "initial_states" in dataset_keys:
             initial_state = np.asarray(data["initial_states"][trajectory_row], dtype=np.float32).reshape(-1)
             initial_target = initial_state[:12].astype(np.float32, copy=True)
+            if initial_state.shape[0] >= 15:
+                initial_orientation = initial_state[12:15].astype(np.float32, copy=True)
             target_source = "initial_states[:12]"
         elif "q" in dataset_keys:
             q0 = np.asarray(data["q"][trajectory_row], dtype=np.float32)
-            initial_target = q0.reshape(q0.shape[0], -1)[0, :12].astype(np.float32, copy=True)
+            q0_state = q0.reshape(-1) if q0.ndim == 1 else q0.reshape(q0.shape[0], -1)[0]
+            initial_target = q0_state[:12].astype(np.float32, copy=True)
+            if q0_state.shape[0] >= 15:
+                initial_orientation = q0_state[12:15].astype(np.float32, copy=True)
             target_source = "q[0, :12]"
         else:
             raise ValueError(
@@ -463,6 +474,7 @@ def _load_proto5_hardware_initialization(config: dict) -> dict | None:
         "trajectory_row": trajectory_row,
         "target_source": target_source,
         "initial_target": initial_target,
+        "initial_orientation": initial_orientation,
     }
 
 
@@ -483,6 +495,14 @@ def send_proto5_hardware_initial_pose_and_wait(env, initialization: dict, *, dev
         flush=True,
     )
     env.step(initial_target)
+    initial_orientation = initialization.get("initial_orientation")
+    if initial_orientation is not None and hasattr(env, "set_observed_object_orientation"):
+        env.set_observed_object_orientation(initial_orientation)
+        print(
+            "Proto5 hardware initial object orientation loaded from dataset: "
+            f"{initial_orientation.tolist()}",
+            flush=True,
+        )
     input(
         "Proto5 initial hand pose command sent. "
         "Confirm the hand is ready, then press Enter to start policy execution."
@@ -700,11 +720,41 @@ def make_hardware_env(config):
     return HardwareScrewdriverRecoveryEnv(config, device=config.get("sim_device", "cpu"))
 
 
+def ensure_isaac_victor_envs_compat():
+    try:
+        from isaac_victor_envs.utils import get_assets_dir  # noqa: F401
+
+        return
+    except ImportError:
+        pass
+
+    assets_dir = ISAAC_VICTOR_COMPAT_ASSETS_DIR
+    if not assets_dir.exists():
+        raise ImportError(
+            "Could not import isaac_victor_envs and compatibility assets were not found at "
+            f"{assets_dir}. Install isaac_victor_envs or provide the IsaacSim hand assets."
+        )
+
+    package = sys.modules.get("isaac_victor_envs") or types.ModuleType("isaac_victor_envs")
+    package.__path__ = []
+    utils_module = types.ModuleType("isaac_victor_envs.utils")
+    utils_module.get_assets_dir = lambda: str(assets_dir)
+    tasks_module = sys.modules.get("isaac_victor_envs.tasks") or types.ModuleType("isaac_victor_envs.tasks")
+    tasks_module.__path__ = []
+
+    sys.modules["isaac_victor_envs"] = package
+    sys.modules["isaac_victor_envs.utils"] = utils_module
+    sys.modules["isaac_victor_envs.tasks"] = tasks_module
+
+
 def prepare_legacy_module(config):
     if str(CCAI_PATH) not in sys.path:
         sys.path.insert(0, str(CCAI_PATH))
     if str(ISAACGYM_ARM_ENVS_PATH) not in sys.path:
         sys.path.insert(0, str(ISAACGYM_ARM_ENVS_PATH))
+    if str(TORCH_CG_PATH) not in sys.path:
+        sys.path.insert(0, str(TORCH_CG_PATH))
+    ensure_isaac_victor_envs_compat()
 
     legacy_path = CCAI_PATH / "examples" / "allegro_screwdriver.py"
     spec = importlib.util.spec_from_file_location("_ccai_legacy_allegro_screwdriver", legacy_path)
@@ -803,8 +853,14 @@ def main():
         raise FileNotFoundError(f"Could not find {config['hand']} URDF at {hand_spec.urdf_path}")
     chain = pk.build_chain_from_urdf(open(hand_spec.urdf_path, "r", encoding="utf-8").read())
 
+    proto5_hardware_initialization = _load_proto5_hardware_initialization(config)
+    using_dataset_initial_grasp = proto5_hardware_initialization is not None
+    if using_dataset_initial_grasp:
+        params["skip_pregrasp_stage"] = True
+        params["skip_pregrasp"] = True
+
     pregrasp_states = None
-    if params["skip_pregrasp"]:
+    if params["skip_pregrasp"] and not using_dataset_initial_grasp:
         pregrasp_states, _ = legacy.load_pregrasp_states(config, experiment_dir)
 
     start_ind = int(config["start_ind"])
@@ -814,23 +870,25 @@ def main():
 
     seed = 0
     base_seed = 0 if config.get("seed", None) is None else int(config["seed"])
-    proto5_hardware_initialization = _load_proto5_hardware_initialization(config)
     for i in tqdm(range(start_ind, num_episodes)):
         fpath = experiment_dir / "csvgd" / f"trial_{i + 1}"
         fpath.mkdir(parents=True, exist_ok=True)
         with tee_stdout_to_file(fpath / "stdout.log"):
             print(f"\nTrial {i + 1}")
-            if not params["skip_pregrasp"]:
+            if using_dataset_initial_grasp:
+                if config.get("debug_progress", False):
+                    print("debug_progress: resetting hardware env for dataset initial grasp", flush=True)
+                env.reset()
+                send_proto5_hardware_initial_pose_and_wait(
+                    env,
+                    proto5_hardware_initialization,
+                    device=params["device"],
+                )
+            elif not params["skip_pregrasp"]:
                 if config.get("debug_progress", False):
                     backend_name = "hardware env" if hardware_mode else "IsaacSim env"
                     print(f"debug_progress: resetting {backend_name}", flush=True)
                 env.reset()
-                if proto5_hardware_initialization is not None:
-                    send_proto5_hardware_initial_pose_and_wait(
-                        env,
-                        proto5_hardware_initialization,
-                        device=params["device"],
-                    )
                 object_randomization = None
                 if not hardware_mode:
                     object_randomization = randomize_isaacsim_object_start(
