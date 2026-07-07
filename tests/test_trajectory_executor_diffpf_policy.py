@@ -76,9 +76,12 @@ class _FakePolicy:
         self.observe_calls = 0
         self.reset_after_recovery_calls = 0
         self.reset_belief_args = []
+        self.plan_step_indices = []
+        self.observe_step_indices = []
 
     def plan_next(self, env, step_idx):
         self.plan_calls += 1
+        self.plan_step_indices.append(int(step_idx))
         delta = torch.ones(12) * 0.01 * (step_idx + 1)
         state = env.get_state()["q"][0, :15]
         return {
@@ -90,6 +93,7 @@ class _FakePolicy:
 
     def observe_transition(self, **kwargs):
         self.observe_calls += 1
+        self.observe_step_indices.append(int(kwargs["step_idx"]))
 
     def reset_after_recovery(self, env, *, reset_belief=True):
         self.reset_belief_args.append(reset_belief)
@@ -109,6 +113,22 @@ class _RecordingSampler:
         del args, kwargs
         self.states.append(torch.as_tensor(state).detach().clone())
         return True, torch.tensor(0.0)
+
+
+class _SequenceSampler:
+    def __init__(self, id_sequence):
+        self.id_sequence = list(id_sequence)
+        self.states = []
+        self.calls = 0
+
+    def check_id(self, state, *args, **kwargs):
+        del args, kwargs
+        self.states.append(torch.as_tensor(state).detach().clone())
+        idx = min(self.calls, len(self.id_sequence) - 1)
+        id_check = bool(self.id_sequence[idx])
+        likelihood = torch.tensor(0.0 if id_check else -100.0)
+        self.calls += 1
+        return id_check, likelihood
 
 
 class _FakePlanner:
@@ -375,6 +395,157 @@ def test_proto5_normal_policy_branch_logs_contact_timeseries_and_rows():
     torch.testing.assert_close(torch.as_tensor(first_record["contact_plan"][0]), torch.ones(3))
     torch.testing.assert_close(torch.as_tensor(first_record["states"][0, :12]), torch.zeros(12))
     torch.testing.assert_close(torch.as_tensor(first_record["states"][1, :12]), torch.ones(12) * 0.01)
+
+
+def test_diffpf_recovery_resets_once_and_exits_when_likelihood_returns_id():
+    env = _FakeEnv()
+    recovery_policy = _FakePolicy()
+    sampler = _SequenceSampler([False, True])
+    data = _data()
+    params = {
+        "device": "cpu",
+        "mode": "simulation",
+        "live_recovery": True,
+        "OOD_metric": "likelihood",
+        "likelihood_num_samples": 1,
+        "likelihood_threshold": -15,
+        "diffpf_execution_horizon": 10,
+        "recovery_diffpf_execution_horizon": 4,
+        "controller": "csvgd",
+        "recovery_controller": "diffpf",
+    }
+
+    actual, planned, _initial, _sim_rollouts, *_middle, recover, episode_steps = TrajectoryExecutor(
+        params,
+        env,
+    ).execute_traj(
+        planner=None,
+        mode="diffpf_recovery",
+        env=env,
+        data=data,
+        trajectory_sampler_orig=sampler,
+        num_fingers=3,
+        obj_dof=3,
+        episode_num_steps=0,
+        max_episode_num_steps=10,
+        recover=True,
+        recovery_action_policy=recovery_policy,
+    )
+
+    assert recover is False
+    assert episode_steps == 2
+    assert recovery_policy.reset_after_recovery_calls == 1
+    assert recovery_policy.reset_belief_args == [True]
+    assert recovery_policy.plan_calls == 2
+    assert recovery_policy.observe_calls == 2
+    assert sampler.calls == 2
+    assert len(env.step_calls) == 2
+    assert actual.shape == (2, 27)
+    assert [tuple(plan.shape) for plan in planned] == [(1, 1, 36), (1, 1, 36)]
+    assert len(data["pre_action_likelihoods"][-1]) == 2
+    assert len(data["recovery_policy_times"]) == 2
+    assert len(data["contact_plan"]) == 2
+    torch.testing.assert_close(data["contact_plan"][0], torch.ones(3))
+    assert len(data["hri_diffpf_records"]) == 2
+    assert data["hri_diffpf_records"][0]["recover"] is True
+
+
+def test_diffpf_recovery_uses_recovery_execution_horizon_without_per_action_reset():
+    env = _FakeEnv()
+    recovery_policy = _FakePolicy()
+    sampler = _SequenceSampler([False, False, False])
+    data = _data()
+    params = {
+        "device": "cpu",
+        "mode": "simulation",
+        "live_recovery": True,
+        "OOD_metric": "likelihood",
+        "likelihood_num_samples": 1,
+        "likelihood_threshold": -15,
+        "diffpf_execution_horizon": 10,
+        "recovery_diffpf_execution_horizon": 2,
+        "controller": "csvgd",
+        "recovery_controller": "diffpf",
+    }
+
+    *_prefix, recover, episode_steps = TrajectoryExecutor(params, env).execute_traj(
+        planner=None,
+        mode="diffpf_recovery",
+        env=env,
+        data=data,
+        trajectory_sampler_orig=sampler,
+        num_fingers=3,
+        obj_dof=3,
+        episode_num_steps=0,
+        max_episode_num_steps=10,
+        recover=True,
+        recovery_action_policy=recovery_policy,
+    )
+
+    assert recover is True
+    assert episode_steps == 2
+    assert recovery_policy.plan_calls == 2
+    assert recovery_policy.observe_calls == 2
+    assert recovery_policy.reset_after_recovery_calls == 1
+    assert recovery_policy.reset_belief_args == [True]
+    assert sampler.calls == 2
+
+
+def test_continued_diffpf_recovery_uses_monotonic_policy_step_indices():
+    env = _FakeEnv()
+    recovery_policy = _FakePolicy()
+    sampler = _SequenceSampler([False, False, True])
+    data = _data()
+    params = {
+        "device": "cpu",
+        "mode": "simulation",
+        "live_recovery": True,
+        "OOD_metric": "likelihood",
+        "likelihood_num_samples": 1,
+        "likelihood_threshold": -15,
+        "diffpf_execution_horizon": 10,
+        "recovery_diffpf_execution_horizon": 2,
+        "controller": "csvgd",
+        "recovery_controller": "diffpf",
+    }
+    executor = TrajectoryExecutor(params, env)
+
+    *_prefix, recover, episode_steps = executor.execute_traj(
+        planner=None,
+        mode="diffpf_recovery",
+        env=env,
+        data=data,
+        trajectory_sampler_orig=sampler,
+        num_fingers=3,
+        obj_dof=3,
+        episode_num_steps=0,
+        max_episode_num_steps=10,
+        recover=True,
+        recovery_action_policy=recovery_policy,
+    )
+    assert recover is True
+    assert episode_steps == 2
+
+    *_prefix, recover, episode_steps = executor.execute_traj(
+        planner=None,
+        mode="diffpf_recovery",
+        env=env,
+        data=data,
+        trajectory_sampler_orig=sampler,
+        num_fingers=3,
+        obj_dof=3,
+        episode_num_steps=episode_steps,
+        max_episode_num_steps=10,
+        recover=True,
+        recovery_action_policy=recovery_policy,
+        reset_recovery_policy=False,
+    )
+
+    assert recover is False
+    assert episode_steps == 3
+    assert recovery_policy.reset_after_recovery_calls == 1
+    assert recovery_policy.plan_step_indices == [0, 1, 2]
+    assert recovery_policy.observe_step_indices == [0, 1, 2]
 
 
 def test_hri_diffpf_record_saves_optional_full_joint_and_wrist_fields():

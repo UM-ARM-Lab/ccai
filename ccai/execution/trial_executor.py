@@ -68,7 +68,7 @@ class TrajectoryExecutor:
                     trajectory_sampler_orig=None, turn_problem=None, num_fingers=None,
                     obj_dof=None, obj_joint_dim=1, episode_num_steps=None, max_episode_num_steps=None,
                     min_force_dict=None, proj_path=None, AllegroScrewdriver=None, tactile_controller=False, skip_csvto=False,
-                    normal_action_policy=None):
+                    normal_action_policy=None, recovery_action_policy=None, reset_recovery_policy=True):
         """Execute a trajectory with the given planner and mode."""
         
         rand_pct = self.params.get('rand_pct', 1/3)
@@ -159,6 +159,8 @@ class TrajectoryExecutor:
             contact[:, 2] = 1
         elif mode == 'turn':
             contact[:, :] = 1
+        elif mode == 'diffpf_recovery':
+            contact[:, :] = 1
         elif mode == 'thumb':
             contact[:, 0] = 1
             contact[:, 1] = 1
@@ -184,6 +186,28 @@ class TrajectoryExecutor:
             )
             reset_normal_policy_after_recovery()
             return actual_trajectory, planned_trajectories, initial_samples, None, optimizer_paths, contact_points, contact_distance, recover, episode_num_steps
+
+        if mode == "diffpf_recovery" and recover and recovery_action_policy is not None:
+            actual_trajectory, planned_trajectories, recover, episode_num_steps = self._execute_recovery_policy_steps(
+                recovery_action_policy,
+                mode,
+                start_timestep,
+                max_timesteps,
+                num_fingers,
+                obj_dof,
+                episode_num_steps,
+                max_episode_num_steps,
+                data,
+                trajectory_sampler_orig,
+                actual_trajectory,
+                planned_trajectories,
+                reset_policy=bool(reset_recovery_policy),
+            )
+            if not recover:
+                reset_normal_policy_after_recovery()
+            return actual_trajectory, planned_trajectories, initial_samples, None, optimizer_paths, contact_points, contact_distance, recover, episode_num_steps
+        if mode == "diffpf_recovery" and recover:
+            raise ValueError("diffpf_recovery mode requires recovery_action_policy.")
 
         recovery_params = copy.deepcopy(self.params)
 
@@ -257,6 +281,7 @@ class TrajectoryExecutor:
             "thumb": (1.0, 1.0, 0.0),
             "middle": (1.0, 0.0, 1.0),
             "pregrasp": (0.0, 0.0, 0.0),
+            "diffpf_recovery": (1.0, 1.0, 1.0),
         }
         return torch.tensor(mapping.get(str(mode), (0.0, 0.0, 0.0)), device=device, dtype=torch.float32)
 
@@ -268,6 +293,8 @@ class TrajectoryExecutor:
         data.setdefault("hri_diffpf_records", [])
         data.setdefault("normal_policy_times", [])
         data.setdefault("normal_policy_likelihood_stats", [])
+        data.setdefault("recovery_policy_times", [])
+        data.setdefault("recovery_policy_likelihood_stats", [])
 
     @staticmethod
     def _as_cpu_float_tensor(value):
@@ -577,6 +604,154 @@ class TrajectoryExecutor:
             episode_num_steps += 1
 
         return self._stack_actual_trajectory(actual_trajectory), planned_trajectories, False, episode_num_steps
+
+    def _check_recovery_policy_returned_id(self, state, trajectory_sampler_orig, data):
+        if (
+            not self.params.get("live_recovery", False)
+            or self.params.get("OOD_metric") != "likelihood"
+            or trajectory_sampler_orig is None
+        ):
+            return False, None, False
+        task_state = wrap_screwdriver_task_state_yaw(self.params, state)
+        id_check, likelihood = trajectory_sampler_orig.check_id(
+            task_state,
+            self.params["likelihood_num_samples"],
+            threshold=self.params.get("likelihood_threshold", -15),
+        )
+        if likelihood is not None and data is not None:
+            data["pre_action_likelihoods"][-1].append(likelihood)
+        roll_abs = np.abs(state[-3].item())
+        pitch_abs = np.abs(state[-2].item())
+        drop_cutoff = np.float32(0.15).item()
+        dropped = (roll_abs > drop_cutoff) or (pitch_abs > drop_cutoff)
+        return bool(id_check), likelihood, bool(dropped)
+
+    def _execute_recovery_policy_steps(self, recovery_action_policy, mode, start_timestep, max_timesteps,
+                                       num_fingers, obj_dof, episode_num_steps, max_episode_num_steps, data,
+                                       trajectory_sampler_orig, actual_trajectory, planned_trajectories,
+                                       reset_policy=True):
+        self._ensure_execution_timeseries(data)
+        if data is not None and len(data["contact_state"]) == 0:
+            self._record_tactile_state(data)
+        if episode_num_steps is None:
+            episode_num_steps = 0
+        if reset_policy and hasattr(recovery_action_policy, "reset_after_recovery"):
+            try:
+                recovery_action_policy.reset_after_recovery(self.env, reset_belief=True)
+            except TypeError:
+                recovery_action_policy.reset_after_recovery(self.env)
+
+        total_steps = self.params.get("recovery_diffpf_execution_horizon", None)
+        if total_steps is None:
+            total_steps = self.params.get("diffpf_execution_horizon", None)
+        if total_steps is None:
+            total_steps = self.params.get("T_orig", self.params.get("T", 1))
+        if max_timesteps is not None:
+            total_steps = min(int(total_steps), int(max_timesteps))
+        if max_episode_num_steps is not None:
+            total_steps = min(int(total_steps), max(0, int(max_episode_num_steps) - int(episode_num_steps)))
+
+        for k in range(int(start_timestep), int(total_steps)):
+            state_dict = self.env.get_state()
+            state_16 = state_dict["q"].reshape(-1, 4 * num_fingers + obj_dof + 1).to(device=self.params["device"])[0]
+            state = state_16[:4 * num_fingers + obj_dof]
+            policy_step_idx = int(episode_num_steps)
+
+            start_time = time.perf_counter()
+            result = recovery_action_policy.plan_next(self.env, policy_step_idx)
+            elapsed = time.perf_counter() - start_time
+            if data is not None:
+                data["recovery_policy_times"].append(elapsed)
+                stats = self._policy_result_value(result, "likelihood_stats", default=None)
+                data["recovery_policy_likelihood_stats"].append(stats)
+            print(f"DiffPF recovery planning time for step {k + 1} (global step {policy_step_idx})", elapsed)
+
+            delta = self._policy_result_value(result, "delta_action", "delta12", "action_delta", default=None)
+            target = self._policy_result_value(
+                result,
+                "absolute_action_target",
+                "target_action",
+                "target12",
+                "active_joint_target",
+                default=None,
+            )
+            if target is None and delta is None:
+                raise ValueError("recovery_action_policy.plan_next(...) must return a delta action or absolute target.")
+            if delta is None:
+                target_t = torch.as_tensor(target, device=self.params["device"], dtype=torch.float32).reshape(-1)[:12]
+                delta_t = target_t - state[:12]
+            else:
+                delta_t = torch.as_tensor(delta, device=self.params["device"], dtype=torch.float32).reshape(-1)[:12]
+                target_t = (
+                    torch.as_tensor(target, device=self.params["device"], dtype=torch.float32).reshape(-1)[:12]
+                    if target is not None
+                    else state[:12] + delta_t
+                )
+
+            selected_plan_rows = self._policy_result_value(result, "selected_plan_rows", "planned_rows", default=None)
+            if selected_plan_rows is None:
+                planned_row = torch.cat((state[:15], delta_t, torch.zeros(9, device=self.params["device"])))
+                selected_plan_rows_t = planned_row.reshape(1, -1)
+            else:
+                selected_plan_rows_t = torch.as_tensor(
+                    selected_plan_rows,
+                    device=self.params["device"],
+                    dtype=torch.float32,
+                )
+                if selected_plan_rows_t.ndim == 1:
+                    selected_plan_rows_t = selected_plan_rows_t.reshape(1, -1)
+            if selected_plan_rows_t.ndim == 2:
+                selected_plan_rows_t = selected_plan_rows_t.reshape(1, selected_plan_rows_t.shape[0], -1)
+            planned_trajectories.append(selected_plan_rows_t.detach().cpu())
+
+            pre_state15 = state[:15].detach().cpu()
+            pre_tactile = self._read_tactile_state()
+            pre_full_dof_reference = self._full_dof_reference_from_env()
+            actual_trajectory.append(torch.cat((pre_state15, delta_t.detach().cpu())))
+            self.env.step(target_t.reshape(1, -1).to(device=self.env.device))
+            if hasattr(recovery_action_policy, "observe_transition"):
+                recovery_action_policy.observe_transition(
+                    env=self.env,
+                    step_idx=policy_step_idx,
+                    state=state.detach(),
+                    delta_action=delta_t.detach(),
+                    target_action=target_t.detach(),
+                )
+            post_state15 = self._state15_from_env(num_fingers=num_fingers, obj_dof=obj_dof)
+            post_tactile = self._read_tactile_state()
+            post_full_dof_reference = self._full_dof_reference_from_env()
+            id_check, likelihood, dropped = self._check_recovery_policy_returned_id(
+                post_state15.to(device=self.params["device"]),
+                trajectory_sampler_orig,
+                data,
+            )
+            contact_plan = self._contact_plan_vector(mode, device="cpu")
+            self._record_contact_plan(data, mode)
+            self._record_tactile_state(data, post_tactile)
+            self._append_hri_diffpf_record(
+                data,
+                pre_state15=pre_state15,
+                post_state15=post_state15,
+                delta12=delta_t,
+                contact_plan=contact_plan,
+                pre_tactile=pre_tactile,
+                post_tactile=post_tactile,
+                pre_full_dof_reference=pre_full_dof_reference,
+                post_full_dof_reference=post_full_dof_reference,
+                mode=mode,
+                recover=True,
+                episode_num_steps=episode_num_steps,
+                ood_likelihood=likelihood,
+            )
+            episode_num_steps += 1
+            if dropped:
+                print("dropped")
+                return self._stack_actual_trajectory(actual_trajectory), planned_trajectories, False, episode_num_steps
+            if id_check:
+                print("DiffPF recovery returned state to ID. Exiting recovery loop")
+                return self._stack_actual_trajectory(actual_trajectory), planned_trajectories, False, episode_num_steps
+
+        return self._stack_actual_trajectory(actual_trajectory), planned_trajectories, True, episode_num_steps
 
     def _create_mode_planner(self, mode, planner, state, goal, num_fingers, obj_dof, 
                            recovery_params, min_force_dict, proj_path, max_timesteps, 

@@ -54,6 +54,46 @@ DEFAULT_DIFFPF_TRAJECTORY_SELECTION_MODE = "max_reward_times_exp_likelihood"
 DEFAULT_DIFFPF_LIKELIHOOD_MASK = "inverse_dynamics"
 DEFAULT_DIFFPF_LIKELIHOOD_TEMPERATURE = 10.0
 DEFAULT_DIFFPF_LIKELIHOOD_REWARD_SCOPE = "per_step"
+RECOVERY_DIFFPF_OVERRIDE_SUFFIXES = (
+    "ema_decay",
+    "compile_model",
+    "sample_horizon",
+    "execution_horizon",
+    "num_trajectories",
+    "temporal_ensemble_actions",
+    "temporal_ensemble_coeff",
+    "autoregressive_planning",
+    "freeze_autoregressive_mamba_token",
+    "context_augmentation",
+    "eqm_nesterov_override",
+    "beam_search",
+    "beam_width",
+    "beam_children_per_branch",
+    "trajectory_selection_mode",
+    "likelihood_mask",
+    "likelihood_proposal_correction",
+    "likelihood_temperature",
+    "likelihood_step_min",
+    "likelihood_reward_scope",
+    "likelihood_min",
+    "likelihood_min_mode",
+    "likelihood_stop_min",
+    "likelihood_stop_stat",
+    "likelihood_stop_mode",
+    "likelihood_stop_warn_without_proposal_correction",
+    "trajectory_selection_discount",
+    "reward_trust_decay",
+    "reward_source",
+    "drop_reward_indicator",
+    "r_cond",
+    "r_cond_value",
+    "r_cond_dataset_path",
+    "allow_planning_beyond_episode_end",
+    "denoising_steps",
+    "info_gain_scale",
+    "all_particles_info_gain_mult",
+    "attn_mask_method",
+)
 DEFAULT_HARDWARE_ROS_CONFIG = (
     MODEL_MISMATCH_PATH / "examples" / "evaluation" / "config" / "screwdriver_hardware_ros_profiles.yaml"
 )
@@ -280,6 +320,10 @@ def load_config(args) -> dict:
     config.setdefault("diffpf_likelihood_temperature", DEFAULT_DIFFPF_LIKELIHOOD_TEMPERATURE)
     config.setdefault("diffpf_likelihood_reward_scope", DEFAULT_DIFFPF_LIKELIHOOD_REWARD_SCOPE)
     config.setdefault("diffpf_reset_belief_after_recovery", True)
+    config.setdefault("recovery_controller", "csvgd")
+    config.setdefault("recovery_diffpf_checkpoint", None)
+    for suffix in RECOVERY_DIFFPF_OVERRIDE_SUFFIXES:
+        config.setdefault(f"recovery_diffpf_{suffix}", None)
     config.setdefault("hardware_ros_config", str(DEFAULT_HARDWARE_ROS_CONFIG))
     config.setdefault("hardware_profile", str(config.get("hand", "proto5")))
     config.setdefault("hardware_execute", False)
@@ -293,6 +337,11 @@ def load_config(args) -> dict:
     config["mode"] = str(config.get("mode", "simulation")).lower()
     if config["mode"] not in {"simulation", "hardware", "hardware_copy"}:
         raise ValueError(f"Unsupported mode {config['mode']!r}; expected simulation, hardware, or hardware_copy.")
+    if str(config.get("recovery_controller", "")).lower() == "diffpf":
+        if config.get("recovery_diffpf_checkpoint") in (None, ""):
+            raise ValueError("recovery_controller: diffpf requires recovery_diffpf_checkpoint.")
+        if str(config.get("OOD_metric", "")).lower() != "likelihood":
+            raise ValueError("recovery_controller: diffpf requires OOD_metric: likelihood.")
     if config["mode"] == "hardware":
         config["external_wrench_perturb"] = False
         config["randomize_obj_start"] = False
@@ -782,7 +831,7 @@ def prepare_legacy_module(config):
     return legacy
 
 
-def build_normal_action_policy(config, env, device):
+def build_diffpf_action_policy(config, env, device):
     checkpoint = config.get("diffpf_checkpoint")
     if checkpoint in (None, ""):
         return None
@@ -802,6 +851,28 @@ def build_normal_action_policy(config, env, device):
             f"{eval_path / 'screwdriver_diffpf_policy.py'} to exist and be import-safe."
         ) from exc
     return DiffPFScrewdriverActionPolicy.from_config(config, env, device)
+
+
+def build_normal_action_policy(config, env, device):
+    return build_diffpf_action_policy(config, env, device)
+
+
+def build_recovery_diffpf_config(config: dict) -> dict:
+    recovery_config = dict(config)
+    recovery_config["diffpf_checkpoint"] = config.get("recovery_diffpf_checkpoint")
+    for suffix in RECOVERY_DIFFPF_OVERRIDE_SUFFIXES:
+        recovery_key = f"recovery_diffpf_{suffix}"
+        diffpf_key = f"diffpf_{suffix}"
+        value = config.get(recovery_key, None)
+        if value is not None:
+            recovery_config[diffpf_key] = value
+    return recovery_config
+
+
+def build_recovery_action_policy(config, env, device):
+    if str(config.get("recovery_controller", "")).lower() != "diffpf":
+        return None
+    return build_diffpf_action_policy(build_recovery_diffpf_config(config), env, device)
 
 
 def main():
@@ -829,6 +900,7 @@ def main():
     sim_viz_env = HardwareVisualizationShim(env) if hardware_mode else None
     hand_spec = get_hand_spec(config["hand"])
     normal_action_policy = build_normal_action_policy(config, env, config.get("sim_device", "cuda:0"))
+    recovery_action_policy = build_recovery_action_policy(config, env, config.get("sim_device", "cuda:0"))
 
     if "recovery_controller" not in config:
         config["recovery_controller"] = "csvgd"
@@ -956,6 +1028,7 @@ def main():
                 config=config,
                 classifier=classifier,
                 normal_action_policy=normal_action_policy,
+                recovery_action_policy=recovery_action_policy,
             )
             print(f"Trial {i + 1} yaw delta: {final_distance_to_goal}; dropped={dropped}")
         seed += 1

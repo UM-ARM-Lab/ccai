@@ -302,7 +302,7 @@ def apply_saved_pregrasp_state(env, sim_viz_env, pregrasp_states, trial_index, s
 
 def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noise=None, noise_noise=None, sim=None, seed=None,
              proj_path=None, perturb_this_trial=False, trajectory_sampler=None, trajectory_sampler_orig=None, config=None,
-             classifier=None, normal_action_policy=None):
+             classifier=None, normal_action_policy=None, recovery_action_policy=None):
     global all_yaw_deltas
     debug_progress = bool(params.get('debug_progress', False))
     episode_num_steps = 0
@@ -437,7 +437,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     trajectory_executor = TrajectoryExecutor(params, env, sim_viz_env)
     
     def execute_traj(planner, mode, env, goal=None, fname=None, initial_samples=None, recover=False, 
-                     start_timestep=0, max_timesteps=None, ctrl=None, mppi_warmup=False):
+                     start_timestep=0, max_timesteps=None, ctrl=None, mppi_warmup=False,
+                     reset_recovery_policy=True):
         """
         Execute a trajectory with the given planner and mode.
         
@@ -497,7 +498,9 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             AllegroScrewdriver=AllegroScrewdriver,
             tactile_controller=params.get('tactile_controller', False),
             skip_csvto=params.get('skip_csvto', False),
-            normal_action_policy=normal_action_policy
+            normal_action_policy=normal_action_policy,
+            recovery_action_policy=recovery_action_policy,
+            reset_recovery_policy=reset_recovery_policy,
         )
 
         if params.get('live_recovery', False) and not was_recovering and recover:
@@ -553,6 +556,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     executed_contacts = []
     recover = False
     pre_recover = False
+    diffpf_recovery_active = False
     stage = 1 if skip_pregrasp_stage else 0
     all_stage = 1 if skip_pregrasp_stage else 0
     done = False
@@ -581,13 +585,19 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         state = env.get_state()
         state = extract_state_vector(state, num_fingers, params['device'], slice_end=15)
         planned = False
+        recovery_controller_name = str(params.get('recovery_controller', '')).lower()
         if params.get('live_recovery', False) and recover:
-            contact_sequence = get_baseline_contact_sequence(params, recover=True)
+            if recovery_controller_name == 'diffpf':
+                contact_sequence = ['diffpf_recovery']
+            else:
+                contact_sequence = get_baseline_contact_sequence(params, recover=True)
             goal_config = None
             initial_samples = None
             likelihood = None
 
-            if params['recovery_controller'] == 'mppi':
+            if recovery_controller_name == 'diffpf':
+                pass
+            elif recovery_controller_name == 'mppi':
                 # MPPI baseline - no additional planning needed
                 pass
             elif params.get('task_model_path', None) and params.get('generate_context', False):
@@ -687,6 +697,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             'index': torch.tensor([0.0, 1.0, 1.0]),
             'thumb_middle': torch.tensor([1.0, 0.0, 0.0]),
             'turn': torch.tensor([1.0, 1.0, 1.0]),
+            'diffpf_recovery': torch.tensor([1.0, 1.0, 1.0]),
             'thumb': torch.tensor([1.0, 1.0, 0.0]),
             'middle': torch.tensor([1.0, 0.0, 1.0]),
             # 'mppi': None
@@ -788,6 +799,24 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             
             traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
 
+        elif contact == 'diffpf_recovery':
+            result = execute_traj(
+                None,
+                'diffpf_recovery',
+                env,
+                goal=None,
+                fname=f'diffpf_recovery_{all_stage}',
+                initial_samples=initial_samples,
+                recover=recover,
+                start_timestep=0,
+                max_timesteps=None,
+                reset_recovery_policy=not diffpf_recovery_active,
+            )
+
+            state = env.get_state()
+            state = extract_state_vector(state, num_fingers, params['device'], slice_end=15)
+            traj, plans, inits, init_sim_rollouts, optimizer_paths, contact_points, contact_distance, recover = result
+
         elif contact == 'mppi':
             # Use baseline MPPI controller
             if baseline_controller and baseline_controller.is_mppi_controller():
@@ -817,6 +846,8 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                     data['final_likelihoods'][-1].append(likelihood)
                 else:
                     data['final_likelihoods'][-1].append(None)
+            elif recovery_controller_name == 'diffpf' and pre_recover:
+                pass
             else:
                 # If we just recovered, assume we are done. If we are not, next turn will catch it.
                 recover = False
@@ -827,6 +858,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         just_finished_recovery = bool(pre_recover) and not bool(recover)
         if just_finished_recovery:
             update_screwdriver_yaw_wrap_after_recovery(params, start)
+        diffpf_recovery_active = bool(recover) and recovery_controller_name == 'diffpf'
 
         stage += 1
         all_stage += 1
@@ -843,7 +875,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
         data['dropped'] = dropped
         data['dropped_recovery'] = dropped and pre_recover
         
-        if recover and not done and params.get('task_diffuse_goal', False):
+        if recover and not done and params.get('task_diffuse_goal', False) and recovery_controller_name != 'diffpf':
             state = env.get_state()
             state = extract_state_vector(state, num_fingers, params['device'], slice_end=15)
             
@@ -970,7 +1002,7 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
             if torch.allclose(start, goal):
                 print('Goal is the same as current state')
                 recover = False
-        elif recover and not done and params.get('task_model_path', None) and contact_planner is None:
+        elif recover and not done and params.get('task_model_path', None) and contact_planner is None and recovery_controller_name != 'diffpf':
             contact_planner = ContactPlanner(params, env, trajectory_sampler, trajectory_sampler_orig, 
                                 turn_problem,
                                 )
