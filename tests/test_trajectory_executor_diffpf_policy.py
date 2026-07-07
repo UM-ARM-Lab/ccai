@@ -7,6 +7,7 @@ sys.modules.setdefault("open3d", types.ModuleType("open3d"))
 allegro_utils = types.ModuleType("ccai.utils.allegro_utils")
 allegro_utils.convert_yaw_to_sine_cosine = lambda x: x
 allegro_utils.convert_sine_cosine_to_yaw = lambda x: x
+allegro_utils.visualize_trajectory = lambda *args, **kwargs: None
 sys.modules["ccai.utils.allegro_utils"] = allegro_utils
 
 recovery_utils = types.ModuleType("ccai.utils.recovery_utils")
@@ -122,6 +123,35 @@ class _FakePlanner:
         )
         self.warmed_up = True
         self.x = torch.zeros(1, 16)
+
+
+class _ResetRecordingPlanner:
+    def __init__(self, particle_count=4):
+        self.N = particle_count
+        self.problem = types.SimpleNamespace(
+            T=0,
+            obj_dof=3,
+            obj_joint_dim=1,
+            dx=15,
+            du=12,
+            goal=torch.zeros(3),
+            data={},
+        )
+        self.warmed_up = True
+        self.x = torch.zeros(particle_count, 1, 27)
+        self.reset_calls = []
+
+    def reset(self, start, initial_x=None, **kwargs):
+        self.reset_calls.append(
+            {
+                "start": start.detach().clone(),
+                "initial_x": None if initial_x is None else initial_x.detach().clone(),
+                "kwargs": kwargs,
+            }
+        )
+        self.warmed_up = False
+        if initial_x is not None:
+            self.x = initial_x.detach().clone()
 
 
 class _FakeTrajectorySampler:
@@ -243,6 +273,56 @@ def test_diffusion_initial_samples_unwrap_yaw_before_planner_use(tmp_path, monke
 
     torch.testing.assert_close(sampler.starts[0].reshape(-1)[-1], torch.tensor(0.8))
     torch.testing.assert_close(initial_samples[0, 0, 14], torch.tensor(1.0 - torch.pi / 2.0 - 0.2))
+
+
+def test_reused_recovery_planner_resets_with_diffusion_initial_samples(tmp_path):
+    env = _FakeEnv()
+    planner = _ResetRecordingPlanner(particle_count=4)
+    data = _data()
+    params = {
+        "device": "cpu",
+        "mode": "simulation",
+        "live_recovery": True,
+        "OOD_metric": "likelihood",
+        "likelihood_num_samples": 1,
+        "likelihood_threshold": -15,
+        "controller": "csvgd",
+        "recovery_controller": "csvgd",
+        "visualize_plan": False,
+        "visualize_recovery_plan": False,
+        "diff_init": True,
+        "task_model_path": "task.pt",
+        "N": 1,
+        "recovery_N": 4,
+        "N_contact_plan": 4,
+        "T": 1,
+        "T_orig": 1,
+    }
+    full_samples = torch.zeros(2, 2, 27)
+    full_samples[0, 1, 0] = 10.0
+    full_samples[1, 1, 0] = 20.0
+
+    TrajectoryExecutor(params, env).execute_traj(
+        planner=planner,
+        mode="thumb_middle",
+        env=env,
+        goal=torch.zeros(3),
+        fname="thumb_middle_regrasp",
+        initial_samples=full_samples,
+        recover=True,
+        fpath=tmp_path,
+        data=data,
+        trajectory_sampler_orig=None,
+        num_fingers=3,
+        obj_dof=3,
+        episode_num_steps=0,
+        max_episode_num_steps=10,
+    )
+
+    assert len(planner.reset_calls) == 1
+    initial_x = planner.reset_calls[0]["initial_x"]
+    assert initial_x.shape == (4, 1, 27)
+    torch.testing.assert_close(initial_x[:, 0, 0], torch.tensor([10.0, 20.0, 10.0, 20.0]))
 
 
 def test_proto5_normal_policy_branch_logs_contact_timeseries_and_rows():

@@ -120,7 +120,7 @@ chained_recovery_likelihood_threshold: -100
 
 controllers:
   csvgd:
-    N: 1
+    N: 16
     recovery_N: 16
     alpha_J: 1.0e-2
     alpha_C: 1

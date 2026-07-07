@@ -9,6 +9,21 @@ pk_module = types.ModuleType("pytorch_kinematics")
 pk_module.transforms = types.ModuleType("pytorch_kinematics.transforms")
 sys.modules.setdefault("pytorch_kinematics", pk_module)
 sys.modules.setdefault("pytorch_kinematics.transforms", pk_module.transforms)
+allegro_utils_module = types.ModuleType("ccai.utils.allegro_utils")
+
+
+def _convert_yaw_to_sine_cosine(state):
+    return torch.cat((state[..., :-1], torch.cos(state[..., -1:]), torch.sin(state[..., -1:])), dim=-1)
+
+
+def _convert_sine_cosine_to_yaw(state):
+    return torch.cat((state[..., :-2], torch.atan2(state[..., -1:], state[..., -2:-1])), dim=-1)
+
+
+allegro_utils_module.convert_yaw_to_sine_cosine = _convert_yaw_to_sine_cosine
+allegro_utils_module.convert_sine_cosine_to_yaw = _convert_sine_cosine_to_yaw
+allegro_utils_module.visualize_trajectory = lambda *args, **kwargs: None
+sys.modules["ccai.utils.allegro_utils"] = allegro_utils_module
 recovery_utils_module = types.ModuleType("ccai.utils.recovery_utils")
 
 
@@ -36,6 +51,7 @@ def _get_contact_state_mappings():
 
 recovery_utils_module.get_contact_state_mappings = _get_contact_state_mappings
 recovery_utils_module.create_visualization_paths = lambda *args, **kwargs: None
+recovery_utils_module.get_screwdriver_plan_camera_path = lambda *args, **kwargs: None
 recovery_utils_module.save_goal_info = lambda *args, **kwargs: None
 recovery_utils_module.save_recovery_info = lambda *args, **kwargs: None
 sys.modules["ccai.utils.recovery_utils"] = recovery_utils_module
@@ -69,6 +85,29 @@ class FakeJointRecoverySampler:
         assert modes.shape[0] == N
         assert likelihoods.shape[0] == N
         return trajectories.clone(), modes.clone(), likelihoods.clone()
+
+
+class FakeSingleStageRecoverySampler:
+    T = 4
+
+    def __init__(self, trajectories, modes, likelihoods):
+        self.trajectories = trajectories
+        self.modes = modes
+        self.likelihoods = likelihoods
+        self.calls = []
+
+    def sample(self, N, start, H, constraints=None, project=False):
+        self.calls.append(
+            {
+                "N": N,
+                "start_shape": tuple(start.shape),
+                "H": H,
+                "constraints": constraints,
+                "project": project,
+            }
+        )
+        assert N == self.trajectories.shape[0]
+        return self.trajectories.clone(), self.modes.clone(), self.likelihoods.clone()
 
 
 class FakeTaskSampler:
@@ -129,6 +168,44 @@ def _raw_mode(name):
 
 def _raw_contact_vector(vector):
     return 2 * torch.tensor(vector) - 1
+
+
+def test_nonchained_recovery_returns_recovery_n_csvto_seed_samples(monkeypatch, tmp_path):
+    import ccai.planning.contact_planning as contact_planning_module
+
+    monkeypatch.setattr(contact_planning_module, "convert_yaw_to_sine_cosine", lambda x: x)
+    monkeypatch.setattr(contact_planning_module, "convert_sine_cosine_to_yaw", lambda x: x)
+    monkeypatch.setattr(contact_planning_module, "wrap_screwdriver_task_state_yaw", lambda params, state: state)
+    monkeypatch.setattr(contact_planning_module, "unwrap_screwdriver_task_state_yaw", lambda params, samples, yaw_idx: samples)
+
+    sample_count = 16
+    trajectories = torch.zeros(sample_count, 4, 15)
+    trajectories[:, -1, 0] = torch.arange(sample_count, dtype=torch.float32)
+    modes = torch.stack([_raw_mode("thumb_middle")] * sample_count)
+    likelihoods = torch.arange(sample_count, 0, -1, dtype=torch.float32)
+    sampler = FakeSingleStageRecoverySampler(trajectories, modes, likelihoods)
+
+    params = _params(
+        chained_recovery_contact_search=False,
+        task_model_path="task.pt",
+        generate_context=True,
+        task_diffuse_goal=False,
+        visualize_recovery_planning_samples=False,
+        N_contact_plan=sample_count,
+        N=1,
+        recovery_N=sample_count,
+        T=3,
+    )
+    planner = ContactPlanner(params, env=None, trajectory_sampler=sampler, turn_problem=DummyTurnProblem())
+
+    contact_sequence, goal_config, initial_samples, likelihood, _ = planner.plan_recovery_contacts(
+        torch.zeros(15), stage=1, fpath=tmp_path, all_stage=1, index_regrasp_planner=None
+    )
+
+    assert contact_sequence == ["thumb_middle"]
+    assert initial_samples.shape[0] == sample_count
+    assert likelihood.shape[0] == sample_count
+    torch.testing.assert_close(goal_config, trajectories[0, -1, :15])
 
 
 def _trajectories(terminal_scores):

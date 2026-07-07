@@ -30,6 +30,36 @@ class TrajectoryExecutor:
         self.params = params
         self.env = env
         self.sim_viz_env = sim_viz_env
+
+    @staticmethod
+    def _planner_particle_count(planner):
+        for owner in (planner, getattr(planner, "solver", None)):
+            if owner is None:
+                continue
+            count = getattr(owner, "N", None)
+            if count is not None:
+                return int(count)
+        x = getattr(planner, "x", None)
+        if torch.is_tensor(x) and x.ndim > 0:
+            return int(x.shape[0])
+        return None
+
+    def _match_initial_sample_batch(self, initial_samples, planner):
+        if initial_samples is None:
+            return None
+        target_count = self._planner_particle_count(planner)
+        if target_count is None or target_count <= 0:
+            return initial_samples
+        sample_count = int(initial_samples.shape[0])
+        if sample_count == target_count:
+            return initial_samples
+        if sample_count == 0:
+            raise ValueError("Cannot initialize CSVTO with an empty initial sample batch.")
+        if sample_count > target_count:
+            return initial_samples[:target_count]
+        repeats = (target_count + sample_count - 1) // sample_count
+        repeat_shape = [repeats] + [1] * (initial_samples.ndim - 1)
+        return initial_samples.repeat(*repeat_shape)[:target_count]
         
     def execute_traj(self, planner, mode, env, goal=None, fname=None, initial_samples=None, 
                     recover=False, start_timestep=0, max_timesteps=None, ctrl=None, 
@@ -176,13 +206,15 @@ class TrajectoryExecutor:
         initial_samples, new_T, sim_rollouts = self._handle_initial_sampling(
             mode, trajectory_sampler, trajectory_sampler_orig, recover, skip_diff_init,
             initial_samples, state, contact, num_fingers, obj_dof, mode_fpath, planner)
+        initial_samples = self._match_initial_sample_batch(initial_samples, planner)
+        sim_rollouts = self._match_initial_sample_batch(sim_rollouts, planner)
 
         # Reset planner with new parameters
         state = self.env.get_state()
         state = state['q'].reshape(-1, 4 * num_fingers + planner.problem.obj_dof + planner.problem.obj_joint_dim)[0, :4 * num_fingers + planner.problem.obj_dof].to(device=self.params['device'])
         state = state[:planner.problem.dx]
 
-        if created_planner:
+        if created_planner or initial_samples is not None:
             planner.reset(state, T=new_T, goal=goal, initial_x=initial_samples, proj_path=proj_path)
         else:
             planner.problem.goal[-1] = state[-1]
@@ -629,7 +661,8 @@ class TrajectoryExecutor:
             initial_samples, _, likelihood = ret
             
             max_likelihood_idx = likelihood.argsort(descending=True)
-            initial_samples = initial_samples[max_likelihood_idx][:self.params['N']]
+            seed_count = self.params.get('recovery_N', self.params['N']) if recover else self.params['N']
+            initial_samples = initial_samples[max_likelihood_idx][:int(seed_count)]
                 
             if self.params['sine_cosine']:
                 initial_samples = convert_sine_cosine_to_yaw(initial_samples)

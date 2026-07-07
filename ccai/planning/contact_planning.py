@@ -47,6 +47,9 @@ class ContactPlanner:
         self.trajectory_sampler_orig = trajectory_sampler_orig
         self.turn_problem = turn_problem
         self.mode_planner_dict = mode_planner_dict
+
+    def _recovery_seed_count(self):
+        return int(self.params.get('recovery_N', self.params.get('N', 1)))
         
     def plan_recovery_contacts_w_model(self, state, contact_state_dict_flip, classifier):
         """Plan recovery contacts using a trained model."""
@@ -213,8 +216,9 @@ class ContactPlanner:
                         camera_parameters_path=get_screwdriver_plan_camera_path(self.turn_problem),
                     )
             
-            if self.params['N'] > 1:
-                initial_samples = initial_samples[:self.params['N']]
+            seed_count = self._recovery_seed_count()
+            if seed_count > 1:
+                initial_samples = initial_samples[:seed_count]
             else:
                 # Use highest likelihood trajectory of highst sum likelihood mode
                 initial_samples = initial_samples[best_traj_idx:best_traj_idx+1]
