@@ -9,6 +9,7 @@ import time
 import json
 import pathlib
 import pickle as pkl
+import heapq
 from dataclasses import dataclass
 from pprint import pprint
 
@@ -227,53 +228,23 @@ class ContactPlanner:
         max_depth = self.params.get('max_recovery_stages', 1)
 
         root_state = state[:state_dim].reshape(1, -1)
-        frontier = [
-            ChainedRecoveryNode(
-                contact_sequence=[],
-                terminal_states=root_state,
-                node_id=self._next_chained_recovery_node_id(),
-                parent_node_id=None,
-                path_node_ids=[],
-                depth=0,
-            )
-        ]
-        best_node = None
+        root_node = ChainedRecoveryNode(
+            contact_sequence=[],
+            terminal_states=root_state,
+            node_id=self._next_chained_recovery_node_id(),
+            parent_node_id=None,
+            path_node_ids=[],
+            depth=0,
+        )
+        selected_node = self._find_shortest_recovery_contact_path_dijkstra(
+            root_node,
+            contact_state_dict_flip=contact_state_dict_flip,
+            max_depth=max_depth,
+            threshold=threshold,
+        )
 
-        for depth in range(max_depth):
-            children = self._expand_chained_recovery_frontier(
-                frontier,
-                contact_state_dict_flip=contact_state_dict_flip,
-            )
-            if not children:
-                break
-
-            best_child = max(children, key=lambda node: node.score)
-            if best_node is None or best_child.score > best_node.score:
-                best_node = best_child
-
-            terminating_children = [child for child in children if child.score > threshold]
-            if terminating_children:
-                selected = max(terminating_children, key=lambda node: node.score)
-                print('Chained recovery terminated at depth:', depth + 1)
-                print('Chained recovery contact sequence:', selected.contact_sequence)
-                print('Chained recovery terminal task likelihood:', selected.score)
-                return self._format_chained_recovery_result(
-                    selected,
-                    time.perf_counter() - start_plan_time,
-                )
-
-            print('Chained recovery continuing with frontier size:', len(children))
-            print('Chained recovery best contact sequence so far:', best_child.contact_sequence)
-            print('Chained recovery best terminal task likelihood:', best_child.score)
-            frontier = children
-
-        if best_node is None:
-            raise ValueError("Joint recovery model did not produce any valid contact modes for chained search.")
-
-        print('Chained recovery reached max depth; returning best visited sequence:', best_node.contact_sequence)
-        print('Chained recovery best terminal task likelihood:', best_node.score)
         return self._format_chained_recovery_result(
-            best_node,
+            selected_node,
             time.perf_counter() - start_plan_time,
         )
 
@@ -500,13 +471,10 @@ class ContactPlanner:
         )
         temperature = self._recovery_likelihood_temperature()
         scaled_recovery_likelihoods = recovery_likelihoods / temperature
-        # return torch.logsumexp(
-        #     scaled_recovery_likelihoods + terminal_likelihoods,
-        #     dim=0,
-        # ) - torch.logsumexp(scaled_recovery_likelihoods, dim=0)
-
-
-        return torch.argmax(torch.logsumexp(torch.softmax(scaled_recovery_likelihoods + terminal_likelihoods, dim=0), dim=0))
+        return torch.logsumexp(
+            scaled_recovery_likelihoods + terminal_likelihoods,
+            dim=0,
+        ) - torch.logsumexp(scaled_recovery_likelihoods, dim=0)
 
     def _recovery_likelihood_temperature(self):
         temperature = float(self.params.get("recovery_likelihood_temperature", 1.0))
@@ -634,9 +602,7 @@ class ContactPlanner:
             best_idx = 0
             likelihoods = None
         else:
-            # best_idx = torch.argmax(node.terminal_likelihoods).item()
-
-            best_idx = torch.argmax(torch.logsumexp(torch.softmax(node.recovery_likelihoods + node.terminal_likelihoods, dim=0), dim=0)).item()
+            best_idx = torch.argmax(node.terminal_likelihoods).item()
             likelihoods = node.terminal_likelihoods
         goal_config = node.terminal_states[best_idx].clone()
         initial_samples = node.csvto_seed_trajectories
@@ -979,3 +945,70 @@ class ContactPlanner:
             )
 
         self._write_node_metadata(node)
+
+    def _find_shortest_recovery_contact_path_dijkstra(
+        self,
+        start_node,
+        contact_state_dict_flip=None,
+        max_depth=1,
+        threshold=None,
+    ):
+        """Find the shortest recovery contact path using Dijkstra's algorithm."""
+        if threshold is None:
+            threshold = self._chained_recovery_likelihood_threshold()
+
+        queue = [(0.0, 0, start_node)]
+        tie_breaker = 1
+        best_fallback = None
+        best_fallback_cost = float("inf")
+        visited = set()
+
+        while queue:
+            cumulative_cost, _, node = heapq.heappop(queue)
+            node_key = node.node_id if node.node_id is not None else id(node)
+            if node_key in visited:
+                continue
+            visited.add(node_key)
+
+            if node.depth > 0:
+                if node.score > threshold:
+                    print('Chained recovery Dijkstra terminated at depth:', node.depth)
+                    print('Chained recovery Dijkstra path cost:', cumulative_cost)
+                    print('Chained recovery contact sequence:', node.contact_sequence)
+                    print('Chained recovery terminal task likelihood:', node.score)
+                    return node
+                if cumulative_cost < best_fallback_cost:
+                    best_fallback = node
+                    best_fallback_cost = cumulative_cost
+
+            if node.depth >= max_depth:
+                continue
+
+            children = self._expand_chained_recovery_frontier(
+                [node],
+                contact_state_dict_flip=contact_state_dict_flip,
+            )
+            if not children:
+                continue
+
+            for child in children:
+                edge_cost = self._chained_recovery_edge_cost(child)
+                heapq.heappush(queue, (cumulative_cost + edge_cost, tie_breaker, child))
+                tie_breaker += 1
+
+        if best_fallback is None:
+            raise ValueError("Joint recovery model did not produce any valid contact modes for chained search.")
+
+        print('Chained recovery Dijkstra reached max depth; returning best visited sequence:', best_fallback.contact_sequence)
+        print('Chained recovery Dijkstra path cost:', best_fallback_cost)
+        print('Chained recovery best terminal task likelihood:', best_fallback.score)
+        return best_fallback
+
+    def _chained_recovery_edge_cost(self, node):
+        edge_cost = -float(node.score)
+        if not np.isfinite(edge_cost) or edge_cost < 0:
+            raise ValueError(
+                "Chained recovery Dijkstra requires finite non-negative edge costs from negative node scores, "
+                f"got score={node.score} and edge_cost={edge_cost}."
+            )
+        return edge_cost
