@@ -6,6 +6,7 @@ Contains functions for planning recovery contact sequences.
 import torch
 import numpy as np
 import time
+import json
 import pathlib
 import pickle as pkl
 from dataclasses import dataclass
@@ -24,6 +25,13 @@ class ChainedRecoveryNode:
     score: float = float("-inf")
     terminal_likelihoods: torch.Tensor = None
     recovery_likelihoods: torch.Tensor = None
+    node_id: int = None
+    parent_node_id: int = None
+    path_node_ids: list = None
+    depth: int = 0
+    frontier_parent_index: int = None
+    contact_mode: str = None
+    particle_metadata: list = None
 
 
 class ContactPlanner:
@@ -37,6 +45,7 @@ class ContactPlanner:
         self.trajectory_sampler_orig = trajectory_sampler_orig
         self.turn_problem = turn_problem
         self.mode_planner_dict = mode_planner_dict
+        self.last_chained_recovery_selection = None
         
     def plan_recovery_contacts_w_model(self, state, contact_state_dict_flip, classifier):
         """Plan recovery contacts using a trained model."""
@@ -77,7 +86,7 @@ class ContactPlanner:
     def plan_recovery_contacts(self, state, stage, fpath, all_stage, index_regrasp_planner):
         """Plan recovery contacts using recovery model."""
         if self.params.get('chained_recovery_contact_search', False):
-            return self._plan_chained_joint_recovery_contacts(state)
+            return self._plan_chained_joint_recovery_contacts(state, fpath=fpath, all_stage=all_stage)
 
         start_plan_time = time.perf_counter()
         
@@ -92,7 +101,7 @@ class ContactPlanner:
             while contact_mode_str_max == 'unknown':
                 initial_samples, raw_contact_mode, likelihood = self.trajectory_sampler.sample(
                     N=self.params['N_contact_plan'], start=start, H=self.params['T']+1, 
-                    constraints=None, project=False)
+                    constraints=None, project=False) ## sample candidates from the recovery diffusion model and obtain their likelihoods
                 
                 scaled_raw_contact_mode = (raw_contact_mode + 1) / 2
                 contact_vec = torch.round(scaled_raw_contact_mode)
@@ -159,6 +168,8 @@ class ContactPlanner:
                 goal_config = initial_samples[best_traj_idx, -1, :15]
             
                 # Use the goal from the planner if using the task model to diffuse the goal
+
+                ## what planner is this? 
                 if self.params['task_diffuse_goal']:
                     goal = index_regrasp_planner.problem.goal.clone()
                     goal[-1] = state[-1]
@@ -202,7 +213,7 @@ class ContactPlanner:
             return self.plan_recovery_contacts_offline(state, stage, fpath, all_stage)
 
     @torch.no_grad()
-    def _plan_chained_joint_recovery_contacts(self, state, contact_state_dict_flip=None):
+    def _plan_chained_joint_recovery_contacts(self, state, contact_state_dict_flip=None, fpath=None, all_stage=None):
         """Plan a contact-mode sequence by chaining joint recovery diffusion samples."""
         if self.trajectory_sampler is None:
             raise ValueError("chained_recovery_contact_search requires trajectory_sampler.")
@@ -210,12 +221,22 @@ class ContactPlanner:
             raise ValueError("chained_recovery_contact_search requires trajectory_sampler_orig for terminal OOD scoring.")
 
         start_plan_time = time.perf_counter()
+        self._set_chained_recovery_visualization_context(fpath, all_stage)
         state_dim = self._state_dim()
         threshold = self._chained_recovery_likelihood_threshold()
         max_depth = self.params.get('max_recovery_stages', 1)
 
         root_state = state[:state_dim].reshape(1, -1)
-        frontier = [ChainedRecoveryNode(contact_sequence=[], terminal_states=root_state)]
+        frontier = [
+            ChainedRecoveryNode(
+                contact_sequence=[],
+                terminal_states=root_state,
+                node_id=self._next_chained_recovery_node_id(),
+                parent_node_id=None,
+                path_node_ids=[],
+                depth=0,
+            )
+        ]
         best_node = None
 
         for depth in range(max_depth):
@@ -376,17 +397,38 @@ class ContactPlanner:
                     dtype=torch.long,
                 )
                 mode_trajectories = resampled_trajectories[mode_indices]
+                mode_recovery_likelihoods = resampled_likelihoods[mode_indices]
                 terminal_states_for_score = valid_trajectories[score_indices, -1, :state_dim]
+                source_valid_indices = resampled_local_indices[mode_indices]
+                source_local_indices = valid_indices[source_valid_indices]
+                particle_metadata = []
+                for particle_idx in range(mode_indices.shape[0]):
+                    source_local_index = int(source_local_indices[particle_idx].item())
+                    source_valid_index = int(source_valid_indices[particle_idx].item())
+                    valid_mode_index = int(resampled_score_indices[particle_idx].item())
+                    particle_metadata.append(
+                        {
+                            "particle_index": particle_idx,
+                            "source_global_index": int(chunk_start + source_local_index),
+                            "source_local_index": source_local_index,
+                            "valid_index": source_valid_index,
+                            "valid_mode_index": valid_mode_index,
+                            "resampled_source_index": source_valid_index,
+                            "recovery_likelihood": float(mode_recovery_likelihoods[particle_idx].item()),
+                        }
+                    )
                 child_specs.append(
                     (
                         node,
+                        node_idx,
                         mode,
                         terminal_states_for_score,
                         valid_likelihoods[score_indices],
                         resampled_score_indices,
                         mode_trajectories,
-                        resampled_likelihoods[mode_indices],
+                        mode_recovery_likelihoods,
                         chunk_csvto_seed_trajectories,
+                        particle_metadata,
                     )
                 )
                 terminal_state_chunks.append(terminal_states_for_score)
@@ -401,6 +443,7 @@ class ContactPlanner:
         likelihood_offset = 0
         for (
             node,
+            frontier_parent_index,
             mode,
             terminal_states_for_score,
             recovery_likelihoods_for_score,
@@ -408,6 +451,7 @@ class ContactPlanner:
             mode_trajectories,
             mode_recovery_likelihoods,
             csvto_seed_trajectories,
+            particle_metadata,
         ) in child_specs:
             likelihood_count = terminal_states_for_score.shape[0]
             terminal_likelihoods_for_score = all_terminal_likelihoods[
@@ -420,6 +464,10 @@ class ContactPlanner:
             ).item()
             terminal_likelihoods = terminal_likelihoods_for_score[resampled_score_indices]
             terminal_states = mode_trajectories[:, -1, :state_dim]
+            node_id = self._next_chained_recovery_node_id()
+            for particle_idx, metadata in enumerate(particle_metadata):
+                metadata["particle_index"] = particle_idx
+                metadata["terminal_likelihood"] = float(terminal_likelihoods[particle_idx].item())
             children.append(
                 ChainedRecoveryNode(
                     contact_sequence=list(node.contact_sequence) + [mode],
@@ -429,8 +477,19 @@ class ContactPlanner:
                     score=score,
                     terminal_likelihoods=terminal_likelihoods,
                     recovery_likelihoods=mode_recovery_likelihoods,
+                    node_id=node_id,
+                    parent_node_id=node.node_id,
+                    path_node_ids=list(node.path_node_ids or []) + [node_id],
+                    depth=len(node.contact_sequence) + 1,
+                    frontier_parent_index=frontier_parent_index,
+                    contact_mode=mode,
+                    particle_metadata=particle_metadata,
                 )
             )
+
+        if self.params.get('visualize_recovery_per_node', False):
+            for node_idx, child in enumerate(children):
+                self._visualize_node_particles(child, node_idx)
 
         return children
 
@@ -439,10 +498,24 @@ class ContactPlanner:
             device=terminal_likelihoods.device,
             dtype=terminal_likelihoods.dtype,
         )
-        return torch.logsumexp(
-            recovery_likelihoods + terminal_likelihoods,
-            dim=0,
-        ) - torch.logsumexp(recovery_likelihoods, dim=0)
+        temperature = self._recovery_likelihood_temperature()
+        scaled_recovery_likelihoods = recovery_likelihoods / temperature
+        # return torch.logsumexp(
+        #     scaled_recovery_likelihoods + terminal_likelihoods,
+        #     dim=0,
+        # ) - torch.logsumexp(scaled_recovery_likelihoods, dim=0)
+
+
+        return torch.argmax(torch.logsumexp(torch.softmax(scaled_recovery_likelihoods + terminal_likelihoods, dim=0), dim=0))
+
+    def _recovery_likelihood_temperature(self):
+        temperature = float(self.params.get("recovery_likelihood_temperature", 1.0))
+        if not np.isfinite(temperature) or temperature <= 0:
+            raise ValueError(
+                "recovery_likelihood_temperature must be a finite positive value, "
+                f"got {temperature}."
+            )
+        return temperature
 
     def _prepare_chained_expansion_starts(self, terminal_states):
         starts = self._prepare_chained_start_batch(terminal_states)
@@ -490,8 +563,8 @@ class ContactPlanner:
         return modes
 
     def _resample_indices_from_recovery_likelihoods(self, recovery_likelihoods, num_samples):
-        weights = torch.exp(recovery_likelihoods)
-        weights = weights / weights.sum()
+        temperature = self._recovery_likelihood_temperature()
+        weights = torch.softmax(recovery_likelihoods / temperature, dim=0)
         if not torch.isfinite(weights).all():
             raise ValueError("Non-finite recovery likelihood weights in chained recovery search.")
         return torch.multinomial(weights, num_samples=num_samples, replacement=True)
@@ -561,17 +634,176 @@ class ContactPlanner:
             best_idx = 0
             likelihoods = None
         else:
-            best_idx = torch.argmax(node.terminal_likelihoods).item()
+            # best_idx = torch.argmax(node.terminal_likelihoods).item()
+
+            best_idx = torch.argmax(torch.logsumexp(torch.softmax(node.recovery_likelihoods + node.terminal_likelihoods, dim=0), dim=0)).item()
             likelihoods = node.terminal_likelihoods
         goal_config = node.terminal_states[best_idx].clone()
         initial_samples = node.csvto_seed_trajectories
         if initial_samples is None:
             initial_samples = node.trajectories
+        self.last_chained_recovery_selection = self._build_chained_recovery_selection(
+            node,
+            best_idx,
+            goal_config,
+        )
+        self._save_selected_chained_recovery_rollout(node, best_idx)
         return node.contact_sequence, goal_config, initial_samples, likelihoods, plan_time
 
     def _state_dim(self):
         obj_dof = self.turn_problem.obj_dof if self.turn_problem is not None else 3
         return 4 * len(self.params['fingers']) + obj_dof
+
+    def _set_chained_recovery_visualization_context(self, fpath=None, all_stage=None):
+        self._chained_viz_trial_dir = pathlib.Path(fpath) if fpath is not None else None
+        self._chained_viz_all_stage = all_stage
+        self._chained_viz_episode_index = self._episode_index_from_trial_dir(self._chained_viz_trial_dir)
+        self._chained_viz_next_node_id = 0
+        self.last_chained_recovery_selection = None
+        if self._chained_viz_trial_dir is not None:
+            self._chained_viz_base_dir = self._chained_viz_trial_dir / "recovery_visualizations_per_node"
+            self._chained_viz_log_run_dir = self._chained_viz_trial_dir.parent
+            self._chained_viz_log_run_name = self._chained_viz_log_run_dir.name
+        else:
+            self._chained_viz_base_dir = (
+                pathlib.Path(__file__).resolve().parent.parent
+                / "data"
+                / "recovery_visualizations_per_node"
+                / self._chained_recovery_log_run_name()
+            )
+            self._chained_viz_log_run_dir = self._chained_viz_base_dir
+            self._chained_viz_log_run_name = self._chained_viz_base_dir.name
+
+    def _episode_index_from_trial_dir(self, trial_dir):
+        if trial_dir is None:
+            return None
+        name = pathlib.Path(trial_dir).name
+        prefix = "trial_"
+        if not name.startswith(prefix):
+            return None
+        index = name[len(prefix):]
+        return int(index) if index.isdigit() else None
+
+    def _temperature_for_path(self):
+        text = f"{self._recovery_likelihood_temperature():g}"
+        if "e" not in text and "." not in text:
+            text = f"{text}.0"
+        return text.replace("-", "m").replace("+", "").replace(".", "p")
+
+    def _chained_recovery_log_run_name(self):
+        timestamp = time.strftime("%Y%m%d_%H%M")
+        return f"{timestamp}_temp{self._temperature_for_path()}"
+
+    def _next_chained_recovery_node_id(self):
+        node_id = getattr(self, "_chained_viz_next_node_id", 0)
+        self._chained_viz_next_node_id = node_id + 1
+        return node_id
+
+    def _chained_recovery_viz_root(self):
+        return (
+            getattr(self, "_chained_viz_base_dir", None)
+            or pathlib.Path(__file__).resolve().parent.parent / "data" / "recovery_visualizations_per_node" / "run"
+        )
+
+    def _node_visualization_dir(self, node):
+        mode = node.contact_mode or (node.contact_sequence[-1] if node.contact_sequence else "root")
+        node_id = "none" if node.node_id is None else node.node_id
+        return self._chained_recovery_viz_root() / f"depth{node.depth}_{mode}_node{node_id}"
+
+    def _jsonable_tensor(self, value):
+        if value is None:
+            return None
+        if torch.is_tensor(value):
+            return value.detach().cpu().tolist()
+        return value
+
+    def _build_chained_recovery_selection(self, node, selected_particle_index, goal_config):
+        particle_metadata = {}
+        if node.particle_metadata and selected_particle_index < len(node.particle_metadata):
+            particle_metadata = dict(node.particle_metadata[selected_particle_index])
+
+        return {
+            "episode_index": getattr(self, "_chained_viz_episode_index", None),
+            "trial_dir": str(getattr(self, "_chained_viz_trial_dir", "")) if getattr(self, "_chained_viz_trial_dir", None) is not None else None,
+            "all_stage": getattr(self, "_chained_viz_all_stage", None),
+            "log_run_name": getattr(self, "_chained_viz_log_run_name", None),
+            "log_run_dir": str(getattr(self, "_chained_viz_log_run_dir", self._chained_recovery_viz_root())),
+            "selected_node_id": node.node_id,
+            "selected_parent_node_id": node.parent_node_id,
+            "selected_path_node_ids": list(node.path_node_ids or []),
+            "selected_depth": node.depth,
+            "selected_contact_mode": node.contact_mode,
+            "selected_contact_sequence": list(node.contact_sequence),
+            "selected_particle_index": int(selected_particle_index),
+            "selected_particle": particle_metadata,
+            "recovery_likelihood_temperature": self._recovery_likelihood_temperature(),
+            "score": float(node.score),
+            "terminal_likelihood": (
+                float(node.terminal_likelihoods[selected_particle_index].item())
+                if node.terminal_likelihoods is not None else None
+            ),
+            "goal_config": self._jsonable_tensor(goal_config),
+        }
+
+    def _save_selected_chained_recovery_rollout(self, node, selected_particle_index):
+        selection = self.last_chained_recovery_selection
+        if selection is None:
+            return
+        if getattr(self, "_chained_viz_trial_dir", None) is None:
+            return
+
+        viz_root = self._chained_recovery_viz_root()
+        viz_root.mkdir(parents=True, exist_ok=True)
+        with open(viz_root / "selected_rollout.json", "w") as f:
+            json.dump(selection, f, indent=2)
+
+        self._write_node_metadata(node, selected_particle_index=selected_particle_index)
+
+    def _write_node_metadata(self, node, selected_particle_index=None):
+        if node.contact_sequence is None:
+            return
+
+        base_dir = self._node_visualization_dir(node)
+        base_dir.mkdir(parents=True, exist_ok=True)
+        num_particles = int(node.trajectories.shape[0]) if node.trajectories is not None else 0
+        particles = []
+        for p in range(num_particles):
+            particle = {}
+            if node.particle_metadata and p < len(node.particle_metadata):
+                particle.update(node.particle_metadata[p])
+            particle.setdefault("particle_index", p)
+            particle.setdefault(
+                "recovery_likelihood",
+                float(node.recovery_likelihoods[p].item()) if node.recovery_likelihoods is not None else float("nan"),
+            )
+            particle.setdefault(
+                "terminal_likelihood",
+                float(node.terminal_likelihoods[p].item()) if node.terminal_likelihoods is not None else float("nan"),
+            )
+            particle["selected"] = selected_particle_index == p
+            particles.append(particle)
+
+        metadata = {
+            "episode_index": getattr(self, "_chained_viz_episode_index", None),
+            "trial_dir": str(getattr(self, "_chained_viz_trial_dir", "")) if getattr(self, "_chained_viz_trial_dir", None) is not None else None,
+            "all_stage": getattr(self, "_chained_viz_all_stage", None),
+            "log_run_name": getattr(self, "_chained_viz_log_run_name", None),
+            "log_run_dir": str(getattr(self, "_chained_viz_log_run_dir", self._chained_recovery_viz_root())),
+            "node_id": node.node_id,
+            "parent_node_id": node.parent_node_id,
+            "path_node_ids": list(node.path_node_ids or []),
+            "depth": node.depth,
+            "frontier_parent_index": node.frontier_parent_index,
+            "contact_mode": node.contact_mode,
+            "contact_sequence": list(node.contact_sequence),
+            "recovery_likelihood_temperature": self._recovery_likelihood_temperature(),
+            "score": float(node.score),
+            "num_particles": num_particles,
+            "selected_particle_index": selected_particle_index,
+            "particles": particles,
+        }
+        with open(base_dir / "metadata.json", "w") as f:
+            json.dump(metadata, f, indent=2)
 
     def plan_recovery_contacts_offline(self, state, stage, fpath, all_stage):
         """Plan recovery contacts using CSVTO + likelihood estimation"""
@@ -697,4 +929,53 @@ class ContactPlanner:
         gif_fpath.mkdir(parents=True, exist_ok=True)
         
         visualize_trajectory(traj_for_viz, self.turn_problem.contact_scenes_for_viz, viz_fpath,
-                            self.turn_problem.fingers, self.turn_problem.obj_dof + 1) 
+                            self.turn_problem.fingers, self.turn_problem.obj_dof + 1)
+
+    def _visualize_node_particles(self, node, node_idx):
+        """Render every particle trajectory of a search-tree node to disk (no display).
+
+        Produces, per node, a directory named by depth/contact-mode and, per particle, a
+        sub-directory whose name encodes that particle's recovery and terminal likelihoods.
+        All rendering is off-screen; nothing is displayed.
+        """
+        if self.turn_problem is None or node.trajectories is None:
+            return
+        if not node.contact_sequence:
+            return
+
+        dx = self.turn_problem.dx
+
+        base_dir = self._node_visualization_dir(node)
+        base_dir.mkdir(parents=True, exist_ok=True)
+
+        num_particles = node.trajectories.shape[0]
+        recovery_likelihoods = node.recovery_likelihoods
+        terminal_likelihoods = node.terminal_likelihoods
+
+        for p in range(num_particles):
+            rl = float(recovery_likelihoods[p].item()) if recovery_likelihoods is not None else float("nan")
+            tl = float(terminal_likelihoods[p].item()) if terminal_likelihoods is not None else float("nan")
+
+            particle_fpath = base_dir / f"particle{p:02d}_rec{rl:.3f}_term{tl:.3f}"
+            img_fpath, gif_fpath = particle_fpath / 'img', particle_fpath / 'gif'
+            img_fpath.mkdir(parents=True, exist_ok=True)
+            gif_fpath.mkdir(parents=True, exist_ok=True)
+
+            traj = node.trajectories[p]
+            traj_for_viz = traj[:, :dx]
+            # Prepend the particle's own first frame as the starting pose for visual continuity.
+            traj_for_viz = torch.cat((traj_for_viz[:1], traj_for_viz), dim=0)
+            tmp = torch.zeros((traj_for_viz.shape[0], 1), device=traj.device)
+            traj_for_viz = torch.cat((traj_for_viz, tmp), dim=1)
+
+            visualize_trajectory(
+                traj_for_viz,
+                self.turn_problem.contact_scenes_for_viz,
+                particle_fpath,
+                self.turn_problem.fingers,
+                self.turn_problem.obj_dof + 1,
+                headless=True,
+                render_backend='offscreen',
+            )
+
+        self._write_node_metadata(node)
