@@ -10,6 +10,7 @@ import json
 import pathlib
 import pickle as pkl
 import heapq
+import shutil
 from dataclasses import dataclass
 from pprint import pprint
 
@@ -676,6 +677,20 @@ class ContactPlanner:
         node_id = "none" if node.node_id is None else node.node_id
         return self._chained_recovery_viz_root() / f"depth{node.depth}_{mode}_node{node_id}"
 
+    def _stage_node_visualization_dir(self, node):
+        trial_dir = getattr(self, "_chained_viz_trial_dir", None)
+        all_stage = getattr(self, "_chained_viz_all_stage", None)
+        if trial_dir is None or all_stage is None:
+            return None
+        mode = node.contact_mode or (node.contact_sequence[-1] if node.contact_sequence else "root")
+        node_id = "none" if node.node_id is None else node.node_id
+        return (
+            pathlib.Path(trial_dir)
+            / f"recovery_stage_{all_stage}"
+            / mode
+            / f"depth{node.depth}_node{node_id}"
+        )
+
     def _jsonable_tensor(self, value):
         if value is None:
             return None
@@ -724,12 +739,16 @@ class ContactPlanner:
             json.dump(selection, f, indent=2)
 
         self._write_node_metadata(node, selected_particle_index=selected_particle_index)
+        stage_dir = self._stage_node_visualization_dir(node)
+        if stage_dir is not None and stage_dir.exists():
+            self._write_node_metadata(node, selected_particle_index=selected_particle_index, base_dir=stage_dir)
 
-    def _write_node_metadata(self, node, selected_particle_index=None):
+    def _write_node_metadata(self, node, selected_particle_index=None, base_dir=None):
         if node.contact_sequence is None:
             return
 
-        base_dir = self._node_visualization_dir(node)
+        if base_dir is None:
+            base_dir = self._node_visualization_dir(node)
         base_dir.mkdir(parents=True, exist_ok=True)
         num_particles = int(node.trajectories.shape[0]) if node.trajectories is not None else 0
         particles = []
@@ -912,6 +931,8 @@ class ContactPlanner:
         dx = self.turn_problem.dx
 
         base_dir = self._node_visualization_dir(node)
+        if base_dir.exists():
+            shutil.rmtree(base_dir)
         base_dir.mkdir(parents=True, exist_ok=True)
 
         num_particles = node.trajectories.shape[0]
@@ -942,9 +963,22 @@ class ContactPlanner:
                 self.turn_problem.obj_dof + 1,
                 headless=True,
                 render_backend='offscreen',
+                camera_mode="auto",
+                full_dof_reference=getattr(self.turn_problem, "full_dof_reference", None),
+                joint_index=getattr(self.turn_problem, "joint_index", None),
             )
 
         self._write_node_metadata(node)
+        self._mirror_node_visualization_to_stage(node, base_dir)
+
+    def _mirror_node_visualization_to_stage(self, node, source_dir):
+        stage_dir = self._stage_node_visualization_dir(node)
+        if stage_dir is None:
+            return
+        if stage_dir.exists():
+            shutil.rmtree(stage_dir)
+        stage_dir.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(source_dir, stage_dir)
 
     def _find_shortest_recovery_contact_path_dijkstra(
         self,
