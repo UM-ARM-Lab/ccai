@@ -503,6 +503,7 @@ class TrajectoryExecutor:
             state_dict = self.env.get_state()
             state_16 = state_dict["q"].reshape(-1, 4 * num_fingers + obj_dof + 1).to(device=self.params["device"])[0]
             state = state_16[:4 * num_fingers + obj_dof]
+            policy_step_idx = int(episode_num_steps) if episode_num_steps is not None else int(k)
 
             if k > int(start_timestep):
                 exit_, recover_ = self._check_exit_conditions(
@@ -521,13 +522,13 @@ class TrajectoryExecutor:
                     return self._stack_actual_trajectory(actual_trajectory), planned_trajectories, recover_, episode_num_steps
 
             start_time = time.perf_counter()
-            result = normal_action_policy.plan_next(self.env, k)
+            result = normal_action_policy.plan_next(self.env, policy_step_idx)
             elapsed = time.perf_counter() - start_time
             if data is not None:
                 data["normal_policy_times"].append(elapsed)
                 stats = self._policy_result_value(result, "likelihood_stats", default=None)
                 data["normal_policy_likelihood_stats"].append(stats)
-            print(f"DiffPF planning time for step {k + 1} (global step {episode_num_steps})", elapsed)
+            print(f"DiffPF planning time for step {k + 1} (global step {policy_step_idx})", elapsed)
 
             delta = self._policy_result_value(result, "delta_action", "delta12", "action_delta", default=None)
             target = self._policy_result_value(
@@ -581,7 +582,7 @@ class TrajectoryExecutor:
             if hasattr(normal_action_policy, "observe_transition"):
                 normal_action_policy.observe_transition(
                     env=self.env,
-                    step_idx=k,
+                    step_idx=policy_step_idx,
                     state=state.detach(),
                     delta_action=delta_t.detach(),
                     target_action=target_t.detach(),

@@ -397,6 +397,41 @@ def test_proto5_normal_policy_branch_logs_contact_timeseries_and_rows():
     torch.testing.assert_close(torch.as_tensor(first_record["states"][1, :12]), torch.ones(12) * 0.01)
 
 
+def test_normal_diffpf_policy_uses_global_episode_step_indices(tmp_path):
+    env = _FakeEnv()
+    policy = _FakePolicy()
+    data = _data()
+    params = {
+        "device": "cpu",
+        "mode": "simulation",
+        "live_recovery": True,
+        "OOD_metric": "likelihood",
+        "likelihood_num_samples": 1,
+        "likelihood_threshold": -15,
+        "diffpf_execution_horizon": 2,
+        "controller": "csvgd",
+        "recovery_controller": "csvgd",
+    }
+
+    *_unused, episode_steps = TrajectoryExecutor(params, env).execute_traj(
+        planner=None,
+        mode="turn",
+        env=env,
+        data=data,
+        trajectory_sampler_orig=_FakeSampler(),
+        num_fingers=3,
+        obj_dof=3,
+        episode_num_steps=5,
+        max_episode_num_steps=10,
+        normal_action_policy=policy,
+        fpath=tmp_path,
+    )
+
+    assert policy.plan_step_indices == [5, 6]
+    assert policy.observe_step_indices == [5, 6]
+    assert episode_steps == 7
+
+
 def test_diffpf_recovery_resets_once_and_exits_when_likelihood_returns_id():
     env = _FakeEnv()
     recovery_policy = _FakePolicy()

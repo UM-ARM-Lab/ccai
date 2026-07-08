@@ -25,6 +25,7 @@ SCREWDRIVER_HAND_CHOICES = (SCREWDRIVER_HAND_ALLEGRO, SCREWDRIVER_HAND_PROTO5)
 
 CCAI_ROOT = Path(__file__).resolve().parents[2]
 DOCUMENTS_ROOT = CCAI_ROOT.parent
+MODEL_MISMATCH_PATH = DOCUMENTS_ROOT / "model_mismatch"
 ISAACSIM_HAND_ENVS_PATH = DOCUMENTS_ROOT / "github" / "isaacsim-hand-envs"
 PROTO5_DEFAULTS_PATH = ISAACSIM_HAND_ENVS_PATH / "isaacsim_hand_envs" / "assets" / "robot" / "proto5_defaults.py"
 
@@ -659,6 +660,32 @@ class IsaacSimScrewdriverRecoveryEnv:
             "screwdriver_angle": obj_orientation[:, 2:3],
         }
 
+    def get_screwdriver_position_robot(
+        self,
+        device: str | torch.device | None = None,
+        dtype: torch.dtype = torch.float32,
+    ) -> torch.Tensor:
+        """Return the object root position in the robot root frame."""
+        device = self.device if device is None else torch.device(device)
+        env_ids = self._env_ids()
+        robot = self.scene["robot"]
+        obj = self.scene["obj"]
+        root_pos_w = robot.data.root_pos_w.index_select(0, env_ids.to(robot.data.root_pos_w.device)).to(
+            device=device,
+            dtype=dtype,
+        )
+        root_quat_w = robot.data.root_quat_w.index_select(0, env_ids.to(robot.data.root_quat_w.device)).to(
+            device=device,
+            dtype=dtype,
+        )
+        obj_pos_source = getattr(obj.data, "root_pos_w", None)
+        if obj_pos_source is None:
+            obj_pos_source = getattr(obj.data, "root_link_pos_w", None)
+        if obj_pos_source is None:
+            raise RuntimeError("Object asset does not expose root_pos_w or root_link_pos_w.")
+        obj_pos_w = obj_pos_source.index_select(0, env_ids.to(obj_pos_source.device)).to(device=device, dtype=dtype)
+        return rotate_vectors_by_inverse_quat(obj_pos_w - root_pos_w, root_quat_w).to(dtype=dtype)
+
     def get_contact_state(self, threshold: float = 1.0e-6) -> torch.Tensor:
         """Return simulator contact flags per fingertip in index/middle/thumb order."""
         flags = []
@@ -710,46 +737,15 @@ class IsaacSimScrewdriverRecoveryEnv:
 
         robot = self.scene["robot"]
         try:
-            child_body_ids = self._robot_body_ids(PROTO5_6AF_BODY_NAMES, "_proto5_6af_body_ids")
-            parent_body_ids = self._robot_body_ids(PROTO5_6AF_PARENT_BODY_NAMES, "_proto5_6af_parent_body_ids")
-            wrench_source = getattr(robot.data, "body_incoming_joint_wrench_b", None)
-            if wrench_source is None:
-                physx_view = getattr(robot, "root_physx_view", None) or getattr(robot, "_root_physx_view", None)
-                if physx_view is None:
-                    raise AttributeError("body_incoming_joint_wrench_b")
-                wrench_source = physx_view.get_link_incoming_joint_force()
+            if str(MODEL_MISMATCH_PATH) not in sys.path:
+                sys.path.insert(0, str(MODEL_MISMATCH_PATH))
+            from model_mismatch.utils.proto5_wrenches import extract_proto5_6af_wrenches_robot_frame
 
-            env_ids = self._env_ids()
-            child_ids_t = torch.as_tensor(child_body_ids, device=wrench_source.device, dtype=torch.long)
-            parent_ids_t = torch.as_tensor(parent_body_ids, device=robot.data.body_quat_w.device, dtype=torch.long)
-            wrench_joint_frame = wrench_source.index_select(0, env_ids.to(wrench_source.device)).index_select(
-                1, child_ids_t
-            ).to(device=self.device, dtype=torch.float32)
-            parent_quat_w = robot.data.body_quat_w.index_select(
-                0, env_ids.to(robot.data.body_quat_w.device)
-            ).index_select(1, parent_ids_t).to(device=self.device, dtype=torch.float32)
-            root_quat_w = robot.data.root_quat_w.index_select(
-                0, env_ids.to(robot.data.root_quat_w.device)
-            ).to(device=self.device, dtype=torch.float32)
-            root_quat_per_finger = root_quat_w[:, None, :].expand(-1, len(child_body_ids), -1)
-
-            force_world = rotate_vectors_by_quat(
-                wrench_joint_frame[..., :3].reshape(-1, 3),
-                parent_quat_w.reshape(-1, 4),
-            ).reshape(self.num_envs, len(child_body_ids), 3)
-            torque_world = rotate_vectors_by_quat(
-                wrench_joint_frame[..., 3:6].reshape(-1, 3),
-                parent_quat_w.reshape(-1, 4),
-            ).reshape(self.num_envs, len(child_body_ids), 3)
-            force_robot = rotate_vectors_by_inverse_quat(
-                force_world.reshape(-1, 3),
-                root_quat_per_finger.reshape(-1, 4),
-            ).reshape(self.num_envs, len(child_body_ids), 3)
-            torque_robot = rotate_vectors_by_inverse_quat(
-                torque_world.reshape(-1, 3),
-                root_quat_per_finger.reshape(-1, 4),
-            ).reshape(self.num_envs, len(child_body_ids), 3)
-            return torch.cat((force_robot, torque_robot), dim=-1).to(dtype=torch.float32)
+            return extract_proto5_6af_wrenches_robot_frame(
+                robot,
+                env_ids=self._env_ids(),
+                device=self.device,
+            )
         except (AttributeError, KeyError, RuntimeError, ValueError) as exc:
             if strict:
                 raise RuntimeError("Proto5 6D contact wrench telemetry is unavailable.") from exc
@@ -774,10 +770,32 @@ class IsaacSimScrewdriverRecoveryEnv:
         robot.write_root_link_pose_to_sim(root_state[:, :7], env_ids=env_ids)
         robot.write_root_com_velocity_to_sim(root_state[:, 7:], env_ids=env_ids)
 
-    def _write_obj_root_default(self, env_ids: torch.Tensor) -> None:
+    def _write_obj_root_default(self, env_ids: torch.Tensor, screwdriver_pos_robot=None) -> None:
         obj = self.scene["obj"]
         root_state = obj.data.default_root_state[env_ids].clone()
         root_state[:, 0:3] += self.scene.env_origins[env_ids]
+        if screwdriver_pos_robot is not None:
+            robot = self.scene["robot"]
+            position_robot = torch.as_tensor(
+                screwdriver_pos_robot,
+                device=self.device,
+                dtype=root_state.dtype,
+            )
+            if position_robot.ndim == 1:
+                position_robot = position_robot.reshape(1, 3)
+            if position_robot.shape[0] == 1 and len(env_ids) != 1:
+                position_robot = position_robot.expand(len(env_ids), -1)
+            if position_robot.shape != (len(env_ids), 3):
+                raise ValueError(
+                    "screwdriver_pos_robot must have shape (3,) or (num_envs, 3), "
+                    f"got {tuple(position_robot.shape)} for num_envs={len(env_ids)}."
+                )
+            robot_root_state = robot.data.default_root_state[env_ids].clone()
+            robot_root_state[:, 0:3] += self.scene.env_origins[env_ids]
+            root_state[:, 0:3] = robot_root_state[:, 0:3] + rotate_vectors_by_quat(
+                position_robot,
+                robot_root_state[:, 3:7].to(device=self.device, dtype=position_robot.dtype),
+            )
         obj.write_root_link_pose_to_sim(root_state[:, :7], env_ids=env_ids)
         obj.write_root_com_velocity_to_sim(root_state[:, 7:], env_ids=env_ids)
 
@@ -899,7 +917,7 @@ class IsaacSimScrewdriverRecoveryEnv:
                 self._write_camera_frame(frame_path)
         self._frame_id += 1
 
-    def set_pose(self, state):
+    def set_pose(self, state, screwdriver_pos_robot=None):
         state = _as_2d_tensor(state, device=self.device, dtype=torch.float32)
         if state.shape[-1] < 15:
             raise ValueError(f"Expected state with at least 15 values, got shape {tuple(state.shape)}.")
@@ -907,7 +925,12 @@ class IsaacSimScrewdriverRecoveryEnv:
             state = state.repeat(self.num_envs, 1)
         env_ids = self._env_ids()
         self._write_robot_root_default(env_ids)
-        self._write_obj_root_default(env_ids)
+        try:
+            self._write_obj_root_default(env_ids, screwdriver_pos_robot=screwdriver_pos_robot)
+        except TypeError:
+            if screwdriver_pos_robot is not None:
+                raise
+            self._write_obj_root_default(env_ids)
         self._write_robot_joint_state(state[:, :12], env_ids)
         self._write_obj_joint_state(state[:, 12:15], env_ids)
         self._sync_scene()

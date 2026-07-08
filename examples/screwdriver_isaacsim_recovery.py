@@ -627,8 +627,19 @@ def _read_dataset_initial_grasp(config: dict, dataset_path, trajectory_row: int)
 
     initial_orientation = None
     initial_state_vector = None
+    screwdriver_pos_robot = None
     with open_trajectory_dataset(str(dataset_path), allow_pickle=True) as data:
         dataset_keys = set(trajectory_dataset_keys(data))
+        if "screwdriver_pos_robot" in dataset_keys:
+            screwdriver_pos_robot = np.asarray(
+                data["screwdriver_pos_robot"][trajectory_row],
+                dtype=np.float32,
+            ).reshape(-1)
+            if screwdriver_pos_robot.shape != (3,):
+                raise ValueError(
+                    "Expected screwdriver_pos_robot shape (3,) for dataset initial grasp row "
+                    f"{trajectory_row}, got {tuple(screwdriver_pos_robot.shape)}."
+                )
         full_state = _active_joint_state_from_full_dataset(data, dataset_keys, config, trajectory_row)
         if full_state is not None:
             initial_target = full_state["initial_target"]
@@ -681,6 +692,7 @@ def _read_dataset_initial_grasp(config: dict, dataset_path, trajectory_row: int)
         "initial_target": initial_target,
         "initial_orientation": initial_orientation,
         "initial_state": initial_state_vector,
+        "screwdriver_pos_robot": screwdriver_pos_robot,
     }
 
 
@@ -744,6 +756,7 @@ def apply_simulation_dataset_initial_grasp(env, initialization: dict, *, device)
     import torch
 
     initial_state = initialization.get("initial_state")
+    screwdriver_pos_robot = initialization.get("screwdriver_pos_robot")
     print(
         "Applying simulation dataset initial grasp: "
         f"dataset row {int(initialization['trajectory_row'])}; "
@@ -752,7 +765,21 @@ def apply_simulation_dataset_initial_grasp(env, initialization: dict, *, device)
     )
     env.reset()
     if initial_state is not None and len(initial_state) >= 15 and hasattr(env, "set_pose"):
-        env.set_pose(torch.as_tensor(initial_state, device=device, dtype=torch.float32))
+        state_t = torch.as_tensor(initial_state, device=device, dtype=torch.float32)
+        if screwdriver_pos_robot is not None:
+            try:
+                env.set_pose(
+                    state_t,
+                    screwdriver_pos_robot=torch.as_tensor(
+                        screwdriver_pos_robot,
+                        device=device,
+                        dtype=torch.float32,
+                    ),
+                )
+                return
+            except TypeError:
+                pass
+        env.set_pose(state_t)
         return
 
     initial_target = torch.as_tensor(
@@ -762,10 +789,28 @@ def apply_simulation_dataset_initial_grasp(env, initialization: dict, *, device)
     ).reshape(1, -1)
     env.step(initial_target)
     initial_orientation = initialization.get("initial_orientation")
-    if initial_orientation is not None and hasattr(env, "set_pose") and hasattr(env, "get_state"):
+    if (
+        (initial_orientation is not None or screwdriver_pos_robot is not None)
+        and hasattr(env, "set_pose")
+        and hasattr(env, "get_state")
+    ):
         state = env.get_state()["q"].reshape(-1).to(device=device, dtype=torch.float32)
         if state.numel() >= 15:
-            state[12:15] = torch.as_tensor(initial_orientation, device=device, dtype=torch.float32)
+            if initial_orientation is not None:
+                state[12:15] = torch.as_tensor(initial_orientation, device=device, dtype=torch.float32)
+            if screwdriver_pos_robot is not None:
+                try:
+                    env.set_pose(
+                        state,
+                        screwdriver_pos_robot=torch.as_tensor(
+                            screwdriver_pos_robot,
+                            device=device,
+                            dtype=torch.float32,
+                        ),
+                    )
+                    return
+                except TypeError:
+                    pass
             env.set_pose(state)
 
 

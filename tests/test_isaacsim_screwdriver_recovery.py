@@ -428,7 +428,11 @@ def test_simulation_initial_grasp_from_dataset_uses_local_trial_row(tmp_path):
     dataset_path = tmp_path / "initial_grasp.h5"
     q = np.zeros((2, 3, 16), dtype=np.float32)
     q[1, 0, :15] = np.arange(15, dtype=np.float32) + 100.0
-    _write_hardware_initialization_h5(dataset_path, q=q)
+    screwdriver_pos_robot = np.array(
+        [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],
+        dtype=np.float32,
+    )
+    _write_hardware_initialization_h5(dataset_path, q=q, screwdriver_pos_robot=screwdriver_pos_robot)
 
     initialization = screwdriver_isaacsim_recovery.load_simulation_dataset_initial_grasp(
         {
@@ -445,6 +449,7 @@ def test_simulation_initial_grasp_from_dataset_uses_local_trial_row(tmp_path):
     np.testing.assert_allclose(initialization["initial_target"], q[1, 0, :12])
     np.testing.assert_allclose(initialization["initial_orientation"], q[1, 0, 12:15])
     np.testing.assert_allclose(initialization["initial_state"], q[1, 0])
+    np.testing.assert_allclose(initialization["screwdriver_pos_robot"], screwdriver_pos_robot[1])
 
 
 def test_simulation_initial_grasp_prefers_full_joint_state_h5_schema(tmp_path):
@@ -496,13 +501,19 @@ def test_apply_simulation_dataset_initial_grasp_sets_dataset_state():
 
         def __init__(self):
             self.state = torch.zeros(16, dtype=torch.float32)
+            self.screwdriver_pos_robot = None
 
         def reset(self):
             calls.append("reset")
 
-        def set_pose(self, state):
+        def set_pose(self, state, screwdriver_pos_robot=None):
             calls.append("set_pose")
             self.state = torch.as_tensor(state, dtype=torch.float32).reshape(-1)
+            self.screwdriver_pos_robot = (
+                None
+                if screwdriver_pos_robot is None
+                else torch.as_tensor(screwdriver_pos_robot, dtype=torch.float32).reshape(-1)
+            )
 
         def step(self, action):
             calls.append("step")
@@ -518,12 +529,14 @@ def test_apply_simulation_dataset_initial_grasp_sets_dataset_state():
             "initial_target": initial_state[:12],
             "initial_orientation": initial_state[12:15],
             "initial_state": initial_state,
+            "screwdriver_pos_robot": np.array([0.4, 0.5, 0.6], dtype=np.float32),
         },
         device="cpu",
     )
 
     assert calls == ["reset", "set_pose"]
     torch.testing.assert_close(env.state, torch.arange(16, dtype=torch.float32))
+    torch.testing.assert_close(env.screwdriver_pos_robot, torch.tensor([0.4, 0.5, 0.6]))
 
 
 def test_send_proto5_hardware_initial_pose_steps_before_confirmation(monkeypatch):
@@ -979,6 +992,61 @@ class _FakeEnv:
 
     def reset(self):
         return None
+
+
+def _wrapper_from_scene(scene, *, hand="proto5"):
+    wrapper = object.__new__(IsaacSimScrewdriverRecoveryEnv)
+    wrapper._unwrapped = types.SimpleNamespace(scene=scene)
+    wrapper.device = torch.device("cpu")
+    wrapper.num_envs = 1
+    wrapper.hand = hand
+    return wrapper
+
+
+def test_isaacsim_wrapper_reports_screwdriver_position_in_robot_frame():
+    robot = types.SimpleNamespace(
+        data=types.SimpleNamespace(
+            root_pos_w=torch.tensor([[1.0, 2.0, 3.0]], dtype=torch.float32),
+            root_quat_w=torch.tensor([[1.0, 0.0, 0.0, 0.0]], dtype=torch.float32),
+        )
+    )
+    obj = types.SimpleNamespace(
+        data=types.SimpleNamespace(root_pos_w=torch.tensor([[1.4, 2.5, 3.6]], dtype=torch.float32))
+    )
+    wrapper = _wrapper_from_scene({"robot": robot, "obj": obj})
+
+    position = wrapper.get_screwdriver_position_robot("cpu")
+
+    torch.testing.assert_close(position, torch.tensor([[0.4, 0.5, 0.6]], dtype=torch.float32))
+
+
+def test_isaacsim_wrapper_contact_wrenches_use_model_mismatch_proto5_6af_helper():
+    from model_mismatch.utils.proto5_wrenches import extract_proto5_6af_wrenches_robot_frame
+
+    body_names = [
+        "RHand_I3Y_LINK",
+        "RHand_I6AF_LINK",
+        "RHand_M3Y_LINK",
+        "RHand_M6AF_LINK",
+        "RHand_T3Y_LINK",
+        "RHand_T6AF_LINK",
+    ]
+    raw_wrenches = torch.zeros((1, len(body_names), 6), dtype=torch.float32)
+    for finger_idx, body_name in enumerate(("RHand_I6AF_LINK", "RHand_M6AF_LINK", "RHand_T6AF_LINK")):
+        raw_wrenches[0, body_names.index(body_name)] = torch.arange(6, dtype=torch.float32) + 10.0 * finger_idx
+    robot = types.SimpleNamespace(
+        body_names=body_names,
+        data=types.SimpleNamespace(
+            body_incoming_joint_wrench_b=raw_wrenches,
+            body_quat_w=torch.tensor([[[1.0, 0.0, 0.0, 0.0]]] * len(body_names), dtype=torch.float32).transpose(0, 1),
+            root_quat_w=torch.tensor([[1.0, 0.0, 0.0, 0.0]], dtype=torch.float32),
+        ),
+    )
+    wrapper = _wrapper_from_scene({"robot": robot, "obj": types.SimpleNamespace()})
+
+    expected = extract_proto5_6af_wrenches_robot_frame(robot, env_ids=[0], device="cpu")
+
+    torch.testing.assert_close(wrapper.get_contact_wrenches(strict=True), expected)
 
 
 class _FakeCamera:
