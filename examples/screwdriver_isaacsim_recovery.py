@@ -137,6 +137,10 @@ def parse_args():
     parser.add_argument("--start_ind", type=int, default=None)
     parser.add_argument("--end_ind", type=int, default=None)
     parser.add_argument("--skip_pregrasp", type=_bool_from_cli, default=None)
+    parser.add_argument("--experiment_dir", type=pathlib.Path, default=None)
+    parser.add_argument("--write_pregrasp_states", type=_bool_from_cli, default=None)
+    parser.add_argument("--cycle_initial_grasp_dataset", type=_bool_from_cli, default=None)
+    parser.add_argument("--controller_device", type=str, default=None)
     pregrasp_only_group = parser.add_mutually_exclusive_group()
     pregrasp_only_group.add_argument(
         "--pregrasp_only",
@@ -258,6 +262,10 @@ def load_config(args) -> dict:
         "start_ind",
         "end_ind",
         "skip_pregrasp",
+        "experiment_dir",
+        "write_pregrasp_states",
+        "cycle_initial_grasp_dataset",
+        "controller_device",
         "pregrasp_only",
         "experiment_name",
         "planner_yaw_joint_friction_override",
@@ -289,6 +297,8 @@ def load_config(args) -> dict:
         value = getattr(args, key, None)
         if value is not None:
             config[key] = value
+    if config.get("experiment_dir") not in (None, ""):
+        config["experiment_dir"] = str(config["experiment_dir"])
     if args.proto5_control_wrist is not None:
         config["proto5_control_wrist"] = bool(args.proto5_control_wrist)
 
@@ -305,6 +315,8 @@ def load_config(args) -> dict:
     config.setdefault("steps_per_action", 40)
     config.setdefault("action_repeat", 3)
     config.setdefault("save_recovery_frames", True)
+    config.setdefault("write_pregrasp_states", True)
+    config.setdefault("cycle_initial_grasp_dataset", False)
     config.setdefault("pregrasp_only", False)
     config.setdefault("planner_use_env_yaw_joint_friction", True)
     config.setdefault("planner_yaw_joint_friction_override", 0.0)
@@ -372,6 +384,9 @@ def load_config(args) -> dict:
         config["visualize_recovery_planning_samples"] = False
     if args.debug_progress:
         config["debug_progress"] = True
+    controller_device = config.get("controller_device")
+    if controller_device not in (None, ""):
+        config.setdefault("controllers", {}).setdefault("csvgd", {})["device"] = str(controller_device)
     return config
 
 
@@ -756,8 +771,18 @@ def _trajectory_count_for_dataset_path(dataset_path) -> int:
         return _dataset_num_trajectories(data, set(trajectory_dataset_keys(data)))
 
 
-def select_initial_grasp_dataset_row(dataset_path, trial_index: int, start_ind: int) -> int:
+def select_initial_grasp_dataset_row(
+    dataset_path,
+    trial_index: int,
+    start_ind: int,
+    *,
+    cycle: bool = False,
+) -> int:
     num_rows = _trajectory_count_for_dataset_path(dataset_path)
+    if cycle:
+        if num_rows <= 0:
+            raise ValueError(f"Initial grasp dataset has no rows: {dataset_path}")
+        return int(trial_index) % int(num_rows)
     if 0 <= int(trial_index) < num_rows:
         return int(trial_index)
     local_index = int(trial_index) - int(start_ind)
@@ -771,7 +796,12 @@ def select_initial_grasp_dataset_row(dataset_path, trial_index: int, start_ind: 
 
 def load_simulation_dataset_initial_grasp(config: dict, trial_index: int, start_ind: int) -> dict:
     dataset_path = _initial_grasp_dataset_path(config)
-    trajectory_row = select_initial_grasp_dataset_row(dataset_path, trial_index, start_ind)
+    trajectory_row = select_initial_grasp_dataset_row(
+        dataset_path,
+        trial_index,
+        start_ind,
+        cycle=bool(config.get("cycle_initial_grasp_dataset", False)),
+    )
     initialization = _read_dataset_initial_grasp(config, dataset_path, trajectory_row)
     initialization["dataset_path"] = str(dataset_path)
     return initialization
@@ -1260,10 +1290,16 @@ def main():
     config["obj_dof"] = 3
     config["robot_sdf_path_prefix"] = str(hand_spec.planner_robot_sdf_path_prefix)
 
-    now = ""
-    if config.get("timestamp_experiment", False):
-        now = "." + datetime.datetime.now().strftime("%m.%d.%y:%I:%M:%S")
-    experiment_dir = CCAI_PATH / "data" / "experiments" / f"{config['experiment_name']}{now}"
+    experiment_dir_config = config.get("experiment_dir")
+    if experiment_dir_config not in (None, ""):
+        experiment_dir = pathlib.Path(str(experiment_dir_config)).expanduser()
+        if not experiment_dir.is_absolute():
+            experiment_dir = CCAI_PATH / experiment_dir
+    else:
+        now = ""
+        if config.get("timestamp_experiment", False):
+            now = "." + datetime.datetime.now().strftime("%m.%d.%y:%I:%M:%S")
+        experiment_dir = CCAI_PATH / "data" / "experiments" / f"{config['experiment_name']}{now}"
     experiment_dir.mkdir(parents=True, exist_ok=True)
     with open(experiment_dir / "config_isaacsim.yaml", "w", encoding="utf-8") as handle:
         yaml.safe_dump(config, handle, sort_keys=True)
@@ -1401,7 +1437,7 @@ def main():
             print(f"Trial {i + 1} yaw delta: {final_distance_to_goal}; dropped={dropped}")
         seed += 1
 
-        if not params["skip_pregrasp"]:
+        if not params["skip_pregrasp"] and bool(config.get("write_pregrasp_states", True)):
             with open(experiment_dir / "pregrasp_states.pkl", "wb") as handle:
                 pickle.dump(legacy.all_pregrasp_states, handle)
 

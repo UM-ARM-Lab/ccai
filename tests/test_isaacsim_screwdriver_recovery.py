@@ -460,6 +460,60 @@ def test_simulation_initial_grasp_from_dataset_uses_local_trial_row(tmp_path):
     np.testing.assert_allclose(initialization["screwdriver_pos_robot"], screwdriver_pos_robot[1])
 
 
+def test_initial_grasp_dataset_row_can_cycle_for_long_parallel_runs(monkeypatch):
+    monkeypatch.setattr(
+        screwdriver_isaacsim_recovery,
+        "_trajectory_count_for_dataset_path",
+        lambda dataset_path: 307,
+    )
+
+    assert screwdriver_isaacsim_recovery.select_initial_grasp_dataset_row(
+        "unused.h5",
+        trial_index=0,
+        start_ind=0,
+        cycle=True,
+    ) == 0
+    assert screwdriver_isaacsim_recovery.select_initial_grasp_dataset_row(
+        "unused.h5",
+        trial_index=306,
+        start_ind=0,
+        cycle=True,
+    ) == 306
+    assert screwdriver_isaacsim_recovery.select_initial_grasp_dataset_row(
+        "unused.h5",
+        trial_index=307,
+        start_ind=0,
+        cycle=True,
+    ) == 0
+    assert screwdriver_isaacsim_recovery.select_initial_grasp_dataset_row(
+        "unused.h5",
+        trial_index=9999,
+        start_ind=0,
+        cycle=True,
+    ) == 175
+
+
+def test_load_config_applies_parallel_launcher_overrides(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    experiment_dir = tmp_path / "parallel_run"
+    config_path.write_text("controllers:\n  csvgd:\n    device: cuda:7\n")
+
+    config = screwdriver_isaacsim_recovery.load_config(
+        _entrypoint_args(
+            config_path,
+            experiment_dir=experiment_dir,
+            write_pregrasp_states=False,
+            cycle_initial_grasp_dataset=True,
+            controller_device="cuda:0",
+        )
+    )
+
+    assert config["experiment_dir"] == str(experiment_dir)
+    assert config["write_pregrasp_states"] is False
+    assert config["cycle_initial_grasp_dataset"] is True
+    assert config["controllers"]["csvgd"]["device"] == "cuda:0"
+
+
 def test_simulation_initial_grasp_prefers_full_joint_state_h5_schema(tmp_path):
     h5py = pytest.importorskip("h5py")
     dataset_path = tmp_path / "full_joint_initial_grasp.h5"
