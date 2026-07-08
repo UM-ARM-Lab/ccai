@@ -10,6 +10,7 @@ import json
 import pathlib
 import pickle as pkl
 import heapq
+import shutil
 from dataclasses import dataclass
 from pprint import pprint
 
@@ -263,15 +264,53 @@ class ContactPlanner:
             path_node_ids=[],
             depth=0,
         )
-        selected_node = self._find_shortest_recovery_contact_path_dijkstra(
-            root_node,
-            contact_state_dict_flip=contact_state_dict_flip,
-            max_depth=max_depth,
-            threshold=threshold,
-        )
+        # Dijkstra selection is intentionally kept for reference, but the active
+        # chained recovery policy uses the previous greedy max-score search.
+        # selected_node = self._find_shortest_recovery_contact_path_dijkstra(
+        #     root_node,
+        #     contact_state_dict_flip=contact_state_dict_flip,
+        #     max_depth=max_depth,
+        #     threshold=threshold,
+        # )
 
+        frontier = [root_node]
+        best_node = None
+
+        for depth in range(max_depth):
+            children = self._expand_chained_recovery_frontier(
+                frontier,
+                contact_state_dict_flip=contact_state_dict_flip,
+            )
+            if not children:
+                break
+
+            best_child = max(children, key=lambda node: node.score)
+            if best_node is None or best_child.score > best_node.score:
+                best_node = best_child
+
+            terminating_children = [child for child in children if child.score > threshold]
+            if terminating_children:
+                selected_node = max(terminating_children, key=lambda node: node.score)
+                print('Chained recovery terminated at depth:', depth + 1)
+                print('Chained recovery contact sequence:', selected_node.contact_sequence)
+                print('Chained recovery terminal task likelihood:', selected_node.score)
+                return self._format_chained_recovery_result(
+                    selected_node,
+                    time.perf_counter() - start_plan_time,
+                )
+
+            print('Chained recovery continuing with frontier size:', len(children))
+            print('Chained recovery best contact sequence so far:', best_child.contact_sequence)
+            print('Chained recovery best terminal task likelihood:', best_child.score)
+            frontier = children
+
+        if best_node is None:
+            raise ValueError("Joint recovery model did not produce any valid contact modes for chained search.")
+
+        print('Chained recovery reached max depth; returning best visited sequence:', best_node.contact_sequence)
+        print('Chained recovery best terminal task likelihood:', best_node.score)
         return self._format_chained_recovery_result(
-            selected_node,
+            best_node,
             time.perf_counter() - start_plan_time,
         )
 
@@ -710,6 +749,20 @@ class ContactPlanner:
         node_id = "none" if node.node_id is None else node.node_id
         return self._chained_recovery_viz_root() / f"depth{node.depth}_{mode}_node{node_id}"
 
+    def _stage_node_visualization_dir(self, node):
+        trial_dir = getattr(self, "_chained_viz_trial_dir", None)
+        all_stage = getattr(self, "_chained_viz_all_stage", None)
+        if trial_dir is None or all_stage is None:
+            return None
+        mode = node.contact_mode or (node.contact_sequence[-1] if node.contact_sequence else "root")
+        node_id = "none" if node.node_id is None else node.node_id
+        return (
+            pathlib.Path(trial_dir)
+            / f"recovery_stage_{all_stage}"
+            / mode
+            / f"depth{node.depth}_node{node_id}"
+        )
+
     def _jsonable_tensor(self, value):
         if value is None:
             return None
@@ -758,12 +811,16 @@ class ContactPlanner:
             json.dump(selection, f, indent=2)
 
         self._write_node_metadata(node, selected_particle_index=selected_particle_index)
+        stage_dir = self._stage_node_visualization_dir(node)
+        if stage_dir is not None and stage_dir.exists():
+            self._write_node_metadata(node, selected_particle_index=selected_particle_index, base_dir=stage_dir)
 
-    def _write_node_metadata(self, node, selected_particle_index=None):
+    def _write_node_metadata(self, node, selected_particle_index=None, base_dir=None):
         if node.contact_sequence is None:
             return
 
-        base_dir = self._node_visualization_dir(node)
+        if base_dir is None:
+            base_dir = self._node_visualization_dir(node)
         base_dir.mkdir(parents=True, exist_ok=True)
         num_particles = int(node.trajectories.shape[0]) if node.trajectories is not None else 0
         particles = []
@@ -965,6 +1022,8 @@ class ContactPlanner:
         dx = self.turn_problem.dx
 
         base_dir = self._node_visualization_dir(node)
+        if base_dir.exists():
+            shutil.rmtree(base_dir)
         base_dir.mkdir(parents=True, exist_ok=True)
 
         num_particles = node.trajectories.shape[0]
@@ -995,9 +1054,22 @@ class ContactPlanner:
                 self.turn_problem.obj_dof + 1,
                 headless=True,
                 render_backend='offscreen',
+                camera_mode="auto",
+                full_dof_reference=getattr(self.turn_problem, "full_dof_reference", None),
+                joint_index=getattr(self.turn_problem, "joint_index", None),
             )
 
         self._write_node_metadata(node)
+        self._mirror_node_visualization_to_stage(node, base_dir)
+
+    def _mirror_node_visualization_to_stage(self, node, source_dir):
+        stage_dir = self._stage_node_visualization_dir(node)
+        if stage_dir is None:
+            return
+        if stage_dir.exists():
+            shutil.rmtree(stage_dir)
+        stage_dir.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(source_dir, stage_dir)
 
     def _find_shortest_recovery_contact_path_dijkstra(
         self,
