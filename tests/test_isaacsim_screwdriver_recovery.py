@@ -339,8 +339,15 @@ def test_load_single_screwdriver_shape_rejects_mixed_h5_shapes(tmp_path):
         screwdriver_isaacsim_recovery.load_single_screwdriver_shape_from_dataset(dataset_path)
 
 
-def test_load_config_can_take_screwdriver_shape_from_dataset(tmp_path):
+def test_load_config_can_take_screwdriver_shape_from_dataset(monkeypatch, tmp_path):
     dataset_path = tmp_path / "shape.h5"
+    planner_urdf_path = tmp_path / "generated_screwdriver_3d.urdf"
+    planner_urdf_path.write_text("<robot name='screwdriver'/>", encoding="utf-8")
+    monkeypatch.setattr(
+        screwdriver_isaacsim_recovery,
+        "resolve_screwdriver_planner_urdf_path",
+        lambda body_height, body_diameter, **kwargs: str(planner_urdf_path),
+    )
     _write_hardware_initialization_h5(
         dataset_path,
         q=np.zeros((2, 2, 15), dtype=np.float32),
@@ -366,6 +373,7 @@ def test_load_config_can_take_screwdriver_shape_from_dataset(tmp_path):
     assert config["screwdriver_shape_dataset_id"] == 0
     assert config["screwdriver_body_height"] == pytest.approx(0.12)
     assert config["screwdriver_body_diameter"] == pytest.approx(0.035)
+    assert config["planner_screwdriver_urdf_path"] == str(planner_urdf_path)
     assert "screwdriver_shape_id" not in config
 
 
@@ -1278,6 +1286,53 @@ def test_recovery_physical_kwargs_respect_yaw_override_and_model_toggles(tmp_pat
     assert kwargs["yaw_inertia_model_path"] == str(inertia_model)
 
 
+def test_recovery_physical_kwargs_pass_planner_screwdriver_urdf(monkeypatch, tmp_path):
+    planner_urdf_path = tmp_path / "screwdriver_3d.urdf"
+    planner_urdf_path.write_text(
+        "<robot name='screwdriver'><link name='base'><inertial><mass value='0.42'/></inertial></link></robot>",
+        encoding="utf-8",
+    )
+    if str(screwdriver_isaacsim_recovery.MODEL_MISMATCH_PATH) not in sys.path:
+        sys.path.insert(0, str(screwdriver_isaacsim_recovery.MODEL_MISMATCH_PATH))
+    from model_mismatch.utils import screwdriver_csvto_planning
+
+    captured = {}
+
+    def fake_physical_kwargs(env_params, **kwargs):
+        captured["env_params"] = env_params
+        captured.update(kwargs)
+        return {
+            "object_asset_path": str(kwargs["screwdriver_urdf_path"]),
+            "object_mass": 0.42,
+            "friction_coefficient": 1.0,
+            "yaw_joint_friction": 0.2,
+        }
+
+    monkeypatch.setattr(
+        screwdriver_csvto_planning,
+        "get_screwdriver_turn_problem_physical_kwargs",
+        fake_physical_kwargs,
+    )
+
+    class Env:
+        def get_environment_parameters(self, env_id=0):
+            return {"screwdriver_friction": 2.0, "yaw_joint_friction": 0.2}
+
+    kwargs = screwdriver_isaacsim_recovery.get_recovery_planner_physical_kwargs(
+        Env(),
+        {
+            "planner_screwdriver_urdf_path": str(planner_urdf_path),
+            "planner_use_env_yaw_joint_friction": True,
+            "disable_planner_yaw_friction_model": True,
+            "planner_use_yaw_inertia_model": False,
+        },
+    )
+
+    assert captured["screwdriver_urdf_path"] == str(planner_urdf_path)
+    assert kwargs["object_asset_path"] == str(planner_urdf_path)
+    assert kwargs["object_mass"] == pytest.approx(0.42)
+
+
 def test_randomize_isaacsim_object_start_matches_collector_fields():
     env = _FakeRandomizationEnv()
     config = {
@@ -1380,6 +1435,56 @@ def test_wrapper_reset_and_set_pose_force_render():
     assert sim.render_count > reset_render_count
 
 
+def test_wrapper_set_pose_updates_object_pose_from_robot_frame_position():
+    class PoseData:
+        def __init__(self, root_pos):
+            root_state = torch.zeros(1, 13, dtype=torch.float32)
+            root_state[0, :3] = torch.as_tensor(root_pos, dtype=torch.float32)
+            root_state[0, 3:7] = torch.tensor([1.0, 0.0, 0.0, 0.0])
+            self.default_root_state = root_state
+
+    class PoseAsset:
+        def __init__(self, root_pos):
+            self.data = PoseData(root_pos)
+            self.last_root_pose = None
+            self.last_root_velocity = None
+
+        def write_root_link_pose_to_sim(self, root_pose, env_ids):
+            self.last_root_pose = root_pose.detach().clone()
+
+        def write_root_com_velocity_to_sim(self, root_velocity, env_ids):
+            self.last_root_velocity = root_velocity.detach().clone()
+
+    class PoseScene(dict):
+        env_origins = torch.tensor([[10.0, 20.0, 30.0]], dtype=torch.float32)
+
+    wrapper = object.__new__(IsaacSimScrewdriverRecoveryEnv)
+    wrapper.device = torch.device("cpu")
+    wrapper.num_envs = 1
+    wrapper._unwrapped = types.SimpleNamespace(
+        scene=PoseScene(
+            {
+                "robot": PoseAsset([1.0, 2.0, 3.0]),
+                "obj": PoseAsset([0.0, 0.0, 1.205]),
+            }
+        )
+    )
+    wrapper.table_pose = torch.zeros(3)
+    wrapper.obj_pose = torch.zeros(3)
+    wrapper._write_robot_root_default = lambda env_ids: None
+    wrapper._write_robot_joint_state = lambda active_joint_pos, env_ids: None
+    wrapper._write_obj_joint_state = lambda obj_orientation, env_ids: None
+    wrapper._sync_scene = lambda: None
+    wrapper._record_frame = lambda force_render=False, sync_joint_targets=False: None
+
+    wrapper.set_pose(torch.zeros(15), screwdriver_pos_robot=torch.tensor([0.4, 0.5, 0.6]))
+
+    expected_pos = torch.tensor([11.4, 22.5, 33.6], dtype=torch.float32)
+    torch.testing.assert_close(wrapper.scene["obj"].last_root_pose[0, :3], expected_pos)
+    torch.testing.assert_close(wrapper.table_pose, expected_pos)
+    torch.testing.assert_close(wrapper.obj_pose, expected_pos)
+
+
 def test_wrapper_saves_initial_and_repeated_step_frames(tmp_path):
     robot_joint_names = ALLEGRO_ACTIVE_JOINT_NAMES[:8] + ALLEGRO_RING_JOINT_NAMES + ALLEGRO_ACTIVE_JOINT_NAMES[8:]
     robot = _FakeAsset(robot_joint_names, torch.arange(16, dtype=torch.float32).reshape(1, 16))
@@ -1471,7 +1576,11 @@ def _load_legacy_recovery_module(monkeypatch, executed_modes, created_problems=N
     def create_problem(*args, **kwargs):
         if created_problems is not None:
             created_problems.append({"args": args, "kwargs": kwargs})
-        return types.SimpleNamespace(dx=15)
+        return types.SimpleNamespace(
+            dx=15,
+            contact_scenes_for_viz=None,
+            fingers=["index", "middle", "thumb"],
+        )
 
     stubs["ccai.utils.recovery_utils"].create_allegro_screwdriver_problem = create_problem
     stubs["ccai.utils.recovery_utils"].create_planner = lambda problem, mode, params: FakePlanner(problem)
@@ -1633,6 +1742,7 @@ def test_create_problem_passes_proto5_full_dof_metadata():
         "friction_coefficient": 1.85,
         "yaw_joint_friction": 0.07,
         "dt": 0.5,
+        "object_asset_path": "/tmp/generated_screwdriver_3d.urdf",
         "object_mass": 0.355,
         "yaw_friction_model_path": "/tmp/yaw_friction.json",
         "yaw_inertia_model_path": "/tmp/yaw_inertia.json",
@@ -1655,6 +1765,7 @@ def test_create_problem_passes_proto5_full_dof_metadata():
     assert captured["friction_coefficient"] == pytest.approx(1.85)
     assert captured["yaw_joint_friction"] == pytest.approx(0.07)
     assert captured["dt"] == pytest.approx(0.5)
+    assert captured["object_asset_path"] == "/tmp/generated_screwdriver_3d.urdf"
     assert captured["object_mass"] == pytest.approx(0.355)
     assert captured["yaw_friction_model_path"] == "/tmp/yaw_friction.json"
     assert captured["yaw_inertia_model_path"] == "/tmp/yaw_inertia.json"

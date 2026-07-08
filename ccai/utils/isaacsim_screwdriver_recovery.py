@@ -798,6 +798,7 @@ class IsaacSimScrewdriverRecoveryEnv:
             )
         obj.write_root_link_pose_to_sim(root_state[:, :7], env_ids=env_ids)
         obj.write_root_com_velocity_to_sim(root_state[:, 7:], env_ids=env_ids)
+        return root_state[:, 0:3].detach().clone()
 
     def _set_proto5_frozen_targets(self, full_joint_pos: torch.Tensor, env_ids: torch.Tensor) -> None:
         if self.hand != SCREWDRIVER_HAND_PROTO5:
@@ -926,11 +927,14 @@ class IsaacSimScrewdriverRecoveryEnv:
         env_ids = self._env_ids()
         self._write_robot_root_default(env_ids)
         try:
-            self._write_obj_root_default(env_ids, screwdriver_pos_robot=screwdriver_pos_robot)
+            obj_root_pos = self._write_obj_root_default(env_ids, screwdriver_pos_robot=screwdriver_pos_robot)
         except TypeError:
             if screwdriver_pos_robot is not None:
                 raise
-            self._write_obj_root_default(env_ids)
+            obj_root_pos = self._write_obj_root_default(env_ids)
+        if screwdriver_pos_robot is not None:
+            self.table_pose = obj_root_pos[0].detach().clone().to(device=self.device, dtype=torch.float32)
+            self.obj_pose = self.table_pose
         self._write_robot_joint_state(state[:, :12], env_ids)
         self._write_obj_joint_state(state[:, 12:15], env_ids)
         self._sync_scene()

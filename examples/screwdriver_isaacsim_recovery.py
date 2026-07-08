@@ -493,15 +493,58 @@ def apply_screwdriver_shape_from_dataset(config: dict) -> None:
     config["screwdriver_body_diameter"] = float(shape["screwdriver_body_diameter"])
     config["screwdriver_shape_dataset_id"] = int(shape["screwdriver_shape_id"])
     config["screwdriver_shape_dataset_path"] = str(dataset_path)
+    planner_urdf_path = resolve_screwdriver_planner_urdf_path(
+        config["screwdriver_body_height"],
+        config["screwdriver_body_diameter"],
+        cache_dir=config.get("screwdriver_shape_cache_dir"),
+        generation_timeout_s=config.get("screwdriver_shape_generation_timeout_s"),
+        debug_log_path=config.get("screwdriver_shape_generation_debug_log_path"),
+    )
+    config["planner_screwdriver_urdf_path"] = planner_urdf_path
     config.pop("screwdriver_shape_id", None)
     print(
         "Loaded screwdriver shape from dataset: "
         f"path={dataset_path} "
         f"shape_id={config['screwdriver_shape_dataset_id']} "
         f"body_height={config['screwdriver_body_height']:.6f} "
-        f"body_diameter={config['screwdriver_body_diameter']:.6f}",
+        f"body_diameter={config['screwdriver_body_diameter']:.6f} "
+        f"planner_urdf={planner_urdf_path}",
         flush=True,
     )
+
+
+def resolve_screwdriver_planner_urdf_path(
+    body_height: float,
+    body_diameter: float,
+    *,
+    cache_dir: str | pathlib.Path | None = None,
+    generation_timeout_s: float | None = None,
+    debug_log_path: str | pathlib.Path | None = None,
+) -> str:
+    if str(ISAACSIM_HAND_ENVS_PATH) not in sys.path:
+        sys.path.insert(0, str(ISAACSIM_HAND_ENVS_PATH))
+    from isaacsim_hand_envs.assets.object.screwdriver.shape_bank import get_screwdriver_shape_spec
+
+    shape_spec = get_screwdriver_shape_spec(
+        body_height=float(body_height),
+        body_diameter=float(body_diameter),
+        cache_dir=cache_dir,
+        generation_timeout_s=generation_timeout_s,
+        debug_log_path=debug_log_path,
+    )
+    if shape_spec.urdf_path in (None, ""):
+        raise FileNotFoundError(
+            "Resolved screwdriver shape has no planner URDF path "
+            f"(body_height={float(body_height):.6f}, body_diameter={float(body_diameter):.6f})."
+        )
+    planner_urdf_path = pathlib.Path(shape_spec.urdf_path).expanduser().resolve()
+    if not planner_urdf_path.exists():
+        raise FileNotFoundError(
+            "Resolved screwdriver planner URDF does not exist "
+            f"(body_height={float(body_height):.6f}, body_diameter={float(body_diameter):.6f}, "
+            f"urdf_path={planner_urdf_path})."
+        )
+    return str(planner_urdf_path)
 
 
 def get_recovery_planner_physical_kwargs(env, config) -> dict:
@@ -521,6 +564,7 @@ def get_recovery_planner_physical_kwargs(env, config) -> dict:
         yaw_joint_friction_override=yaw_joint_friction_override,
         yaw_friction_model_path=yaw_friction_model_path,
         yaw_inertia_model_path=yaw_inertia_model_path,
+        screwdriver_urdf_path=config.get("planner_screwdriver_urdf_path"),
     )
     if "friction_coefficient" in config:
         physical_kwargs["friction_coefficient"] = float(config["friction_coefficient"])
