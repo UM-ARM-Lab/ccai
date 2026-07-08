@@ -205,6 +205,10 @@ def parse_args():
     parser.add_argument("--hardware_allow_placeholder_wrenches", type=_bool_from_cli, default=None)
     parser.add_argument("--hardware_use_live_screwdriver_orientation", type=_bool_from_cli, default=None)
     parser.add_argument("--hardware_debug_mocap_orientation", type=_bool_from_cli, default=None)
+    parser.add_argument("--screwdriver_shape_from_dataset", type=_bool_from_cli, default=None)
+    parser.add_argument("--screwdriver_shape_dataset_path", type=str, default=None)
+    parser.add_argument("--initial_grasp_from_dataset", type=_bool_from_cli, default=None)
+    parser.add_argument("--initial_grasp_dataset_path", type=str, default=None)
     return parser.parse_args()
 
 
@@ -277,6 +281,10 @@ def load_config(args) -> dict:
         "hardware_allow_placeholder_wrenches",
         "hardware_use_live_screwdriver_orientation",
         "hardware_debug_mocap_orientation",
+        "screwdriver_shape_from_dataset",
+        "screwdriver_shape_dataset_path",
+        "initial_grasp_from_dataset",
+        "initial_grasp_dataset_path",
     ):
         value = getattr(args, key, None)
         if value is not None:
@@ -335,6 +343,11 @@ def load_config(args) -> dict:
     config.setdefault("hardware_use_live_screwdriver_position", True)
     config.setdefault("hardware_use_live_screwdriver_orientation", True)
     config.setdefault("hardware_debug_mocap_orientation", False)
+    config.setdefault("screwdriver_shape_from_dataset", False)
+    config.setdefault("screwdriver_shape_dataset_path", None)
+    config.setdefault("initial_grasp_from_dataset", False)
+    config.setdefault("initial_grasp_dataset_path", None)
+    apply_screwdriver_shape_from_dataset(config)
     config["mode"] = str(config.get("mode", "simulation")).lower()
     if config["mode"] not in {"simulation", "hardware", "hardware_copy"}:
         raise ValueError(f"Unsupported mode {config['mode']!r}; expected simulation, hardware, or hardware_copy.")
@@ -418,6 +431,79 @@ def resolve_planner_yaw_model_paths(config) -> tuple[str | None, str | None]:
     return yaw_friction_model_path, yaw_inertia_model_path
 
 
+def _dataset_num_trajectories(data, dataset_keys: set[str]) -> int:
+    for key in ("q", "initial_joint_targets", "initial_state", "initial_states", "screwdriver_body_height"):
+        if key in dataset_keys:
+            return len(data[key])
+    raise ValueError(
+        "Could not infer trajectory count from screwdriver shape dataset; expected one of "
+        "q, initial_joint_targets, initial_state, initial_states, or screwdriver_body_height."
+    )
+
+
+def load_single_screwdriver_shape_from_dataset(dataset_path: str | pathlib.Path) -> dict[str, float | int]:
+    import numpy as np
+
+    if str(MODEL_MISMATCH_PATH) not in sys.path:
+        sys.path.insert(0, str(MODEL_MISMATCH_PATH))
+    from model_mismatch.utils.screwdriver_shape import resolve_screwdriver_shape_arrays
+    from model_mismatch.utils.trajectory_dataset_io import open_trajectory_dataset, trajectory_dataset_keys
+
+    with open_trajectory_dataset(str(dataset_path), allow_pickle=True) as data:
+        dataset_keys = set(trajectory_dataset_keys(data))
+        num_trajectories = _dataset_num_trajectories(data, dataset_keys)
+        shape_arrays = resolve_screwdriver_shape_arrays(data, num_trajectories)
+
+    shape_ids = np.unique(shape_arrays["screwdriver_shape_id"])
+    body_heights = np.unique(shape_arrays["screwdriver_body_height"])
+    body_diameters = np.unique(shape_arrays["screwdriver_body_diameter"])
+    dimension_pairs = np.unique(
+        np.stack(
+            (
+                shape_arrays["screwdriver_body_height"],
+                shape_arrays["screwdriver_body_diameter"],
+            ),
+            axis=1,
+        ),
+        axis=0,
+    )
+    if dimension_pairs.shape[0] != 1:
+        raise ValueError(
+            "screwdriver_shape_from_dataset requires a single screwdriver body shape, "
+            f"but {dataset_path} contains {dimension_pairs.shape[0]} height/diameter pairs."
+        )
+    return {
+        "screwdriver_shape_id": int(shape_ids[0]) if shape_ids.shape[0] == 1 else -1,
+        "screwdriver_body_height": float(body_heights[0]),
+        "screwdriver_body_diameter": float(body_diameters[0]),
+    }
+
+
+def apply_screwdriver_shape_from_dataset(config: dict) -> None:
+    if not bool(config.get("screwdriver_shape_from_dataset", False)):
+        return
+    dataset_path = config.get("screwdriver_shape_dataset_path") or config.get("dataset_path")
+    if dataset_path in (None, ""):
+        raise ValueError(
+            "screwdriver_shape_from_dataset=True requires screwdriver_shape_dataset_path or dataset_path."
+        )
+
+    shape = load_single_screwdriver_shape_from_dataset(dataset_path)
+    config["screwdriver_body_height"] = float(shape["screwdriver_body_height"])
+    config["screwdriver_body_diameter"] = float(shape["screwdriver_body_diameter"])
+    config["screwdriver_shape_dataset_id"] = int(shape["screwdriver_shape_id"])
+    config["screwdriver_shape_dataset_path"] = str(dataset_path)
+    config.pop("screwdriver_shape_id", None)
+    print(
+        "Loaded screwdriver shape from dataset: "
+        f"path={dataset_path} "
+        f"shape_id={config['screwdriver_shape_dataset_id']} "
+        f"body_height={config['screwdriver_body_height']:.6f} "
+        f"body_diameter={config['screwdriver_body_diameter']:.6f}",
+        flush=True,
+    )
+
+
 def get_recovery_planner_physical_kwargs(env, config) -> dict:
     if str(MODEL_MISMATCH_PATH) not in sys.path:
         sys.path.insert(0, str(MODEL_MISMATCH_PATH))
@@ -465,6 +551,176 @@ def _resolve_proto5_validation_dataset_row(seed: int) -> int:
     return int(proto5_screwdriver_val_indices[ordinal])
 
 
+def _expected_initial_grasp_dim(config: dict) -> int:
+    return 14 if bool(config.get("proto5_control_wrist", False)) else 12
+
+
+def _dataset_value_or_attr(data, dataset_keys: set[str], key: str):
+    if hasattr(data, "attrs") and key in data.attrs:
+        return data.attrs[key]
+    if key in dataset_keys:
+        return data[key]
+    return None
+
+
+def _string_list(values) -> list[str]:
+    strings = []
+    for value in list(values):
+        if isinstance(value, bytes):
+            strings.append(value.decode("utf-8"))
+        else:
+            strings.append(str(value))
+    return strings
+
+
+def _active_joint_state_from_full_dataset(data, dataset_keys: set[str], config: dict, trajectory_row: int):
+    import numpy as np
+
+    full_key = "robot_joint_pos_full" if "robot_joint_pos_full" in dataset_keys else "robot_joint_targets_full"
+    if full_key not in dataset_keys:
+        return None
+    full_joint_names_raw = _dataset_value_or_attr(data, dataset_keys, "robot_full_joint_names")
+    if full_joint_names_raw is None:
+        raise ValueError(f"{full_key} requires robot_full_joint_names metadata.")
+
+    from ccai.utils.isaacsim_screwdriver_recovery import get_hand_spec
+
+    hand_spec = get_hand_spec(str(config.get("hand", "proto5")))
+    target_joint_names = list(hand_spec.active_joint_names)
+    if bool(config.get("proto5_control_wrist", False)):
+        target_joint_names = list(hand_spec.wrist_joint_names) + target_joint_names
+    full_joint_names = _string_list(np.asarray(full_joint_names_raw).reshape(-1))
+    name_to_index = {name: idx for idx, name in enumerate(full_joint_names)}
+    missing = [name for name in target_joint_names if name not in name_to_index]
+    if missing:
+        raise ValueError(f"{full_key} is missing required joint names: {missing}")
+
+    row = np.asarray(data[full_key][trajectory_row], dtype=np.float32)
+    row0 = row.reshape(-1, row.shape[-1])[0] if row.ndim > 1 else row.reshape(-1)
+    initial_target = row0[[name_to_index[name] for name in target_joint_names]].astype(np.float32, copy=True)
+    initial_orientation = None
+    if "observation" in dataset_keys:
+        observation = np.asarray(data["observation"][trajectory_row], dtype=np.float32)
+        observation0 = observation.reshape(-1, observation.shape[-1])[0] if observation.ndim > 1 else observation.reshape(-1)
+        if observation0.shape[0] >= 3:
+            initial_orientation = observation0[:3].astype(np.float32, copy=True)
+
+    initial_state_vector = (
+        np.concatenate((initial_target[:12], initial_orientation), axis=0).astype(np.float32, copy=False)
+        if initial_orientation is not None and initial_target.shape[0] >= 12
+        else None
+    )
+    return {
+        "initial_target": initial_target,
+        "initial_orientation": initial_orientation,
+        "initial_state": initial_state_vector,
+        "target_source": f"{full_key}[0, active_joints]",
+    }
+
+
+def _read_dataset_initial_grasp(config: dict, dataset_path, trajectory_row: int) -> dict:
+    import numpy as np
+
+    if str(MODEL_MISMATCH_PATH) not in sys.path:
+        sys.path.insert(0, str(MODEL_MISMATCH_PATH))
+    from model_mismatch.utils.trajectory_dataset_io import open_trajectory_dataset, trajectory_dataset_keys
+
+    initial_orientation = None
+    initial_state_vector = None
+    with open_trajectory_dataset(str(dataset_path), allow_pickle=True) as data:
+        dataset_keys = set(trajectory_dataset_keys(data))
+        full_state = _active_joint_state_from_full_dataset(data, dataset_keys, config, trajectory_row)
+        if full_state is not None:
+            initial_target = full_state["initial_target"]
+            initial_orientation = full_state["initial_orientation"]
+            initial_state_vector = full_state["initial_state"]
+            target_source = full_state["target_source"]
+        elif "initial_joint_targets" in dataset_keys:
+            initial_target = np.asarray(
+                data["initial_joint_targets"][trajectory_row],
+                dtype=np.float32,
+            ).reshape(-1)
+            target_source = "initial_joint_targets"
+        elif "initial_state" in dataset_keys:
+            initial_state_vector = np.asarray(data["initial_state"][trajectory_row], dtype=np.float32).reshape(-1)
+            initial_target = initial_state_vector[:12].astype(np.float32, copy=True)
+            if initial_state_vector.shape[0] >= 15:
+                initial_orientation = initial_state_vector[12:15].astype(np.float32, copy=True)
+            target_source = "initial_state[:12]"
+        elif "initial_states" in dataset_keys:
+            initial_state_vector = np.asarray(data["initial_states"][trajectory_row], dtype=np.float32).reshape(-1)
+            initial_target = initial_state_vector[:12].astype(np.float32, copy=True)
+            if initial_state_vector.shape[0] >= 15:
+                initial_orientation = initial_state_vector[12:15].astype(np.float32, copy=True)
+            target_source = "initial_states[:12]"
+        elif "q" in dataset_keys:
+            q0 = np.asarray(data["q"][trajectory_row], dtype=np.float32)
+            initial_state_vector = q0.reshape(-1) if q0.ndim == 1 else q0.reshape(q0.shape[0], -1)[0]
+            initial_target = initial_state_vector[:12].astype(np.float32, copy=True)
+            if initial_state_vector.shape[0] >= 15:
+                initial_orientation = initial_state_vector[12:15].astype(np.float32, copy=True)
+            target_source = "q[0, :12]"
+        else:
+            raise ValueError(
+                "Initial grasp dataset must contain one of "
+                "initial_joint_targets, initial_state, initial_states, or q."
+            )
+
+    expected_dim = _expected_initial_grasp_dim(config)
+    if initial_target.shape != (expected_dim,):
+        raise ValueError(
+            "Initial grasp target has incompatible dimension: "
+            f"selected {target_source} from dataset row {trajectory_row} with shape "
+            f"{tuple(initial_target.shape)}, expected ({expected_dim},) for "
+            f"proto5_control_wrist={bool(config.get('proto5_control_wrist', False))}."
+        )
+
+    return {
+        "trajectory_row": int(trajectory_row),
+        "target_source": target_source,
+        "initial_target": initial_target,
+        "initial_orientation": initial_orientation,
+        "initial_state": initial_state_vector,
+    }
+
+
+def _initial_grasp_dataset_path(config: dict):
+    dataset_path = config.get("initial_grasp_dataset_path") or config.get("dataset_path")
+    if dataset_path in (None, ""):
+        raise ValueError("initial_grasp_from_dataset=True requires initial_grasp_dataset_path or dataset_path.")
+    return dataset_path
+
+
+def _trajectory_count_for_dataset_path(dataset_path) -> int:
+    if str(MODEL_MISMATCH_PATH) not in sys.path:
+        sys.path.insert(0, str(MODEL_MISMATCH_PATH))
+    from model_mismatch.utils.trajectory_dataset_io import open_trajectory_dataset, trajectory_dataset_keys
+
+    with open_trajectory_dataset(str(dataset_path), allow_pickle=True) as data:
+        return _dataset_num_trajectories(data, set(trajectory_dataset_keys(data)))
+
+
+def select_initial_grasp_dataset_row(dataset_path, trial_index: int, start_ind: int) -> int:
+    num_rows = _trajectory_count_for_dataset_path(dataset_path)
+    if 0 <= int(trial_index) < num_rows:
+        return int(trial_index)
+    local_index = int(trial_index) - int(start_ind)
+    if 0 <= local_index < num_rows:
+        return local_index
+    raise IndexError(
+        f"No dataset initial grasp row for trial index {trial_index}; "
+        f"dataset has {num_rows} rows and start_ind={start_ind}."
+    )
+
+
+def load_simulation_dataset_initial_grasp(config: dict, trial_index: int, start_ind: int) -> dict:
+    dataset_path = _initial_grasp_dataset_path(config)
+    trajectory_row = select_initial_grasp_dataset_row(dataset_path, trial_index, start_ind)
+    initialization = _read_dataset_initial_grasp(config, dataset_path, trajectory_row)
+    initialization["dataset_path"] = str(dataset_path)
+    return initialization
+
+
 def _load_proto5_hardware_initialization(config: dict) -> dict | None:
     if not _is_proto5_hardware_dataset_initialization_mode(config):
         return None
@@ -475,64 +731,42 @@ def _load_proto5_hardware_initialization(config: dict) -> dict | None:
             "so seed can select an initial pose from scripts/proto5_screwdriver_val_indices.py."
         )
 
-    import numpy as np
-
-    if str(MODEL_MISMATCH_PATH) not in sys.path:
-        sys.path.insert(0, str(MODEL_MISMATCH_PATH))
-    from model_mismatch.utils.trajectory_dataset_io import open_trajectory_dataset, trajectory_dataset_keys
-
     validation_ordinal = int(config.get("seed", 0))
     trajectory_row = _resolve_proto5_validation_dataset_row(validation_ordinal)
-    initial_orientation = None
-    with open_trajectory_dataset(str(dataset_path), allow_pickle=True) as data:
-        dataset_keys = set(trajectory_dataset_keys(data))
-        if "initial_joint_targets" in dataset_keys:
-            initial_target = np.asarray(
-                data["initial_joint_targets"][trajectory_row],
-                dtype=np.float32,
-            ).reshape(-1)
-            target_source = "initial_joint_targets"
-        elif "initial_state" in dataset_keys:
-            initial_state = np.asarray(data["initial_state"][trajectory_row], dtype=np.float32).reshape(-1)
-            initial_target = initial_state[:12].astype(np.float32, copy=True)
-            if initial_state.shape[0] >= 15:
-                initial_orientation = initial_state[12:15].astype(np.float32, copy=True)
-            target_source = "initial_state[:12]"
-        elif "initial_states" in dataset_keys:
-            initial_state = np.asarray(data["initial_states"][trajectory_row], dtype=np.float32).reshape(-1)
-            initial_target = initial_state[:12].astype(np.float32, copy=True)
-            if initial_state.shape[0] >= 15:
-                initial_orientation = initial_state[12:15].astype(np.float32, copy=True)
-            target_source = "initial_states[:12]"
-        elif "q" in dataset_keys:
-            q0 = np.asarray(data["q"][trajectory_row], dtype=np.float32)
-            q0_state = q0.reshape(-1) if q0.ndim == 1 else q0.reshape(q0.shape[0], -1)[0]
-            initial_target = q0_state[:12].astype(np.float32, copy=True)
-            if q0_state.shape[0] >= 15:
-                initial_orientation = q0_state[12:15].astype(np.float32, copy=True)
-            target_source = "q[0, :12]"
-        else:
-            raise ValueError(
-                "Proto5 hardware initialization dataset must contain one of "
-                "initial_joint_targets, initial_state, initial_states, or q."
-            )
-
-    expected_dim = 14 if bool(config.get("proto5_control_wrist", False)) else 12
-    if initial_target.shape != (expected_dim,):
-        raise ValueError(
-            "Proto5 hardware initial pose target has incompatible dimension: "
-            f"selected {target_source} from dataset row {trajectory_row} with shape "
-            f"{tuple(initial_target.shape)}, expected ({expected_dim},) for "
-            f"proto5_control_wrist={bool(config.get('proto5_control_wrist', False))}."
-        )
-
-    return {
+    initialization = _read_dataset_initial_grasp(config, dataset_path, trajectory_row)
+    initialization.update({
         "validation_ordinal": validation_ordinal,
-        "trajectory_row": trajectory_row,
-        "target_source": target_source,
-        "initial_target": initial_target,
-        "initial_orientation": initial_orientation,
-    }
+    })
+    return initialization
+
+
+def apply_simulation_dataset_initial_grasp(env, initialization: dict, *, device) -> None:
+    import torch
+
+    initial_state = initialization.get("initial_state")
+    print(
+        "Applying simulation dataset initial grasp: "
+        f"dataset row {int(initialization['trajectory_row'])}; "
+        f"source={initialization['target_source']}.",
+        flush=True,
+    )
+    env.reset()
+    if initial_state is not None and len(initial_state) >= 15 and hasattr(env, "set_pose"):
+        env.set_pose(torch.as_tensor(initial_state, device=device, dtype=torch.float32))
+        return
+
+    initial_target = torch.as_tensor(
+        initialization["initial_target"],
+        device=device,
+        dtype=torch.float32,
+    ).reshape(1, -1)
+    env.step(initial_target)
+    initial_orientation = initialization.get("initial_orientation")
+    if initial_orientation is not None and hasattr(env, "set_pose") and hasattr(env, "get_state"):
+        state = env.get_state()["q"].reshape(-1).to(device=device, dtype=torch.float32)
+        if state.numel() >= 15:
+            state[12:15] = torch.as_tensor(initial_orientation, device=device, dtype=torch.float32)
+            env.set_pose(state)
 
 
 def send_proto5_hardware_initial_pose_and_wait(env, initialization: dict, *, device) -> None:
@@ -753,6 +987,13 @@ def make_isaacsim_env(config):
             contact_friction_range=screwdriver_friction_range,
             screwdriver_joint_friction_range=yaw_friction_range,
             control_wrist=bool(config.get("proto5_control_wrist", False)),
+            screwdriver_shape_id=config.get("screwdriver_shape_id"),
+            screwdriver_shape_manifest_path=config.get("screwdriver_shape_manifest_path"),
+            screwdriver_body_height=config.get("screwdriver_body_height"),
+            screwdriver_body_diameter=config.get("screwdriver_body_diameter"),
+            screwdriver_body_heights=config.get("screwdriver_body_heights"),
+            screwdriver_body_diameters=config.get("screwdriver_body_diameters"),
+            screwdriver_shape_cache_dir=config.get("screwdriver_shape_cache_dir"),
         )
     else:
         from isaacsim_hand_envs.allegro_screwdriver_turning import get_allegro_screwdriver_turning_rl_env_cfg
@@ -766,6 +1007,13 @@ def make_isaacsim_env(config):
             seed=seed,
             screwdriver_friction_range=screwdriver_friction_range,
             yaw_joint_friction_range=yaw_friction_range,
+            screwdriver_shape_id=config.get("screwdriver_shape_id"),
+            screwdriver_shape_manifest_path=config.get("screwdriver_shape_manifest_path"),
+            screwdriver_body_height=config.get("screwdriver_body_height"),
+            screwdriver_body_diameter=config.get("screwdriver_body_diameter"),
+            screwdriver_body_heights=config.get("screwdriver_body_heights"),
+            screwdriver_body_diameters=config.get("screwdriver_body_diameters"),
+            screwdriver_shape_cache_dir=config.get("screwdriver_shape_cache_dir"),
         )
 
     env_cfg.sim.create_stage_in_memory = True
@@ -952,13 +1200,18 @@ def main():
     chain = pk.build_chain_from_urdf(open(hand_spec.urdf_path, "r", encoding="utf-8").read())
 
     proto5_hardware_initialization = _load_proto5_hardware_initialization(config)
-    using_dataset_initial_grasp = proto5_hardware_initialization is not None
-    if using_dataset_initial_grasp:
+    using_hardware_dataset_initial_grasp = proto5_hardware_initialization is not None
+    using_simulation_dataset_initial_grasp = bool(config.get("initial_grasp_from_dataset", False)) and not hardware_mode
+    if using_hardware_dataset_initial_grasp or using_simulation_dataset_initial_grasp:
         params["skip_pregrasp_stage"] = True
         params["skip_pregrasp"] = True
 
     pregrasp_states = None
-    if params["skip_pregrasp"] and not using_dataset_initial_grasp:
+    if (
+        params["skip_pregrasp"]
+        and not using_hardware_dataset_initial_grasp
+        and not using_simulation_dataset_initial_grasp
+    ):
         pregrasp_states, _ = legacy.load_pregrasp_states(config, experiment_dir)
 
     start_ind = int(config["start_ind"])
@@ -973,13 +1226,22 @@ def main():
         fpath.mkdir(parents=True, exist_ok=True)
         with tee_stdout_to_file(fpath / "stdout.log"):
             print(f"\nTrial {i + 1}")
-            if using_dataset_initial_grasp:
+            if using_hardware_dataset_initial_grasp:
                 if config.get("debug_progress", False):
                     print("debug_progress: resetting hardware env for dataset initial grasp", flush=True)
                 env.reset()
                 send_proto5_hardware_initial_pose_and_wait(
                     env,
                     proto5_hardware_initialization,
+                    device=params["device"],
+                )
+            elif using_simulation_dataset_initial_grasp:
+                if config.get("debug_progress", False):
+                    print("debug_progress: applying simulation dataset initial grasp", flush=True)
+                simulation_initialization = load_simulation_dataset_initial_grasp(config, i, start_ind)
+                apply_simulation_dataset_initial_grasp(
+                    env,
+                    simulation_initialization,
                     device=params["device"],
                 )
             elif not params["skip_pregrasp"]:

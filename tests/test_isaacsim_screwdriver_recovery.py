@@ -308,7 +308,225 @@ def test_proto5_hardware_initialization_rejects_wrong_target_dim(monkeypatch, tm
         )
 
 
-def test_send_proto5_hardware_initial_pose_captures_orientation_after_confirmation(monkeypatch):
+def test_load_single_screwdriver_shape_from_h5_dataset(tmp_path):
+    dataset_path = tmp_path / "shape.h5"
+    _write_hardware_initialization_h5(
+        dataset_path,
+        q=np.zeros((3, 2, 15), dtype=np.float32),
+        screwdriver_shape_id=np.zeros(3, dtype=np.int64),
+        screwdriver_body_height=np.full(3, 0.12, dtype=np.float32),
+        screwdriver_body_diameter=np.full(3, 0.035, dtype=np.float32),
+    )
+
+    shape = screwdriver_isaacsim_recovery.load_single_screwdriver_shape_from_dataset(dataset_path)
+
+    assert shape["screwdriver_shape_id"] == 0
+    assert shape["screwdriver_body_height"] == pytest.approx(0.12)
+    assert shape["screwdriver_body_diameter"] == pytest.approx(0.035)
+
+
+def test_load_single_screwdriver_shape_rejects_mixed_h5_shapes(tmp_path):
+    dataset_path = tmp_path / "mixed_shape.h5"
+    _write_hardware_initialization_h5(
+        dataset_path,
+        q=np.zeros((3, 2, 15), dtype=np.float32),
+        screwdriver_shape_id=np.zeros(3, dtype=np.int64),
+        screwdriver_body_height=np.asarray([0.12, 0.13, 0.12], dtype=np.float32),
+        screwdriver_body_diameter=np.full(3, 0.035, dtype=np.float32),
+    )
+
+    with pytest.raises(ValueError, match="requires a single screwdriver body shape"):
+        screwdriver_isaacsim_recovery.load_single_screwdriver_shape_from_dataset(dataset_path)
+
+
+def test_load_config_can_take_screwdriver_shape_from_dataset(tmp_path):
+    dataset_path = tmp_path / "shape.h5"
+    _write_hardware_initialization_h5(
+        dataset_path,
+        q=np.zeros((2, 2, 15), dtype=np.float32),
+        screwdriver_shape_id=np.zeros(2, dtype=np.int64),
+        screwdriver_body_height=np.full(2, 0.12, dtype=np.float32),
+        screwdriver_body_diameter=np.full(2, 0.035, dtype=np.float32),
+    )
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "\n".join(
+            (
+                "controllers:",
+                "  csvgd: {}",
+                f"dataset_path: '{dataset_path}'",
+                "screwdriver_shape_from_dataset: true",
+                "",
+            )
+        )
+    )
+
+    config = screwdriver_isaacsim_recovery.load_config(_entrypoint_args(config_path))
+
+    assert config["screwdriver_shape_dataset_id"] == 0
+    assert config["screwdriver_body_height"] == pytest.approx(0.12)
+    assert config["screwdriver_body_diameter"] == pytest.approx(0.035)
+    assert "screwdriver_shape_id" not in config
+
+
+def test_make_isaacsim_env_forwards_dataset_shape_to_proto5_cfg(monkeypatch):
+    captured = {}
+
+    def fake_cfg_factory(**kwargs):
+        captured.update(kwargs)
+        return types.SimpleNamespace(
+            sim=types.SimpleNamespace(create_stage_in_memory=False),
+            terminations=types.SimpleNamespace(success=object(), screwdriver_dropped=object()),
+        )
+
+    gym_module = types.ModuleType("gymnasium")
+    gym_module.make = lambda gym_id, cfg: types.SimpleNamespace(gym_id=gym_id, cfg=cfg)
+    proto5_module = types.ModuleType("isaacsim_hand_envs.proto5_screwdriver_turning")
+    proto5_module.get_proto5_screwdriver_turning_rl_env_cfg = fake_cfg_factory
+    monkeypatch.setitem(sys.modules, "gymnasium", gym_module)
+    monkeypatch.setitem(sys.modules, "isaacsim_hand_envs", types.ModuleType("isaacsim_hand_envs"))
+    monkeypatch.setitem(sys.modules, "isaacsim_hand_envs.proto5_screwdriver_turning", proto5_module)
+    monkeypatch.setattr(
+        isaacsim_recovery_utils,
+        "get_hand_spec",
+        lambda hand: types.SimpleNamespace(gym_id="Proto5ScrewdriverTurning-v0"),
+    )
+    monkeypatch.setattr(
+        isaacsim_recovery_utils,
+        "IsaacSimScrewdriverRecoveryEnv",
+        lambda env, **kwargs: types.SimpleNamespace(env=env, kwargs=kwargs),
+    )
+
+    screwdriver_isaacsim_recovery.make_isaacsim_env(
+        {
+            "hand": "proto5",
+            "num_envs": 1,
+            "steps_per_action": 40,
+            "episode_length_s": 1000.0,
+            "sim_device": "cuda:0",
+            "no_video": True,
+            "save_recovery_frames": False,
+            "friction_coefficient": 0.9,
+            "screwdriver_friction": 2.5,
+            "yaw_joint_friction": 0.03,
+            "proto5_control_wrist": False,
+            "external_wrench_perturb": False,
+            "rand_pct": 0.333,
+            "random_force_magnitude": 1.0,
+            "action_repeat": 3,
+            "screwdriver_body_height": 0.12,
+            "screwdriver_body_diameter": 0.035,
+        }
+    )
+
+    assert captured["screwdriver_body_height"] == pytest.approx(0.12)
+    assert captured["screwdriver_body_diameter"] == pytest.approx(0.035)
+    assert captured["screwdriver_shape_id"] is None
+
+
+def test_simulation_initial_grasp_from_dataset_uses_local_trial_row(tmp_path):
+    dataset_path = tmp_path / "initial_grasp.h5"
+    q = np.zeros((2, 3, 16), dtype=np.float32)
+    q[1, 0, :15] = np.arange(15, dtype=np.float32) + 100.0
+    _write_hardware_initialization_h5(dataset_path, q=q)
+
+    initialization = screwdriver_isaacsim_recovery.load_simulation_dataset_initial_grasp(
+        {
+            "initial_grasp_from_dataset": True,
+            "dataset_path": str(dataset_path),
+            "proto5_control_wrist": False,
+        },
+        trial_index=11,
+        start_ind=10,
+    )
+
+    assert initialization["trajectory_row"] == 1
+    assert initialization["target_source"] == "q[0, :12]"
+    np.testing.assert_allclose(initialization["initial_target"], q[1, 0, :12])
+    np.testing.assert_allclose(initialization["initial_orientation"], q[1, 0, 12:15])
+    np.testing.assert_allclose(initialization["initial_state"], q[1, 0])
+
+
+def test_simulation_initial_grasp_prefers_full_joint_state_h5_schema(tmp_path):
+    h5py = pytest.importorskip("h5py")
+    dataset_path = tmp_path / "full_joint_initial_grasp.h5"
+    full_joint_names = np.asarray(
+        [
+            "RHand_WRZ_joint",
+            "RHand_WRY_joint",
+            *PROTO5_ACTIVE_JOINT_NAMES,
+        ],
+        dtype=object,
+    )
+    full = np.zeros((1, 2, len(full_joint_names)), dtype=np.float32)
+    active_values = np.arange(12, dtype=np.float32) + 10.0
+    full[0, 0, 2:] = active_values
+    observation = np.zeros((1, 2, 3), dtype=np.float32)
+    observation[0, 0] = np.array([0.1, -0.2, 0.3], dtype=np.float32)
+    q = np.full((1, 2, 3, 4), -99.0, dtype=np.float32)
+
+    with h5py.File(dataset_path, "w") as h5_file:
+        h5_file.create_dataset("robot_joint_pos_full", data=full)
+        h5_file.create_dataset("observation", data=observation)
+        h5_file.create_dataset("q", data=q)
+        h5_file.attrs["robot_full_joint_names"] = full_joint_names
+
+    initialization = screwdriver_isaacsim_recovery.load_simulation_dataset_initial_grasp(
+        {
+            "initial_grasp_from_dataset": True,
+            "dataset_path": str(dataset_path),
+            "hand": "proto5",
+            "proto5_control_wrist": False,
+        },
+        trial_index=0,
+        start_ind=0,
+    )
+
+    assert initialization["target_source"] == "robot_joint_pos_full[0, active_joints]"
+    np.testing.assert_allclose(initialization["initial_target"], active_values)
+    np.testing.assert_allclose(initialization["initial_orientation"], observation[0, 0])
+    np.testing.assert_allclose(initialization["initial_state"], np.concatenate((active_values, observation[0, 0])))
+
+
+def test_apply_simulation_dataset_initial_grasp_sets_dataset_state():
+    calls = []
+
+    class Env:
+        device = torch.device("cpu")
+
+        def __init__(self):
+            self.state = torch.zeros(16, dtype=torch.float32)
+
+        def reset(self):
+            calls.append("reset")
+
+        def set_pose(self, state):
+            calls.append("set_pose")
+            self.state = torch.as_tensor(state, dtype=torch.float32).reshape(-1)
+
+        def step(self, action):
+            calls.append("step")
+
+    env = Env()
+    initial_state = np.arange(16, dtype=np.float32)
+
+    screwdriver_isaacsim_recovery.apply_simulation_dataset_initial_grasp(
+        env,
+        {
+            "trajectory_row": 3,
+            "target_source": "q[0, :12]",
+            "initial_target": initial_state[:12],
+            "initial_orientation": initial_state[12:15],
+            "initial_state": initial_state,
+        },
+        device="cpu",
+    )
+
+    assert calls == ["reset", "set_pose"]
+    torch.testing.assert_close(env.state, torch.arange(16, dtype=torch.float32))
+
+
+def test_send_proto5_hardware_initial_pose_steps_before_confirmation(monkeypatch):
     calls = []
 
     class Env:
