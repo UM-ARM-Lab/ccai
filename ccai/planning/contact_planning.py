@@ -237,15 +237,53 @@ class ContactPlanner:
             path_node_ids=[],
             depth=0,
         )
-        selected_node = self._find_shortest_recovery_contact_path_dijkstra(
-            root_node,
-            contact_state_dict_flip=contact_state_dict_flip,
-            max_depth=max_depth,
-            threshold=threshold,
-        )
+        # Dijkstra selection is intentionally kept for reference, but the active
+        # chained recovery policy uses the previous greedy max-score search.
+        # selected_node = self._find_shortest_recovery_contact_path_dijkstra(
+        #     root_node,
+        #     contact_state_dict_flip=contact_state_dict_flip,
+        #     max_depth=max_depth,
+        #     threshold=threshold,
+        # )
 
+        frontier = [root_node]
+        best_node = None
+
+        for depth in range(max_depth):
+            children = self._expand_chained_recovery_frontier(
+                frontier,
+                contact_state_dict_flip=contact_state_dict_flip,
+            )
+            if not children:
+                break
+
+            best_child = max(children, key=lambda node: node.score)
+            if best_node is None or best_child.score > best_node.score:
+                best_node = best_child
+
+            terminating_children = [child for child in children if child.score > threshold]
+            if terminating_children:
+                selected_node = max(terminating_children, key=lambda node: node.score)
+                print('Chained recovery terminated at depth:', depth + 1)
+                print('Chained recovery contact sequence:', selected_node.contact_sequence)
+                print('Chained recovery terminal task likelihood:', selected_node.score)
+                return self._format_chained_recovery_result(
+                    selected_node,
+                    time.perf_counter() - start_plan_time,
+                )
+
+            print('Chained recovery continuing with frontier size:', len(children))
+            print('Chained recovery best contact sequence so far:', best_child.contact_sequence)
+            print('Chained recovery best terminal task likelihood:', best_child.score)
+            frontier = children
+
+        if best_node is None:
+            raise ValueError("Joint recovery model did not produce any valid contact modes for chained search.")
+
+        print('Chained recovery reached max depth; returning best visited sequence:', best_node.contact_sequence)
+        print('Chained recovery best terminal task likelihood:', best_node.score)
         return self._format_chained_recovery_result(
-            selected_node,
+            best_node,
             time.perf_counter() - start_plan_time,
         )
 
