@@ -267,12 +267,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     experiment_dir.mkdir(parents=True, exist_ok=True)
     log_dir = experiment_dir / "_parallel_worker_logs"
     log_dir.mkdir(parents=True, exist_ok=True)
+    worker_output_dir = experiment_dir / "_parallel_worker_outputs"
+    worker_output_dir.mkdir(parents=True, exist_ok=True)
 
     worker_entries = []
     for worker_index, (slot, shard) in enumerate(zip(slots, shards)):
+        worker_experiment_dir = (
+            worker_output_dir
+            / f"worker_{worker_index:02d}_{slot.label}_{shard.start_ind}_{shard.end_ind}"
+        )
+        worker_experiment_dir.mkdir(parents=True, exist_ok=True)
         command, cuda_visible_devices = build_worker_command(
             config_path=config_path,
-            experiment_dir=experiment_dir,
+            experiment_dir=worker_experiment_dir,
             shard=shard,
             slot=slot,
             forwarded_args=forwarded_args,
@@ -291,12 +298,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "command": command,
                 "logged_command": format_logged_command(command, cuda_visible_devices),
                 "log_path": str(log_path),
+                "experiment_dir": str(worker_experiment_dir),
             }
         )
 
     manifest = {
         "config_path": str(config_path),
         "experiment_dir": str(experiment_dir),
+        "worker_output_dir": str(worker_output_dir),
         "devices": devices,
         "workers_per_gpu": int(args.workers_per_gpu),
         "start_ind": start_ind,

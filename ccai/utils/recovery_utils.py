@@ -14,13 +14,10 @@ from ccai.allegro_contact import AllegroManipulationProblem, PositionControlCons
 from ccai.utils.allegro_utils import visualize_trajectory
 from ccai.controller.tactile_feedback_controller import ControllerConfig, TactileFeedbackQPController
 from ccai.controller.grampc_motion_contact_controller import GRAMPCMotionContactTracker
+from ccai.utils.project_paths import find_model_mismatch_root
 
-DEFAULT_PROTO5_PLAN_CAMERA_PATH = (
-    pathlib.Path(__file__).resolve().parents[3]
-    / "model_mismatch"
-    / "scripts"
-    / "proto5_plan_camera.json"
-)
+MODEL_MISMATCH_PATH = find_model_mismatch_root(pathlib.Path(__file__).resolve().parents[2])
+DEFAULT_PROTO5_PLAN_CAMERA_PATH = MODEL_MISMATCH_PATH / "scripts" / "proto5_plan_camera.json"
 
 
 def get_screwdriver_plan_camera_path(turn_problem):

@@ -19,9 +19,9 @@ screwdriver_friction: 3
 yaw_joint_friction: 0.03
 planner_use_env_yaw_joint_friction: True
 planner_yaw_joint_friction_override: 0.0
-planner_yaw_friction_model_path: '/home/abhinav/Documents/model_mismatch/results/csvto_yaw_joint_fit/yaw_friction_model.json'
+planner_yaw_friction_model_path: '/root/model_mismatch/results/csvto_yaw_joint_fit/yaw_friction_model.json'
 disable_planner_yaw_friction_model: False
-planner_yaw_inertia_model_path: '/home/abhinav/Documents/model_mismatch/results/csvto_yaw_inertia_fit_full/yaw_inertia_model.json'
+planner_yaw_inertia_model_path: '/root/model_mismatch/results/csvto_yaw_inertia_fit_full/yaw_inertia_model.json'
 planner_use_yaw_inertia_model: False
 use_pregrasp_reference_targets: False
 pregrasp_target_contact_patch_cost_weight: 100.0
@@ -72,9 +72,9 @@ obj_gravity: True
 type: 'diffusion'
 OOD_metric: 'likelihood'
 recovery_controller: 'csvgd'
-model_dir: 'data/training/allegro_screwdriver/proto5_grey_screwdriver_task_fixed_replay_diffusion'
-model_path: 'data/training/allegro_screwdriver/proto5_grey_screwdriver_task_fixed_replay_diffusion/allegro_screwdriver_diffusion_best.pt'
-diffpf_checkpoint: '/home/abhinav/Documents/model_mismatch/runs/proto5_grey_screwdriver_fixed_replay_latest.pt'
+model_dir: '/root/model_mismatch/src/ccai/data/training/allegro_screwdriver/proto5_grey_screwdriver_task_fixed_replay_diffusion'
+model_path: '/root/model_mismatch/src/ccai/data/training/allegro_screwdriver/proto5_grey_screwdriver_task_fixed_replay_diffusion/allegro_screwdriver_diffusion_best.pt'
+diffpf_checkpoint: '/root/model_mismatch/runs/proto5_grey_screwdriver_fixed_replay_latest.pt'
 diffpf_ema_decay: .9999
 compile_models: false
 diffpf_compile_model: false
@@ -90,10 +90,10 @@ likelihood_threshold: -75.0
 # likelihood_threshold: -40.0
 likelihood_num_samples: 8
 N_contact_plan: 16
-start_ind: 0
-end_ind: 10000
+start_ind: 10000
+end_ind: 20000
 
-dataset_path: /home/abhinav/Documents/model_mismatch/data/proto5_skinnier_screwdriver_pregrasp.h5
+dataset_path: /root/model_mismatch/data/proto5_skinnier_screwdriver_pregrasp.h5
 screwdriver_shape_from_dataset: true
 initial_grasp_from_dataset: true
 

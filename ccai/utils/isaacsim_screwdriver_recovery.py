@@ -18,15 +18,17 @@ from typing import Sequence, TextIO
 import numpy as np
 import torch
 
+from ccai.utils.project_paths import find_model_mismatch_root, resolve_isaacsim_hand_envs_path
+
 
 SCREWDRIVER_HAND_ALLEGRO = "allegro"
 SCREWDRIVER_HAND_PROTO5 = "proto5"
 SCREWDRIVER_HAND_CHOICES = (SCREWDRIVER_HAND_ALLEGRO, SCREWDRIVER_HAND_PROTO5)
 
 CCAI_ROOT = Path(__file__).resolve().parents[2]
-DOCUMENTS_ROOT = CCAI_ROOT.parent
-MODEL_MISMATCH_PATH = DOCUMENTS_ROOT / "model_mismatch"
-ISAACSIM_HAND_ENVS_PATH = DOCUMENTS_ROOT / "github" / "isaacsim-hand-envs"
+MODEL_MISMATCH_PATH = find_model_mismatch_root(CCAI_ROOT)
+DOCUMENTS_ROOT = MODEL_MISMATCH_PATH.parent
+ISAACSIM_HAND_ENVS_PATH = resolve_isaacsim_hand_envs_path(MODEL_MISMATCH_PATH)
 PROTO5_DEFAULTS_PATH = ISAACSIM_HAND_ENVS_PATH / "isaacsim_hand_envs" / "assets" / "robot" / "proto5_defaults.py"
 
 
@@ -1098,8 +1100,8 @@ class HardwareScrewdriverRecoveryEnv:
         return self
 
     def _create_runtime(self):
-        if str(DOCUMENTS_ROOT / "model_mismatch") not in sys.path:
-            sys.path.insert(0, str(DOCUMENTS_ROOT / "model_mismatch"))
+        if str(MODEL_MISMATCH_PATH) not in sys.path:
+            sys.path.insert(0, str(MODEL_MISMATCH_PATH))
         from model_mismatch.utils.screwdriver_hardware_runtime import create_hardware_runtime
 
         args = self._runtime_args_from_config()

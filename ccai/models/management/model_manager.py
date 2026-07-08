@@ -61,7 +61,7 @@ class ModelManager:
             T = self.config['T']
             
         dx = 12 + obj_dof + (1 if self.config['sine_cosine'] else 0)
-        checkpoint_path = f'{self.ccai_path}/{path}'
+        checkpoint_path = self._resolve_path(path)
         d = self._unwrap_state_dict(torch.load(checkpoint_path, map_location=torch.device('cpu')))
         d = {k:v for k, v in d.items() if 'classifier' not in k}
 
@@ -191,9 +191,17 @@ class ModelManager:
         
         model_path_classifier = self.config.get('model_path_classifier', None)
         if model_path_classifier:
-            classifier_d = torch.load(f'{self.ccai_path}/{model_path_classifier}', 
-                                    map_location=torch.device(self.params['device']))
+            classifier_d = torch.load(
+                self._resolve_path(model_path_classifier),
+                map_location=torch.device(self.params['device']),
+            )
             classifier.load_state_dict(classifier_d)
             classifier.eval()
             
         return classifier 
+
+    def _resolve_path(self, path):
+        resolved = pathlib.Path(str(path)).expanduser()
+        if not resolved.is_absolute():
+            resolved = pathlib.Path(self.ccai_path) / resolved
+        return resolved

@@ -22,11 +22,20 @@ import yaml
 
 
 CCAI_PATH = pathlib.Path(__file__).resolve().parents[1]
-DOCUMENTS_PATH = CCAI_PATH.parent
-MODEL_MISMATCH_PATH = DOCUMENTS_PATH / "model_mismatch"
-ISAACSIM_HAND_ENVS_PATH = DOCUMENTS_PATH / "github" / "isaacsim-hand-envs"
-ISAACGYM_ARM_ENVS_PATH = DOCUMENTS_PATH / "github" / "isaacgym-arm-envs"
-TORCH_CG_PATH = DOCUMENTS_PATH / "torch_cg"
+if str(CCAI_PATH) not in sys.path:
+    sys.path.insert(0, str(CCAI_PATH))
+from ccai.utils.project_paths import (
+    find_model_mismatch_root,
+    resolve_isaac_victor_envs_path,
+    resolve_isaacsim_hand_envs_path,
+    resolve_torch_cg_path,
+)
+
+MODEL_MISMATCH_PATH = find_model_mismatch_root(CCAI_PATH)
+DOCUMENTS_PATH = MODEL_MISMATCH_PATH.parent
+ISAACSIM_HAND_ENVS_PATH = resolve_isaacsim_hand_envs_path(MODEL_MISMATCH_PATH)
+ISAACGYM_ARM_ENVS_PATH = resolve_isaac_victor_envs_path(MODEL_MISMATCH_PATH)
+TORCH_CG_PATH = resolve_torch_cg_path(MODEL_MISMATCH_PATH)
 ISAAC_VICTOR_COMPAT_ASSETS_DIR = ISAACSIM_HAND_ENVS_PATH / "isaacsim_hand_envs" / "assets" / "urdf"
 DEFAULT_CONFIG_PATH = CCAI_PATH / "examples" / "config" / "proto5" / "proto_screwdriver_csvto_TODR_recovery_data_gen_no_belief_reset.yaml"
 DEFAULT_PLANNER_YAW_FRICTION_MODEL_PATH = (
@@ -41,9 +50,9 @@ PROTO5_POINT_CACHE_NAMES = (
     "RHand_T6AF_LINK_points_cache.pkl",
 )
 PROTO5_POINT_CACHE_SOURCE_DIRS = (
-    DOCUMENTS_PATH / "model_mismatch",
-    DOCUMENTS_PATH / "model_mismatch" / "scripts",
-    DOCUMENTS_PATH / "model_mismatch" / "examples",
+    MODEL_MISMATCH_PATH,
+    MODEL_MISMATCH_PATH / "scripts",
+    MODEL_MISMATCH_PATH / "examples",
 )
 DEFAULT_OBJ_ORIENTATION_NOISE_STD = 0.03
 DEFAULT_OBJ_POSITION_NOISE_RANGE = (-0.0075, 0.0075)
