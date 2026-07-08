@@ -1244,6 +1244,20 @@ class HardwareScrewdriverRecoveryEnv:
             raise ValueError(f"Expected 3 object orientation values, got shape {tuple(orientation.shape)}.")
         self._observed_object_orientation_fallback = orientation
 
+    def capture_observed_object_orientation(self) -> torch.Tensor:
+        if hasattr(self.runtime, "get_screwdriver_orientation_euler"):
+            orientation = self.runtime.get_screwdriver_orientation_euler(self.device, dtype=torch.float32)
+            orientation = torch.as_tensor(orientation, device=self.device, dtype=torch.float32).reshape(1, -1)
+            if orientation.shape[-1] != 3:
+                raise ValueError(
+                    "Expected runtime screwdriver orientation with 3 values, "
+                    f"got shape {tuple(orientation.shape)}."
+                )
+        else:
+            orientation = self._raw_state15_from_runtime()[:, 12:15]
+        self.set_observed_object_orientation(orientation)
+        return self._observed_object_orientation_fallback.detach().clone()
+
     def _update_object_pose(self) -> None:
         if not self.hardware_use_live_screwdriver_position:
             self.table_pose = torch.tensor(DEFAULT_SCREWDRIVER_TABLE_POSE, device=self.device, dtype=torch.float32)

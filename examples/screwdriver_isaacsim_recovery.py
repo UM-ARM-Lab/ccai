@@ -553,17 +553,32 @@ def send_proto5_hardware_initial_pose_and_wait(env, initialization: dict, *, dev
     )
     env.step(initial_target)
     initial_orientation = initialization.get("initial_orientation")
-    if initial_orientation is not None and hasattr(env, "set_observed_object_orientation"):
-        env.set_observed_object_orientation(initial_orientation)
+    if initial_orientation is not None:
         print(
-            "Proto5 hardware initial object orientation loaded from dataset: "
-            f"{initial_orientation.tolist()}",
+            "Proto5 hardware dataset initial object orientation available: "
+            f"{initial_orientation.tolist()}. "
+            "The execution start orientation will be captured after confirmation.",
             flush=True,
         )
     input(
         "Proto5 initial hand pose command sent. "
         "Confirm the hand is ready, then press Enter to start policy execution."
     )
+    if hasattr(env, "capture_observed_object_orientation"):
+        confirmed_orientation = env.capture_observed_object_orientation()
+        confirmed_orientation = torch.as_tensor(confirmed_orientation, dtype=torch.float32)
+        print(
+            "Proto5 hardware initial object orientation captured after confirmation: "
+            f"{confirmed_orientation.detach().cpu().reshape(-1).tolist()}",
+            flush=True,
+        )
+    elif initial_orientation is not None and hasattr(env, "set_observed_object_orientation"):
+        env.set_observed_object_orientation(initial_orientation)
+        print(
+            "Proto5 hardware initial object orientation loaded from dataset after confirmation: "
+            f"{initial_orientation.tolist()}",
+            flush=True,
+        )
     if hasattr(env, "print_mocap_orientation_diagnostic"):
         env.print_mocap_orientation_diagnostic(context="after_initial_pose_confirm")
 

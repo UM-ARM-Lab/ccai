@@ -308,15 +308,16 @@ def test_proto5_hardware_initialization_rejects_wrong_target_dim(monkeypatch, tm
         )
 
 
-def test_send_proto5_hardware_initial_pose_steps_before_confirmation(monkeypatch):
+def test_send_proto5_hardware_initial_pose_captures_orientation_after_confirmation(monkeypatch):
     calls = []
 
     class Env:
         def step(self, action):
             calls.append(("step", torch.as_tensor(action).detach().cpu().clone()))
 
-        def set_observed_object_orientation(self, orientation):
-            calls.append(("orientation", torch.as_tensor(orientation).detach().cpu().clone()))
+        def capture_observed_object_orientation(self):
+            calls.append(("capture_orientation", None))
+            return torch.tensor([[0.4, 0.5, 0.6]], dtype=torch.float32)
 
     def fake_input(prompt):
         calls.append(("input", prompt))
@@ -338,9 +339,8 @@ def test_send_proto5_hardware_initial_pose_steps_before_confirmation(monkeypatch
 
     assert calls[0][0] == "step"
     torch.testing.assert_close(calls[0][1], torch.arange(12, dtype=torch.float32).reshape(1, 12))
-    assert calls[1][0] == "orientation"
-    torch.testing.assert_close(calls[1][1], torch.tensor([0.1, 0.2, 0.3]))
-    assert calls[2][0] == "input"
+    assert calls[1][0] == "input"
+    assert calls[2][0] == "capture_orientation"
 
 
 def test_isaacsim_recovery_rejects_frame_saving_without_cameras(tmp_path):
@@ -615,6 +615,27 @@ def test_hardware_recovery_env_can_freeze_dataset_orientation_over_live_runtime(
     state = env.get_state()
 
     torch.testing.assert_close(state["q"][0, 12:16], torch.tensor([0.4, -0.2, 0.7, 0.7]))
+
+
+def test_hardware_recovery_env_can_capture_current_orientation_as_observed_fallback():
+    runtime = _FakeHardwareRuntime()
+    env = HardwareScrewdriverRecoveryEnv(
+        {
+            "hand": "proto5",
+            "sim_device": "cpu",
+            "hardware_use_live_screwdriver_orientation": False,
+        },
+        runtime=runtime,
+        device="cpu",
+    )
+    env.set_observed_object_orientation(torch.tensor([0.4, -0.2, 0.7]))
+    runtime.state15[:, 12:15] = torch.tensor([[0.8, 0.9, 1.0]])
+
+    captured = env.capture_observed_object_orientation()
+    state = env.get_state()
+
+    torch.testing.assert_close(captured, torch.tensor([[0.8, 0.9, 1.0]]))
+    torch.testing.assert_close(state["q"][0, 12:16], torch.tensor([0.8, 0.9, 1.0, 1.0]))
 
 
 def test_hardware_recovery_env_step_and_set_pose_delegate_active_12d_targets():

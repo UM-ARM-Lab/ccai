@@ -566,6 +566,12 @@ class TrajectoryExecutor:
             if selected_plan_rows_t.ndim == 2:
                 selected_plan_rows_t = selected_plan_rows_t.reshape(1, selected_plan_rows_t.shape[0], -1)
             planned_trajectories.append(selected_plan_rows_t.detach().cpu())
+            selected_contact_mode = self._policy_result_value(
+                result,
+                "selected_contact_mode",
+                "contact_mode",
+                default=None,
+            )
 
             pre_state15 = state[:15].detach().cpu()
             pre_tactile = self._read_tactile_state()
@@ -579,6 +585,7 @@ class TrajectoryExecutor:
                     state=state.detach(),
                     delta_action=delta_t.detach(),
                     target_action=target_t.detach(),
+                    contact_mode=selected_contact_mode,
                 )
             post_state15 = self._state15_from_env(num_fingers=num_fingers, obj_dof=obj_dof)
             post_tactile = self._read_tactile_state()
@@ -703,6 +710,12 @@ class TrajectoryExecutor:
             if selected_plan_rows_t.ndim == 2:
                 selected_plan_rows_t = selected_plan_rows_t.reshape(1, selected_plan_rows_t.shape[0], -1)
             planned_trajectories.append(selected_plan_rows_t.detach().cpu())
+            selected_contact_mode = self._policy_result_value(
+                result,
+                "selected_contact_mode",
+                "contact_mode",
+                default=None,
+            )
 
             pre_state15 = state[:15].detach().cpu()
             pre_tactile = self._read_tactile_state()
@@ -716,6 +729,7 @@ class TrajectoryExecutor:
                     state=state.detach(),
                     delta_action=delta_t.detach(),
                     target_action=target_t.detach(),
+                    contact_mode=selected_contact_mode,
                 )
             post_state15 = self._state15_from_env(num_fingers=num_fingers, obj_dof=obj_dof)
             post_tactile = self._read_tactile_state()
