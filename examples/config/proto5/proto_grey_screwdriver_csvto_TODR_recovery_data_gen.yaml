@@ -7,8 +7,8 @@ num_turns: 1
 max_recovery_stages: 4
 num_trials: 1000
 num_episodes: 2000
-visualize: True
-experiment_name: 'proto_grey_screwdriver_D_TOUR_recovery_data_gen_fixed_replay'
+visualize: False
+experiment_name: 'proto_grey_screwdriver_D_TOUR_recovery_data_gen_fixed_replay_full'
 mode: 'simulation'  # choose from 'simulation', 'hardware', 'hardware_copy'
 # fingers: ['index', 'thumb']
 fingers: ['index', 'middle', 'thumb']
@@ -34,14 +34,14 @@ goal: -1.5
 prior: 1
 multi_particle_search: True
 replan: False
-visualize_plan: True
-visualize_recovery_plan: True
-visualize_contact_plan: True
+visualize_plan: False
+visualize_recovery_plan: False
+visualize_contact_plan: False
 optimize_force: True
 min_force:
   index: 0
-  middle: 1
-  thumb: 1
+  middle: 0
+  thumb: 0
 exclude_index: False
 projected: False
 use_saved_plans: True
@@ -86,7 +86,7 @@ diffpf_likelihood_mask: "inverse_dynamics"
 diffpf_likelihood_temperature: 10
 diffpf_likelihood_reward_scope: "per_step"
 diffpf_reset_belief_after_recovery: true
-likelihood_threshold: -90.0
+likelihood_threshold: -75.0
 # likelihood_threshold: -40.0
 likelihood_num_samples: 8
 N_contact_plan: 16
@@ -113,7 +113,7 @@ controllers:
     # N: 16
     N: 1
     recovery_N: 16
-    alpha_J: 1.0e-2
+    alpha_J: 3.0e-3
     alpha_C: 1
     step_size: 0.1
     momentum: 0.

@@ -2062,14 +2062,14 @@ class AllegroRegraspProblem(AllegroObjectProblem):
         h, grad_h, hess_h, t_mask = self._contact_constraints(xu, finger_name, compute_grads, compute_hess, terminal=False, projected_diffusion=projected_diffusion)
         eps = torch.zeros_like(h)
         # eps[:, :-1] = 5e-3
-        if self.object_type == 'valve':
-            eps[:, :-1] = 1.25e-2
-        elif len(self.regrasp_fingers) == len(self.fingers):
-            eps[:, :-1] = .5e-2
-        else:
-            eps[:, :-1] = 1.5e-2
+        # if self.object_type == 'valve':
+        #     eps[:, :-1] = 1.25e-2
+        # elif len(self.regrasp_fingers) == len(self.fingers):
+        #     eps[:, :-1] = .5e-2
+        # else:
+        #     eps[:, :-1] = 1.5e-2
             
-            # eps[:, :-1] = .5e-2
+        eps[:, :-1] = .75e-2
         h = -h + eps
         if grad_h is not None:
             grad_h = -grad_h
