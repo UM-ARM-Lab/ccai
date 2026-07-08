@@ -10,7 +10,7 @@ num_episodes: 1
 visualize: False
 no_video: False
 save_recovery_frames: False
-experiment_name: 'proto5_screwdriver_hardware_recovery_diffpf'
+experiment_name: 'proto5_screwdriver_hardware_recovery_diffpf_contact_tokens'
 mode: 'hardware'
 hand: 'proto5'
 fingers: ['index', 'middle', 'thumb']

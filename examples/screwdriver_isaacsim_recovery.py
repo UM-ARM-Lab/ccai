@@ -290,6 +290,7 @@ def load_config(args) -> dict:
     elif "headless" not in config:
         config["headless"] = not bool(config.get("visualize", False))
     config.setdefault("no_video", True)
+    config.setdefault("visualize_executed_rollout", False)
     config.setdefault("num_envs", 1)
     config.setdefault("sim_device", "cuda:0")
     config.setdefault("proto5_control_wrist", False)
@@ -922,6 +923,7 @@ def main():
     params["mode"] = config.get("mode", "simulation")
     params["hand"] = config["hand"]
     params["proto5_control_wrist"] = bool(config.get("proto5_control_wrist", False))
+    params["visualize_executed_rollout"] = bool(config.get("visualize_executed_rollout", False))
     params["robot_sdf_path_prefix"] = str(hand_spec.planner_robot_sdf_path_prefix)
     params["controller"] = "csvgd"
     params.setdefault("skip_pregrasp", False)

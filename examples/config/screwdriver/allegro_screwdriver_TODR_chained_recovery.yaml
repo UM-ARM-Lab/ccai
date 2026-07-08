@@ -86,7 +86,7 @@ chained_recovery_contact_search: True
 N_contact_plan: 16  # Total joint (trajectory, contact mode) samples per expanded node.
 likelihood_num_samples: 8
 recovery_likelihood_temperature: 1.5
-chained_recovery_likelihood_threshold: -100
+chained_recovery_likelihood_threshold: -170
 
 controllers:
   csvgd:

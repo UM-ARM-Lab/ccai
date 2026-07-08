@@ -1163,18 +1163,19 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
                 actual_trajectory_save = [i for i in actual_trajectory_save if type(i) != list]
                 pickle.dump([i.cpu().numpy() for i in actual_trajectory_save], f)
             selected_recovery = getattr(contact_planner, 'last_chained_recovery_selection', None) if contact_planner is not None else None
-            save_executed_rollout_visualization(
-                fpath,
-                actual_trajectory,
-                state.clone()[:4 * num_fingers + obj_dof],
-                data.get('executed_contacts', []),
-                turn_problem,
-                num_fingers,
-                obj_dof,
-                selected_recovery=selected_recovery,
-                temperature=params.get("recovery_likelihood_temperature", 1.0),
-                all_stage=all_stage,
-            )
+            if params.get("visualize_executed_rollout", True):
+                save_executed_rollout_visualization(
+                    fpath,
+                    actual_trajectory,
+                    state.clone()[:4 * num_fingers + obj_dof],
+                    data.get('executed_contacts', []),
+                    turn_problem,
+                    num_fingers,
+                    obj_dof,
+                    selected_recovery=selected_recovery,
+                    temperature=params.get("recovery_likelihood_temperature", 1.0),
+                    all_stage=all_stage,
+                )
         del actual_trajectory_save
         write_hri_diffpf_records_for_experiment(data, fpath)
 
@@ -1205,18 +1206,19 @@ def do_trial(env, params, fpath, sim_viz_env=None, ros_copy_node=None, inits_noi
     state = env.get_state()
     state = extract_state_vector(state, num_fingers, params['device'], slice_end=15)
     selected_recovery = getattr(contact_planner, 'last_chained_recovery_selection', None) if contact_planner is not None else None
-    save_executed_rollout_visualization(
-        fpath,
-        actual_trajectory,
-        state.clone()[:4 * num_fingers + obj_dof],
-        data.get('executed_contacts', []),
-        turn_problem,
-        num_fingers,
-        obj_dof,
-        selected_recovery=selected_recovery,
-        temperature=params.get("recovery_likelihood_temperature", 1.0),
-        all_stage=all_stage,
-    )
+    if params.get("visualize_executed_rollout", True):
+        save_executed_rollout_visualization(
+            fpath,
+            actual_trajectory,
+            state.clone()[:4 * num_fingers + obj_dof],
+            data.get('executed_contacts', []),
+            turn_problem,
+            num_fingers,
+            obj_dof,
+            selected_recovery=selected_recovery,
+            temperature=params.get("recovery_likelihood_temperature", 1.0),
+            all_stage=all_stage,
+        )
     final_yaw = state[-1].item()
     print('Final yaw:', final_yaw)
     try:
