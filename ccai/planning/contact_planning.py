@@ -536,16 +536,21 @@ class ContactPlanner:
         return children
 
     def _weighted_terminal_task_score(self, recovery_likelihoods, terminal_likelihoods):
-        recovery_likelihoods = recovery_likelihoods.to(
-            device=terminal_likelihoods.device,
-            dtype=terminal_likelihoods.dtype,
-        )
-        temperature = self._recovery_likelihood_temperature()
-        scaled_recovery_likelihoods = recovery_likelihoods / temperature
+        # recovery_likelihoods = recovery_likelihoods.to(
+        #     device=terminal_likelihoods.device,
+        #     dtype=terminal_likelihoods.dtype,
+        # )
+        # temperature = self._recovery_likelihood_temperature()
+        # scaled_recovery_likelihoods = recovery_likelihoods / temperature
+        # return torch.logsumexp(
+        #     scaled_recovery_likelihoods + terminal_likelihoods,
+        #     dim=0,
+        # ) - torch.logsumexp(scaled_recovery_likelihoods, dim=0)
+
         return torch.logsumexp(
-            scaled_recovery_likelihoods + terminal_likelihoods,
+            terminal_likelihoods,
             dim=0,
-        ) - torch.logsumexp(scaled_recovery_likelihoods, dim=0)
+        ) - torch.log(torch.tensor(len(recovery_likelihoods)))
 
     def _recovery_likelihood_temperature(self):
         temperature = float(self.params.get("recovery_likelihood_temperature", 1.0))
@@ -603,10 +608,21 @@ class ContactPlanner:
 
     def _resample_indices_from_recovery_likelihoods(self, recovery_likelihoods, num_samples):
         temperature = self._recovery_likelihood_temperature()
-        weights = torch.softmax(recovery_likelihoods / temperature, dim=0)
+        weights = torch.softmax(recovery_likelihoods * temperature, dim=0)
+
+        alpha = self.params.get('recovery_model_n_particles_temperature', 0.5)
+
+        num_particles_at_node = len(recovery_likelihoods)
+        num_particles_to_sample = max(
+            1,
+            int(round(num_samples * (num_particles_at_node / num_samples) ** alpha)),
+        )
         if not torch.isfinite(weights).all():
             raise ValueError("Non-finite recovery likelihood weights in chained recovery search.")
-        return torch.multinomial(weights, num_samples=num_samples, replacement=True)
+        # return torch.multinomial(weights, num_samples=num_samples, replacement=True)
+
+        return torch.multinomial(weights, num_samples=num_particles_to_sample, replacement=True)
+
 
     def _terminal_task_likelihoods(self, terminal_states):
         if terminal_states.numel() == 0:
@@ -733,6 +749,20 @@ class ContactPlanner:
         timestamp = time.strftime("%Y%m%d_%H%M")
         return f"{timestamp}_temp{self._temperature_for_path()}"
 
+    def _recovery_visualization_camera_mode(self):
+        mode = self.params.get('recovery_visualization_camera_mode', 'preset')
+        if mode not in {'preset', 'auto'}:
+            raise ValueError(
+                "recovery_visualization_camera_mode must be one of: preset, auto."
+            )
+        return mode
+
+    def _recovery_visualization_camera_parameters_path(self):
+        configured_path = self.params.get('recovery_visualization_camera_parameters_path')
+        if configured_path not in (None, ""):
+            return configured_path
+        return get_screwdriver_plan_camera_path(self.turn_problem)
+
     def _next_chained_recovery_node_id(self):
         node_id = getattr(self, "_chained_viz_next_node_id", 0)
         self._chained_viz_next_node_id = node_id + 1
@@ -744,24 +774,24 @@ class ContactPlanner:
             or pathlib.Path(__file__).resolve().parent.parent / "data" / "recovery_visualizations_per_node" / "run"
         )
 
+    def _chained_recovery_stage_root(self):
+        all_stage = getattr(self, "_chained_viz_all_stage", None)
+        viz_root = self._chained_recovery_viz_root()
+        if all_stage is None:
+            return viz_root
+        return viz_root / f"stage_{all_stage}"
+
     def _node_visualization_dir(self, node):
         mode = node.contact_mode or (node.contact_sequence[-1] if node.contact_sequence else "root")
         node_id = "none" if node.node_id is None else node.node_id
-        return self._chained_recovery_viz_root() / f"depth{node.depth}_{mode}_node{node_id}"
+        return self._chained_recovery_stage_root() / f"depth{node.depth}_{mode}_node{node_id}"
 
     def _stage_node_visualization_dir(self, node):
         trial_dir = getattr(self, "_chained_viz_trial_dir", None)
         all_stage = getattr(self, "_chained_viz_all_stage", None)
         if trial_dir is None or all_stage is None:
             return None
-        mode = node.contact_mode or (node.contact_sequence[-1] if node.contact_sequence else "root")
-        node_id = "none" if node.node_id is None else node.node_id
-        return (
-            pathlib.Path(trial_dir)
-            / f"recovery_stage_{all_stage}"
-            / mode
-            / f"depth{node.depth}_node{node_id}"
-        )
+        return self._node_visualization_dir(node)
 
     def _jsonable_tensor(self, value):
         if value is None:
@@ -808,6 +838,11 @@ class ContactPlanner:
         viz_root = self._chained_recovery_viz_root()
         viz_root.mkdir(parents=True, exist_ok=True)
         with open(viz_root / "selected_rollout.json", "w") as f:
+            json.dump(selection, f, indent=2)
+
+        stage_root = self._chained_recovery_stage_root()
+        stage_root.mkdir(parents=True, exist_ok=True)
+        with open(stage_root / "selected_rollout.json", "w") as f:
             json.dump(selection, f, indent=2)
 
         self._write_node_metadata(node, selected_particle_index=selected_particle_index)
@@ -1054,9 +1089,11 @@ class ContactPlanner:
                 self.turn_problem.obj_dof + 1,
                 headless=True,
                 render_backend='offscreen',
-                camera_mode="auto",
+                camera_mode=self._recovery_visualization_camera_mode(),
+                camera_parameters_path=self._recovery_visualization_camera_parameters_path(),
                 full_dof_reference=getattr(self.turn_problem, "full_dof_reference", None),
                 joint_index=getattr(self.turn_problem, "joint_index", None),
+                controlled_joint_index=getattr(self.turn_problem, "controlled_joint_index", None),
             )
 
         self._write_node_metadata(node)
@@ -1065,6 +1102,8 @@ class ContactPlanner:
     def _mirror_node_visualization_to_stage(self, node, source_dir):
         stage_dir = self._stage_node_visualization_dir(node)
         if stage_dir is None:
+            return
+        if pathlib.Path(source_dir) == stage_dir:
             return
         if stage_dir.exists():
             shutil.rmtree(stage_dir)
