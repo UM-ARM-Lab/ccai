@@ -16,6 +16,7 @@ import pathlib
 import pickle
 import shutil
 import sys
+import time
 import types
 
 import yaml
@@ -131,6 +132,39 @@ def _bool_from_cli(value):
     raise argparse.ArgumentTypeError(f"Expected boolean value, got {value!r}.")
 
 
+def _sanitize_temperature_for_path(temperature=None):
+    temperature = 1.0 if temperature is None else float(temperature)
+    text = f"{temperature:g}"
+    if "e" not in text and "." not in text:
+        text = f"{text}.0"
+    return text.replace("-", "m").replace("+", "").replace(".", "p")
+
+
+def _recovery_log_run_name(temperature=None):
+    timestamp = time.strftime("%Y%m%d_%H%M")
+    return f"{timestamp}_temp{_sanitize_temperature_for_path(temperature)}"
+
+
+def _collision_safe_child_dir(parent, preferred_name):
+    parent = pathlib.Path(parent)
+    candidate = parent / preferred_name
+    if not candidate.exists():
+        return candidate
+    suffix = 2
+    while True:
+        candidate = parent / f"{preferred_name}_run{suffix:02d}"
+        if not candidate.exists():
+            return candidate
+        suffix += 1
+
+
+def _experiment_log_run_dir(controller_dir, temperature=None):
+    return _collision_safe_child_dir(
+        controller_dir,
+        _recovery_log_run_name(temperature),
+    )
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=pathlib.Path, default=DEFAULT_CONFIG_PATH)
@@ -150,6 +184,7 @@ def parse_args():
     parser.add_argument("--write_pregrasp_states", type=_bool_from_cli, default=None)
     parser.add_argument("--cycle_initial_grasp_dataset", type=_bool_from_cli, default=None)
     parser.add_argument("--controller_device", type=str, default=None)
+    parser.add_argument("--visualize_executed_rollout", type=_bool_from_cli, default=None)
     pregrasp_only_group = parser.add_mutually_exclusive_group()
     pregrasp_only_group.add_argument(
         "--pregrasp_only",
@@ -275,6 +310,7 @@ def load_config(args) -> dict:
         "write_pregrasp_states",
         "cycle_initial_grasp_dataset",
         "controller_device",
+        "visualize_executed_rollout",
         "pregrasp_only",
         "experiment_name",
         "planner_yaw_joint_friction_override",
@@ -317,7 +353,7 @@ def load_config(args) -> dict:
     elif "headless" not in config:
         config["headless"] = not bool(config.get("visualize", False))
     config.setdefault("no_video", True)
-    config.setdefault("visualize_executed_rollout", False)
+    config.setdefault("visualize_executed_rollout", True)
     config.setdefault("num_envs", 1)
     config.setdefault("sim_device", "cuda:0")
     config.setdefault("proto5_control_wrist", False)
@@ -1355,8 +1391,14 @@ def main():
 
     seed = 0
     base_seed = 0 if config.get("seed", None) is None else int(config["seed"])
+    controller_dir = experiment_dir / "csvgd"
+    trial_run_dir = _experiment_log_run_dir(
+        controller_dir,
+        temperature=params.get("recovery_likelihood_temperature", 1.0),
+    )
+    trial_run_dir.mkdir(parents=True, exist_ok=True)
     for i in tqdm(range(start_ind, num_episodes)):
-        fpath = experiment_dir / "csvgd" / f"trial_{i + 1}"
+        fpath = trial_run_dir / f"trial_{i + 1}"
         fpath.mkdir(parents=True, exist_ok=True)
         with tee_stdout_to_file(fpath / "stdout.log"):
             print(f"\nTrial {i + 1}")

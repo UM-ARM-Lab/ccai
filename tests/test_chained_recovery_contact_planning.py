@@ -1,3 +1,4 @@
+import json
 import sys
 import types
 
@@ -61,6 +62,16 @@ from ccai.planning.contact_planning import ChainedRecoveryNode, ContactPlanner
 
 class DummyTurnProblem:
     obj_dof = 3
+
+
+class DummyVisualizationTurnProblem:
+    dx = 15
+    obj_dof = 3
+    fingers = ["index", "middle", "thumb"]
+    contact_scenes_for_viz = object()
+    full_dof_reference = torch.arange(18, dtype=torch.float32)
+    joint_index = [0, 1, 2]
+    controlled_joint_index = [0, 1, 2, 3]
 
 
 class FakeJointRecoverySampler:
@@ -276,6 +287,30 @@ def test_chained_expansion_resamples_by_recovery_likelihood_before_grouping(monk
     assert child_scores[("thumb_middle",)] == pytest.approx(expected_thumb_middle_score.item())
 
 
+def test_recovery_likelihood_resampling_rounds_particle_count_to_int(monkeypatch):
+    planner, _ = _planner(
+        [],
+        params=_params(recovery_model_n_particles_temperature=0.5),
+    )
+    captured = {}
+
+    def fake_multinomial(weights, num_samples, replacement):
+        captured["num_samples"] = num_samples
+        assert isinstance(num_samples, int)
+        assert replacement is True
+        return torch.arange(num_samples, device=weights.device)
+
+    monkeypatch.setattr(torch, "multinomial", fake_multinomial)
+
+    indices = planner._resample_indices_from_recovery_likelihoods(
+        torch.zeros(2),
+        num_samples=8,
+    )
+
+    assert captured["num_samples"] == 4
+    assert indices.tolist() == [0, 1, 2, 3]
+
+
 def test_chained_search_returns_full_sequence_when_terminal_child_reaches_threshold(monkeypatch):
     first_modes = torch.stack(
         [
@@ -357,9 +392,9 @@ def test_chained_search_returns_raw_outputs_as_csvto_seeds_even_if_filtered(monk
 
     def fake_multinomial(weights, num_samples, replacement):
         captured["weights"] = weights.detach().clone()
-        assert num_samples == 4
+        assert num_samples == 3
         assert replacement is True
-        return torch.tensor([1, 2, 2, 1], device=weights.device)
+        return torch.tensor([1, 2, 2], device=weights.device)
 
     monkeypatch.setattr(torch, "multinomial", fake_multinomial)
 
@@ -371,7 +406,7 @@ def test_chained_search_returns_raw_outputs_as_csvto_seeds_even_if_filtered(monk
     assert torch.allclose(captured["weights"], expected_search_weights)
     assert contact_sequence == ["thumb_middle"]
     assert goal_config[0].item() == pytest.approx(40.0)
-    assert likelihoods.tolist() == pytest.approx([30.0, 40.0, 40.0, 30.0])
+    assert likelihoods.tolist() == pytest.approx([30.0, 40.0, 40.0])
     assert initial_samples.shape == (4, 3, 36)
     assert initial_samples[:, -1, 0].tolist() == pytest.approx([10.0, 99.0, 30.0, 40.0])
 
@@ -471,3 +506,162 @@ def test_chained_search_returns_best_visited_node_at_max_depth(monkeypatch):
     assert contact_sequence == ["thumb_middle"]
     assert goal_config[0].item() == pytest.approx(-2.0)
     assert likelihoods.tolist() == pytest.approx([-2.0, -2.0])
+
+
+def test_chained_recovery_visualization_context_uses_trial_run_parent(tmp_path):
+    planner, _ = _planner([])
+    run_dir = tmp_path / "20260709_1530_temp0p5"
+    trial_dir = run_dir / "trial_2"
+
+    planner._set_chained_recovery_visualization_context(trial_dir, all_stage=3)
+
+    assert planner._chained_viz_trial_dir == trial_dir
+    assert planner._chained_viz_log_run_dir == run_dir
+    assert planner._chained_viz_log_run_name == "20260709_1530_temp0p5"
+    assert planner._chained_recovery_viz_root() == trial_dir / "recovery_visualizations_per_node"
+
+    node = ChainedRecoveryNode(
+        contact_sequence=["index"],
+        terminal_states=torch.zeros(1, 15),
+        trajectories=torch.zeros(2, 3, 15),
+        score=12.5,
+        terminal_likelihoods=torch.tensor([-4.0, -2.0]),
+        recovery_likelihoods=torch.tensor([-1.0, -0.5]),
+        node_id=4,
+        parent_node_id=1,
+        path_node_ids=[0, 1, 4],
+        depth=1,
+    )
+    node.contact_mode = "index"
+    planner.last_chained_recovery_selection = planner._build_chained_recovery_selection(
+        node,
+        selected_particle_index=1,
+        goal_config=torch.ones(15),
+    )
+
+    stage_root = trial_dir / "recovery_visualizations_per_node" / "stage_3"
+    stage_node_dir = stage_root / "depth1_index_node4"
+    assert planner._stage_node_visualization_dir(node) == (
+        stage_node_dir
+    )
+    assert planner._node_visualization_dir(node) == stage_node_dir
+
+    planner._save_selected_chained_recovery_rollout(node, selected_particle_index=1)
+
+    assert (trial_dir / "recovery_visualizations_per_node" / "selected_rollout.json").exists()
+    assert (stage_root / "selected_rollout.json").exists()
+    with open(stage_node_dir / "metadata.json") as handle:
+        metadata = json.load(handle)
+
+    assert metadata["trial_dir"] == str(trial_dir)
+    assert metadata["log_run_name"] == "20260709_1530_temp0p5"
+    assert metadata["log_run_dir"] == str(run_dir)
+    assert metadata["all_stage"] == 3
+    assert metadata["depth"] == 1
+    assert metadata["node_id"] == 4
+    assert metadata["parent_node_id"] == 1
+    assert metadata["path_node_ids"] == [0, 1, 4]
+    assert metadata["contact_mode"] == "index"
+    assert metadata["contact_sequence"] == ["index"]
+    assert metadata["selected_particle_index"] == 1
+    assert metadata["particles"][0]["recovery_likelihood"] == pytest.approx(-1.0)
+    assert metadata["particles"][1]["terminal_likelihood"] == pytest.approx(-2.0)
+    assert metadata["particles"][1]["selected"] is True
+
+
+def test_chained_recovery_particle_visualization_uses_proto5_preset_camera(monkeypatch, tmp_path):
+    import ccai.planning.contact_planning as contact_planning_module
+
+    captured = {}
+    expected_camera_path = tmp_path / "proto5_plan_camera.json"
+
+    def fake_visualize_trajectory(traj, contact_scenes, fpath, fingers, obj_dof, **kwargs):
+        captured["traj"] = traj.clone()
+        captured["contact_scenes"] = contact_scenes
+        captured["fpath"] = fpath
+        captured["fingers"] = fingers
+        captured["obj_dof"] = obj_dof
+        captured["kwargs"] = kwargs
+
+    monkeypatch.setattr(contact_planning_module, "visualize_trajectory", fake_visualize_trajectory)
+    monkeypatch.setattr(
+        contact_planning_module,
+        "get_screwdriver_plan_camera_path",
+        lambda turn_problem: expected_camera_path,
+    )
+
+    planner, _ = _planner([])
+    planner.turn_problem = DummyVisualizationTurnProblem()
+    planner._set_chained_recovery_visualization_context(tmp_path / "run" / "trial_2", all_stage=3)
+    node = ChainedRecoveryNode(
+        contact_sequence=["thumb_middle"],
+        terminal_states=torch.zeros(1, 15),
+        trajectories=torch.zeros(1, 2, 15),
+        recovery_likelihoods=torch.tensor([-4.0]),
+        terminal_likelihoods=torch.tensor([-95.0]),
+        node_id=1,
+        depth=1,
+        contact_mode="thumb_middle",
+    )
+
+    planner._visualize_node_particles(node, node_idx=0)
+
+    assert captured["fpath"] == (
+        tmp_path
+        / "run"
+        / "trial_2"
+        / "recovery_visualizations_per_node"
+        / "stage_3"
+        / "depth1_thumb_middle_node1"
+        / "particle00_rec-4.000_term-95.000"
+    )
+    assert captured["contact_scenes"] is planner.turn_problem.contact_scenes_for_viz
+    assert captured["fingers"] == planner.turn_problem.fingers
+    assert captured["obj_dof"] == 4
+    assert captured["kwargs"]["render_backend"] == "offscreen"
+    assert captured["kwargs"]["camera_mode"] == "preset"
+    assert captured["kwargs"]["camera_parameters_path"] == expected_camera_path
+    assert captured["kwargs"]["full_dof_reference"] is planner.turn_problem.full_dof_reference
+    assert captured["kwargs"]["joint_index"] is planner.turn_problem.joint_index
+    assert captured["kwargs"]["controlled_joint_index"] is planner.turn_problem.controlled_joint_index
+
+
+def test_chained_recovery_particle_visualization_camera_overrides(monkeypatch, tmp_path):
+    import ccai.planning.contact_planning as contact_planning_module
+
+    captured = {}
+
+    def fake_visualize_trajectory(*args, **kwargs):
+        captured["kwargs"] = kwargs
+
+    monkeypatch.setattr(contact_planning_module, "visualize_trajectory", fake_visualize_trajectory)
+    monkeypatch.setattr(
+        contact_planning_module,
+        "get_screwdriver_plan_camera_path",
+        lambda turn_problem: tmp_path / "unused_proto5_plan_camera.json",
+    )
+
+    planner, _ = _planner(
+        [],
+        params=_params(
+            recovery_visualization_camera_mode="auto",
+            recovery_visualization_camera_parameters_path="/tmp/custom_camera.json",
+        ),
+    )
+    planner.turn_problem = DummyVisualizationTurnProblem()
+    planner._set_chained_recovery_visualization_context(tmp_path / "run" / "trial_2", all_stage=3)
+    node = ChainedRecoveryNode(
+        contact_sequence=["index"],
+        terminal_states=torch.zeros(1, 15),
+        trajectories=torch.zeros(1, 2, 15),
+        recovery_likelihoods=torch.tensor([-1.0]),
+        terminal_likelihoods=torch.tensor([-2.0]),
+        node_id=2,
+        depth=1,
+        contact_mode="index",
+    )
+
+    planner._visualize_node_particles(node, node_idx=0)
+
+    assert captured["kwargs"]["camera_mode"] == "auto"
+    assert captured["kwargs"]["camera_parameters_path"] == "/tmp/custom_camera.json"

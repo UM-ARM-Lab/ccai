@@ -79,6 +79,7 @@ def _entrypoint_args(config_path, **overrides):
         "end_ind": None,
         "skip_pregrasp": None,
         "pregrasp_only": None,
+        "visualize_executed_rollout": None,
         "experiment_name": None,
         "debug_progress": False,
         "planner_yaw_joint_friction_override": None,
@@ -102,10 +103,10 @@ def test_isaacsim_recovery_defaults_match_csvto_cadence(tmp_path):
     assert config["steps_per_action"] == 40
     assert config["action_repeat"] == 3
     assert config["save_recovery_frames"] is True
-    assert config["visualize_executed_rollout"] is False
+    assert config["visualize_executed_rollout"] is True
 
 
-def test_isaacsim_recovery_can_enable_executed_rollout_visualization(tmp_path):
+def test_isaacsim_recovery_can_disable_executed_rollout_visualization(tmp_path):
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
         "controllers:\n"
@@ -113,12 +114,26 @@ def test_isaacsim_recovery_can_enable_executed_rollout_visualization(tmp_path):
         "external_wrench_perturb: false\n"
         "rand_pct: 0.333\n"
         "random_force_magnitude: 1.0\n"
-        "visualize_executed_rollout: true\n"
+        "visualize_executed_rollout: false\n"
     )
 
     config = screwdriver_isaacsim_recovery.load_config(_entrypoint_args(config_path))
 
-    assert config["visualize_executed_rollout"] is True
+    assert config["visualize_executed_rollout"] is False
+
+
+def test_isaacsim_recovery_run_dir_uses_collision_safe_top_level_stamp(tmp_path, monkeypatch):
+    monkeypatch.setattr(screwdriver_isaacsim_recovery.time, "strftime", lambda fmt: "20260709_1530")
+
+    controller_dir = tmp_path / "csvgd"
+
+    first = screwdriver_isaacsim_recovery._experiment_log_run_dir(controller_dir, temperature=0.5)
+    first.mkdir(parents=True)
+    second = screwdriver_isaacsim_recovery._experiment_log_run_dir(controller_dir, temperature=0.5)
+
+    assert first == controller_dir / "20260709_1530_temp0p5"
+    assert second == controller_dir / "20260709_1530_temp0p5_run02"
+    assert second / "trial_2" == controller_dir / "20260709_1530_temp0p5_run02" / "trial_2"
 
 
 def test_isaacsim_recovery_visualize_false_defaults_to_headless(tmp_path):

@@ -395,6 +395,9 @@ def save_executed_rollout_visualization(
         viz_fpath,
         turn_problem.fingers,
         obj_dof + 1,
+        full_dof_reference=getattr(turn_problem, "full_dof_reference", None),
+        joint_index=getattr(turn_problem, "joint_index", None),
+        controlled_joint_index=getattr(turn_problem, "controlled_joint_index", None),
     )
 
     run_name, run_dir = _trial_log_run(fpath)
