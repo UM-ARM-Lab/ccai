@@ -4,14 +4,14 @@ T_orig: 6
 receding_horizon: False
 num_steps: 8
 num_turns: 1
-max_recovery_stages: 4
+max_recovery_stages: 2
 num_trials: 1000
 num_episodes: 1
-visualize: False
+visualize: True
 no_video: False
-save_recovery_frames: False
-experiment_name: 'proto5_screwdriver_hardware_recovery_diffpf_contact_tokens'
-mode: 'hardware'
+save_recovery_frames: True
+experiment_name: 'proto5_screwdriver_hardware_recovery'
+mode: 'simulation'
 hand: 'proto5'
 fingers: ['index', 'middle', 'thumb']
 object_type: 'screwdriver'
@@ -21,9 +21,9 @@ screwdriver_friction: 2.5
 yaw_joint_friction: 0.03
 planner_use_env_yaw_joint_friction: True
 planner_yaw_joint_friction_override: 0.0
-planner_yaw_friction_model_path: '/home/proto5/Programs/UMich/model_mismatch/results/csvto_yaw_joint_fit/yaw_friction_model.json'
+planner_yaw_friction_model_path: '/home/disha/projects/model_mismatch/results/csvto_yaw_joint_fit/yaw_friction_model.json'
 disable_planner_yaw_friction_model: False
-planner_yaw_inertia_model_path: '/home/proto5/Programs/UMich/model_mismatch/results/csvto_yaw_inertia_fit_full/yaw_inertia_model.json'
+planner_yaw_inertia_model_path: '/home/disha/projects/model_mismatch/results/csvto_yaw_inertia_fit_full/yaw_inertia_model.json'
 planner_use_yaw_inertia_model: False
 use_pregrasp_reference_targets: False
 kp: 3.0
@@ -37,6 +37,7 @@ visualize_plan: True
 visualize_recovery_plan: True
 visualize_contact_plan: True
 visualize_recovery_planning_samples: True
+visualize_recovery_per_node: True
 optimize_force: True
 min_force:
   index: 0
@@ -68,18 +69,15 @@ task_diffuse_goal: False
 obj_gravity: True
 type: 'diffusion'
 OOD_metric: 'likelihood'
-recovery_controller: 'diffpf'
-recovery_model_dir: 'data/training/allegro_screwdriver/proto5_blue_screwdriver_filtered_diffusion'
-model_path: 'data/training/allegro_screwdriver/proto5_blue_screwdriver_filtered_diffusion/allegro_screwdriver_diffusion_best.pt'
-model_dir: 'data/training/allegro_screwdriver/proto5_blue_screwdriver_filtered_diffusion'
+recovery_controller: 'csvgd'
+recovery_model_dir: 'data/training/allegro_screwdriver/proto5_blue_screwdriver_all_diffusion'
+model_path: 'data/training/allegro_screwdriver/proto5_blue_screwdriver_all_diffusion/allegro_screwdriver_diffusion_best.pt'
+model_dir: 'data/training/allegro_screwdriver/proto5_blue_screwdriver_all_diffusion'
 task_model_path: 'data/training/allegro_screwdriver/proto5_blue_screwdriver_task_fixed_replay_diffusion/allegro_screwdriver_diffusion_best.pt'
-diffpf_checkpoint: '/home/proto5/Programs/UMich/model_mismatch/runs/proto5_blue_screwdriver_fixed_replay_latest.pt'
-recovery_diffpf_checkpoint: '/home/proto5/Programs/UMich/model_mismatch/runs/proto5_blue_screwdriver_recovery_contact_modes_reg_weight_1e-3_latest.pt'
+diffpf_checkpoint: '/home/disha/projects/model_mismatch/model_mismatch/runs/proto5_blue_screwdriver_fixed_replay_latest.pt'
 diffpf_ema_decay: .9999
 compile_models: false
 diffpf_compile_model: false
-recovery_diffpf_compile_model: false
-recovery_diffpf_sample_horizon: 4
 diffpf_sample_horizon: 8
 diffpf_execution_horizon: 1
 diffpf_num_trajectories: 128
@@ -91,11 +89,11 @@ diffpf_reset_belief_after_recovery: true
 likelihood_threshold: -90.0
 likelihood_num_samples: 8
 N_contact_plan: 16
-seed: 20
-start_ind: 20
-end_ind: 21
-dataset_path: '/home/proto5/Programs/UMich/model_mismatch/data/proto5_blue_fixed_replay.h5'
-hardware_ros_config: '/home/proto5/Programs/UMich/model_mismatch/examples/evaluation/config/screwdriver_hardware_ros_profiles.yaml'
+seed: 1
+start_ind: 1
+end_ind: 2
+dataset_path: '/home/disha/projects/model_mismatch/model_mismatch/data/proto5_blue_fixed_replay.h5'
+hardware_ros_config: '/home/disha/projects/model_mismatch/examples/evaluation/config/screwdriver_hardware_ros_profiles.yaml'
 hardware_profile: 'proto5'
 hardware_execute: true
 hardware_track_wrist_state: true
@@ -116,11 +114,12 @@ recovery_tactile_controller: False
 skip_csvto: False
 recovery_skip_csvto: False
 
-chained_recovery_contact_search: False
+chained_recovery_contact_search: True
 N_contact_plan: 16  # Total joint (trajectory, contact mode) samples per expanded node.
 likelihood_num_samples: 8
-chained_recovery_likelihood_threshold: -100
-
+recovery_likelihood_temperature: 0.5
+chained_recovery_likelihood_threshold: -70
+recovery_model_n_particles_temperature: 0
 controllers:
   csvgd:
     N: 16
