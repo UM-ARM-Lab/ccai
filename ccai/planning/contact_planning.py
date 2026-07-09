@@ -536,16 +536,21 @@ class ContactPlanner:
         return children
 
     def _weighted_terminal_task_score(self, recovery_likelihoods, terminal_likelihoods):
-        recovery_likelihoods = recovery_likelihoods.to(
-            device=terminal_likelihoods.device,
-            dtype=terminal_likelihoods.dtype,
-        )
-        temperature = self._recovery_likelihood_temperature()
-        scaled_recovery_likelihoods = recovery_likelihoods / temperature
+        # recovery_likelihoods = recovery_likelihoods.to(
+        #     device=terminal_likelihoods.device,
+        #     dtype=terminal_likelihoods.dtype,
+        # )
+        # temperature = self._recovery_likelihood_temperature()
+        # scaled_recovery_likelihoods = recovery_likelihoods / temperature
+        # return torch.logsumexp(
+        #     scaled_recovery_likelihoods + terminal_likelihoods,
+        #     dim=0,
+        # ) - torch.logsumexp(scaled_recovery_likelihoods, dim=0)
+
         return torch.logsumexp(
-            scaled_recovery_likelihoods + terminal_likelihoods,
+            terminal_likelihoods,
             dim=0,
-        ) - torch.logsumexp(scaled_recovery_likelihoods, dim=0)
+        ) - torch.log(torch.tensor(len(recovery_likelihoods)))
 
     def _recovery_likelihood_temperature(self):
         temperature = float(self.params.get("recovery_likelihood_temperature", 1.0))
@@ -603,10 +608,18 @@ class ContactPlanner:
 
     def _resample_indices_from_recovery_likelihoods(self, recovery_likelihoods, num_samples):
         temperature = self._recovery_likelihood_temperature()
-        weights = torch.softmax(recovery_likelihoods / temperature, dim=0)
+        weights = torch.softmax(recovery_likelihoods * temperature, dim=0)
+
+        alpha = self.params.get('recovery_model_n_particles_temperature', 0.5)
+
+        num_particles_at_node = len(recovery_likelihoods)
+        num_particles_to_sample = num_samples * (num_particles_at_node / num_samples)** alpha
         if not torch.isfinite(weights).all():
             raise ValueError("Non-finite recovery likelihood weights in chained recovery search.")
-        return torch.multinomial(weights, num_samples=num_samples, replacement=True)
+        # return torch.multinomial(weights, num_samples=num_samples, replacement=True)
+
+        return torch.multinomial(weights, num_samples=num_particles_to_sample, replacement=True)
+
 
     def _terminal_task_likelihoods(self, terminal_states):
         if terminal_states.numel() == 0:
