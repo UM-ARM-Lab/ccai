@@ -840,9 +840,19 @@ def test_hardware_recovery_env_can_keep_hardcoded_position_with_live_orientation
 
     state = env.get_state()
 
+    expected_csvto_world_position = env.world_trans.transform_points(
+        torch.tensor(
+            [isaacsim_recovery_utils.DEFAULT_SCREWDRIVER_POSITION_ROBOT],
+            dtype=torch.float32,
+        )
+    )[0]
     torch.testing.assert_close(
         env.table_pose,
-        torch.tensor(isaacsim_recovery_utils.DEFAULT_SCREWDRIVER_TABLE_POSE, dtype=torch.float32),
+        expected_csvto_world_position,
+    )
+    torch.testing.assert_close(
+        env.get_screwdriver_position_robot(),
+        torch.tensor([[0.7, 0.8, 0.9]], dtype=torch.float32),
     )
     torch.testing.assert_close(state["q"][0, 12:16], torch.tensor([0.1, 0.2, 0.3, 0.3]))
 

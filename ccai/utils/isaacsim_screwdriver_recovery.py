@@ -30,6 +30,9 @@ MODEL_MISMATCH_PATH = find_model_mismatch_root(CCAI_ROOT)
 DOCUMENTS_ROOT = MODEL_MISMATCH_PATH.parent
 ISAACSIM_HAND_ENVS_PATH = resolve_isaacsim_hand_envs_path(MODEL_MISMATCH_PATH)
 PROTO5_DEFAULTS_PATH = ISAACSIM_HAND_ENVS_PATH / "isaacsim_hand_envs" / "assets" / "robot" / "proto5_defaults.py"
+SCREWDRIVER_POSITION_DEFAULTS_PATH = (
+    MODEL_MISMATCH_PATH / "model_mismatch" / "utils" / "screwdriver_position_defaults.py"
+)
 
 
 class _StdoutTee:
@@ -92,6 +95,24 @@ def _load_proto5_defaults():
 
 
 _PROTO5_DEFAULTS = _load_proto5_defaults()
+
+
+def _load_default_screwdriver_position_robot() -> tuple[float, float, float]:
+    spec = importlib.util.spec_from_file_location(
+        "_model_mismatch_screwdriver_position_defaults",
+        SCREWDRIVER_POSITION_DEFAULTS_PATH,
+    )
+    if spec is None or spec.loader is None:
+        raise ImportError(
+            "Could not load screwdriver position defaults from "
+            f"{SCREWDRIVER_POSITION_DEFAULTS_PATH}"
+        )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return tuple(float(value) for value in module.DEFAULT_SCREWDRIVER_POSITION_ROBOT)
+
+
+DEFAULT_SCREWDRIVER_POSITION_ROBOT = _load_default_screwdriver_position_robot()
 
 ALLEGRO_ACTIVE_JOINT_NAMES = (
     "allegro_hand_hitosashi_finger_finger_joint_0",
@@ -1084,9 +1105,20 @@ class HardwareScrewdriverRecoveryEnv:
             device=self.device,
             dtype=torch.float32,
         ).reshape(1, -1)
-        self.table_pose = torch.tensor(DEFAULT_SCREWDRIVER_TABLE_POSE, device=self.device, dtype=torch.float32)
-        self.obj_pose = self.table_pose
         self.world_trans = create_world_transform(self.hand, self.device)
+        csvto_position_robot = torch.as_tensor(
+            self.config.get(
+                "csvto_screwdriver_position_robot",
+                DEFAULT_SCREWDRIVER_POSITION_ROBOT,
+            ),
+            device=self.device,
+            dtype=torch.float32,
+        ).reshape(1, 3)
+        self.csvto_default_object_pose_world = self.world_trans.transform_points(
+            csvto_position_robot
+        )[0]
+        self.table_pose = self.csvto_default_object_pose_world.detach().clone()
+        self.obj_pose = self.table_pose
         self.external_wrench_perturb = False
         self.wrench_perturb_inds = []
         self.frame_fpath = None
@@ -1289,7 +1321,7 @@ class HardwareScrewdriverRecoveryEnv:
 
     def _update_object_pose(self) -> None:
         if not self.hardware_use_live_screwdriver_position:
-            self.table_pose = torch.tensor(DEFAULT_SCREWDRIVER_TABLE_POSE, device=self.device, dtype=torch.float32)
+            self.table_pose = self.csvto_default_object_pose_world.detach().clone()
             self.obj_pose = self.table_pose
             return
         if hasattr(self.runtime, "get_screwdriver_position_robot"):
@@ -1299,6 +1331,26 @@ class HardwareScrewdriverRecoveryEnv:
                 self.obj_pose = self.table_pose
             except Exception:
                 pass
+
+    def get_screwdriver_position_robot(
+        self,
+        device: str | torch.device | None = None,
+        dtype: torch.dtype = torch.float32,
+    ) -> torch.Tensor:
+        """Return the live model-frame position used by position-conditioned policies.
+
+        This is intentionally independent of ``table_pose``.  CSVTO consumes
+        ``table_pose`` as a world-frame object asset pose, while DiffPF consumes
+        this robot/model-frame observation after the hardware profile's mocap,
+        flange-frame, and offset transforms have been applied by the runtime.
+        """
+        device = self.device if device is None else torch.device(device)
+        if not hasattr(self.runtime, "get_screwdriver_position_robot"):
+            raise AttributeError(
+                "Hardware runtime does not expose get_screwdriver_position_robot()."
+            )
+        position = self.runtime.get_screwdriver_position_robot(device, dtype=dtype)
+        return torch.as_tensor(position, device=device, dtype=dtype).reshape(1, 3)
 
     def reset(self):
         self.wrench_perturb_inds = []
