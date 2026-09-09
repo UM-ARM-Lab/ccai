@@ -63,7 +63,6 @@ class ObjectPoseReader:
         self.mocap_obj = [i for i in data.tracked_objects if i.name == self.obj][0]
         self.obj_euler_, self.obj_trans_ = self.euler_trans_from_segment(self.mocap_obj.segments[0])
 
-        # self.obj_euler_[0], self.obj_euler_[1] = -self.obj_euler_[1], self.obj_euler_[0]
         self.obj_trans_[2] += .02
         # self.obj_euler_[0] += .02
         
@@ -71,7 +70,8 @@ class ObjectPoseReader:
 
     def get_state(self):
         if self.obj == 'valve':
-            return self.obj_euler_[1]
+            # Valve yaw is the negated mocap X-axis Euler angle.
+            return -self.obj_euler_[0]
         return self.obj_trans_, self.obj_euler_
     
     def get_state_world_frame_pos(self):
@@ -121,11 +121,34 @@ class ObjectPoseReader:
 #          [-6.1232e-01, -6.0740e-01,  5.0610e-01,  7.3183e-01],
 #          [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  1.0000e+00]]])  self.hand_to_object_trans <- GPT says this one
 class HardwareEnv:
-    def __init__(self, default_pos, num_repeat=1, gradual_control=False, finger_list=['index', 'middle', 'ring', 'thumb'], kp=4, obj='valve', ori_only=True, mode='relative', device='cuda:0', node_name='allegro_hand_viz'):
+    def __init__(
+        self,
+        default_pos,
+        num_repeat=1,
+        gradual_control=False,
+        finger_list=['index', 'middle', 'ring', 'thumb'],
+        kp=4,
+        obj='valve',
+        ori_only=True,
+        mode='relative',
+        device='cuda:0',
+        node_name='allegro_hand_viz',
+        command_mode='repeat',
+        command_duration_s=1.0 / 12.0,
+        initialize_control=True,
+    ):
         self.__all_finger_list = ['index', 'middle', 'ring', 'thumb']
         self.obj = obj
         self.__finger_list = finger_list
-        self.__ros_node = RosNode(node_name=node_name, kp=kp, num_repeat=num_repeat, gradual_control=gradual_control)
+        self.__ros_node = RosNode(
+            node_name=node_name,
+            kp=kp,
+            num_repeat=num_repeat,
+            gradual_control=gradual_control,
+            command_mode=command_mode,
+            command_duration_s=command_duration_s,
+            initialize_control=initialize_control,
+        )
 
         self.obj_reader = ObjectPoseReader(obj=obj, mode=mode)
 
@@ -314,4 +337,3 @@ if __name__ == "__main__":
         
         # sim_env.set_pose(state['q'].reshape(1,-1).to(sim_env.device))
         sim_env.set_pose(cur_pose.reshape(1,-1))
-

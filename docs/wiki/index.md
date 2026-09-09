@@ -25,6 +25,8 @@ Related: [Overview](overview.md) · [Change log](log.md)
 
 ## Workflows
 
+- [Valve timed execution](workflows/valve-timed-execution.md) — Completion-aware Valve repeated targets and fresh-state contract. Last updated: 2026-09-09.
+
 - [Proto5 Isaac Sim screwdriver recovery](workflows/proto5-isaacsim-screwdriver-recovery.md) — YAML-led recovery data generation and evaluation flow. Last updated: 2026-07-22.
 
 ## Analyses
